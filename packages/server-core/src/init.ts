@@ -13,6 +13,19 @@ import { configureLogLevel } from "./utils/logging";
 import { createAdminRoutes, createAuthRoutes, requireAuth, requireAdmin, configureJwt } from "./auth";
 import { createStorageController, createStorageRoutes, DEFAULT_STORAGE_ID, DefaultStorageRegistry, BackendStorageConfig, StorageController, StorageRegistry } from "./storage";
 import { createHistoryRoutes } from "./history";
+import { EmailConfig } from "./email";
+
+export interface RebaseAuthConfig {
+    jwtSecret?: string;
+    accessExpiresIn?: string;
+    refreshExpiresIn?: string;
+    requireAuth?: boolean;
+    allowRegistration?: boolean;
+    email?: EmailConfig;
+    google?: { clientId: string };
+    defaultRole?: string;
+    [key: string]: unknown;
+}
 
 export interface RebaseBackendConfig {
     collections?: EntityCollection[];
@@ -24,7 +37,7 @@ export interface RebaseBackendConfig {
     logging?: {
         level?: "error" | "warn" | "info" | "debug";
     };
-    auth?: unknown;
+    auth?: RebaseAuthConfig;
     storage?: BackendStorageConfig | Record<string, BackendStorageConfig>;
     history?: unknown;
     enableSwagger?: boolean;
@@ -131,7 +144,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     let authConfigResult: BootstrappedAuth | undefined = undefined;
     if (config.auth) {
         // Secure JWT setup proactively within core package memory to eliminate dual-package hazards
-        const safeAuthConfig = config.auth as any;
+        const safeAuthConfig = config.auth;
         if (safeAuthConfig.jwtSecret) {
             configureJwt({
                 secret: safeAuthConfig.jwtSecret,
@@ -151,9 +164,9 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     let historyConfigResult: any = undefined;
     if (config.history) {
-        if ((defaultBootstrapper as any).initializeHistory) {
+        if (defaultBootstrapper.initializeHistory) {
             console.log("📜 Bootstrapping entity history via driver protocol...");
-            historyConfigResult = await (defaultBootstrapper as any).initializeHistory(config.history, defaultDriverResult);
+            historyConfigResult = await defaultBootstrapper.initializeHistory(config.history, defaultDriverResult);
             console.log("✅ Entity history initialized");
         } else {
             console.warn("⚠️ History requested but default bootstrapper does not support initializeHistory");
@@ -189,17 +202,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // 4. Mount API Routes
     if (config.auth && authConfigResult) {
         const authRoutes = createAuthRoutes({
-            authRepo: (authConfigResult as any).authRepository ?? (authConfigResult as any).userService,
-            emailService: authConfigResult.emailService as any,
-            emailConfig: (config.auth as any).email,
-            allowRegistration: (config.auth as any).allowRegistration ?? false
+            authRepo: authConfigResult.authRepository as import("./auth/interfaces").AuthRepository ?? authConfigResult.userService as import("./auth/interfaces").AuthRepository,
+            emailService: authConfigResult.emailService as import("./email").EmailService,
+            emailConfig: config.auth.email,
+            allowRegistration: config.auth.allowRegistration ?? false,
+            defaultRole: config.auth.defaultRole
         });
         config.app.route(`${basePath}/auth`, authRoutes);
 
         const adminRoutes = createAdminRoutes({ 
-            authRepo: (authConfigResult as any).authRepository ?? (authConfigResult as any).userService,
-            emailService: authConfigResult.emailService as any,
-            emailConfig: (config.auth as any).email,
+            authRepo: authConfigResult.authRepository as import("./auth/interfaces").AuthRepository ?? authConfigResult.userService as import("./auth/interfaces").AuthRepository,
+            emailService: authConfigResult.emailService as import("./email").EmailService,
+            emailConfig: config.auth.email,
         });
         config.app.route(`${basePath}/admin`, adminRoutes);
     }
@@ -209,7 +223,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             const { createSchemaEditorRoutes } = await import("./api/schema-editor-routes");
             const schemaEditorRoutes = createSchemaEditorRoutes(config.collectionsDir);
             
-            if ((config.auth as any)?.requireAuth !== false && !!(config.auth as any)?.jwtSecret) {
+            if (config.auth?.requireAuth !== false && !!config.auth?.jwtSecret) {
                 schemaEditorRoutes.use("/*", requireAuth, requireAdmin);
             }
             
@@ -221,7 +235,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     if (storageController) {
         const storageRoutes = createStorageRoutes({
             controller: storageController,
-            requireAuth: (config.auth as any)?.requireAuth ?? true
+            requireAuth: config.auth?.requireAuth ?? true
         });
         config.app.route(`${basePath}/storage`, storageRoutes);
     }
@@ -231,7 +245,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
         dataRouter.use("/*", createAuthMiddleware({
             driver: defaultDriver,
-            requireAuth: (config.auth as any)?.requireAuth !== false && !!(config.auth as any)?.jwtSecret
+            requireAuth: false // true BaaS — delegate completely to Postgres RLS
         }));
 
         const restGenerator = new RestApiGenerator(activeCollections, defaultDriver);

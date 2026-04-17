@@ -175,8 +175,12 @@ export function createAuthMiddleware(options: AuthMiddlewareOptions): Middleware
                     c.set("user", { userId: "default", roles: [] });
                     c.set("driver", driver);
                 } else {
-                    // Not authenticated - driver stays unscoped
-                    c.set("driver", driver);
+                    // Not authenticated - inject anon scope explicitly
+                    try {
+                        c.set("driver", await scopeDataDriver(driver, { uid: "anon", roles: ["anon"] }));
+                    } catch (error) {
+                        c.set("driver", driver);
+                    }
                 }
             } catch (error) {
                 return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
@@ -201,12 +205,23 @@ export function createAuthMiddleware(options: AuthMiddlewareOptions): Middleware
                         c.set("driver", driver);
                     }
                 } else {
-                    console.error("[AUTH] No token found! Auth header:", authHeader, "Query:", queryToken, "Path:", c.req.path);
-                    c.set("driver", driver);
+                    // Try to inject anon scope to allow RLS policies to match against public connections
+                    try {
+                        c.set("driver", await scopeDataDriver(driver, { uid: "anon", roles: ["anon"] }));
+                    } catch (error) {
+                        console.error("[AUTH] Error scoping default anon driver", error);
+                        c.set("driver", driver);
+                    }
                 }
             } catch (error) {
                 console.error("Default auth validation error", error);
-                c.set("driver", driver);
+                
+                // Fallback to anon scope
+                try {
+                    c.set("driver", await scopeDataDriver(driver, { uid: "anon", roles: ["anon"] }));
+                } catch (anonError) {
+                    c.set("driver", driver);
+                }
             }
         }
 

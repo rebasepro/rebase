@@ -104,15 +104,10 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
 
         // Here we just invoke the local generate-drizzle-schema.ts since we are inside the postgresql-backend
         // If installed in node_modules, __dirname is node_modules/@rebasepro/server-postgresql/dist or src.
-        const generatorScript = path.join(__dirname, "generate-drizzle-schema.ts");
+        const generatorScript = path.join(__dirname, "schema", "generate-drizzle-schema.ts");
         if (!fs.existsSync(generatorScript)) {
-            // fallback for dev mode
-            if (fs.existsSync(path.join(__dirname, "generate-drizzle-schema.ts"))) {
-                 // it's true
-            } else {
-                 console.error(chalk.red(`✗ Could not find generate-drizzle-schema.ts near ${__dirname}`));
-                 process.exit(1);
-            }
+            console.error(chalk.red(`✗ Could not find generate-drizzle-schema.ts at ${generatorScript}`));
+            process.exit(1);
         }
         
         const tsxBin = resolveLocalBin("tsx");

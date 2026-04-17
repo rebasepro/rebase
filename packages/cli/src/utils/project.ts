@@ -68,9 +68,10 @@ export function getActiveBackendPlugin(backendDir: string): string | null {
         const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
         const deps = { ...pkg.dependencies, ...pkg.devDependencies };
         
-        // Find the first dependency that matches @rebasepro/*-backend, but isn't just @rebasepro/server-core
+        // Find the first dependency that matches @rebasepro/server-* (database driver plugins),
+        // but not @rebasepro/server-core which is the framework itself
         for (const dep of Object.keys(deps)) {
-            if (dep.startsWith("@rebasepro/") && dep.endsWith("-backend") && dep !== "@rebasepro/server-core") {
+            if (dep.startsWith("@rebasepro/server-") && dep !== "@rebasepro/server-core") {
                 return dep;
             }
         }
