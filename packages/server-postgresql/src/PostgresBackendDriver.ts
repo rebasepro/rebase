@@ -1,5 +1,6 @@
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { EntityService } from "./services/entityService";
+import { BranchService } from "./services/BranchService";
 import { RealtimeService } from "./services/realtimeService";
 import { DatabasePoolManager } from "./databasePoolManager";
 import { DrizzleClient } from "./interfaces";
@@ -40,6 +41,7 @@ export class PostgresBackendDriver implements DataDriver {
     public entityService: EntityService;
     public realtimeService: RealtimeService;
     public historyService?: HistoryService;
+    public branchService?: BranchService;
     public user?: User;
     public data: RebaseData;
 
@@ -69,7 +71,12 @@ export class PostgresBackendDriver implements DataDriver {
         this.user = user;
         this.data = buildRebaseData(this);
 
-        // Expose SQL + schema admin capabilities via the new typed `admin` property.
+        // Initialize BranchService when adminConnectionString is configured
+        if (poolManager) {
+            this.branchService = new BranchService(db, poolManager);
+        }
+
+        // Expose SQL + schema + branch admin capabilities via the typed `admin` property.
         // The individual methods on `this` are kept for backwards compatibility.
         this.admin = {
             executeSql: this.executeSql.bind(this),
@@ -78,11 +85,18 @@ export class PostgresBackendDriver implements DataDriver {
             fetchCurrentDatabase: this.fetchCurrentDatabase.bind(this),
             fetchUnmappedTables: this.fetchUnmappedTables.bind(this),
             fetchTableMetadata: this.fetchTableMetadata.bind(this),
-        } satisfies SQLAdmin & SchemaAdmin;
+            // Branch operations (only available when poolManager is configured)
+            ...(this.branchService ? {
+                createBranch: this.branchService.createBranch.bind(this.branchService),
+                deleteBranch: this.branchService.deleteBranch.bind(this.branchService),
+                listBranches: this.branchService.listBranches.bind(this.branchService),
+                getBranchInfo: this.branchService.getBranchInfo.bind(this.branchService),
+            } : {}),
+        };
     }
 
     /**
-     * Typed admin capabilities (SQLAdmin + SchemaAdmin).
+     * Typed admin capabilities (SQLAdmin + SchemaAdmin + BranchAdmin).
      */
     admin: DatabaseAdmin;
 

@@ -41,10 +41,15 @@ export async function runPluginCommand(args: string[]) {
 }
 
 async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
-    const VALID_ACTIONS = ["push", "pull", "generate", "migrate", "studio"];
+    const VALID_ACTIONS = ["push", "pull", "generate", "migrate", "studio", "branch"];
     if (!subcommand || !VALID_ACTIONS.includes(subcommand)) {
         console.error(chalk.red(`Unknown db command. Valid: ${VALID_ACTIONS.join(", ")}`));
         process.exit(1);
+    }
+
+    if (subcommand === "branch") {
+        await branchCommand(rawArgs);
+        return;
     }
 
     if (subcommand === "generate") {
@@ -63,6 +68,191 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
     } else {
         await runDrizzleKit(subcommand, rawArgs);
     }
+}
+
+async function branchCommand(rawArgs: string[]): Promise<void> {
+    const branchAction = rawArgs[2]; // create, list, delete, info
+
+    if (!branchAction || branchAction === "--help") {
+        printBranchHelp();
+        return;
+    }
+
+    // Load .env for DATABASE_URL
+    try {
+        const dotenv = await import("dotenv");
+        const envPath = process.env.DOTENV_CONFIG_PATH;
+        if (envPath) {
+            dotenv.config({ path: envPath });
+        } else {
+            dotenv.config();
+        }
+    } catch {
+        // dotenv may not be installed
+    }
+
+    const databaseUrl = process.env.DATABASE_URL || process.env.ADMIN_CONNECTION_STRING;
+    if (!databaseUrl) {
+        console.error(chalk.red("✗ DATABASE_URL is not set. Make sure your .env file is configured."));
+        process.exit(1);
+    }
+
+    // Dynamic imports to avoid loading heavy deps when not needed
+    const { DatabasePoolManager } = await import("./databasePoolManager");
+    const { BranchService } = await import("./services/BranchService");
+    const { drizzle } = await import("drizzle-orm/node-postgres");
+    const { Pool } = await import("pg");
+
+    const pool = new Pool({ connectionString: databaseUrl, max: 3 });
+    const db = drizzle(pool);
+    const poolManager = new DatabasePoolManager(databaseUrl);
+    const branchService = new BranchService(db, poolManager);
+
+    // Ensure metadata table exists
+    await branchService.ensureBranchMetadataTable();
+
+    try {
+        switch (branchAction) {
+            case "create": {
+                const name = rawArgs[3];
+                if (!name) {
+                    console.error(chalk.red("✗ Branch name is required."));
+                    console.log(chalk.gray("  Usage: rebase db branch create <name> [--from <source>]"));
+                    process.exit(1);
+                }
+                let source: string | undefined;
+                const fromIdx = rawArgs.indexOf("--from");
+                if (fromIdx !== -1 && rawArgs[fromIdx + 1]) {
+                    source = rawArgs[fromIdx + 1];
+                }
+                console.log("");
+                console.log(chalk.bold("  🌿 Creating database branch..."));
+                console.log(chalk.gray(`  Name:   ${name}`));
+                if (source) console.log(chalk.gray(`  Source: ${source}`));
+                console.log("");
+                const branch = await branchService.createBranch(name, source ? { source } : undefined);
+                console.log(chalk.green(`  ✓ Branch "${branch.name}" created successfully.`));
+                console.log(chalk.gray(`    Database: rb_${branch.name}`));
+                console.log(chalk.gray(`    Parent:   ${branch.parentDatabase}`));
+                console.log("");
+                break;
+            }
+
+            case "list": {
+                const branches = await branchService.listBranches();
+                console.log("");
+                if (branches.length === 0) {
+                    console.log(chalk.gray("  No branches found. Create one with: rebase db branch create <name>"));
+                } else {
+                    console.log(chalk.bold(`  🌿 ${branches.length} branch(es):`));
+                    console.log("");
+                    for (const b of branches) {
+                        const size = b.sizeBytes != null
+                            ? chalk.gray(` (${formatBytes(b.sizeBytes)})`)
+                            : "";
+                        const age = chalk.gray(` — created ${timeAgo(b.createdAt)}`);
+                        console.log(`  ${chalk.green("●")} ${chalk.bold(b.name)}${size}${age}`);
+                        console.log(chalk.gray(`    from ${b.parentDatabase}`));
+                    }
+                }
+                console.log("");
+                break;
+            }
+
+            case "delete": {
+                const name = rawArgs[3];
+                if (!name) {
+                    console.error(chalk.red("✗ Branch name is required."));
+                    console.log(chalk.gray("  Usage: rebase db branch delete <name>"));
+                    process.exit(1);
+                }
+                console.log("");
+                console.log(chalk.bold(`  🗑️  Deleting branch "${name}"...`));
+                await branchService.deleteBranch(name);
+                console.log(chalk.green(`  ✓ Branch "${name}" deleted.`));
+                console.log("");
+                break;
+            }
+
+            case "info": {
+                const name = rawArgs[3];
+                if (!name) {
+                    console.error(chalk.red("✗ Branch name is required."));
+                    console.log(chalk.gray("  Usage: rebase db branch info <name>"));
+                    process.exit(1);
+                }
+                const info = await branchService.getBranchInfo(name);
+                console.log("");
+                if (!info) {
+                    console.error(chalk.red(`  ✗ Branch "${name}" not found.`));
+                } else {
+                    console.log(chalk.bold(`  🌿 Branch: ${info.name}`));
+                    console.log(chalk.gray(`    Database: rb_${info.name}`));
+                    console.log(chalk.gray(`    Parent:   ${info.parentDatabase}`));
+                    console.log(chalk.gray(`    Created:  ${info.createdAt.toISOString()}`));
+                    if (info.sizeBytes != null) {
+                        console.log(chalk.gray(`    Size:     ${formatBytes(info.sizeBytes)}`));
+                    }
+                }
+                console.log("");
+                break;
+            }
+
+            default:
+                console.error(chalk.red(`Unknown branch action: "${branchAction}".`));
+                printBranchHelp();
+                process.exit(1);
+        }
+    } finally {
+        await poolManager.shutdown();
+        await pool.end();
+    }
+}
+
+function printBranchHelp() {
+    console.log(`
+${chalk.bold("rebase db branch")} — Database branching commands
+
+${chalk.green.bold("Usage")}
+  rebase db branch ${chalk.blue("<command>")} [options]
+
+${chalk.green.bold("Commands")}
+  ${chalk.blue.bold("create")} <name> [--from <source>]   Create a new branch
+  ${chalk.blue.bold("list")}                              List all branches
+  ${chalk.blue.bold("delete")} <name>                     Delete a branch
+  ${chalk.blue.bold("info")} <name>                       Show branch details
+
+${chalk.green.bold("Examples")}
+  ${chalk.gray("# Create a branch from the current database")}
+  rebase db branch create feature_auth
+
+  ${chalk.gray("# Create a branch from a specific source")}
+  rebase db branch create staging --from production
+
+  ${chalk.gray("# List all branches")}
+  rebase db branch list
+
+  ${chalk.gray("# Delete a branch")}
+  rebase db branch delete feature_auth
+`);
+}
+
+function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+function timeAgo(date: Date): string {
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (seconds < 60) return "just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
 }
 
 async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> {

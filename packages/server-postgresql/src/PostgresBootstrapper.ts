@@ -129,6 +129,15 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             const driver = new PostgresBackendDriver(schemaAwareDb, realtimeService, registry, undefined, poolManager);
             realtimeService.setDataDriver(driver);
 
+            // Ensure branch metadata table exists when branching is available
+            if (driver.branchService) {
+                try {
+                    await driver.branchService.ensureBranchMetadataTable();
+                } catch (err) {
+                    console.warn("⚠️ Could not initialize branch metadata table:", err);
+                }
+            }
+
             // Enable cross-instance realtime (opt-in)
             if (pgConfig.connectionString) {
                 try {

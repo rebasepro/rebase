@@ -53,6 +53,25 @@ export class DatabasePoolManager {
         return pool;
     }
 
+    /**
+     * Disconnect and remove the pool for a specific database.
+     * Required before `CREATE DATABASE ... TEMPLATE` or `DROP DATABASE`,
+     * which need exclusive access to the target database.
+     */
+    public async disconnectDatabase(databaseName: string): Promise<void> {
+        const pool = this.pools.get(databaseName);
+        if (pool) {
+            await pool.end();
+            this.pools.delete(databaseName);
+            this.drizzleInstances.delete(databaseName);
+        }
+    }
+
+    /** Check if a pool exists for a given database name. */
+    public hasPool(databaseName: string): boolean {
+        return this.pools.has(databaseName);
+    }
+
     public async shutdown(): Promise<void> {
         const promises = [];
         for (const [dbName, pool] of this.pools.entries()) {

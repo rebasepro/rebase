@@ -402,15 +402,50 @@ export interface SchemaAdmin {
 }
 
 /**
+ * Metadata for a database branch.
+ * @group Admin
+ */
+export interface BranchInfo {
+    /** Branch name (without prefix). */
+    name: string;
+    /** The database this branch was created from. */
+    parentDatabase: string;
+    /** When the branch was created. */
+    createdAt: Date;
+    /** Size in bytes, if available from the server. */
+    sizeBytes?: number;
+}
+
+/**
+ * Administrative operations for database branching.
+ * Allows creating isolated database copies for development/preview workflows.
+ *
+ * @group Admin
+ */
+export interface BranchAdmin {
+    /** Create a new branch (database copy) from the current or specified source database. */
+    createBranch(name: string, options?: { source?: string }): Promise<BranchInfo>;
+
+    /** Delete a branch database. Cannot delete the main/default database. */
+    deleteBranch(name: string): Promise<void>;
+
+    /** List all branches (databases that were created via branching). */
+    listBranches(): Promise<BranchInfo[]>;
+
+    /** Get info about a specific branch. */
+    getBranchInfo(name: string): Promise<BranchInfo | undefined>;
+}
+
+/**
  * Union type for all admin capabilities.
  * A backend may implement any combination of these interfaces.
  *
- * Use type guards (`isSQLAdmin`, `isDocumentAdmin`, `isSchemaAdmin`)
+ * Use type guards (`isSQLAdmin`, `isDocumentAdmin`, `isSchemaAdmin`, `isBranchAdmin`)
  * to safely narrow the type before calling methods.
  *
  * @group Admin
  */
-export type DatabaseAdmin = Partial<SQLAdmin> & Partial<DocumentAdmin> & Partial<SchemaAdmin>;
+export type DatabaseAdmin = Partial<SQLAdmin> & Partial<DocumentAdmin> & Partial<SchemaAdmin> & Partial<BranchAdmin>;
 
 /**
  * Type guard: does this admin support SQL operations?
@@ -440,6 +475,14 @@ export function isSchemaAdmin(admin: DatabaseAdmin | undefined): admin is Schema
         typeof (admin as SchemaAdmin).fetchUnmappedTables === "function" ||
         typeof (admin as SchemaAdmin).fetchTableMetadata === "function"
     );
+}
+
+/**
+ * Type guard: does this admin support database branching?
+ * @group Admin
+ */
+export function isBranchAdmin(admin: DatabaseAdmin | undefined): admin is BranchAdmin {
+    return !!admin && typeof (admin as BranchAdmin).createBranch === "function";
 }
 
 // =============================================================================

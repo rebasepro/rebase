@@ -82,6 +82,7 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("generate")}   Generate migration files
   ${chalk.blue.bold("migrate")}    Run pending migrations
   ${chalk.blue.bold("studio")}     Open Studio viewer
+  ${chalk.blue.bold("branch")}     Database branching (create, list, delete, info)
 
 ${chalk.green.bold("Examples")}
   ${chalk.gray("# Quick development workflow")}
@@ -90,5 +91,8 @@ ${chalk.green.bold("Examples")}
   ${chalk.gray("# Production migration workflow")}
   rebase db generate
   rebase db migrate
+
+  ${chalk.gray("# Create a database branch")}
+  rebase db branch create feature_auth
 `);
 }

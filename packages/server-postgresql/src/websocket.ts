@@ -1,6 +1,6 @@
 import { RealtimeService } from "./services/realtimeService";
 import { PostgresBackendDriver } from "./PostgresBackendDriver";
-import { DataDriver, DeleteEntityProps, FetchCollectionProps, FetchEntityProps, SaveEntityProps, TableMetadata } from "@rebasepro/types";
+import { DataDriver, DeleteEntityProps, FetchCollectionProps, FetchEntityProps, SaveEntityProps, TableMetadata, BranchInfo } from "@rebasepro/types";
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
@@ -32,7 +32,10 @@ const ADMIN_ONLY_TYPES = new Set([
     "FETCH_ROLES",
     "FETCH_UNMAPPED_TABLES",
     "FETCH_TABLE_METADATA",
-    "FETCH_CURRENT_DATABASE"
+    "FETCH_CURRENT_DATABASE",
+    "CREATE_BRANCH",
+    "DELETE_BRANCH",
+    "LIST_BRANCHES"
 ]);
 
 /**
@@ -376,6 +379,61 @@ export function createPostgresWebSocket(
                         const response = {
                             type: "FETCH_TABLE_METADATA_SUCCESS",
                             payload: { metadata },
+                            requestId
+                        };
+                        ws.send(JSON.stringify(response));
+                    }
+                        break;
+
+                    case "CREATE_BRANCH": {
+                        wsDebug("🌿 [WebSocket Server] Processing CREATE_BRANCH request");
+                        const { name, options } = payload;
+                        const delegate = await getScopedDelegate();
+                        if (!delegate.admin?.createBranch) {
+                            sendError("ERROR", "NOT_SUPPORTED", "Database branching is not available. Configure adminConnectionString.");
+                            break;
+                        }
+                        const branch: BranchInfo = await delegate.admin.createBranch(name, options);
+                        wsDebug(`🌿 [WebSocket Server] Branch created: ${branch.name}`);
+                        const response = {
+                            type: "CREATE_BRANCH_SUCCESS",
+                            payload: { branch },
+                            requestId
+                        };
+                        ws.send(JSON.stringify(response));
+                    }
+                        break;
+
+                    case "DELETE_BRANCH": {
+                        wsDebug("🗑️ [WebSocket Server] Processing DELETE_BRANCH request");
+                        const { name: branchName } = payload;
+                        const delegate = await getScopedDelegate();
+                        if (!delegate.admin?.deleteBranch) {
+                            sendError("ERROR", "NOT_SUPPORTED", "Database branching is not available.");
+                            break;
+                        }
+                        await delegate.admin.deleteBranch(branchName);
+                        wsDebug(`🗑️ [WebSocket Server] Branch deleted: ${branchName}`);
+                        const response = {
+                            type: "DELETE_BRANCH_SUCCESS",
+                            payload: { success: true },
+                            requestId
+                        };
+                        ws.send(JSON.stringify(response));
+                    }
+                        break;
+
+                    case "LIST_BRANCHES": {
+                        wsDebug("🌿 [WebSocket Server] Processing LIST_BRANCHES request");
+                        const delegate = await getScopedDelegate();
+                        let branches: BranchInfo[] = [];
+                        if (delegate.admin?.listBranches) {
+                            branches = await delegate.admin.listBranches();
+                        }
+                        wsDebug(`🌿 [WebSocket Server] Listed ${branches.length} branches.`);
+                        const response = {
+                            type: "LIST_BRANCHES_SUCCESS",
+                            payload: { branches },
                             requestId
                         };
                         ws.send(JSON.stringify(response));

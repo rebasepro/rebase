@@ -9,4 +9,5 @@ export * from "./utils/drizzle-conditions";
 export * from "./services/realtimeService";
 export * from "./websocket";
 export * from "./collections/PostgresCollectionRegistry";
+export * from "./services/BranchService";
 export * from "./PostgresBootstrapper";
