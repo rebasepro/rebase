@@ -50,7 +50,7 @@ export interface RebaseBackendInstance {
     realtimeServices: Record<string, RealtimeProvider>;
     realtimeService: RealtimeProvider;
     auth?: BootstrappedAuth;
-    history?: any;
+    history?: unknown;
     storageRegistry?: StorageRegistry;
     storageController?: StorageController;
     collectionRegistry: BackendCollectionRegistry;
@@ -112,7 +112,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     // 1. Initialize all drivers
     for (const bootstrapper of bootstrappers) {
-        const b = bootstrapper as any;
+        const b = bootstrapper as BackendBootstrapper & { id?: string; isDefault?: boolean };
         console.log(`📦 Running bootstrapper for driver: "${b.id || bootstrapper.type}"`);
         if (b.isDefault) {
             defaultDriverId = b.id || bootstrapper.type;
@@ -138,7 +138,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     if (!defaultDriver || !defaultDriverResult) {
         throw new Error("Default driver not initialized by bootstrappers");
     }
-    const defaultBootstrapper = bootstrappers.find(b => (b as any).id === defaultDriverId || b.type === defaultDriverId) || bootstrappers[0];
+    const defaultBootstrapper = bootstrappers.find(b => (b as BackendBootstrapper & { id?: string }).id === defaultDriverId || b.type === defaultDriverId) || bootstrappers[0];
     const defaultRealtimeService = defaultDriverResult.realtimeProvider;
 
     // 2. Initialize Auth & History via the default driver's bootstrapper
@@ -163,7 +163,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
     }
 
-    let historyConfigResult: any = undefined;
+    let historyConfigResult: Record<string, unknown> | undefined = undefined;
     if (config.history) {
         if (defaultBootstrapper.initializeHistory) {
             console.log("📜 Bootstrapping entity history via driver protocol...");
@@ -183,10 +183,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         const controllers: Record<string, StorageController> = {};
 
         if (typeof config.storage === "object" && "type" in config.storage) {
-            const controller = createStorageController(config.storage as any);
+            const controller = createStorageController(config.storage as BackendStorageConfig);
             controllers[DEFAULT_STORAGE_ID] = controller;
         } else {
-            for (const [storageId, storageConfig] of Object.entries(config.storage as Record<string, any>)) {
+            for (const [storageId, storageConfig] of Object.entries(config.storage as Record<string, BackendStorageConfig>)) {
                 controllers[storageId] = createStorageController(storageConfig);
             }
         }
@@ -254,7 +254,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
         if (historyConfigResult && historyConfigResult.historyService) {
             const historyRoutes = createHistoryRoutes({
-                historyService: historyConfigResult.historyService as any,
+                historyService: historyConfigResult.historyService as import("./history/history-routes").HistoryService,
                 registry: collectionRegistry,
                 driver: defaultDriver
             });
@@ -287,8 +287,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
     }
 
-    if ((defaultBootstrapper as any).initializeWebsockets) {
-        await (defaultBootstrapper as any).initializeWebsockets(config.server, defaultRealtimeService, defaultDriver, config.auth);
+    if ((defaultBootstrapper as BackendBootstrapper & { initializeWebsockets?: (...args: unknown[]) => unknown }).initializeWebsockets) {
+        await (defaultBootstrapper as BackendBootstrapper & { initializeWebsockets: (...args: unknown[]) => unknown }).initializeWebsockets(config.server, defaultRealtimeService, defaultDriver, config.auth);
     }
 
     console.log("✅ Rebase Backend Initialized");

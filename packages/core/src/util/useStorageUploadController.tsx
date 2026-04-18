@@ -24,7 +24,7 @@ export interface StorageFieldItem {
     size: StorageFieldSize
 }
 
-export function useStorageUploadController<M extends object>({
+export function useStorageUploadController<M extends Record<string, unknown>>({
     entityId,
     entityValues,
     path,

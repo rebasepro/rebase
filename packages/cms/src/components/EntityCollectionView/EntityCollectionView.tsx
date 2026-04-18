@@ -75,7 +75,7 @@ const DEFAULT_ENTITY_OPEN_MODE: "side_panel" | "full_screen" = "side_panel";
 /**
  * @group Components
  */
-export type EntityCollectionViewProps<M extends Record<string, any>> = {
+export type EntityCollectionViewProps<M extends Record<string, unknown>> = {
     /**
      * Complete path where this collection is located.
      * It defaults to the collection path if not provided.
@@ -128,7 +128,7 @@ export type EntityCollectionViewProps<M extends Record<string, any>> = {
  * @group Components
  */
 export const EntityCollectionView = React.memo(
-    function EntityCollectionView<M extends Record<string, any>>({
+    function EntityCollectionView<M extends Record<string, unknown>>({
         path: pathProp,
 
         parentCollectionIds,
@@ -385,8 +385,8 @@ export const EntityCollectionView = React.memo(
         const pluginToolbarWidgets = useSlot("collection.toolbar", {
             path,
             parentCollectionIds: parentCollectionIds ?? [],
-            collection,
-            tableController,
+            collection: collection,
+            tableController: tableController,
             selectionController: usedSelectionController
         });
 
@@ -698,7 +698,7 @@ export const EntityCollectionView = React.memo(
             const isSelected = Boolean(usedSelectionController.selectedEntities.find(e => e.id == entity.id && e.path == entity.path));
             const customEntityActions = (collection.entityActions ?? [])
                 .map(action => resolveEntityAction(action, customizationController.entityActions))
-                .filter(Boolean) as EntityAction[];
+                .filter(Boolean) as EntityAction<M>[];
 
             const actions = getActionsForEntity({
                 entity,
@@ -765,8 +765,8 @@ export const EntityCollectionView = React.memo(
                 propertyKey,
                 onHover,
                 path,
-                collection,
-                tableController,
+                collection: collection as unknown as EntityCollection,
+                tableController: tableController as unknown as EntityTableController,
                 parentCollectionIds: parentCollectionIds ?? []
             };
             return <>{headerActionContributions.map((s, i) => (

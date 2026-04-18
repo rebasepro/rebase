@@ -8,7 +8,7 @@ export type EntityStatus = "new" | "existing" | "copy";
  * Representation of an entity fetched from the driver
  * @group Models
  */
-export interface Entity<M extends object = object> {
+export interface Entity<M extends Record<string, unknown> = Record<string, unknown>> {
 
     /**
      * ID of the entity
@@ -44,7 +44,7 @@ export interface Entity<M extends object = object> {
  * entity collection.
  * @group Models
  */
-export type EntityValues<M extends object> = M;
+export type EntityValues<M extends Record<string, unknown>> = M;
 
 /**
  * Props for creating an EntityReference

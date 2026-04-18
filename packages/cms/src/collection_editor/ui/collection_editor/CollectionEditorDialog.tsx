@@ -267,7 +267,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
 
 }
 
-function CollectionEditorInternal<M extends Record<string, any>>({
+function CollectionEditorInternal<M extends Record<string, unknown>>({
     isNewCollection,
     configController,
     editedCollectionId,
@@ -438,7 +438,7 @@ function CollectionEditorInternal<M extends Record<string, any>>({
                 if (success) {
                     aiModifiedPaths?.clearAllPaths();
                     formexController.resetForm({ values: newCollectionState });
-                    handleClose(newCollectionState);
+                    handleClose(newCollectionState as unknown as EntityCollection);
                 }
                 return;
             }
@@ -476,7 +476,7 @@ function CollectionEditorInternal<M extends Record<string, any>>({
                 if (success) {
                     formexController.resetForm({ values: initialValues });
                     setNextMode();
-                    handleClose(newCollectionState);
+                    handleClose(newCollectionState as unknown as EntityCollection);
                 }
             } else {
                 setNextMode();
@@ -492,7 +492,7 @@ function CollectionEditorInternal<M extends Record<string, any>>({
         }
     };
 
-    const validation = (col: EntityCollection) => {
+    const validation = (col: EntityCollection<M>) => {
 
         let errors: Record<string, string> = {};
         const schema = (currentView === "properties" || currentView === "relations" || currentView === "general") && CollectionEditorSchema;
@@ -911,7 +911,7 @@ function CollectionEditorInternal<M extends Record<string, any>>({
 
 }
 
-function applyPropertyConfigs<M extends Record<string, any> = any>(collection: EntityCollection<M>, propertyConfigs: Record<string, PropertyConfig>): EntityCollection<M> {
+function applyPropertyConfigs<M extends Record<string, unknown> = Record<string, unknown>>(collection: EntityCollection<M>, propertyConfigs: Record<string, PropertyConfig>): EntityCollection<M> {
     const {
         properties,
         ...rest

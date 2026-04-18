@@ -118,8 +118,8 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         sortBy: sortUrl
     } = parseFilterAndSort(location.search);
 
-    const [filterValues, setFilterValues] = React.useState<FilterValues<Extract<keyof M, string>> | undefined>(forceFilter ?? (updateUrl ? filterUrl : undefined) ?? filter ?? undefined);
-    const [sortBy, setSortBy] = React.useState<[Extract<keyof M, string>, "asc" | "desc"] | undefined>((updateUrl ? sortUrl : undefined) ?? sortInternal);
+    const [filterValues, setFilterValues] = React.useState<FilterValues<Extract<keyof M, string> | (string & {})> | undefined>(forceFilter ?? (updateUrl ? filterUrl : undefined) ?? filter ?? undefined);
+    const [sortBy, setSortBy] = React.useState<[Extract<keyof M, string> | (string & {}), "asc" | "desc"] | undefined>((updateUrl ? sortUrl : undefined) ?? sortInternal);
 
     // Sync filter/sort state from URL on browser navigation (back/forward).
     // Skip initial mount since useState initializers already handle URL params + collection defaults.
@@ -135,12 +135,12 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
         const { filterValues: urlFilterValues, sortBy: urlSortBy } = parseFilterAndSort(location.search);
         if (!forceFilter) {
-            setFilterValues(urlFilterValues as FilterValues<Extract<keyof M, string>> | undefined);
+            setFilterValues(urlFilterValues as FilterValues<Extract<keyof M, string> | (string & {})> | undefined);
         }
         if (urlSortBy && forceFilter && !checkFilterCombination(forceFilter, urlSortBy)) {
             console.warn("URL sort is not compatible with the force filter.");
         } else {
-            setSortBy(urlSortBy as [Extract<keyof M, string>, "asc" | "desc"] | undefined);
+            setSortBy(urlSortBy as [Extract<keyof M, string> | (string & {}), "asc" | "desc"] | undefined);
         }
     }, [location.search, updateUrl, forceFilter, checkFilterCombination]);
 
@@ -175,7 +175,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
     const clearFilter = useCallback(() => setFilterValues(forceFilter ?? undefined), [forceFilter]);
 
-    const updateFilterValues = useCallback((updatedFilter: FilterValues<Extract<keyof M, string>> | undefined) => {
+    const updateFilterValues = useCallback((updatedFilter: FilterValues<Extract<keyof M, string> | (string & {})> | undefined) => {
         if (forceFilter) {
             console.warn("Filter is not compatible with the force filter. Ignoring filter");
             return;

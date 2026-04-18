@@ -162,7 +162,7 @@ export interface FieldProps<
  * Context passed to custom fields
  * @group Form custom fields
  */
-export interface FormContext<M extends Record<string, any> = any> {
+export interface FormContext<M extends Record<string, unknown> = Record<string, unknown>> {
 
     /**
      * Current values of the entity
@@ -220,7 +220,7 @@ export interface FormContext<M extends Record<string, any> = any> {
  * custom field you can use {@link PropertyFieldBinding} with these props.
  * @group Form custom fields
  */
-export interface PropertyFieldBindingProps<M extends Record<string, any> = any> {
+export interface PropertyFieldBindingProps<M extends Record<string, unknown> = Record<string, unknown>> {
 
     /**
      * The key/path of the property, such as `age`. You can use nested and array

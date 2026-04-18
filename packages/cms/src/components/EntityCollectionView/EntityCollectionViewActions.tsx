@@ -18,7 +18,7 @@ import { ExportCollectionAction } from "../../data_export/export";
 import { EditorCollectionAction } from "../../collection_editor/ui/EditorCollectionAction";
 import { useCollectionEditorController } from "../../collection_editor/useCollectionEditorController";
 
-export type EntityCollectionViewActionsProps<M extends Record<string, any>> = {
+export type EntityCollectionViewActionsProps<M extends Record<string, unknown>> = {
     collection: EntityCollection<M>;
     path: string;
     relativePath: string;
@@ -31,7 +31,7 @@ export type EntityCollectionViewActionsProps<M extends Record<string, any>> = {
     collectionEntitiesCount?: number;
 }
 
-export function EntityCollectionViewActions<M extends Record<string, any>>({
+export function EntityCollectionViewActions<M extends Record<string, unknown>>({
     collection,
     relativePath,
     parentCollectionIds,
@@ -105,7 +105,7 @@ export function EntityCollectionViewActions<M extends Record<string, any>>({
             </Tooltip>
     }
 
-    const actionProps: CollectionActionsProps = {
+    const actionProps: CollectionActionsProps<M> = {
         path,
         relativePath,
         parentCollectionIds,
@@ -123,7 +123,7 @@ export function EntityCollectionViewActions<M extends Record<string, any>>({
             </ErrorBoundary>
         ));
 
-    const pluginActions = useSlot("collection.actions", actionProps);
+    const pluginActions = useSlot("collection.actions", actionProps as any);
 
     return (
         <>
@@ -132,14 +132,14 @@ export function EntityCollectionViewActions<M extends Record<string, any>>({
                 {pluginActions}
             </ErrorBoundary>
             <ErrorBoundary>
-                <ImportCollectionAction {...actionProps} />
+                <ImportCollectionAction {...(actionProps as any)} />
             </ErrorBoundary>
             <ErrorBoundary>
-                <ExportCollectionAction {...actionProps} />
+                <ExportCollectionAction {...(actionProps as any)} />
             </ErrorBoundary>
             {hasCollectionEditor && (
                 <ErrorBoundary>
-                    <EditorCollectionAction {...actionProps} />
+                    <EditorCollectionAction {...(actionProps as any)} />
                 </ErrorBoundary>
             )}
             {multipleDeleteButton}

@@ -103,7 +103,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
      * Path: /file/{bucket}/{path} or /file/{path}
      */
     router.get('/file/*', readAuthMiddleware, async (c) => {
-        const rawPath = c.req.path.replace(new RegExp(`^.*/file/`), '');
+        const rawPath = c.req.param('*');
         if (!rawPath) {
             throw ApiError.badRequest('File path required');
         }
@@ -153,7 +153,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
      * GET /metadata/* - Get file metadata
      */
     router.get('/metadata/*', readAuthMiddleware, async (c) => {
-        const rawPath = c.req.path.replace(new RegExp(`^.*/metadata/`), '');
+        const rawPath = c.req.param('*');
         if (!rawPath) {
             throw ApiError.badRequest('File path required');
         }
@@ -177,7 +177,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
      * DELETE /file/* - Delete a file
      */
     router.delete('/file/*', writeAuthMiddleware, async (c) => {
-        const rawPath = c.req.path.replace(new RegExp(`^.*/file/`), '');
+        const rawPath = c.req.param('*');
         if (!rawPath) {
             throw ApiError.badRequest('File path required');
         }

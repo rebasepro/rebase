@@ -13,8 +13,8 @@ export class BackendCollectionRegistry extends CollectionRegistry implements Col
      * Maps from the collection's relation property names to the relation names.
      */
     getRelationKeysForCollection(collectionPath: string): string[] {
-        const collection = this.getCollectionByPath(collectionPath) as (EntityCollection & { relations?: any[] }) | undefined;
+        const collection = this.getCollectionByPath(collectionPath) as (EntityCollection & { relations?: { relationName?: string, localKey?: string }[] }) | undefined;
         if (!collection?.relations) return [];
-        return collection.relations.map(r => r.relationName || r.localKey || "").filter(Boolean);
+        return collection.relations.map(r => (r.relationName || r.localKey || "") as string).filter(Boolean);
     }
 }

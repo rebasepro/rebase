@@ -41,7 +41,7 @@ export interface QueryFilter {
 /**
  * Options for fetching a collection of entities
  */
-export interface FetchCollectionOptions<M extends Record<string, any> = any> {
+export interface FetchCollectionOptions<M extends Record<string, unknown> = Record<string, unknown>> {
     filter?: FilterValues<Extract<keyof M, string>>;
     orderBy?: string;
     order?: "desc" | "asc";
@@ -55,7 +55,7 @@ export interface FetchCollectionOptions<M extends Record<string, any> = any> {
 /**
  * Options for searching entities
  */
-export interface SearchOptions<M extends Record<string, any> = any> {
+export interface SearchOptions<M extends Record<string, unknown> = Record<string, unknown>> {
     filter?: FilterValues<Extract<keyof M, string>>;
     orderBy?: string;
     order?: "desc" | "asc";
@@ -67,7 +67,7 @@ export interface SearchOptions<M extends Record<string, any> = any> {
 /**
  * Options for counting entities
  */
-export interface CountOptions<M extends Record<string, any> = any> {
+export interface CountOptions<M extends Record<string, unknown> = Record<string, unknown>> {
     filter?: FilterValues<Extract<keyof M, string>>;
     databaseId?: string;
 }
@@ -81,11 +81,11 @@ export interface CountOptions<M extends Record<string, any> = any> {
  * 
  * @template T The type of condition returned by the builder (e.g., SQL for PostgreSQL, Filter<Document> for MongoDB)
  */
-export interface ConditionBuilder<T = any> {
+export interface ConditionBuilder<T = unknown> {
     /**
      * Build filter conditions from Rebase FilterValues
      */
-    buildFilterConditions<M extends Record<string, any>>(
+    buildFilterConditions<M extends Record<string, unknown>>(
         filter: FilterValues<Extract<keyof M, string>>,
         collectionPath: string,
         ...args: unknown[]
@@ -119,8 +119,8 @@ export interface ConditionBuilder<T = any> {
  * // DrizzleConditionBuilder satisfies this type
  * const builder: ConditionBuilderStatic<SQL> = DrizzleConditionBuilder;
  */
-export type ConditionBuilderStatic<T = any> = {
-    buildFilterConditions<M extends Record<string, any>>(
+export type ConditionBuilderStatic<T = unknown> = {
+    buildFilterConditions<M extends Record<string, unknown>>(
         filter: FilterValues<Extract<keyof M, string>>,
         ...args: unknown[]
     ): T[];
@@ -150,7 +150,7 @@ export interface EntityRepository {
     /**
      * Fetch a single entity by ID
      */
-    fetchEntity<M extends Record<string, any>>(
+    fetchEntity<M extends Record<string, unknown>>(
         collectionPath: string,
         entityId: string | number,
         databaseId?: string
@@ -159,7 +159,7 @@ export interface EntityRepository {
     /**
      * Fetch a collection of entities with optional filtering, ordering, and pagination
      */
-    fetchCollection<M extends Record<string, any>>(
+    fetchCollection<M extends Record<string, unknown>>(
         collectionPath: string,
         options?: FetchCollectionOptions<M>
     ): Promise<Entity<M>[]>;
@@ -167,7 +167,7 @@ export interface EntityRepository {
     /**
      * Search entities by text
      */
-    searchEntities<M extends Record<string, any>>(
+    searchEntities<M extends Record<string, unknown>>(
         collectionPath: string,
         searchString: string,
         options?: SearchOptions<M>
@@ -176,7 +176,7 @@ export interface EntityRepository {
     /**
      * Count entities in a collection
      */
-    countEntities<M extends Record<string, any>>(
+    countEntities<M extends Record<string, unknown>>(
         collectionPath: string,
         options?: CountOptions<M>
     ): Promise<number>;
@@ -184,7 +184,7 @@ export interface EntityRepository {
     /**
      * Save an entity (create or update)
      */
-    saveEntity<M extends Record<string, any>>(
+    saveEntity<M extends Record<string, unknown>>(
         collectionPath: string,
         values: Partial<M>,
         entityId?: string | number,
@@ -317,16 +317,16 @@ export interface DataTransformer {
     /**
      * Transform entity data for storage in the database
      */
-    serializeToDatabase<M extends Record<string, any>>(
+    serializeToDatabase<M extends Record<string, unknown>>(
         entity: M,
         collection: EntityCollection
-    ): Record<string, any>;
+    ): Record<string, unknown>;
 
     /**
      * Transform database data back to entity format
      */
-    deserializeFromDatabase<M extends Record<string, any>>(
-        data: Record<string, any>,
+    deserializeFromDatabase<M extends Record<string, unknown>>(
+        data: Record<string, unknown>,
         collection: EntityCollection
     ): Promise<M>;
 }

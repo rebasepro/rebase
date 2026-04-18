@@ -116,7 +116,7 @@ export class UserService implements UserRepository {
         }
 
         // Map snake_case rows to camelCase UserData
-        const mappedUsers: User[] = rows.map((row: Record<string, unknown>) => ({
+        const mappedUsers: User[] = rows.map((row: Record<string, any>) => ({
             id: row.id,
             email: row.email,
             passwordHash: row.password_hash ?? row.passwordHash ?? null,
@@ -129,7 +129,7 @@ export class UserService implements UserRepository {
             emailVerificationSentAt: row.email_verification_sent_at ?? row.emailVerificationSentAt ?? null,
             createdAt: row.created_at ?? row.createdAt,
             updatedAt: row.updated_at ?? row.updatedAt
-        }));
+        })) as User[];
 
         return { users: mappedUsers, total, limit, offset };
     }

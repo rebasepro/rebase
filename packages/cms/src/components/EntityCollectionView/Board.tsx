@@ -15,7 +15,7 @@ import { BoardColumn } from "./BoardColumn";
 import { BoardItem, BoardItemMap, BoardItemViewProps, BoardProps } from "./board_types";
 import { cls } from "@rebasepro/ui";
 
-export function Board<M extends Record<string, any>, COLUMN extends string>({
+export function Board<M extends Record<string, unknown>, COLUMN extends string>({
     data,
     columns: columnsProp,
     columnLabels,

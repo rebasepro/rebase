@@ -32,7 +32,7 @@ export function isPropertyBuilder(property?: Property) {
     return typeof property?.dynamicProps === "function";
 }
 
-export function getDefaultValuesFor<M extends Record<string, any>>(properties: Properties): Partial<EntityValues<M>> {
+export function getDefaultValuesFor<M extends Record<string, unknown>>(properties: Properties): Partial<EntityValues<M>> {
     if (!properties) return {};
     return Object.entries(properties)
         .map(([key, property]) => {
@@ -79,7 +79,7 @@ export function getDefaultValueFortype(type: DataType) {
  * Update the automatic values in an entity before save
  * @group Driver
  */
-export function updateDateAutoValues<M extends Record<string, any>>({
+export function updateDateAutoValues<M extends Record<string, unknown>>({
     inputValues,
     properties,
     status,
@@ -117,7 +117,7 @@ export function updateDateAutoValues<M extends Record<string, any>>({
  * @param properties
  * @group Driver
  */
-export function sanitizeData<M extends Record<string, any>>
+export function sanitizeData<M extends Record<string, unknown>>
     (
         values: EntityValues<M>,
         properties: Properties
@@ -131,7 +131,7 @@ export function sanitizeData<M extends Record<string, any>>
     return result;
 }
 
-export function getReferenceFrom<M extends Record<string, any>>(entity: Entity<M>): EntityReference {
+export function getReferenceFrom<M extends Record<string, unknown>>(entity: Entity<M>): EntityReference {
     if (typeof entity.id !== "string")
         throw new Error("Only string IDs are supported in references");
     return new EntityReference({
@@ -142,7 +142,7 @@ export function getReferenceFrom<M extends Record<string, any>>(entity: Entity<M
     });
 }
 
-export function getRelationFrom<M extends Record<string, any>>(entity: Entity<M>): EntityRelation {
+export function getRelationFrom<M extends Record<string, unknown>>(entity: Entity<M>): EntityRelation {
     return new EntityRelation(entity.id, entity.path, entity);
 }
 
@@ -171,7 +171,7 @@ export function normalizeToEntityRelation(value: unknown): EntityRelation | null
     );
 }
 
-export function traverseValuesProperties<M extends Record<string, any>>(
+export function traverseValuesProperties<M extends Record<string, unknown>>(
     inputValues: Partial<EntityValues<M>>,
     properties: Properties,
     operation: (value: unknown, property: Property) => unknown

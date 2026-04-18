@@ -1,5 +1,4 @@
 import { EntityCallbacks, Properties } from "@rebasepro/types";
-import { mergeDeep } from "@rebasepro/utils";
 
 /**
  * Helper function to recursively check if there are any callbacks in the properties.
@@ -33,13 +32,13 @@ async function processProperties(
 ): Promise<Record<string, unknown>> {
     if (!values || typeof values !== "object") return values;
 
-    let result = { ...values };
+    const result = { ...values };
 
     for (const [key, property] of Object.entries(properties)) {
         if (result[key] === undefined) continue;
 
         let currentValue = result[key];
-        let previousValue = previousValues?.[key];
+        const previousValue = previousValues?.[key];
 
         // 1. Array Property
         if (property.type === "array" && Array.isArray(currentValue)) {

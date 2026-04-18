@@ -18,7 +18,7 @@ export function buildIdColumn(largeLayout?: boolean): VirtualTableColumn {
     };
 }
 
-export interface PropertiesToColumnsParams<M extends Record<string, any>> {
+export interface PropertiesToColumnsParams<M extends Record<string, unknown>> {
     properties: Properties;
     sortable?: boolean;
     forceFilter?: FilterValues<keyof M extends string ? keyof M : never>;
@@ -29,7 +29,7 @@ export interface PropertiesToColumnsParams<M extends Record<string, any>> {
     }>;
 }
 
-export function propertiesToColumns<M extends Record<string, any>>({ properties, sortable, forceFilter, AdditionalHeaderWidget }: PropertiesToColumnsParams<M>): VirtualTableColumn[] {
+export function propertiesToColumns<M extends Record<string, unknown>>({ properties, sortable, forceFilter, AdditionalHeaderWidget }: PropertiesToColumnsParams<M>): VirtualTableColumn[] {
     const disabledFilter = Boolean(forceFilter);
     return Object.entries<Property>(properties)
         .flatMap(([key, property]) => getColumnKeysForProperty(property, key))

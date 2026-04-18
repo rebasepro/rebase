@@ -67,7 +67,7 @@ export const PropertyFieldBinding = React.memo(PropertyFieldBindingInternal, (a:
     return false;
 }) as typeof PropertyFieldBindingInternal;
 
-function PropertyFieldBindingInternal<M extends Record<string, any> = any>
+function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record<string, unknown>>
     ({
         propertyKey,
         property,
@@ -176,7 +176,7 @@ function PropertyFieldBindingInternal<M extends Record<string, any> = any>
 
 }
 
-type ResolvedPropertyFieldBindingProps<M extends Record<string, any> = any> =
+type ResolvedPropertyFieldBindingProps<M extends Record<string, unknown> = Record<string, unknown>> =
     Omit<PropertyFieldBindingProps<M>, "property">
     & {
         property: Property
@@ -293,7 +293,7 @@ const shouldPropertyReRender = (property: Property, plugins?: RebasePlugin[]): b
     }
 }
 
-interface UseWrappedComponentParams<M extends Record<string, any> = any> {
+interface UseWrappedComponentParams<M extends Record<string, unknown> = Record<string, unknown>> {
     path?: string,
     collection?: EntityCollection<M>,
     propertyKey: string,

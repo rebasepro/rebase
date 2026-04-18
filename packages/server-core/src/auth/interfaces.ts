@@ -56,7 +56,7 @@ export interface RoleData {
         edit?: boolean;
         delete?: boolean;
     }> | null;
-    config: Record<string, any> | null;
+    config: Record<string, unknown> | null;
 }
 
 /**

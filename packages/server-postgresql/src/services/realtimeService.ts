@@ -9,6 +9,7 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { sql as drizzleSql } from "drizzle-orm";
 import { RealtimeProvider, CollectionSubscriptionConfig, EntitySubscriptionConfig } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
+import { buildPropertyCallbacks } from "@rebasepro/common";
 
 /** Channel name used for Postgres LISTEN/NOTIFY cross-instance realtime. */
 const PG_NOTIFY_CHANNEL = "rebase_entity_changes";
@@ -543,27 +544,68 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                     await tx.execute(drizzleSql`SELECT set_config('app.user_roles', ${authContext.roles.join(",")}, true)`);
                     await tx.execute(drizzleSql`SELECT set_config('app.jwt', ${JSON.stringify({ sub: authContext.userId, roles: authContext.roles })}, true)`);
                     const txEntityService = new EntityService(tx, this.registry);
+                    let fetchedEntities;
                     if (collectionRequest.searchString) {
-                        return await txEntityService.searchEntities(
+                        fetchedEntities = await txEntityService.searchEntities(
                             notifyPath,
                             collectionRequest.searchString,
                             {
-                                filter: collectionRequest.filter,
-                                orderBy: collectionRequest.orderBy,
-                                order: collectionRequest.order,
-                                limit: collectionRequest.limit,
-                                databaseId: collectionRequest.databaseId
-                            }
+                            filter: collectionRequest.filter as import("@rebasepro/types").FilterValues<string>,
+                            orderBy: collectionRequest.orderBy,
+                            order: collectionRequest.order,
+                            limit: collectionRequest.limit,
+                            databaseId: collectionRequest.databaseId
+                        }
                         );
-                    }
-                    return await txEntityService.fetchCollection(notifyPath, {
-                        filter: collectionRequest.filter,
+                    } else {
+                        fetchedEntities = await txEntityService.fetchCollection(notifyPath, {
+                        filter: collectionRequest.filter as import("@rebasepro/types").FilterValues<string>,
                         orderBy: collectionRequest.orderBy,
                         order: collectionRequest.order,
                         limit: collectionRequest.limit,
                         startAfter: collectionRequest.startAfter,
                         databaseId: collectionRequest.databaseId
                     });
+                    }
+
+                    // Re-apply `afterRead` lifecycle hooks to ensure consistent data structures
+                    // between the initial driver fetch and this RLS-bound refetch.
+                    const registryCollection = this.registry.getCollectionByPath(notifyPath);
+                    const resolvedCollection = collection ? { ...collection, ...registryCollection } as import("@rebasepro/types").EntityCollection : registryCollection as import("@rebasepro/types").EntityCollection;
+                    
+                    const callbacks = resolvedCollection?.callbacks;
+                    const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
+
+                    if (callbacks?.afterRead || propertyCallbacks?.afterRead) {
+                        const contextForCallback = {
+                            user: { uid: authContext.userId, roles: authContext.roles },
+                            driver: this.driver,
+                            data: this.driver ? (this.driver as any).data : undefined
+                        } as any;
+                        
+                        return await Promise.all(fetchedEntities.map(async (entity) => {
+                            let processedEntity = entity;
+                            if (callbacks?.afterRead) {
+                                processedEntity = await callbacks.afterRead({
+                                    collection: resolvedCollection,
+                                    path: notifyPath,
+                                    entity: processedEntity,
+                                    context: contextForCallback
+                                }) ?? processedEntity;
+                            }
+                            if (propertyCallbacks?.afterRead) {
+                                processedEntity = await propertyCallbacks.afterRead({
+                                    collection: resolvedCollection,
+                                    path: notifyPath,
+                                    entity: processedEntity,
+                                    context: contextForCallback
+                                }) ?? processedEntity;
+                            }
+                            return processedEntity;
+                        }));
+                    }
+
+                    return fetchedEntities;
                 });
             }
 
@@ -576,7 +618,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 notifyPath,
                 collectionRequest.searchString,
                 {
-                    filter: collectionRequest.filter,
+                    filter: collectionRequest.filter as import("@rebasepro/types").FilterValues<string>,
                     orderBy: collectionRequest.orderBy,
                     order: collectionRequest.order,
                     limit: collectionRequest.limit,
@@ -585,7 +627,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             );
         }
         return await this.entityService.fetchCollection(notifyPath, {
-            filter: collectionRequest.filter,
+            filter: collectionRequest.filter as import("@rebasepro/types").FilterValues<string>,
             orderBy: collectionRequest.orderBy,
             order: collectionRequest.order,
             limit: collectionRequest.limit,

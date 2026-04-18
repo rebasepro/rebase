@@ -41,7 +41,7 @@ export type BarActionsParams = {
     entityId?: string | number;
 };
 
-export type OnTabChangeParams<M extends Record<string, any>> = {
+export type OnTabChangeParams<M extends Record<string, unknown>> = {
     path: string;
     entityId?: string | number;
     selectedTab?: string;
@@ -49,7 +49,7 @@ export type OnTabChangeParams<M extends Record<string, any>> = {
 
 };
 
-export interface EntityEditViewProps<M extends Record<string, any> = any> {
+export interface EntityEditViewProps<M extends Record<string, unknown> = Record<string, unknown>> {
     /**
      * The CMS path of the entity, e.g. "users" or "products".
      */
@@ -72,7 +72,7 @@ export interface EntityEditViewProps<M extends Record<string, any> = any> {
  * This is the default view that is used as the content of a side panel when
  * an entity is opened.
  */
-export function EntityEditView<M extends Record<string, any>, USER extends User>({
+export function EntityEditView<M extends Record<string, unknown>>({
     entityId,
     ...props
 }: EntityEditViewProps<M>) {
@@ -82,7 +82,7 @@ export function EntityEditView<M extends Record<string, any>, USER extends User>
         dataLoading,
         // eslint-disable-next-line no-unused-vars
         dataLoadingError
-    } = useEntityFetch<M, USER>({
+    } = useEntityFetch<M>({
         path: props.path,
         entityId: entityId,
         collection: props.collection,
@@ -132,7 +132,7 @@ export function EntityEditView<M extends Record<string, any>, USER extends User>
     />;
 }
 
-export function EntityEditViewInner<M extends Record<string, any>>({
+export function EntityEditViewInner<M extends Record<string, unknown>>({
     path,
     entityId,
     selectedTab: selectedTabProp,
@@ -237,12 +237,12 @@ export function EntityEditViewInner<M extends Record<string, any>>({
             }
 
             const formexStub = createFormexStub<M>(usedEntity?.values ?? {} as M);
-            const usedFormContext: FormContext = formContext ?? {
+            const usedFormContext: FormContext<M> = formContext ?? {
                 entityId,
                 disabled: false,
                 openEntityMode: layout,
                 status: status,
-                values: usedEntity?.values ?? {},
+                values: usedEntity?.values ?? ({} as M),
                 setFieldValue: (key: string, value: any) => {
                     throw new Error("You can't update values in read only mode");
                 },

@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, getTableName, gt, lt, or, SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, getTableName, gt, lt, or, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { Entity, EntityCollection, FilterValues, Relation } from "@rebasepro/types";
 import { resolveCollectionRelations } from "@rebasepro/common";
@@ -34,9 +34,9 @@ export class EntityFetchService {
      * Get the relational query builder for a given table name.
      * Safely narrows the DrizzleClient union type to access db.query[tableName].
      */
-    private getQueryBuilder(tableName: string): RelationalQueryBuilder<Record<string, unknown>, Record<string, unknown>> | undefined {
+    private getQueryBuilder(tableName: string): RelationalQueryBuilder<TablesRelationalConfig, TableRelationalConfig> | undefined {
         const query = (this.db as { query?: DbQueryAccessor }).query;
-        return query?.[tableName] as RelationalQueryBuilder<Record<string, unknown>, Record<string, unknown>> | undefined;
+        return query?.[tableName] as RelationalQueryBuilder<TablesRelationalConfig, TableRelationalConfig> | undefined;
     }
 
     /**

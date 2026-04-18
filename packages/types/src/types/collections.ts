@@ -19,7 +19,7 @@ import { EntityAction } from "./entity_actions";
  *
  * @group Models
  */
-export interface BaseEntityCollection<M extends Record<string, any> = any, USER extends User = any> {
+export interface BaseEntityCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> {
 
     /**
      * You can set an alias that will be used internally instead of the `path`.
@@ -53,7 +53,7 @@ export interface BaseEntityCollection<M extends Record<string, any> = any, USER 
      *
      * Custom drivers can set this directly to expose child collections to the UI.
      */
-    childCollections?: () => EntityCollection<any>[];
+    childCollections?: () => EntityCollection<Record<string, unknown>>[];
 
 
 
@@ -108,7 +108,7 @@ export interface BaseEntityCollection<M extends Record<string, any> = any, USER 
      * Array of entity views that this collection has.
      * Can be an array of `EntityCustomView` or a string representing the key of a global `EntityCustomView`.
      */
-    entityViews?: (string | EntityCustomView<any>)[];
+    entityViews?: (string | EntityCustomView<Record<string, unknown>>)[];
 
     /**
      * Default preview properties displayed when this collection is referenced to.
@@ -120,7 +120,7 @@ export interface BaseEntityCollection<M extends Record<string, any> = any, USER 
      * as the title in entity related views and references.
      * If not specified, the first property simple text property will be used.
      */
-    titleProperty?: Extract<keyof M, string>;
+    readonly titleProperty?: Extract<keyof M, string> | (string & {});
 
     /**
      * When editing an entity, you can choose to open the entity in a side dialog
@@ -147,7 +147,7 @@ export interface BaseEntityCollection<M extends Record<string, any> = any, USER 
      * `hidden` in the property definition,will be ignored.
      * `propertiesOrder` has precedence over `hidden`.
      */
-    propertiesOrder?: (Extract<keyof M, string> | string | `subcollection:${string}`)[];
+    propertiesOrder?: (Extract<keyof M, string> | (string & {}) | string | `subcollection:${string}`)[];
 
     /**
      * If enabled, content is loaded in batches. If `false` all entities in the
@@ -166,7 +166,7 @@ export interface BaseEntityCollection<M extends Record<string, any> = any, USER 
      * is being created, updated or deleted.
      * Useful for adding your own logic or blocking the execution of the operation.
      */
-    callbacks?: EntityCallbacks<M, USER>;
+    readonly callbacks?: EntityCallbacks<M, USER>;
 
     /**
      * Pass your own selection controller if you want to control selected
@@ -181,7 +181,7 @@ export interface BaseEntityCollection<M extends Record<string, any> = any, USER 
      * e.g. `forceFilter: { age: [">", 18] }`
      * e.g. `forceFilter: { related_user: ["==", new EntityReference("sdc43dsw2", "users")] }`
      */
-    forceFilter?: FilterValues<Extract<keyof M, string>>;
+    readonly forceFilter?: FilterValues<Extract<keyof M, string> | (string & {})>;
 
     /**
      * Initial filters applied to the collection this collection is related to.
@@ -189,7 +189,7 @@ export interface BaseEntityCollection<M extends Record<string, any> = any, USER 
      * e.g. `filter: { age: [">", 18] }`
      * e.g. `filter: { related_user: ["==", new EntityReference("sdc43dsw2", "users")] }`
      */
-    filter?: FilterValues<Extract<keyof M, string>>; // setting FilterValues<M> can break defining collections by code
+    readonly filter?: FilterValues<Extract<keyof M, string> | (string & {})>; // setting FilterValues<M> can break defining collections by code
 
     /**
      * Default sort applied to this collection.
@@ -197,13 +197,13 @@ export interface BaseEntityCollection<M extends Record<string, any> = any, USER 
      * applied in the collection.
      * e.g. `sort: ["order", "asc"]`
      */
-    sort?: [Extract<keyof M, string>, "asc" | "desc"];
+    readonly sort?: [Extract<keyof M, string> | (string & {}), "asc" | "desc"];
 
     /**
      * You can add additional fields to the collection view by implementing
      * an additional field delegate.
      */
-    additionalFields?: AdditionalFieldDelegate<M, USER>[];
+    readonly additionalFields?: AdditionalFieldDelegate<M, USER>[];
 
     /**
      * Default size of the rendered collection
@@ -335,7 +335,7 @@ export interface BaseEntityCollection<M extends Record<string, any> = any, USER 
      * fractional indexing. Used by Kanban view for ordering within columns
      * and can be used for general ordering purposes.
      */
-    orderProperty?: Extract<keyof M, string>;
+    readonly orderProperty?: Extract<keyof M, string> | (string & {});
 
     /**
      * Actions that can be performed on the entities in this collection.
@@ -345,7 +345,7 @@ export interface BaseEntityCollection<M extends Record<string, any> = any, USER 
     /**
      * Builder for the collection actions rendered in the toolbar
      */
-    Actions?: React.ComponentType<CollectionActionsProps<M, USER>>[];
+    Actions?: React.ComponentType<any>[];
 
 }
 
@@ -360,7 +360,7 @@ export interface BaseEntityCollection<M extends Record<string, any> = any, USER 
  *
  * @group Models
  */
-export interface PostgresCollection<M extends Record<string, any> = any, USER extends User = any>
+export interface PostgresCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>
     extends BaseEntityCollection<M, USER> {
 
     /**
@@ -413,7 +413,7 @@ export interface PostgresCollection<M extends Record<string, any> = any, USER ex
  *
  * @group Models
  */
-export interface FirebaseCollection<M extends Record<string, any> = any, USER extends User = any>
+export interface FirebaseCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>
     extends BaseEntityCollection<M, USER> {
 
     /**
@@ -426,7 +426,7 @@ export interface FirebaseCollection<M extends Record<string, any> = any, USER ex
      * collections. The collections added here will be displayed when opening
      * the side dialog of an entity.
      */
-    subcollections?: () => EntityCollection<any>[];
+    subcollections?: () => EntityCollection<Record<string, unknown>>[];
 }
 
 /**
@@ -436,7 +436,7 @@ export interface FirebaseCollection<M extends Record<string, any> = any, USER ex
  *
  * @group Models
  */
-export type EntityCollection<M extends Record<string, any> = any, USER extends User = any> =
+export type EntityCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> =
     | PostgresCollection<M, USER>
     | FirebaseCollection<M, USER>;
 
@@ -447,7 +447,7 @@ export type EntityCollection<M extends Record<string, any> = any, USER extends U
  * Returns true if the collection uses the Postgres driver (or the default driver).
  * @group Models
  */
-export function isPostgresCollection<M extends Record<string, any> = any, USER extends User = any>(
+export function isPostgresCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
     collection: EntityCollection<M, USER>
 ): collection is PostgresCollection<M, USER> {
     return !collection.driver || collection.driver === "postgres";
@@ -457,7 +457,7 @@ export function isPostgresCollection<M extends Record<string, any> = any, USER e
  * Type guard for Firebase / Firestore collections.
  * @group Models
  */
-export function isFirebaseCollection<M extends Record<string, any> = any, USER extends User = any>(
+export function isFirebaseCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
     collection: EntityCollection<M, USER>
 ): collection is FirebaseCollection<M, USER> {
     return collection.driver === "firestore";
@@ -468,14 +468,14 @@ export function isFirebaseCollection<M extends Record<string, any> = any, USER e
  * Configuration for Kanban board view mode.
  * @group Collections
  */
-export interface KanbanConfig<M extends Record<string, any> = any> {
+export interface KanbanConfig<M extends Record<string, unknown> = Record<string, unknown>> {
     /**
      * Property key to use for Kanban board columns.
      * Must reference a string property with enumValues defined.
      * Entities will be grouped into columns based on this property's value.
      * The column order is determined by the order of enumValues in the property.
      */
-    columnProperty: Extract<keyof M, string>;
+    columnProperty: Extract<keyof M, string> | (string & {});
 }
 
 /**
@@ -491,7 +491,7 @@ export type ViewMode = "table" | "cards" | "kanban";
  *
  * @group Models
  */
-export interface CollectionActionsProps<M extends Record<string, any> = any, USER extends User = User, EC extends EntityCollection<M> = EntityCollection<M>> {
+export interface CollectionActionsProps<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User, EC extends EntityCollection<M> = EntityCollection<M>> {
     /**
      * Full collection path of this entity. This is the full path, like
      * `users/1234/addresses`
@@ -543,11 +543,12 @@ export interface CollectionActionsProps<M extends Record<string, any> = any, USE
  * an {@link EntityCollection}
  * @group Models
  */
-export type SelectionController<M extends Record<string, any> = any> = {
+export interface SelectionController<M extends Record<string, unknown> = Record<string, unknown>> {
     selectedEntities: Entity<M>[];
-    setSelectedEntities: Dispatch<SetStateAction<Entity<M>[]>>;
-    isEntitySelected: (entity: Entity<M>) => boolean;
-    toggleEntitySelection: (entity: Entity<M>, newSelectedState?: boolean) => void;
+    setSelectedEntities(entities: Entity<M>[]): void;
+    setSelectedEntities(action: (prev: Entity<M>[]) => Entity<M>[]): void;
+    isEntitySelected(entity: Entity<M>): boolean;
+    toggleEntitySelection(entity: Entity<M>, newSelectedState?: boolean): void;
 }
 
 /**
@@ -575,7 +576,7 @@ export type WhereFilterOp =
  * @group Models
  */
 export type FilterValues<Key extends string> =
-    Partial<Record<Key, [WhereFilterOp, any]>>;
+    Partial<Record<Key, [WhereFilterOp, unknown]>>;
 
 /**
  * Used to indicate valid filter combinations (e.g. created in Firestore)
@@ -591,7 +592,7 @@ export type FilterCombination<Key extends string> = Partial<Record<Key, "asc" | 
  */
 export type CollectionSize = "xs" | "s" | "m" | "l" | "xl";
 
-export type AdditionalFieldDelegateProps<M extends Record<string, any> = any, USER extends User = User> = {
+export type AdditionalFieldDelegateProps<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> = {
     entity: Entity<M>,
     context: RebaseContext<USER>
 };
@@ -600,7 +601,7 @@ export type AdditionalFieldDelegateProps<M extends Record<string, any> = any, US
  * Use this interface for adding additional fields to entity collection views and forms.
  * @group Models
  */
-export interface AdditionalFieldDelegate<M extends Record<string, any> = any,
+export interface AdditionalFieldDelegate<M extends Record<string, unknown> = Record<string, unknown>,
     USER extends User = User> {
 
     /**
@@ -622,7 +623,7 @@ export interface AdditionalFieldDelegate<M extends Record<string, any> = any,
     /**
      * Builder for the custom field
      */
-    Builder?: React.ComponentType<{ entity: Entity<M>, context: RebaseContext<USER> }>;
+    Builder?(props: { entity: Entity<M>, context: RebaseContext<USER> }): React.ReactNode;
 
 
 
@@ -634,7 +635,7 @@ export interface AdditionalFieldDelegate<M extends Record<string, any> = any,
      * This is a performance optimization, if you don't define dependencies
      * it will be updated in every render.
      */
-    dependencies?: Extract<keyof M, string>[];
+    dependencies?: NoInfer<Extract<keyof M, string>> | NoInfer<Extract<keyof M, string>>[] | (string & {}) | (string & {})[];
 
     /**
      * Use this prop to define the value of the column as a string or number.
@@ -643,10 +644,10 @@ export interface AdditionalFieldDelegate<M extends Record<string, any> = any,
      * view.
      * @param entity
      */
-    value?: (props: {
+    value?(props: {
         entity: Entity<M>,
         context: RebaseContext
-    }) => string | number | Promise<string | number> | undefined;
+    }): string | number | Promise<string | number> | undefined;
 }
 
 
@@ -669,15 +670,15 @@ export type DefaultSelectedViewParams = {
 /**
  * You can use this controller to control the table view of a collection.
  */
-export type EntityTableController<M extends Record<string, any> = any> = {
+export type EntityTableController<M extends Record<string, unknown> = Record<string, unknown>> = {
     data: Entity<M>[];
     dataLoading: boolean;
     noMoreToLoad: boolean;
     dataLoadingError?: Error;
-    filterValues?: FilterValues<Extract<keyof M, string>>;
-    setFilterValues?: (filterValues: FilterValues<Extract<keyof M, string>>) => void;
-    sortBy?: [Extract<keyof M, string>, "asc" | "desc"];
-    setSortBy?: (sortBy?: [Extract<keyof M, string>, "asc" | "desc"]) => void;
+    filterValues?: FilterValues<Extract<keyof M, string> | (string & {})>;
+    setFilterValues?: (filterValues: FilterValues<Extract<keyof M, string> | (string & {})>) => void;
+    sortBy?: [Extract<keyof M, string> | (string & {}), "asc" | "desc"];
+    setSortBy?: (sortBy?: [Extract<keyof M, string> | (string & {}), "asc" | "desc"]) => void;
     searchString?: string;
     setSearchString?: (searchString?: string) => void;
     clearFilter?: () => void;
@@ -691,7 +692,7 @@ export type EntityTableController<M extends Record<string, any> = any> = {
     }) => void;
     paginationEnabled?: boolean;
     pageSize?: number;
-    checkFilterCombination?: (filterValues: FilterValues<any>,
+    checkFilterCombination?: (filterValues: FilterValues<string>,
         sortBy?: [string, "asc" | "desc"]) => boolean;
     popupCell?: SelectedCellProps<M>;
     setPopupCell?: (popupCell?: SelectedCellProps<M>) => void;
@@ -699,8 +700,8 @@ export type EntityTableController<M extends Record<string, any> = any> = {
     onAddColumn?: (column: string) => void;
 }
 
-export type SelectedCellProps<M extends Record<string, any> = any> = {
-    propertyKey: Extract<keyof M, string>;
+export type SelectedCellProps<M extends Record<string, unknown> = Record<string, unknown>> = {
+    propertyKey: Extract<keyof M, string> | (string & {});
     cellRect: DOMRect;
     width: number;
     height: number;

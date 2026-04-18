@@ -7,7 +7,7 @@ import {
 } from "@rebasepro/types";
 import { isPropertyBuilder } from "./entities";
 
-export function sortProperties<M extends Record<string, any>>(properties: Properties, propertiesOrder?: string[]): Properties {
+export function sortProperties<M extends Record<string, unknown>>(properties: Properties, propertiesOrder?: string[]): Properties {
     try {
         const propertiesKeys = Object.keys(properties);
         // If no propertiesOrder, just use the original keys order
@@ -54,7 +54,7 @@ export function sortProperties<M extends Record<string, any>>(properties: Proper
                     return ({ [key]: property });
                 }
             })
-            .reduce((a: any, b: any) => ({ ...a, ...b }), {}) as Properties;
+            .reduce((a: Properties, b: Properties) => ({ ...a, ...b }), {}) as Properties;
 
         // Append any properties that were NOT in propertiesOrder (so they don't disappear!)
         const missingProperties = propertiesKeys
@@ -72,7 +72,7 @@ export function sortProperties<M extends Record<string, any>>(properties: Proper
                     return ({ [key]: property });
                 }
             })
-            .reduce((a: any, b: any) => ({ ...a, ...b }), {}) as Properties;
+            .reduce((a: Properties, b: Properties) => ({ ...a, ...b }), {}) as Properties;
 
         return { ...orderedResult, ...missingProperties };
     } catch (e) {
@@ -110,7 +110,7 @@ export function getLocalChangesBackup(collection: EntityCollection) {
  * Fallbacks to `["id"]` if no properties are marked as `isId: true`.
  * @param collection
  */
-export function getPrimaryKeys<M extends Record<string, any>>(collection: EntityCollection<M>): Extract<keyof M, string>[] {
+export function getPrimaryKeys<M extends Record<string, unknown>>(collection: EntityCollection<M>): Extract<keyof M, string>[] {
     const properties = collection.properties;
     if (!properties) {
         return ["id"] as Extract<keyof M, string>[];

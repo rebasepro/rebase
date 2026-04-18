@@ -6,7 +6,7 @@ import { BoardColumnTitle } from "./BoardColumnTitle";
 import { BoardItem, BoardItemViewProps } from "./board_types";
 import { AddIcon, ChipColorKey, ChipColorScheme, cls, defaultBorderMixin, IconButton } from "@rebasepro/ui";
 
-export interface BoardColumnProps<M extends Record<string, any>> {
+export interface BoardColumnProps<M extends Record<string, unknown>> {
     id: string;
     title: string;
     items: BoardItem<M>[];
@@ -46,7 +46,7 @@ export interface BoardColumnProps<M extends Record<string, any>> {
 }
 
 // Memoized to prevent unnecessary re-renders when other columns change
-export const BoardColumn = memo(function BoardColumn<M extends Record<string, any>>({
+export const BoardColumn = memo(function BoardColumn<M extends Record<string, unknown>>({
     id,
     title,
     items,
@@ -155,4 +155,4 @@ export const BoardColumn = memo(function BoardColumn<M extends Record<string, an
             </SortableContext>
         </div>
     );
-}) as <M extends Record<string, any>>(props: BoardColumnProps<M>) => React.ReactElement;
+}) as <M extends Record<string, unknown>>(props: BoardColumnProps<M>) => React.ReactElement;

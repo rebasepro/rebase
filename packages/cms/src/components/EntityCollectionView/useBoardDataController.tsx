@@ -8,7 +8,7 @@ const DEFAULT_PAGE_SIZE = 20;
 /**
  * Data state for a single board column
  */
-export interface BoardColumnData<M extends Record<string, any> = any> {
+export interface BoardColumnData<M extends Record<string, unknown> = Record<string, unknown>> {
     /** Entities loaded for this column */
     entities: Entity<M>[];
     /** Whether the column is currently loading data */
@@ -24,7 +24,7 @@ export interface BoardColumnData<M extends Record<string, any> = any> {
 /**
  * Controller for managing per-column data in a Kanban board
  */
-export interface BoardDataController<M extends Record<string, any> = any, COLUMN extends string = string> {
+export interface BoardDataController<M extends Record<string, unknown> = any, COLUMN extends string = string> {
     /** Data state for each column */
     columnData: Record<COLUMN, BoardColumnData<M>>;
     /** Load more items for a specific column */
@@ -43,7 +43,7 @@ export interface BoardDataController<M extends Record<string, any> = any, COLUMN
     error?: Error;
 }
 
-export interface UseBoardDataControllerProps<M extends Record<string, any> = any> {
+export interface UseBoardDataControllerProps<M extends Record<string, unknown> = Record<string, unknown>> {
     /** Full path to the collection */
     fullPath: string;
     /** The entity collection configuration */
@@ -66,7 +66,7 @@ export interface UseBoardDataControllerProps<M extends Record<string, any> = any
  * Hook that manages per-column data loading for the Kanban board.
  * Each column gets its own independent query to the data source.
  */
-export function useBoardDataController<M extends Record<string, any> = any, COLUMN extends string = string>({
+export function useBoardDataController<M extends Record<string, unknown> = any, COLUMN extends string = string>({
     fullPath,
     collection,
     columnProperty,

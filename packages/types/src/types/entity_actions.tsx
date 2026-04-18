@@ -10,7 +10,7 @@ import { SideEntityController } from "../controllers";
  * An entity action is a custom action that can be performed on an entity.
  * They are displayed in the entity view and in the collection view.
  */
-export type EntityAction<M extends object = any, USER extends User = User> = {
+export interface EntityAction<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> {
     /**
      * Title of the action
      */
@@ -38,13 +38,13 @@ export type EntityAction<M extends object = any, USER extends User = User> = {
      * Callback when the action is clicked
      * @param props
      */
-    onClick: (props: EntityActionClickProps<M, USER>) => Promise<void> | void;
+    onClick(props: EntityActionClickProps<M, USER>): Promise<void> | void;
 
     /**
      * Optional callback in case you want to disable the action
      * @param props
      */
-    isEnabled?: (props: EntityActionClickProps<M, USER>) => boolean;
+    isEnabled?(props: EntityActionClickProps<M, USER>): boolean;
 
     /**
      * Show this action collapsed in the menu of the collection view.
@@ -60,12 +60,12 @@ export type EntityAction<M extends object = any, USER extends User = User> = {
 
 }
 
-export type EntityActionClickProps<M extends object, USER extends User = User> = {
+export type EntityActionClickProps<M extends Record<string, unknown>, USER extends User = User> = {
     entity?: Entity<M>;
     context: RebaseContext<USER>;
 
     path?: string;
-    collection?: EntityCollection<M>;
+    collection?: EntityCollection<Record<string, unknown>, any>;
 
     /**
      * Optional form context, present if the action is being called from a form.

@@ -14,7 +14,7 @@ import { RebaseContext } from "../rebase_context";
  * Callbacks/Hooks for individual property fields
  * @group Entity properties
  */
-export type PropertyCallbacks<T = any, M extends Record<string, any> = any, USER extends User = User> = {
+export type PropertyCallbacks<T = unknown, M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> = {
     /**
      * Callback used after fetching data, to transform the value before rendering
      */
@@ -76,8 +76,8 @@ export type InferPropertyType<P extends Property> =
     P extends GeopointProperty ? GeoPoint :
     P extends ReferenceProperty ? EntityReference :
     P extends RelationProperty ? EntityRelation | EntityRelation[] :
-    P extends ArrayProperty ? (P["of"] extends Property ? InferPropertyType<P["of"]>[] : any[]) :
-    P extends MapProperty ? (P["properties"] extends Properties ? InferEntityType<P["properties"]> : Record<string, any>) :
+    P extends ArrayProperty ? (P["of"] extends Property ? InferPropertyType<P["of"]>[] : unknown[]) :
+    P extends MapProperty ? (P["properties"] extends Properties ? InferEntityType<P["properties"]> : Record<string, unknown>) :
     never;
 
 /**
@@ -102,7 +102,7 @@ export type InferEntityType<P extends Properties> = {
  * Interface including all common properties of a CMS property.
  * @group Entity properties
  */
-export interface BaseProperty<CustomProps = any> {
+export interface BaseProperty<CustomProps = unknown> {
     /**
      * Property name (e.g. Product)
      */
@@ -201,13 +201,13 @@ export interface BaseProperty<CustomProps = any> {
      * Custom field component to render this property in forms.
      * Used by the CMS layer.
      */
-    Field?: React.ComponentType<any>;
+    Field?: React.ComponentType<unknown>;
 
     /**
      * Custom preview component to render this property in previews/tables.
      * Used by the CMS layer.
      */
-    Preview?: React.ComponentType<any>;
+    Preview?: React.ComponentType<unknown>;
 }
 
 /**
@@ -633,7 +633,7 @@ export interface MapProperty extends BaseProperty {
 /**
  * @group Entity properties
  */
-export type PropertyBuilderProps<M extends Record<string, any> = any> = {
+export type PropertyBuilderProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     values: Partial<M>;
     previousValues?: Partial<M>;
     propertyValue?: unknown;

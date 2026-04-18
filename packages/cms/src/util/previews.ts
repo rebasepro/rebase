@@ -31,7 +31,7 @@ export function getEntityPreviewKeys(
     }
 }
 
-export function getEntityTitlePropertyKey<M extends Record<string, any>>(collection: EntityCollection<M>, propertyConfigs: Record<string, PropertyConfig>): string | undefined {
+export function getEntityTitlePropertyKey<M extends Record<string, unknown>>(collection: EntityCollection<M>, propertyConfigs: Record<string, PropertyConfig>): string | undefined {
     if (collection.titleProperty) {
         return collection.titleProperty as string;
     }

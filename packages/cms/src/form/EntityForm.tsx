@@ -108,7 +108,7 @@ export function getChanges<T extends object>(source: Partial<T>, comparison: Par
     return changes;
 }
 
-export function EntityForm<M extends Record<string, any>>({
+export function EntityForm<M extends Record<string, unknown>>({
     path,
     entityId: entityIdProp,
     collection,
@@ -377,7 +377,7 @@ export function EntityForm<M extends Record<string, any>>({
         });
     };
 
-    type EntityFormSaveParams<M extends Record<string, any>> = {
+    type EntityFormSaveParams<M extends Record<string, unknown>> = {
         collection: EntityCollection<M>,
         path: string,
         entityId: string | number | undefined,
@@ -422,7 +422,7 @@ export function EntityForm<M extends Record<string, any>>({
 
         lastSavedValues.current = values;
         return onSaveEntityRequest({
-            collection: collection,
+            collection,
             path,
             entityId,
             values: valuesToSave,
@@ -446,7 +446,7 @@ export function EntityForm<M extends Record<string, any>>({
         // eslint-disable-next-line react-hooks/exhaustive-deps -- stable reference for form field value setter
         setFieldValue: useCallback((key: string, value: unknown) => formex.setFieldValue(key, value), []),
         values: formex.values,
-        collection: collection,
+        collection,
         entityId: entityId as string,
         path,
         save,
@@ -470,7 +470,7 @@ export function EntityForm<M extends Record<string, any>>({
         parentCollectionIds,
         path: path,
         status,
-        collection: collection!,
+        collection,
         context,
         formContext,
         openEntityMode,
@@ -693,7 +693,7 @@ export function EntityForm<M extends Record<string, any>>({
     />;
 
     return (
-        <Formex value={formex as unknown as FormexController<Record<string, unknown>>}>
+        <Formex value={formex}>
             <form
                 onSubmit={formex.handleSubmit}
                 onReset={() => formex.resetForm({
@@ -745,7 +745,7 @@ export function EntityForm<M extends Record<string, any>>({
     );
 }
 
-export function getInitialEntityValues<M extends object>(
+export function getInitialEntityValues<M extends Record<string, unknown>>(
     authController: AuthController,
     collection: EntityCollection,
     path: string,

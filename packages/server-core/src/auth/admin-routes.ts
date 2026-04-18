@@ -347,7 +347,7 @@ export function createAdminRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
             throw ApiError.notFound("User not found");
         }
 
-        const updates: any = {};
+        const updates: Record<string, unknown> = {};
         if (email !== undefined) updates.email = email.toLowerCase();
         if (displayName !== undefined) updates.displayName = displayName;
 

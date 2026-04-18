@@ -1,6 +1,6 @@
 import { AuthController, Entity, EntityCollection, isPostgresCollection, SecurityRule, User } from "@rebasepro/types";
 
-function evaluateAST(sqlString: string, auth: AuthController, entity: Entity<any> | null): boolean {
+function evaluateAST<USER extends User, M extends Record<string, unknown>>(sqlString: string, auth: AuthController<USER>, entity: Entity<M> | null): boolean {
     // This is a client-side SQL evaluator used *only* for optimistic UI updates.
     // It parses basic AND / OR statements to evaluate RLS without backend roundtrips.
     if (!entity) return true;
@@ -111,7 +111,7 @@ function evaluateAST(sqlString: string, auth: AuthController, entity: Entity<any
     return true; // Optimistic fallback for anything else
 }
 
-function evaluateRule(rule: SecurityRule, auth: AuthController, entity: Entity<any> | null): boolean {
+function evaluateRule<USER extends User, M extends Record<string, unknown>>(rule: SecurityRule, auth: AuthController<USER>, entity: Entity<M> | null): boolean {
 
     if (rule.access === "public") return true;
 
@@ -135,10 +135,10 @@ function evaluateRule(rule: SecurityRule, auth: AuthController, entity: Entity<a
     return true;
 }
 
-function checkOperation(
-    collection: EntityCollection<any>,
-    authController: AuthController<any>,
-    entity: Entity<any> | null,
+function checkOperation<M extends Record<string, unknown>, USER extends User>(
+    collection: EntityCollection<M>,
+    authController: AuthController<USER>,
+    entity: Entity<M> | null,
     targetOperation: "select" | "insert" | "update" | "delete"
 ): boolean {
     const securityRules = isPostgresCollection(collection) ? collection.securityRules : undefined;
@@ -196,7 +196,7 @@ function checkOperation(
     }
 }
 
-export function canReadCollection<M extends Record<string, any>, USER extends User>
+export function canReadCollection<M extends Record<string, unknown>, USER extends User>
     (
         collection: EntityCollection<M>,
         authController: AuthController<USER>
@@ -204,7 +204,7 @@ export function canReadCollection<M extends Record<string, any>, USER extends Us
     return checkOperation(collection, authController, null, "select");
 }
 
-export function canEditEntity<M extends Record<string, any>, USER extends User>
+export function canEditEntity<M extends Record<string, unknown>, USER extends User>
     (
         collection: EntityCollection<M>,
         authController: AuthController<USER>,
@@ -214,7 +214,7 @@ export function canEditEntity<M extends Record<string, any>, USER extends User>
     return checkOperation(collection, authController, entity, "update");
 }
 
-export function canCreateEntity<M extends Record<string, any>, USER extends User>
+export function canCreateEntity<M extends Record<string, unknown>, USER extends User>
     (
         collection: EntityCollection<M>,
         authController: AuthController<USER>,
@@ -224,7 +224,7 @@ export function canCreateEntity<M extends Record<string, any>, USER extends User
     return checkOperation(collection, authController, entity, "insert");
 }
 
-export function canDeleteEntity<M extends Record<string, any>, USER extends User>
+export function canDeleteEntity<M extends Record<string, unknown>, USER extends User>
     (
         collection: EntityCollection<M>,
         authController: AuthController<USER>,

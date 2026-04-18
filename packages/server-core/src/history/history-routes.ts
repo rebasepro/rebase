@@ -7,8 +7,13 @@ import { DataDriver } from "@rebasepro/types";
  * Create Hono routes for entity history.
  * Mounted at `{basePath}/data/:slug/:entityId/history`.
  */
+export interface HistoryService {
+    fetchHistory(tableName: string, entityId: string, options: { limit: number, offset: number }): Promise<{ data: any[], total: number }>;
+    fetchHistoryEntry(historyId: string): Promise<any>;
+}
+
 export function createHistoryRoutes(params: {
-    historyService: any;
+    historyService: HistoryService;
     registry: BackendCollectionRegistry;
     driver: DataDriver;
 }): Hono<HonoEnv> {

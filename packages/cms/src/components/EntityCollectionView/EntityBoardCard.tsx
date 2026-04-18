@@ -11,7 +11,7 @@ import { useCustomizationController } from "@rebasepro/core";
 import { BoardItemViewProps } from "./board_types";
 import { getValueInPath } from "@rebasepro/utils";
 
-export type EntityBoardCardProps<M extends Record<string, any> = any> = BoardItemViewProps<M> & {
+export type EntityBoardCardProps<M extends Record<string, unknown> = Record<string, unknown>> = BoardItemViewProps<M> & {
     collection: EntityCollection<M>;
     onClick?: (entity: Entity<M>) => void;
     selected?: boolean;
@@ -23,7 +23,7 @@ export type EntityBoardCardProps<M extends Record<string, any> = any> = BoardIte
  * Compact card component for displaying an entity in a Kanban board.
  * Shows thumbnail, title, and optional selection checkbox.
  */
-function EntityBoardCardInner<M extends Record<string, any> = any>({
+function EntityBoardCardInner<M extends Record<string, unknown> = Record<string, unknown>>({
     item,
     isDragging,
     isGroupedOver,
@@ -180,7 +180,7 @@ export const EntityBoardCard = memo(EntityBoardCardInner) as typeof EntityBoardC
 /**
  * Wrapper component that adapts EntityBoardCard to BoardItemViewProps interface
  */
-export function createEntityBoardCardComponent<M extends Record<string, any>>(
+export function createEntityBoardCardComponent<M extends Record<string, unknown>>(
     collection: EntityCollection<M>,
     options: {
         onClick?: (entity: Entity<M>) => void;

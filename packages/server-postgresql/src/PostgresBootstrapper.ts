@@ -198,7 +198,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             await ensureHistoryTableExists(db);
             
             const retention = typeof historyConfig === "object" && historyConfig !== null ? (historyConfig as { retention?: number }).retention : undefined;
-            const historyService = new HistoryService(db, retention);
+            const historyService = new HistoryService(db, retention ? { ttlDays: retention } : undefined);
 
             return { historyService };
         },

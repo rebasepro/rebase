@@ -9,7 +9,7 @@ import {
 } from "@rebasepro/ui";
 import { useAuthController, useCustomizationController } from "@rebasepro/core";
 
-export type EntityCollectionCardViewProps<M extends Record<string, any> = any> = {
+export type EntityCollectionCardViewProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     collection: EntityCollection<M>;
     tableController: EntityTableController<M>;
     onEntityClick?: (entity: Entity<M>) => void;
@@ -65,7 +65,7 @@ function getGridColumnsClass(size: CollectionSize): string {
  * Card grid view for displaying entities with infinite scroll.
  * Alternative to the EntityCollectionTable for visual browsing.
  */
-export function EntityCollectionCardView<M extends Record<string, any> = any>({
+export function EntityCollectionCardView<M extends Record<string, unknown> = Record<string, unknown>>({
     collection,
     tableController,
     onEntityClick,

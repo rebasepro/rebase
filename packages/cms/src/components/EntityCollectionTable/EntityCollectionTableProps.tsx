@@ -9,7 +9,7 @@ import { VirtualTableColumn } from "@rebasepro/ui";
 /**
  * @group Collection components
  */
-export type EntityCollectionTableProps<M extends Record<string, any>,
+export type EntityCollectionTableProps<M extends Record<string, unknown>,
     USER extends User = User> = {
 
         className?: string;
@@ -160,7 +160,7 @@ export type EntityCollectionTableProps<M extends Record<string, any>,
         hideToolbar?: boolean;
     };
 
-export type GetPropertyForProps<M extends Record<string, any>> = {
+export type GetPropertyForProps<M extends Record<string, unknown>> = {
     propertyKey: string,
     entity: Entity<M>
 };

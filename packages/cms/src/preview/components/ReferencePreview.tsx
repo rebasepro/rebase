@@ -81,7 +81,7 @@ function ReferencePreviewInternal({
         hover={hover} />
 }
 
-function ReferencePreviewExisting<M extends Record<string, any> = any>({
+function ReferencePreviewExisting<M extends Record<string, unknown> = Record<string, unknown>>({
     reference,
     collection,
     previewProperties,

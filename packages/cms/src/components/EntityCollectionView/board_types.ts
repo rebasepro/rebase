@@ -5,7 +5,7 @@ import { Entity } from "@rebasepro/types";
 /**
  * Item wrapper for entities in the Board component
  */
-export interface BoardItem<M extends Record<string, any> = any> {
+export interface BoardItem<M extends Record<string, unknown> = Record<string, unknown>> {
     id: string;
     entity: Entity<M>;
 }
@@ -13,14 +13,14 @@ export interface BoardItem<M extends Record<string, any> = any> {
 /**
  * Map of column keys to arrays of board items
  */
-export interface BoardItemMap<M extends Record<string, any> = any> {
+export interface BoardItemMap<M extends Record<string, unknown> = Record<string, unknown>> {
     [columnKey: string]: BoardItem<M>[];
 }
 
 /**
  * Props passed to custom item render components
  */
-export interface BoardItemViewProps<M extends Record<string, any> = any> {
+export interface BoardItemViewProps<M extends Record<string, unknown> = Record<string, unknown>> {
     item: BoardItem<M>;
     isDragging: boolean;
     isClone?: boolean;
@@ -45,7 +45,7 @@ export interface ColumnLoadingState {
 /**
  * Props for the Board component
  */
-export interface BoardProps<M extends Record<string, any>, COLUMN extends string> {
+export interface BoardProps<M extends Record<string, unknown>, COLUMN extends string> {
     /**
      * Array of board items (entities wrapped with id)
      */

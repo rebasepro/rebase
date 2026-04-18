@@ -452,7 +452,7 @@ export const generateSchema = async (collections: EntityCollection[]): Promise<s
 
             schemaContent += `${Array.from(columns).join(",\n")}`;
 
-            const securityRules = (collection as import("@rebasepro/types").PostgresCollection<Record<string, unknown>, Record<string, unknown>>).securityRules;
+            const securityRules = (collection as import("@rebasepro/types").PostgresCollection<Record<string, unknown>, import("@rebasepro/types").User>).securityRules;
             if (securityRules && securityRules.length > 0) {
                 schemaContent += "\n}, (table) => ([\n";
                 securityRules.forEach((rule: SecurityRule, idx: number) => {

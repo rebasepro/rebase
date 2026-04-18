@@ -38,7 +38,7 @@ import { PgTransaction } from "drizzle-orm/pg-core";
  * a dynamic schema, enabling `db.query[tableName]` access without casts.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type DrizzleClient = NodePgDatabase<any> | PgTransaction<any, any, any>;
+export type DrizzleClient = NodePgDatabase<Record<string, unknown>> | PgTransaction<any, any, any>;
 
 export type {
     DatabaseConnection,

@@ -14,7 +14,7 @@ import { useCollectionRegistryController } from "../index";
  * This is the same hook used internally when a reference property is defined.
  * @group Hooks and utilities
  */
-export function useEntitySelectionDialog<M extends Record<string, any>>(referenceDialogProps: Omit<EntitySelectionProps<M>, "path"> & {
+export function useEntitySelectionDialog<M extends Record<string, unknown>>(referenceDialogProps: Omit<EntitySelectionProps<M>, "path"> & {
     path?: string | false;
     onClose?: () => void;
 }): { open: () => void; close: () => void } {

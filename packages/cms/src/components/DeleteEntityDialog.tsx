@@ -13,7 +13,7 @@ import {
 } from "@rebasepro/core";
 import { EntityView } from "./EntityView";
 
-export interface DeleteEntityDialogProps<M extends Record<string, any>> {
+export interface DeleteEntityDialogProps<M extends Record<string, unknown>> {
     entityOrEntitiesToDelete?: Entity<M> | Entity<M>[],
     path: string,
     collection: EntityCollection<M>
@@ -26,7 +26,7 @@ export interface DeleteEntityDialogProps<M extends Record<string, any>> {
     onMultipleEntitiesDelete?(path: string, entities: Entity<M>[]): void;
 }
 
-export function DeleteEntityDialog<M extends Record<string, any>>({
+export function DeleteEntityDialog<M extends Record<string, unknown>>({
     entityOrEntitiesToDelete,
     collection,
     onClose,

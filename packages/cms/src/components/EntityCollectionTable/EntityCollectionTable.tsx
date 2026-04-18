@@ -42,7 +42,7 @@ import { getValueInPath } from "@rebasepro/utils";
  * @see VirtualTable
  * @group Components
  */
-export const EntityCollectionTable = function EntityCollectionTable<M extends Record<string, any> = any, USER extends User = any>
+export const EntityCollectionTable = function EntityCollectionTable<M extends Record<string, unknown> = any, USER extends User = any>
     ({
         className,
         style,

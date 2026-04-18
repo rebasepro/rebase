@@ -27,7 +27,7 @@ import { useUrlController, useSideEntityController } from "../../index";
 /**
  * @group Components
  */
-export interface EntitySelectionProps<M extends Record<string, any>> {
+export interface EntitySelectionProps<M extends Record<string, unknown>> {
 
     /**
      * Allow multiple selection of values
@@ -90,7 +90,7 @@ export interface EntitySelectionProps<M extends Record<string, any>> {
  * You probably want to open this dialog as a side view using {@link useEntitySelectionTable}
  * @group Components
  */
-export function EntitySelectionTable<M extends Record<string, any>>(
+export function EntitySelectionTable<M extends Record<string, unknown>>(
     {
         onSingleEntitySelected,
         onMultipleEntitiesSelected,

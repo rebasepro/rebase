@@ -1,0 +1,22 @@
+
+> @rebasepro/core@0.0.1 build /Users/francesco/rebase/packages/core
+> vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && pnpm exec esbuild src/vitePlugin.ts --platform=node --format=esm --outfile=dist/vitePlugin.js
+
+vite v7.3.1 building client environment for production...
+transforming...
+✓ 2454 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.es.js  1,862.07 kB │ gzip: 300.59 kB │ map: 3,475.75 kB
+dist/index.umd.js  2,042.82 kB │ gzip: 305.51 kB │ map: 3,515.66 kB
+✓ built in 7.74s
+src/util/useStorageUploadController.tsx(40,36): error TS2344: Type 'M' does not satisfy the constraint 'Record<string, unknown>'.
+  Type 'object' is not assignable to type 'Record<string, unknown>'.
+    Index signature for type 'string' is missing in type '{}'.
+src/util/useStorageUploadController.tsx(88,17): error TS2322: Type 'M' is not assignable to type 'Record<string, unknown>'.
+  Type 'object' is not assignable to type 'Record<string, unknown>'.
+    Index signature for type 'string' is missing in type '{}'.
+src/util/useStorageUploadController.tsx(107,13): error TS2322: Type 'M' is not assignable to type 'Record<string, unknown>'.
+  Type 'object' is not assignable to type 'Record<string, unknown>'.
+    Index signature for type 'string' is missing in type '{}'.
+ ELIFECYCLE  Command failed with exit code 2.

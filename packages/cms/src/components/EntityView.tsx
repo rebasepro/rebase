@@ -12,14 +12,14 @@ import { PropertyCollectionView } from "./PropertyCollectionView";
 /**
  * @group Components
  */
-export interface EntityViewProps<M extends Record<string, any>> {
+export interface EntityViewProps<M extends Record<string, unknown>> {
     entity: Entity<M>;
     collection: EntityCollection<M>;
     path: string;
     className?: string;
 }
 
-export function EntityView<M extends Record<string, any>>(
+export function EntityView<M extends Record<string, unknown>>(
     {
         entity,
         collection,

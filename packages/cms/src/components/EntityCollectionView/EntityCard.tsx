@@ -23,7 +23,7 @@ import { IconForView } from "@rebasepro/core";
 import { getValueInPath } from "@rebasepro/utils";
 import { useCollectionRegistryController, useSideEntityController } from "../../index";
 
-export type EntityCardProps<M extends Record<string, any> = any> = {
+export type EntityCardProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     entity: Entity<M>;
     collection: EntityCollection<M>;
     onClick?: (entity: Entity<M>) => void;
@@ -41,7 +41,7 @@ export type EntityCardProps<M extends Record<string, any> = any> = {
  * Card component for displaying an entity in a grid view.
  * Shows thumbnail, title, and preview properties.
  */
-export function EntityCard<M extends Record<string, any> = any>({
+export function EntityCard<M extends Record<string, unknown> = Record<string, unknown>>({
     entity,
     collection,
     onClick,

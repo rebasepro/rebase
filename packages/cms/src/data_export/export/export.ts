@@ -6,7 +6,7 @@ interface Header {
     label: string;
 }
 
-export interface DownloadEntitiesExportParams<M extends Record<string, any>> {
+export interface DownloadEntitiesExportParams<M extends Record<string, unknown>> {
     data: Entity<M>[];
     additionalData: Record<string, any>[] | undefined;
     properties: Properties;
@@ -18,7 +18,7 @@ export interface DownloadEntitiesExportParams<M extends Record<string, any>> {
     dateExportType: "timestamp" | "string";
 }
 
-export function downloadEntitiesExport<M extends Record<string, any>>({
+export function downloadEntitiesExport<M extends Record<string, unknown>>({
     data,
     additionalData,
     properties,
@@ -95,7 +95,7 @@ export function getEntityJsonExportableData(data: Entity<any>[],
     return mergedData;
 }
 
-function getExportHeaders<M extends Record<string, any>>(properties: Properties,
+function getExportHeaders<M extends Record<string, unknown>>(properties: Properties,
     propertiesOrder: string[] | undefined,
     additionalHeaders: string[] | undefined,
     arrayValuesCount?: ArrayValuesCount): Header[] {
@@ -188,7 +188,7 @@ function processValueForExport(inputValue: any,
     return value;
 }
 
-function processValuesForExport<M extends Record<string, any>>
+function processValuesForExport<M extends Record<string, unknown>>
     (inputValues: Record<keyof M, any>,
         properties: Properties,
         exportType: "csv" | "json",

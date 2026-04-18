@@ -342,8 +342,8 @@ export class LocalStorageController implements StorageController {
                 prefixes,
                 nextPageToken
             };
-        } catch (error: any) {
-            const code = error?.code;
+        } catch (error: unknown) {
+            const code = (error as NodeJS.ErrnoException)?.code;
             if (code === 'ENOENT' || code === 'ENOTDIR') {
                 return { items: [], prefixes: [] };
             }

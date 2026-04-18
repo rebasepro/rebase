@@ -14,7 +14,7 @@ import {
     isFirebaseCollection,
 } from "@rebasepro/types";
 
-type PropertyConfig = { property: any; [key: string]: any };
+type PropertyConfig = { property: unknown; [key: string]: unknown };
 import { isPropertyBuilder } from "./entities";
 import { enumToObjectEntries } from "./enums";
 import { DEFAULT_ONE_OF_TYPE } from "./common";
@@ -25,7 +25,7 @@ import { getIn, mergeDeep } from "@rebasepro/utils";
  * Resolve property builders, enums and arrays.
  */
 
-export type ResolvePropertyProps<M extends Record<string, any> = any> = {
+export type ResolvePropertyProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     property: Property
     propertyKey?: string,
     values?: Partial<M>,
@@ -38,7 +38,7 @@ export type ResolvePropertyProps<M extends Record<string, any> = any> = {
     authController: AuthController;
 }
 
-export function resolveProperty<M extends Record<string, any> = any>(props: ResolvePropertyProps<M>): Property | null {
+export function resolveProperty<M extends Record<string, unknown> = Record<string, unknown>>(props: ResolvePropertyProps<M>): Property | null {
 
     const {
         property,
@@ -117,7 +117,8 @@ export function resolveProperty<M extends Record<string, any> = any>(props: Reso
             return resolvedProperty;
         }
         if (customField.property) {
-            const { propertyConfig: _unused, ...restConfigProperty } = customField.property;
+            const restConfigProperty = { ...customField.property } as Record<string, unknown>;
+            delete restConfigProperty.propertyConfig;
             const customFieldProperty = resolveProperty({
                 property: { name: "", ...restConfigProperty } as Property,
                 ignoreMissingFields,
@@ -165,7 +166,7 @@ export function resolvePropertyEnum(property: StringProperty | NumberProperty): 
  * @param properties
  * @param value
  */
-export function resolveProperties<M extends Record<string, any>>({
+export function resolveProperties<M extends Record<string, unknown>>({
     propertyKey,
     properties,
     ignoreMissingFields,
@@ -330,7 +331,7 @@ export function resolveEnumValues(input: EnumValues): EnumValueConfig[] | undefi
 
 
 
-export function getSubcollections<M extends Record<string, any> = any>(collection: EntityCollection<M>): EntityCollection<any>[] {
+export function getSubcollections<M extends Record<string, unknown> = Record<string, unknown>>(collection: EntityCollection<M>): EntityCollection<Record<string, unknown>>[] {
     if (collection.childCollections) {
         return collection.childCollections();
     }

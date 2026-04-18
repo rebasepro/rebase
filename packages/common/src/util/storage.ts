@@ -1,7 +1,7 @@
 import { ArrayProperty, EntityValues, StorageConfig, StringProperty, UploadedFileContext } from "@rebasepro/types";
 import { randomString } from "@rebasepro/utils";
 
-interface ResolveFilenameStringParams<M extends object> {
+interface ResolveFilenameStringParams<M extends Record<string, unknown>> {
     input: string | ((context: UploadedFileContext) => (Promise<string> | string));
     storage: StorageConfig;
     values: EntityValues<M>;
@@ -12,7 +12,7 @@ interface ResolveFilenameStringParams<M extends object> {
     propertyKey: string;
 }
 
-export async function resolveStorageFilenameString<M extends object>(
+export async function resolveStorageFilenameString<M extends Record<string, unknown>>(
     {
         input,
         storage,
@@ -53,7 +53,7 @@ export async function resolveStorageFilenameString<M extends object>(
     return result;
 }
 
-interface ResolveStoragePathStringParams<M extends object> {
+interface ResolveStoragePathStringParams<M extends Record<string, unknown>> {
     input: string | ((context: UploadedFileContext) => string);
     storage: StorageConfig;
     values: EntityValues<M>;
@@ -64,7 +64,7 @@ interface ResolveStoragePathStringParams<M extends object> {
     propertyKey: string;
 }
 
-export function resolveStoragePathString<M extends object>(
+export function resolveStoragePathString<M extends Record<string, unknown>>(
     {
         input,
         storage,

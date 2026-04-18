@@ -35,7 +35,7 @@ export interface ServeSPAConfig {
 /**
  * Serve a Single Page Application from an Hono app.
  */
-export function serveSPA(app: Hono<any>, config: ServeSPAConfig): void {
+export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: ServeSPAConfig): void {
     const {
         frontendPath,
         apiBasePath = "/api",

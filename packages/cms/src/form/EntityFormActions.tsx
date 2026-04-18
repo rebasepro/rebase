@@ -72,7 +72,7 @@ export function EntityFormActions({
         });
 }
 
-type ActionsViewProps<M extends object> = {
+type ActionsViewProps<M extends Record<string, unknown>> = {
     path: string,
     savingError: Error | undefined,
     entity: Entity<M> | undefined,
@@ -90,7 +90,7 @@ type ActionsViewProps<M extends object> = {
     t: (key: string) => string;
 };
 
-function buildBottomActions<M extends object>({
+function buildBottomActions<M extends Record<string, unknown>>({
     savingError,
     entity,
     path,
@@ -159,7 +159,7 @@ function buildBottomActions<M extends object>({
     </DialogActions>;
 }
 
-function buildSideActions<M extends object>({
+function buildSideActions<M extends Record<string, unknown>>({
     savingError,
     entity,
     formActions,

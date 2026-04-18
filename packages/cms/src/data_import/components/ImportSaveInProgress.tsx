@@ -5,7 +5,7 @@ import { Button, CenteredView, CircularProgress, Typography, } from "@rebasepro/
 import { useEffect, useRef, useState } from "react";
 import { ImportConfig } from "../types";
 
-export function ImportSaveInProgress<C extends EntityCollection>
+export function ImportSaveInProgress<C extends EntityCollection<any>>
     ({
         path,
         importConfig,

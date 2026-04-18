@@ -119,7 +119,7 @@ export function isPlainObject(obj: unknown): obj is Record<string, unknown> {
     return proto === Object.prototype;
 }
 
-export function mergeDeep<T extends Record<string, any>, U extends Record<string, any>>(
+export function mergeDeep<T extends object, U extends object>(
     target: T,
     source: U,
     ignoreUndefined: boolean = false

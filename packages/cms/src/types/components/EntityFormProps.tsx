@@ -4,7 +4,7 @@ import { FormContext } from "../fields";
 import { FormexController } from "./formex";
 import { EntityFormActionsProps } from "./EntityFormActionsProps";
 
-export type EntityFormProps<M extends Record<string, any>> = {
+export type EntityFormProps<M extends Record<string, unknown>> = {
     path: string;
     fullIdPath?: string;
     collection: EntityCollection<M>;
@@ -15,7 +15,7 @@ export type EntityFormProps<M extends Record<string, any>> = {
     onValuesModified?: (modified: boolean, values: M) => void;
     onSaved?: (params: OnUpdateParams) => void;
     initialDirtyValues?: Partial<M>; // dirty cached entity in memory
-    onFormContextReady?: (formContext: FormContext) => void;
+    onFormContextReady?: (formContext: FormContext<M>) => void;
     forceActionsAtTheBottom?: boolean;
     className?: string;
     initialStatus: EntityStatus;

@@ -8,7 +8,7 @@ import { useCMSContext } from "./useCMSContext";
  * @see resolveNavigationFrom
  * @group Hooks and utilities
  */
-export type ResolvedNavigationEntry<M extends Record<string, any>> =
+export type ResolvedNavigationEntry<M extends Record<string, unknown>> =
     | ResolvedNavigationEntity<M>
     | ResolvedNavigationCollection<M>
     | ResolvedNavigationEntityCustom<M>;
@@ -17,7 +17,7 @@ export type ResolvedNavigationEntry<M extends Record<string, any>> =
  * @see resolveNavigationFrom
  * @group Hooks and utilities
  */
-export interface ResolvedNavigationEntity<M extends Record<string, any>> {
+export interface ResolvedNavigationEntity<M extends Record<string, unknown>> {
     type: "entity";
     entity: Entity<M>;
     entityId: string | number;
@@ -29,7 +29,7 @@ export interface ResolvedNavigationEntity<M extends Record<string, any>> {
  * @see resolveNavigationFrom
  * @group Hooks and utilities
  */
-export interface ResolvedNavigationCollection<M extends Record<string, any>> {
+export interface ResolvedNavigationCollection<M extends Record<string, unknown>> {
     type: "collection";
     path: string;
     collection: EntityCollection<M>;
@@ -39,7 +39,7 @@ export interface ResolvedNavigationCollection<M extends Record<string, any>> {
  * @see resolveNavigationFrom
  * @group Hooks and utilities
  */
-interface ResolvedNavigationEntityCustom<M extends Record<string, any>> {
+interface ResolvedNavigationEntityCustom<M extends Record<string, unknown>> {
     type: "custom_view";
     path: string;
     view: EntityCustomView<M>;
@@ -56,7 +56,7 @@ interface ResolvedNavigationEntityCustom<M extends Record<string, any>> {
  * @param context
  * @group Hooks and utilities
  */
-export function resolveNavigationFrom<M extends Record<string, any>, USER extends User>({
+export function resolveNavigationFrom<M extends Record<string, unknown>, USER extends User>({
     path,
     context
 }: {
@@ -111,7 +111,7 @@ export interface NavigationFromProps {
 /**
  * @group Hooks and utilities
  */
-export interface NavigationFrom<M extends Record<string, any>> {
+export interface NavigationFrom<M extends Record<string, unknown>> {
     data?: ResolvedNavigationEntry<M>[]
     dataLoading: boolean,
     dataLoadingError?: Error
@@ -123,7 +123,7 @@ export interface NavigationFrom<M extends Record<string, any>> {
  * in any React component that lives under `Rebase`
  * @group Hooks and utilities
  */
-export function useResolvedNavigationFrom<M extends Record<string, any>>(
+export function useResolvedNavigationFrom<M extends Record<string, unknown>>(
     {
         path
     }: NavigationFromProps): NavigationFrom<M> {

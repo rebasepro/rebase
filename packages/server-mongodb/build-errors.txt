@@ -1,0 +1,31 @@
+
+> @rebasepro/server-mongodb@0.0.1 build /Users/francesco/rebase/packages/server-mongodb
+> vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+
+vite v5.4.21 building for production...
+transforming...
+✓ 7 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.es.js  24.69 kB │ gzip: 5.32 kB │ map: 61.25 kB
+dist/index.umd.js  27.34 kB │ gzip: 5.61 kB │ map: 61.47 kB
+✓ built in 82ms
+src/services/MongoDriver.ts(74,13): error TS2322: Type 'EntityCollection<M> | undefined' is not assignable to type 'EntityCollection | undefined'.
+  Type 'PostgresCollection<M, User>' is not assignable to type 'EntityCollection | undefined'.
+    Type 'PostgresCollection<M, User>' is not assignable to type 'PostgresCollection<Record<string, unknown>, User>'.
+      Types of property 'callbacks' are incompatible.
+        Type 'EntityCallbacks<M, User> | undefined' is not assignable to type 'EntityCallbacks<Record<string, unknown>, User> | undefined'.
+          Type 'EntityCallbacks<M, User>' is not assignable to type 'EntityCallbacks<Record<string, unknown>, User>'.
+            Types of property 'afterRead' are incompatible.
+              Type '((props: EntityAfterReadProps<M, User>) => Entity<M> | Promise<Entity<M>>) | undefined' is not assignable to type '((props: EntityAfterReadProps<Record<string, unknown>, User>) => Entity<Record<string, unknown>> | Promise<Entity<Record<string, unknown>>>) | undefined'.
+                Type '(props: EntityAfterReadProps<M, User>) => Entity<M> | Promise<Entity<M>>' is not assignable to type '(props: EntityAfterReadProps<Record<string, unknown>, User>) => Entity<Record<string, unknown>> | Promise<Entity<Record<string, unknown>>>'.
+                  Types of parameters 'props' and 'props' are incompatible.
+                    Type 'EntityAfterReadProps<Record<string, unknown>, User>' is not assignable to type 'EntityAfterReadProps<M, User>'.
+                      Types of property 'collection' are incompatible.
+                        Type 'EntityCollection<Record<string, unknown>, User>' is not assignable to type 'EntityCollection<M, User>'.
+                          Type 'PostgresCollection<Record<string, unknown>, User>' is not assignable to type 'EntityCollection<M, User>'.
+                            Type 'PostgresCollection<Record<string, unknown>, User>' is not assignable to type 'PostgresCollection<M, User>'.
+                              Types of property 'titleProperty' are incompatible.
+                                Type 'string | undefined' is not assignable to type 'Extract<keyof M, string> | undefined'.
+                                  Type 'string' is not assignable to type 'Extract<keyof M, string>'.
+ ELIFECYCLE  Command failed with exit code 2.

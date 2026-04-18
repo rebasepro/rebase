@@ -14,7 +14,7 @@ import { SelectableTableContext } from "./SelectableTableContext";
 import { getRowHeight } from "@rebasepro/core";
 import { RelationFilterField } from "./filters/RelationFilterField";
 
-export type SelectableTableProps<M extends Record<string, any>> = {
+export type SelectableTableProps<M extends Record<string, unknown>> = {
 
     /**
      * Callback when a cell value changes.
@@ -119,7 +119,7 @@ export type SelectableTableProps<M extends Record<string, any>> = {
  * @see VirtualTable
  * @group Components
  */
-export const SelectableTable = function SelectableTable<M extends Record<string, any>>
+export const SelectableTable = function SelectableTable<M extends Record<string, unknown>>
     ({
         onValueChange,
         cellRenderer,

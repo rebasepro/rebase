@@ -24,7 +24,7 @@ export interface AuthCapabilities {
  * to do it as the result of a hook.
  * @group Hooks and utilities
  */
-export type AuthController<USER extends User = any, ExtraData = unknown> = {
+export type AuthController<USER extends User = User, ExtraData = unknown> = {
 
     /**
      * The user currently logged in
@@ -93,7 +93,7 @@ export type AuthController<USER extends User = any, ExtraData = unknown> = {
  * extend this with their own backend-specific extras.
  * @group Hooks and utilities
  */
-export interface AuthControllerExtended<USER extends User = any, ExtraData = unknown> extends AuthController<USER, ExtraData> {
+export interface AuthControllerExtended<USER extends User = User, ExtraData = unknown> extends AuthController<USER, ExtraData> {
     /** Login with email and password */
     emailPasswordLogin?: (email: string, password: string) => Promise<void>;
     /** Login with a Google ID token or trigger Google popup */

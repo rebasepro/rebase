@@ -823,7 +823,7 @@ export class RebaseWebSocketClient {
                             mismatches[key] = { cached: normCached[key], incoming: normIncoming[key] };
                         }
                     }
-                    console.log(`[RebaseWS] Row ${incomingEntity.id} refetch mismatch:`, mismatches);
+                    console.log(`[RebaseWS] Row ${incomingEntity.id} refetch mismatch:\n`, JSON.stringify(mismatches, null, 2));
                 }
             }
             return incomingEntity;

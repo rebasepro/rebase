@@ -130,7 +130,7 @@ describe("Permissions Evaluator", () => {
 
     test("8. Unknown operation name in rule is silently ignored", () => {
         const collection = createMockCollection([
-            { operation: "read" as any, access: "public" } // "read" not a valid op
+            { operation: "read" as never, access: "public" } // "read" not a valid op
         ]);
         // "read" does not match "select", so it is never applied → denied
         expect(canReadCollection(collection, mockAuthController)).toBe(false);
@@ -611,7 +611,7 @@ describe("Permissions Evaluator", () => {
                 providerId: "test", isAnonymous: false, photoURL: null,
                 roles: ["editor"]
             };
-            const editorAuth: AuthController<any> = { ...mockAuthController, user: editorUser };
+            const editorAuth: AuthController<User> = { ...mockAuthController, user: editorUser };
 
             const collection = createMockCollection([
                 { operation: "select", roles: ["admin", "editor", "author"] }, // read all three
@@ -697,7 +697,7 @@ describe("Permissions Evaluator", () => {
 
         test("58. Missing authController ('blankAuth') handled gracefully", () => {
             const collection = createMockCollection([{ operation: "insert", roles: ["admin"] }]);
-            const blankAuth = { user: null } as any;
+            const blankAuth = { user: null } as unknown as AuthController<User>;
             expect(canCreateEntity(collection, blankAuth, "test", null)).toBe(false);
         });
 

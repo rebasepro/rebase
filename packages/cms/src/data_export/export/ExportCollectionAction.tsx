@@ -26,14 +26,14 @@ import { downloadEntitiesExport } from "./export";
 
 const DOCS_LIMIT = 500;
 
-export function ExportCollectionAction<M extends Record<string, any>, USER extends User>({
+export function ExportCollectionAction<M extends Record<string, unknown>, USER extends User>({
     collection,
     path,
     collectionEntitiesCount,
     onAnalyticsEvent,
     exportAllowed,
     notAllowedView
-}: CollectionActionsProps<M, USER, EntityCollection<M, any>> & {
+}: CollectionActionsProps<M, USER, EntityCollection<M>> & {
     exportAllowed?: (props: { collectionEntitiesCount: number, path: string, collection: EntityCollection }) => boolean;
     notAllowedView?: React.ReactNode;
     onAnalyticsEvent?: (event: string, params?: any) => void;

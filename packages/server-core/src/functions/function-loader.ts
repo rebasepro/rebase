@@ -7,7 +7,7 @@ export interface LoadedFunction {
     /** Endpoint name derived from filename (e.g., "send-invoice") */
     name: string;
     /** The Hono sub-app to mount */
-    app: Hono<any>;
+    app: Hono<import("hono").Env>;
 }
 
 /**

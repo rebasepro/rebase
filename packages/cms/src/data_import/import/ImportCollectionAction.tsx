@@ -37,7 +37,7 @@ import { slugify } from "@rebasepro/utils";
 
 type ImportState = "initial" | "mapping" | "preview" | "import_data_saving";
 
-export function ImportCollectionAction<M extends Record<string, any>, USER extends User>({
+export function ImportCollectionAction<M extends Record<string, unknown>, USER extends User>({
     collection,
     path,
     onAnalyticsEvent
@@ -174,7 +174,7 @@ export function ImportCollectionAction<M extends Record<string, any>, USER exten
 
                 {step === "import_data_saving" && importConfig &&
                     <ImportSaveInProgress importConfig={importConfig}
-                        collection={collection}
+                        collection={collection as unknown as EntityCollection}
                         path={path}
                         onImportSuccess={(importedCollection) => {
                             handleClose();
@@ -367,7 +367,7 @@ export function PropertySelectEntry({
 
 }
 
-export function ImportDataPreview<M extends Record<string, any>>({
+export function ImportDataPreview<M extends Record<string, unknown>>({
     importConfig,
     properties,
     propertiesOrder

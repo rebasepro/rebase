@@ -18,4 +18,9 @@ When contributing to the Rebase monorepo, you MUST adhere strictly to the follow
 - Rebase acts as a true Backend-as-a-Service (BaaS).
 - **Let the DB Decide**: API routers should not blindly reject unauthenticated requests (`requireAuth: true`) if the endpoints represent database mutations or access. Pass the identity downward (even if it is the `"anon"` identity) and allow Postgres Row-Level Security (RLS) to evaluate the request.
 
-*These rules were instated because lazy `any` abstractions previously caused critical technical debt in framework initialization logic.*
+## 4. Strict ES Modules (ESM) Only (NO `require`)
+- **No dynamic `require()` statements**: Rebase handles monorepo build tools, Vite, and ESM environments. Using inline `require("@rebasepro/...")` inside logic blocks will trigger critical `ReferenceError: require is not defined` errors.
+- **Top-level Imports Only**: Always use standard ES modules `import { Target } from "module"` syntax at the top of your files.
+- If importing causes circular dependency issues, you must fix the architectural pattern (e.g. inject dependencies via constructors or refactor shared logic) rather than cheating with a dynamic `require()`.
+
+*These rules were instated because lazy abstractions and dynamic requires have previously caused critical technical debt and runtime crashes in the framework.*

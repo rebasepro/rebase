@@ -1,0 +1,37 @@
+
+> @rebasepro/server-postgresql@0.0.1 build /Users/francesco/rebase/packages/server-postgresql
+> vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+
+vite v5.4.21 building for production...
+transforming...
+✓ 328 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.es.js  434.54 kB │ gzip: 83.11 kB │ map: 1,031.37 kB
+dist/index.umd.js  459.59 kB │ gzip: 84.58 kB │ map: 1,035.30 kB
+✓ built in 1.23s
+src/auth/services.ts(119,15): error TS2322: Type '{ id: unknown; email: unknown; passwordHash: {} | null; displayName: {} | null; photoUrl: {} | null; provider: unknown; googleId: {} | null; emailVerified: {}; emailVerificationToken: {} | null; emailVerificationSentAt: {} | null; createdAt: unknown; updatedAt: unknown; }[]' is not assignable to type '{ email: string; id: string; createdAt: Date; passwordHash: string | null; displayName: string | null; photoUrl: string | null; provider: string; googleId: string | null; emailVerified: boolean; emailVerificationToken: string | null; emailVerificationSentAt: Date | null; updatedAt: Date; }[]'.
+  Type '{ id: unknown; email: unknown; passwordHash: {} | null; displayName: {} | null; photoUrl: {} | null; provider: unknown; googleId: {} | null; emailVerified: {}; emailVerificationToken: {} | null; emailVerificationSentAt: {} | null; createdAt: unknown; updatedAt: unknown; }' is not assignable to type '{ email: string; id: string; createdAt: Date; passwordHash: string | null; displayName: string | null; photoUrl: string | null; provider: string; googleId: string | null; emailVerified: boolean; emailVerificationToken: string | null; emailVerificationSentAt: Date | null; updatedAt: Date; }'.
+    Types of property 'email' are incompatible.
+      Type 'unknown' is not assignable to type 'string'.
+src/collections/PostgresCollectionRegistry.ts(90,143): error TS2344: Type 'Record<string, unknown>' does not satisfy the constraint 'User'.
+  Type 'Record<string, unknown>' is missing the following properties from type 'User': uid, displayName, email, photoURL, and 2 more.
+src/PostgresBootstrapper.ts(201,59): error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type 'Partial<HistoryRetentionConfig> | undefined'.
+  Type 'number' has no properties in common with type 'Partial<HistoryRetentionConfig>'.
+src/schema/generate-drizzle-schema-logic.ts(455,121): error TS2344: Type 'Record<string, unknown>' does not satisfy the constraint 'User'.
+  Type 'Record<string, unknown>' is missing the following properties from type 'User': uid, displayName, email, photoURL, and 2 more.
+src/services/EntityFetchService.ts(37,72): error TS2344: Type 'Record<string, unknown>' does not satisfy the constraint 'TablesRelationalConfig'.
+  'string' index signatures are incompatible.
+    Type 'unknown' is not assignable to type 'TableRelationalConfig'.
+src/services/EntityFetchService.ts(39,61): error TS2344: Type 'Record<string, unknown>' does not satisfy the constraint 'TablesRelationalConfig'.
+  'string' index signatures are incompatible.
+    Type 'unknown' is not assignable to type 'TableRelationalConfig'.
+src/services/realtimeService.ts(621,21): error TS2322: Type 'Record<string, unknown> | undefined' is not assignable to type 'Partial<Record<string, [WhereFilterOp, unknown]>> | undefined'.
+  Type 'Record<string, unknown>' is not assignable to type 'Partial<Record<string, [WhereFilterOp, unknown]>>'.
+    'string' index signatures are incompatible.
+      Type 'unknown' is not assignable to type '[WhereFilterOp, unknown] | undefined'.
+src/services/realtimeService.ts(630,13): error TS2322: Type 'Record<string, unknown> | undefined' is not assignable to type 'Partial<Record<string, [WhereFilterOp, unknown]>> | undefined'.
+  Type 'Record<string, unknown>' is not assignable to type 'Partial<Record<string, [WhereFilterOp, unknown]>>'.
+    'string' index signatures are incompatible.
+      Type 'unknown' is not assignable to type '[WhereFilterOp, unknown] | undefined'.
+ ELIFECYCLE  Command failed with exit code 2.

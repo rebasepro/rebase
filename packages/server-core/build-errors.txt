@@ -1,0 +1,52 @@
+
+> @rebasepro/server-core@0.0.1 build /Users/francesco/rebase/packages/server-core
+> vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+
+vite v5.4.21 building for production...
+transforming...
+✓ 1641 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.es.js            1.68 kB │ gzip:   0.80 kB │ map:     0.09 kB
+dist/index-CvlusawO.js      8.86 kB │ gzip:   2.11 kB │ map:    16.79 kB
+dist/index-BGGPU0RK.js  1,946.14 kB │ gzip: 411.28 kB │ map: 4,292.57 kB
+dist/index.umd.js  2,070.48 kB │ gzip: 419.31 kB │ map: 4,326.51 kB
+✓ built in 2.97s
+src/api/graphql/graphql-schema-generator.ts(65,34): error TS18046: 'source' is of type 'unknown'.
+src/api/graphql/graphql-schema-generator.ts(72,51): error TS18046: 'source' is of type 'unknown'.
+src/api/graphql/graphql-schema-generator.ts(136,13): error TS2322: Type 'Record<string, unknown>' is not assignable to type 'ThunkObjMap<GraphQLInputFieldConfig>'.
+src/api/graphql/graphql-schema-generator.ts(178,17): error TS2322: Type '(_: unknown, args: any, context: { driver: DataDriver; }) => Promise<Entity<Record<string, unknown>> | undefined>' is not assignable to type 'GraphQLFieldResolver<unknown, unknown, any, unknown>'.
+  Types of parameters 'context' and 'context' are incompatible.
+    Type 'unknown' is not assignable to type '{ driver: DataDriver; }'.
+src/api/graphql/graphql-schema-generator.ts(198,17): error TS2322: Type '(_: unknown, args: any, context: { driver: DataDriver; }) => Promise<Entity<Record<string, unknown>>[]>' is not assignable to type 'GraphQLFieldResolver<unknown, unknown, any, unknown>'.
+  Types of parameters 'context' and 'context' are incompatible.
+    Type 'unknown' is not assignable to type '{ driver: DataDriver; }'.
+src/api/graphql/graphql-schema-generator.ts(249,17): error TS2322: Type '(_: unknown, args: any, context: { driver: DataDriver; }) => Promise<Entity<Record<string, unknown>>>' is not assignable to type 'GraphQLFieldResolver<unknown, unknown, any, unknown>'.
+  Types of parameters 'context' and 'context' are incompatible.
+    Type 'unknown' is not assignable to type '{ driver: DataDriver; }'.
+src/api/graphql/graphql-schema-generator.ts(269,17): error TS2322: Type '(_: unknown, args: any, context: { driver: DataDriver; }) => Promise<Entity<Record<string, unknown>>>' is not assignable to type 'GraphQLFieldResolver<unknown, unknown, any, unknown>'.
+  Types of parameters 'context' and 'context' are incompatible.
+    Type 'unknown' is not assignable to type '{ driver: DataDriver; }'.
+src/api/graphql/graphql-schema-generator.ts(288,17): error TS2322: Type '(_: unknown, args: any, context: { driver: DataDriver; }) => Promise<boolean>' is not assignable to type 'GraphQLFieldResolver<unknown, unknown, any, unknown>'.
+  Types of parameters 'context' and 'context' are incompatible.
+    Type 'unknown' is not assignable to type '{ driver: DataDriver; }'.
+src/api/rest/api-generator.ts(90,63): error TS18046: 'entities' is of type 'unknown'.
+src/collections/BackendCollectionRegistry.ts(18,9): error TS2322: Type '{}[]' is not assignable to type 'string[]'.
+  Type '{}' is not assignable to type 'string'.
+src/functions/function-loader.ts(10,15): error TS2344: Type 'unknown' does not satisfy the constraint 'Env'.
+src/functions/function-routes.ts(27,37): error TS2345: Argument of type 'Hono<unknown, BlankSchema, "/">' is not assignable to parameter of type 'Hono<Env, BlankSchema, "/", "/">'.
+  The types of 'get(...).get' are incompatible between these types.
+    Type 'HandlerInterface<unknown, "get", BlankSchema, "/", any>' is not assignable to type 'HandlerInterface<Env, "get", BlankSchema, "/", any>'.
+      Types of parameters 'handlers' and 'handlers' are incompatible.
+        Type 'H<Env, any, any, any>' is not assignable to type 'H<unknown, any, any, any>'.
+          Type 'Handler<Env, any, any, any>' is not assignable to type 'H<unknown, any, any, any>'.
+            Type 'Handler<Env, any, any, any>' is not assignable to type 'Handler<unknown, any, any, any>'.
+              Types of parameters 'c' and 'c' are incompatible.
+                Type 'Context<unknown, any, any>' is not assignable to type 'Context<Env, any, any>'.
+                  Types of property 'env' are incompatible.
+                    Type 'unknown' is not assignable to type 'object | undefined'.
+src/history/history-routes.ts(48,30): error TS18046: 'historyService' is of type 'unknown'.
+src/history/history-routes.ts(87,36): error TS18046: 'historyService' is of type 'unknown'.
+src/serve-spa.ts(38,36): error TS2344: Type 'unknown' does not satisfy the constraint 'Env'.
+src/storage/LocalStorageController.ts(346,33): error TS2339: Property 'code' does not exist on type '{}'.
+ ELIFECYCLE  Command failed with exit code 2.

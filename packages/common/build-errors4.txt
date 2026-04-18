@@ -1,0 +1,113 @@
+
+> @rebasepro/common@0.0.1 build /Users/francesco/rebase/packages/common
+> vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+
+vite v5.4.21 building for production...
+transforming...
+✓ 68 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.es.js  75.11 kB │ gzip: 16.31 kB │ map: 232.64 kB
+dist/index.umd.js  82.14 kB │ gzip: 16.95 kB │ map: 233.34 kB
+✓ built in 596ms
+src/collections/CollectionRegistry.ts(371,39): error TS2352: Conversion of type 'EntityCollection' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'FirebaseCollection<Record<string, unknown>, User>' is not comparable to type 'Record<string, unknown>'.
+    Index signature for type 'string' is missing in type 'FirebaseCollection<Record<string, unknown>, User>'.
+src/collections/CollectionRegistry.ts(372,39): error TS2352: Conversion of type 'EntityCollection' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'FirebaseCollection<Record<string, unknown>, User>' is not comparable to type 'Record<string, unknown>'.
+    Index signature for type 'string' is missing in type 'FirebaseCollection<Record<string, unknown>, User>'.
+src/data/buildRebaseData.ts(45,13): error TS18046: 'value' is of type 'unknown'.
+src/data/buildRebaseData.ts(45,38): error TS18046: 'value' is of type 'unknown'.
+src/data/buildRebaseData.ts(46,21): error TS18046: 'value' is of type 'unknown'.
+src/util/conditions.ts(33,40): error TS2345: Argument of type '(this: ConditionContext, roleId: string) => boolean' is not assignable to parameter of type '(...args: unknown[]) => unknown'.
+  Types of parameters 'roleId' and 'args' are incompatible.
+    Type 'unknown' is not assignable to type 'string'.
+src/util/conditions.ts(38,43): error TS2345: Argument of type '(this: ConditionContext, roleIds: string[]) => boolean' is not assignable to parameter of type '(...args: unknown[]) => unknown'.
+  Types of parameters 'roleIds' and 'args' are incompatible.
+    Type 'unknown' is not assignable to type 'string[]'.
+src/util/conditions.ts(44,40): error TS2345: Argument of type '(timestamp: number) => boolean' is not assignable to parameter of type '(...args: unknown[]) => unknown'.
+  Types of parameters 'timestamp' and 'args' are incompatible.
+    Type 'unknown' is not assignable to type 'number'.
+src/util/conditions.ts(54,39): error TS2345: Argument of type '(timestamp: number) => boolean' is not assignable to parameter of type '(...args: unknown[]) => unknown'.
+  Types of parameters 'timestamp' and 'args' are incompatible.
+    Type 'unknown' is not assignable to type 'number'.
+src/util/conditions.ts(60,41): error TS2345: Argument of type '(timestamp: number) => boolean' is not assignable to parameter of type '(...args: unknown[]) => unknown'.
+  Types of parameters 'timestamp' and 'args' are incompatible.
+    Type 'unknown' is not assignable to type 'number'.
+src/util/permissions.ts(204,27): error TS2345: Argument of type 'EntityCollection<M>' is not assignable to parameter of type 'EntityCollection<Record<string, unknown>>'.
+  Type 'PostgresCollection<M, User>' is not assignable to type 'EntityCollection<Record<string, unknown>>'.
+    Type 'PostgresCollection<M, User>' is not assignable to type 'PostgresCollection<Record<string, unknown>, User>'.
+      Types of property 'callbacks' are incompatible.
+        Type 'EntityCallbacks<M, User> | undefined' is not assignable to type 'EntityCallbacks<Record<string, unknown>, User> | undefined'.
+          Type 'EntityCallbacks<M, User>' is not assignable to type 'EntityCallbacks<Record<string, unknown>, User>'.
+            Types of property 'afterRead' are incompatible.
+              Type '((props: EntityAfterReadProps<M, User>) => Entity<M> | Promise<Entity<M>>) | undefined' is not assignable to type '((props: EntityAfterReadProps<Record<string, unknown>, User>) => Entity<Record<string, unknown>> | Promise<Entity<Record<string, unknown>>>) | undefined'.
+                Type '(props: EntityAfterReadProps<M, User>) => Entity<M> | Promise<Entity<M>>' is not assignable to type '(props: EntityAfterReadProps<Record<string, unknown>, User>) => Entity<Record<string, unknown>> | Promise<Entity<Record<string, unknown>>>'.
+                  Types of parameters 'props' and 'props' are incompatible.
+                    Type 'EntityAfterReadProps<Record<string, unknown>, User>' is not assignable to type 'EntityAfterReadProps<M, User>'.
+                      Types of property 'collection' are incompatible.
+                        Type 'EntityCollection<Record<string, unknown>, User>' is not assignable to type 'EntityCollection<M, User>'.
+                          Type 'PostgresCollection<Record<string, unknown>, User>' is not assignable to type 'EntityCollection<M, User>'.
+                            Type 'PostgresCollection<Record<string, unknown>, User>' is not assignable to type 'PostgresCollection<M, User>'.
+                              Types of property 'titleProperty' are incompatible.
+                                Type 'string | undefined' is not assignable to type 'Extract<keyof M, string> | undefined'.
+                                  Type 'string' is not assignable to type 'Extract<keyof M, string>'.
+src/util/permissions.ts(214,27): error TS2345: Argument of type 'EntityCollection<M>' is not assignable to parameter of type 'EntityCollection<Record<string, unknown>>'.
+  Type 'PostgresCollection<M, User>' is not assignable to type 'EntityCollection<Record<string, unknown>>'.
+    Type 'PostgresCollection<M, User>' is not assignable to type 'PostgresCollection<Record<string, unknown>, User>'.
+      Types of property 'callbacks' are incompatible.
+        Type 'EntityCallbacks<M, User> | undefined' is not assignable to type 'EntityCallbacks<Record<string, unknown>, User> | undefined'.
+          Type 'EntityCallbacks<M, User>' is not assignable to type 'EntityCallbacks<Record<string, unknown>, User>'.
+            Types of property 'afterRead' are incompatible.
+              Type '((props: EntityAfterReadProps<M, User>) => Entity<M> | Promise<Entity<M>>) | undefined' is not assignable to type '((props: EntityAfterReadProps<Record<string, unknown>, User>) => Entity<Record<string, unknown>> | Promise<Entity<Record<string, unknown>>>) | undefined'.
+                Type '(props: EntityAfterReadProps<M, User>) => Entity<M> | Promise<Entity<M>>' is not assignable to type '(props: EntityAfterReadProps<Record<string, unknown>, User>) => Entity<Record<string, unknown>> | Promise<Entity<Record<string, unknown>>>'.
+                  Types of parameters 'props' and 'props' are incompatible.
+                    Type 'EntityAfterReadProps<Record<string, unknown>, User>' is not assignable to type 'EntityAfterReadProps<M, User>'.
+                      Types of property 'collection' are incompatible.
+                        Type 'EntityCollection<Record<string, unknown>, User>' is not assignable to type 'EntityCollection<M, User>'.
+                          Type 'PostgresCollection<Record<string, unknown>, User>' is not assignable to type 'EntityCollection<M, User>'.
+                            Type 'PostgresCollection<Record<string, unknown>, User>' is not assignable to type 'PostgresCollection<M, User>'.
+                              Types of property 'titleProperty' are incompatible.
+                                Type 'string | undefined' is not assignable to type 'Extract<keyof M, string> | undefined'.
+                                  Type 'string' is not assignable to type 'Extract<keyof M, string>'.
+src/util/permissions.ts(224,27): error TS2345: Argument of type 'EntityCollection<M>' is not assignable to parameter of type 'EntityCollection<Record<string, unknown>>'.
+  Type 'PostgresCollection<M, User>' is not assignable to type 'EntityCollection<Record<string, unknown>>'.
+    Type 'PostgresCollection<M, User>' is not assignable to type 'PostgresCollection<Record<string, unknown>, User>'.
+      Types of property 'callbacks' are incompatible.
+        Type 'EntityCallbacks<M, User> | undefined' is not assignable to type 'EntityCallbacks<Record<string, unknown>, User> | undefined'.
+          Type 'EntityCallbacks<M, User>' is not assignable to type 'EntityCallbacks<Record<string, unknown>, User>'.
+            Types of property 'afterRead' are incompatible.
+              Type '((props: EntityAfterReadProps<M, User>) => Entity<M> | Promise<Entity<M>>) | undefined' is not assignable to type '((props: EntityAfterReadProps<Record<string, unknown>, User>) => Entity<Record<string, unknown>> | Promise<Entity<Record<string, unknown>>>) | undefined'.
+                Type '(props: EntityAfterReadProps<M, User>) => Entity<M> | Promise<Entity<M>>' is not assignable to type '(props: EntityAfterReadProps<Record<string, unknown>, User>) => Entity<Record<string, unknown>> | Promise<Entity<Record<string, unknown>>>'.
+                  Types of parameters 'props' and 'props' are incompatible.
+                    Type 'EntityAfterReadProps<Record<string, unknown>, User>' is not assignable to type 'EntityAfterReadProps<M, User>'.
+                      Types of property 'collection' are incompatible.
+                        Type 'EntityCollection<Record<string, unknown>, User>' is not assignable to type 'EntityCollection<M, User>'.
+                          Type 'PostgresCollection<Record<string, unknown>, User>' is not assignable to type 'EntityCollection<M, User>'.
+                            Type 'PostgresCollection<Record<string, unknown>, User>' is not assignable to type 'PostgresCollection<M, User>'.
+                              Types of property 'titleProperty' are incompatible.
+                                Type 'string | undefined' is not assignable to type 'Extract<keyof M, string> | undefined'.
+                                  Type 'string' is not assignable to type 'Extract<keyof M, string>'.
+src/util/permissions.ts(234,27): error TS2345: Argument of type 'EntityCollection<M>' is not assignable to parameter of type 'EntityCollection<Record<string, unknown>>'.
+  Type 'PostgresCollection<M, User>' is not assignable to type 'EntityCollection<Record<string, unknown>>'.
+    Type 'PostgresCollection<M, User>' is not assignable to type 'PostgresCollection<Record<string, unknown>, User>'.
+      Types of property 'callbacks' are incompatible.
+        Type 'EntityCallbacks<M, User> | undefined' is not assignable to type 'EntityCallbacks<Record<string, unknown>, User> | undefined'.
+          Type 'EntityCallbacks<M, User>' is not assignable to type 'EntityCallbacks<Record<string, unknown>, User>'.
+            Types of property 'afterRead' are incompatible.
+              Type '((props: EntityAfterReadProps<M, User>) => Entity<M> | Promise<Entity<M>>) | undefined' is not assignable to type '((props: EntityAfterReadProps<Record<string, unknown>, User>) => Entity<Record<string, unknown>> | Promise<Entity<Record<string, unknown>>>) | undefined'.
+                Type '(props: EntityAfterReadProps<M, User>) => Entity<M> | Promise<Entity<M>>' is not assignable to type '(props: EntityAfterReadProps<Record<string, unknown>, User>) => Entity<Record<string, unknown>> | Promise<Entity<Record<string, unknown>>>'.
+                  Types of parameters 'props' and 'props' are incompatible.
+                    Type 'EntityAfterReadProps<Record<string, unknown>, User>' is not assignable to type 'EntityAfterReadProps<M, User>'.
+                      Types of property 'collection' are incompatible.
+                        Type 'EntityCollection<Record<string, unknown>, User>' is not assignable to type 'EntityCollection<M, User>'.
+                          Type 'PostgresCollection<Record<string, unknown>, User>' is not assignable to type 'EntityCollection<M, User>'.
+                            Type 'PostgresCollection<Record<string, unknown>, User>' is not assignable to type 'PostgresCollection<M, User>'.
+                              Types of property 'titleProperty' are incompatible.
+                                Type 'string | undefined' is not assignable to type 'Extract<keyof M, string> | undefined'.
+                                  Type 'string' is not assignable to type 'Extract<keyof M, string>'.
+src/util/references.ts(3,97): error TS2344: Type 'M' does not satisfy the constraint 'Record<string, unknown>'.
+  Type 'object' is not assignable to type 'Record<string, unknown>'.
+    Index signature for type 'string' is missing in type '{}'.
+src/util/resolutions.ts(120,21): error TS2339: Property 'propertyConfig' does not exist on type '{}'.
+ ELIFECYCLE  Command failed with exit code 2.

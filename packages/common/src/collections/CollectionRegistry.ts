@@ -368,8 +368,8 @@ function areCollectionListsEqual(a: EntityCollection[], b: EntityCollection[]) {
 function areCollectionsEqual(a: EntityCollection, b: EntityCollection) {
     const subcollectionsA = getSubcollections(a);
     const subcollectionsB = getSubcollections(b);
-    const { driver: _dA, ...restA } = a as Record<string, any>;
-    const { driver: _dB, ...restB } = b as Record<string, any>;
+    const { driver: _dA, ...restA } = a as unknown as Record<string, unknown>;
+    const { driver: _dB, ...restB } = b as unknown as Record<string, unknown>;
     // Remove subcollections/relations from comparison objects (already handled above)
     delete restA.subcollections;
     delete restB.subcollections;

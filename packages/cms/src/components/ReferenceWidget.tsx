@@ -9,7 +9,7 @@ import { ReferencePreview } from "../preview";
 import { Button, cls } from "@rebasepro/ui";
 import { useCollectionRegistryController } from "../index";
 
-export type ReferenceWidgetProps<M extends Record<string, any>> = {
+export type ReferenceWidgetProps<M extends Record<string, unknown>> = {
     name?: string,
     multiselect?: boolean,
     value: EntityReference | EntityReference[] | null,
@@ -37,7 +37,7 @@ export type ReferenceWidgetProps<M extends Record<string, any>> = {
 /**
  * This field allows selecting reference/s.
  */
-export function ReferenceWidget<M extends Record<string, any>>({
+export function ReferenceWidget<M extends Record<string, unknown>>({
     name,
     multiselect = false,
     path,

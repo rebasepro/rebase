@@ -70,7 +70,7 @@ export interface EntityAfterReadProps<M extends Record<string, any> = any, USER 
     /**
      * Collection of the entity
      */
-    collection: EntityCollection<M, USER>;
+    collection: EntityCollection<Record<string, unknown>, any>;
 
     /**
      * Full path of the CMS where this collection is being fetched.
@@ -117,7 +117,7 @@ export interface EntityAfterSaveProps<M extends Record<string, any> = any, USER 
     /**
      * Resolved collection of the entity
      */
-    collection: EntityCollection<M>;
+    collection: EntityCollection<Record<string, unknown>, any>;
 
     /**
      * Full path of the CMS where this entity is being saved.
@@ -160,7 +160,7 @@ export interface EntityBeforeDeleteProps<M extends Record<string, any> = any, US
     /**
      * collection of the entity being deleted
      */
-    collection: EntityCollection<M>;
+    collection: EntityCollection<Record<string, unknown>, any>;
 
     /**
      * Path of the parent collection
@@ -192,7 +192,7 @@ export interface EntityAfterDeleteProps<M extends Record<string, any> = any, USE
     /**
      * collection of the entity being deleted
      */
-    collection: EntityCollection<M>;
+    collection: EntityCollection<Record<string, unknown>, any>;
 
     /**
      * Path of the parent collection

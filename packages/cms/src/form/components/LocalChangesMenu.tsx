@@ -23,7 +23,7 @@ import { flattenKeys, removeEntityFromCache } from "@rebasepro/core";
 import { PropertyCollectionView } from "../../components/PropertyCollectionView";
 import { mergeDeep } from "@rebasepro/utils";
 
-interface LocalChangesMenuProps<M extends Record<string, any>> {
+interface LocalChangesMenuProps<M extends Record<string, unknown>> {
     cacheKey: string;
     cachedData: Partial<M>;
     formex: FormexController<M>;
@@ -31,7 +31,7 @@ interface LocalChangesMenuProps<M extends Record<string, any>> {
     properties: Properties;
 }
 
-export function LocalChangesMenu<M extends Record<string, any>>({
+export function LocalChangesMenu<M extends Record<string, unknown>>({
     cachedData,
     formex,
     onClearLocalChanges,

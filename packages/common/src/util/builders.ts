@@ -24,7 +24,7 @@ import {
  * @group Builder
  */
 export function buildCollection<
-    M extends Record<string, any> = any,
+    M extends Record<string, unknown> = Record<string, unknown>,
     USER extends User = User>
     (
         collection: EntityCollection<M, USER>
@@ -59,7 +59,7 @@ export function buildProperty<T, P extends Property = Property>(
  * @param properties
  * @group Builder
  */
-export function buildProperties<M extends Record<string, any>>(
+export function buildProperties<M extends Record<string, unknown>>(
     properties: Properties
 ): Properties {
     return properties;
@@ -71,7 +71,7 @@ export function buildProperties<M extends Record<string, any>>(
  * @param propertiesOrBuilder
  * @group Builder
  */
-export function buildPropertiesOrBuilder<M extends Record<string, any>>(
+export function buildPropertiesOrBuilder<M extends Record<string, unknown>>(
     propertiesOrBuilder: Properties
 ): Properties {
     return propertiesOrBuilder;
@@ -107,7 +107,7 @@ export function buildEnumValueConfig(
  * @param callbacks
  * @group Builder
  */
-export function buildEntityCallbacks<M extends Record<string, any> = any>(
+export function buildEntityCallbacks<M extends Record<string, unknown> = Record<string, unknown>>(
     callbacks: EntityCallbacks<M>
 ): EntityCallbacks<M> {
     return callbacks;
@@ -119,7 +119,7 @@ export function buildEntityCallbacks<M extends Record<string, any> = any>(
  * @param additionalFieldDelegate
  * @group Builder
  */
-export function buildAdditionalFieldDelegate<M extends Record<string, any>, USER extends User = User>(
+export function buildAdditionalFieldDelegate<M extends Record<string, unknown>, USER extends User = User>(
     additionalFieldDelegate: AdditionalFieldDelegate<M, USER>
 ): AdditionalFieldDelegate<M, USER> {
     return additionalFieldDelegate;

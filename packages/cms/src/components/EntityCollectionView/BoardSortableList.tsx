@@ -5,7 +5,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { CircularProgress, cls } from "@rebasepro/ui";
 import { BoardItem, BoardItemViewProps } from "./board_types";
 
-interface BoardSortableListProps<M extends Record<string, any>> {
+interface BoardSortableListProps<M extends Record<string, unknown>> {
     columnId: string;
     items: BoardItem<M>[];
     ItemComponent: React.ComponentType<BoardItemViewProps<M>>;
@@ -16,7 +16,7 @@ interface BoardSortableListProps<M extends Record<string, any>> {
     onLoadMore?: () => void;
 }
 
-export function BoardSortableList<M extends Record<string, any>>({
+export function BoardSortableList<M extends Record<string, unknown>>({
     columnId,
     items,
     ItemComponent,
@@ -123,7 +123,7 @@ export function BoardSortableList<M extends Record<string, any>>({
     );
 }
 
-interface SortableItemProps<M extends Record<string, any>> {
+interface SortableItemProps<M extends Record<string, unknown>> {
     item: BoardItem<M>;
     index: number;
     columnId: string;
@@ -131,7 +131,7 @@ interface SortableItemProps<M extends Record<string, any>> {
 }
 
 // Memoized to prevent unnecessary re-renders when other items in the list change
-const SortableItem = memo(function SortableItem<M extends Record<string, any>>({
+const SortableItem = memo(function SortableItem<M extends Record<string, unknown>>({
     item,
     index,
     columnId,
@@ -169,4 +169,4 @@ const SortableItem = memo(function SortableItem<M extends Record<string, any>>({
             />
         </div>
     );
-}) as <M extends Record<string, any>>(props: SortableItemProps<M>) => React.ReactElement;
+}) as <M extends Record<string, unknown>>(props: SortableItemProps<M>) => React.ReactElement;

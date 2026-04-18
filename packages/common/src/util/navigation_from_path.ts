@@ -1,14 +1,14 @@
 import { EntityCollection } from "@rebasepro/types";
-type EntityCustomView<M extends Record<string, any> = any> = { key: string; [key: string]: any };
+type EntityCustomView<M extends Record<string, unknown> = Record<string, unknown>> = { key: string; [key: string]: unknown };
 import { getCollectionPathsCombinations, removeInitialAndTrailingSlashes } from "./navigation_utils";
 import { getSubcollections } from "./resolutions";
 
-export type NavigationViewInternal<M extends Record<string, any> = any> =
+export type NavigationViewInternal<M extends Record<string, unknown> = Record<string, unknown>> =
     | NavigationViewEntityInternal<M>
     | NavigationViewCollectionInternal<M>
     | NavigationViewEntityCustomInternal<M>;
 
-export interface NavigationViewEntityInternal<M extends Record<string, any>> {
+export interface NavigationViewEntityInternal<M extends Record<string, unknown>> {
     type: "entity";
     entityId: string | number;
     slug: string;
@@ -16,7 +16,7 @@ export interface NavigationViewEntityInternal<M extends Record<string, any>> {
     parentCollection: EntityCollection<M>;
 }
 
-export interface NavigationViewCollectionInternal<M extends Record<string, any>> {
+export interface NavigationViewCollectionInternal<M extends Record<string, unknown>> {
     type: "collection";
     id: string;
     slug: string;
@@ -24,7 +24,7 @@ export interface NavigationViewCollectionInternal<M extends Record<string, any>>
     collection: EntityCollection<M>;
 }
 
-export interface NavigationViewEntityCustomInternal<M extends Record<string, any>> {
+export interface NavigationViewEntityCustomInternal<M extends Record<string, unknown>> {
     type: "custom_view";
     slug: string;
     path: string;

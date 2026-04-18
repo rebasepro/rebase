@@ -21,7 +21,7 @@ interface PropertyContext<P extends Property> {
     name?: any
 }
 
-export function getEntitySchema<M extends Record<string, any>>(
+export function getEntitySchema<M extends Record<string, unknown>>(
     entityId: string | number | undefined,
     properties: Properties,
     customFieldValidator?: CustomFieldValidator): z.ZodObject<any> {

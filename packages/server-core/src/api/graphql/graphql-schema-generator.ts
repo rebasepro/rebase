@@ -9,8 +9,9 @@ import {
     GraphQLNonNull,
     GraphQLFieldConfig,
     GraphQLInputObjectType,
+    GraphQLInputFieldConfig
 } from "graphql";
-import { DataDriver, EntityCollection, FetchCollectionProps, Property } from "@rebasepro/types";
+import { DataDriver, EntityCollection, FetchCollectionProps, Property, Entity } from "@rebasepro/types";
 
 /**
  * Lightweight GraphQL schema generator that leverages existing DataDriver
@@ -56,20 +57,20 @@ export class GraphQLSchemaGenerator {
             return this.typeRegistry.get(typeName)!;
         }
 
-        const fields: Record<string, GraphQLFieldConfig<any, any>> = {};
+        const fields: Record<string, GraphQLFieldConfig<unknown, unknown>> = {};
 
         // Add ID field
         fields.id = {
             type: new GraphQLNonNull(GraphQLString),
             description: "Unique identifier",
-            resolve: (source) => source.id
+            resolve: (source: unknown) => (source as Entity<Record<string, unknown>>).id
         };
 
         // Convert properties to GraphQL fields
         Object.entries(collection.properties).forEach(([key, property]) => {
             if (property.type !== "relation" && key !== "id") {
                 const fieldConfig = this.convertPropertyToField(property);
-                fieldConfig.resolve = (source) => source.values?.[key];
+                fieldConfig.resolve = (source: unknown) => (source as Entity<Record<string, unknown>>).values?.[key];
                 fields[key] = fieldConfig;
             }
         });
@@ -84,7 +85,7 @@ export class GraphQLSchemaGenerator {
         return entityType;
     }
 
-    private convertPropertyToField(property: Property): GraphQLFieldConfig<any, any> {
+    private convertPropertyToField(property: Property): GraphQLFieldConfig<unknown, unknown> {
         let type;
 
         switch (property.type) {
@@ -120,7 +121,7 @@ export class GraphQLSchemaGenerator {
             return this.inputTypeRegistry.get(typeName)!;
         }
 
-        const fields: Record<string, any> = {};
+        const fields: Record<string, GraphQLInputFieldConfig> = {};
 
         Object.entries(collection.properties).forEach(([key, property]) => {
             if (property.type !== "relation") {
@@ -161,7 +162,7 @@ export class GraphQLSchemaGenerator {
      * Create Query type using existing DataDriver methods
      */
     private createQueryType(): GraphQLObjectType {
-        const fields: Record<string, GraphQLFieldConfig<any, any>> = {};
+        const fields: Record<string, GraphQLFieldConfig<unknown, unknown>> = {};
 
         this.collections.forEach(collection => {
             const typeName = this.getTypeName(collection);
@@ -175,8 +176,9 @@ export class GraphQLSchemaGenerator {
                 args: {
                     id: { type: new GraphQLNonNull(GraphQLString) }
                 },
-                resolve: async (_, args, context: { driver: DataDriver }) => {
-                    const ds = context.driver || this.driver;
+                resolve: async (_, args, context: unknown) => {
+                    const ctx = context as { driver: DataDriver };
+                    const ds = ctx.driver || this.driver;
                     const entity = await ds.fetchEntity({
                         path: collection.slug,
                         entityId: args.id,
@@ -195,8 +197,9 @@ export class GraphQLSchemaGenerator {
                     where: { type: GraphQLString },
                     orderBy: { type: GraphQLString }
                 },
-                resolve: async (_, args, context: { driver: DataDriver }) => {
-                    const ds = context.driver || this.driver;
+                resolve: async (_, args, context: unknown) => {
+                    const ctx = context as { driver: DataDriver };
+                    const ds = ctx.driver || this.driver;
                     let filter: FetchCollectionProps["filter"] | undefined;
                     if (args.where) {
                         try {
@@ -231,7 +234,7 @@ export class GraphQLSchemaGenerator {
      * Create Mutation type using existing DataDriver methods
      */
     private createMutationType(): GraphQLObjectType {
-        const fields: Record<string, GraphQLFieldConfig<any, any>> = {};
+        const fields: Record<string, GraphQLFieldConfig<unknown, unknown>> = {};
 
         this.collections.forEach(collection => {
             const typeName = this.getTypeName(collection);
@@ -246,8 +249,9 @@ export class GraphQLSchemaGenerator {
                 args: {
                     input: { type: new GraphQLNonNull(inputType) }
                 },
-                resolve: async (_, args, context: { driver: DataDriver }) => {
-                    const ds = context.driver || this.driver;
+                resolve: async (_, args, context: unknown) => {
+                    const ctx = context as { driver: DataDriver };
+                    const ds = ctx.driver || this.driver;
                     const path = collection.slug;
                     const entity = await ds.saveEntity({
                         path,
@@ -266,8 +270,9 @@ export class GraphQLSchemaGenerator {
                     id: { type: new GraphQLNonNull(GraphQLString) },
                     input: { type: new GraphQLNonNull(inputType) }
                 },
-                resolve: async (_, args, context: { driver: DataDriver }) => {
-                    const ds = context.driver || this.driver;
+                resolve: async (_, args, context: unknown) => {
+                    const ctx = context as { driver: DataDriver };
+                    const ds = ctx.driver || this.driver;
                     const entity = await ds.saveEntity({
                         path: collection.slug,
                         entityId: args.id,
@@ -285,9 +290,10 @@ export class GraphQLSchemaGenerator {
                 args: {
                     id: { type: new GraphQLNonNull(GraphQLString) }
                 },
-                resolve: async (_, args, context: { driver: DataDriver }) => {
+                resolve: async (_, args, context: unknown) => {
                     try {
-                        const ds = context.driver || this.driver;
+                        const ctx = context as { driver: DataDriver };
+                        const ds = ctx.driver || this.driver;
                         const existingEntity = await ds.fetchEntity({
                             path: collection.slug,
                             entityId: args.id,

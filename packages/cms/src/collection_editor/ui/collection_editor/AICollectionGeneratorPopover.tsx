@@ -24,7 +24,7 @@ export interface AICollectionGeneratorPopoverProps {
     /**
      * Current collection being edited (if modifying an existing collection)
      */
-    existingCollection?: EntityCollection;
+    existingCollection?: EntityCollection<any>;
 
     /**
      * Callback when a collection is generated or modified.

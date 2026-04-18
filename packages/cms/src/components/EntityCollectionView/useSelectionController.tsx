@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { Entity, SelectionController } from "@rebasepro/types";
 
-export function useSelectionController<M extends Record<string, any> = any>(
+export function useSelectionController<M extends Record<string, unknown> = Record<string, unknown>>(
     onSelectionChange?: (entity: Entity<M>, selected: boolean) => void
 ): SelectionController<M> {
 

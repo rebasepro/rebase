@@ -57,14 +57,14 @@ export interface CollectionsConfigController {
 
 }
 
-export type UpdateCollectionParams<M extends Record<string, any> = any> = {
+export type UpdateCollectionParams<M extends Record<string, unknown> = Record<string, unknown>> = {
     id: string,
     collectionData: Partial<EntityCollection<M>>,
     previousId?: string,
     parentCollectionIds?: string[]
 }
 
-export type SaveCollectionParams<M extends Record<string, any> = any> = {
+export type SaveCollectionParams<M extends Record<string, unknown> = Record<string, unknown>> = {
     id: string,
     collectionData: EntityCollection<M>,
     previousId?: string,

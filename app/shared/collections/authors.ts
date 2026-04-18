@@ -23,7 +23,7 @@ const authorsCollection: EntityCollection = {
             },
             callbacks: {
                 beforeSave: ({ value }) => {
-                    return value?.trim();
+                    return typeof value === "string" ? value.trim() : value;
                 }
             }
         },
@@ -35,7 +35,7 @@ const authorsCollection: EntityCollection = {
             },
             callbacks: {
                 beforeSave: ({ value }) => {
-                    return value?.trim();
+                    return typeof value === "string" ? value.trim() : value;
                 },
                 afterRead: ({ value }) => {
                     // Sample logic to obscure the email for testing

@@ -9,7 +9,7 @@ import { FiltersDialog } from "./FiltersDialog";
 import { Badge, Button, cls, FilterListIcon, IconButton, Tooltip } from "@rebasepro/ui";
 import { toArray } from "@rebasepro/utils";
 
-export type EntityCollectionViewStartActionsProps<M extends Record<string, any>> = {
+export type EntityCollectionViewStartActionsProps<M extends Record<string, unknown>> = {
     collection: EntityCollection<M>;
     path: string;
     relativePath: string;
@@ -23,7 +23,7 @@ export type EntityCollectionViewStartActionsProps<M extends Record<string, any>>
     resolvedProperties?: Properties;
 }
 
-export function EntityCollectionViewStartActions<M extends Record<string, any>>({
+export function EntityCollectionViewStartActions<M extends Record<string, unknown>>({
     collection,
     relativePath,
     parentCollectionIds,
@@ -48,7 +48,7 @@ export function EntityCollectionViewStartActions<M extends Record<string, any>>(
         ? Object.keys(filterValues).filter(key => !forceFilter || !(key in forceFilter)).length
         : 0;
 
-    const actionProps: CollectionActionsProps = {
+    const actionProps: CollectionActionsProps<M> = {
         path,
         relativePath,
         parentCollectionIds,

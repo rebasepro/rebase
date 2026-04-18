@@ -87,7 +87,7 @@ export class PostgresCollectionRegistry extends CollectionRegistry implements Co
      * defined in the schema.
      */
     getRelationKeysForCollection(collectionPath: string): string[] {
-        const collection = this.getCollectionByPath(collectionPath) as import("@rebasepro/types").PostgresCollection<Record<string, unknown>, Record<string, unknown>>;
+        const collection = this.getCollectionByPath(collectionPath) as import("@rebasepro/types").PostgresCollection<Record<string, unknown>, import("@rebasepro/types").User>;
         if (!collection?.relations) return [];
         return collection.relations.map(r => r.relationName || r.localKey || "").filter(Boolean);
     }

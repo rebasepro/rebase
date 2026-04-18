@@ -72,7 +72,7 @@ function RelationPreviewInternal({
         hover={hover} />
 }
 
-function RelationPreviewExisting<M extends Record<string, any> = any>({
+function RelationPreviewExisting<M extends Record<string, unknown> = Record<string, unknown>>({
     relation,
     collection,
     previewProperties,

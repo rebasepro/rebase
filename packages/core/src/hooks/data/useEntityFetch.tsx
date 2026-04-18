@@ -36,7 +36,7 @@ const CACHE: Record<string, Entity<any> | undefined> = {};
  * @group Hooks and utilities
  */
 
-export function useEntityFetch<M extends Record<string, any>, USER extends User>(
+export function useEntityFetch<M extends Record<string, any>, USER extends User = User>(
     {
         path,
         entityId,

@@ -35,7 +35,7 @@ import { setIn } from "@rebasepro/formex";
 import { useBoardDataController } from "./useBoardDataController";
 import { useSideEntityController } from "../../index";
 
-export type EntityCollectionBoardViewProps<M extends Record<string, any> = any> = {
+export type EntityCollectionBoardViewProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     collection: EntityCollection<M>;
     tableController: EntityTableController<M>;
     fullPath: string;
@@ -53,7 +53,7 @@ export type EntityCollectionBoardViewProps<M extends Record<string, any> = any> 
 /**
  * Kanban board view for displaying entities grouped by a string enum property.
  */
-export function EntityCollectionBoardView<M extends Record<string, any> = any>({
+export function EntityCollectionBoardView<M extends Record<string, unknown> = Record<string, unknown>>({
     collection,
     tableController,
     fullPath,

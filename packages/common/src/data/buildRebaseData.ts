@@ -39,10 +39,10 @@ function convertWhereToFilter(where?: Record<string, string>): FilterValues<stri
         if (dotIndex === -1) continue;
 
         const op = rawValue.substring(0, dotIndex);
-        let value: any = rawValue.substring(dotIndex + 1);
+        let value: unknown = rawValue.substring(dotIndex + 1);
 
         // Parse list values like "(admin,editor)"
-        if (value.startsWith("(") && value.endsWith(")")) {
+        if (typeof value === "string" && value.startsWith("(") && value.endsWith(")")) {
             value = value.slice(1, -1).split(",").map((v: string) => v.trim());
         }
 
@@ -74,7 +74,7 @@ function parseOrderBy(orderBy?: string): [string, "asc" | "desc"] | undefined {
 /**
  * Create a CollectionAccessor that delegates to a DataDriver for a given collection slug.
  */
-function createDriverAccessor<M extends Record<string, any> = any>(
+function createDriverAccessor<M extends Record<string, unknown> = Record<string, unknown>>(
     driver: DataDriver,
     slug: string
 ): CollectionAccessor<M> {

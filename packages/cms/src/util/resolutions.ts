@@ -32,7 +32,7 @@ export function resolveEntityView(
     }
 }
 
-export function resolveEntityAction<M extends Record<string, any>>(
+export function resolveEntityAction<M extends Record<string, unknown>>(
     entityAction: string | EntityAction<M>,
     contextEntityActions?: EntityAction<M>[]
 ): EntityAction<M> | undefined {
@@ -43,7 +43,7 @@ export function resolveEntityAction<M extends Record<string, any>>(
     }
 }
 
-export function resolvedSelectedEntityView<M extends Record<string, any>>(
+export function resolvedSelectedEntityView<M extends Record<string, unknown>>(
     customViews: (string | EntityCustomView<M>)[] | undefined,
     customizationController: CustomizationController,
     selectedTab?: string,

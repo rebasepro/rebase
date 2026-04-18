@@ -19,7 +19,7 @@ import { useAuthController, useCustomizationController, useData, useRebaseContex
 import type { OnCellValueChangeParams } from "@rebasepro/core";
 import { isReadOnly } from "@rebasepro/common";
 
-interface PopupFormFieldProps<M extends Record<string, any>> {
+interface PopupFormFieldProps<M extends Record<string, unknown>> {
     customFieldValidator?: CustomFieldValidator;
     path: string;
     entityId: string | number;
@@ -37,13 +37,13 @@ interface PopupFormFieldProps<M extends Record<string, any>> {
     onCellValueChange?: (params: OnCellValueChangeParams<any, any>) => Promise<void> | void;
 }
 
-export function PopupFormField<M extends Record<string, any>>(props: PopupFormFieldProps<M>) {
+export function PopupFormField<M extends Record<string, unknown>>(props: PopupFormFieldProps<M>) {
     if (!props.open) return null;
     return <PopupFormFieldLoading {...props} />;
 
 }
 
-export function PopupFormFieldLoading<M extends Record<string, any>>({
+export function PopupFormFieldLoading<M extends Record<string, unknown>>({
     tableKey,
     entityId,
     customFieldValidator,
@@ -80,7 +80,7 @@ export function PopupFormFieldLoading<M extends Record<string, any>>({
     }} entity={entity} />;
 }
 
-export function PopupFormFieldInternal<M extends Record<string, any>>({
+export function PopupFormFieldInternal<M extends Record<string, unknown>>({
     tableKey,
     entityId,
     customFieldValidator,

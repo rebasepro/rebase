@@ -39,9 +39,9 @@ export class RestApiGenerator {
     /**
      * Get the EntityFetchService from a driver if it exposes one (for include support)
      */
-    private getFetchService(driver: DataDriver): any {
+    private getFetchService(driver: DataDriver): Record<string, (...args: unknown[]) => unknown> | null {
         if ("entityService" in driver && typeof driver.entityService === "object" && driver.entityService) {
-            const es = driver.entityService as any;
+            const es = driver.entityService as Record<string, unknown>;
             if (typeof es.getFetchService === "function") {
                 return es.getFetchService();
             }
@@ -87,7 +87,7 @@ export class RestApiGenerator {
                         total,
                         limit: queryOptions.limit,
                         offset: queryOptions.offset,
-                        hasMore: (queryOptions.offset || 0) + entities.length < total
+                        hasMore: (queryOptions.offset || 0) + (entities as unknown[]).length < total
                     }
                 });
             }
@@ -102,7 +102,7 @@ export class RestApiGenerator {
                     total,
                     limit: queryOptions.limit,
                     offset: queryOptions.offset,
-                    hasMore: (queryOptions.offset || 0) + entities.length < total
+                    hasMore: (queryOptions.offset || 0) + (entities as unknown[]).length < total
                 }
             });
         });
@@ -260,8 +260,8 @@ export class RestApiGenerator {
         };
 
         // GET /<subcollection-path> — list or get single entity
-        this.router.get("/*", async (c) => {
-            const rawPath = c.req.path.replace(/^\//, "");
+        this.router.get("/:parent/:parentId/*", async (c) => {
+            const rawPath = `${c.req.param("parent")}/${c.req.param("parentId")}/${c.req.param("*")}`;
             const parsed = parseSubPath(rawPath);
             if (!parsed) return c.notFound();
 
@@ -300,8 +300,8 @@ export class RestApiGenerator {
         });
 
         // POST /<subcollection-path> — create entity
-        this.router.post("/*", async (c) => {
-            const rawPath = c.req.path.replace(/^\//, "");
+        this.router.post("/:parent/:parentId/*", async (c) => {
+            const rawPath = `${c.req.param("parent")}/${c.req.param("parentId")}/${c.req.param("*")}`;
             const parsed = parseSubPath(rawPath);
             if (!parsed || parsed.entityId) return c.notFound();
 
@@ -318,8 +318,8 @@ export class RestApiGenerator {
         });
 
         // PUT /<subcollection-path>/:id — update entity
-        this.router.put("/*", async (c) => {
-            const rawPath = c.req.path.replace(/^\//, "");
+        this.router.put("/:parent/:parentId/*", async (c) => {
+            const rawPath = `${c.req.param("parent")}/${c.req.param("parentId")}/${c.req.param("*")}`;
             const parsed = parseSubPath(rawPath);
             if (!parsed || !parsed.entityId) return c.notFound();
 
@@ -337,8 +337,8 @@ export class RestApiGenerator {
         });
 
         // DELETE /<subcollection-path>/:id — delete entity
-        this.router.delete("/*", async (c) => {
-            const rawPath = c.req.path.replace(/^\//, "");
+        this.router.delete("/:parent/:parentId/*", async (c) => {
+            const rawPath = `${c.req.param("parent")}/${c.req.param("parentId")}/${c.req.param("*")}`;
             const parsed = parseSubPath(rawPath);
             if (!parsed || !parsed.entityId) return c.notFound();
 
