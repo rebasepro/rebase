@@ -15,6 +15,9 @@ export function useBuildSideDialogsController(): SideDialogsController {
     const location = useLocation();
     const navigate = useNavigate();
 
+    const locationRef = useRef(location);
+    locationRef.current = location;
+
     const [sidePanels, setSidePanels] = useState<SideDialogPanelProps[]>([]);
     const sidePanelsRef = useRef<SideDialogPanelProps[]>(sidePanels);
 
@@ -57,7 +60,7 @@ export function useBuildSideDialogsController(): SideDialogsController {
                 navigate(-1);
             routesCount.current--;
         } else if (lastSidePanel.parentUrlPath) {
-            const baseLocation = (location.state as SideDialogLocationState | null)?.base_location ?? location;
+            const baseLocation = (locationRef.current.state as SideDialogLocationState | null)?.base_location ?? locationRef.current;
             navigate(
                 lastSidePanel.parentUrlPath,
                 {
@@ -69,7 +72,7 @@ export function useBuildSideDialogsController(): SideDialogsController {
                 }
             );
         }
-    }, [navigate, location]);
+    }, [navigate]);
 
     const open = useCallback((panelProps: SideDialogPanelProps | SideDialogPanelProps[]) => {
 
@@ -80,7 +83,7 @@ export function useBuildSideDialogsController(): SideDialogsController {
         });
         routesCount.current = routesCount.current + newPanels.length;
 
-        const baseLocation = (location.state as SideDialogLocationState | null)?.base_location ?? location;
+        const baseLocation = (locationRef.current.state as SideDialogLocationState | null)?.base_location ?? locationRef.current;
 
         const currentPanels = sidePanelsRef.current;
         const updatedPanels = [...currentPanels, ...newPanels];
@@ -100,7 +103,7 @@ export function useBuildSideDialogsController(): SideDialogsController {
             }
         });
 
-    }, [location, navigate]);
+    }, [navigate]);
 
     const replace = useCallback((panelProps: SideDialogPanelProps | SideDialogPanelProps[]) => {
 
@@ -109,7 +112,7 @@ export function useBuildSideDialogsController(): SideDialogsController {
             routesStore.current[panel.key] = panel;
         });
 
-        const baseLocation = (location.state as SideDialogLocationState | null)?.base_location ?? location;
+        const baseLocation = (locationRef.current.state as SideDialogLocationState | null)?.base_location ?? locationRef.current;
 
         const currentPanels = sidePanelsRef.current;
         const updatedPanels = [...currentPanels.slice(0, -newPanels.length), ...newPanels];
@@ -130,7 +133,7 @@ export function useBuildSideDialogsController(): SideDialogsController {
             }
         });
 
-    }, [location, navigate]);
+    }, [navigate]);
 
     return {
         sidePanels,

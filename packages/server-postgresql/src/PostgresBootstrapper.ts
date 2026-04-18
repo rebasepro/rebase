@@ -80,7 +80,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             // Currently config from init.ts is `{ collections, collectionRegistry }`
             const { collections, collectionRegistry } = config as {
                 collections?: EntityCollection[];
-                collectionRegistry?: any;
+                collectionRegistry?: unknown;
             };
 
             // Create a fresh registry for this driver
@@ -92,8 +92,8 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             // Register tables
             if (pgConfig.schema?.tables) {
                 Object.values(pgConfig.schema.tables).forEach((table) => {
-                    if (isTable(table as any)) {
-                        const tableName = getTableName(table as any);
+                    if (isTable(table)) {
+                        const tableName = getTableName(table);
                         registry.registerTable(table as PgTable, tableName);
                     }
                 });
@@ -197,7 +197,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
 
             await ensureHistoryTableExists(db);
             
-            const retention = typeof historyConfig === "object" ? (historyConfig as any).retention : undefined;
+            const retention = typeof historyConfig === "object" && historyConfig !== null ? (historyConfig as { retention?: number }).retention : undefined;
             const historyService = new HistoryService(db, retention);
 
             return { historyService };

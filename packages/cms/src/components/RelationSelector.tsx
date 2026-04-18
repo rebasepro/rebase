@@ -22,6 +22,7 @@ import {
 import { Entity, EntityRelation, FilterValues, Relation } from "@rebasepro/types";
 import { EntityPreviewData } from "./EntityPreview";
 import { useData, useRelationSelector } from "@rebasepro/core";
+import { normalizeToEntityRelation } from "@rebasepro/common";
 import { EmptyValue } from "../preview";
 
 export interface RelationItem {
@@ -112,47 +113,125 @@ export const RelationSelector = React.forwardRef<
         const contentRef = useRef<HTMLDivElement | null>(null);
         const searchInputRef = useRef<HTMLInputElement | null>(null);
 
-        const computeSelectedItems = useCallback(async (val?: EntityRelation | EntityRelation[] | null) => {
-            if (!val) return [] as RelationItem[];
-            const relationsArray = Array.isArray(val) ? val : [val];
-            const promises = relationsArray.map(async (rel) => {
-                const isPrimitive = typeof rel === "string" || typeof rel === "number";
-                const relId = isPrimitive ? rel : rel.id;
-                const path = isPrimitive ? collection.slug : rel.path;
-                
-                try {
-                    let entity = rel?.data;
-                    if (!entity) {
-                        entity = await dataClient.collection(path).findById(relId);
-                    }
-                    if (entity) return entityToRelationItem(entity, isPrimitive ? new EntityRelation(relId, path) : rel);
-                } catch (e) {
-                    console.warn("RelationSelector: could not fetch entity for relation", rel, e);
-                }
-                return {
-                    id: relId,
-                    label: String(relId),
-                    relation: isPrimitive ? new EntityRelation(relId, path) : rel
-                } as RelationItem;
-            });
-            return Promise.all(promises);
-        }, [dataClient, collection, entityToRelationItem]);
+        // Keep stable refs for dependencies used in the value-resolution effect
+        // so the effect only re-fires when the actual `value` identity changes.
+        const dataClientRef = useRef(dataClient);
+        dataClientRef.current = dataClient;
+        const entityToRelationItemRef = useRef(entityToRelationItem);
+        entityToRelationItemRef.current = entityToRelationItem;
+        const collectionSlugRef = useRef(collection.slug);
+        collectionSlugRef.current = collection.slug;
+
+        // Stable ref to track which IDs we've already resolved
+        const resolvedIdsRef = useRef<string>("");
+        // Track whether we have resolved items (used for skip guard without adding to deps)
+        const hasResolvedItemsRef = useRef(false);
+
+        const selectedItemsRef = useRef(selectedItems);
+        selectedItemsRef.current = selectedItems;
 
         useEffect(() => {
             let active = true;
+
+            // Normalize incoming values — plain { __type: "relation" } objects
+            // from the server are converted to proper EntityRelation instances.
+            const rawArray = !value ? [] : Array.isArray(value) ? value : [value];
+            const relationsArray = rawArray.map(rel => {
+                if (typeof rel === "string" || typeof rel === "number") return rel;
+                return normalizeToEntityRelation(rel) ?? rel;
+            });
+
+            // Build a fingerprint of the incoming value's IDs
+            const incomingIds = relationsArray
+                .map(rel => {
+                    const isPrimitive = typeof rel === "string" || typeof rel === "number";
+                    return String(isPrimitive ? rel : (rel as EntityRelation).id);
+                })
+                .sort()
+                .join(",");
+
+            // Check if every relation already has embedded data
+            const allHaveData = relationsArray.length > 0 && relationsArray.every(rel => {
+                if (typeof rel === "string" || typeof rel === "number") return false;
+                return !!(rel as EntityRelation)?.data;
+            });
+
+            // If the IDs haven't changed and we already resolved them, skip entirely
+            if (incomingIds === resolvedIdsRef.current && (allHaveData || hasResolvedItemsRef.current)) {
+                return;
+            }
+
+            // MATCH PATH: selectedItems already cover all incoming IDs.
+            // Happens when the user just picked from the dropdown and the server echoes back
+            // the value without embedded .data — no need to re-fetch.
+            const currentSelected = selectedItemsRef.current;
+            if (currentSelected.length > 0 && currentSelected.length === relationsArray.length) {
+                const currentIds = new Set(currentSelected.map(item => String(item.id)));
+                const allCovered = relationsArray.every(rel => {
+                    const isPrimitive = typeof rel === "string" || typeof rel === "number";
+                    return currentIds.has(String(isPrimitive ? rel : (rel as EntityRelation).id));
+                });
+                if (allCovered) {
+                    hasResolvedItemsRef.current = true;
+                    resolvedIdsRef.current = incomingIds;
+                    return;
+                }
+            }
+
+            // FAST PATH: all data is embedded — resolve synchronously, no loading flash
+            if (allHaveData) {
+                const toRelationItem = entityToRelationItemRef.current;
+                const resolved = relationsArray.map(rel => {
+                    const r = rel as EntityRelation;
+                    if (r.data) return toRelationItem(r.data, r);
+                    return { id: r.id, label: String(r.id), relation: r } as RelationItem;
+                });
+                setSelectedItems(resolved);
+                hasResolvedItemsRef.current = true;
+                resolvedIdsRef.current = incomingIds;
+                return;
+            }
+
+            // SLOW PATH: need to fetch missing data — show loading
             if (value && (!Array.isArray(value) || value.length > 0)) {
                 setIsLoadingSelectedItems(true);
             }
-            computeSelectedItems(value || undefined).then(resolved => {
+
+            const slug = collectionSlugRef.current;
+            const client = dataClientRef.current;
+            const toRelationItem = entityToRelationItemRef.current;
+
+            Promise.all(
+                relationsArray.map(async (rel) => {
+                    const isPrimitive = typeof rel === "string" || typeof rel === "number";
+                    const relId = isPrimitive ? rel : (rel as EntityRelation).id;
+                    const path = isPrimitive ? slug : (rel as EntityRelation).path;
+                    try {
+                        let entity = isPrimitive ? undefined : (rel as EntityRelation)?.data;
+                        if (!entity) {
+                            entity = await client.collection(path).findById(relId);
+                        }
+                        const relation = isPrimitive ? new EntityRelation(relId, path) : rel as EntityRelation;
+                        if (entity) return toRelationItem(entity, relation);
+                    } catch (e) {
+                        console.warn("RelationSelector: could not fetch entity for relation", rel, e);
+                    }
+                    const relation = isPrimitive ? new EntityRelation(relId as string | number, path) : rel as EntityRelation;
+                    return { id: relId, label: String(relId), relation } as RelationItem;
+                })
+            ).then(resolved => {
                 if (active) {
                     setSelectedItems(resolved);
                     setIsLoadingSelectedItems(false);
+                    hasResolvedItemsRef.current = true;
+                    resolvedIdsRef.current = incomingIds;
                 }
             });
+
             return () => {
                 active = false;
             };
-        }, [value, computeSelectedItems]);
+        }, [value]);
 
         const sentinelCallbackRef = useCallback((node: HTMLDivElement | null) => {
             if (observerRef.current) {

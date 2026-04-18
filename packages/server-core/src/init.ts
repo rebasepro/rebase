@@ -41,6 +41,7 @@ export interface RebaseBackendConfig {
     storage?: BackendStorageConfig | Record<string, BackendStorageConfig>;
     history?: unknown;
     enableSwagger?: boolean;
+    functionsDir?: string;
 }
 
 export interface RebaseBackendInstance {
@@ -261,6 +262,29 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
 
         config.app.route(`${basePath}/data`, dataRouter);
+    }
+
+    // 5. Mount Custom Functions
+    if (config.functionsDir) {
+        const { loadFunctionsFromDirectory } = await import("./functions/function-loader");
+        const { createFunctionRoutes } = await import("./functions/function-routes");
+
+        const loadedFunctions = await loadFunctionsFromDirectory(config.functionsDir);
+
+        if (loadedFunctions.length > 0) {
+            const functionsRouter = new Hono<HonoEnv>();
+
+            // Apply auth middleware — delegates to RLS, per-route auth is up to the function
+            functionsRouter.use("/*", createAuthMiddleware({
+                driver: defaultDriver,
+                requireAuth: false
+            }));
+
+            const fnRoutes = createFunctionRoutes(loadedFunctions);
+            functionsRouter.route("/", fnRoutes);
+            config.app.route(`${basePath}/functions`, functionsRouter);
+            console.log(`⚡ Mounted ${loadedFunctions.length} custom function(s) at ${basePath}/functions`);
+        }
     }
 
     if ((defaultBootstrapper as any).initializeWebsockets) {

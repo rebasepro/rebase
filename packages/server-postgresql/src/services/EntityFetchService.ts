@@ -34,9 +34,9 @@ export class EntityFetchService {
      * Get the relational query builder for a given table name.
      * Safely narrows the DrizzleClient union type to access db.query[tableName].
      */
-    private getQueryBuilder(tableName: string): RelationalQueryBuilder<any, any> | undefined {
+    private getQueryBuilder(tableName: string): RelationalQueryBuilder<Record<string, unknown>, Record<string, unknown>> | undefined {
         const query = (this.db as { query?: DbQueryAccessor }).query;
-        return query?.[tableName];
+        return query?.[tableName] as RelationalQueryBuilder<Record<string, unknown>, Record<string, unknown>> | undefined;
     }
 
     /**
@@ -231,6 +231,113 @@ export class EntityFetchService {
     }
 
     /**
+     * Post-fetch joinPath relations for a single entity.
+     * joinPath relations cannot be expressed via Drizzle's `with` config,
+     * so they must be loaded separately after the primary query.
+     */
+    private async resolveJoinPathRelations<M extends Record<string, any>>(
+        entity: Entity<M>,
+        collection: EntityCollection,
+        collectionPath: string,
+        parsedId: string | number,
+        databaseId?: string
+    ): Promise<void> {
+        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection<any, any>);
+        const propertyKeys = new Set(Object.keys(collection.properties || {}));
+
+        const promises = Object.entries(resolvedRelations)
+            .filter(([key, relation]) => propertyKeys.has(key) && relation.joinPath && relation.joinPath.length > 0)
+            .map(async ([key, relation]) => {
+                try {
+                    const relatedEntities = await this.relationService.fetchRelatedEntities(
+                        collectionPath,
+                        parsedId,
+                        key,
+                        { limit: relation.cardinality === "one" ? 1 : undefined }
+                    );
+
+                    if (relation.cardinality === "one" && relatedEntities.length > 0) {
+                        const e = relatedEntities[0];
+                        (entity.values as Record<string, unknown>)[key] = {
+                            id: e.id,
+                            path: e.path,
+                            __type: "relation" as const,
+                            data: e
+                        };
+                    } else if (relation.cardinality === "many") {
+                        (entity.values as Record<string, unknown>)[key] = relatedEntities.map(e => ({
+                            id: e.id,
+                            path: e.path,
+                            __type: "relation" as const,
+                            data: e
+                        }));
+                    }
+                } catch (e) {
+                    console.warn(`Could not resolve joinPath relation '${key}':`, e);
+                }
+            });
+
+        await Promise.all(promises);
+    }
+
+    /**
+     * Post-fetch joinPath relations for a batch of entities.
+     * Uses batch fetching to avoid N+1 queries for list views.
+     */
+    private async resolveJoinPathRelationsBatch<M extends Record<string, any>>(
+        entities: Entity<M>[],
+        collection: EntityCollection,
+        collectionPath: string,
+        idInfo: { fieldName: string; type: "string" | "number" },
+        databaseId?: string
+    ): Promise<void> {
+        if (entities.length === 0) return;
+
+        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection<any, any>);
+        const propertyKeys = new Set(Object.keys(collection.properties || {}));
+
+        const joinPathRelations = Object.entries(resolvedRelations)
+            .filter(([key, relation]) => propertyKeys.has(key) && relation.joinPath && relation.joinPath.length > 0);
+
+        if (joinPathRelations.length === 0) return;
+
+        for (const [key, relation] of joinPathRelations) {
+            try {
+                const entityIds = entities.map(e => {
+                    const parsed = parseIdValues(e.id, [idInfo]);
+                    return parsed[idInfo.fieldName] as string | number;
+                });
+
+                const resultMap = await this.relationService.batchFetchRelatedEntities(
+                    collectionPath,
+                    entityIds,
+                    key,
+                    relation
+                );
+
+                for (const entity of entities) {
+                    const parsed = parseIdValues(entity.id, [idInfo]);
+                    const entityId = parsed[idInfo.fieldName] as string | number;
+                    const relatedEntity = resultMap.get(entityId);
+
+                    if (relatedEntity) {
+                        if (relation.cardinality === "one") {
+                            (entity.values as Record<string, unknown>)[key] = {
+                                id: relatedEntity.id,
+                                path: relatedEntity.path,
+                                __type: "relation" as const,
+                                data: relatedEntity
+                            };
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn(`Could not batch resolve joinPath relation '${key}':`, e);
+            }
+        }
+    }
+
+    /**
      * Convert a db.query result row to a flat REST-style object with populated relations.
      */
     private drizzleResultToRestRow(
@@ -326,7 +433,7 @@ export class EntityFetchService {
         }
 
         // OrderBy
-        const orderExpressions: any[] = [];
+        const orderExpressions: unknown[] = [];
         if (options.orderBy) {
             const orderByField = table[options.orderBy as keyof typeof table] as AnyPgColumn;
             if (orderByField) {
@@ -422,11 +529,16 @@ export class EntityFetchService {
                 const row = await qb.findFirst({
                     where: eq(idField, parsedId),
                     with: withConfig
-                } as any);
+                } as unknown as Parameters<NonNullable<typeof qb>["findFirst"]>[0]);
 
                 if (!row) return undefined;
 
-                return this.drizzleResultToEntity<M>(row, collection, collectionPath, idInfo, databaseId, idInfoArray);
+                const entity = this.drizzleResultToEntity<M>(row, collection, collectionPath, idInfo, databaseId, idInfoArray);
+
+                // Post-fetch joinPath relations that Drizzle's `with` can't express
+                await this.resolveJoinPathRelations(entity, collection, collectionPath, parsedId, databaseId);
+
+                return entity;
             } catch (e) {
                 console.warn(`[EntityFetchService] db.query.findFirst failed for ${collectionPath}, falling back to db.select:`, e);
             }
@@ -535,11 +647,16 @@ export class EntityFetchService {
                 );
 
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic query config
-                const results = await qb.findMany(queryOpts as any);
+                const results = await qb.findMany(queryOpts as unknown as Parameters<NonNullable<typeof qb>["findMany"]>[0]);
 
-                return (results as Record<string, unknown>[]).map(row =>
+                const entities = (results as Record<string, unknown>[]).map(row =>
                     this.drizzleResultToEntity<M>(row, collection, collectionPath, idInfo, options.databaseId, idInfoArray)
                 );
+
+                // Post-fetch joinPath relations that Drizzle's `with` can't express
+                await this.resolveJoinPathRelationsBatch(entities, collection, collectionPath, idInfo, options.databaseId);
+
+                return entities;
             } catch (e) {
                 console.warn(`[EntityFetchService] db.query.findMany failed for ${collectionPath}, falling back to db.select:`, e);
             }
@@ -964,7 +1081,7 @@ export class EntityFetchService {
                 );
 
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic query config
-                const results = await qb.findMany(queryOpts as any);
+                const results = await qb.findMany(queryOpts as unknown as Parameters<NonNullable<typeof qb>["findMany"]>[0]);
 
                 return (results as Record<string, unknown>[]).map(row =>
                     this.drizzleResultToRestRow(row, collection, idInfo, idInfoArray)
@@ -1067,7 +1184,7 @@ export class EntityFetchService {
                 const row = await qb.findFirst({
                     where: eq(idField, parsedId),
                     ...(withConfig ? { with: withConfig } : {})
-                } as any);
+                } as unknown as Parameters<NonNullable<typeof qb>["findFirst"]>[0]);
 
                 if (!row) return null;
 
@@ -1261,7 +1378,7 @@ export class EntityFetchService {
             }
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- deprecated method, will be removed
-            const results = await queryTarget.findMany(queryOpts as any);
+            const results = await queryTarget.findMany(queryOpts as unknown as Parameters<NonNullable<typeof queryTarget>["findMany"]>[0]);
 
             // Flatten the nested Drizzle results into REST format
             return results.map((row: Record<string, unknown>) => {

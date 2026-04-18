@@ -1,0 +1,28 @@
+# Dependencies (re-installed inside the container)
+node_modules
+**/node_modules
+
+# Build artifacts
+**/dist
+**/.turbo
+
+# Dev / IDE
+.git
+.gitignore
+.vscode
+.idea
+**/.DS_Store
+
+# Environment (secrets should be injected, not baked in)
+.env
+.env.local
+.env.*.local
+
+# Docker
+docker-compose*.yml
+**/Dockerfile
+
+# Docs / misc
+README.md
+LICENSE
+*.md

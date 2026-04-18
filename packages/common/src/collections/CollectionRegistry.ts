@@ -15,7 +15,7 @@ import { deepEqual } from "fast-equals";
 
 import { enumToObjectEntries, getSubcollections, getTableName, resolveCollectionRelations } from "../util";
 import cloneDeep from "lodash/cloneDeep.js";
-import { removeFunctions } from "@rebasepro/utils";
+import { removeFunctions, mergeDeep } from "@rebasepro/utils";
 
 export class CollectionRegistry {
 
@@ -149,6 +149,22 @@ export class CollectionRegistry {
         const properties: Properties = this.normalizeProperties(collection.properties, relations);
 
         collection.properties = properties;
+        
+        // Populate childCollections from driver-specific fields
+        if (!collection.childCollections) {
+            if (isFirebaseCollection(collection) && collection.subcollections) {
+                collection.childCollections = collection.subcollections;
+            } else if (isPostgresCollection(collection) && collection.relations) {
+                const manyRelations = collection.relations.filter(r => r.cardinality === "many");
+                if (manyRelations.length > 0) {
+                    collection.childCollections = () => manyRelations.map(r => {
+                        const target = r.target();
+                        return r.overrides ? mergeDeep(target, r.overrides) : target;
+                    });
+                }
+            }
+        }
+        
         return collection;
     }
 
@@ -313,8 +329,8 @@ export class CollectionRegistry {
 
             if (i + 1 < pathSegments.length) {
                 const subcollectionSlug = pathSegments[i + 1];
-                const subcollections: EntityCollection[] | undefined = isFirebaseCollection(currentCollection) ? currentCollection.subcollections?.() : undefined;
-                if (!subcollections) {
+                const subcollections: EntityCollection[] | undefined = getSubcollections(currentCollection);
+                if (!subcollections || subcollections.length === 0) {
                     throw new Error(`No subcollections found for ${currentCollection.slug} in path: ${path}`);
                 }
 
@@ -350,16 +366,16 @@ function areCollectionListsEqual(a: EntityCollection[], b: EntityCollection[]) {
 }
 
 function areCollectionsEqual(a: EntityCollection, b: EntityCollection) {
-    const hasSubA = isFirebaseCollection(a);
-    const hasSubB = isFirebaseCollection(b);
-    const subcollectionsA = hasSubA ? a.subcollections : undefined;
-    const subcollectionsB = hasSubB ? b.subcollections : undefined;
+    const subcollectionsA = getSubcollections(a);
+    const subcollectionsB = getSubcollections(b);
     const { driver: _dA, ...restA } = a as Record<string, any>;
     const { driver: _dB, ...restB } = b as Record<string, any>;
-    // Remove subcollections from comparison objects (already handled above)
+    // Remove subcollections/relations from comparison objects (already handled above)
     delete restA.subcollections;
     delete restB.subcollections;
-    if (!areCollectionListsEqual(subcollectionsA?.() ?? [], subcollectionsB?.() ?? [])) {
+    delete restA.relations;
+    delete restB.relations;
+    if (!areCollectionListsEqual(subcollectionsA, subcollectionsB)) {
         return false;
     }
     return deepEqual(removeFunctions(restA), removeFunctions(restB));

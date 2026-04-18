@@ -364,7 +364,6 @@ export function EntityEditViewInner<M extends Record<string, any>>({
         disabled={!canEdit}
         {...formProps}
         onEntityChange={(entity) => {
-            console.log("333 EntityEditView onEntityChange:", entity);
             setUsedEntity(entity);
             formProps?.onEntityChange?.(entity);
         }}

@@ -64,7 +64,7 @@ describe("createCollectionClient", () => {
             const result = await client.find({ limit: 10, offset: 20 });
 
             expect(result).toEqual({
-                data: [{ id: 1, path: "posts", values: { title: "Hello" } }],
+                data: [{ id: 1, path: "posts", values: { id: 1, title: "Hello" } }],
                 meta: { total: 1, limit: 10, offset: 20, hasMore: false }
             });
             expect(mockRequest).toHaveBeenCalledWith("/data/posts?limit=10&offset=20", { method: "GET" });
@@ -99,8 +99,8 @@ describe("createCollectionClient", () => {
 
             const result = await client.find();
             expect(result.data).toHaveLength(2);
-            expect(result.data[0]).toEqual({ id: "a", path: "posts", values: { title: "First", status: "published" } });
-            expect(result.data[1]).toEqual({ id: "b", path: "posts", values: { title: "Second", status: "draft" } });
+            expect(result.data[0]).toEqual({ id: "a", path: "posts", values: { id: "a", title: "First", status: "published" } });
+            expect(result.data[1]).toEqual({ id: "b", path: "posts", values: { id: "b", title: "Second", status: "draft" } });
         });
 
         it("passes where filter parameters correctly", async () => {
@@ -129,7 +129,7 @@ describe("createCollectionClient", () => {
             mockRequest.mockResolvedValueOnce({ id: "123", title: "Test" });
 
             const result = await client.findById("123");
-            expect(result).toEqual({ id: "123", path: "posts", values: { title: "Test" } });
+            expect(result).toEqual({ id: "123", path: "posts", values: { id: "123", title: "Test" } });
             expect(mockRequest).toHaveBeenCalledWith("/data/posts/123", { method: "GET" });
         });
 
@@ -169,7 +169,7 @@ describe("createCollectionClient", () => {
             const input: Partial<PostModel> = { title: "New" };
             const result = await client.create(input);
 
-            expect(result).toEqual({ id: 1, path: "posts", values: { title: "New" } });
+            expect(result).toEqual({ id: 1, path: "posts", values: { id: 1, title: "New" } });
             expect(mockRequest).toHaveBeenCalledWith("/data/posts", { method: "POST", body: JSON.stringify(input) });
         });
 
@@ -180,7 +180,7 @@ describe("createCollectionClient", () => {
             const input: Partial<PostModel> = { title: "Custom" };
             const result = await client.create(input, "custom-id");
 
-            expect(result).toEqual({ id: "custom-id", path: "posts", values: { title: "Custom" } });
+            expect(result).toEqual({ id: "custom-id", path: "posts", values: { id: "custom-id", title: "Custom" } });
             expect(mockRequest).toHaveBeenCalledWith("/data/posts", {
                 method: "POST",
                 body: JSON.stringify({ title: "Custom", id: "custom-id" })
@@ -208,7 +208,7 @@ describe("createCollectionClient", () => {
             const patch: Partial<PostModel> = { title: "Updated" };
             const result = await client.update(1, patch);
 
-            expect(result).toEqual({ id: 1, path: "posts", values: { title: "Updated" } });
+            expect(result).toEqual({ id: 1, path: "posts", values: { id: 1, title: "Updated" } });
             expect(mockRequest).toHaveBeenCalledWith("/data/posts/1", { method: "PUT", body: JSON.stringify(patch) });
         });
 
@@ -451,6 +451,57 @@ describe("createCollectionClient", () => {
                 .find();
 
             expect(result.data).toHaveLength(1);
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // Regression: id fields must stay in values
+    // -----------------------------------------------------------------------
+    describe("id preservation in values (regression)", () => {
+        it("find keeps id inside entity values", async () => {
+            const client = createCollectionClient<PostModel>(transport, "posts");
+            mockRequest.mockResolvedValueOnce({ data: [{ id: "abc", title: "Test" }], meta: {} });
+
+            const result = await client.find();
+            expect(result.data[0].values).toHaveProperty("id", "abc");
+            expect(result.data[0].id).toBe("abc");
+        });
+
+        it("findById keeps id inside entity values", async () => {
+            const client = createCollectionClient<PostModel>(transport, "posts");
+            mockRequest.mockResolvedValueOnce({ id: 42, title: "Test" });
+
+            const result = await client.findById(42);
+            expect(result!.values).toHaveProperty("id", 42);
+            expect(result!.id).toBe(42);
+        });
+
+        it("create keeps id inside entity values", async () => {
+            const client = createCollectionClient<PostModel>(transport, "posts");
+            mockRequest.mockResolvedValueOnce({ id: "new-id", title: "Created" });
+
+            const result = await client.create({ title: "Created" });
+            expect(result.values).toHaveProperty("id", "new-id");
+            expect(result.id).toBe("new-id");
+        });
+
+        it("update keeps id inside entity values", async () => {
+            const client = createCollectionClient<PostModel>(transport, "posts");
+            mockRequest.mockResolvedValueOnce({ id: "existing", title: "Updated", status: "published" });
+
+            const result = await client.update("existing", { title: "Updated" });
+            expect(result.values).toHaveProperty("id", "existing");
+            expect(result.values).toHaveProperty("title", "Updated");
+            expect(result.values).toHaveProperty("status", "published");
+            expect(result.id).toBe("existing");
+        });
+
+        it("preserves all fields from server response in values", async () => {
+            const client = createCollectionClient<PostModel>(transport, "posts");
+            mockRequest.mockResolvedValueOnce({ id: 1, title: "Full", status: "draft", tags: ["a", "b"], extra_field: "kept" });
+
+            const result = await client.findById(1);
+            expect(result!.values).toEqual({ id: 1, title: "Full", status: "draft", tags: ["a", "b"], extra_field: "kept" });
         });
     });
 });

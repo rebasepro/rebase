@@ -186,63 +186,68 @@ export class EntityPersistService {
 
         const entityData = sanitizeAndConvertDates(processedData);
 
-        const savedId = await this.db.transaction(async (tx) => {
-            let currentId: string | number;
+        let savedId: string | number;
+        try {
+            savedId = await this.db.transaction(async (tx) => {
+                let currentId: string | number;
 
-            if (entityId) {
-                // Update existing entity
-                currentId = entityId; // `entityId` is already the formatted composite or singular string
-                const idValues = parseIdValues(entityId, idInfoArray);
+                if (entityId) {
+                    // Update existing entity
+                    currentId = entityId; // `entityId` is already the formatted composite or singular string
+                    const idValues = parseIdValues(entityId, idInfoArray);
 
-                let updateQuery = tx.update(table).set(entityData as Record<string, unknown>);
-                const conditions = [];
-                for (const info of idInfoArray) {
-                    const field = table[info.fieldName as keyof typeof table] as AnyPgColumn;
-                    conditions.push(eq(field, idValues[info.fieldName]));
-                }
-
-                await updateQuery.where(and(...conditions));
-            } else {
-                const dataForInsert = { ...(entityData as Record<string, unknown>) };
-
-                // Strip empty primary keys so the database defaults (e.g. uuid_gen(), auto-increment) can trigger
-                for (const info of idInfoArray) {
-                    if (dataForInsert[info.fieldName] === "" || dataForInsert[info.fieldName] === null || dataForInsert[info.fieldName] === undefined) {
-                        delete dataForInsert[info.fieldName];
+                    let updateQuery = tx.update(table).set(entityData as Record<string, unknown>);
+                    const conditions = [];
+                    for (const info of idInfoArray) {
+                        const field = table[info.fieldName as keyof typeof table] as AnyPgColumn;
+                        conditions.push(eq(field, idValues[info.fieldName]));
                     }
+
+                    await updateQuery.where(and(...conditions));
+                } else {
+                    const dataForInsert = { ...(entityData as Record<string, unknown>) };
+
+                    // Strip empty primary keys so the database defaults (e.g. uuid_gen(), auto-increment) can trigger
+                    for (const info of idInfoArray) {
+                        if (dataForInsert[info.fieldName] === "" || dataForInsert[info.fieldName] === null || dataForInsert[info.fieldName] === undefined) {
+                            delete dataForInsert[info.fieldName];
+                        }
+                    }
+
+                    const result = await tx
+                        .insert(table)
+                        .values(dataForInsert)
+                        .returning(returningKeys);
+
+                    const resultRow = result[0];
+                    currentId = buildCompositeId(resultRow, idInfoArray);
                 }
 
-                const result = await tx
-                    .insert(table)
-                    .values(dataForInsert)
-                    .returning(returningKeys);
+                // Handle inverse relation updates
+                if (inverseRelationUpdates.length > 0) {
+                    await this.relationService.updateInverseRelations(tx, collection, currentId, inverseRelationUpdates);
+                }
 
-                const resultRow = result[0];
-                currentId = buildCompositeId(resultRow, idInfoArray);
-            }
+                // Update many-to-many relations
+                if (Object.keys(relationValues).length > 0) {
+                    await this.relationService.updateRelationsUsingJoins(tx, collection, currentId, relationValues);
+                }
 
-            // Handle inverse relation updates
-            if (inverseRelationUpdates.length > 0) {
-                await this.relationService.updateInverseRelations(tx, collection, currentId, inverseRelationUpdates);
-            }
+                // Apply joinPath one-to-one relation updates
+                if (joinPathRelationUpdates.length > 0) {
+                    await this.relationService.updateJoinPathOneToOneRelations(tx, collection, currentId, joinPathRelationUpdates);
+                }
 
-            // Update many-to-many relations
-            if (Object.keys(relationValues).length > 0) {
-                await this.relationService.updateRelationsUsingJoins(tx, collection, currentId, relationValues);
-            }
+                // Handle junction table creation for many-to-many path-based saves
+                if (junctionTableInfo && !entityId) {
+                    await this.relationService.handleJunctionTableCreation(tx, currentId, junctionTableInfo);
+                }
 
-            // Apply joinPath one-to-one relation updates
-            if (joinPathRelationUpdates.length > 0) {
-                await this.relationService.updateJoinPathOneToOneRelations(tx, collection, currentId, joinPathRelationUpdates);
-            }
-
-            // Handle junction table creation for many-to-many path-based saves
-            if (junctionTableInfo && !entityId) {
-                await this.relationService.handleJunctionTableCreation(tx, currentId, junctionTableInfo);
-            }
-
-            return currentId;
-        });
+                return currentId;
+            });
+        } catch (error: unknown) {
+            throw this.toUserFriendlyError(error, collection.slug);
+        }
 
         // Fetch the updated/created entity to return with proper relation objects
         const finalEntity = await this.fetchService.fetchEntity<M>(collection.slug, savedId, databaseId);
@@ -262,5 +267,69 @@ export class EntityPersistService {
      */
     getFetchService(): EntityFetchService {
         return this.fetchService;
+    }
+
+    /**
+     * Translate raw PostgreSQL / Drizzle errors into user-friendly messages.
+     */
+    private toUserFriendlyError(error: unknown, collectionSlug: string): Error {
+        // Dig into Drizzle's wrapper to find the underlying PG error
+        const pgError = this.extractPgError(error);
+
+        if (pgError) {
+            const detail = pgError.detail as string | undefined;
+            const constraint = pgError.constraint as string | undefined;
+            const column = pgError.column as string | undefined;
+            const table = pgError.table as string | undefined;
+
+            switch (pgError.code) {
+                case "23503": // foreign_key_violation
+                    return new Error(
+                        detail
+                            ? `Foreign key constraint violated: ${detail}`
+                            : `Cannot save: a foreign key constraint${constraint ? ` (${constraint})` : ""} was violated in "${collectionSlug}".`
+                    );
+                case "23505": // unique_violation
+                    return new Error(
+                        detail
+                            ? `Duplicate value: ${detail}`
+                            : `Cannot save: a unique constraint${constraint ? ` (${constraint})` : ""} was violated in "${collectionSlug}".`
+                    );
+                case "23502": // not_null_violation
+                    return new Error(
+                        `Missing required field: "${column ?? "unknown"}" in "${table ?? collectionSlug}" cannot be empty.`
+                    );
+                case "23514": // check_violation
+                    return new Error(
+                        `Validation failed: a check constraint${constraint ? ` (${constraint})` : ""} was violated in "${collectionSlug}".`
+                    );
+            }
+        }
+
+        // Fall through: re-throw original
+        if (error instanceof Error) return error;
+        return new Error(String(error));
+    }
+
+    /**
+     * Extract the underlying PostgreSQL error from a Drizzle wrapper.
+     * Drizzle wraps PG errors in a `cause` property.
+     */
+    private extractPgError(error: unknown): (Error & { code?: string; detail?: unknown; constraint?: unknown; column?: unknown; table?: unknown }) | null {
+        if (!error || typeof error !== "object") return null;
+
+        const err = error as Error & { code?: string; cause?: unknown; detail?: unknown };
+
+        // Check if the error itself has a PG error code
+        if (err.code && /^[0-9]{5}$/.test(err.code)) {
+            return err as Error & { code: string; detail?: unknown; constraint?: unknown; column?: unknown; table?: unknown };
+        }
+
+        // Check the cause chain (Drizzle wraps PG errors)
+        if (err.cause && typeof err.cause === "object") {
+            return this.extractPgError(err.cause);
+        }
+
+        return null;
     }
 }

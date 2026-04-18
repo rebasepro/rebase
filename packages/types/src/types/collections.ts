@@ -46,6 +46,15 @@ export interface BaseEntityCollection<M extends Record<string, any> = any, USER 
      */
     description?: string;
 
+    /**
+     * Child collections nested under entities of this collection.
+     * Populated automatically during normalization from driver-specific fields
+     * (e.g. Firebase `subcollections`, Postgres `relations` with many-cardinality).
+     *
+     * Custom drivers can set this directly to expose child collections to the UI.
+     */
+    childCollections?: () => EntityCollection<any>[];
+
 
 
     /**

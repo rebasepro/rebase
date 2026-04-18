@@ -14,6 +14,7 @@ The Rebase backend is a **Node.js server** built on [Hono](https://hono.dev/) th
 - **Storage** — File upload/download with local filesystem or S3
 - **WebSocket** — Real-time data sync via PostgreSQL LISTEN/NOTIFY
 - **Entity History** — Audit trail for every data change
+- **Database Branching** — Instant, isolated database copies for dev/staging/testing
 
 Everything is initialized with a single function:
 
@@ -83,6 +84,9 @@ interface RebaseBackendConfig {
 
     // OpenAPI/Swagger
     enableSwagger?: boolean;
+
+    // Custom API endpoints
+    functionsDir?: string;    // Auto-load Hono routes from a directory
 
     // Logging
     logging?: { level?: "error" | "warn" | "info" | "debug" };
@@ -163,3 +167,4 @@ If initialization fails (e.g., database connection error), the server still star
 - **[Storage](/docs/storage)** — Local and S3 file storage
 - **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks
 - **[Entity History](/docs/backend/history)** — Audit trail
+- **[Database Branching](/docs/backend/branching)** — Instant database copies for dev/staging

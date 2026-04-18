@@ -332,7 +332,14 @@ export class RebaseWebSocketClient {
             if (subscriptionKey) {
                 const collectionSub = this.collectionSubscriptions.get(subscriptionKey);
                 if (collectionSub) {
-                    const entities = message.entities || [];
+                    const incomingEntities = message.entities || [];
+
+                    // Structural merge: preserve cached entity references for entities
+                    // whose values haven't changed. This prevents downstream React components
+                    // from re-rendering (VirtualTableCell uses deepEqual on rowData —
+                    // same reference = instant true, avoiding expensive deep comparison).
+                    const entities = this.mergeEntities(collectionSub.latestData, incomingEntities);
+
                     // Cache the latest data with optimizations
                     collectionSub.latestData = entities;
                     collectionSub.lastUpdated = Date.now();
@@ -693,6 +700,134 @@ export class RebaseWebSocketClient {
         }) as { metadata?: TableMetadata };
         // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
         return response.metadata || ({ columns: [], foreignKeys: [], junctions: [], policies: [] } as TableMetadata);
+    }
+
+    /**
+     * Recursively compare two values for structural equality.
+     * Handles primitives, null, undefined, Date, RegExp, arrays, and plain objects.
+     */
+    private deepEqual(a: unknown, b: unknown): boolean {
+        // Same reference or same primitive
+        if (a === b) return true;
+
+        // Handle null/undefined
+        if (a === null || b === null || a === undefined || b === undefined) return false;
+
+        // Different types
+        if (typeof a !== typeof b) return false;
+
+        // Non-object primitives (number, string, boolean, bigint, symbol)
+        // that weren't caught by === above (e.g. NaN !== NaN)
+        if (typeof a !== "object") return false;
+
+        // Date comparison
+        if (a instanceof Date && b instanceof Date) {
+            return a.getTime() === b.getTime();
+        }
+        if (a instanceof Date || b instanceof Date) return false;
+
+        // RegExp comparison
+        if (a instanceof RegExp && b instanceof RegExp) {
+            return a.source === b.source && a.flags === b.flags;
+        }
+        if (a instanceof RegExp || b instanceof RegExp) return false;
+
+        // Array comparison
+        const aIsArray = Array.isArray(a);
+        const bIsArray = Array.isArray(b);
+        if (aIsArray !== bIsArray) return false;
+
+        if (aIsArray && bIsArray) {
+            if (a.length !== b.length) return false;
+            for (let i = 0; i < a.length; i++) {
+                if (!this.deepEqual(a[i], b[i])) return false;
+            }
+            return true;
+        }
+
+        // Plain object comparison
+        const aObj = a as Record<string, unknown>;
+        const bObj = b as Record<string, unknown>;
+        const aKeys = Object.keys(aObj);
+        const bKeys = Object.keys(bObj);
+
+        if (aKeys.length !== bKeys.length) return false;
+
+        for (const key of aKeys) {
+            if (!Object.prototype.hasOwnProperty.call(bObj, key)) return false;
+            if (!this.deepEqual(aObj[key], bObj[key])) return false;
+        }
+
+        return true;
+    }
+
+    private normalizeForComparison(val: unknown): unknown {
+        if (!val) return val;
+        
+        if (Array.isArray(val)) {
+            return val.map(item => this.normalizeForComparison(item));
+        }
+        
+        if (typeof val === "object") {
+            if (val instanceof Date) return val;
+            if (val instanceof RegExp) return val;
+            
+            const obj = val as Record<string, unknown>;
+            if (obj.__type === "relation") {
+                const { data, ...rest } = obj;
+                return rest;
+            }
+            
+            const result: Record<string, unknown> = {};
+            for (const [k, v] of Object.entries(obj)) {
+                result[k] = this.normalizeForComparison(v);
+            }
+            return result;
+        }
+        
+        return val;
+    }
+
+    /**
+     * Merge incoming entities with cached data, preserving cached references
+     * for entities whose values haven't changed. This avoids unnecessary
+     * React re-renders when the server refetches all entities but most
+     * haven't actually changed.
+     */
+    private mergeEntities(cached: Entity[] | undefined, incoming: Entity[]): Entity[] {
+        if (!cached || cached.length === 0) return incoming;
+
+        // Build a lookup from cached entities by ID for O(1) access
+        const cachedById = new Map<string | number, Entity>();
+        for (const entity of cached) {
+            cachedById.set(entity.id, entity);
+        }
+
+        return incoming.map(incomingEntity => {
+            const cachedEntity = cachedById.get(incomingEntity.id);
+            if (!cachedEntity) return incomingEntity;
+
+            if (cachedEntity.path === incomingEntity.path) {
+                const normCached = this.normalizeForComparison(cachedEntity.values) as Record<string, unknown>;
+                const normIncoming = this.normalizeForComparison(incomingEntity.values) as Record<string, unknown>;
+                
+                if (this.deepEqual(normCached, normIncoming)) {
+                    return cachedEntity;
+                } else {
+                    // Deep debug: Why did it fail? Let's check which exact property differs 
+                    // so the user can see it in their browser console if flashing still occurs.
+                    const mismatches: Record<string, { cached: unknown, incoming: unknown }> = {};
+                    const allKeys = new Set([...Object.keys(normCached), ...Object.keys(normIncoming)]);
+                    for (const key of allKeys) {
+                        if (!this.deepEqual(normCached[key], normIncoming[key])) {
+                            mismatches[key] = { cached: normCached[key], incoming: normIncoming[key] };
+                        }
+                    }
+                    console.log(`[RebaseWS] Row ${incomingEntity.id} refetch mismatch:`, mismatches);
+                }
+            }
+            return incomingEntity;
+        });
     }
 
     // Subscription methods

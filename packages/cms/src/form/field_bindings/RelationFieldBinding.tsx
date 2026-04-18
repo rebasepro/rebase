@@ -7,7 +7,7 @@ import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
 import { EntityPreviewContainer } from "../../components/EntityPreview";
 import { IconForView } from "@rebasepro/core";
 import { getIconForProperty } from "../../util/property_utils";
-import { getRelationFrom, resolveRelationProperty } from "@rebasepro/common";
+import { getRelationFrom, resolveRelationProperty, normalizeToEntityRelation } from "@rebasepro/common";
 
 import { ErrorView } from "@rebasepro/core";
 import { cls } from "@rebasepro/ui";
@@ -47,7 +47,8 @@ export function RelationFieldBinding({
     const widget = property.widget ?? "select";
 
     if (widget === "select" && relation) {
-        const singleValue = (!manyRelation && value && !Array.isArray(value) && value.isEntityRelation && value.isEntityRelation()) ? value : null;
+        const normalizedSingle = (!manyRelation && value && !Array.isArray(value)) ? normalizeToEntityRelation(value) : null;
+        const singleValue = normalizedSingle ?? null;
         const multipleValue = (manyRelation && Array.isArray(value)) ? value : [];
 
         const selectorSize: "small" | "medium" | undefined = size === "large" ? "medium" : size;
@@ -102,7 +103,8 @@ export function RelationFieldBinding({
         />
     } else {
 
-        const validValue = value && !Array.isArray(value) && value.isEntityRelation && value.isEntityRelation();
+        const normalizedValue = value && !Array.isArray(value) ? normalizeToEntityRelation(value) : null;
+        const validValue = !!normalizedValue;
 
         const collection = relation?.target();
 
@@ -119,7 +121,7 @@ export function RelationFieldBinding({
             path: collection.slug,
             collection,
             onSingleEntitySelected,
-            selectedEntityIds: validValue ? [value.id] : undefined,
+            selectedEntityIds: validValue && normalizedValue ? [normalizedValue.id] : undefined,
             forceFilter: property.forceFilter
         }
         );
@@ -129,7 +131,7 @@ export function RelationFieldBinding({
             referenceDialogController.open();
         };
 
-        const usedRelation = Array.isArray(value) ? undefined : value;
+        const usedRelation = Array.isArray(value) ? undefined : normalizedValue ?? undefined;
         return (
             <>
                 <LabelWithIconAndTooltip

@@ -52,6 +52,11 @@ export function SideDialogs() {
 
     const sidePanels = sideDialogsController.sidePanels;
 
+    // A trailing `undefined` slot ("ghost panel") is always appended so that
+    // close animations work correctly. Index-based keys ensure that when the
+    // last real panel is removed, the ghost inherits key=0 — re-using the
+    // same SideDialogView instance so the Sheet smoothly transitions from
+    // open → closed rather than unmounting instantly.
     const panels: (SideDialogPanelProps | undefined)[] = [...sidePanels];
     panels.push(undefined);
 
@@ -61,6 +66,7 @@ export function SideDialogs() {
                 <SideDialogView
                     key={`side_dialog_${index}`}
                     panel={panel}
+                    panelIndex={index}
                     offsetPosition={sidePanels.length - index - 1}
                     isTopPanel={index === sidePanels.length - 1} />)
         }
@@ -70,10 +76,12 @@ export function SideDialogs() {
 function SideDialogView({
     offsetPosition,
     panel,
+    panelIndex,
     isTopPanel
 }: {
     offsetPosition: number,
     panel?: SideDialogPanelProps,
+    panelIndex: number,
     isTopPanel: boolean
 }) {
 
@@ -141,8 +149,9 @@ function SideDialogView({
 
             <Sheet
                 open={Boolean(panel)}
-                includeBackgroundOverlay={isTopPanel}
-                overlayZIndex="z-40"
+                includeBackgroundOverlay={true}
+                overlayStyle={{ zIndex: 40 + panelIndex * 10 }}
+                style={{ zIndex: 45 + panelIndex * 10 }}
                 onOpenChange={(open) => {
                     if (!open) {
                         // Check if any suggestion menu is visible in DOM

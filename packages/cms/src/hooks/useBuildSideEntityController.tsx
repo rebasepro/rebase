@@ -149,10 +149,17 @@ export const useBuildSideEntityController = (collectionRegistryController: Colle
     }, [location.pathname, location.hash]);
 
     // update side panels to match browser size
+    // Only update panel widths on layout change — don't recreate components.
+    // Recreating components would unmount/remount EntitySidePanel, losing
+    // scroll position, unsaved form state, and triggering unnecessary data fetches.
     useEffect(() => {
         const updatedSidePanels = sideDialogsController.sidePanels.map(sidePanelProps => {
             if (sidePanelProps.additional) {
-                return propsToSidePanel(sidePanelProps.additional as EntitySidePanelProps, urlController.buildUrlCollectionPath, urlController.resolveDatabasePathsFrom, smallLayout, customizationController, authController, location.search);
+                const entityProps = sidePanelProps.additional as EntitySidePanelProps;
+                const newWidth = getEntityViewWidth(entityProps, smallLayout, customizationController);
+                if (sidePanelProps.width !== newWidth) {
+                    return { ...sidePanelProps, width: newWidth };
+                }
             }
             return sidePanelProps;
         });

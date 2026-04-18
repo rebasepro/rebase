@@ -1,4 +1,5 @@
 import { CollectionRegistry } from "@rebasepro/common";
+import type { EntityCollection } from "@rebasepro/types";
 import { PgEnum, PgTable } from "drizzle-orm/pg-core";
 import { Relations } from "drizzle-orm";
 import { CollectionRegistryInterface } from "../interfaces";
@@ -13,7 +14,7 @@ import { getTableName } from "@rebasepro/common";
 export class PostgresCollectionRegistry extends CollectionRegistry implements CollectionRegistryInterface {
 
     private tables = new Map<string, PgTable>();
-    private enums = new Map<string, PgEnum<any>>();
+    private enums = new Map<string, PgEnum<[string, ...string[]]>>();
     private relations = new Map<string, Relations>();
 
     registerTable(table: PgTable, tableName: string) {
@@ -34,14 +35,14 @@ export class PostgresCollectionRegistry extends CollectionRegistry implements Co
     /**
      * Finds collections assigned to a specific driver that do not have a registered table.
      */
-    getCollectionsWithoutTables(driverId: string = "(default)"): any[] {
+    getCollectionsWithoutTables(driverId: string = "(default)"): EntityCollection[] {
         const collections = this.getCollections().filter(
             c => c.driver === driverId || (!c.driver && driverId === "(default)")
         );
         return collections.filter(c => !this.tables.has(getTableName(c)));
     }
 
-    registerEnums(enums: Record<string, PgEnum<any>>) {
+    registerEnums(enums: Record<string, PgEnum<[string, ...string[]]>>) {
         Object.entries(enums).forEach(([name, value]) => this.enums.set(name, value));
     }
 
@@ -49,7 +50,7 @@ export class PostgresCollectionRegistry extends CollectionRegistry implements Co
         Object.entries(relations).forEach(([name, value]) => this.relations.set(name, value));
     }
 
-    getEnum(name: string): PgEnum<any> | undefined {
+    getEnum(name: string): PgEnum<[string, ...string[]]> | undefined {
         return this.enums.get(name);
     }
 
@@ -57,7 +58,7 @@ export class PostgresCollectionRegistry extends CollectionRegistry implements Co
         return this.relations.get(name);
     }
 
-    getAllEnums(): Record<string, PgEnum<any>> {
+    getAllEnums(): Record<string, PgEnum<[string, ...string[]]>> {
         return Object.fromEntries(this.enums.entries());
     }
 
@@ -86,7 +87,7 @@ export class PostgresCollectionRegistry extends CollectionRegistry implements Co
      * defined in the schema.
      */
     getRelationKeysForCollection(collectionPath: string): string[] {
-        const collection = this.getCollectionByPath(collectionPath) as import("@rebasepro/types").PostgresCollection<any, any>;
+        const collection = this.getCollectionByPath(collectionPath) as import("@rebasepro/types").PostgresCollection<Record<string, unknown>, Record<string, unknown>>;
         if (!collection?.relations) return [];
         return collection.relations.map(r => r.relationName || r.localKey || "").filter(Boolean);
     }

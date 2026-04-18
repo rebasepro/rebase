@@ -9,9 +9,6 @@ function makeCollection(overrides: Record<string, any> = {}): EntityCollection {
         properties: {},
         ...overrides,
     };
-    if ('subcollections' in base) {
-        return { ...base, driver: "firestore" } as FirebaseCollection;
-    }
     return base as EntityCollection;
 }
 
@@ -48,7 +45,7 @@ describe("getNavigationEntriesFromPath", () => {
         });
         const collections = [
             makeCollection({
-                subcollections: () => [subCol],
+                childCollections: () => [subCol],
             }),
         ];
         const result = getNavigationEntriesFromPath({

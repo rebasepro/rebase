@@ -53,10 +53,10 @@ export const Sheet: React.FC<SheetProps> = ({
     const finalContainer = (portalContainer ?? contextContainer ?? undefined) as HTMLElement | undefined;
 
     useEffect(() => {
-        const timeout = setTimeout(() => {
+        const raf = requestAnimationFrame(() => {
             setDisplayed(open);
-        }, 1);
-        return () => clearTimeout(timeout);
+        });
+        return () => cancelAnimationFrame(raf);
     }, [open]);
 
     const transformValue: Record<string, string> = {
@@ -103,7 +103,7 @@ export const Sheet: React.FC<SheetProps> = ({
                         "transform-gpu",
                         "will-change-transform",
                         "text-surface-accent-900 dark:text-white",
-                        "fixed transform z-50 transition-all ease-in-out",
+                        "fixed transform z-50 transition-[transform,opacity] ease-in-out",
                         !displayed ? "duration-150" : "duration-100",
                         "outline-none focus:outline-none",
                         transparent ? "" : "shadow-md bg-white dark:bg-surface-950",

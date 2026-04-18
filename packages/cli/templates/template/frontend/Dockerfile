@@ -1,28 +1,50 @@
-FROM node:24-alpine AS base
+# ─── Multi-stage production Dockerfile for the Rebase frontend ────────
+# Builds the Vite app, then serves via nginx for proper caching/compression.
+#
+# Build context: the project root (where pnpm-workspace.yaml lives)
+# Usage:
+#   docker build -t my-app-frontend -f frontend/Dockerfile .
+
+# ── Stage 1: Install + Build ─────────────────────────────────────────
+FROM node:24-alpine AS builder
+
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
+
 RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
 
-# Copy root configurations
-COPY package.json ./
+# Copy workspace root files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# Copy internal workspaces
+# Copy workspace packages
 COPY frontend ./frontend
 COPY shared ./shared
 
 # Install dependencies
-RUN pnpm install
+RUN pnpm install --frozen-lockfile
 
-# Build shared and frontend
-RUN pnpm run build:shared
-RUN pnpm run build:frontend
+# Build shared first, then frontend
+RUN pnpm --filter "*-shared" run build
+RUN pnpm --filter "*-frontend" run build
 
-# Install a simple static server
-RUN npm install -g serve
+# ── Stage 2: Serve with nginx ────────────────────────────────────────
+FROM nginx:1.27-alpine AS runtime
 
-WORKDIR /app/frontend
-EXPOSE 5173
-CMD ["serve", "-s", "dist", "-l", "5173"]
+# Remove default nginx page
+RUN rm -rf /usr/share/nginx/html/*
+
+# Copy built assets
+COPY --from=builder /app/frontend/dist /usr/share/nginx/html
+
+# Custom nginx config for SPA routing + compression
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]

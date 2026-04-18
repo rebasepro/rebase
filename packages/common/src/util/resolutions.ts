@@ -330,19 +330,22 @@ export function resolveEnumValues(input: EnumValues): EnumValueConfig[] | undefi
 
 
 
-export function getSubcollections<M extends Record<string, any> = any>(collection: EntityCollection<M>) {
-    const subcollections: EntityCollection<any>[] = [];
-    if (isFirebaseCollection(collection)) {
-        subcollections.push(...(collection.subcollections?.() ?? []));
+export function getSubcollections<M extends Record<string, any> = any>(collection: EntityCollection<M>): EntityCollection<any>[] {
+    if (collection.childCollections) {
+        return collection.childCollections();
     }
-    if (isPostgresCollection(collection)) {
-        subcollections.push(...((collection.relations ?? [])
-            .filter((rel) => rel.cardinality === "many")
-            .map(relation => {
-                const targetCollection = relation.target();
-                const overrides = relation.overrides;
-                return overrides ? mergeDeep(targetCollection, overrides) : targetCollection;
-            }) ?? []));
+    
+    if (isFirebaseCollection(collection) && collection.subcollections) {
+        return collection.subcollections();
     }
-    return subcollections;
+    
+    if (isPostgresCollection(collection) && collection.relations) {
+        const manyRelations = collection.relations.filter(r => r.cardinality === "many");
+        return manyRelations.map(r => {
+            const target = r.target();
+            return r.overrides ? mergeDeep(target, r.overrides) : target;
+        });
+    }
+    
+    return [];
 }

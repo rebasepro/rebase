@@ -102,7 +102,7 @@ describe("resolveEnumValues", () => {
 // getSubcollections
 // ─────────────────────────────────────────────────────────────
 describe("getSubcollections", () => {
-    it("returns subcollections from subcollections function", () => {
+    it("returns subcollections from childCollections function", () => {
         const subCol: EntityCollection = {
             name: "Comments",
             slug: "comments",
@@ -113,16 +113,15 @@ describe("getSubcollections", () => {
             name: "Posts",
             slug: "posts",
             table: "posts",
-            driver: "firestore",
             properties: {},
-            subcollections: () => [subCol],
-        } as any;
+            childCollections: () => [subCol],
+        };
         const result = getSubcollections(collection);
         expect(result).toHaveLength(1);
         expect(result[0].name).toBe("Comments");
     });
 
-    it("returns empty array when no subcollections", () => {
+    it("returns empty array when no childCollections", () => {
         const collection: EntityCollection = {
             name: "Posts",
             slug: "posts",
@@ -133,29 +132,15 @@ describe("getSubcollections", () => {
         expect(result).toEqual([]);
     });
 
-    it("includes many-cardinality relations as subcollections", () => {
-        const targetCol: EntityCollection = {
-            name: "Tags",
-            slug: "tags",
-            table: "tags",
-            properties: {},
-        };
+    it("returns empty array when childCollections returns undefined", () => {
         const collection: EntityCollection = {
             name: "Posts",
             slug: "posts",
             table: "posts",
             properties: {},
-            relations: [
-                {
-                    relationName: "tags",
-                    target: () => targetCol,
-                    cardinality: "many",
-                    direction: "owning",
-                } as any,
-            ],
+            childCollections: () => undefined as any,
         };
         const result = getSubcollections(collection);
-        expect(result).toHaveLength(1);
-        expect(result[0].name).toBe("Tags");
+        expect(result).toEqual([]);
     });
 });

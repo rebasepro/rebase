@@ -87,5 +87,16 @@ export default [
             "@typescript-eslint/ban-ts-comment": "warn",
             "@typescript-eslint/no-explicit-any": "off",
         }
+    },
+    {
+        files: [
+            "packages/types/**/*.{ts,tsx}",
+            "packages/utils/**/*.{ts,tsx}",
+            "packages/common/**/*.{ts,tsx}",
+            "packages/server-core/**/*.{ts,tsx}"
+        ],
+        rules: {
+            "@typescript-eslint/no-explicit-any": "error"
+        }
     }
 ];

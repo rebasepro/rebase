@@ -412,9 +412,15 @@ export function EntityForm<M extends Record<string, any>>({
 
     const lastSavedValues = useRef<EntityValues<M> | undefined>(entity?.values);
     const save = async (values: EntityValues<M>): Promise<Entity<M> | void> => {
-        let valuesToSave = values;
+        let valuesToSave = status === "existing"
+            ? getChanges(values, entity?.values || {}) as EntityValues<M>
+            : values;
 
-        lastSavedValues.current = valuesToSave;
+        if (status === "existing" && Object.keys(valuesToSave).length === 0 && entity) {
+            return Promise.resolve(entity);
+        }
+
+        lastSavedValues.current = values;
         return onSaveEntityRequest({
             collection: collection,
             path,

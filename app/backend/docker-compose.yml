@@ -1,37 +1,60 @@
-version: '3.8'
+# ─── Rebase — Docker Compose (monorepo dev/prod) ─────────────────────
+#
+# Usage:
+#   docker compose up -d
+#
+# This is for the internal monorepo app (app/backend).
+# For the user-facing template, see packages/cli/templates/template/docker-compose.yml
 
 services:
   db:
     image: postgres:18-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: rebase
-      POSTGRES_PASSWORD: rebasepassword
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rebasepassword}
       POSTGRES_DB: rebase
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rebase"]
+      test: ["CMD-SHELL", "pg_isready -U rebase -d rebase"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 10s
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "max_connections=100"
+      - "-c"
+      - "log_min_duration_statement=1000"
 
   backend:
-    build: 
+    build:
       context: ../..
       dockerfile: app/backend/Dockerfile
+    restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "${PORT:-3001}:3001"
     environment:
-      - DATABASE_URL=postgresql://rebase:rebasepassword@db:5432/rebase
-      - JWT_SECRET=super-secret-jwt-key
-      - NODE_ENV=development
+      DATABASE_URL: postgresql://rebase:${POSTGRES_PASSWORD:-rebasepassword}@db:5432/rebase
+      ADMIN_CONNECTION_STRING: postgresql://rebase:${POSTGRES_PASSWORD:-rebasepassword}@db:5432/rebase
+      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-change-in-production}
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: "3001"
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
     depends_on:
       db:
         condition: service_healthy
     volumes:
-      - ./uploads:/app/app/backend/uploads
+      - uploads:/app/app/backend/uploads
 
 volumes:
   postgres_data:
+    driver: local
+  uploads:
+    driver: local

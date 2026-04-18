@@ -757,6 +757,165 @@ describe("RebaseWebSocketClient", () => {
     });
 
     // -----------------------------------------------------------------------
+    // mergeEntities structural equality and normalization
+    // -----------------------------------------------------------------------
+    describe("mergeEntities structural equality and normalization", () => {
+        it("preserves entity reference if only relation .data changes", () => {
+            const client = createClient();
+            jest.runAllTimers();
+            const ws = getWs();
+
+            const onUpdate = jest.fn();
+            client.listenCollection({ path: "posts" }, onUpdate);
+
+            const subMsg = JSON.parse(ws.sentMessages[0]);
+            const subId = subMsg.payload.subscriptionId;
+
+            // Initial data contains a relation without .data
+            const initialEntity = {
+                id: "1",
+                path: "posts",
+                values: {
+                    title: "Hello",
+                    author: { __type: "relation", id: "2", path: "users" }
+                }
+            };
+
+            ws.onmessage!({ data: JSON.stringify({
+                type: "collection_update",
+                subscriptionId: subId,
+                entities: [initialEntity]
+            })});
+
+            expect(onUpdate).toHaveBeenCalledTimes(1);
+            const firstUpdate = onUpdate.mock.calls[0][0] as any[];
+            const cachedEntityInstance = firstUpdate[0];
+
+            onUpdate.mockClear();
+
+            // Next update contains EXACTLY the same relation, but WITH .data appended
+            const refetchedEntity = {
+                id: "1", 
+                path: "posts", 
+                values: {
+                    title: "Hello",
+                    author: { 
+                        __type: "relation", 
+                        id: "2", 
+                        path: "users", 
+                        data: { id: "2", path: "users", values: { name: "Alice" } } 
+                    }
+                }
+            };
+
+            ws.onmessage!({ data: JSON.stringify({
+                type: "collection_update",
+                subscriptionId: subId,
+                entities: [refetchedEntity]
+            })});
+
+            expect(onUpdate).toHaveBeenCalledTimes(1);
+            const secondUpdate = onUpdate.mock.calls[0][0] as any[];
+
+            // Because the .data is purely denormalized cache, the identity of the relation 
+            // is the same, so it should have preserved the SAME object reference!
+            expect(secondUpdate[0]).toBe(cachedEntityInstance);
+        });
+
+        it("does NOT preserve entity reference if the relation ID changes", () => {
+            const client = createClient();
+            jest.runAllTimers();
+            const ws = getWs();
+
+            const onUpdate = jest.fn();
+            client.listenCollection({ path: "posts" }, onUpdate);
+
+            const subMsg = JSON.parse(ws.sentMessages[0]);
+            const subId = subMsg.payload.subscriptionId;
+
+            const initialEntity = {
+                id: "1",
+                path: "posts",
+                values: {
+                    title: "Hello",
+                    author: { __type: "relation", id: "2", path: "users" }
+                }
+            };
+
+            ws.onmessage!({ data: JSON.stringify({
+                type: "collection_update",
+                subscriptionId: subId,
+                entities: [initialEntity]
+            })});
+
+            const firstUpdate = onUpdate.mock.calls[0][0] as any[];
+            const cachedEntityInstance = firstUpdate[0];
+            onUpdate.mockClear();
+
+            // Next update changes the author ID
+            const newAuthorEntity = {
+                id: "1", 
+                path: "posts", 
+                values: {
+                    title: "Hello",
+                    author: { __type: "relation", id: "3", path: "users" }
+                }
+            };
+
+            ws.onmessage!({ data: JSON.stringify({
+                type: "collection_update",
+                subscriptionId: subId,
+                entities: [newAuthorEntity]
+            })});
+
+            const secondUpdate = onUpdate.mock.calls[0][0] as any[];
+            // It should be a new reference because the value is structurally different
+            expect(secondUpdate[0]).not.toBe(cachedEntityInstance);
+        });
+
+        it("preserves relation identity inside array of relations", () => {
+            const client = createClient();
+            jest.runAllTimers();
+            const ws = getWs();
+
+            const onUpdate = jest.fn();
+            client.listenCollection({ path: "posts" }, onUpdate);
+
+            const subId = JSON.parse(ws.sentMessages[0]).payload.subscriptionId;
+
+            const entity = { 
+                id: "1", 
+                path: "posts", 
+                values: { 
+                    tags: [
+                        { __type: "relation", id: "10", path: "tags" },
+                        { __type: "relation", id: "11", path: "tags" }
+                    ] 
+                } 
+            };
+            ws.onmessage!({ data: JSON.stringify({ type: "collection_update", subscriptionId: subId, entities: [entity] }) });
+            
+            const firstInstance = (onUpdate.mock.calls[0][0] as any[])[0];
+            onUpdate.mockClear();
+
+            const entityWithData = { 
+                id: "1", 
+                path: "posts", 
+                values: { 
+                    tags: [
+                        { __type: "relation", id: "10", path: "tags", data: { id: "10" } },
+                        { __type: "relation", id: "11", path: "tags", data: { id: "11" } }
+                    ] 
+                } 
+            };
+            ws.onmessage!({ data: JSON.stringify({ type: "collection_update", subscriptionId: subId, entities: [entityWithData] }) });
+
+            const secondInstance = (onUpdate.mock.calls[0][0] as any[])[0];
+            expect(secondInstance).toBe(firstInstance);
+        });
+    });
+
+    // -----------------------------------------------------------------------
     // collection_entity_patch handling
     // -----------------------------------------------------------------------
     describe("collection_entity_patch", () => {

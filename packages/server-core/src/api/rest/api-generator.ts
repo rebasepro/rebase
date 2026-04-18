@@ -27,6 +27,12 @@ export class RestApiGenerator {
         this.collections.forEach(collection => {
             this.createCollectionRoutes(collection);
         });
+
+        // Catch-all routes for subcollection paths like
+        // /authors/111094/posts  and  /authors/111094/posts/43
+        // The DataDriver already knows how to resolve nested relation paths.
+        this.createSubcollectionRoutes();
+
         return this.router;
     }
 
@@ -211,6 +217,141 @@ export class RestApiGenerator {
                 entity: existingEntity,
                 collection: resolvedCollection
             });
+
+            return new Response(null, { status: 204 });
+        });
+    }
+
+    /**
+     * Catch-all routes for subcollection paths.
+     *
+     * Matches URL patterns like:
+     *   GET    /authors/111094/posts          → list child collection
+     *   GET    /authors/111094/posts/43       → get child entity
+     *   POST   /authors/111094/posts          → create child entity
+     *   PUT    /authors/111094/posts/43       → update child entity
+     *   DELETE /authors/111094/posts/43       → delete child entity
+     *
+     * The wildcard `*` captures the full remainder of the URL path.
+     * We split it into segments and reconstruct the `collectionPath`
+     * (e.g. "authors/111094/posts") and optional `entityId` (e.g. "43").
+     *
+     * The DataDriver.saveEntity / fetchCollection / etc. already know how to
+     * resolve multi-segment relation paths, so we just forward to them.
+     */
+    private createSubcollectionRoutes(): void {
+        // Helper: parse a path like "authors/111094/posts/43" into
+        // { collectionPath: "authors/111094/posts", entityId: "43" }
+        // or "authors/111094/posts" into
+        // { collectionPath: "authors/111094/posts", entityId: undefined }
+        const parseSubPath = (rawPath: string): { collectionPath: string; entityId?: string } | null => {
+            const segments = rawPath.split("/").filter(Boolean);
+            // Need at least 3 segments for a subcollection path (parent/id/child)
+            if (segments.length < 3) return null;
+
+            // Odd segment count → collection path (parent/id/child or parent/id/child/id2/grandchild)
+            // Even segment count → entity path   (parent/id/child/entityId)
+            if (segments.length % 2 === 1) {
+                return { collectionPath: segments.join("/") };
+            } else {
+                const entityId = segments.pop()!;
+                return { collectionPath: segments.join("/"), entityId };
+            }
+        };
+
+        // GET /<subcollection-path> — list or get single entity
+        this.router.get("/*", async (c) => {
+            const rawPath = c.req.path.replace(/^\//, "");
+            const parsed = parseSubPath(rawPath);
+            if (!parsed) return c.notFound();
+
+            const driver = c.get("driver") || this.driver;
+
+            if (parsed.entityId) {
+                // GET /parent/:parentId/child/:id — single entity
+                const entity = await driver.fetchEntity({
+                    path: parsed.collectionPath,
+                    entityId: parsed.entityId
+                });
+                if (!entity) throw ApiError.notFound("Entity not found");
+                return c.json(this.flattenEntity(entity));
+            } else {
+                // GET /parent/:parentId/child — list entities
+                const queryDict = c.req.query();
+                const queryOptions = parseQueryOptions(queryDict);
+                const entities = await driver.fetchCollection({
+                    path: parsed.collectionPath,
+                    filter: queryOptions.where as FetchCollectionProps["filter"],
+                    limit: queryOptions.limit,
+                    orderBy: queryOptions.orderBy?.[0]?.field,
+                    order: queryOptions.orderBy?.[0]?.direction === "desc" ? "desc" : "asc",
+                    searchString: queryDict.searchString as string | undefined
+                });
+                return c.json({
+                    data: entities.map(e => this.flattenEntity(e)),
+                    meta: {
+                        total: entities.length,
+                        limit: queryOptions.limit,
+                        offset: queryOptions.offset,
+                        hasMore: false
+                    }
+                });
+            }
+        });
+
+        // POST /<subcollection-path> — create entity
+        this.router.post("/*", async (c) => {
+            const rawPath = c.req.path.replace(/^\//, "");
+            const parsed = parseSubPath(rawPath);
+            if (!parsed || parsed.entityId) return c.notFound();
+
+            const driver = c.get("driver") || this.driver;
+            const body = await c.req.json().catch(() => ({}));
+
+            const entity = await driver.saveEntity({
+                path: parsed.collectionPath,
+                values: body,
+                status: "new"
+            });
+
+            return c.json(this.formatResponse(entity), 201);
+        });
+
+        // PUT /<subcollection-path>/:id — update entity
+        this.router.put("/*", async (c) => {
+            const rawPath = c.req.path.replace(/^\//, "");
+            const parsed = parseSubPath(rawPath);
+            if (!parsed || !parsed.entityId) return c.notFound();
+
+            const driver = c.get("driver") || this.driver;
+            const body = await c.req.json().catch(() => ({}));
+
+            const entity = await driver.saveEntity({
+                path: parsed.collectionPath,
+                entityId: parsed.entityId,
+                values: body,
+                status: "existing"
+            });
+
+            return c.json(this.formatResponse(entity));
+        });
+
+        // DELETE /<subcollection-path>/:id — delete entity
+        this.router.delete("/*", async (c) => {
+            const rawPath = c.req.path.replace(/^\//, "");
+            const parsed = parseSubPath(rawPath);
+            if (!parsed || !parsed.entityId) return c.notFound();
+
+            const driver = c.get("driver") || this.driver;
+
+            const existingEntity = await driver.fetchEntity({
+                path: parsed.collectionPath,
+                entityId: parsed.entityId
+            });
+
+            if (!existingEntity) throw ApiError.notFound("Entity not found");
+
+            await driver.deleteEntity({ entity: existingEntity });
 
             return new Response(null, { status: 204 });
         });

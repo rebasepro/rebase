@@ -1,48 +1,97 @@
-version: '3.8'
+# ─── Rebase — Production Docker Compose ──────────────────────────────
+#
+# Quick start:
+#   cp .env.template .env    # Edit with your secrets
+#   docker compose up -d     # Start everything
+#
+# This runs:
+#   1. PostgreSQL 18 with persistent data
+#   2. Backend (Node.js / Hono) with health checks
+#   3. Frontend (nginx) serving the Vite build
+#
+# For development, use `pnpm dev` instead.
+# ─────────────────────────────────────────────────────────────────────
 
 services:
+  # ── PostgreSQL ───────────────────────────────────────────────────────
   db:
     image: postgres:18-alpine
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: rebase
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: rebase
+      POSTGRES_USER: ${POSTGRES_USER:-rebase}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-rebase}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rebase"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rebase} -d ${POSTGRES_DB:-rebase}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 10s
+    # Production tuning (adjust for your workload)
+    command:
+      - "postgres"
+      - "-c" 
+      - "shared_buffers=256MB"
+      - "-c"
+      - "max_connections=100"
+      - "-c"
+      - "work_mem=4MB"
+      - "-c"
+      - "effective_cache_size=768MB"
+      - "-c"
+      - "log_min_duration_statement=1000"
 
+  # ── Backend ──────────────────────────────────────────────────────────
   backend:
-    build: 
+    build:
       context: .
       dockerfile: backend/Dockerfile
+    restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "${PORT:-3001}:3001"
     environment:
-      - DATABASE_URL=postgresql://rebase:${POSTGRES_PASSWORD}@db:5432/rebase
-      - JWT_SECRET=${JWT_SECRET}
-      - NODE_ENV=development
+      DATABASE_URL: postgresql://${POSTGRES_USER:-rebase}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-rebase}
+      ADMIN_CONNECTION_STRING: postgresql://${POSTGRES_USER:-rebase}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-rebase}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-1h}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-30d}
+      NODE_ENV: production
+      PORT: "3001"
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      # Optional Google OAuth
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      # Optional SMTP
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      APP_NAME: ${APP_NAME:-Rebase}
     depends_on:
       db:
         condition: service_healthy
     volumes:
-      - ./backend/uploads:/app/backend/uploads
+      - uploads:/app/backend/uploads
 
+  # ── Frontend ─────────────────────────────────────────────────────────
   frontend:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+    restart: unless-stopped
     ports:
-      - "5173:5173"
-    environment:
-      - VITE_API_URL=http://localhost:3001
+      - "${FRONTEND_PORT:-80}:80"
     depends_on:
       - backend
 
 volumes:
   postgres_data:
+    driver: local
+  uploads:
+    driver: local

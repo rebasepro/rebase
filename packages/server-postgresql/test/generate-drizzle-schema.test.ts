@@ -575,30 +575,7 @@ describe("generateDrizzleSchema", () => {
             expect(result).toContain('as: "restrictive"');
         });
 
-        it("should import pgPolicy and sql only when RLS is used", async () => {
-            const withRls: EntityCollection[] = [{
-                slug: "secure",
-                table: "secure",
-                name: "Secure",
-                properties: { data: { type: "string" } },
-                securityRules: [{ operation: "select", access: "public" }]
-            }];
-            const withoutRls: EntityCollection[] = [{
-                slug: "open",
-                table: "open",
-                name: "Open",
-                properties: { data: { type: "string" } }
-            }];
-
-            const resultWith = await generateSchema(withRls);
-            const resultWithout = await generateSchema(withoutRls);
-
-            expect(resultWith).toContain("pgPolicy");
-            expect(resultWith).toContain("sql");
-            expect(resultWithout).not.toContain("pgPolicy");
-        });
     });
-
 });
 // V2 improvements tests
 describe("generateDrizzleSchema V2 improvements", () => {

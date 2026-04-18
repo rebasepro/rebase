@@ -1,6 +1,4 @@
-import React, { CSSProperties, useMemo } from "react";
-
-import { ContentCopyIcon, IconButton, OpenInNewIcon, Tooltip } from "@rebasepro/ui";
+import React, { CSSProperties, useMemo, useState, useEffect } from "react";import { ContentCopyIcon, IconButton, OpenInNewIcon, Tooltip, BrokenImageIcon } from "@rebasepro/ui";
 import { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { getThumbnailMeasure } from "../util";
 import { useTranslation } from "@rebasepro/core";
@@ -24,27 +22,51 @@ export function ImagePreview({
     size,
     url,
     fill
-}: ImagePreviewProps) {
+    }: ImagePreviewProps) {
+    const [hasError, setHasError] = useState(false);
+
+    useEffect(() => {
+        setHasError(false);
+    }, [url]);
+
+    const handleError = () => setHasError(true);
 
     const imageSize = useMemo(() => getThumbnailMeasure(size), [size]);
     const { t } = useTranslation();
 
     // Fill mode - image fills its container completely
     if (fill) {
+        if (hasError) {
+            return (
+                <div className="w-full h-full flex items-center justify-center bg-surface-100 dark:bg-surface-800 rounded-md">
+                    <BrokenImageIcon className="text-surface-400 dark:text-surface-500" />
+                </div>
+            );
+        }
         return (
             <img src={url}
                 className={"w-full h-full object-cover"}
                 key={"fill_image_preview_" + url}
                 loading="lazy"
+                onError={handleError}
             />
         );
     }
 
     if (size === "small") {
+        if (hasError) {
+            return (
+                <div className="flex items-center justify-center bg-surface-100 dark:bg-surface-800 rounded-md"
+                     style={{ width: imageSize, height: imageSize, maxHeight: "100%" }}>
+                    <BrokenImageIcon className="text-surface-400 dark:text-surface-500" />
+                </div>
+            );
+        }
         return (
             <img src={url}
                 className={"rounded-md"}
                 key={"tiny_image_preview_" + url}
+                onError={handleError}
                 style={{
                     position: "relative",
                     objectFit: "cover",
@@ -70,9 +92,16 @@ export function ImagePreview({
             }}
             key={"image_preview_" + url}>
 
-            <img src={url}
-                className={"rounded-md"}
-                style={imageStyle} />
+            {hasError ? (
+                <div className="w-full h-full flex items-center justify-center bg-surface-100 dark:bg-surface-800 rounded-md">
+                    <BrokenImageIcon className="text-surface-400 dark:text-surface-500" />
+                </div>
+            ) : (
+                <img src={url}
+                    className={"rounded-md"}
+                    style={imageStyle}
+                    onError={handleError} />
+            )}
 
             <div className={"flex flex-row gap-2 absolute bottom-[-4px] right-[-4px] invisible group-hover:visible"}>
                 {navigator && <Tooltip

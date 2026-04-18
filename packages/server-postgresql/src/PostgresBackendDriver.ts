@@ -952,8 +952,9 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         const authContext = { userId: this.user?.uid || "anonymous", roles: this.user?.roles ?? [] };
         const entries = Array.from(this.delegate.realtimeService.subscriptions.entries());
         const lastEntry = entries[entries.length - 1];
-        if (lastEntry && (lastEntry as any)[1].clientId === "driver") {
-            (lastEntry as any)[1].authContext = authContext;
+        const lastSub = lastEntry?.[1] as Record<string, unknown> | undefined;
+        if (lastSub && lastSub.clientId === "driver") {
+            lastSub.authContext = authContext;
         }
         return unsubscribe;
     }

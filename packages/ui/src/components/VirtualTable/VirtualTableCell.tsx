@@ -47,9 +47,8 @@ export const VirtualTableCell = React.memo<VirtualTableCellProps<any>>(
         return equal(a.rowData, b.rowData) &&
             equal(a.column, b.column) &&
             equal(a.cellData, b.cellData) &&
-            equal(a.rowIndex, b.rowIndex) &&
-            equal(a.cellRenderer, b.cellRenderer) &&
-            equal(a.columnIndex, b.columnIndex) &&
+            a.rowIndex === b.rowIndex &&
+            a.columnIndex === b.columnIndex &&
             a.isDragging === b.isDragging &&
             a.isDraggable === b.isDraggable &&
             a.frozen === b.frozen

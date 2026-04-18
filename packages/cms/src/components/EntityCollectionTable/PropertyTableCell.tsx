@@ -547,8 +547,8 @@ function areEqual(prevProps: PropertyTableCellProps<any>, nextProps: PropertyTab
         prevProps.width === nextProps.width &&
         equal(prevProps.property, nextProps.property) &&
         equal(prevProps.value, nextProps.value) &&
-        equal(prevProps.entity.id, nextProps.entity.id) &&
-        equal(prevProps.entity.values, nextProps.entity.values) &&
+        prevProps.entity.id === nextProps.entity.id &&
+        prevProps.entity.path === nextProps.entity.path &&
         prevProps.isDragging === nextProps.isDragging &&
         prevProps.isDraggable === nextProps.isDraggable &&
         prevProps.frozen === nextProps.frozen

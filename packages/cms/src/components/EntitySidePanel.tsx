@@ -80,23 +80,8 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
 
     const collection = collectionRegistryController.getCollection(path) ?? props.collection;
 
-    useEffect(() => {
-        function beforeunload(e: any) {
-            if (blocked && collection) {
-                e.preventDefault();
-                e.returnValue = `You have unsaved changes in this ${collection.name}. Are you sure you want to leave this page?`;
-            }
-        }
-
-        if (typeof window !== "undefined")
-            window.addEventListener("beforeunload", beforeunload);
-
-        return () => {
-            if (typeof window !== "undefined")
-                window.removeEventListener("beforeunload", beforeunload);
-        };
-
-    }, [blocked, collection]);
+    // Note: beforeunload is handled by useUnsavedChangesDialog in SideDialogView,
+    // which listens to the same `blocked` state via SideDialogContext.
 
     const onValuesModified = useCallback((modified: boolean) => {
         setBlockedNavigationMessage(modified

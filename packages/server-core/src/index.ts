@@ -44,6 +44,9 @@ export * from "./utils/sql";
 // Entity history
 export * from "./history";
 
+// Custom Functions (auto-discovered Hono routes)
+export * from "./functions";
+
 
 
 // SPA serving helper

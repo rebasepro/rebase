@@ -282,7 +282,7 @@ describe("find() — without include", () => {
     it("wraps entities correctly", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{ id: 1, title: "Plain", author_id: 5 }]));
-        expect((await c.find()).data[0]).toEqual({ id: 1, path: "posts", values: { title: "Plain", author_id: 5 } });
+        expect((await c.find()).data[0]).toEqual({ id: 1, path: "posts", values: { id: 1, title: "Plain", author_id: 5 } });
     });
     it("handles undefined data gracefully", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");

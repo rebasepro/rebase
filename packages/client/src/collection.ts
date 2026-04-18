@@ -60,13 +60,14 @@ function parseWhereFilter(where?: Record<string, string>): FilterValues<any> | u
 /**
  * Wrap a flat row (returned by the REST API as `{ id, ...fields }`) into
  * a proper `Entity<M>` structure expected by the core framework.
+ * The `id` is kept inside `values` as well, since collection properties
+ * may define an `isId` field that the form binds to `formex.values`.
  */
 function rowToEntity<M extends Record<string, any>>(row: Record<string, any>, slug: string): Entity<M> {
-    const { id, ...values } = row;
     return {
-        id: id,
+        id: row.id,
         path: slug,
-        values: values as M
+        values: row as M
     };
 }
 
@@ -144,13 +145,14 @@ export function createCollectionClient<M extends Record<string, any> = any>(tran
                         searchString: params?.searchString
                     },
                     (entities: Entity[]) => {
+                        const requestedLimit = params?.limit || 20;
                         onUpdate({
                             data: entities as Entity<M>[],
                             meta: {
                                 total: entities.length,
-                                limit: params?.limit || 20,
+                                limit: requestedLimit,
                                 offset: params?.offset || 0,
-                                hasMore: false
+                                hasMore: entities.length >= requestedLimit
                             }
                         });
                     },

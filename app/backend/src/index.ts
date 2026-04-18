@@ -29,7 +29,9 @@ app.use("/*", cors({
     credentials: true
 }));
 
-app.use("/*", secureHeaders());
+app.use("/*", secureHeaders({
+    crossOriginResourcePolicy: "cross-origin"
+}));
 
 // ─── Database ────────────────────────────────────────────────────────
 const databaseUrl = process.env.DATABASE_URL;
@@ -47,6 +49,7 @@ async function startServer() {
 
     const backend = await initializeRebaseBackend({
         collectionsDir: path.resolve(__dirname, "../../shared/collections"),
+        functionsDir: path.resolve(__dirname, "../functions"),
         server,
         app,
         bootstrappers: [
