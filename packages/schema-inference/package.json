@@ -1,6 +1,6 @@
 {
     "name": "@rebasepro/schema-inference",
-    "version": "0.0.1",
+    "version": "0.0.1-canary.4d4fb3e",
     "type": "module",
     "publishConfig": {
         "access": "public"
@@ -10,7 +10,7 @@
     "types": "dist/index.d.ts",
     "source": "src/index.ts",
     "devDependencies": {
-        "@rebasepro/types": "0.0.1",
+        "@rebasepro/types": "workspace:*",
         "@types/node": "^20.17.14",
         "typescript": "^5.9.3",
         "vite": "^7.2.4"
@@ -33,6 +33,5 @@
         "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json",
         "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f"
     },
-    "gitHead": "d935eefa5aa8d1009a2398cfac2c1e4ee9aeb6b6",
-    "dependencies": {}
+    "gitHead": "d935eefa5aa8d1009a2398cfac2c1e4ee9aeb6b6"
 }

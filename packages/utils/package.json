@@ -1,7 +1,7 @@
 {
     "name": "@rebasepro/utils",
     "type": "module",
-    "version": "0.0.1",
+    "version": "0.0.1-canary.4d4fb3e",
     "description": "Utility functions for Rebase",
     "funding": {
         "url": "https://github.com/sponsors/rebaseco"
@@ -50,7 +50,7 @@
         "./package.json": "./package.json"
     },
     "dependencies": {
-        "@rebasepro/types": "0.0.1",
+        "@rebasepro/types": "workspace:*",
         "object-hash": "^3.0.0"
     },
     "devDependencies": {

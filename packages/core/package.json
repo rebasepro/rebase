@@ -1,7 +1,7 @@
 {
     "name": "@rebasepro/core",
     "type": "module",
-    "version": "0.0.1",
+    "version": "0.0.1-canary.4d4fb3e",
     "description": "Rebase core — framework-agnostic runtime for data-driven admin panels",
     "funding": {
         "url": "https://github.com/sponsors/rebaseco"
@@ -56,18 +56,17 @@
         "./package.json": "./package.json"
     },
     "dependencies": {
-
-        "@rebasepro/common": "0.0.1",
-        "@rebasepro/formex": "0.0.1",
-        "@rebasepro/types": "0.0.1",
-        "@rebasepro/ui": "0.0.1",
+        "@rebasepro/common": "workspace:*",
+        "@rebasepro/formex": "workspace:*",
+        "@rebasepro/types": "workspace:*",
+        "@rebasepro/ui": "workspace:*",
+        "@rebasepro/utils": "workspace:*",
         "compressorjs": "^1.2.1",
         "fast-equals": "5.3.0",
         "fuse.js": "^7.1.0",
         "i18next": "^23.16.4",
         "notistack": "^3.0.2",
-        "react-i18next": "^14.1.3",
-        "@rebasepro/utils": "0.0.1"
+        "react-i18next": "^14.1.3"
     },
     "peerDependencies": {
         "react": ">=19.0.0",

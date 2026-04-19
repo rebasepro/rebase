@@ -1,7 +1,7 @@
 {
     "name": "@rebasepro/server-core",
     "type": "module",
-    "version": "0.0.1",
+    "version": "0.0.1-canary.4d4fb3e",
     "description": "Database-Agnostic Backend Core for Rebase",
     "funding": {
         "url": "https://github.com/sponsors/rebaseco"
@@ -53,32 +53,27 @@
         "@aws-sdk/s3-request-presigner": "^3.654.0",
         "@hono/graphql-server": "0.7.0",
         "@hono/node-server": "1.19.12",
-        "@rebasepro/common": "0.0.1",
-        "@rebasepro/types": "0.0.1",
-
+        "@rebasepro/common": "workspace:*",
+        "@rebasepro/types": "workspace:*",
+        "@rebasepro/utils": "workspace:*",
         "google-auth-library": "^9.0.0",
         "graphql": "^16.8.1",
         "hono": "4.12.10",
         "jsonwebtoken": "^9.0.0",
         "nodemailer": "^6.9.0",
-
-
         "ws": "^8.16.0",
-        "zod": "^3.22.4",
-        "@rebasepro/utils": "0.0.1"
+        "zod": "^3.22.4"
     },
     "devDependencies": {
-        "@rebasepro/common": "0.0.1",
-        "@rebasepro/types": "0.0.1",
+        "@rebasepro/common": "workspace:*",
+        "@rebasepro/types": "workspace:*",
         "@types/jest": "^29.5.14",
         "@types/jsonwebtoken": "^9.0.0",
         "@types/node": "^20.10.5",
         "@types/nodemailer": "^6.4.0",
-
         "@types/react": "^19.0.8",
         "@types/react-dom": "^19.0.3",
         "@types/ws": "^8.5.10",
-
         "jest": "^29.7.0",
         "ts-jest": "29.4.1",
         "typescript": "^5.0.0",

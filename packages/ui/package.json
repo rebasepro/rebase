@@ -1,7 +1,7 @@
 {
     "name": "@rebasepro/ui",
     "type": "module",
-    "version": "0.0.1",
+    "version": "0.0.1-canary.4d4fb3e",
     "description": "Awesome Firebase/Firestore-based headless open-source CMS",
     "funding": {
         "url": "https://github.com/sponsors/rebaseco"
@@ -67,6 +67,7 @@
         "@radix-ui/react-tabs": "^1.1.13",
         "@radix-ui/react-tooltip": "^1.2.8",
         "@radix-ui/react-visually-hidden": "^1.2.4",
+        "@rebasepro/types": "workspace:*",
         "clsx": "^2.1.1",
         "cmdk": "^1.1.1",
         "fast-equals": "5.3.0",
@@ -74,8 +75,7 @@
         "react-dropzone": "^14.3.8",
         "react-use-measure": "^2.1.7",
         "react-window": "^1.8.11",
-        "tailwind-merge": "^2.6.0",
-        "@rebasepro/types": "0.0.1"
+        "tailwind-merge": "^2.6.0"
     },
     "peerDependencies": {
         "react": ">=19.0.0",

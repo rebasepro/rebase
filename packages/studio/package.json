@@ -1,28 +1,28 @@
 {
     "name": "@rebasepro/studio",
     "type": "module",
-    "version": "0.0.1",
+    "version": "0.0.1-canary.4d4fb3e",
     "main": "./dist/index.umd.js",
     "module": "./dist/index.es.js",
     "types": "dist/index.d.ts",
     "source": "src/index.ts",
     "dependencies": {
         "@monaco-editor/react": "^4.7.0",
-        "@rebasepro/client": "0.0.1",
-        "@rebasepro/common": "0.0.1",
-        "@rebasepro/core": "0.0.1",
-        "@rebasepro/types": "0.0.1",
-        "@rebasepro/ui": "0.0.1",
+        "@rebasepro/client": "workspace:*",
+        "@rebasepro/common": "workspace:*",
+        "@rebasepro/core": "workspace:*",
+        "@rebasepro/types": "workspace:*",
+        "@rebasepro/ui": "workspace:*",
+        "@rebasepro/utils": "workspace:*",
         "pgsql-ast-parser": "12.0.2",
-        "prism-react-renderer": "^2.4.1",
-        "@rebasepro/utils": "0.0.1"
+        "prism-react-renderer": "^2.4.1"
     },
     "peerDependencies": {
+        "@rebasepro/cms": "workspace:*",
         "react": ">=19.0.0",
         "react-dom": ">=19.0.0",
         "react-router": "^7.0.0",
-        "react-router-dom": "^7.0.0",
-        "@rebasepro/cms": "0.0.1"
+        "react-router-dom": "^7.0.0"
     },
     "peerDependenciesMeta": {
         "@rebasepro/cms": {

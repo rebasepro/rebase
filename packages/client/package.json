@@ -1,7 +1,7 @@
 {
     "name": "@rebasepro/client",
     "type": "module",
-    "version": "0.0.1",
+    "version": "0.0.1-canary.4d4fb3e",
     "description": "HTTP SDK client for the Rebase custom backend",
     "funding": {
         "url": "https://github.com/sponsors/rebaseco"
@@ -38,7 +38,7 @@
         "./package.json": "./package.json"
     },
     "dependencies": {
-        "@rebasepro/types": "0.0.1"
+        "@rebasepro/types": "workspace:*"
     },
     "devDependencies": {
         "@jest/globals": "^29.7.0",

@@ -1,7 +1,7 @@
 {
     "name": "@rebasepro/client-postgresql",
     "type": "module",
-    "version": "0.0.1",
+    "version": "0.0.1-canary.4d4fb3e",
     "description": "PostgreSQL data source client for Rebase",
     "funding": {
         "url": "https://github.com/sponsors/rebaseco"
@@ -67,8 +67,8 @@
         "./package.json": "./package.json"
     },
     "dependencies": {
-        "@rebasepro/client": "0.0.1",
-        "@rebasepro/types": "0.0.1"
+        "@rebasepro/client": "workspace:*",
+        "@rebasepro/types": "workspace:*"
     },
     "peerDependencies": {
         "react": ">=19.0.0",
