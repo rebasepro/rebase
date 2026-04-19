@@ -34,7 +34,7 @@
     "scripts": {
         "dev": "vite",
         "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json",
-        "prepublishOnly": "run-s build",
+        "prepublishOnly": "npm run build",
         "test": "jest --passWithNoTests"
     },
     "browserslist": {
