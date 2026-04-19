@@ -45,6 +45,7 @@ jobs:
 
           # Configure pnpm natively to allow lockfile updates during canary version bump
           pnpm config set frozen-lockfile false
+          pnpm config set resolution-worker-threads false
 
           # Update all package versions without creating git tags or commits
           npx lerna version "$CANARY_VERSION" --no-git-tag-version --no-push --yes

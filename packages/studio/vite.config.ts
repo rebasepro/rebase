@@ -9,7 +9,7 @@ const ReactCompilerConfig = {
 };
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;
-    if (id.startsWith("@rebasepro/")) return false;
+    
     return true;
 };
 

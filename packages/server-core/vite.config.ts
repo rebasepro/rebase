@@ -27,7 +27,7 @@ const CONSUMER_EXTERNALS = [
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;
     // Inline all @rebasepro/* packages
-    if (id.startsWith("@rebasepro/")) return false;
+    
     // Externalize only deps the consumer app explicitly installs
     if (CONSUMER_EXTERNALS.some(ext => id === ext || id.startsWith(ext + "/"))) return true;
     // Externalize Node built-ins

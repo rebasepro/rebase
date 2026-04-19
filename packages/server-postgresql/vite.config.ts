@@ -29,7 +29,7 @@ const isExternal = (id: string) => {
     // Externalize server-core to prevent singleton duplication (e.g. JWT config, etc)
     if (id === "@rebasepro/server-core" || id.startsWith("@rebasepro/server-core/")) return true;
     // Inline other @rebasepro/* packages (like common, types)
-    if (id.startsWith("@rebasepro/")) return false;
+    
     // Externalize only deps the consumer app explicitly installs
     if (CONSUMER_EXTERNALS.some(ext => id === ext || id.startsWith(ext + "/"))) return true;
     // Externalize Node built-ins
