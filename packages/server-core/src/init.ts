@@ -249,9 +249,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             requireAuth: false // true BaaS — delegate completely to Postgres RLS
         }));
 
-        const restGenerator = new RestApiGenerator(activeCollections, defaultDriver);
-        dataRouter.route("/", restGenerator.generateRoutes());
-
+        // Mount history routes BEFORE the REST API subcollection catch-all so
+        // that /:slug/:entityId/history is matched by the dedicated handler first.
         if (historyConfigResult && historyConfigResult.historyService) {
             const historyRoutes = createHistoryRoutes({
                 historyService: historyConfigResult.historyService as import("./history/history-routes").HistoryService,
@@ -260,6 +259,9 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             });
             dataRouter.route("/", historyRoutes);
         }
+
+        const restGenerator = new RestApiGenerator(activeCollections, defaultDriver);
+        dataRouter.route("/", restGenerator.generateRoutes());
 
         config.app.route(`${basePath}/data`, dataRouter);
     }

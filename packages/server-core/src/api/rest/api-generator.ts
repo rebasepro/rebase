@@ -241,6 +241,11 @@ export class RestApiGenerator {
      * resolve multi-segment relation paths, so we just forward to them.
      */
     private createSubcollectionRoutes(): void {
+        // Reserved path segments that should NOT be treated as relation names.
+        // These are handled by dedicated route handlers (e.g., history routes)
+        // mounted on the same data router.
+        const RESERVED_SEGMENTS = new Set(["history"]);
+
         // Helper: parse a path like "authors/111094/posts/43" into
         // { collectionPath: "authors/111094/posts", entityId: "43" }
         // or "authors/111094/posts" into
@@ -249,6 +254,10 @@ export class RestApiGenerator {
             const segments = rawPath.split("/").filter(s => s && s !== "undefined");
             // Need at least 3 segments for a subcollection path (parent/id/child)
             if (segments.length < 3) return null;
+
+            // If any segment is a reserved path (e.g. "history"), this is not a
+            // subcollection route — let it fall through to other handlers.
+            if (segments.some(s => RESERVED_SEGMENTS.has(s))) return null;
 
             // Odd segment count → collection path (parent/id/child or parent/id/child/id2/grandchild)
             // Even segment count → entity path   (parent/id/child/entityId)
@@ -263,12 +272,12 @@ export class RestApiGenerator {
         // GET /<subcollection-path> — list or get single entity
         // Use :rest{.+} instead of * because Hono v4's wildcard doesn't
         // capture into c.req.param("*") — it always returns undefined.
-        this.router.get("/:parent/:parentId/:rest{.+}", async (c) => {
+        this.router.get("/:parent/:parentId/:rest{.+}", async (c, next) => {
             const rest = c.req.param("rest");
-            if (!rest || rest === "undefined") return c.notFound();
+            if (!rest || rest === "undefined") return next();
             const rawPath = `${c.req.param("parent")}/${c.req.param("parentId")}/${rest}`;
             const parsed = parseSubPath(rawPath);
-            if (!parsed) return c.notFound();
+            if (!parsed) return next();
 
             const driver = c.get("driver") || this.driver;
 
@@ -305,12 +314,12 @@ export class RestApiGenerator {
         });
 
         // POST /<subcollection-path> — create entity
-        this.router.post("/:parent/:parentId/:rest{.+}", async (c) => {
+        this.router.post("/:parent/:parentId/:rest{.+}", async (c, next) => {
             const rest = c.req.param("rest");
-            if (!rest || rest === "undefined") return c.notFound();
+            if (!rest || rest === "undefined") return next();
             const rawPath = `${c.req.param("parent")}/${c.req.param("parentId")}/${rest}`;
             const parsed = parseSubPath(rawPath);
-            if (!parsed || parsed.entityId) return c.notFound();
+            if (!parsed || parsed.entityId) return next();
 
             const driver = c.get("driver") || this.driver;
             const body = await c.req.json().catch(() => ({}));
@@ -325,12 +334,12 @@ export class RestApiGenerator {
         });
 
         // PUT /<subcollection-path>/:id — update entity
-        this.router.put("/:parent/:parentId/:rest{.+}", async (c) => {
+        this.router.put("/:parent/:parentId/:rest{.+}", async (c, next) => {
             const rest = c.req.param("rest");
-            if (!rest || rest === "undefined") return c.notFound();
+            if (!rest || rest === "undefined") return next();
             const rawPath = `${c.req.param("parent")}/${c.req.param("parentId")}/${rest}`;
             const parsed = parseSubPath(rawPath);
-            if (!parsed || !parsed.entityId) return c.notFound();
+            if (!parsed || !parsed.entityId) return next();
 
             const driver = c.get("driver") || this.driver;
             const body = await c.req.json().catch(() => ({}));
@@ -346,12 +355,12 @@ export class RestApiGenerator {
         });
 
         // DELETE /<subcollection-path>/:id — delete entity
-        this.router.delete("/:parent/:parentId/:rest{.+}", async (c) => {
+        this.router.delete("/:parent/:parentId/:rest{.+}", async (c, next) => {
             const rest = c.req.param("rest");
-            if (!rest || rest === "undefined") return c.notFound();
+            if (!rest || rest === "undefined") return next();
             const rawPath = `${c.req.param("parent")}/${c.req.param("parentId")}/${rest}`;
             const parsed = parseSubPath(rawPath);
-            if (!parsed || !parsed.entityId) return c.notFound();
+            if (!parsed || !parsed.entityId) return next();
 
             const driver = c.get("driver") || this.driver;
 

@@ -196,14 +196,20 @@ export class EntityPersistService {
                     currentId = entityId; // `entityId` is already the formatted composite or singular string
                     const idValues = parseIdValues(entityId, idInfoArray);
 
-                    let updateQuery = tx.update(table).set(entityData as Record<string, unknown>);
-                    const conditions = [];
-                    for (const info of idInfoArray) {
-                        const field = table[info.fieldName as keyof typeof table] as AnyPgColumn;
-                        conditions.push(eq(field, idValues[info.fieldName]));
-                    }
+                    // Only issue an UPDATE if there are scalar columns to set.
+                    // When the payload contains only relation data, entityData is
+                    // empty after relation stripping and Drizzle throws "No values to set".
+                    const scalarKeys = Object.keys(entityData as Record<string, unknown>);
+                    if (scalarKeys.length > 0) {
+                        let updateQuery = tx.update(table).set(entityData as Record<string, unknown>);
+                        const conditions = [];
+                        for (const info of idInfoArray) {
+                            const field = table[info.fieldName as keyof typeof table] as AnyPgColumn;
+                            conditions.push(eq(field, idValues[info.fieldName]));
+                        }
 
-                    await updateQuery.where(and(...conditions));
+                        await updateQuery.where(and(...conditions));
+                    }
                 } else {
                     const dataForInsert = { ...(entityData as Record<string, unknown>) };
 

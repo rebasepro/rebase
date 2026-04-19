@@ -425,12 +425,17 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             try {
                 if (subscription.type === "entity" && notifyPath === originalPath) {
                     // Send entity update directly (only for exact path matches)
-                    this.sendEntityUpdate(subscription.clientId, subscriptionId, entity);
-
+                    if (entity && (entity as any).values?._rebase_invalidated) {
+                        this.debouncedEntityRefetch(subscriptionId, notifyPath, entityId, subscription);
+                    } else {
+                        this.sendEntityUpdate(subscription.clientId, subscriptionId, entity);
+                    }
                 } else if (subscription.type === "collection" && subscription.collectionRequest) {
                     // Phase 1: Send instant entity-level patch (no DB query)
                     // This gives immediate cross-tab feedback
-                    this.sendCollectionEntityPatch(subscription.clientId, subscriptionId, entityId, entity);
+                    if (!entity || !(entity as any).values?._rebase_invalidated) {
+                        this.sendCollectionEntityPatch(subscription.clientId, subscriptionId, entityId, entity);
+                    }
 
                     // Phase 2: Schedule a deferred full refetch for correctness
                     // Handles filter/sort changes and ensures consistency
@@ -449,9 +454,12 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 if (!callback) continue;
 
                 if (subscription.type === "entity" && notifyPath === originalPath) {
-                    // Call the callback directly with the entity (only for exact path matches)
-                    callback(entity);
-
+                    if (entity && (entity as any).values?._rebase_invalidated) {
+                        this.debouncedEntityDriverRefetch(subscriptionId, notifyPath, entityId, subscription, callback);
+                    } else {
+                        // Call the callback directly with the entity (only for exact path matches)
+                        callback(entity);
+                    }
                 } else if (subscription.type === "collection" && subscription.collectionRequest) {
                     // Debounce collection refetches for DataDriver subscriptions too
                     this.debouncedDriverRefetch(subscriptionId, notifyPath, subscription, callback);
@@ -634,6 +642,126 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             startAfter: collectionRequest.startAfter,
             databaseId: collectionRequest.databaseId
         });
+    }
+
+    /**
+     * Debounce an entity refetch for a WebSocket subscription.
+     */
+    private debouncedEntityRefetch(
+        subscriptionId: string,
+        notifyPath: string,
+        entityId: string,
+        subscription: { clientId: string; authContext?: SubscriptionAuthContext }
+    ) {
+        const timerKey = `wse_${subscriptionId}`;
+        const existing = this.refetchTimers.get(timerKey);
+        if (existing) clearTimeout(existing);
+
+        this.refetchTimers.set(timerKey, setTimeout(async () => {
+            this.refetchTimers.delete(timerKey);
+            if (!this._subscriptions.has(subscriptionId)) return;
+            try {
+                const entity = await this.fetchEntityWithAuth(notifyPath, entityId, subscription.authContext);
+                this.sendEntityUpdate(subscription.clientId, subscriptionId, entity || null);
+            } catch (error) {
+                console.error(`❌ [RealtimeService] Error in debounced entity refetch for ${subscriptionId}:`, error);
+                this.sendError(subscription.clientId, `Failed to process entity update for subscription ${subscriptionId}`, subscriptionId);
+            }
+        }, RealtimeService.REFETCH_DEBOUNCE_MS));
+    }
+
+    /**
+     * Debounce an entity refetch for a Driver callback subscription.
+     */
+    private debouncedEntityDriverRefetch(
+        subscriptionId: string,
+        notifyPath: string,
+        entityId: string,
+        subscription: { clientId: string; authContext?: SubscriptionAuthContext },
+        callback: (data: any) => void
+    ) {
+        const timerKey = `drve_${subscriptionId}`;
+        const existing = this.refetchTimers.get(timerKey);
+        if (existing) clearTimeout(existing);
+
+        this.refetchTimers.set(timerKey, setTimeout(async () => {
+            this.refetchTimers.delete(timerKey);
+            if (!this._subscriptions.has(subscriptionId)) return;
+            try {
+                const entity = await this.fetchEntityWithAuth(notifyPath, entityId, subscription.authContext);
+                callback(entity || null);
+            } catch (error) {
+                console.error(`❌ [RealtimeService] Error in debounced entity driver refetch for ${subscriptionId}:`, error);
+            }
+        }, RealtimeService.REFETCH_DEBOUNCE_MS));
+    }
+
+    /**
+     * Fetch a single entity with optional RLS auth context.
+     */
+    private async fetchEntityWithAuth(
+        notifyPath: string,
+        entityId: string,
+        authContext?: SubscriptionAuthContext
+    ): Promise<Entity | undefined> {
+        if (this.driver) {
+            const collection = this.registry.getCollectionByPath(notifyPath);
+            const fetchFn = async () => this.driver!.fetchEntity({
+                path: notifyPath,
+                entityId,
+                collection
+            });
+
+            // If we have auth context, wrap in a transaction with session vars
+            if (authContext) {
+                return await this.db.transaction(async (tx) => {
+                    await tx.execute(drizzleSql`SELECT set_config('app.user_id', ${authContext.userId}, true)`);
+                    await tx.execute(drizzleSql`SELECT set_config('app.user_roles', ${authContext.roles.join(",")}, true)`);
+                    await tx.execute(drizzleSql`SELECT set_config('app.jwt', ${JSON.stringify({ sub: authContext.userId, roles: authContext.roles })}, true)`);
+                    const txEntityService = new EntityService(tx, this.registry);
+                    let processedEntity = await txEntityService.fetchEntity(notifyPath, entityId, collection?.databaseId);
+
+                    if (processedEntity) {
+                        const registryCollection = this.registry.getCollectionByPath(notifyPath);
+                        const resolvedCollection = collection ? { ...collection, ...registryCollection } as import("@rebasepro/types").EntityCollection : registryCollection as import("@rebasepro/types").EntityCollection;
+                        
+                        const callbacks = resolvedCollection?.callbacks;
+                        const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
+
+                        if (callbacks?.afterRead || propertyCallbacks?.afterRead) {
+                            const contextForCallback = {
+                                user: { uid: authContext.userId, roles: authContext.roles },
+                                driver: this.driver,
+                                data: this.driver ? (this.driver as any).data : undefined
+                            } as any;
+                            
+                            if (callbacks?.afterRead) {
+                                processedEntity = await callbacks.afterRead({
+                                    collection: resolvedCollection,
+                                    path: notifyPath,
+                                    entity: processedEntity,
+                                    context: contextForCallback
+                                }) ?? processedEntity;
+                            }
+                            if (propertyCallbacks?.afterRead) {
+                                processedEntity = await propertyCallbacks.afterRead({
+                                    collection: resolvedCollection,
+                                    path: notifyPath,
+                                    entity: processedEntity,
+                                    context: contextForCallback
+                                }) ?? processedEntity;
+                            }
+                        }
+                    }
+
+                    return processedEntity;
+                });
+            }
+
+            return fetchFn();
+        }
+
+        return await this.entityService.fetchEntity(notifyPath, entityId);
     }
 
     private sendCollectionUpdate(clientId: string, subscriptionId: string, entities: Entity[]) {

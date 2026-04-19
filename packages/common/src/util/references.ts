@@ -30,5 +30,19 @@ export function getEntityImagePreviewPropertyKey<M extends Record<string, unknow
             return key;
         }
     }
+    // fallback: any storage property without explicit acceptedFiles (e.g. a generic "picture" field)
+    for (const key in collection.properties) {
+        const property = collection.properties[key];
+        if (property.type === "string" && property.storage && !property.storage.acceptedFiles) {
+            return key;
+        }
+    }
+    // fallback: any array of storage properties without explicit acceptedFiles
+    for (const key in collection.properties) {
+        const property = collection.properties[key];
+        if (property.type === "array" && !Array.isArray(property.of) && property.of?.type === "string" && property.of.storage && !property.of.storage.acceptedFiles) {
+            return key;
+        }
+    }
     return undefined;
 }
