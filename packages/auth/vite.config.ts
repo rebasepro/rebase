@@ -5,7 +5,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react"
 
 const isExternal = (id: string) => {
-    return !id.startsWith(".") && !path.isAbsolute(id) && !id.startsWith("@rebasepro/");
+    return !id.startsWith(".") && !path.isAbsolute(id);
 };
 
 export default defineConfig(() => ({

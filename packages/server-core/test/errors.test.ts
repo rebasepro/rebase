@@ -136,7 +136,7 @@ describe("errorHandler", () => {
 
         expect(getStatus()).toBe(500);
         expect(getBody()).toEqual({
-            error: { message: "Something broke", code: "INTERNAL_ERROR" }
+            error: { message: "Internal Server Error", code: "INTERNAL_ERROR" }
         });
     });
 

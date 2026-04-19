@@ -3,6 +3,14 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { EntityCollection } from "@rebasepro/types";
 
+jest.mock("../src/services/entityService", () => ({
+    EntityService: jest.fn().mockImplementation(() => ({
+        fetchCollection: jest.fn().mockResolvedValue([{ id: 1, _rebase_invalidated: false }]),
+        fetchEntity: jest.fn().mockResolvedValue({ id: 1, _rebase_invalidated: false }),
+        searchEntities: jest.fn().mockResolvedValue([]),
+    }))
+}));
+
 // --- Mock Classes ---
 class MockWebSocket {
     public readyState = 1;
@@ -58,6 +66,7 @@ describe("RealtimeService", () => {
         };
 
         realtimeService = new RealtimeService(db, registry, mockPoolManager as any, "test-instance", mockAuthSettings);
+        realtimeService.setDataDriver(mockDriver);
         realtimeService.setDataDriver(mockDriver);
     });
 
@@ -233,7 +242,7 @@ describe("RealtimeService", () => {
             await Promise.resolve();
 
             expect(db.execute).toHaveBeenCalled();
-            const executeCalls = db.execute.mock.calls.map(c => c[0].strings ? c[0].strings.join("") : String(c[0]));
+            const executeCalls = db.execute.mock.calls.map(c => JSON.stringify(c[0]));
             
             expect(executeCalls.some(sql => sql.includes("set_config('app.user_id'"))).toBe(true);
             expect(executeCalls.some(sql => sql.includes("set_config('app.user_roles'"))).toBe(true);
@@ -256,7 +265,7 @@ describe("RealtimeService", () => {
             await Promise.resolve();
 
             expect(db.execute).toHaveBeenCalled();
-            const executeCalls = db.execute.mock.calls.map(c => c[0].strings ? c[0].strings.join("") : String(c[0]));
+            const executeCalls = db.execute.mock.calls.map(c => JSON.stringify(c[0]));
             
             expect(executeCalls.some(sql => sql.includes("set_config('app.user_id'"))).toBe(true);
             expect(executeCalls.some(sql => sql.includes("set_config('app.user_roles'"))).toBe(true);

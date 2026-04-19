@@ -101,7 +101,7 @@ describe("Error Handler (Hono)", () => {
         expect(res.status).toBe(500);
         const body = await res.json() as any;
         expect(body.error.code).toBe("INTERNAL_ERROR");
-        expect(body.error.message).toBe("Something went wrong");
+        expect(body.error.message).toBe("Internal Server Error");
     });
 
     it("maps known error codes to HTTP status codes", async () => {

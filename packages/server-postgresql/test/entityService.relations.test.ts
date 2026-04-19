@@ -590,11 +590,11 @@ describe("EntityService - Relation Types Tests", () => {
 
                 // Track main entity update
                 const originalUpdate = db.update;
-                db.update = jest.fn((table) => {
+                db.update = jest.fn(function(this: any, table) {
                     if (table && (table as any)._def?.tableName === "posts") {
                         expectedOps.push("mainUpdate");
                     }
-                    return originalUpdate(table);
+                    return originalUpdate.call(this, table);
                 }) as any;
 
                 db.limit.mockResolvedValue([{ id: 1, title: "Test Post Updated", author_id: 1 }]);
