@@ -27,5 +27,10 @@
     "app/backend",
     "app/shared"
   ],
-  "npmClient": "pnpm"
+  "npmClient": "pnpm",
+  "command": {
+    "version": {
+      "syncWorkspaceLock": false
+    }
+  }
 }
