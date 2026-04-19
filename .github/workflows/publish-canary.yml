@@ -1,6 +1,7 @@
 name: Publish Canary Packages
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
