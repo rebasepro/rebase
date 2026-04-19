@@ -23,9 +23,9 @@ When contributing to the Rebase monorepo, you MUST adhere strictly to the follow
 - **Top-level Imports Only**: Always use standard ES modules `import { Target } from "module"` syntax at the top of your files.
 - If importing causes circular dependency issues, you must fix the architectural pattern (e.g. inject dependencies via constructors or refactor shared logic) rather than cheating with a dynamic `require()`.
 
-## 5. NO HACKS (Strict Resolution of CI/CD & Logic Errors)
-- **Fix the Root Cause**: Do NOT use shell-script interception (e.g., path hijacking or fake executables) or arbitrary environment manipulation hacks to bypass failing processes.
-- **Find the Native Solution**: Always find the official, native way to resolve issues. For example, if a node process runs out of memory, increase `NODE_OPTIONS=--max_old_space_size=...`. If a lockfile fails, fix the config organically (e.g., `pnpm config set frozen-lockfile false`).
-- **This is a serious project**: Infrastructure and CI instability must be repaired structurally to ensure long-term framework reliability. Duct-tape fixes are unacceptable.
+## 5. NO HACKS EVER (Absolute Zero Tolerance)
+- **Fix the Root Cause, Always**: Do NOT use hacks, workarounds, script interceptions, monkey patches, or arbitrary bypasses to fix *any* issue. This applies to application code, architecture, build tooling, CI/CD, and infrastructure.
+- **Find the Native, Architectural Solution**: Always investigate until you find the true root cause. Solve it the proper way, even if it requires more effort, reading documentation, or deep architectural refactoring.
+- **This is a serious project**: Duct-tape fixes are strictly prohibited. We build for long-term stability and reliability.
 
-*These rules were instated because lazy abstractions, dynamic requires, and infrastructure hacks have previously caused critical technical debt, CI instability, and runtime crashes in the framework.*
+*These rules were instated because lazy abstractions, dynamic requires, and hacking around problems instead of fixing the root cause have previously caused critical technical debt and system instability.*
