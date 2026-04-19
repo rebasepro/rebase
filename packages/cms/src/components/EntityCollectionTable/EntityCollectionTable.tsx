@@ -326,7 +326,7 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
             return <EntityTableCell
                 size={size}
                 width={column.width}
-                saved={false}
+                savedTimestamp={undefined}
                 value={null}
                 align={"left"}
                 fullHeight={false}

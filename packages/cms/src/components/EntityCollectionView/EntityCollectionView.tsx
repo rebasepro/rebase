@@ -10,8 +10,8 @@ import {
     EntityCollectionTable,
 } from "../EntityCollectionTable";
 import { CollectionTableToolbar } from "../EntityCollectionTable/internal/CollectionTableToolbar";
-
 import { getSubcollections } from "@rebasepro/common";
+import { useCollectionInlineEditor } from "./hooks/useCollectionInlineEditor";
 import { navigateToEntity } from "../../util/navigation_utils";
 import { mergeEntityActions } from "../../util/entity_actions";
 import { resolveEntityAction } from "../../util/resolutions";
@@ -444,65 +444,12 @@ export const EntityCollectionView = React.memo(
 
         const createEnabled = canCreate(collection, path);
 
-        const uniqueFieldValidator: UniqueFieldValidator = useCallback(
-            async ({
-                name,
-                value,
-                property,
-                entityId
-            }) => {
-                const accessor = dataClient.collection(path);
-                const res = await accessor.find({
-                    where: {
-                        [name]: `eq.${value}`
-                    },
-                    limit: 1
-                });
-                
-                const conflictingEntities = res.data;
-                const isUnique = conflictingEntities.length === 0 || 
-                               (conflictingEntities.length === 1 && conflictingEntities[0].id === entityId);
-                               
-                return isUnique;
-            },
-            [path, dataClient]);
-
-        const onValueChange: OnCellValueChange<any, any> = ({
-            value,
-            propertyKey,
-            onValueUpdated,
-            setError,
-            data: entity,
-        }) => {
-
-            const updatedValues = setIn({}, propertyKey, value);
-
-            const saveProps: SaveEntityProps = {
-                path: entity.path ?? path,
-                entityId: entity.id,
-                values: updatedValues,
-                previousValues: entity.values,
-                collection,
-                status: "existing"
-            };
-
-            return saveEntityWithCallbacks({
-                ...saveProps,
-                collection,
-                data: dataClient,
-                context,
-                afterSave: () => {
-                    setError(undefined);
-                    onValueUpdated();
-                },
-                afterSaveError: (e: Error) => {
-                    console.error("Save failure");
-                    console.error(e);
-                    setError(e);
-                }
-            }).then();
-
-        };
+        const { onValueChange, uniqueFieldValidator } = useCollectionInlineEditor({
+            path,
+            collection,
+            dataClient,
+            context
+        });
 
         // In v4, collections are already resolved, so we use collection directly
         const resolvedCollection = collection;

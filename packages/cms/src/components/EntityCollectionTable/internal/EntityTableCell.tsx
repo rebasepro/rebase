@@ -122,6 +122,7 @@ export const EntityTableCell = React.memo<EntityTableCellProps>(
                     clearTimeout(handler);
                 };
             }
+            return undefined;
         }, [savedTimestamp]);
 
         let p = 0;

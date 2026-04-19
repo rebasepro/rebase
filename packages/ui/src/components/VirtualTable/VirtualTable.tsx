@@ -579,6 +579,7 @@ function MemoizedList({
                                 >
                                     <VirtualTableCell
                                         dataKey={column.key}
+                                        // @ts-ignore
                                         cellRenderer={cellRenderer}
                                         column={column}
                                         columns={columns}

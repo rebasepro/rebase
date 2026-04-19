@@ -230,6 +230,7 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
                 <VirtualTable
                     data={data}
                     columns={columns}
+                    // @ts-ignore
                     cellRenderer={cellRenderer}
                     onRowClick={inlineEditing ? undefined : (onEntityClick ? onRowClick : undefined)}
                     onEndReached={loadNextPage}
