@@ -475,7 +475,7 @@ export const EntityCollectionView = React.memo(
             data: entity,
         }) => {
 
-            const updatedValues = setIn({ ...entity.values }, propertyKey, value);
+            const updatedValues = setIn({}, propertyKey, value);
 
             const saveProps: SaveEntityProps = {
                 path: entity.path ?? path,

@@ -120,15 +120,28 @@ export function serializeDataToServer<M extends Record<string, any>>(
                     // Don't add the original relation property to the result
                     continue;
                 } else if (relation.direction === "inverse" && relation.joinPath && relation.joinPath.length > 0) {
-                    // Inverse relation via joinPath: capture as inverse relation update
                     const serializedValue = serializePropertyToServer(value, property);
-                    const pks = getPrimaryKeys(collection, registry!);
-                    inverseRelationUpdates.push({
-                        relationKey: key,
-                        relation,
-                        newValue: serializedValue,
-                        currentEntityId: entity.id || buildCompositeId(entity, pks)
-                    });
+                    if (relation.cardinality === "one") {
+                        // One-to-one inverse joinPath: route through joinPathRelationUpdates.
+                        // The write ordering in EntityPersistService ensures these are processed
+                        // BEFORE the main UPDATE, so parentSourceCol reads the pre-update FK value.
+                        // This prevents stale values from corrupting related entities when an
+                        // intermediate FK (e.g. author_id) changes in the same save.
+                        joinPathRelationUpdates.push({
+                            relationKey: key,
+                            relation,
+                            newTargetId: serializedValue as string | number | null
+                        });
+                    } else {
+                        // Many inverse joinPath: capture as inverse relation update
+                        const pks = getPrimaryKeys(collection, registry!);
+                        inverseRelationUpdates.push({
+                            relationKey: key,
+                            relation,
+                            newValue: serializedValue,
+                            currentEntityId: entity.id || buildCompositeId(entity, pks)
+                        });
+                    }
                     // Don't add the original relation property to the result
                     continue;
                 } else if (relation.cardinality === "one" && relation.direction === "owning" && relation.joinPath && relation.joinPath.length > 0) {

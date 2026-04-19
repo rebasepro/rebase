@@ -224,12 +224,11 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 this.subscriptionCallbacks.delete(subscriptionId);
 
                 // Cancel any pending debounced refetch timers
-                const wsTimerKey = `ws_${subscriptionId}`;
-                const drvTimerKey = `drv_${subscriptionId}`;
-                const wsTimer = this.refetchTimers.get(wsTimerKey);
-                if (wsTimer) { clearTimeout(wsTimer); this.refetchTimers.delete(wsTimerKey); }
-                const drvTimer = this.refetchTimers.get(drvTimerKey);
-                if (drvTimer) { clearTimeout(drvTimer); this.refetchTimers.delete(drvTimerKey); }
+                for (const prefix of ["ws_", "drv_", "wse_", "drve_"]) {
+                    const key = `${prefix}${subscriptionId}`;
+                    const timer = this.refetchTimers.get(key);
+                    if (timer) { clearTimeout(timer); this.refetchTimers.delete(key); }
+                }
             }
         }
     }
@@ -345,7 +344,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         this._subscriptions.delete(subscriptionId);
         this.subscriptionCallbacks.delete(subscriptionId);
         // Cancel any pending debounced refetch
-        for (const prefix of ["ws_", "drv_"]) {
+        for (const prefix of ["ws_", "drv_", "wse_", "drve_"]) {
             const key = `${prefix}${subscriptionId}`;
             const timer = this.refetchTimers.get(key);
             if (timer) { clearTimeout(timer); this.refetchTimers.delete(key); }

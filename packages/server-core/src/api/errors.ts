@@ -87,15 +87,41 @@ export const errorHandler: ErrorHandler = (err, c) => {
     const statusCode = error.statusCode || codeToStatus(error.code) || 500;
     const code = error.code || "INTERNAL_ERROR";
 
+    // Handle DB connection and specific system errors for better logging
+    let logMessage = error.message;
+    if (error.cause && typeof error.cause === 'object' && 'code' in error.cause) {
+        const cause = error.cause as any;
+        if (cause.code === 'ENETUNREACH') {
+            logMessage = `Network unreachable. Cannot connect to database at ${cause.address}:${cause.port}.`;
+        } else if (cause.code === 'ECONNREFUSED') {
+            logMessage = `Connection refused to database at ${cause.address}:${cause.port}.`;
+        }
+    } else if ('code' in error && error.code === 'ENETUNREACH') {
+         logMessage = `Network unreachable. Cannot connect to service at ${(error as any).address}:${(error as any).port}.`;
+    }
+
     // Unexpected errors — log at error level with full stack
     console.error(
-        `❌ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${error.message}`
+        `❌ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}`
     );
     console.error(error.stack || error);
 
+    // Sanitize the message for the client to prevent leaking sensitive details
+    // like SQL queries or internal IP addresses.
+    let clientMessage = "An unexpected error occurred";
+    if (statusCode < 500 && error.message) {
+        // If it's a 4xx error (e.g. from validation), it's generally safe to send the message
+        clientMessage = error.message;
+    } else if (error instanceof ApiError) {
+        // We already handled ApiError above, but just in case
+        clientMessage = error.message;
+    } else if (code === 'INTERNAL_ERROR') {
+        clientMessage = "Internal Server Error";
+    }
+
     return c.json({
         error: {
-            message: error.message || "An unexpected error occurred",
+            message: clientMessage,
             code,
             ...(error.details !== undefined && { details: error.details })
         }

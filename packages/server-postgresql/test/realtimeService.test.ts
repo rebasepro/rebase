@@ -58,7 +58,7 @@ describe("RealtimeService", () => {
         };
 
         realtimeService = new RealtimeService(db, registry, mockPoolManager as any, "test-instance", mockAuthSettings);
-        realtimeService.setDriver(mockDriver);
+        realtimeService.setDataDriver(mockDriver);
     });
 
     afterEach(() => {
@@ -149,9 +149,9 @@ describe("RealtimeService", () => {
 
             // Phase 2: Refetch
             jest.advanceTimersByTime(350);
-            await Promise.resolve();
-            await Promise.resolve();
-            
+            for (let i = 0; i < 10; i++) {
+                await Promise.resolve();
+            }
             lastCall = ws.send.mock.calls[ws.send.mock.calls.length - 1][0];
             parsed = JSON.parse(lastCall);
             expect(parsed.type).toBe("collection_update");
@@ -214,4 +214,54 @@ describe("RealtimeService", () => {
         });
     });
 
+    describe("RLS (Row Level Security)", () => {
+        it("applies auth context correctly on debounced collection refetches", async () => {
+            const ws = new MockWebSocket() as any;
+            realtimeService.addClient("client-rls", ws);
+             
+            await realtimeService.handleClientMessage("client-rls", {
+                type: "subscribe_collection",
+                payload: { path: "posts", subscriptionId: "sub-rls" },
+            }, { userId: "user123", roles: ["admin", "editor"] });
+
+            // Simulate PG_NOTIFY invalidation
+            const dummyEntity = { id: "1", path: "posts", values: { _rebase_invalidated: true } } as any;
+            await realtimeService.notifyEntityUpdate("posts", "1", dummyEntity, undefined, false);
+
+            jest.advanceTimersByTime(350);
+            await Promise.resolve();
+            await Promise.resolve();
+
+            expect(db.execute).toHaveBeenCalled();
+            const executeCalls = db.execute.mock.calls.map(c => c[0].strings ? c[0].strings.join("") : String(c[0]));
+            
+            expect(executeCalls.some(sql => sql.includes("set_config('app.user_id'"))).toBe(true);
+            expect(executeCalls.some(sql => sql.includes("set_config('app.user_roles'"))).toBe(true);
+        });
+
+        it("applies auth context correctly on debounced entity refetches", async () => {
+            const ws = new MockWebSocket() as any;
+            realtimeService.addClient("client-rls-ent", ws);
+             
+            await realtimeService.handleClientMessage("client-rls-ent", {
+                type: "subscribe_entity",
+                payload: { path: "posts", entityId: "1", subscriptionId: "sub-rls-ent" },
+            }, { userId: "user456", roles: ["viewer"] });
+
+            const dummyEntity = { id: "1", path: "posts", values: { _rebase_invalidated: true } } as any;
+            await realtimeService.notifyEntityUpdate("posts", "1", dummyEntity, undefined, false);
+
+            jest.advanceTimersByTime(350);
+            await Promise.resolve();
+            await Promise.resolve();
+
+            expect(db.execute).toHaveBeenCalled();
+            const executeCalls = db.execute.mock.calls.map(c => c[0].strings ? c[0].strings.join("") : String(c[0]));
+            
+            expect(executeCalls.some(sql => sql.includes("set_config('app.user_id'"))).toBe(true);
+            expect(executeCalls.some(sql => sql.includes("set_config('app.user_roles'"))).toBe(true);
+        });
+    });
+
 });
+

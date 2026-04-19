@@ -477,7 +477,7 @@ describe("EntityService - Relation Types Tests", () => {
             const entity = await entityService.saveEntity("orders", orderWithoutCustomer, 1);
 
             // Since no customer property was provided, nothing should be set
-            expect(db.set).toHaveBeenCalledWith({});
+            expect(db.set).not.toHaveBeenCalled();
         });
     });
 
@@ -564,6 +564,48 @@ describe("EntityService - Relation Types Tests", () => {
 
                 // Should have captured the joinPath relation update
                 expect(db.transaction).toHaveBeenCalled();
+            });
+
+            it("applies joinPath updates BEFORE main UPDATE on existing entities to prevent stale data corruption", async () => {
+                jest.spyOn(collectionRegistry, "getCollectionByPath").mockReturnValue(postsWithAuthorViaJoinPath);
+                jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
+                    if (tableName === "posts") return mockPostsTable as any;
+                    if (tableName === "authors") return mockAuthorsTable as any;
+                    if (tableName === "user_profiles") return mockUserProfilesTable as any;
+                    return undefined;
+                });
+
+                const postUpdate = {
+                    title: "Test Post Updated",
+                    authorProfile: { id: "1", path: "user_profiles", __type: "relation" }
+                };
+
+                const expectedOps: string[] = [];
+                
+                // Track updateJoinPathOneToOneRelations
+                const relationService = entityService.getPersistService().getRelationService();
+                const spyJoinPath = jest.spyOn(relationService, "updateJoinPathOneToOneRelations").mockImplementation(async () => {
+                    expectedOps.push("joinPathUpdate");
+                });
+
+                // Track main entity update
+                const originalUpdate = db.update;
+                db.update = jest.fn((table) => {
+                    if (table && (table as any)._def?.tableName === "posts") {
+                        expectedOps.push("mainUpdate");
+                    }
+                    return originalUpdate(table);
+                }) as any;
+
+                db.limit.mockResolvedValue([{ id: 1, title: "Test Post Updated", author_id: 1 }]);
+
+                try {
+                    await entityService.saveEntity("posts_jp", postUpdate, 1);
+                    expect(expectedOps).toEqual(["joinPathUpdate", "mainUpdate"]);
+                } finally {
+                    db.update = originalUpdate;
+                    spyJoinPath.mockRestore();
+                }
             });
         });
 

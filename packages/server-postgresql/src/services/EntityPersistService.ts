@@ -196,6 +196,16 @@ export class EntityPersistService {
                     currentId = entityId; // `entityId` is already the formatted composite or singular string
                     const idValues = parseIdValues(entityId, idInfoArray);
 
+                    // Apply joinPath one-to-one relation updates BEFORE the main UPDATE.
+                    // This ensures parentSourceCol reads the pre-update FK value, preventing
+                    // stale joinPath values from corrupting related entities when an
+                    // intermediate FK (e.g., author_id) changes in the same save.
+                    // Example: changing author A→B with stale profile P1 (A's):
+                    //   reads old author_id=A → clears P1.author_id → re-sets P1.author_id=A (no-op).
+                    if (joinPathRelationUpdates.length > 0) {
+                        await this.relationService.updateJoinPathOneToOneRelations(tx, collection, currentId, joinPathRelationUpdates);
+                    }
+
                     // Only issue an UPDATE if there are scalar columns to set.
                     // When the payload contains only relation data, entityData is
                     // empty after relation stripping and Drizzle throws "No values to set".
@@ -227,6 +237,11 @@ export class EntityPersistService {
 
                     const resultRow = result[0];
                     currentId = buildCompositeId(resultRow, idInfoArray);
+
+                    // For inserts, apply joinPath after since the parent row didn't exist before
+                    if (joinPathRelationUpdates.length > 0) {
+                        await this.relationService.updateJoinPathOneToOneRelations(tx, collection, currentId, joinPathRelationUpdates);
+                    }
                 }
 
                 // Handle inverse relation updates
@@ -237,11 +252,6 @@ export class EntityPersistService {
                 // Update many-to-many relations
                 if (Object.keys(relationValues).length > 0) {
                     await this.relationService.updateRelationsUsingJoins(tx, collection, currentId, relationValues);
-                }
-
-                // Apply joinPath one-to-one relation updates
-                if (joinPathRelationUpdates.length > 0) {
-                    await this.relationService.updateJoinPathOneToOneRelations(tx, collection, currentId, joinPathRelationUpdates);
                 }
 
                 // Handle junction table creation for many-to-many path-based saves

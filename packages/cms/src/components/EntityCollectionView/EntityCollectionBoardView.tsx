@@ -423,7 +423,7 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
         }
 
         // Build updated values
-        let updatedValues = { ...entity.values };
+        let updatedValues = {};
 
         // Calculate and set new order value (only if orderProperty is configured)
         if (orderProperty) {
