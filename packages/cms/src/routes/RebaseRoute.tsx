@@ -48,7 +48,7 @@ export function RebaseRoute() {
                     });
                 } else if (entry.type === "custom_view") {
                     return ({
-                        title: entry.view.name,
+                        title: String(entry.view.name ?? entry.view.key),
                         url: urlController.buildUrlCollectionPath(entry.path)
                         // count: undefined (not applicable for custom views)
                     });
@@ -170,7 +170,7 @@ function EntityFullScreenRoute({
 
     const lastCustomView = [...navigationEntriesAfterEntity].reverse().find(
         (entry) => entry.type === "custom_view" || entry.type === "collection"
-    ) as NavigationViewCollectionInternal<EntityCollection> | NavigationViewEntityCustomInternal<EntityCollection> | undefined;
+    ) as NavigationViewCollectionInternal<any> | NavigationViewEntityCustomInternal<any> | undefined;
 
     const entityId = lastEntityEntry && "entityId" in lastEntityEntry ? lastEntityEntry.entityId : undefined;
 

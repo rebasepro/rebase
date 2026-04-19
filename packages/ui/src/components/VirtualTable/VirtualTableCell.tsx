@@ -12,7 +12,7 @@ type VirtualTableCellProps<T extends any> = {
     cellData: any;
     rowIndex: any;
     columnIndex: number;
-    cellRenderer: React.ComponentType<CellRendererParams<T>>;
+    cellRenderer: (props: CellRendererParams<T>) => React.ReactNode;
     // Sortable props
     sortableNodeRef?: (node: HTMLElement | null) => void;
     sortableStyle?: React.CSSProperties;
@@ -24,7 +24,7 @@ type VirtualTableCellProps<T extends any> = {
 
 export const VirtualTableCell = React.memo<VirtualTableCellProps<any>>(
     function VirtualTableCell<T>(props: VirtualTableCellProps<T>) {
-        return props.rowData && React.createElement(props.cellRenderer,
+        return props.rowData ? props.cellRenderer(
             {
                 cellData: props.cellData,
                 rowData: props.rowData,
@@ -41,7 +41,7 @@ export const VirtualTableCell = React.memo<VirtualTableCellProps<any>>(
                 isDraggable: props.isDraggable,
                 frozen: props.frozen
             } as CellRendererParams<T>
-        );
+        ) : null;
     },
     (a, b) => {
         return equal(a.rowData, b.rowData) &&

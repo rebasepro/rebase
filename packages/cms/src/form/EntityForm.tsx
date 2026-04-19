@@ -676,7 +676,9 @@ export function EntityForm<M extends Record<string, unknown>>({
         throw Error("INTERNAL: Collection and path must be defined in form context");
     }
 
-    const dialogActions = <EntityFormActionsComponent
+    const EntityFormActionsRender = EntityFormActionsComponent as React.FC<any>;
+
+    const dialogActions = <EntityFormActionsRender
         collection={collection}
         path={path}
         entity={entity}

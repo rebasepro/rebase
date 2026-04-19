@@ -42,7 +42,7 @@ export function VirtualTableInput(props: {
             updateValue(internalValue);
         }
     }, [internalValue, updateValue, value]);
-    useDebouncedCallback(internalValue, doUpdate, !focused, 1000);
+    useDebouncedCallback(internalValue, doUpdate, !focused, 400);
     useEffect(() => {
         if (ref.current && focused && !focusedState.current) {
             focusedState.current = true;

@@ -22,6 +22,28 @@ export interface StorageRoutesConfig {
 }
 
 /**
+ * Extract the wildcard portion of a route path from the full request path.
+ *
+ * Hono's `c.req.param('*')` does not work reliably in sub-routers mounted
+ * via `app.route(prefix, subRouter)`. Instead we derive the wildcard value
+ * from the fully-resolved `c.req.path` and `c.req.routePath`.
+ *
+ * For a route `/metadata/*` mounted at `/api/storage`, a request to
+ * `/api/storage/metadata/default/file.jpg` yields routePath
+ * `/api/storage/metadata/*`.  We strip the prefix (everything before `/*`)
+ * plus one character for the trailing `/` to obtain `default/file.jpg`.
+ */
+export function extractWildcardPath(c: { req: { path: string; routePath: string } }): string {
+    const routePath = c.req.routePath;           // e.g. "/api/storage/metadata/*"
+    const prefix = routePath.replace('/*', '');   // e.g. "/api/storage/metadata"
+    const fullPath = c.req.path;                  // e.g. "/api/storage/metadata/default/file.jpg"
+    const idx = fullPath.indexOf(prefix);
+    if (idx < 0) return '';
+    // +1 to skip the '/' after the prefix
+    return fullPath.substring(idx + prefix.length + 1);
+}
+
+/**
  * Create storage REST API routes
  */
 export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> {
@@ -103,9 +125,9 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
      * Path: /file/{bucket}/{path} or /file/{path}
      */
     router.get('/file/*', readAuthMiddleware, async (c) => {
-        const rawPath = c.req.param('*');
+        const rawPath = extractWildcardPath(c);
         if (!rawPath) {
-            throw ApiError.badRequest('File path required');
+            throw ApiError.notFound('File not found');
         }
 
         const filePath = decodeURIComponent(rawPath);
@@ -153,9 +175,13 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
      * GET /metadata/* - Get file metadata
      */
     router.get('/metadata/*', readAuthMiddleware, async (c) => {
-        const rawPath = c.req.param('*');
+        const rawPath = extractWildcardPath(c);
         if (!rawPath) {
-            throw ApiError.badRequest('File path required');
+            return c.json({
+                success: true,
+                data: null,
+                fileNotFound: true
+            }, 404);
         }
 
         const filePath = decodeURIComponent(rawPath);
@@ -177,9 +203,9 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
      * DELETE /file/* - Delete a file
      */
     router.delete('/file/*', writeAuthMiddleware, async (c) => {
-        const rawPath = c.req.param('*');
+        const rawPath = extractWildcardPath(c);
         if (!rawPath) {
-            throw ApiError.badRequest('File path required');
+            return c.json({ success: true, message: 'No file to delete' });
         }
 
         const filePath = decodeURIComponent(rawPath);

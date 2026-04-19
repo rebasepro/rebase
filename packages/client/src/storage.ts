@@ -59,12 +59,16 @@ export function createStorage(transport: Transport): StorageSource {
 
         let filePath = pathOrUrl;
 
-        if (pathOrUrl.startsWith("local://") || pathOrUrl.startsWith("s3://")) {
-            filePath = pathOrUrl.substring(pathOrUrl.indexOf("://") + 3);
+        if (filePath && (filePath.startsWith("local://") || filePath.startsWith("s3://"))) {
+            filePath = filePath.substring(filePath.indexOf("://") + 3);
         }
 
-        if (bucket && !filePath.startsWith(bucket)) {
+        if (bucket && filePath && !filePath.startsWith(bucket)) {
             filePath = `${bucket}/${filePath}`;
+        }
+
+        if (!filePath || filePath.trim() === '' || filePath === '/') {
+            return { url: null, fileNotFound: true };
         }
 
         try {
@@ -94,12 +98,16 @@ export function createStorage(transport: Transport): StorageSource {
     ): Promise<File | null> {
         let filePath = path;
 
-        if (path.startsWith("local://") || path.startsWith("s3://")) {
-            filePath = path.substring(path.indexOf("://") + 3);
+        if (filePath && (filePath.startsWith("local://") || filePath.startsWith("s3://"))) {
+            filePath = filePath.substring(filePath.indexOf("://") + 3);
         }
 
-        if (bucket && !filePath.startsWith(bucket)) {
+        if (bucket && filePath && !filePath.startsWith(bucket)) {
             filePath = `${bucket}/${filePath}`;
+        }
+
+        if (!filePath || filePath.trim() === '' || filePath === '/') {
+            return null;
         }
 
         // We must use plain fetch because transport.request expects JSON response, but here we want a Blob.
@@ -124,12 +132,16 @@ export function createStorage(transport: Transport): StorageSource {
     ): Promise<void> {
         let filePath = path;
 
-        if (path.startsWith("local://") || path.startsWith("s3://")) {
-            filePath = path.substring(path.indexOf("://") + 3);
+        if (filePath && (filePath.startsWith("local://") || filePath.startsWith("s3://"))) {
+            filePath = filePath.substring(filePath.indexOf("://") + 3);
         }
 
-        if (bucket && !filePath.startsWith(bucket)) {
+        if (bucket && filePath && !filePath.startsWith(bucket)) {
             filePath = `${bucket}/${filePath}`;
+        }
+
+        if (!filePath || filePath.trim() === '' || filePath === '/') {
+            return;
         }
 
         try {

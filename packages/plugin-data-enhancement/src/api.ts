@@ -12,7 +12,7 @@ import { flatMapEntityValues } from "./utils/values";
 
 const DEFAULT_SERVER = "https://api.rebase.pro";
 
-export async function enhanceDataAPIStream<M extends object>(props: {
+export async function enhanceDataAPIStream<M extends Record<string, unknown>>(props: {
     apiKey: string,
     entityId?: string | number,
     entityName: string,

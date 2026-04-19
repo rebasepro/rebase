@@ -75,9 +75,9 @@ export type AuthController<USER extends User = User, ExtraData = unknown> = {
     setExtra: (extra: ExtraData) => void;
 
 
-    setUser?: (user: USER | null) => void;
+    setUser?(user: USER | null): void;
 
-    setUserRoles?: (roles: Role[]) => void;
+    setUserRoles?(roles: Role[]): void;
 
     /**
      * Capabilities advertised by the auth provider.
@@ -95,21 +95,21 @@ export type AuthController<USER extends User = User, ExtraData = unknown> = {
  */
 export interface AuthControllerExtended<USER extends User = User, ExtraData = unknown> extends AuthController<USER, ExtraData> {
     /** Login with email and password */
-    emailPasswordLogin?: (email: string, password: string) => Promise<void>;
+    emailPasswordLogin?(email: string, password: string): Promise<void>;
     /** Login with a Google ID token or trigger Google popup */
-    googleLogin?: (idToken: string) => Promise<void>;
+    googleLogin?(idToken: string): Promise<void>;
     /** Register a new user */
-    register?: (email: string, password: string, displayName?: string) => Promise<void>;
+    register?(email: string, password: string, displayName?: string): Promise<void>;
     /** Skip login (for anonymous access if enabled) */
-    skipLogin?: () => void;
+    skipLogin?(): void;
     /** Request password reset email */
-    forgotPassword?: (email: string) => Promise<void>;
+    forgotPassword?(email: string): Promise<void>;
     /** Reset password using a token */
-    resetPassword?: (token: string, password: string) => Promise<void>;
+    resetPassword?(token: string, password: string): Promise<void>;
     /** Change password for the authenticated user */
-    changePassword?: (oldPassword: string, newPassword: string) => Promise<void>;
+    changePassword?(oldPassword: string, newPassword: string): Promise<void>;
     /** Update user profile */
-    updateProfile?: (displayName?: string, photoURL?: string) => Promise<USER>;
+    updateProfile?(displayName?: string, photoURL?: string): Promise<USER>;
 }
 
 /**

@@ -107,13 +107,10 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
 
         const [error, setError] = useState<Error | undefined>();
         const [validationError, setValidationError] = useState<Error | undefined>();
-        const [saved, setSaved] = useState<boolean>(false);
+        const [savedTimestamp, setSavedTimestamp] = useState<number>(0);
 
         const onValueUpdated = useCallback(() => {
-            setSaved(true)
-            setTimeout(() => {
-                setSaved(false);
-            }, 100);
+            setSavedTimestamp(Date.now());
         }, []);
 
         const customField = Boolean(property.Field);
@@ -144,7 +141,6 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
         const saveValues = async (value: any) => {
             if (equal(value, internalValueRef.current))
                 return;
-            setSaved(false);
             const result = await validation.safeParseAsync(value);
             if (result.success) {
                     setValidationError(undefined);
@@ -244,7 +240,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
             return <EntityTableCell
                 size={size}
                 width={width}
-                saved={saved}
+                savedTimestamp={savedTimestamp}
                 key={`${propertyKey}_${entity.path}_${entity.id}`}
                 value={internalValue}
                 align={align ?? "left"}
@@ -511,7 +507,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
                 disabledTooltip={disabledTooltip ?? "Disabled"}
                 removePadding={removePadding}
                 fullHeight={fullHeight}
-                saved={saved}
+                savedTimestamp={savedTimestamp}
                 error={validationError ?? error}
                 align={align}
                 allowScroll={allowScroll}

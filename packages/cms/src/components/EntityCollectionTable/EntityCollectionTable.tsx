@@ -118,7 +118,7 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
 
     const customFieldValidator: CustomFieldValidator | undefined = uniqueFieldValidator;
 
-    const propertyCellRenderer = ({
+    const propertyCellRenderer = useCallback(({
         column,
         columnIndex,
         rowData,
@@ -176,7 +176,7 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
                 }
             </ErrorBoundary>);
 
-    };
+    }, [getPropertyFor, customFieldValidator, inlineEditing, enablePopupIcon, size]);
 
     const additionalCellRenderer = useCallback(({
         column,

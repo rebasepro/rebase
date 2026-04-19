@@ -1183,6 +1183,315 @@ describe("RebaseWebSocketClient", () => {
     });
 
     // -----------------------------------------------------------------------
+    // ensureAuthenticated – on-demand auth with retry logic
+    // -----------------------------------------------------------------------
+    describe("ensureAuthenticated (on-demand auth)", () => {
+
+        /**
+         * Helper: create a client that is connected and has a token getter,
+         * but is NOT yet authenticated.  This mimics the startup race where the
+         * ConfigControllerProvider fires a request before the WS has authed.
+         *
+         * NOTE: `setAuthTokenGetter` auto-triggers an auth attempt when the WS
+         * is already connected.  We flush that call and clear the mock so that
+         * subsequent call-count assertions only reflect the `ensureAuthenticated`
+         * path triggered by data requests.
+         */
+        async function setupWithTokenGetter(
+            getter: jest.Mock<() => Promise<string>>
+        ) {
+            // Create client WITHOUT a built-in getAuthToken so onopen doesn't auto-auth
+            const client = createClient();
+            jest.runAllTimers();          // open the WS
+            await Promise.resolve();      // flush microtasks
+
+            // Now install the getter *after* connect (mimics useEffect ordering).
+            // This fires an auto-auth attempt asynchronously via getAuthToken().then(...)
+            client.setAuthTokenGetter(getter);
+
+            // Flush the auto-auth microtask so it resolves / rejects
+            await Promise.resolve();
+            await Promise.resolve();
+
+            // Reset the mock so tests only count ensureAuthenticated calls
+            getter.mockClear();
+
+            return { client, ws: getWs() };
+        }
+
+        /** Drain pending microtasks by chaining multiple Promise.resolve() calls */
+        async function flushMicrotasks(n = 10) {
+            for (let i = 0; i < n; i++) {
+                await Promise.resolve();
+            }
+        }
+
+        it("retries on 'still loading' and succeeds once token becomes available", async () => {
+            let callCount = 0;
+            const getter = jest.fn(async () => {
+                callCount++;
+                if (callCount <= 2) {
+                    throw new Error("Auth is still loading");
+                }
+                return "valid-token";
+            });
+
+            const { client, ws } = await setupWithTokenGetter(getter as any);
+
+            // Reset callCount after auto-auth consumed one call
+            callCount = 0;
+            getter.mockClear();
+            getter.mockImplementation(async () => {
+                callCount++;
+                if (callCount <= 2) {
+                    throw new Error("Auth is still loading");
+                }
+                return "valid-token";
+            });
+
+            // Start a request that will trigger ensureAuthenticated
+            const fetchPromise = client.fetchCollection({ path: "posts" });
+
+            // Progressively advance timers and flush microtasks until AUTHENTICATE appears
+            for (let i = 0; i < 10; i++) {
+                jest.advanceTimersByTime(500);
+                await flushMicrotasks();
+                if (ws.sentMessages.some(m => JSON.parse(m).type === "AUTHENTICATE")) break;
+            }
+
+            // Find and respond to the AUTHENTICATE message
+            const authMsg = ws.sentMessages.find(
+                m => JSON.parse(m).type === "AUTHENTICATE"
+            );
+            expect(authMsg).toBeDefined();
+            const parsed = JSON.parse(authMsg!);
+            expect(parsed.payload.token).toBe("valid-token");
+
+            // Simulate auth success
+            ws.onmessage!({ data: JSON.stringify({
+                type: "AUTH_SUCCESS",
+                requestId: parsed.requestId,
+                payload: {}
+            })});
+
+            // Flush until the FETCH_COLLECTION is sent
+            await flushMicrotasks();
+
+            const fetchMsg = ws.sentMessages.find(
+                m => JSON.parse(m).type === "FETCH_COLLECTION"
+            );
+            expect(fetchMsg).toBeDefined();
+
+            // Respond to the fetch
+            const fetchParsed = JSON.parse(fetchMsg!);
+            ws.onmessage!({ data: JSON.stringify({
+                requestId: fetchParsed.requestId,
+                payload: { entities: [{ id: "1" }] }
+            })});
+
+            const result = await fetchPromise;
+            expect(result).toEqual([{ id: "1" }]);
+
+            // Verify it retried (3 calls from ensureAuthenticated)
+            expect(getter).toHaveBeenCalledTimes(3);
+        });
+
+        it("immediately fails on 'not logged in' without retrying", async () => {
+            const getter = jest.fn(async (): Promise<string> => {
+                throw new Error("User is not logged in");
+            });
+
+            const { client } = await setupWithTokenGetter(getter as any);
+
+            const promise = client.fetchCollection({ path: "posts" });
+
+            // Flush microtasks to let ensureAuthenticated run
+            await Promise.resolve();
+            await Promise.resolve();
+
+            await expect(promise).rejects.toThrow("not logged in");
+            // ensureAuthenticated should call getter exactly once — no retries
+            expect(getter).toHaveBeenCalledTimes(1);
+        });
+
+        it("immediately fails on 'Session expired' without retrying", async () => {
+            const getter = jest.fn(async (): Promise<string> => {
+                throw new Error("Session expired. Please login again.");
+            });
+
+            const { client } = await setupWithTokenGetter(getter as any);
+
+            const promise = client.fetchCollection({ path: "users" });
+
+            await Promise.resolve();
+            await Promise.resolve();
+
+            await expect(promise).rejects.toThrow("Session expired");
+            expect(getter).toHaveBeenCalledTimes(1);
+        });
+
+        it("returns falsy token (empty string) as 'not logged in'", async () => {
+            const getter = jest.fn(async () => "");
+            const { client } = await setupWithTokenGetter(getter as any);
+
+            const promise = client.fetchCollection({ path: "test" });
+            await Promise.resolve();
+            await Promise.resolve();
+
+            await expect(promise).rejects.toThrow("not logged in");
+        });
+
+        it("retries generic errors with backoff and eventually fails", async () => {
+            const getter = jest.fn(async (): Promise<string> => {
+                throw new Error("Network unavailable");
+            });
+
+            const { client } = await setupWithTokenGetter(getter as any);
+            const promise = client.fetchCollection({ path: "test" });
+
+            // Attempt 1 — immediate
+            await Promise.resolve();
+            await Promise.resolve();
+
+            // Advance past the first retry delay (1000ms)
+            jest.advanceTimersByTime(1000);
+            await Promise.resolve();
+            await Promise.resolve();
+
+            // Advance past the second retry delay (2000ms)
+            jest.advanceTimersByTime(2000);
+            await Promise.resolve();
+            await Promise.resolve();
+
+            // All 3 attempts exhausted
+            await expect(promise).rejects.toThrow("Network unavailable");
+            expect(getter).toHaveBeenCalledTimes(3);
+        });
+
+        it("skips auth entirely when already authenticated", async () => {
+            const getter = jest.fn(async () => "token-123");
+            const client = createClient({ getAuthToken: getter });
+
+            jest.runAllTimers();
+            await Promise.resolve();
+
+            // The client auto-authenticates on connect — simulate auth success
+            const ws = getWs();
+            const authMsg = ws.sentMessages.find(m => JSON.parse(m).type === "AUTHENTICATE");
+            if (authMsg) {
+                const parsed = JSON.parse(authMsg);
+                ws.onmessage!({ data: JSON.stringify({
+                    type: "AUTH_SUCCESS",
+                    requestId: parsed.requestId,
+                    payload: {}
+                })});
+            }
+            await Promise.resolve();
+
+            // Reset call count after auto-auth
+            getter.mockClear();
+
+            // Now make a data request — ensureAuthenticated should skip
+            const fetchPromise = client.fetchCollection({ path: "users" });
+            const fetchMsg = ws.sentMessages.find(m => JSON.parse(m).type === "FETCH_COLLECTION");
+            expect(fetchMsg).toBeDefined();
+
+            const fetchParsed = JSON.parse(fetchMsg!);
+            ws.onmessage!({ data: JSON.stringify({
+                requestId: fetchParsed.requestId,
+                payload: { entities: [] }
+            })});
+
+            await fetchPromise;
+            // Token getter should NOT have been called again since we're already authed
+            expect(getter).not.toHaveBeenCalled();
+        });
+
+        it("skips auth when no token getter is set", async () => {
+            const client = createClient();
+            jest.runAllTimers();
+            await Promise.resolve();
+
+            // No getAuthToken set — ensureAuthenticated should be a no-op
+            const ws = getWs();
+            const fetchPromise = client.fetchCollection({ path: "public" });
+
+            const fetchMsg = ws.sentMessages.find(m => JSON.parse(m).type === "FETCH_COLLECTION");
+            expect(fetchMsg).toBeDefined();
+
+            const fetchParsed = JSON.parse(fetchMsg!);
+            ws.onmessage!({ data: JSON.stringify({
+                requestId: fetchParsed.requestId,
+                payload: { entities: [{ id: "pub1" }] }
+            })});
+
+            const result = await fetchPromise;
+            expect(result).toEqual([{ id: "pub1" }]);
+        });
+
+        it("'still loading' uses shorter backoff (500ms) than generic errors (1000ms)", async () => {
+            let callCount = 0;
+            const getter = jest.fn(async (): Promise<string> => {
+                callCount++;
+                if (callCount <= 2) {
+                    throw new Error("Auth is still loading");
+                }
+                return "token";
+            });
+
+            const { client, ws } = await setupWithTokenGetter(getter as any);
+
+            // Reset after auto-auth
+            callCount = 0;
+            getter.mockClear();
+            getter.mockImplementation(async () => {
+                callCount++;
+                if (callCount <= 2) {
+                    throw new Error("Auth is still loading");
+                }
+                return "token";
+            });
+
+            const fetchPromise = client.fetchCollection({ path: "test" });
+
+            // Progressively advance timers and flush microtasks until AUTHENTICATE appears
+            for (let i = 0; i < 10; i++) {
+                jest.advanceTimersByTime(500);
+                await flushMicrotasks();
+                if (ws.sentMessages.some(m => JSON.parse(m).type === "AUTHENTICATE")) break;
+            }
+
+            // Third call succeeds, authenticate
+            const authMsg = ws.sentMessages.find(m => JSON.parse(m).type === "AUTHENTICATE");
+            expect(authMsg).toBeDefined();
+
+            const parsed = JSON.parse(authMsg!);
+            ws.onmessage!({ data: JSON.stringify({
+                type: "AUTH_SUCCESS",
+                requestId: parsed.requestId,
+                payload: {}
+            })});
+            await flushMicrotasks();
+
+            // Respond to fetch
+            const fetchMsg = ws.sentMessages.find(m => JSON.parse(m).type === "FETCH_COLLECTION");
+            expect(fetchMsg).toBeDefined();
+
+            const fetchParsed = JSON.parse(fetchMsg!);
+            ws.onmessage!({ data: JSON.stringify({
+                requestId: fetchParsed.requestId,
+                payload: { entities: [] }
+            })});
+
+            const result = await fetchPromise;
+            expect(result).toEqual([]);
+
+            // Verify the getter was called 3 times by ensureAuthenticated
+            expect(getter).toHaveBeenCalledTimes(3);
+        });
+    });
+
+    // -----------------------------------------------------------------------
     // ApiError
     // -----------------------------------------------------------------------
     describe("ApiError", () => {

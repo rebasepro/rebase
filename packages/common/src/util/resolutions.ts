@@ -333,11 +333,11 @@ export function resolveEnumValues(input: EnumValues): EnumValueConfig[] | undefi
 
 export function getSubcollections<M extends Record<string, unknown> = Record<string, unknown>>(collection: EntityCollection<M>): EntityCollection<Record<string, unknown>>[] {
     if (collection.childCollections) {
-        return collection.childCollections();
+        return collection.childCollections() ?? [];
     }
     
     if (isFirebaseCollection(collection) && collection.subcollections) {
-        return collection.subcollections();
+        return collection.subcollections() ?? [];
     }
     
     if (isPostgresCollection(collection) && collection.relations) {

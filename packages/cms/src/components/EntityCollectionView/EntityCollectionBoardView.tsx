@@ -353,8 +353,8 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
             })
             .filter(item => item.id !== movedItemId)
             .sort((a, b) => {
-                const orderA = a.entity.values?.[orderProperty!] ?? 0;
-                const orderB = b.entity.values?.[orderProperty!] ?? 0;
+                const orderA = (a.entity.values?.[orderProperty!] as number) ?? 0;
+                const orderB = (b.entity.values?.[orderProperty!] as number) ?? 0;
                 return orderA - orderB;
             });
 
@@ -379,11 +379,11 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
 
         if (newIndex > 0) {
             const prevItem = newColumnItems[newIndex - 1];
-            prevOrder = prevItem?.entity.values?.[orderProperty!] ?? null;
+            prevOrder = (prevItem?.entity.values?.[orderProperty!] as number) ?? null;
         }
         if (newIndex < newColumnItems.length - 1) {
             const nextItem = newColumnItems[newIndex + 1];
-            nextOrder = nextItem?.entity.values?.[orderProperty!] ?? null;
+            nextOrder = (nextItem?.entity.values?.[orderProperty!] as number) ?? null;
         }
 
         // Calculate new order using fractional indexing

@@ -131,14 +131,18 @@ export function useBackendStorageSource({
         let filePath = pathOrUrl;
 
         // Handle local:// and s3:// URLs
-        if (pathOrUrl.startsWith('local://') || pathOrUrl.startsWith('s3://')) {
-            const withoutProtocol = pathOrUrl.substring(pathOrUrl.indexOf('://') + 3);
+        if (filePath && (filePath.startsWith('local://') || filePath.startsWith('s3://'))) {
+            const withoutProtocol = filePath.substring(filePath.indexOf('://') + 3);
             filePath = withoutProtocol;
         }
 
         // If bucket is provided separately, prepend it
-        if (bucket && !filePath.startsWith(bucket)) {
+        if (bucket && filePath && !filePath.startsWith(bucket)) {
             filePath = `${bucket}/${filePath}`;
+        }
+
+        if (!filePath || filePath.trim() === '' || filePath === '/') {
+            return { url: null, fileNotFound: true };
         }
 
         const response = await fetchWithAuth(`${storageBasePath}/metadata/${filePath}`);
@@ -182,13 +186,17 @@ export function useBackendStorageSource({
         let filePath = path;
 
         // Handle protocol URLs
-        if (path.startsWith('local://') || path.startsWith('s3://')) {
-            const withoutProtocol = path.substring(path.indexOf('://') + 3);
+        if (filePath && (filePath.startsWith('local://') || filePath.startsWith('s3://'))) {
+            const withoutProtocol = filePath.substring(filePath.indexOf('://') + 3);
             filePath = withoutProtocol;
         }
 
-        if (bucket && !filePath.startsWith(bucket)) {
+        if (bucket && filePath && !filePath.startsWith(bucket)) {
             filePath = `${bucket}/${filePath}`;
+        }
+
+        if (!filePath || filePath.trim() === '' || filePath === '/') {
+            return null;
         }
 
         const response = await fetchWithAuth(`${storageBasePath}/file/${filePath}`);
@@ -216,13 +224,17 @@ export function useBackendStorageSource({
         let filePath = path;
 
         // Handle protocol URLs
-        if (path.startsWith('local://') || path.startsWith('s3://')) {
-            const withoutProtocol = path.substring(path.indexOf('://') + 3);
+        if (filePath && (filePath.startsWith('local://') || filePath.startsWith('s3://'))) {
+            const withoutProtocol = filePath.substring(filePath.indexOf('://') + 3);
             filePath = withoutProtocol;
         }
 
-        if (bucket && !filePath.startsWith(bucket)) {
+        if (bucket && filePath && !filePath.startsWith(bucket)) {
             filePath = `${bucket}/${filePath}`;
+        }
+
+        if (!filePath || filePath.trim() === '' || filePath === '/') {
+            return;
         }
 
         const response = await fetchWithAuth(`${storageBasePath}/file/${filePath}`, {

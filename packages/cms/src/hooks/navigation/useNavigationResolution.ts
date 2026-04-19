@@ -64,9 +64,9 @@ export function applyPluginModifyCollection(resolvedCollections: EntityCollectio
     });
 }
 
-export async function resolveCollections(
-    collections: undefined | EntityCollection[] | EntityCollectionsBuilder<any>,
-    authController: AuthController,
+export async function resolveCollections<U extends User, EC extends EntityCollection>(
+    collections: undefined | EC[] | EntityCollectionsBuilder<EC>,
+    authController: AuthController<U>,
     data: RebaseData,
     plugins: RebasePlugin[] | undefined
 ): Promise<EntityCollection[]> {
@@ -100,9 +100,9 @@ export async function resolveCollections(
     return resolvedCollections;
 }
 
-export async function resolveAppViews(
+export async function resolveAppViews<U extends User>(
     baseViews: AppView[] | AppViewsBuilder | undefined,
-    authController: AuthController,
+    authController: AuthController<U>,
     data: RebaseData,
     plugins?: RebasePlugin[]
 ) {
@@ -112,7 +112,7 @@ export async function resolveAppViews(
             user: authController.user,
             authController,
             data
-        });
+        }) ?? [];
     } else if (Array.isArray(baseViews)) {
         resolvedViews = baseViews;
     }

@@ -1,7 +1,7 @@
 import { EntityValues } from "@rebasepro/types";
 import { EditorAIController } from "@rebasepro/cms";
 
-export type EnhanceParams<M extends object> = {
+export type EnhanceParams<M extends Record<string, unknown>> = {
     entityId?: string | number;
     propertyKey?: string;
     propertyInstructions?: string;
@@ -16,7 +16,7 @@ export type DataEnhancementController = {
      */
     enabled: boolean;
     suggestions: Record<string, string | number>;
-    enhance: <M extends object>(props: EnhanceParams<M>) => Promise<EnhancedDataResult | null>;
+    enhance: <M extends Record<string, unknown>>(props: EnhanceParams<M>) => Promise<EnhancedDataResult | null>;
     clearSuggestion: (key: string, suggestion: string | number) => void;
     allowReferenceDataSelection: boolean;
     clearAllSuggestions: () => void;

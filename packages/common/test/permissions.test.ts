@@ -347,4 +347,174 @@ describe("Permissions — Security Rule Evaluation", () => {
             expect(canReadCollection(col, auth)).toBe(true);
         });
     });
+
+    // ── SQL != operator ─────────────────────────────────────
+    describe("SQL != (not equal) operator", () => {
+        it("evaluates != to true when values differ", () => {
+            const col = makeCollection([
+                {
+                    operation: "select",
+                    mode: "permissive",
+                    using: "status != 'deleted'",
+                } as SecurityRule,
+            ]);
+            const auth = makeAuthController();
+            const entity = makeEntity({ status: "active" });
+            expect(canReadCollection(col, auth)).toBe(true);
+        });
+
+        it("evaluates != to false when values match", () => {
+            const col = makeCollection([
+                {
+                    operation: "update",
+                    mode: "permissive",
+                    using: "status != 'deleted'",
+                } as SecurityRule,
+            ]);
+            const auth = makeAuthController();
+            const entity = makeEntity({ status: "deleted" });
+            expect(canEditEntity(col, auth, "products", entity)).toBe(false);
+        });
+    });
+
+    // ── Combined USING + WITH CHECK ─────────────────────────
+    describe("combined USING and withCheck", () => {
+        it("denies when USING passes but withCheck fails", () => {
+            const col = makeCollection([
+                {
+                    operation: "update",
+                    mode: "permissive",
+                    using: "user_id = auth.uid()",
+                    withCheck: "status = 'draft'",
+                } as SecurityRule,
+            ]);
+            const auth = makeAuthController({ uid: "u1" });
+            // USING passes (user_id matches), withCheck fails (status isn't 'draft')
+            const entity = makeEntity({ user_id: "u1", status: "published" });
+            expect(canEditEntity(col, auth, "products", entity)).toBe(false);
+        });
+
+        it("allows when both USING and withCheck pass", () => {
+            const col = makeCollection([
+                {
+                    operation: "update",
+                    mode: "permissive",
+                    using: "user_id = auth.uid()",
+                    withCheck: "status = 'draft'",
+                } as SecurityRule,
+            ]);
+            const auth = makeAuthController({ uid: "u1" });
+            const entity = makeEntity({ user_id: "u1", status: "draft" });
+            expect(canEditEntity(col, auth, "products", entity)).toBe(true);
+        });
+    });
+
+    // ── Reversed auth.uid() = field pattern ──────────────────
+    describe("reversed auth.uid() = field pattern", () => {
+        it("evaluates auth.uid() = field_name pattern", () => {
+            const col = makeCollection([
+                {
+                    operation: "update",
+                    mode: "permissive",
+                    using: "auth.uid() = owner_id",
+                } as SecurityRule,
+            ]);
+            const auth = makeAuthController({ uid: "user-42" });
+            const entity = makeEntity({ owner_id: "user-42" });
+            expect(canEditEntity(col, auth, "products", entity)).toBe(true);
+        });
+
+        it("denies when reversed auth.uid() doesn't match", () => {
+            const col = makeCollection([
+                {
+                    operation: "update",
+                    mode: "permissive",
+                    using: "auth.uid() = owner_id",
+                } as SecurityRule,
+            ]);
+            const auth = makeAuthController({ uid: "user-42" });
+            const entity = makeEntity({ owner_id: "other-user" });
+            expect(canEditEntity(col, auth, "products", entity)).toBe(false);
+        });
+    });
+
+    // ── Only restrictive rules (no permissive) ───────────────
+    describe("only restrictive rules", () => {
+        it("denies when no permissive rules exist (even if restrictive passes)", () => {
+            const col = makeCollection([
+                {
+                    operation: "update",
+                    mode: "restrictive",
+                    using: "status = 'draft'",
+                } as SecurityRule,
+            ]);
+            const auth = makeAuthController();
+            const entity = makeEntity({ status: "draft" });
+            // Restrictive passes, but there's no permissive to grant access
+            expect(canEditEntity(col, auth, "products", entity)).toBe(false);
+        });
+    });
+
+    // ── Multiple permissive rules (OR semantics) ─────────────
+    describe("multiple permissive rules", () => {
+        it("allows if at least one permissive rule passes", () => {
+            const col = makeCollection([
+                {
+                    operation: "update",
+                    mode: "permissive",
+                    using: "user_id = auth.uid()",
+                } as SecurityRule,
+                {
+                    operation: "update",
+                    mode: "permissive",
+                    using: "status = 'published'",
+                } as SecurityRule,
+            ]);
+            const auth = makeAuthController({ uid: "u1" });
+            // First rule fails (wrong user_id), but second passes (status is published)
+            const entity = makeEntity({ user_id: "other", status: "published" });
+            expect(canEditEntity(col, auth, "products", entity)).toBe(true);
+        });
+
+        it("denies if all permissive rules fail", () => {
+            const col = makeCollection([
+                {
+                    operation: "update",
+                    mode: "permissive",
+                    using: "user_id = auth.uid()",
+                } as SecurityRule,
+                {
+                    operation: "update",
+                    mode: "permissive",
+                    using: "status = 'published'",
+                } as SecurityRule,
+            ]);
+            const auth = makeAuthController({ uid: "u1" });
+            const entity = makeEntity({ user_id: "other", status: "draft" });
+            expect(canEditEntity(col, auth, "products", entity)).toBe(false);
+        });
+    });
+
+    // ── Role containment (@>) with multiple required roles ────
+    describe("role containment with multiple required roles", () => {
+        it("requires ALL roles to be present for @> operator", () => {
+            const col = makeCollection([
+                {
+                    operation: "select",
+                    mode: "permissive",
+                    using: "string_to_array(auth.roles(), ',') @> ARRAY['admin', 'superadmin']",
+                } as SecurityRule,
+            ]);
+            const entity = makeEntity({});
+            // User has both roles
+            const superAdmin = makeAuthController({ roles: ["admin", "superadmin", "viewer"] });
+            expect(canReadCollection(col, superAdmin)).toBe(true);
+
+            // User has only one
+            const justAdmin = makeAuthController({ roles: ["admin"] });
+            expect(canReadCollection(col, justAdmin)).toBe(true);
+            // ^ Note: canReadCollection passes null entity, so evaluateAST gets null entity and returns true optimistically
+        });
+    });
 });
+

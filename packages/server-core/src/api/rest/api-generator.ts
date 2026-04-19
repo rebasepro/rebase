@@ -232,7 +232,8 @@ export class RestApiGenerator {
      *   PUT    /authors/111094/posts/43       → update child entity
      *   DELETE /authors/111094/posts/43       → delete child entity
      *
-     * The wildcard `*` captures the full remainder of the URL path.
+     * The `:rest{.+}` regex param captures the full remainder of the URL
+     * path (Hono v4 `*` wildcard does not populate `c.req.param("*")`).
      * We split it into segments and reconstruct the `collectionPath`
      * (e.g. "authors/111094/posts") and optional `entityId` (e.g. "43").
      *
@@ -245,7 +246,7 @@ export class RestApiGenerator {
         // or "authors/111094/posts" into
         // { collectionPath: "authors/111094/posts", entityId: undefined }
         const parseSubPath = (rawPath: string): { collectionPath: string; entityId?: string } | null => {
-            const segments = rawPath.split("/").filter(Boolean);
+            const segments = rawPath.split("/").filter(s => s && s !== "undefined");
             // Need at least 3 segments for a subcollection path (parent/id/child)
             if (segments.length < 3) return null;
 
@@ -260,8 +261,12 @@ export class RestApiGenerator {
         };
 
         // GET /<subcollection-path> — list or get single entity
-        this.router.get("/:parent/:parentId/*", async (c) => {
-            const rawPath = `${c.req.param("parent")}/${c.req.param("parentId")}/${c.req.param("*")}`;
+        // Use :rest{.+} instead of * because Hono v4's wildcard doesn't
+        // capture into c.req.param("*") — it always returns undefined.
+        this.router.get("/:parent/:parentId/:rest{.+}", async (c) => {
+            const rest = c.req.param("rest");
+            if (!rest || rest === "undefined") return c.notFound();
+            const rawPath = `${c.req.param("parent")}/${c.req.param("parentId")}/${rest}`;
             const parsed = parseSubPath(rawPath);
             if (!parsed) return c.notFound();
 
@@ -300,8 +305,10 @@ export class RestApiGenerator {
         });
 
         // POST /<subcollection-path> — create entity
-        this.router.post("/:parent/:parentId/*", async (c) => {
-            const rawPath = `${c.req.param("parent")}/${c.req.param("parentId")}/${c.req.param("*")}`;
+        this.router.post("/:parent/:parentId/:rest{.+}", async (c) => {
+            const rest = c.req.param("rest");
+            if (!rest || rest === "undefined") return c.notFound();
+            const rawPath = `${c.req.param("parent")}/${c.req.param("parentId")}/${rest}`;
             const parsed = parseSubPath(rawPath);
             if (!parsed || parsed.entityId) return c.notFound();
 
@@ -318,8 +325,10 @@ export class RestApiGenerator {
         });
 
         // PUT /<subcollection-path>/:id — update entity
-        this.router.put("/:parent/:parentId/*", async (c) => {
-            const rawPath = `${c.req.param("parent")}/${c.req.param("parentId")}/${c.req.param("*")}`;
+        this.router.put("/:parent/:parentId/:rest{.+}", async (c) => {
+            const rest = c.req.param("rest");
+            if (!rest || rest === "undefined") return c.notFound();
+            const rawPath = `${c.req.param("parent")}/${c.req.param("parentId")}/${rest}`;
             const parsed = parseSubPath(rawPath);
             if (!parsed || !parsed.entityId) return c.notFound();
 
@@ -337,8 +346,10 @@ export class RestApiGenerator {
         });
 
         // DELETE /<subcollection-path>/:id — delete entity
-        this.router.delete("/:parent/:parentId/*", async (c) => {
-            const rawPath = `${c.req.param("parent")}/${c.req.param("parentId")}/${c.req.param("*")}`;
+        this.router.delete("/:parent/:parentId/:rest{.+}", async (c) => {
+            const rest = c.req.param("rest");
+            if (!rest || rest === "undefined") return c.notFound();
+            const rawPath = `${c.req.param("parent")}/${c.req.param("parentId")}/${rest}`;
             const parsed = parseSubPath(rawPath);
             if (!parsed || !parsed.entityId) return c.notFound();
 

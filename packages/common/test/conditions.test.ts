@@ -421,6 +421,326 @@ describe("Property Conditions", () => {
         });
     });
 
+    describe("applyPropertyConditions — readOnly condition", () => {
+        const baseContext: ConditionContext = {
+            values: { status: "archived" },
+            previousValues: {},
+            propertyValue: undefined,
+            path: "products",
+            entityId: "123",
+            isNew: false,
+            user: { uid: "user1", email: null, displayName: null, photoURL: null, roles: ["admin"] },
+            now: Date.now()
+        };
+
+        it("should set readOnly when condition evaluates to true", () => {
+            const property = {
+                dataType: "string",
+                name: "SKU",
+                resolved: true,
+                fromBuilder: false,
+                conditions: {
+                    readOnly: { "==": [{ "var": "values.status" }, "archived"] },
+                }
+            } as ResolvedProperty<string>;
+
+            const result = applyPropertyConditions(property, baseContext);
+            expect(result.readOnly).toBe(true);
+        });
+
+        it("should not set readOnly when condition evaluates to false", () => {
+            const property = {
+                dataType: "string",
+                name: "SKU",
+                resolved: true,
+                fromBuilder: false,
+                conditions: {
+                    readOnly: { "==": [{ "var": "values.status" }, "draft"] },
+                }
+            } as ResolvedProperty<string>;
+
+            const result = applyPropertyConditions(property, baseContext);
+            expect(result.readOnly).toBeUndefined();
+        });
+    });
+
+    describe("applyPropertyConditions — defaultValue condition", () => {
+        it("should set defaultValue for new entities", () => {
+            const context: ConditionContext = {
+                values: {},
+                previousValues: {},
+                propertyValue: undefined,
+                path: "products",
+                isNew: true,
+                user: { uid: "u1", email: null, displayName: null, photoURL: null, roles: [] },
+                now: Date.now()
+            };
+
+            const property = {
+                dataType: "string",
+                name: "Status",
+                resolved: true,
+                fromBuilder: false,
+                conditions: {
+                    defaultValue: "draft",
+                }
+            } as ResolvedProperty<string>;
+
+            const result = applyPropertyConditions(property, context);
+            expect(result.defaultValue).toBe("draft");
+        });
+
+        it("should NOT set defaultValue for existing entities", () => {
+            const context: ConditionContext = {
+                values: { status: "published" },
+                previousValues: {},
+                propertyValue: undefined,
+                path: "products",
+                entityId: "123",
+                isNew: false,
+                user: { uid: "u1", email: null, displayName: null, photoURL: null, roles: [] },
+                now: Date.now()
+            };
+
+            const property = {
+                dataType: "string",
+                name: "Status",
+                resolved: true,
+                fromBuilder: false,
+                conditions: {
+                    defaultValue: "draft",
+                }
+            } as ResolvedProperty<string>;
+
+            const result = applyPropertyConditions(property, context);
+            expect(result.defaultValue).toBeUndefined();
+        });
+    });
+
+    describe("applyPropertyConditions — reference conditions", () => {
+        const baseContext: ConditionContext = {
+            values: { category: "electronics" },
+            previousValues: {},
+            propertyValue: undefined,
+            path: "products",
+            entityId: "123",
+            isNew: false,
+            user: { uid: "u1", email: null, displayName: null, photoURL: null, roles: [] },
+            now: Date.now()
+        };
+
+        it("should set dynamic reference path", () => {
+            const property = {
+                type: "reference",
+                name: "Related",
+                resolved: true,
+                fromBuilder: false,
+                conditions: {
+                    referencePath: { "var": "values.category" },
+                }
+            } as unknown as Property;
+
+            const result = applyPropertyConditions(property, baseContext);
+            expect((result as any).path).toBe("electronics");
+        });
+    });
+
+    describe("applyPropertyConditions — array conditions", () => {
+        const baseContext: ConditionContext = {
+            values: { status: "locked" },
+            previousValues: {},
+            propertyValue: undefined,
+            path: "products",
+            entityId: "123",
+            isNew: false,
+            user: { uid: "u1", email: null, displayName: null, photoURL: null, roles: [] },
+            now: Date.now()
+        };
+
+        it("should disable adding elements when condition evaluates to false", () => {
+            const property = {
+                type: "array",
+                name: "Tags",
+                resolved: true,
+                fromBuilder: false,
+                conditions: {
+                    canAddElements: { "!=": [{ "var": "values.status" }, "locked"] },
+                }
+            } as unknown as Property;
+
+            const result = applyPropertyConditions(property, baseContext);
+            expect((result as any).canAddElements).toBe(false);
+        });
+
+        it("should set sortable based on condition", () => {
+            const property = {
+                type: "array",
+                name: "Items",
+                resolved: true,
+                fromBuilder: false,
+                conditions: {
+                    sortable: { "!=": [{ "var": "values.status" }, "locked"] },
+                }
+            } as unknown as Property;
+
+            const result = applyPropertyConditions(property, baseContext);
+            expect((result as any).sortable).toBe(false);
+        });
+    });
+
+    describe("applyPropertyConditions — enum hidden condition", () => {
+        const baseContext: ConditionContext = {
+            values: { role: "viewer" },
+            previousValues: {},
+            propertyValue: undefined,
+            path: "users",
+            entityId: "123",
+            isNew: false,
+            user: { uid: "u1", email: null, displayName: null, photoURL: null, roles: [] },
+            now: Date.now()
+        };
+
+        it("should hide enum values when hidden condition is true", () => {
+            const property = {
+                type: "string",
+                name: "Role",
+                resolved: true,
+                fromBuilder: false,
+                enum: [
+                    { id: "admin", label: "Admin" },
+                    { id: "editor", label: "Editor" },
+                    { id: "viewer", label: "Viewer" },
+                ],
+                conditions: {
+                    enumConditions: {
+                        admin: {
+                            hidden: { "==": [{ "var": "values.role" }, "viewer"] }
+                        }
+                    }
+                }
+            } as unknown as Property;
+
+            const result = applyPropertyConditions(property, baseContext);
+            const enums = (result as any).enum as { id: string }[];
+            expect(enums.map(e => e.id)).not.toContain("admin");
+            expect(enums.map(e => e.id)).toContain("editor");
+            expect(enums.map(e => e.id)).toContain("viewer");
+        });
+    });
+
+    describe("buildConditionContext — serialization edge cases", () => {
+        it("should serialize Firestore Timestamp-like objects with toMillis", () => {
+            const mockAuthController = { user: null };
+            const fakeTimestamp = { toMillis: () => 1700000000000 };
+
+            const context = buildConditionContext({
+                path: "products",
+                values: { createdAt: fakeTimestamp },
+                authController: mockAuthController as AuthController
+            });
+
+            expect(context.values.createdAt).toBe(1700000000000);
+        });
+
+        it("should serialize Firestore Timestamp-like objects with toDate", () => {
+            const mockAuthController = { user: null };
+            const date = new Date("2024-06-15T12:00:00Z");
+            const fakeTimestamp = { toDate: () => date };
+
+            const context = buildConditionContext({
+                path: "products",
+                values: { updatedAt: fakeTimestamp },
+                authController: mockAuthController as AuthController
+            });
+
+            expect(context.values.updatedAt).toBe(date.getTime());
+        });
+
+        it("should recursively serialize nested objects", () => {
+            const mockAuthController = { user: null };
+            const now = new Date();
+
+            const context = buildConditionContext({
+                path: "products",
+                values: { meta: { created: now, updated: now } },
+                authController: mockAuthController as AuthController
+            });
+
+            expect((context.values.meta as any).created).toBe(now.getTime());
+            expect((context.values.meta as any).updated).toBe(now.getTime());
+        });
+
+        it("should recursively serialize arrays", () => {
+            const mockAuthController = { user: null };
+            const d1 = new Date("2024-01-01");
+            const d2 = new Date("2024-02-01");
+
+            const context = buildConditionContext({
+                path: "products",
+                values: { dates: [d1, d2] },
+                authController: mockAuthController as AuthController
+            });
+
+            expect(context.values.dates).toEqual([d1.getTime(), d2.getTime()]);
+        });
+
+        it("should set propertyValue from propertyKey", () => {
+            const mockAuthController = { user: null };
+
+            const context = buildConditionContext({
+                path: "products",
+                propertyKey: "title",
+                values: { title: "Hello World" },
+                authController: mockAuthController as AuthController
+            });
+
+            expect(context.propertyValue).toBe("Hello World");
+        });
+
+        it("should use values as previousValues when previousValues is undefined", () => {
+            const mockAuthController = { user: null };
+
+            const context = buildConditionContext({
+                path: "products",
+                values: { title: "Current" },
+                authController: mockAuthController as AuthController
+            });
+
+            expect(context.previousValues).toEqual({ title: "Current" });
+        });
+
+        it("should include index when provided", () => {
+            const mockAuthController = { user: null };
+
+            const context = buildConditionContext({
+                path: "products",
+                index: 3,
+                authController: mockAuthController as AuthController
+            });
+
+            expect(context.index).toBe(3);
+        });
+
+        it("should include string roles from user", () => {
+            const mockAuthController = {
+                user: {
+                    uid: "u1",
+                    email: null,
+                    displayName: null,
+                    photoURL: null,
+                    roles: ["admin", "editor"]
+                }
+            };
+
+            const context = buildConditionContext({
+                path: "products",
+                authController: mockAuthController as AuthController
+            });
+
+            expect(context.user.roles).toEqual(["admin", "editor"]);
+        });
+    });
+
     describe("buildConditionContext", () => {
 
         it("should build context with serialized dates", () => {

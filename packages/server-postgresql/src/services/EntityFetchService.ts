@@ -877,7 +877,7 @@ export class EntityFetchService {
             databaseId?: string;
         } = {}
     ): Promise<Entity<M>[]> {
-        const pathSegments = path.split("/").filter(p => p);
+        const pathSegments = path.split("/").filter(p => p && p !== "undefined");
 
         if (pathSegments.length < 3 || pathSegments.length % 2 === 0) {
             throw new Error(`Invalid relation path: ${path}. Expected format: collection/id/relation`);
@@ -952,7 +952,7 @@ export class EntityFetchService {
         path: string,
         options: { filter?: FilterValues<Extract<keyof M, string>>; databaseId?: string } = {}
     ): Promise<number> {
-        const pathSegments = path.split("/").filter(p => p);
+        const pathSegments = path.split("/").filter(p => p && p !== "undefined");
 
         if (pathSegments.length < 3 || pathSegments.length % 2 === 0) {
             throw new Error(`Invalid relation path: ${path}`);

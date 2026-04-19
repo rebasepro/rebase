@@ -512,10 +512,20 @@ export class RebaseWebSocketClient {
                 lastError = error;
 
                 const errMsg = error instanceof Error ? error.message : String(error);
-                // Check if this is a "not logged in" error - don't retry, just fail
+                // "not logged in" / "Session expired" are definitive - don't retry
                 if (errMsg.includes("not logged in") || errMsg.includes("Session expired")) {
                     console.warn("WebSocket auth failed: user not logged in");
                     throw error;
+                }
+
+                // "still loading" is transient - retry with backoff (auth controller
+                // is restoring tokens from localStorage; it will resolve shortly)
+                if (errMsg.includes("still loading")) {
+                    if (attempt < retryCount - 1) {
+                        const delay = Math.min(500 * (attempt + 1), 2000);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        continue;
+                    }
                 }
 
                 // For other errors, retry with backoff

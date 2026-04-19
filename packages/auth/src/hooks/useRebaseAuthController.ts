@@ -298,7 +298,7 @@ export function useRebaseAuthController(
             }
             if (client.ws) {
                 client.ws.setAuthTokenGetter(async () => {
-                    try { return await getAuthToken(); } catch { return ""; }
+                    return await getAuthToken();
                 });
             }
         }

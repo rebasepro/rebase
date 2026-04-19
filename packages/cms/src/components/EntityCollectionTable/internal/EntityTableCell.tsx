@@ -15,7 +15,7 @@ interface EntityTableCellProps {
      */
     value?: any;
     disabled: boolean;
-    saved?: boolean;
+    savedTimestamp?: number;
     error?: Error;
     allowScroll?: boolean;
     align: "right" | "left" | "center";
@@ -82,7 +82,7 @@ export const EntityTableCell = React.memo<EntityTableCellProps>(
         selected,
         disabled,
         disabledTooltip,
-        saved,
+        savedTimestamp,
         error,
         align,
         allowScroll,
@@ -100,27 +100,29 @@ export const EntityTableCell = React.memo<EntityTableCellProps>(
         frozen
     }: EntityTableCellProps) {
 
+
+
         const [measureRef, bounds] = useMeasure();
         const ref = useRef<HTMLDivElement>(null);
 
         const maxHeight = useMemo(() => getRowHeight(size), [size]);
 
         const [onHover, setOnHover] = useState(false);
-        const [internalSaved, setInternalSaved] = useState(saved);
+        const [showSaved, setShowSaved] = useState(false);
 
         const showError = !disabled && Boolean(error);
 
         useEffect(() => {
-            if (saved) {
-                setInternalSaved(true);
+            if (savedTimestamp && savedTimestamp > 0) {
+                setShowSaved(true);
+                const handler = setTimeout(() => {
+                    setShowSaved(false);
+                }, 400);
+                return () => {
+                    clearTimeout(handler);
+                };
             }
-            const handler = setTimeout(() => {
-                setInternalSaved(false);
-            }, 800);
-            return () => {
-                clearTimeout(handler);
-            };
-        }, [saved]);
+        }, [savedTimestamp]);
 
         let p = 0;
         if (!removePadding) {
@@ -191,21 +193,18 @@ export const EntityTableCell = React.memo<EntityTableCellProps>(
 
         const borderClass = showError
             ? "border-red-500"
-            : internalSaved
-                ? "border-green-500"
-                : isSelected
-                    ? "border-primary"
-                    : "border-transparent";
+            : isSelected
+                ? "border-primary"
+                : "border-transparent";
 
         const result = <>
             <div
                 className={cls(
-                    "transition-colors duration-100 ease-in-out",
+                    "transition-colors duration-500",
                     `flex relative h-full rounded-md p-${p} border-4`,
-                    onHover && !disabled ? "bg-surface-50 dark:bg-surface-900" : "",
-                    saved ? "bg-surface-100/75 dark:bg-surface-800/75" : "",
+                    showSaved ? "bg-primary/20 dark:bg-primary/20" : (onHover && !disabled ? "bg-surface-50 dark:bg-surface-900" : ""),
                     hideOverflow ? "overflow-hidden" : "",
-                    isSelected ? "bg-surface-50 dark:bg-surface-900" : "",
+                    isSelected && !showSaved ? "bg-surface-50 dark:bg-surface-900" : "",
                     borderClass
                 )}
                 ref={ref}
@@ -295,7 +294,7 @@ export const EntityTableCell = React.memo<EntityTableCellProps>(
         return a.error === b.error &&
             a.value === b.value &&
             a.disabled === b.disabled &&
-            a.saved === b.saved &&
+            a.savedTimestamp === b.savedTimestamp &&
             a.allowScroll === b.allowScroll &&
             a.align === b.align &&
             a.size === b.size &&

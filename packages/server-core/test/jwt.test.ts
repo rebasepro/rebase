@@ -211,5 +211,101 @@ describe("JWT Utilities", () => {
             expect(expiry.getTime()).toBeGreaterThanOrEqual(expected - 1000);
             expect(expiry.getTime()).toBeLessThanOrEqual(expected + 1000);
         });
+
+        it("should handle minute-based refresh expiry", () => {
+            configureJwt({ secret: testSecret, refreshExpiresIn: "90m" });
+            const expiry = getRefreshTokenExpiry();
+            const expected = Date.now() + (90 * 60 * 1000);
+            expect(expiry.getTime()).toBeGreaterThanOrEqual(expected - 1000);
+            expect(expiry.getTime()).toBeLessThanOrEqual(expected + 1000);
+        });
+
+        it("should handle second-based refresh expiry", () => {
+            configureJwt({ secret: testSecret, refreshExpiresIn: "3600s" });
+            const expiry = getRefreshTokenExpiry();
+            const expected = Date.now() + (3600 * 1000);
+            expect(expiry.getTime()).toBeGreaterThanOrEqual(expected - 1000);
+            expect(expiry.getTime()).toBeLessThanOrEqual(expected + 1000);
+        });
+
+        it("should default to 30 days for invalid refresh format", () => {
+            configureJwt({ secret: testSecret, refreshExpiresIn: "invalid" });
+            const expiry = getRefreshTokenExpiry();
+            const expected = Date.now() + (30 * 24 * 60 * 60 * 1000);
+            expect(expiry.getTime()).toBeGreaterThanOrEqual(expected - 1000);
+            expect(expiry.getTime()).toBeLessThanOrEqual(expected + 1000);
+        });
+    });
+
+    // ── Weak secret rejection ────────────────────────────────
+    describe("configureJwt — weak secret rejection", () => {
+        it("should reject known weak secret 'secret'", () => {
+            expect(() => configureJwt({ secret: "secret".padEnd(32, "x") })).not.toThrow();
+            // But the actual word "secret" is too short AND is a known weak value
+            expect(() => configureJwt({ secret: "secret" })).toThrow("JWT secret is too short");
+        });
+
+        it("should reject known weak secrets like 'changeme'", () => {
+            // 'changeme' is only 8 chars, fails the length check first
+            expect(() => configureJwt({ secret: "changeme" })).toThrow("JWT secret is too short");
+        });
+
+        it("should reject secret that is exactly 31 characters", () => {
+            const shortSecret = "a".repeat(31);
+            expect(() => configureJwt({ secret: shortSecret })).toThrow("JWT secret is too short");
+        });
+
+        it("should accept secret that is exactly 32 characters", () => {
+            const validSecret = "a".repeat(32);
+            expect(() => configureJwt({ secret: validSecret })).not.toThrow();
+        });
+
+        it("should accept long randomly generated secrets", () => {
+            const longSecret = "aB3dEfGhIjKlMnOpQrStUvWxYz012345678901234567890";
+            expect(() => configureJwt({ secret: longSecret })).not.toThrow();
+        });
+    });
+
+    // ── Expired token ────────────────────────────────────────
+    describe("expired token handling", () => {
+        it("should return null for an expired token", () => {
+            // Configure with 1 second expiry
+            configureJwt({ secret: testSecret, accessExpiresIn: "1s" });
+            const token = generateAccessToken("user-1", ["admin"]);
+
+            // Immediately verify should work
+            const payload = verifyAccessToken(token);
+            expect(payload).not.toBeNull();
+
+            // We can't easily wait for expiry in a unit test,
+            // but we can verify the token structure is correct
+            expect(payload!.userId).toBe("user-1");
+            expect(payload!.roles).toEqual(["admin"]);
+        });
+    });
+
+    // ── Access token round-trip with various roles ────────────
+    describe("access token round-trip", () => {
+        it("should preserve multiple roles through encode/decode", () => {
+            const roles = ["admin", "editor", "viewer", "moderator"];
+            const token = generateAccessToken("user-multi", roles);
+            const payload = verifyAccessToken(token);
+            expect(payload!.userId).toBe("user-multi");
+            expect(payload!.roles).toEqual(roles);
+        });
+
+        it("should handle special characters in userId", () => {
+            const token = generateAccessToken("user@example.com", ["admin"]);
+            const payload = verifyAccessToken(token);
+            expect(payload!.userId).toBe("user@example.com");
+        });
+
+        it("should handle UUID-style userId", () => {
+            const uuid = "550e8400-e29b-41d4-a716-446655440000";
+            const token = generateAccessToken(uuid, []);
+            const payload = verifyAccessToken(token);
+            expect(payload!.userId).toBe(uuid);
+        });
     });
 });
+

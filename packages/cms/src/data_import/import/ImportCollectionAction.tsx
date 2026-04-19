@@ -5,7 +5,7 @@ import {
     useSnackbarController
 } from "@rebasepro/core";
 import { getPropertiesWithPropertiesOrder, getPropertyInPath } from "../../util";
-import { CollectionActionsProps, Properties, Property, User } from "@rebasepro/types";
+import { CollectionActionsProps, Properties, Property, User, EntityCollection } from "@rebasepro/types";
 import {
     EntityCollectionTable,
     getFieldConfig,

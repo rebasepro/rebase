@@ -201,13 +201,13 @@ export interface BaseProperty<CustomProps = unknown> {
      * Custom field component to render this property in forms.
      * Used by the CMS layer.
      */
-    Field?: React.ComponentType<unknown>;
+    Field?: React.ComponentType<any>;
 
     /**
      * Custom preview component to render this property in previews/tables.
      * Used by the CMS layer.
      */
-    Preview?: React.ComponentType<unknown>;
+    Preview?: React.ComponentType<any>;
 }
 
 /**

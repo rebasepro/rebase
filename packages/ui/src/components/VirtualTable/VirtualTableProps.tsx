@@ -29,7 +29,7 @@ export interface VirtualTableProps<T extends Record<string, any>> {
      * Custom cell renderer
      * The renderer receives props `{ cellData, columns, column, columnIndex, rowData, rowIndex, container, isScrolling }`
      */
-    cellRenderer: React.ComponentType<CellRendererParams<T>>;
+    cellRenderer: (props: CellRendererParams<T>) => React.ReactNode;
 
     /**
      * Set this callback if you want to support some combinations
