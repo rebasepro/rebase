@@ -43,20 +43,8 @@ jobs:
           echo "CANARY_VERSION=$CANARY_VERSION" >> $GITHUB_ENV
           echo "Publishing canary version: $CANARY_VERSION"
 
-          # Prevent Lerna from crashing by hijacking the memory-intensive lockfile process
-          mkdir -p /tmp/fake-pnpm
-          ORIGINAL_PNPM=$(which pnpm)
-          cat << EOF > /tmp/fake-pnpm/pnpm
-          #!/bin/bash
-          if [[ "\$*" == *"install --lockfile-only"* ]]; then
-            echo "Intercepted pnpm install inside lerna version! Bypassing to prevent crash..."
-            exit 0
-          else
-            exec \$ORIGINAL_PNPM "\$@"
-          fi
-          EOF
-          chmod +x /tmp/fake-pnpm/pnpm
-          export PATH="/tmp/fake-pnpm:$PATH"
+          # Configure pnpm natively to allow lockfile updates during canary version bump
+          pnpm config set frozen-lockfile false
 
           # Update all package versions without creating git tags or commits
           npx lerna version "$CANARY_VERSION" --no-git-tag-version --no-push --yes
@@ -67,6 +55,8 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "chore: canary version $CANARY_VERSION" --no-verify
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
 
       - name: Publish to npm
         run: npx lerna publish from-package --yes --no-verify-access --dist-tag canary
