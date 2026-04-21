@@ -200,6 +200,19 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         return { user: session.user, accessToken: session.accessToken, refreshToken: session.refreshToken };
     }
 
+    async function signInWithLinkedin(code: string, redirectUri: string) {
+        const fetchFn = getFetch();
+        const res = await fetchFn(authUrl("/linkedin"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code, redirectUri }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throwApiError(res.status, body, res.statusText);
+        const session = handleAuthResponse(body, "SIGNED_IN");
+        return { user: session.user, accessToken: session.accessToken, refreshToken: session.refreshToken };
+    }
+
     async function signOut() {
         const fetchFn = getFetch();
         try {
@@ -381,6 +394,7 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         signInWithEmail,
         signUp,
         signInWithGoogle,
+        signInWithLinkedin,
         signOut,
         refreshSession,
         getUser,

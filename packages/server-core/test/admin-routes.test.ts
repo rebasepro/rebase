@@ -30,8 +30,6 @@ function mockUser(overrides: Partial<{ id: string; email: string; displayName: s
         passwordHash: "salt:hash",
         displayName: overrides.displayName ?? "Test User",
         photoUrl: overrides.photoUrl ?? null,
-        provider: overrides.provider ?? "email",
-        googleId: null,
         emailVerified: false,
         emailVerificationToken: null,
         emailVerificationSentAt: null,
@@ -50,7 +48,9 @@ let mockAuthRepo: jest.Mocked<any>;
 function createApp(opts: { defaultRole?: string } = {}) {
     mockAuthRepo = {
         getUserByEmail: jest.fn().mockResolvedValue(null),
-        getUserByGoogleId: jest.fn().mockResolvedValue(null),
+        getUserByIdentity: jest.fn().mockResolvedValue(null),
+        linkUserIdentity: jest.fn().mockResolvedValue(undefined),
+        getUserIdentities: jest.fn().mockResolvedValue([]),
         getUserById: jest.fn().mockResolvedValue(null),
         createUser: jest.fn().mockImplementation((data) =>
             Promise.resolve(mockUser({ email: data.email, displayName: data.displayName, passwordHash: data.passwordHash }))

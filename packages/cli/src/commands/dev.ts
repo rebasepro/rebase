@@ -175,7 +175,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         frontendChild.stdout?.on("data", (data: Buffer) => {
             const lines = data.toString().split("\n").filter(Boolean);
             lines.forEach((line: string) => {
-                console.log(`${chalk.magenta.bold("[frontend]")} ${line}`);
+                console.log(`${chalk.magenta.bold("[admin]")} ${line}`);
                 const cleanLine = stripAnsi(line);
                 const urlMatch = cleanLine.match(/(http:\/\/(?:localhost|127\.0\.0\.1):\d+)/);
                 if (cleanLine.includes("Local:") && urlMatch) {
@@ -188,7 +188,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         frontendChild.stderr?.on("data", (data: Buffer) => {
             const lines = data.toString().split("\n").filter(Boolean);
             lines.forEach((line: string) => {
-                console.log(`${chalk.magenta.bold("[frontend]")} ${line}`);
+                console.log(`${chalk.magenta.bold("[admin]")} ${line}`);
             });
         });
 

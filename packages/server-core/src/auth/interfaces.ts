@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * Authentication Abstraction Interfaces
  * 
@@ -15,8 +17,6 @@ export interface UserData {
     passwordHash?: string | null;
     displayName?: string | null;
     photoUrl?: string | null;
-    provider: string;
-    googleId?: string | null;
     emailVerified: boolean;
     emailVerificationToken?: string | null;
     emailVerificationSentAt?: Date | null;
@@ -32,9 +32,44 @@ export interface CreateUserData {
     passwordHash?: string;
     displayName?: string;
     photoUrl?: string;
-    provider?: string;
-    googleId?: string;
     emailVerified?: boolean;
+}
+
+/**
+ * User Identity Data (OAuth accounts linked to user)
+ */
+export interface UserIdentityData {
+    id: string;
+    userId: string;
+    provider: string;
+    providerId: string;
+    profileData?: Record<string, any> | null;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+/**
+ * Standardized profile data returned by an OAuth provider verification payload
+ */
+export interface OAuthProviderProfile {
+    providerId: string;
+    email: string;
+    displayName?: string | null;
+    photoUrl?: string | null;
+}
+
+/**
+ * Pluggable OAuth Provider integration strategy
+ */
+export interface OAuthProvider {
+    /** The identifier of the provider (e.g. "github", "google") */
+    id: string;
+    
+    /** Zod schema validating the expected request payload (e.g. { code: string }) */
+    schema: z.ZodSchema<any>;
+    
+    /** Verify external tokens/codes and return a standardized user profile */
+    verify: (payload: any) => Promise<OAuthProviderProfile | null>;
 }
 
 /**
@@ -144,9 +179,19 @@ export interface UserRepository {
     getUserByEmail(email: string): Promise<UserData | null>;
 
     /**
-     * Get a user by Google ID
+     * Get a user by an OAuth identity
      */
-    getUserByGoogleId(googleId: string): Promise<UserData | null>;
+    getUserByIdentity(provider: string, providerId: string): Promise<UserData | null>;
+
+    /**
+     * Get all identities linked to a user
+     */
+    getUserIdentities(userId: string): Promise<UserIdentityData[]>;
+
+    /**
+     * Link a new OAuth identity to a user
+     */
+    linkUserIdentity(userId: string, provider: string, providerId: string, profileData?: Record<string, any>): Promise<void>;
 
     /**
      * Update a user

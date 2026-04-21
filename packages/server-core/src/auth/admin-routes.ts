@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { ApiError } from "../api/errors";
+import { ApiError, errorHandler } from "../api/errors";
 import type { AuthRepository } from "./interfaces";
 import { requireAuth, requireAdmin } from "./middleware";
 import { hashPassword, validatePasswordStrength } from "./password";
@@ -55,6 +55,10 @@ export function createAdminRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
     const authRepo = config.authRepo;
     const { emailService, emailConfig } = config;
+
+    // Attach Rebase error handler to ensure exceptions are correctly formatted
+    // instead of caught by Hono's default error handler from the sub-router.
+    router.onError(errorHandler);
 
     // Apply auth middleware to all routes
     router.use("/*", requireAuth);

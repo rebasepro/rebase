@@ -22,10 +22,12 @@ dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 // ─── App ─────────────────────────────────────────────────────────────
 const app = new Hono<HonoEnv>();
 
+const allowedOrigins = process.env.NODE_ENV === "production"
+    ? (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || "https://yourdomain.com").split(",").map(s => s.trim())
+    : ["http://localhost:5173", "http://localhost:3000"];
+
 app.use("/*", cors({
-    origin: process.env.NODE_ENV === "production"
-        ? [process.env.FRONTEND_URL || "https://yourdomain.com"]
-        : ["http://localhost:5173", "http://localhost:3000"],
+    origin: allowedOrigins,
     credentials: true
 }));
 

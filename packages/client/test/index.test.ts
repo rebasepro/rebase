@@ -218,5 +218,74 @@ describe("createRebaseClient", () => {
             });
             expect(client).toBeDefined();
         });
+
+        it("auto-refresh retries the request after 401 (wiring regression test)", async () => {
+            /**
+             * This test proves the wiring fix: transport.setOnUnauthorized() must
+             * be called (vs setting options.onUnauthorized) so the transport's
+             * internal onUnauthorizedHandler closure is updated AFTER creation.
+             */
+            let callCount = 0;
+            const mockFetch = jest.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => {
+                callCount++;
+                if (callCount === 1) {
+                    // First call: simulate 401 from server
+                    return {
+                        ok: false,
+                        status: 401,
+                        statusText: "Unauthorized",
+                        json: async () => ({ error: { message: "Token expired", code: "UNAUTHORIZED" } }),
+                        headers: new Headers(),
+                    } as unknown as Response;
+                }
+                if (callCount === 2) {
+                    // Second call: refresh token endpoint
+                    return {
+                        ok: true,
+                        status: 200,
+                        json: async () => ({
+                            tokens: {
+                                accessToken: "new-jwt",
+                                refreshToken: "new-refresh",
+                                accessTokenExpiresAt: Date.now() + 3600000,
+                            }
+                        }),
+                        headers: new Headers(),
+                    } as unknown as Response;
+                }
+                // Third call: retry of original request — must match collection.find() shape
+                return {
+                    ok: true,
+                    status: 200,
+                    json: async () => ({ data: [{ id: 1, title: "Post" }], meta: { total: 1 } }),
+                    headers: new Headers(),
+                } as unknown as Response;
+            }) as unknown as typeof globalThis.fetch;
+
+            // Seed a session so refreshSession() has a refresh token
+            const storage = createMemoryStorage();
+            storage.setItem("rebase_auth", JSON.stringify({
+                accessToken: "expired-jwt",
+                refreshToken: "valid-refresh",
+                expiresAt: Date.now() + 1000000,
+                user: { uid: "u", email: "u@m.com", displayName: "u", photoURL: null },
+            }));
+
+            const client = createRebaseClient({
+                baseUrl: "http://localhost",
+                fetch: mockFetch,
+                auth: { storage, autoRefresh: false },
+            });
+
+            // Make a request that will get 401 → auto-refresh → retry
+            const result = await client.data.collection("posts").find();
+
+            // The mock fetch should have been called 3 times:
+            // 1) Original request → 401
+            // 2) Refresh token → 200
+            // 3) Retry of original request → 200
+            expect(callCount).toBe(3);
+            expect(result).toBeDefined();
+        });
     });
 });

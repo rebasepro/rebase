@@ -1,4 +1,6 @@
 import { OAuth2Client } from "google-auth-library/build/src/index.js";
+import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
+import { z } from "zod";
 
 export interface GoogleUserInfo {
     googleId: string;
@@ -8,53 +10,39 @@ export interface GoogleUserInfo {
     emailVerified: boolean;
 }
 
-let googleClient: OAuth2Client | null = null;
-let configuredClientId: string | null = null;
-
 /**
- * Configure Google OAuth - call this during initialization
+ * Creates a Google OAuth Provider integration
  */
-export function configureGoogleOAuth(clientId: string): void {
-    configuredClientId = clientId;
-    googleClient = new OAuth2Client(clientId);
-}
+export function createGoogleProvider(clientId: string): OAuthProvider {
+    const googleClient = new OAuth2Client(clientId);
 
-/**
- * Verify a Google ID token and extract user information
- * @param idToken The ID token from Google Sign-In on the frontend
- */
-export async function verifyGoogleIdToken(idToken: string): Promise<GoogleUserInfo | null> {
-    if (!googleClient || !configuredClientId) {
-        throw new Error("Google OAuth not configured. Call configureGoogleOAuth() first.");
-    }
+    return {
+        id: "google",
+        schema: z.object({
+            idToken: z.string().min(1, "ID token is required")
+        }),
+        verify: async (payload: { idToken: string }): Promise<OAuthProviderProfile | null> => {
+            try {
+                const ticket = await googleClient.verifyIdToken({
+                    idToken: payload.idToken,
+                    audience: clientId
+                });
 
-    try {
-        const ticket = await googleClient.verifyIdToken({
-            idToken,
-            audience: configuredClientId
-        });
+                const content = ticket.getPayload();
+                if (!content) {
+                    return null;
+                }
 
-        const payload = ticket.getPayload();
-        if (!payload) {
-            return null;
+                return {
+                    providerId: content.sub,
+                    email: content.email || "",
+                    displayName: content.name || null,
+                    photoUrl: content.picture || null,
+                };
+            } catch (error) {
+                console.error("Failed to verify Google ID token:", error);
+                return null;
+            }
         }
-
-        return {
-            googleId: payload.sub,
-            email: payload.email || "",
-            displayName: payload.name || null,
-            photoUrl: payload.picture || null,
-            emailVerified: payload.email_verified || false
-        };
-    } catch (error) {
-        console.error("Failed to verify Google ID token:", error);
-        return null;
-    }
-}
-
-/**
- * Check if Google OAuth is configured
- */
-export function isGoogleOAuthConfigured(): boolean {
-    return googleClient !== null && configuredClientId !== null;
+    };
 }

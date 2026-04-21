@@ -1,0 +1,201 @@
+---
+import Layout from "../layouts/Layout.astro";
+import SectionBackgroundAccents from "../components/SectionBackgroundAccents.astro";
+
+const title = "Rebase vs Strapi - Clean Postgres Schemas & Code Workflows";
+const description = "Switch to Rebase from Strapi. Stop battling opaque database tables, painful migrations, and slow server reloads.";
+
+const breadcrumbs = [
+    { name: "Home", url: "https://rebase.pro" },
+    { name: "Rebase vs Strapi", url: "https://rebase.pro/rebase-vs-strapi" }
+];
+---
+
+<Layout title={title} description={description} breadcrumbs={breadcrumbs}>
+  <main>
+    <section class="relative isolate overflow-hidden bg-linear-to-br from-black to-surface-950 pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
+      <SectionBackgroundAccents topLine={true} blob={{ position: "top", size: "lg", opacity: 60 }}/>
+      
+      <div class="px-4 mx-auto max-w-7xl text-center lg:px-12">
+        <h1 class="mb-8 text-5xl font-extrabold tracking-tight leading-none md:text-6xl text-white font-sans">
+          Rebase vs Strapi
+        </h1>
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl max-w-3xl mx-auto">
+          Strapi paved the way for Headless CMSs, but modern platforms require clean databases and smooth developer deployments. Discover why developers are migrating to Rebase for cleaner schemas, seamless upgrades, and deeper backend control.
+        </p>
+      </div>
+    </section>
+
+    <!-- Content Sections -->
+    <section class="bg-black py-16 sm:py-24">
+      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        
+        <div class="space-y-16">
+          
+          <!-- Point 1 -->
+          <div class="py-2">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div>
+                  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-3">
+                    <span class="material-symbols-rounded text-primary" style="font-size:18px">database</span>
+                    Schema Clarity
+                  </div>
+                  <h3 class="text-2xl font-bold text-white">Opaque vs Clean Schemas</h3>
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+                <!-- VS Badge -->
+                <div class="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-surface-700 bg-surface-900 items-center justify-center text-xs font-bold text-surface-400 z-10 shadow-xl">VS</div>
+                
+                <!-- Competitor Card -->
+                <div class="bg-surface-800/20 rounded-xl p-6 border border-surface-700/50 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      <span class="material-symbols-rounded text-red-500/80" style="font-size:20px">error</span>
+                      <h4 class="text-white font-semibold">The Strapi Pain</h4>
+                    </div>
+                    <p class="text-surface-400 text-sm leading-relaxed">Strapi generates highly abstracted database schemas. To achieve dynamic zones and complex relations, Strapi creates dozens of opaque joining tables (`components_xxxxx`). Querying a Strapi database using raw SQL or external BI tools is an absolute nightmare.</p>
+                  </div>
+                </div>
+
+                <!-- Rebase Card -->
+                <div class="bg-primary/5 rounded-xl p-6 border border-primary/20 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      <span class="material-symbols-rounded text-primary" style="font-size:20px">check_circle</span>
+                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                    </div>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
+                      Rebase uses true Postgres-native definitions powered by Drizzle ORM.
+                    </p>
+                    <ul class="text-surface-400 space-y-3 text-sm">
+                      <li class="flex items-start"><span class="material-symbols-rounded text-primary mr-2 mt-0.5" style="font-size:18px">done</span> <span class="leading-relaxed">Table structures remain readable, exactly how a developer would craft them by hand.</span></li>
+                  <li class="flex items-start"><span class="material-symbols-rounded text-primary mr-2 mt-0.5" style="font-size:18px">done</span> <span class="leading-relaxed">Connects gracefully to <b>existing</b> databases! You don't have to start from scratch.</span></li>
+                  <li class="flex items-start"><span class="material-symbols-rounded text-primary mr-2 mt-0.5" style="font-size:18px">done</span> <span class="leading-relaxed">Zero vendor lock-in because your data remains entirely queryable by any standard tool.</span></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+          </div>
+
+          <!-- Point 2 -->
+          <div class="py-2">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div>
+                  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-3">
+                    <span class="material-symbols-rounded text-primary" style="font-size:18px">sync</span>
+                    Migrations
+                  </div>
+                  <h3 class="text-2xl font-bold text-white">Smooth Migration Syncing</h3>
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+                <!-- VS Badge -->
+                <div class="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-surface-700 bg-surface-900 items-center justify-center text-xs font-bold text-surface-400 z-10 shadow-xl">VS</div>
+                
+                <!-- Competitor Card -->
+                <div class="bg-surface-800/20 rounded-xl p-6 border border-surface-700/50 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      <span class="material-symbols-rounded text-red-500/80" style="font-size:20px">error</span>
+                      <h4 class="text-white font-semibold">The Strapi Pain</h4>
+                    </div>
+                    <p class="text-surface-400 text-sm leading-relaxed">Moving custom endpoints, data structures, and permissions from a local Strapi instance to production environments has historically been incredibly manual and dangerous, risking data loss during deployments.</p>
+                  </div>
+                </div>
+
+                <!-- Rebase Card -->
+                <div class="bg-primary/5 rounded-xl p-6 border border-primary/20 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      <span class="material-symbols-rounded text-primary" style="font-size:20px">check_circle</span>
+                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                    </div>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
+                      Rebase operates entirely on a <strong>Schema-as-Code</strong> paradigm.
+                    </p>
+                    <ul class="text-surface-400 space-y-3 text-sm">
+                      <li class="flex items-start"><span class="material-symbols-rounded text-primary mr-2 mt-0.5" style="font-size:18px">done</span> <span class="leading-relaxed">The Rebase Studio securely creates AST modifications directly into your underlying TypeScript logic.</span></li>
+                  <li class="flex items-start"><span class="material-symbols-rounded text-primary mr-2 mt-0.5" style="font-size:18px">done</span> <span class="leading-relaxed">Drizzle takes care of migrating your database via simple CLI commands.</span></li>
+                  <li class="flex items-start"><span class="material-symbols-rounded text-primary mr-2 mt-0.5" style="font-size:18px">done</span> <span class="leading-relaxed">Environments stay 100% synchronized through Github commits, not database copy-pasting.</span></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+          </div>
+
+          <!-- Point 3 -->
+          <div class="py-2">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div>
+                  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-3">
+                    <span class="material-symbols-rounded text-primary" style="font-size:18px">speed</span>
+                    Developer Experience
+                  </div>
+                  <h3 class="text-2xl font-bold text-white">Slow Reloads & Bloat</h3>
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+                <!-- VS Badge -->
+                <div class="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-surface-700 bg-surface-900 items-center justify-center text-xs font-bold text-surface-400 z-10 shadow-xl">VS</div>
+                
+                <!-- Competitor Card -->
+                <div class="bg-surface-800/20 rounded-xl p-6 border border-surface-700/50 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      <span class="material-symbols-rounded text-red-500/80" style="font-size:20px">error</span>
+                      <h4 class="text-white font-semibold">The Strapi Pain</h4>
+                    </div>
+                    <p class="text-surface-400 text-sm leading-relaxed">Strapi forces full server reboots during schema changes which can dramatically slow down development time. Adding custom logic or reacting to lifecycle events involves diving into deep layers of proprietary configuration files.</p>
+                  </div>
+                </div>
+
+                <!-- Rebase Card -->
+                <div class="bg-primary/5 rounded-xl p-6 border border-primary/20 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      <span class="material-symbols-rounded text-primary" style="font-size:20px">check_circle</span>
+                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                    </div>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
+                      Rebase is a unified, tightly-coupled TypeScript service.
+                    </p>
+                    <ul class="text-surface-400 space-y-3 text-sm">
+                      <li class="flex items-start"><span class="material-symbols-rounded text-primary mr-2 mt-0.5" style="font-size:18px">done</span> <span class="leading-relaxed">Sub-second hot-reloading for most schema and endpoint changes.</span></li>
+                  <li class="flex items-start"><span class="material-symbols-rounded text-primary mr-2 mt-0.5" style="font-size:18px">done</span> <span class="leading-relaxed">Decoupled architecture using standard Hono and generic React components.</span></li>
+                  <li class="flex items-start"><span class="material-symbols-rounded text-primary mr-2 mt-0.5" style="font-size:18px">done</span> <span class="leading-relaxed">Build standard API routes for your custom behavior rather than fighting a monolith.</span></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+          </div>
+
+          
+        </div>
+
+      </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="bg-black py-16 sm:py-24 border-t border-surface-800/40">
+      <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
+        <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-6">Build your backend at lightspeed.</h2>
+        <div class="flex items-center justify-center gap-x-6">
+          <a href="/docs" class="inline-flex items-center gap-x-2 rounded-md bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-dark transition-all duration-200 ease-in-out btn-glow">
+            Explore Rebase
+            <span class="material-symbols-rounded text-white" style="font-size:20px">arrow_forward</span>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+</Layout>

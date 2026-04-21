@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { users, refreshTokens, passwordResetTokens, User, NewUser } from "../schema/auth-schema";
+import { users, userIdentities, refreshTokens, passwordResetTokens, User, NewUser } from "../schema/auth-schema";
 import {
     UserRepository,
     RoleRepository,
@@ -12,6 +12,7 @@ import {
     CreateRoleData,
     RefreshTokenInfo,
     PasswordResetTokenInfo,
+    UserIdentityData,
     ListUsersOptions,
     PaginatedUsersResult,
     RoleData as Role
@@ -42,9 +43,57 @@ export class UserService implements UserRepository {
         return user || null;
     }
 
-    async getUserByGoogleId(googleId: string): Promise<User | null> {
-        const [user] = await this.db.select().from(users).where(eq(users.googleId, googleId));
-        return user || null;
+    async getUserByIdentity(provider: string, providerId: string): Promise<User | null> {
+        const result = await this.db.execute(sql`
+            SELECT u.*
+            FROM rebase.users u
+            INNER JOIN rebase.user_identities ui ON u.id = ui.user_id
+            WHERE ui.provider = ${provider} AND ui.provider_id = ${providerId}
+            LIMIT 1
+        `);
+
+        if (result.rows.length === 0) return null;
+        
+        const row = result.rows[0] as Record<string, any>;
+        return {
+            id: row.id,
+            email: row.email,
+            passwordHash: row.password_hash ?? null,
+            displayName: row.display_name ?? null,
+            photoUrl: row.photo_url ?? null,
+            emailVerified: row.email_verified ?? false,
+            emailVerificationToken: row.email_verification_token ?? null,
+            emailVerificationSentAt: row.email_verification_sent_at ?? null,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at
+        } as User;
+    }
+
+    async getUserIdentities(userId: string): Promise<UserIdentityData[]> {
+        const result = await this.db.execute(sql`
+            SELECT id, user_id, provider, provider_id, profile_data, created_at, updated_at
+            FROM rebase.user_identities
+            WHERE user_id = ${userId}
+        `);
+
+        return result.rows.map((row: any) => ({
+            id: row.id,
+            userId: row.user_id,
+            provider: row.provider,
+            providerId: row.provider_id,
+            profileData: row.profile_data ?? null,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at
+        }));
+    }
+
+    async linkUserIdentity(userId: string, provider: string, providerId: string, profileData?: Record<string, any>): Promise<void> {
+        await this.db.insert(userIdentities).values({
+            userId,
+            provider,
+            providerId,
+            profileData: profileData || null
+        }).onConflictDoNothing({ target: [userIdentities.provider, userIdentities.providerId] });
     }
 
     async updateUser(id: string, data: Partial<Omit<NewUser, "id">>): Promise<User | null> {
@@ -122,8 +171,6 @@ export class UserService implements UserRepository {
             passwordHash: row.password_hash ?? row.passwordHash ?? null,
             displayName: row.display_name ?? row.displayName ?? null,
             photoUrl: row.photo_url ?? row.photoUrl ?? null,
-            provider: row.provider,
-            googleId: row.google_id ?? row.googleId ?? null,
             emailVerified: row.email_verified ?? row.emailVerified ?? false,
             emailVerificationToken: row.email_verification_token ?? row.emailVerificationToken ?? null,
             emailVerificationSentAt: row.email_verification_sent_at ?? row.emailVerificationSentAt ?? null,
@@ -597,8 +644,16 @@ export class PostgresAuthRepository implements AuthRepository {
         return this.userService.getUserByEmail(email) as Promise<UserData | null>;
     }
 
-    async getUserByGoogleId(googleId: string): Promise<UserData | null> {
-        return this.userService.getUserByGoogleId(googleId) as Promise<UserData | null>;
+    async getUserByIdentity(provider: string, providerId: string): Promise<UserData | null> {
+        return this.userService.getUserByIdentity(provider, providerId) as Promise<UserData | null>;
+    }
+
+    async getUserIdentities(userId: string): Promise<UserIdentityData[]> {
+        return this.userService.getUserIdentities(userId);
+    }
+
+    async linkUserIdentity(userId: string, provider: string, providerId: string, profileData?: Record<string, any>): Promise<void> {
+        return this.userService.linkUserIdentity(userId, provider, providerId, profileData);
     }
 
     async updateUser(id: string, data: Partial<Omit<CreateUserData, "id">>): Promise<UserData | null> {

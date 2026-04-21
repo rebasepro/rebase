@@ -16,8 +16,6 @@ export const users = rebaseSchema.table("users", {
     passwordHash: varchar("password_hash", { length: 255 }), // NULL for OAuth-only users
     displayName: varchar("display_name", { length: 255 }),
     photoUrl: varchar("photo_url", { length: 500 }),
-    provider: varchar("provider", { length: 50 }).notNull().default("email"), // 'email' | 'google'
-    googleId: varchar("google_id", { length: 255 }).unique(),
     emailVerified: boolean("email_verified").default(false).notNull(),
     emailVerificationToken: varchar("email_verification_token", { length: 255 }),
     emailVerificationSentAt: timestamp("email_verification_sent_at"),
@@ -99,11 +97,27 @@ export const appConfig = rebaseSchema.table("app_config", {
     updatedAt: timestamp("updated_at").defaultNow().notNull()
 });
 
+/**
+ * User identities - maps external OAuth profiles back to local users
+ */
+export const userIdentities = rebaseSchema.table("user_identities", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    provider: varchar("provider", { length: 50 }).notNull(), // e.g. 'google', 'linkedin'
+    providerId: varchar("provider_id", { length: 255 }).notNull(),
+    profileData: jsonb("profile_data"), 
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => ({
+    uniqueProviderId: unique("unique_provider_id").on(table.provider, table.providerId)
+}));
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
     userRoles: many(userRoles),
     refreshTokens: many(refreshTokens),
-    passwordResetTokens: many(passwordResetTokens)
+    passwordResetTokens: many(passwordResetTokens),
+    userIdentities: many(userIdentities)
 }));
 
 export const rolesRelations = relations(roles, ({ many }) => ({
@@ -135,6 +149,13 @@ export const passwordResetTokensRelations = relations(passwordResetTokens, ({ on
     })
 }));
 
+export const userIdentitiesRelations = relations(userIdentities, ({ one }) => ({
+    user: one(users, {
+        fields: [userIdentities.userId],
+        references: [users.id]
+    })
+}));
+
 // Type exports
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -144,3 +165,5 @@ export type UserRole = typeof userRoles.$inferSelect;
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type AppConfig = typeof appConfig.$inferSelect;
+export type UserIdentity = typeof userIdentities.$inferSelect;
+export type NewUserIdentity = typeof userIdentities.$inferInsert;

@@ -7,7 +7,7 @@ import * as fs from 'fs';
 import { StorageController } from './types';
 import { LocalStorageController } from './LocalStorageController';
 import { requireAuth as jwtRequireAuth, optionalAuth } from '../auth/middleware';
-import { ApiError } from '../api/errors';
+import { ApiError, errorHandler } from '../api/errors';
 import { HonoEnv } from '../api/types';
 
 export interface StorageRoutesConfig {
@@ -48,6 +48,7 @@ export function extractWildcardPath(c: { req: { path: string; routePath: string 
  */
 export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
+    router.onError(errorHandler);
     const { controller, requireAuth = true, publicRead = false } = config;
 
     // Use actual JWT auth middleware from auth module

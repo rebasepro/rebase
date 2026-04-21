@@ -63,6 +63,7 @@ services:
       PORT: "3001"
       ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
       # Optional Google OAuth
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       # Optional SMTP

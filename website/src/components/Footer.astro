@@ -32,6 +32,19 @@ const footerNavs = [
         ],
     },
     {
+        title: "Compare",
+        links: [
+            { label: "vs Supabase", url: "/rebase-vs-supabase" },
+            { label: "vs Payload", url: "/rebase-vs-payload" },
+            { label: "vs Directus", url: "/rebase-vs-directus" },
+            { label: "vs Strapi", url: "/rebase-vs-strapi" },
+            { label: "vs Retool", url: "/rebase-vs-retool" },
+            { label: "vs Firebase", url: "/rebase-vs-firebase" },
+            { label: "vs Hasura", url: "/rebase-vs-hasura" },
+            { label: "vs Django", url: "/rebase-vs-django" },
+        ],
+    },
+    {
         title: "Company",
         links: [
             { label: "About", url: "/about" },
@@ -63,7 +76,7 @@ const footerNavs = [
                     The Open-Source Postgres CMS · Built in Europe
                 </div>
             </div>
-            <div class="grid grid-cols-2 gap-8 sm:gap-6 sm:grid-cols-3 lg:grid-cols-5">
+            <div class="grid grid-cols-2 gap-8 sm:gap-6 sm:grid-cols-3 lg:grid-cols-6 xl:gap-8">
                 {footerNavs.map((nav) => (
                     <div>
                         <p class="mb-6 text-sm font-semibold uppercase text-white">{nav.title}</p>

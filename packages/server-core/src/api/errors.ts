@@ -68,9 +68,9 @@ export interface ErrorResponse {
  */
 export const errorHandler: ErrorHandler = (err, c) => {
     // Typecast custom error properties
-    const error = err as Error & { statusCode?: number; code?: string; details?: unknown };
+    const error = err as Error & { statusCode?: number; code?: string; details?: unknown, name?: string };
 
-    if (error instanceof ApiError) {
+    if (error instanceof ApiError || error.name === "ApiError") {
         // Operational errors — log at warn level
         console.warn(
             `⚠️ [API] ${c.req.method} ${c.req.path} → ${error.statusCode} ${error.code}: ${error.message}`
@@ -78,7 +78,7 @@ export const errorHandler: ErrorHandler = (err, c) => {
         return c.json({
             error: {
                 message: error.message,
-                code: error.code,
+                code: error.code || "INTERNAL_ERROR",
                 ...(error.details !== undefined && { details: error.details })
             }
         } satisfies ErrorResponse, (error.statusCode || 500) as ContentfulStatusCode);
@@ -89,22 +89,33 @@ export const errorHandler: ErrorHandler = (err, c) => {
 
     // Handle DB connection and specific system errors for better logging
     let logMessage = error.message;
-    if (error.cause && typeof error.cause === 'object' && 'code' in error.cause) {
+    if (error.cause && typeof error.cause === 'object' && error.cause !== null && 'code' in error.cause) {
         const cause = error.cause as any;
         if (cause.code === 'ENETUNREACH') {
             logMessage = `Network unreachable. Cannot connect to database at ${cause.address}:${cause.port}.`;
         } else if (cause.code === 'ECONNREFUSED') {
             logMessage = `Connection refused to database at ${cause.address}:${cause.port}.`;
+        } else if (cause.code === '42703' || cause.code === '42P01') {
+            const issue = cause.code === '42703' ? 'column' : 'table';
+            logMessage = `Database schema mismatch (${issue} missing): ${cause.message}. Did you forget to run migrations ('pnpm db:push' or 'pnpm db:migrate')?`;
         }
     } else if ('code' in error && error.code === 'ENETUNREACH') {
          logMessage = `Network unreachable. Cannot connect to service at ${(error as any).address}:${(error as any).port}.`;
+    } else if ('code' in error && (error.code === '42703' || error.code === '42P01')) {
+        const issue = error.code === '42703' ? 'column' : 'table';
+        logMessage = `Database schema mismatch (${issue} missing): ${error.message}. Did you forget to run migrations ('pnpm db:push' or 'pnpm db:migrate')?`;
     }
 
-    // Unexpected errors — log at error level with full stack
+    // Unexpected errors — log at error level
     console.error(
         `❌ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}`
     );
-    console.error(error.stack || error);
+    
+    // Suppress the huge stack trace for known missing schema errors (it's noisy and not a code bug)
+    const pgErrorCode = (error.cause as any)?.code || (error as any).code;
+    if (pgErrorCode !== '42703' && pgErrorCode !== '42P01') {
+        console.error(error.stack || error);
+    }
 
     // Sanitize the message for the client to prevent leaking sensitive details
     // like SQL queries or internal IP addresses.
@@ -112,9 +123,13 @@ export const errorHandler: ErrorHandler = (err, c) => {
     if (statusCode < 500 && error.message) {
         // If it's a 4xx error (e.g. from validation), it's generally safe to send the message
         clientMessage = error.message;
-    } else if (error instanceof ApiError) {
+    } else if (error instanceof ApiError || error.name === "ApiError") {
         // We already handled ApiError above, but just in case
         clientMessage = error.message;
+    } else if ((error.cause && typeof error.cause === 'object' && (error.cause as any).code === '42703') || (error.cause && typeof error.cause === 'object' && (error.cause as any).code === '42P01') || (error as any).code === '42703' || (error as any).code === '42P01') {
+        const errObj = (error.cause && typeof error.cause === 'object' && (error.cause as any).code) ? (error.cause as any) : error;
+        const issue = errObj.code === '42703' ? 'column' : 'table';
+        clientMessage = `Database schema mismatch (${issue} missing). Ensure backend migrations are up to date!`;
     } else if (code === 'INTERNAL_ERROR') {
         clientMessage = "Internal Server Error";
     }

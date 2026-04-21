@@ -26,7 +26,6 @@ import { RealtimeService } from "./services/realtimeService";
 import { DatabasePoolManager } from "./databasePoolManager";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import {
-    configureGoogleOAuth,
     createAuthRoutes,
     createAdminRoutes,
     requireAuth,
@@ -171,10 +170,6 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             const db = internals.db;
 
             await ensureAuthTablesExist(db);
-
-            if (authConfig.google?.clientId) {
-                configureGoogleOAuth(authConfig.google.clientId);
-            }
 
             let emailService: EmailService | undefined;
             if (authConfig.email) {

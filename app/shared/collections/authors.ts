@@ -59,6 +59,12 @@ const authorsCollection: EntityCollection = {
                 storagePath: "author_pictures/"
             }
         },
+        userId: {
+            name: "Linked User",
+            type: "string",
+            userSelect: true,
+            description: "Link to a Rebase user"
+        },
         profile: {
             name: "Profile",
             type: "relation",
@@ -93,6 +99,7 @@ const authorsCollection: EntityCollection = {
         "id",
         "email",
         "picture",
+        "userId",
         "profile",
         "name"
     ],

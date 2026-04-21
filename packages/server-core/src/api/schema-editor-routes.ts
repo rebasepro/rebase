@@ -1,9 +1,11 @@
 import { Hono } from "hono";
 import { AstSchemaEditor } from "./ast-schema-editor";
+import { errorHandler } from "./errors";
 import { HonoEnv } from "./types";
 
 export function createSchemaEditorRoutes(collectionsDir: string): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
+    router.onError(errorHandler);
     const editor = new AstSchemaEditor(collectionsDir);
 
     router.post("/property/save", async (c) => {

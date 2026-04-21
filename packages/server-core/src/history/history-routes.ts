@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HonoEnv } from "../api/types";
 import { BackendCollectionRegistry } from "../collections/BackendCollectionRegistry";
-import { ApiError } from "../api/errors";
+import { ApiError, errorHandler } from "../api/errors";
 import { DataDriver } from "@rebasepro/types";
 /**
  * Create Hono routes for entity history.
@@ -19,6 +19,7 @@ export function createHistoryRoutes(params: {
 }): Hono<HonoEnv> {
     const { historyService, registry, driver } = params;
     const router = new Hono<HonoEnv>();
+    router.onError(errorHandler);
 
     /**
      * GET /:slug/:entityId/history - List history entries for an entity

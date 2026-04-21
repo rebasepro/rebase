@@ -64,11 +64,21 @@ export default defineConfig({
                             label: "Configuration",
                             slug: "docs/getting-started/configuration"
                         },
-                        {
-                            label: "Deployment",
-                            slug: "docs/getting-started/deployment"
-                        },
                     ],
+                },
+                {
+                    label: "Deployment",
+                    collapsed: false,
+                    items: [
+                        { label: "Overview", slug: "docs/getting-started/deployment" },
+                        { label: "AWS", slug: "docs/deployment/aws" },
+                        { label: "Google Cloud", slug: "docs/deployment/gcp" },
+                        { label: "Azure", slug: "docs/deployment/azure" },
+                        { label: "Hetzner Cloud (EU)", slug: "docs/deployment/hetzner" },
+                        { label: "Scaleway (EU)", slug: "docs/deployment/scaleway" },
+                        { label: "Railway", slug: "docs/deployment/railway" },
+                        { label: "Fly.io", slug: "docs/deployment/flyio" }
+                    ]
                 },
                 {
                     label: "Architecture",

@@ -113,6 +113,19 @@ export async function googleLogin(idToken: string): Promise<AuthResponse> {
 }
 
 /**
+ * Login with LinkedIn OAuth code
+ */
+export async function linkedinLogin(code: string, redirectUri: string): Promise<AuthResponse> {
+    const response = await fetchWithHandling(`${baseApiUrl}/api/auth/linkedin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, redirectUri })
+    });
+
+    return handleResponse<AuthResponse>(response);
+}
+
+/**
  * Refresh access token using refresh token
  */
 export async function refreshAccessToken(refreshToken: string): Promise<RefreshResponse> {
@@ -307,6 +320,8 @@ export interface AuthConfigResponse {
     registrationEnabled: boolean;
     /** Whether Google OAuth is configured */
     googleEnabled: boolean;
+    /** Whether LinkedIn OAuth is configured */
+    linkedinEnabled: boolean;
     /** Whether email service is configured */
     emailServiceEnabled: boolean;
 }

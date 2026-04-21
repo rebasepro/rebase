@@ -245,13 +245,13 @@ export function StudioHomePage({
    ═══════════════════════════════════════════════════════════════ */
 
 function SyntaxHighlightedSnippet() {
-    const kw = "text-violet-400";       // keywords
-    const str = "text-emerald-400";     // strings
-    const typ = "text-amber-300";       // types
-    const fn = "text-blue-400";          // functions
-    const cm = "text-surface-500 italic"; // comments
-    const op = "text-surface-400";       // operators / punctuation
-    const tx = "text-surface-200";       // plain text
+    const kw = "text-violet-600 dark:text-violet-400";       // keywords
+    const str = "text-emerald-600 dark:text-emerald-400";     // strings
+    const typ = "text-amber-600 dark:text-amber-300";       // types
+    const fn = "text-blue-600 dark:text-blue-400";          // functions
+    const cm = "text-surface-500 dark:text-surface-400 italic"; // comments
+    const op = "text-surface-500 dark:text-surface-400";       // operators / punctuation
+    const tx = "text-surface-800 dark:text-surface-200";       // plain text
 
     return (
         <pre className="m-0 whitespace-pre">

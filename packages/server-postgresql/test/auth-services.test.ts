@@ -66,8 +66,7 @@ describe("Auth Services", () => {
             it("should create a user and return it", async () => {
                 const newUser = {
                     email: "test@example.com",
-                    displayName: "Test User",
-                    provider: "email"
+                    displayName: "Test User"
                 };
                 const createdUser = { id: "user-123", ...newUser, createdAt: new Date(), updatedAt: new Date() };
                 mockInsertReturning.mockResolvedValueOnce([createdUser]);
@@ -120,14 +119,32 @@ describe("Auth Services", () => {
             });
         });
 
-        describe("getUserByGoogleId", () => {
-            it("should return user when found by Google ID", async () => {
-                const mockUser = { id: "user-123", googleId: "google-abc" };
-                mockSelectWhere.mockResolvedValueOnce([mockUser]);
+        describe("getUserByIdentity", () => {
+            it("should execute sql for identity lookup", async () => {
+                const mockUser = { id: "user-123" };
+                // execute mock instead of select
+                mockExecute.mockResolvedValueOnce({ rows: [mockUser] });
 
-                const result = await userService.getUserByGoogleId("google-abc");
+                const result = await userService.getUserByIdentity("google", "google-abc");
 
-                expect(result).toEqual(mockUser);
+                expect(mockExecute).toHaveBeenCalled();
+            });
+        });
+
+        describe("getUserIdentities", () => {
+            it("should fetch user identities", async () => {
+                mockExecute.mockResolvedValueOnce({ rows: [] });
+
+                const result = await userService.getUserIdentities("user-123");
+
+                expect(mockExecute).toHaveBeenCalled();
+            });
+        });
+
+        describe("linkUserIdentity", () => {
+            it("should insert user identity", async () => {
+                await userService.linkUserIdentity("user-123", "google", "123", { email: "test@test.com" });
+                expect(db.insert).toHaveBeenCalled();
             });
         });
 

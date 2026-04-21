@@ -1,10 +1,9 @@
 import { Hono } from "hono";
-import { ApiError } from "../api/errors";
+import { ApiError, errorHandler } from "../api/errors";
 import { randomBytes, createHash } from "crypto";
-import type { AuthRepository } from "./interfaces";
+import type { AuthRepository, OAuthProvider } from "./interfaces";
 import { generateAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry, getAccessTokenExpiry } from "./jwt";
 import { hashPassword, verifyPassword, validatePasswordStrength } from "./password";
-import { verifyGoogleIdToken, isGoogleOAuthConfigured } from "./google-oauth";
 import { requireAuth } from "./middleware";
 import { EmailService, EmailConfig } from "../email";
 import { getPasswordResetTemplate, getEmailVerificationTemplate } from "../email/templates";
@@ -23,6 +22,8 @@ export interface AuthModuleConfig {
     allowRegistration?: boolean;
     /** Default role ID to assign to new users (default: none). The first user always gets "admin". */
     defaultRole?: string;
+    /** Optional array of OAuth providers */
+    oauthProviders?: OAuthProvider[];
 }
 
 /**
@@ -73,6 +74,12 @@ function getPasswordResetExpiry(): Date {
 
 export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
+
+    // Attach Rebase error handler to ensure ApiError exceptions are correctly
+    // formatted instead of caught by Hono's default error handler.
+    // Hono's onError does NOT propagate from parent to child routers.
+    router.onError(errorHandler);
+
     const authRepo = config.authRepo;
     const { emailService, emailConfig, allowRegistration = false } = config;
 
@@ -85,9 +92,6 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     const loginSchema = z.object({
         email: z.string().email("Invalid email address").max(255),
         password: z.string().min(1, "Password is required").max(128)
-    });
-    const googleSchema = z.object({
-        idToken: z.string().min(1, "ID token is required")
     });
     const forgotPasswordSchema = z.object({
         email: z.string().email("Invalid email address").max(255)
@@ -168,8 +172,7 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         const user = await authRepo.createUser({
             email: email.toLowerCase(),
             passwordHash,
-            displayName: displayName || undefined,
-            provider: "email"
+            displayName: displayName || undefined
         });
 
         // Check if this is the first user - make them admin
@@ -246,77 +249,83 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     });
 
     /**
-     * POST /auth/google
-     * Login/register with Google ID token
+     * Dynamically mount OAuth provider routes
      */
-    router.post("/google", defaultAuthLimiter, async (c) => {
-        const { idToken } = parseBody(googleSchema, await c.req.json());
+    if (config.oauthProviders && config.oauthProviders.length > 0) {
+        for (const provider of config.oauthProviders) {
+            router.post(`/${provider.id}`, defaultAuthLimiter, async (c) => {
+                const payload = parseBody(provider.schema, await c.req.json());
 
-        if (!isGoogleOAuthConfigured()) {
-            throw ApiError.serviceUnavailable("Google login not configured", "NOT_CONFIGURED");
-        }
-
-        const googleUser = await verifyGoogleIdToken(idToken);
-        if (!googleUser) {
-            throw ApiError.unauthorized("Invalid Google token", "INVALID_TOKEN");
-        }
-
-        // Find or create user
-        let user = await authRepo.getUserByGoogleId(googleUser.googleId);
-
-        if (!user) {
-            // Check if email exists (link accounts)
-            user = await authRepo.getUserByEmail(googleUser.email);
-
-            if (user) {
-                // Link Google to existing account
-                await authRepo.updateUser(user.id, { googleId: googleUser.googleId });
-            } else {
-                // Create new user
-                user = await authRepo.createUser({
-                    email: googleUser.email.toLowerCase(),
-                    displayName: googleUser.displayName || undefined,
-                    photoUrl: googleUser.photoUrl || undefined,
-                    provider: "google",
-                    googleId: googleUser.googleId
-                });
-                // Check if this is the first user - make them admin
-                const allUsers = await authRepo.listUsers();
-                const isFirstUser = allUsers.length === 1;
-                if (isFirstUser) {
-                    await authRepo.assignDefaultRole(user.id, "admin");
-                } else if (config.defaultRole) {
-                    await authRepo.assignDefaultRole(user.id, config.defaultRole);
+                const externalUser = await provider.verify(payload);
+                if (!externalUser) {
+                    throw ApiError.unauthorized(`Invalid ${provider.id} credentials`, "INVALID_TOKEN");
                 }
-            }
-        } else {
-            // Update profile info from Google
-            await authRepo.updateUser(user.id, {
-                displayName: googleUser.displayName || user.displayName || undefined,
-                photoUrl: googleUser.photoUrl || user.photoUrl || undefined
+
+                // Find or create user
+                let user = await authRepo.getUserByIdentity(provider.id, externalUser.providerId);
+
+                if (!user) {
+                    // Check if email exists (link accounts)
+                    user = await authRepo.getUserByEmail(externalUser.email);
+
+                    if (user) {
+                        // Link Provider to existing account
+                        await authRepo.linkUserIdentity(user.id, provider.id, externalUser.providerId, { email: externalUser.email });
+                        
+                        // Optional: Update profile info from external provider if empty
+                        await authRepo.updateUser(user.id, {
+                            displayName: user.displayName || externalUser.displayName || undefined,
+                            photoUrl: user.photoUrl || externalUser.photoUrl || undefined
+                        });
+                    } else {
+                        // Create new user
+                        user = await authRepo.createUser({
+                            email: externalUser.email.toLowerCase(),
+                            displayName: externalUser.displayName || undefined,
+                            photoUrl: externalUser.photoUrl || undefined
+                        });
+                        
+                        await authRepo.linkUserIdentity(user.id, provider.id, externalUser.providerId, { email: externalUser.email });
+                        
+                        // Check if this is the first user - make them admin
+                        const allUsers = await authRepo.listUsers();
+                        const isFirstUser = allUsers.length === 1;
+                        if (isFirstUser) {
+                            await authRepo.assignDefaultRole(user.id, "admin");
+                        } else if (config.defaultRole) {
+                            await authRepo.assignDefaultRole(user.id, config.defaultRole);
+                        }
+                    }
+                } else {
+                    // Update profile info from external provider
+                    await authRepo.updateUser(user.id, {
+                        displayName: externalUser.displayName || user.displayName || undefined,
+                        photoUrl: externalUser.photoUrl || user.photoUrl || undefined
+                    });
+                }
+
+                // Generate tokens
+                const roles = await authRepo.getUserRoles(user.id);
+                const roleIds = roles.map(r => r.id);
+                const accessToken = generateAccessToken(user.id, roleIds);
+                const refreshToken = generateRefreshToken();
+
+                // Store refresh token
+                const userAgent = c.req.header("user-agent") || "unknown";
+                const ipAddress = c.req.header("x-forwarded-for") || "unknown";
+                
+                await authRepo.createRefreshToken(
+                    user.id,
+                    hashRefreshToken(refreshToken),
+                    getRefreshTokenExpiry(),
+                    userAgent,
+                    ipAddress
+                );
+
+                return c.json(buildAuthResponse(user, roleIds, accessToken, refreshToken));
             });
         }
-
-        // Generate tokens
-        const roles = await authRepo.getUserRoles(user.id);
-        const roleIds = roles.map(r => r.id);
-        const accessToken = generateAccessToken(user.id, roleIds);
-        const refreshToken = generateRefreshToken();
-
-        // Store refresh token
-        const userAgent = c.req.header("user-agent") || "unknown";
-        const ipAddress = c.req.header("x-forwarded-for") || "unknown";
-        
-        await authRepo.createRefreshToken(
-            user.id,
-            hashRefreshToken(refreshToken),
-            getRefreshTokenExpiry(),
-            userAgent,
-            ipAddress
-        );
-
-        return c.json(buildAuthResponse(user, roleIds, accessToken, refreshToken));
-    });
+    }
 
     /**
      * POST /auth/forgot-password
@@ -722,6 +731,7 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
             needsSetup,
             registrationEnabled: registrationAllowed,
             googleEnabled: isGoogleOAuthConfigured(),
+            linkedinEnabled: isLinkedinOAuthConfigured(),
             emailServiceEnabled: isEmailConfigured()
         });
     });

@@ -16,7 +16,6 @@ import { configureJwt, generateAccessToken, hashRefreshToken } from "../src/auth
 // ── Mocks ───────────────────────────────────────────────────────────────────
 
 jest.mock("../src/auth/password");
-jest.mock("../src/auth/google-oauth");
 
 // Bypass rate limiters — they share state across tests and cause 429s
 jest.mock("../src/auth/rate-limiter", () => {
@@ -29,7 +28,7 @@ jest.mock("../src/auth/rate-limiter", () => {
 });
 
 import { hashPassword, verifyPassword, validatePasswordStrength } from "../src/auth/password";
-import { verifyGoogleIdToken, isGoogleOAuthConfigured } from "../src/auth/google-oauth";
+import { z } from "zod";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -42,8 +41,6 @@ function mockUser(overrides: Partial<{ id: string; email: string; passwordHash: 
         passwordHash: "passwordHash" in overrides ? overrides.passwordHash : "salt:hash",
         displayName: overrides.displayName ?? "Test User",
         photoUrl: overrides.photoUrl ?? null,
-        provider: overrides.provider ?? "email",
-        googleId: null,
         emailVerified: overrides.emailVerified ?? false,
         emailVerificationToken: overrides.emailVerificationToken ?? null,
         emailVerificationSentAt: null,
@@ -68,7 +65,9 @@ function createApp(opts: { allowRegistration?: boolean; withEmail?: boolean; def
     
     mockAuthRepo = {
         getUserByEmail: jest.fn().mockResolvedValue(null),
-        getUserByGoogleId: jest.fn().mockResolvedValue(null),
+        getUserByIdentity: jest.fn().mockResolvedValue(null),
+        linkUserIdentity: jest.fn().mockResolvedValue(undefined),
+        getUserIdentities: jest.fn().mockResolvedValue([]),
         getUserById: jest.fn().mockResolvedValue(null),
         createUser: jest.fn().mockImplementation((data) =>
             Promise.resolve(mockUser({ email: data.email, displayName: data.displayName, passwordHash: data.passwordHash }))
@@ -108,10 +107,6 @@ function createApp(opts: { allowRegistration?: boolean; withEmail?: boolean; def
     (hashPassword as jest.Mock).mockResolvedValue("hashed-pw");
     (verifyPassword as jest.Mock).mockResolvedValue(true);
 
-    // Google mocks
-    (isGoogleOAuthConfigured as jest.Mock).mockReturnValue(false);
-    (verifyGoogleIdToken as jest.Mock).mockResolvedValue(null);
-
     // Email mock
     mockEmailService = { send: jest.fn().mockResolvedValue(undefined), isConfigured: jest.fn().mockReturnValue(opts.withEmail ?? false) };
 
@@ -121,6 +116,20 @@ function createApp(opts: { allowRegistration?: boolean; withEmail?: boolean; def
         defaultRole: opts.defaultRole,
         emailService: opts.withEmail ? mockEmailService as any : undefined,
         emailConfig: opts.withEmail ? { from: "test@test.com", appName: "TestApp", resetPasswordUrl: "https://app.test", verifyEmailUrl: "https://app.test" } : undefined,
+        oauthProviders: opts.withEmail === false && opts.allowRegistration === false ? [] : [
+            {
+                id: "google",
+                schema: z.object({ idToken: z.string().min(1) }),
+                verify: async (payload: any) => {
+                    const idToken = payload.idToken;
+                    if (idToken === "bad-token") return null;
+                    if (idToken === "link-token") return { providerId: "g-456", email: "existing@test.com", displayName: "Existing", photoUrl: null };
+                    if (idToken === "returning-token") return { providerId: "g-789", email: "returning@test.com", displayName: "Updated Name", photoUrl: "https://new-photo.url" };
+                    if (idToken === "valid-token") return { providerId: "g-123", email: "google@test.com", displayName: "Google User", photoUrl: "https://photo.url" };
+                    return null;
+                }
+            }
+        ]
     };
 
     const app = new Hono<HonoEnv>();
@@ -323,18 +332,14 @@ describe("Auth Routes (Integration)", () => {
 
     // ── Google OAuth ────────────────────────────────────────────────────
     describe("POST /auth/google", () => {
-        it("returns 503 when Google OAuth is not configured", async () => {
-            const app = createApp();
+        it("returns 404 when OAuth provider is not injected", async () => {
+            const app = createApp({ allowRegistration: false, withEmail: false }); // Hack to pass empty list of providers
             const res = await app.request("/auth/google", json({ idToken: "google-token" }));
-            expect(res.status).toBe(503);
-            const body = await res.json() as any;
-            expect(body.error.code).toBe("NOT_CONFIGURED");
+            expect(res.status).toBe(404);
         });
 
         it("returns 401 for invalid Google token", async () => {
             const app = createApp();
-            (isGoogleOAuthConfigured as jest.Mock).mockReturnValueOnce(true);
-            (verifyGoogleIdToken as jest.Mock).mockResolvedValueOnce(null);
 
             const res = await app.request("/auth/google", json({ idToken: "bad-token" }));
             expect(res.status).toBe(401);
@@ -344,58 +349,33 @@ describe("Auth Routes (Integration)", () => {
 
         it("creates a new user for new Google sign-in", async () => {
             const app = createApp();
-            (isGoogleOAuthConfigured as jest.Mock).mockReturnValue(true);
-            (verifyGoogleIdToken as jest.Mock).mockResolvedValueOnce({
-                googleId: "g-123",
-                email: "google@test.com",
-                displayName: "Google User",
-                photoUrl: "https://photo.url",
-                emailVerified: true,
-            });
-            mockAuthRepo.getUserByGoogleId.mockResolvedValueOnce(null);
+            mockAuthRepo.getUserByIdentity.mockResolvedValueOnce(null);
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(null);
             mockAuthRepo.listUsers.mockResolvedValueOnce([mockUser()]); // not first user
 
             const res = await app.request("/auth/google", json({ idToken: "valid-token" }));
             expect(res.status).toBe(200);
             expect(mockAuthRepo.createUser).toHaveBeenCalledWith(expect.objectContaining({
-                email: "google@test.com",
-                provider: "google",
-                googleId: "g-123",
+                email: "google@test.com"
             }));
+            expect(mockAuthRepo.linkUserIdentity).toHaveBeenCalledWith(expect.any(String), "google", "g-123", expect.any(Object));
         });
 
         it("links Google to existing account by email", async () => {
             const app = createApp();
-            (isGoogleOAuthConfigured as jest.Mock).mockReturnValue(true);
-            (verifyGoogleIdToken as jest.Mock).mockResolvedValueOnce({
-                googleId: "g-456",
-                email: "existing@test.com",
-                displayName: "Existing",
-                photoUrl: null,
-                emailVerified: true,
-            });
             const existing = mockUser({ email: "existing@test.com" });
-            mockAuthRepo.getUserByGoogleId.mockResolvedValueOnce(null);
+            mockAuthRepo.getUserByIdentity.mockResolvedValueOnce(null);
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(existing);
 
             const res = await app.request("/auth/google", json({ idToken: "link-token" }));
             expect(res.status).toBe(200);
-            expect(mockAuthRepo.updateUser).toHaveBeenCalledWith(existing.id, { googleId: "g-456" });
+            expect(mockAuthRepo.linkUserIdentity).toHaveBeenCalledWith(existing.id, "google", "g-456", expect.any(Object));
         });
 
         it("updates profile for returning Google user", async () => {
             const app = createApp();
-            (isGoogleOAuthConfigured as jest.Mock).mockReturnValue(true);
             const existingUser = mockUser({ id: "g-user-1" });
-            (verifyGoogleIdToken as jest.Mock).mockResolvedValueOnce({
-                googleId: "g-789",
-                email: "returning@test.com",
-                displayName: "Updated Name",
-                photoUrl: "https://new-photo.url",
-                emailVerified: true,
-            });
-            mockAuthRepo.getUserByGoogleId.mockResolvedValueOnce(existingUser);
+            mockAuthRepo.getUserByIdentity.mockResolvedValueOnce(existingUser);
 
             const res = await app.request("/auth/google", json({ idToken: "returning-token" }));
             expect(res.status).toBe(200);

@@ -82,16 +82,19 @@ export function createRebaseClient<DB = any>(options: CreateRebaseClientOptions)
         });
     }
 
-    // Register transport callback for 401s after auth is instantiated
+    // Register transport callback for 401s after auth is instantiated.
+    // IMPORTANT: We must use transport.setOnUnauthorized() here — NOT set
+    // options.onUnauthorized — because the transport was already created above
+    // and captured the (undefined) value from the config closure.
     if (!options.onUnauthorized) {
-        options.onUnauthorized = async () => {
+        transport.setOnUnauthorized(async () => {
             try {
                 await auth.refreshSession();
                 return true;
             } catch (e) {
                 return false;
             }
-        };
+        });
     }
 
     const collectionClients = new Map<string, CollectionClient<any>>();

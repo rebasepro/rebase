@@ -1,12 +1,15 @@
 // Auth module exports
+export * from "./interfaces";
+
 export { configureJwt, generateAccessToken, verifyAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry, getAccessTokenExpiry } from "./jwt";
 export type { JwtConfig, AccessTokenPayload } from "./jwt";
 
 export { hashPassword, verifyPassword, validatePasswordStrength } from "./password";
 export type { PasswordValidationResult } from "./password";
 
-export { configureGoogleOAuth, verifyGoogleIdToken, isGoogleOAuthConfigured } from "./google-oauth";
-export type { GoogleUserInfo } from "./google-oauth";
+export { createGoogleProvider } from "./google-oauth";
+
+export { createLinkedinProvider } from "./linkedin-oauth";
 
 export { requireAuth, requireAdmin, optionalAuth, extractUserFromToken, createAuthMiddleware } from "./middleware";
 export type { AuthMiddlewareOptions, AuthResult } from "./middleware";

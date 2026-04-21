@@ -14,6 +14,7 @@ import { createAdminRoutes, createAuthRoutes, requireAuth, requireAdmin, configu
 import { createStorageController, createStorageRoutes, DEFAULT_STORAGE_ID, DefaultStorageRegistry, BackendStorageConfig, StorageController, StorageRegistry } from "./storage";
 import { createHistoryRoutes } from "./history";
 import { EmailConfig } from "./email";
+import type { OAuthProvider } from "./auth/interfaces";
 
 export interface RebaseAuthConfig {
     jwtSecret?: string;
@@ -23,7 +24,9 @@ export interface RebaseAuthConfig {
     allowRegistration?: boolean;
     email?: EmailConfig;
     google?: { clientId: string };
+    linkedin?: { clientId: string; clientSecret: string };
     defaultRole?: string;
+    providers?: OAuthProvider[];
     [key: string]: unknown;
 }
 
@@ -202,12 +205,25 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     // 4. Mount API Routes
     if (config.auth && authConfigResult) {
+        const oauthProviders: OAuthProvider[] = [...(config.auth.providers || [])];
+        
+        if (config.auth.google?.clientId) {
+            const { createGoogleProvider } = await import("./auth");
+            oauthProviders.push(createGoogleProvider(config.auth.google.clientId));
+        }
+
+        if (config.auth.linkedin?.clientId && config.auth.linkedin?.clientSecret) {
+            const { createLinkedinProvider } = await import("./auth");
+            oauthProviders.push(createLinkedinProvider(config.auth.linkedin as { clientId: string; clientSecret: string }));
+        }
+
         const authRoutes = createAuthRoutes({
             authRepo: authConfigResult.authRepository as import("./auth/interfaces").AuthRepository ?? authConfigResult.userService as import("./auth/interfaces").AuthRepository,
             emailService: authConfigResult.emailService as import("./email").EmailService,
             emailConfig: config.auth.email,
             allowRegistration: config.auth.allowRegistration ?? false,
-            defaultRole: config.auth.defaultRole
+            defaultRole: config.auth.defaultRole,
+            oauthProviders
         });
         config.app.route(`${basePath}/auth`, authRoutes);
 
@@ -243,6 +259,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     if (activeCollections.length > 0) {
         const dataRouter = new Hono<HonoEnv>();
+        dataRouter.onError(errorHandler);
 
         dataRouter.use("/*", createAuthMiddleware({
             driver: defaultDriver,
@@ -275,6 +292,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
         if (loadedFunctions.length > 0) {
             const functionsRouter = new Hono<HonoEnv>();
+            functionsRouter.onError(errorHandler);
 
             // Apply auth middleware — delegates to RLS, per-route auth is up to the function
             functionsRouter.use("/*", createAuthMiddleware({
