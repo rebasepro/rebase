@@ -80,23 +80,15 @@ export class RestApiGenerator {
                     queryOptions.include
                 );
 
-                // When searchString is active, countRawEntities doesn't account
-                // for text search, so derive the total from fetched data instead.
-                const total = searchString
-                    ? (entities as unknown[]).length
-                    : await this.countRawEntities(driver, resolvedCollection, queryOptions);
+                const total = await this.countRawEntities(driver, resolvedCollection, queryOptions, searchString);
 
                 return c.json({
                     data: entities,
                     meta: {
-                        total: searchString
-                            ? (queryOptions.offset || 0) + (entities as unknown[]).length
-                            : total,
+                        total,
                         limit: queryOptions.limit,
                         offset: queryOptions.offset,
-                        hasMore: searchString
-                            ? (entities as unknown[]).length === (queryOptions.limit || 20)
-                            : (queryOptions.offset || 0) + (entities as unknown[]).length < total
+                        hasMore: (queryOptions.offset || 0) + (entities as unknown[]).length < total
                     }
                 });
             }
@@ -104,21 +96,15 @@ export class RestApiGenerator {
             // Fallback path
             const entities = await this.fetchRawCollection(driver, resolvedCollection, queryOptions, searchString);
 
-            const total = searchString
-                ? (entities as unknown[]).length
-                : await this.countRawEntities(driver, resolvedCollection, queryOptions);
+            const total = await this.countRawEntities(driver, resolvedCollection, queryOptions, searchString);
 
             return c.json({
                 data: entities,
                 meta: {
-                    total: searchString
-                        ? (queryOptions.offset || 0) + (entities as unknown[]).length
-                        : total,
+                    total,
                     limit: queryOptions.limit,
                     offset: queryOptions.offset,
-                    hasMore: searchString
-                        ? (entities as unknown[]).length === (queryOptions.limit || 20)
-                        : (queryOptions.offset || 0) + (entities as unknown[]).length < total
+                    hasMore: (queryOptions.offset || 0) + (entities as unknown[]).length < total
                 }
             });
         });
@@ -460,11 +446,12 @@ export class RestApiGenerator {
     /**
      * Count raw entities for a collection
      */
-    private async countRawEntities(driver: DataDriver, collection: EntityCollection, queryOptions: QueryOptions): Promise<number> {
+    private async countRawEntities(driver: DataDriver, collection: EntityCollection, queryOptions: QueryOptions, searchString?: string): Promise<number> {
         return driver.countEntities ? await driver.countEntities({
             path: collection.slug,
             collection,
-            filter: queryOptions.where as FetchCollectionProps["filter"]
+            filter: queryOptions.where as FetchCollectionProps["filter"],
+            searchString
         }) : 0;
     }
 

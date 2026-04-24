@@ -923,6 +923,7 @@ export class EntityFetchService {
         collectionPath: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
+            searchString?: string;
             databaseId?: string;
         } = {}
     ): Promise<number> {
@@ -934,12 +935,24 @@ export class EntityFetchService {
         const table = getTableForCollection(collection, this.registry);
 
         let query = this.db.select({ count: count() }).from(table).$dynamic();
+        const allConditions: SQL[] = [];
+
+        if (options.searchString) {
+            const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
+                options.searchString, collection.properties, table
+            );
+            if (searchConditions.length === 0) return 0;
+            allConditions.push(DrizzleConditionBuilder.combineConditionsWithOr(searchConditions)!);
+        }
 
         if (options.filter) {
             const filterConditions = this.buildFilterConditions(options.filter, table, collectionPath);
-            if (filterConditions.length > 0) {
-                query = query.where(and(...filterConditions));
-            }
+            if (filterConditions.length > 0) allConditions.push(...filterConditions);
+        }
+
+        if (allConditions.length > 0) {
+            const finalCondition = DrizzleConditionBuilder.combineConditionsWithAnd(allConditions);
+            if (finalCondition) query = query.where(finalCondition);
         }
 
         const result = await query;

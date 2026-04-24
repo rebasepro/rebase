@@ -94,6 +94,7 @@ export class EntityService implements EntityRepository {
         collectionPath: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
+            searchString?: string;
             databaseId?: string;
         } = {}
     ): Promise<number> {

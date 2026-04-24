@@ -69,6 +69,7 @@ export interface SearchOptions<M extends Record<string, unknown> = Record<string
  */
 export interface CountOptions<M extends Record<string, unknown> = Record<string, unknown>> {
     filter?: FilterValues<Extract<keyof M, string>>;
+    searchString?: string;
     databaseId?: string;
 }
 

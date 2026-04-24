@@ -601,11 +601,12 @@ export class PostgresBackendDriver implements DataDriver {
     async countEntities<M extends Record<string, any>>({
         path,
         collection,
-        filter
+        filter,
+        searchString
     }: FetchCollectionProps<M>): Promise<number> {
         return this.entityService.countEntities(
             path,
-            { filter }
+            { filter, searchString }
         );
     }
 
