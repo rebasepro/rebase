@@ -11,7 +11,7 @@ import { createRebaseClient } from "@rebasepro/client";
 import { collections } from "virtual:rebase-collections";
 
 // Configuration from environment
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 export function App() {

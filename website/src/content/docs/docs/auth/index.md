@@ -2,7 +2,7 @@
 title: Authentication
 sidebar_label: Authentication
 slug: docs/auth
-description: Configure JWT authentication, Google OAuth, user management, and role-based access control.
+description: Configure JWT authentication, OAuth providers (Google, LinkedIn), user management, and role-based access control.
 ---
 
 ## Overview
@@ -10,7 +10,7 @@ description: Configure JWT authentication, Google OAuth, user management, and ro
 Rebase includes a complete authentication system:
 
 - **JWT tokens** — Access and refresh token flow
-- **Google OAuth** — Sign in with Google
+- **OAuth Plugins** — Pluggable architecture for Google, LinkedIn, and more
 - **User management** — Signup, login, password reset
 - **Role-based access** — Assign roles to users, check permissions in collections
 - **Auto-bootstrapping** — First user automatically gets admin role
@@ -18,6 +18,8 @@ Rebase includes a complete authentication system:
 ## Backend Configuration
 
 ```typescript
+import { createGoogleProvider, createLinkedinProvider } from "@rebasepro/server-core";
+
 await initializeRebaseBackend({
     // ...
     auth: {
@@ -26,9 +28,13 @@ await initializeRebaseBackend({
         refreshExpiresIn: "30d",             // Refresh token lifetime
         requireAuth: true,                   // Require auth for data API
         allowRegistration: false,            // Allow new signups
-        google: {
-            clientId: process.env.GOOGLE_CLIENT_ID  // Optional
-        },
+        oauthProviders: [
+            createGoogleProvider(process.env.GOOGLE_CLIENT_ID!),
+            createLinkedinProvider({
+                clientId: process.env.LINKEDIN_CLIENT_ID!,
+                clientSecret: process.env.LINKEDIN_CLIENT_SECRET!
+            })
+        ],
         email: {                             // Optional — for password reset
             smtpHost: "smtp.gmail.com",
             smtpPort: 587,
@@ -49,7 +55,7 @@ Auth tables (`rebase.users`, `rebase.roles`, `rebase.user_roles`, `rebase.refres
 | `POST` | `/api/auth/register` | Create a new account |
 | `POST` | `/api/auth/login` | Login with email/password |
 | `POST` | `/api/auth/refresh` | Refresh the access token |
-| `POST` | `/api/auth/google` | Login with Google OAuth token |
+| `POST` | `/api/auth/<provider-id>` | Dynamic sign in endpoint for any configured OAuth provider (e.g. `/api/auth/google`, `/api/auth/linkedin`) |
 | `POST` | `/api/auth/logout` | Revoke refresh token |
 | `POST` | `/api/auth/forgot-password` | Send password reset email |
 | `POST` | `/api/auth/reset-password` | Reset password with token |

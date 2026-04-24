@@ -730,8 +730,8 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         return c.json({
             needsSetup,
             registrationEnabled: registrationAllowed,
-            googleEnabled: isGoogleOAuthConfigured(),
-            linkedinEnabled: isLinkedinOAuthConfigured(),
+            googleEnabled: !!(config.oauthProviders?.some(p => p.id === "google")),
+            linkedinEnabled: !!(config.oauthProviders?.some(p => p.id === "linkedin")),
             emailServiceEnabled: isEmailConfigured()
         });
     });

@@ -1,0 +1,8 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'europe-west3-docker.pkg.dev/rebase-578f2/rebase-demo/rebase-backend:latest', '-f', 'app/backend/Dockerfile', '.']
+images:
+  - 'europe-west3-docker.pkg.dev/rebase-578f2/rebase-demo/rebase-backend:latest'
+options:
+  machineType: 'E2_HIGHCPU_8'
+timeout: 1800s

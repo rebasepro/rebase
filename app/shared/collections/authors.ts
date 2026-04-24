@@ -39,12 +39,12 @@ const authorsCollection: EntityCollection = {
                 },
                 afterRead: ({ value }) => {
                     // Sample logic to obscure the email for testing
-                    if (value && typeof value === "string") {
-                        const parts = value.split("@");
-                        if (parts.length === 2) {
-                            return `${parts[0].slice(0, 2)}***@${parts[1]}`;
-                        }
-                    }
+                    // if (value && typeof value === "string") {
+                    //     const parts = value.split("@");
+                    //     if (parts.length === 2) {
+                    //         return `${parts[0].slice(0, 2)}***@${parts[1]}`;
+                    //     }
+                    // }
                     return value;
                 }
             }

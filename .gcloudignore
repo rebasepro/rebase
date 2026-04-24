@@ -1,0 +1,10 @@
+# node_modules everywhere
+**/node_modules/
+**/.git/
+**/dist/
+**/build/
+**/.DS_Store
+**/.env
+**/test-output.txt
+**/eslint-errors*.json
+**/lerna-debug.log
