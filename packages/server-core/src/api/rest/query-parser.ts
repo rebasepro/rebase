@@ -57,7 +57,7 @@ export function parseQueryOptions(query: Record<string, unknown>): QueryOptions 
     }
 
     // PostgREST style filtering
-    const reservedQueryKeys = ["limit", "offset", "page", "orderBy", "where", "include", "fields"];
+    const reservedQueryKeys = ["limit", "offset", "page", "orderBy", "where", "include", "fields", "searchString"];
     for (const [key, rawValue] of Object.entries(query)) {
         if (reservedQueryKeys.includes(key)) continue;
 

@@ -41,6 +41,10 @@ export function buildQueryString(params?: FindParams): string {
         parts.push(`orderBy=${encodeURIComponent(params.orderBy)}`);
     }
 
+    if (params.searchString) {
+        parts.push(`searchString=${encodeURIComponent(params.searchString)}`);
+    }
+
     if (params.include && params.include.length > 0) {
         parts.push(`include=${encodeURIComponent(params.include.join(","))}`);
     }

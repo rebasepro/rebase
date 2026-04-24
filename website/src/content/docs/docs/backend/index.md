@@ -15,6 +15,7 @@ The Rebase backend is a **Node.js server** built on [Hono](https://hono.dev/) th
 - **WebSocket** — Real-time data sync via PostgreSQL LISTEN/NOTIFY
 - **Entity History** — Audit trail for every data change
 - **Database Branching** — Instant, isolated database copies for dev/staging/testing
+- **Cron Jobs** — Scheduled background tasks with monitoring dashboard
 
 Everything is initialized with a single function:
 
@@ -55,6 +56,7 @@ After initialization, these routes are mounted:
 | `/api/data/:slug/:id/history` | Entity change history (when enabled) |
 | `/api/data/docs` | OpenAPI spec (when `enableSwagger: true`) |
 | `/api/data/swagger` | Swagger UI (dev mode, when `enableSwagger: true`) |
+| `/api/cron/*` | Cron job management (admin-only, when `cronsDir` is set) |
 | WebSocket on upgrade | Real-time subscriptions |
 
 ## Configuration Reference
@@ -88,6 +90,9 @@ interface RebaseBackendConfig {
     // Custom API endpoints
     functionsDir?: string;    // Auto-load Hono routes from a directory
 
+    // Scheduled tasks
+    cronsDir?: string;        // Auto-load cron jobs from a directory
+
     // Logging
     logging?: { level?: "error" | "warn" | "info" | "debug" };
 }
@@ -110,6 +115,7 @@ instance.storageController   // Default storage
 instance.storageRegistry     // All storage backends
 instance.collectionRegistry  // Collection metadata
 instance.historyService      // Entity history
+instance.cronScheduler       // Cron job scheduler (when cronsDir is set)
 ```
 
 ## REST API
@@ -167,4 +173,5 @@ If initialization fails (e.g., database connection error), the server still star
 - **[Storage](/docs/storage)** — Local and S3 file storage
 - **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks
 - **[Entity History](/docs/backend/history)** — Audit trail
+- **[Cron Jobs](/docs/backend/cron-jobs)** — Scheduled background tasks
 - **[Database Branching](/docs/backend/branching)** — Instant database copies for dev/staging

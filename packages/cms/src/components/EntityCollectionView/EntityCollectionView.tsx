@@ -179,7 +179,7 @@ export const EntityCollectionView = React.memo(
         const [deletedEntities, setDeletedEntities] = React.useState<Entity<M>[]>([]);
 
         // number of entities in the collection (undefined = loading)
-        const [docsCount, setDocsCount] = useState<number | undefined>(undefined);
+        const [docsCount, setDocsCount] = useState<number | null | undefined>(null);
 
         // Optimistic state for column order to prevent UI flickering during persistence
         const [localPropertiesOrder, setLocalPropertiesOrder] = useState<string[] | undefined>(collection.propertiesOrder);
@@ -678,11 +678,9 @@ export const EntityCollectionView = React.memo(
 
         }, [updateLastDeleteTimestamp, usedSelectionController]);
 
-        // Update breadcrumb count when count changes (only if loaded)
+        // Update breadcrumb count when count changes
         useEffect(() => {
-            if (docsCount !== undefined) {
-                breadcrumbs.updateCount(path, docsCount);
-            }
+            breadcrumbs.updateCount(path, docsCount);
         }, [docsCount, path, breadcrumbs.updateCount]);
 
         // EntitiesCount fetches count and updates breadcrumb - no visual rendering needed here
@@ -803,7 +801,7 @@ export const EntityCollectionView = React.memo(
                         path={path}
                         relativePath={collection.slug}
                         selectionController={usedSelectionController}
-                        collectionEntitiesCount={docsCount}
+                        collectionEntitiesCount={docsCount ?? undefined}
                         resolvedProperties={resolvedCollection.properties} />}
                     actions={<>
                         {pluginToolbarWidgets}
@@ -817,7 +815,7 @@ export const EntityCollectionView = React.memo(
                             relativePath={collection.slug}
                             selectionController={usedSelectionController}
                             selectionEnabled={selectionEnabled}
-                            collectionEntitiesCount={docsCount}
+                            collectionEntitiesCount={docsCount ?? undefined}
                         />
                     </>}
                 />
@@ -978,13 +976,11 @@ function EntitiesCount({
     collection: EntityCollection,
     filter?: FilterValues<any>,
     sortBy?: [string, "asc" | "desc"],
-    onCountChange?: (count: number) => void,
+    onCountChange?: (count: number | null | undefined) => void,
 }) {
 
     const dataClient = useData();
     const navigation = useCollectionRegistryController();
-    const [count, setCount] = useState<number | undefined>(undefined);
-    const [error, setError] = useState<Error | undefined>(undefined);
 
     const sortByProperty = sortBy ? sortBy[0] : undefined;
     const currentSort = sortBy ? sortBy[1] : undefined;
@@ -994,6 +990,8 @@ function EntitiesCount({
     useEffect(() => {
         const accessor = dataClient.collection(resolvedPath);
         if (accessor.count) {
+            if (onCountChange) onCountChange(null);
+            
             // Convert filterValues to PostgREST where clause
             const whereMap: Record<string, string> = {};
             if (filter) {
@@ -1018,20 +1016,16 @@ function EntitiesCount({
             accessor.count({
                 where: whereParams,
                 orderBy: orderByParams
-            }).then(setCount).catch(setError);
+            }).then((c) => {
+                if (onCountChange) onCountChange(c);
+            }).catch((e) => {
+                console.warn("Error fetching count", e);
+                if (onCountChange) onCountChange(undefined);
+            });
+        } else {
+            if (onCountChange) onCountChange(undefined);
         }
     }, [path, resolvedPath, collection, filter, sortByProperty, currentSort, dataClient]);
-
-    useEffect(() => {
-        if (onCountChange && count !== undefined) {
-            setError(undefined);
-            onCountChange(count);
-        }
-    }, [onCountChange, count]);
-
-    if (error) {
-        return null;
-    }
 
     // Count is now displayed in the breadcrumb bar, this component only fetches and reports
     return null;

@@ -13,6 +13,46 @@ import {
 } from "@rebasepro/types";
 
 /**
+ * Recursively walk a value tree and rehydrate serialized types.
+ * Currently handles `{ __type: "date", value: "<ISO>" }` → `Date`.
+ */
+function rehydrateServerValues(val: unknown): unknown {
+    if (val === null || val === undefined) return val;
+    if (typeof val !== "object") return val;
+    if (val instanceof Date || val instanceof RegExp) return val;
+
+    if (Array.isArray(val)) {
+        return val.map(rehydrateServerValues);
+    }
+
+    const obj = val as Record<string, unknown>;
+
+    // Serialized date from the PostgreSQL data transformer
+    if (obj.__type === "date" && typeof obj.value === "string") {
+        const d = new Date(obj.value);
+        return isNaN(d.getTime()) ? null : d;
+    }
+
+    // Recurse into plain objects (but skip relation markers etc.)
+    const result: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj)) {
+        result[k] = rehydrateServerValues(v);
+    }
+    return result;
+}
+
+/**
+ * Rehydrate all serialised types inside an Entity's `values`.
+ */
+function rehydrateEntity<M extends Record<string, any>>(entity: Entity<M>): Entity<M> {
+    if (!entity || !entity.values) return entity;
+    return {
+        ...entity,
+        values: rehydrateServerValues(entity.values) as M
+    };
+}
+
+/**
  * Extract error message and code from a WebSocket message payload.
  * Handles both `{ error: string }` and `{ error: { message, code } }` shapes.
  */
@@ -332,7 +372,7 @@ export class RebaseWebSocketClient {
             if (subscriptionKey) {
                 const collectionSub = this.collectionSubscriptions.get(subscriptionKey);
                 if (collectionSub) {
-                    const incomingEntities = message.entities || [];
+                    const incomingEntities = (message.entities || []).map((e: Entity) => rehydrateEntity(e));
 
                     // Structural merge: preserve cached entity references for entities
                     // whose values haven't changed. This prevents downstream React components
@@ -368,7 +408,7 @@ export class RebaseWebSocketClient {
             if (subscriptionKey) {
                 const collectionSub = this.collectionSubscriptions.get(subscriptionKey);
                 if (collectionSub && collectionSub.isInitialDataReceived && collectionSub.latestData) {
-                    const patchEntity = message.entity;
+                    const patchEntity = message.entity ? rehydrateEntity(message.entity) : message.entity;
                     const patchEntityId = (message as unknown as { entityId: string }).entityId;
                     let updated: Entity[];
 
@@ -413,7 +453,7 @@ export class RebaseWebSocketClient {
             if (subscriptionKey) {
                 const entitySub = this.entitySubscriptions.get(subscriptionKey);
                 if (entitySub) {
-                    const entity = message.entity ?? null;
+                    const entity = message.entity ? rehydrateEntity(message.entity) : null;
                     // Cache the latest data with optimizations
                     entitySub.latestData = entity;
                     entitySub.lastUpdated = Date.now();
@@ -617,7 +657,7 @@ export class RebaseWebSocketClient {
             type: "FETCH_COLLECTION",
             payload: props
         }) as { entities?: Entity<M>[] };
-        return response.entities || [];
+        return (response.entities || []).map(e => rehydrateEntity(e));
     }
 
     async fetchEntity<M extends Record<string, any>>(props: FetchEntityProps<M>): Promise<Entity<M> | undefined> {
@@ -625,7 +665,7 @@ export class RebaseWebSocketClient {
             type: "FETCH_ENTITY",
             payload: props
         }) as { entity?: Entity<M> };
-        return response.entity;
+        return response.entity ? rehydrateEntity(response.entity) : undefined;
     }
 
     async saveEntity<M extends Record<string, any>>(props: SaveEntityProps<M>): Promise<Entity<M>> {
@@ -633,7 +673,7 @@ export class RebaseWebSocketClient {
             type: "SAVE_ENTITY",
             payload: props
         }) as { entity: Entity<M> };
-        return response.entity;
+        return rehydrateEntity(response.entity);
     }
 
     async deleteEntity<M extends Record<string, any>>(props: DeleteEntityProps<M>): Promise<void> {

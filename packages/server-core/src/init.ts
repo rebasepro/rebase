@@ -45,6 +45,7 @@ export interface RebaseBackendConfig {
     history?: unknown;
     enableSwagger?: boolean;
     functionsDir?: string;
+    cronsDir?: string;
 }
 
 export interface RebaseBackendInstance {
@@ -57,6 +58,7 @@ export interface RebaseBackendInstance {
     storageRegistry?: StorageRegistry;
     storageController?: StorageController;
     collectionRegistry: BackendCollectionRegistry;
+    cronScheduler?: import("./cron").CronScheduler;
 }
 
 export async function initializeRebaseBackend(config: RebaseBackendConfig): Promise<RebaseBackendInstance> {
@@ -307,6 +309,44 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
     }
 
+    // 6. Mount Cron Jobs
+    let cronScheduler: import("./cron").CronScheduler | undefined;
+    if (config.cronsDir) {
+        const { loadCronJobsFromDirectory } = await import("./cron/cron-loader");
+        const { CronScheduler } = await import("./cron/cron-scheduler");
+        const { createCronRoutes } = await import("./cron/cron-routes");
+        const { createCronStore } = await import("./cron/cron-store");
+
+        const loadedCronJobs = await loadCronJobsFromDirectory(config.cronsDir);
+
+        if (loadedCronJobs.length > 0) {
+            cronScheduler = new CronScheduler();
+            cronScheduler.registerJobs(loadedCronJobs);
+
+            // Attach database persistence if the driver supports SQL
+            const store = createCronStore(defaultDriver);
+            if (store) {
+                await store.ensureTable();
+                cronScheduler.setStore(store);
+            }
+
+            const cronRouter = new Hono<HonoEnv>();
+
+            // Cron admin routes require authentication + admin role
+            if (config.auth?.requireAuth !== false && !!config.auth?.jwtSecret) {
+                cronRouter.use("/*", requireAuth, requireAdmin);
+            }
+
+            cronRouter.route("/", createCronRoutes(cronScheduler));
+            config.app.route(`${basePath}/cron`, cronRouter);
+
+            // Start the scheduler
+            cronScheduler.start();
+
+            console.log(`⏰ Mounted ${loadedCronJobs.length} cron job(s) at ${basePath}/cron`);
+        }
+    }
+
     if ((defaultBootstrapper as BackendBootstrapper & { initializeWebsockets?: (...args: unknown[]) => unknown }).initializeWebsockets) {
         await (defaultBootstrapper as BackendBootstrapper & { initializeWebsockets: (...args: unknown[]) => unknown }).initializeWebsockets(config.server, defaultRealtimeService, defaultDriver, config.auth);
     }
@@ -322,6 +362,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         history: historyConfigResult,
         storageRegistry,
         storageController,
-        collectionRegistry
+        collectionRegistry,
+        cronScheduler
     };
 }

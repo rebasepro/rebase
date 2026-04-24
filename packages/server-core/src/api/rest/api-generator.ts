@@ -60,6 +60,7 @@ export class RestApiGenerator {
         this.router.get(basePath, async (c) => {
             const queryDict = c.req.query();
             const queryOptions = parseQueryOptions(queryDict);
+            const searchString = queryDict.searchString as string | undefined;
 
             const driver = c.get("driver") || this.driver;
             const fetchService = this.getFetchService(driver);
@@ -74,35 +75,50 @@ export class RestApiGenerator {
                         limit: queryOptions.limit,
                         orderBy: queryOptions.orderBy?.[0]?.field,
                         order: queryOptions.orderBy?.[0]?.direction === "desc" ? "desc" : "asc",
-                        searchString: queryDict.searchString as string | undefined,
+                        searchString,
                     },
                     queryOptions.include
                 );
 
-                const total = await this.countRawEntities(driver, resolvedCollection, queryOptions);
+                // When searchString is active, countRawEntities doesn't account
+                // for text search, so derive the total from fetched data instead.
+                const total = searchString
+                    ? (entities as unknown[]).length
+                    : await this.countRawEntities(driver, resolvedCollection, queryOptions);
 
                 return c.json({
                     data: entities,
                     meta: {
-                        total,
+                        total: searchString
+                            ? (queryOptions.offset || 0) + (entities as unknown[]).length
+                            : total,
                         limit: queryOptions.limit,
                         offset: queryOptions.offset,
-                        hasMore: (queryOptions.offset || 0) + (entities as unknown[]).length < total
+                        hasMore: searchString
+                            ? (entities as unknown[]).length === (queryOptions.limit || 20)
+                            : (queryOptions.offset || 0) + (entities as unknown[]).length < total
                     }
                 });
             }
 
-            // Fallback for non-Postgres drivers
-            const entities = await this.fetchRawCollection(driver, resolvedCollection, queryOptions);
-            const total = await this.countRawEntities(driver, resolvedCollection, queryOptions);
+            // Fallback path
+            const entities = await this.fetchRawCollection(driver, resolvedCollection, queryOptions, searchString);
+
+            const total = searchString
+                ? (entities as unknown[]).length
+                : await this.countRawEntities(driver, resolvedCollection, queryOptions);
 
             return c.json({
                 data: entities,
                 meta: {
-                    total,
+                    total: searchString
+                        ? (queryOptions.offset || 0) + (entities as unknown[]).length
+                        : total,
                     limit: queryOptions.limit,
                     offset: queryOptions.offset,
-                    hasMore: (queryOptions.offset || 0) + (entities as unknown[]).length < total
+                    hasMore: searchString
+                        ? (entities as unknown[]).length === (queryOptions.limit || 20)
+                        : (queryOptions.offset || 0) + (entities as unknown[]).length < total
                 }
             });
         });
@@ -426,7 +442,7 @@ export class RestApiGenerator {
     /**
      * Fetch raw collection data without Entity wrapper (fallback for non-Postgres)
      */
-    private async fetchRawCollection(driver: DataDriver, collection: EntityCollection, queryOptions: QueryOptions) {
+    private async fetchRawCollection(driver: DataDriver, collection: EntityCollection, queryOptions: QueryOptions, searchString?: string) {
         const entities = await driver.fetchCollection({
             path: collection.slug,
             collection,
@@ -434,7 +450,8 @@ export class RestApiGenerator {
             limit: queryOptions.limit,
             orderBy: queryOptions.orderBy?.[0]?.field,
             order: queryOptions.orderBy?.[0]?.direction === "desc" ? "desc" : "asc",
-            startAfter: queryOptions.offset ? String(queryOptions.offset) : undefined
+            startAfter: queryOptions.offset ? String(queryOptions.offset) : undefined,
+            searchString,
         });
 
         return entities.map(entity => this.flattenEntity(entity));

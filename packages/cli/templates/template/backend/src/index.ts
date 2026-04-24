@@ -8,7 +8,9 @@ import { fileURLToPath } from "url";
 import {
     initializeRebaseBackend,
     serveSPA,
-    HonoEnv
+    HonoEnv,
+    listenWithPortRetry,
+    cleanupDevPortFile
 } from "@rebasepro/server-core";
 import { createPostgresDatabaseConnection, createPostgresBootstrapper } from "@rebasepro/server-postgresql";
 import { enums, relations, tables } from "./schema.generated";
@@ -27,7 +29,13 @@ const allowedOrigins = process.env.NODE_ENV === "production"
     : ["http://localhost:5173", "http://localhost:3000"];
 
 app.use("/*", cors({
-    origin: allowedOrigins,
+    origin: (origin) => {
+        // In dev mode, allow any localhost origin (frontend may be on any port)
+        if (process.env.NODE_ENV !== "production" && origin && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+            return origin;
+        }
+        return allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+    },
     credentials: true
 }));
 
@@ -85,9 +93,23 @@ async function startServer() {
         serveSPA(app, { frontendPath: path.join(__dirname, "../../frontend/dist") });
     }
 
-    server.listen(PORT, () => {
-        console.log(`🚀 Server running at http://localhost:${PORT}`);
-    });
+    if (process.env.NODE_ENV !== "production") {
+        // Dev mode: retry the next port if the current one is in use
+        const projectRoot = path.resolve(__dirname, "../..");
+        const actualPort = await listenWithPortRetry(server, PORT, { portFileDir: projectRoot });
+
+        // Clean up port file on exit
+        const cleanup = () => cleanupDevPortFile(projectRoot);
+        process.on("SIGINT", cleanup);
+        process.on("SIGTERM", cleanup);
+        process.on("exit", cleanup);
+
+        console.log(`🚀 Server running at http://localhost:${actualPort}`);
+    } else {
+        server.listen(PORT, () => {
+            console.log(`🚀 Server running at http://localhost:${PORT}`);
+        });
+    }
 }
 
 startServer().catch(err => {
@@ -96,3 +118,4 @@ startServer().catch(err => {
 });
 
 export { app };
+

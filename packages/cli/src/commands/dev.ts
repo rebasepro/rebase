@@ -6,11 +6,16 @@
  * - Frontend: vite dev server
  *
  * Both processes stream output with color-coded prefixes.
+ *
+ * When the backend uses port-retry (i.e. the configured port is busy and it
+ * binds to the next free one), the CLI detects the actual port from stdout
+ * and injects VITE_API_URL into the frontend so it connects automatically.
  */
 import arg from "arg";
 import chalk from "chalk";
 import execa, { ExecaChildProcess } from "execa";
 import path from "path";
+import fs from "fs";
 import {
     requireProjectRoot,
     findBackendDir,
@@ -18,6 +23,9 @@ import {
     findEnvFile,
     resolveTsx,
 } from "../utils/project";
+
+/** Well-known filename the backend writes its actual port to. */
+const DEV_PORT_FILENAME = ".rebase-dev-port";
 
 export async function devCommand(rawArgs: string[]): Promise<void> {
     const args = arg(
@@ -60,6 +68,9 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     let debounceSummary: NodeJS.Timeout | null = null;
     let bannerPrinted = false;
 
+    /** Actual backend port, resolved once the server prints its URL. */
+    let resolvedBackendPort: number | null = null;
+
     // Use regex to strip ANSI codes before matching
     const stripAnsi = (str: string) => str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
 
@@ -84,6 +95,12 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
 
     // Handle graceful shutdown
     const cleanup = () => {
+        // Clean up dev port file
+        try {
+            const portFile = path.join(projectRoot, DEV_PORT_FILENAME);
+            if (fs.existsSync(portFile)) fs.unlinkSync(portFile);
+        } catch { /* ignore */ }
+
         children.forEach((child) => {
             if (!child.killed) {
                 child.kill("SIGTERM");
@@ -93,6 +110,57 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     };
     process.on("SIGINT", cleanup);
     process.on("SIGTERM", cleanup);
+
+    /**
+     * Start the Vite frontend, optionally injecting the backend port.
+     */
+    function startFrontend(backendPort: number | null) {
+        if (!frontendDir) return;
+
+        console.log(`  ${chalk.magenta("▶")} Frontend: ${chalk.gray(frontendDir)}`);
+
+        const frontendEnv: Record<string, string> = { ...process.env as Record<string, string> };
+
+        // Inject the resolved backend URL so Vite picks it up
+        if (backendPort) {
+            frontendEnv.VITE_API_URL = `http://localhost:${backendPort}`;
+            console.log(`  ${chalk.gray("↳ VITE_API_URL")} = ${chalk.white(`http://localhost:${backendPort}`)}`);
+        }
+
+        const frontendChild = execa(
+            "pnpm",
+            ["run", "dev"],
+            {
+                cwd: frontendDir,
+                stdio: ["inherit", "pipe", "pipe"],
+                env: frontendEnv,
+                shell: true,
+            }
+        );
+        frontendChild.catch(() => {}); // prevent unhandled promise rejection on exit
+
+        frontendChild.stdout?.on("data", (data: Buffer) => {
+            const lines = data.toString().split("\n").filter(Boolean);
+            lines.forEach((line: string) => {
+                console.log(`${chalk.magenta.bold("[admin]")} ${line}`);
+                const cleanLine = stripAnsi(line);
+                const urlMatch = cleanLine.match(/(http:\/\/(?:localhost|127\.0\.0\.1):\d+)/);
+                if (cleanLine.includes("Local:") && urlMatch) {
+                    frontendUrl = urlMatch[1];
+                    printSummary();
+                }
+            });
+        });
+
+        frontendChild.stderr?.on("data", (data: Buffer) => {
+            const lines = data.toString().split("\n").filter(Boolean);
+            lines.forEach((line: string) => {
+                console.log(`${chalk.magenta.bold("[admin]")} ${line}`);
+            });
+        });
+
+        children.push(frontendChild);
+    }
 
     // Start backend
     if (!frontendOnly && backendDir) {
@@ -120,6 +188,9 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
 
         console.log(`  ${chalk.cyan("▶")} Backend:  ${chalk.gray(backendDir)}`);
 
+        /** Whether the frontend has been launched (we only launch it once). */
+        let frontendLaunched = false;
+
         const backendChild = execa(
             tsxBin,
             ["watch", ...watchDirs, "--conditions", "development", "src/index.ts"],
@@ -137,9 +208,17 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             lines.forEach((line: string) => {
                 console.log(`${chalk.cyan.bold("[backend]")}  ${line}`);
                 const cleanLine = stripAnsi(line);
-                if (cleanLine.includes("Server running at http://")) {
+                const serverMatch = cleanLine.match(/Server running at http:\/\/(?:localhost|127\.0\.0\.1):(\d+)/);
+                if (serverMatch) {
+                    resolvedBackendPort = parseInt(serverMatch[1], 10);
                     backendUrl = "started";
                     printSummary();
+
+                    // Start frontend now that we know the real port
+                    if (!backendOnly && frontendDir && !frontendLaunched) {
+                        frontendLaunched = true;
+                        startFrontend(resolvedBackendPort);
+                    }
                 }
             });
         });
@@ -156,43 +235,9 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         console.warn(chalk.yellow("  ⚠ No backend/ directory found, skipping backend."));
     }
 
-    // Start frontend
-    if (!backendOnly && frontendDir) {
-        console.log(`  ${chalk.magenta("▶")} Frontend: ${chalk.gray(frontendDir)}`);
-
-        const frontendChild = execa(
-            "pnpm",
-            ["run", "dev"],
-            {
-                cwd: frontendDir,
-                stdio: ["inherit", "pipe", "pipe"],
-                env: process.env as Record<string, string>,
-                shell: true,
-            }
-        );
-        frontendChild.catch(() => {}); // prevent unhandled promise rejection on exit
-
-        frontendChild.stdout?.on("data", (data: Buffer) => {
-            const lines = data.toString().split("\n").filter(Boolean);
-            lines.forEach((line: string) => {
-                console.log(`${chalk.magenta.bold("[admin]")} ${line}`);
-                const cleanLine = stripAnsi(line);
-                const urlMatch = cleanLine.match(/(http:\/\/(?:localhost|127\.0\.0\.1):\d+)/);
-                if (cleanLine.includes("Local:") && urlMatch) {
-                    frontendUrl = urlMatch[1];
-                    printSummary();
-                }
-            });
-        });
-
-        frontendChild.stderr?.on("data", (data: Buffer) => {
-            const lines = data.toString().split("\n").filter(Boolean);
-            lines.forEach((line: string) => {
-                console.log(`${chalk.magenta.bold("[admin]")} ${line}`);
-            });
-        });
-
-        children.push(frontendChild);
+    // Start frontend immediately if backend-only mode or no backend
+    if (!backendOnly && frontendDir && (frontendOnly || !backendDir)) {
+        startFrontend(null);
     } else if (!backendOnly && !frontendDir) {
         console.warn(chalk.yellow("  ⚠ No frontend/ directory found, skipping frontend."));
     }
@@ -232,5 +277,11 @@ ${chalk.green.bold("Options")}
 ${chalk.green.bold("Description")}
   Starts both the backend (tsx watch + Express) and frontend (Vite)
   dev servers concurrently with color-coded output prefixes.
+
+  If the backend port is already in use (e.g. another Rebase instance
+  is running), the server will automatically try the next port. The
+  frontend is started only after the backend is ready, and VITE_API_URL
+  is injected automatically so it connects to the correct port.
 `);
 }
+

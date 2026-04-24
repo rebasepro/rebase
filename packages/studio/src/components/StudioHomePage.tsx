@@ -53,6 +53,14 @@ const SECTIONS: StudioSection[] = [
             { path: "/roles", name: "Roles", description: "Create and configure fine-grained access permissions", icon: "admin_panel_settings" },
         ],
     },
+    {
+        label: "Automation",
+        dotColor: "bg-teal-400",
+        iconColor: "text-teal-400",
+        tools: [
+            { path: "/cron", name: "Cron Jobs", description: "Monitor and manage scheduled background tasks", icon: "schedule" },
+        ],
+    },
 ];
 
 /* ═══════════════════════════════════════════════════════════════ */

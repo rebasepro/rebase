@@ -635,11 +635,12 @@ export class EntityFetchService {
         }
 
         // Primary path: use db.query.findMany with relation loading
+        // Skip when searchString is present (same reason as fetchCollectionForRest)
         
         const tableName = getTableName(table);
 
         const qb = this.getQueryBuilder(tableName);
-        if (qb) {
+        if (qb && !options.searchString) {
             try {
                 const withConfig = this.buildWithConfig(collection);
                 const queryOpts = this.buildDrizzleQueryOptions<M>(
@@ -1066,11 +1067,14 @@ export class EntityFetchService {
         const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
 
         // Primary path: use db.query.findMany
+        // NOTE: Skip db.query path when searchString is present because
+        // Drizzle's relational query API doesn't properly apply raw SQL
+        // ILIKE conditions — the fallback db.select path handles them correctly.
         
         const tableName = getTableName(table);
 
         const qb = this.getQueryBuilder(tableName);
-        if (qb) {
+        if (qb && !options.searchString) {
             try {
                 const withConfig = (include && include.length > 0)
                     ? this.buildWithConfig(collection, include)

@@ -132,6 +132,10 @@ export default defineConfig({
                             label: "Entity History",
                             slug: "docs/backend/history"
                         },
+                        {
+                            label: "Cron Jobs",
+                            slug: "docs/backend/cron-jobs"
+                        },
                     ],
                 },
                 {

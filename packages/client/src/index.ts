@@ -1,11 +1,13 @@
 import { createTransport, RebaseClientConfig } from "./transport";
 import { createAuth, CreateAuthOptions } from "./auth";
 import { createAdmin, CreateAdminOptions } from "./admin";
+import { createCron, CreateCronOptions } from "./cron";
 import { createCollectionClient, CollectionClient } from "./collection";
 
 export * from "./transport";
 export * from "./auth";
 export * from "./admin";
+export * from "./cron";
 export * from "./collection";
 export * from "./websocket";
 export * from "./storage";
@@ -13,6 +15,7 @@ export * from "./storage";
 export interface CreateRebaseClientOptions extends RebaseClientConfig {
     auth?: CreateAuthOptions;
     admin?: CreateAdminOptions;
+    cron?: CreateCronOptions;
 }
 
 import { RebaseWebSocketClient } from "./websocket";
@@ -25,6 +28,7 @@ export type RebaseClient<DB = any> = BaseRebaseClient<DB> & {
     resolveToken: () => Promise<string | null>;
     auth: ReturnType<typeof createAuth>;
     admin: ReturnType<typeof createAdmin>;
+    cron: ReturnType<typeof createCron>;
     ws?: RebaseWebSocketClient;
     storage?: StorageSource;
     call: <T = any>(endpoint: string, payload?: any) => Promise<T>;
@@ -56,6 +60,7 @@ export function createRebaseClient<DB = any>(options: CreateRebaseClientOptions)
     const transport = createTransport(options);
     const auth = createAuth(transport, options.auth);
     const admin = createAdmin(transport, options.admin);
+    const cron = createCron(transport, options.cron);
     const storage = createStorage(transport);
 
     const resolvedWsUrl = options.websocketUrl ?? deriveWebSocketUrl(options.baseUrl);
@@ -124,6 +129,7 @@ export function createRebaseClient<DB = any>(options: CreateRebaseClientOptions)
     const target = {
         auth,
         admin,
+        cron,
         storage,
         ws,
         setToken: transport.setToken,

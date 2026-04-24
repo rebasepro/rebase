@@ -1,0 +1,88 @@
+import * as fs from "fs";
+import * as path from "path";
+import { pathToFileURL } from "url";
+import type { CronJobDefinition } from "@rebasepro/types";
+
+export interface LoadedCronJob {
+    /** Job ID derived from filename (e.g. "cleanup-sessions"). */
+    id: string;
+    /** The full definition. */
+    definition: CronJobDefinition;
+}
+
+/**
+ * Auto-discover cron job files from a directory.
+ *
+ * Each file should default-export a `CronJobDefinition`.
+ * The filename (without extension) becomes the job ID:
+ *   `crons/cleanup-sessions.ts` → id = "cleanup-sessions"
+ *
+ * Follows the same discovery pattern as `loadFunctionsFromDirectory`.
+ */
+export async function loadCronJobsFromDirectory(
+    directory: string
+): Promise<LoadedCronJob[]> {
+    const jobs: LoadedCronJob[] = [];
+
+    if (!fs.existsSync(directory)) {
+        return jobs;
+    }
+
+    const files = fs.readdirSync(directory);
+    for (const file of files) {
+        if (
+            (file.endsWith(".ts") || file.endsWith(".js")) &&
+            !file.includes(".test.") &&
+            !file.endsWith(".d.ts") &&
+            file !== "index.ts" &&
+            file !== "index.js"
+        ) {
+            const filePath = path.join(directory, file);
+            try {
+                const fileUrl = pathToFileURL(filePath).href;
+
+                // Native dynamic import — bypasses tsc down-compilation
+                const dynamicImport = new Function("url", "return import(url)");
+                const mod = await dynamicImport(fileUrl);
+
+                const exported: unknown = mod.default;
+
+                if (!exported || typeof exported !== "object") {
+                    console.warn(
+                        `[cron] ${file}: no valid default export. Skipping.`
+                    );
+                    continue;
+                }
+
+                const def = exported as Record<string, unknown>;
+                if (typeof def.schedule !== "string" || typeof def.handler !== "function") {
+                    console.warn(
+                        `[cron] ${file}: default export missing required 'schedule' or 'handler'. Skipping.`
+                    );
+                    continue;
+                }
+
+                const id = path.basename(file, path.extname(file));
+                const definition: CronJobDefinition = {
+                    schedule: def.schedule as string,
+                    name: (def.name as string) || id,
+                    description: def.description as string | undefined,
+                    enabled: def.enabled !== false,
+                    timeoutSeconds: (def.timeoutSeconds as number) || 300,
+                    handler: def.handler as CronJobDefinition["handler"],
+                };
+
+                jobs.push({ id, definition });
+                console.log(`⏰ Loaded cron job: ${id} (${definition.schedule})`);
+            } catch (err: unknown) {
+                const message =
+                    err instanceof Error ? err.message : String(err);
+                console.error(
+                    `[cron] Failed to load ${file}: ${message}`
+                );
+            }
+        }
+    }
+
+    return jobs;
+}

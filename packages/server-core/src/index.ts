@@ -47,10 +47,15 @@ export * from "./history";
 // Custom Functions (auto-discovered Hono routes)
 export * from "./functions";
 
+// Cron Jobs (auto-discovered scheduled tasks)
+export * from "./cron";
 
 
 // SPA serving helper
 export * from "./serve-spa";
+
+// Dev-mode port resolution (retry on EADDRINUSE)
+export * from "./utils/dev-port";
 
 // Backend bootstrappers (pluggable driver initialization)
 

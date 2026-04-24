@@ -6,6 +6,7 @@ import { SQLEditor } from "./SQLEditor/SQLEditor";
 import { JSEditor } from "./JSEditor/JSEditor";
 import { RLSEditor } from "./RLSEditor/RLSEditor";
 import { StorageView } from "./StorageView/StorageView";
+import { CronJobsView } from "./CronJobs/CronJobsView";
 import { StudioHomePage } from "./StudioHomePage";
 
 /**
@@ -21,7 +22,7 @@ export function RebaseStudio({ tools, homePage = <StudioHomePage /> }: RebaseStu
     
     const devViews: AppView[] = useMemo(() => {
         const views: AppView[] = [];
-        const activeTools = tools ?? ["sql", "js", "rls", "storage"];
+        const activeTools = tools ?? ["sql", "js", "rls", "storage", "cron"];
         
         if (activeTools.includes("sql")) {
             views.push({ slug: "sql", name: "SQL Console", group: "Database", icon: "terminal", description: "Execute SQL queries", view: <SQLEditor /> });
@@ -34,6 +35,9 @@ export function RebaseStudio({ tools, homePage = <StudioHomePage /> }: RebaseStu
         }
         if (activeTools.includes("storage")) {
             views.push({ slug: "storage", name: "Storage", group: "Storage", icon: "cloud", description: "Manage storage files", view: <StorageView /> });
+        }
+        if (activeTools.includes("cron")) {
+            views.push({ slug: "cron", name: "Cron Jobs", group: "Automation", icon: "schedule", description: "Manage scheduled tasks", view: <CronJobsView /> });
         }
         // Note: "schema" tool is auto-injected by RebaseShell when collectionEditor is enabled.
         // It is NOT registered here anymore.
