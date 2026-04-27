@@ -66,7 +66,15 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         console.log(`  You can now run ${chalk.bold.green("rebase db migrate")} to apply the migrations to your database.`);
         console.log("");
     } else {
+        // For push/pull/migrate/studio, print a clear header so the user
+        // sees output even when drizzle-kit itself is quiet.
+        console.log("");
+        console.log(chalk.bold(`  🗄️  Rebase DB ${subcommand.charAt(0).toUpperCase() + subcommand.slice(1)}`));
+        console.log("");
         await runDrizzleKit(subcommand, rawArgs);
+        console.log("");
+        console.log(chalk.green(`  ✓ rebase db ${subcommand} completed successfully.`));
+        console.log("");
     }
 }
 

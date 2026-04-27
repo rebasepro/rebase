@@ -7,6 +7,30 @@ import { Entity, EntityValues } from "../types/entities";
  *
  * @group Data
  */
+/**
+ * A where-clause value for a single field.
+ *
+ * Supports three syntaxes:
+ *  1. **Equality shorthand**: raw JS values — `null`, `"active"`, `42`, `true`
+ *  2. **Tuple syntax**: `[operator, value]` — `[">", 18]`, `["in", ["a","b"]]`
+ *  3. **PostgREST string**: `"eq.published"`, `"gte.18"`, `"in.(a,b)"`
+ *
+ * @group Data
+ */
+export type WhereFieldValue =
+    | string
+    | number
+    | boolean
+    | null
+    | [WhereFilterOpShort, any];
+
+/** Short operator strings accepted in the tuple syntax. */
+export type WhereFilterOpShort =
+    | "==" | "!=" | ">" | ">=" | "<" | "<="
+    | "eq" | "neq" | "gt" | "gte" | "lt" | "lte"
+    | "in" | "nin" | "not-in"
+    | "array-contains" | "array-contains-any" | "cs" | "csa";
+
 export interface FindParams {
     /** Maximum number of items to return (default: 20) */
     limit?: number;
@@ -15,16 +39,30 @@ export interface FindParams {
     /** Page number (1-indexed), alternative to offset */
     page?: number;
     /**
-     * PostgREST-style filter object.
-     * Keys are field names, values use "operator.value" format.
-     * Operators: eq, neq, gt, gte, lt, lte, in, nin, cs (array-contains), csa (array-contains-any)
+     * Filter object. Supports multiple syntaxes per field:
      *
-     * @example
+     * **Equality shorthand** — raw JS values (null, string, number, boolean):
+     * ```ts
+     * { company_profile_id: null }
+     * { status: "active" }
+     * { age: 18 }
+     * ```
+     *
+     * **Tuple syntax** — `[operator, value]`:
+     * ```ts
+     * { age: [">=", 18] }
+     * { role: ["in", ["admin", "editor"]] }
+     * { deleted_at: ["!=", null] }
+     * ```
+     *
+     * **PostgREST string syntax** (original format):
+     * ```ts
      * { status: "eq.published" }
      * { age: "gte.18" }
      * { role: "in.(admin,editor)" }
+     * ```
      */
-    where?: Record<string, string>;
+    where?: Record<string, WhereFieldValue>;
     /**
      * Sort order. Format: "field:direction".
      * @example "created_at:desc", "name:asc"

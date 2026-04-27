@@ -7,16 +7,21 @@ import {
     Entity,
     EntityValues,
     FilterValues,
-    WhereFilterOp
+    WhereFilterOp,
+    WhereFieldValue
 } from "@rebasepro/types";
 
 /**
- * Convert PostgREST-style filter object to the internal DataDriver FilterValues format.
+ * Convert where-clause filter object to the internal DataDriver FilterValues format.
  *
- * PostgREST: { status: "eq.published", age: "gte.18" }
+ * Supports multiple value formats:
+ * - PostgREST string: { status: "eq.published", age: "gte.18" }
+ * - Equality shorthand: { company_profile_id: null, status: "active", age: 18 }
+ * - Tuple syntax: { age: [">=", 18], role: ["in", ["admin", "editor"]] }
+ *
  * Internal:  { status: ["==", "published"], age: [">=", 18] }
  */
-function convertWhereToFilter(where?: Record<string, string>): FilterValues<string> | undefined {
+function convertWhereToFilter(where?: Record<string, WhereFieldValue>): FilterValues<string> | undefined {
     if (!where) return undefined;
 
     const operatorMap: Record<string, WhereFilterOp> = {
@@ -28,32 +33,81 @@ function convertWhereToFilter(where?: Record<string, string>): FilterValues<stri
         "lte": "<=",
         "in": "in",
         "nin": "not-in",
+        "not-in": "not-in",
         "cs": "array-contains",
         "csa": "array-contains-any",
+        "==": "==", "!=": "!=",
+        ">": ">", ">=": ">=",
+        "<": "<", "<=": "<=",
+        "array-contains": "array-contains",
+        "array-contains-any": "array-contains-any",
     };
 
     const filter: FilterValues<string> = {};
 
     for (const [field, rawValue] of Object.entries(where)) {
-        const dotIndex = rawValue.indexOf(".");
-        if (dotIndex === -1) continue;
-
-        const op = rawValue.substring(0, dotIndex);
-        let value: unknown = rawValue.substring(dotIndex + 1);
-
-        // Parse list values like "(admin,editor)"
-        if (typeof value === "string" && value.startsWith("(") && value.endsWith(")")) {
-            value = value.slice(1, -1).split(",").map((v: string) => v.trim());
+        // Handle null → equality
+        if (rawValue === null) {
+            filter[field] = ["==", null];
+            continue;
         }
 
-        // Try to parse numbers
-        if (typeof value === "string" && !isNaN(Number(value)) && value.trim() !== "") {
-            value = Number(value);
+        // Handle boolean → equality
+        if (typeof rawValue === "boolean") {
+            filter[field] = ["==", rawValue];
+            continue;
         }
 
-        const mappedOp = operatorMap[op];
-        if (mappedOp) {
-            filter[field] = [mappedOp, value];
+        // Handle number → equality
+        if (typeof rawValue === "number") {
+            filter[field] = ["==", rawValue];
+            continue;
+        }
+
+        // Handle tuple: [operator, value]
+        if (Array.isArray(rawValue) && rawValue.length === 2) {
+            const [rawOp, val] = rawValue;
+            const mappedOp = operatorMap[rawOp] ?? "==";
+            filter[field] = [mappedOp, val];
+            continue;
+        }
+
+        // Handle PostgREST string format: "op.value"
+        if (typeof rawValue === "string") {
+            const dotIndex = rawValue.indexOf(".");
+            if (dotIndex === -1) {
+                // Plain string equality
+                filter[field] = ["==", rawValue];
+                continue;
+            }
+
+            const op = rawValue.substring(0, dotIndex);
+            let value: unknown = rawValue.substring(dotIndex + 1);
+
+            // Parse list values like "(admin,editor)"
+            if (typeof value === "string" && value.startsWith("(") && value.endsWith(")")) {
+                value = value.slice(1, -1).split(",").map((v: string) => v.trim());
+            }
+
+            // Parse null string
+            if (value === "null") {
+                value = null;
+            }
+            // Parse boolean strings
+            else if (value === "true") {
+                value = true;
+            } else if (value === "false") {
+                value = false;
+            }
+            // Try to parse numbers
+            else if (typeof value === "string" && !isNaN(Number(value)) && value.trim() !== "") {
+                value = Number(value);
+            }
+
+            const mappedOp = operatorMap[op];
+            if (mappedOp) {
+                filter[field] = [mappedOp, value];
+            }
         }
     }
 

@@ -1,4 +1,4 @@
-import { FindParams as TypesFindParams, FindResponse as TypesFindResponse } from "@rebasepro/types";
+import { FindParams as TypesFindParams, FindResponse as TypesFindResponse, WhereFieldValue } from "@rebasepro/types";
 
 export interface RebaseClientConfig {
     baseUrl: string;
@@ -29,6 +29,56 @@ export class RebaseApiError extends Error {
     }
 }
 
+/**
+ * Maps a short operator alias to the PostgREST-style short code.
+ */
+const OP_MAP: Record<string, string> = {
+    "==": "eq", "!=": "neq",
+    ">": "gt", ">=": "gte",
+    "<": "lt", "<=": "lte",
+    "not-in": "nin",
+    "array-contains": "cs",
+    "array-contains-any": "csa",
+};
+
+/**
+ * Normalise a single `WhereFieldValue` into the PostgREST query-string
+ * representation the backend expects.
+ *
+ * Supports:
+ *  - `null`          → `"eq.null"`
+ *  - `true`/`false`  → `"eq.true"` / `"eq.false"`
+ *  - `42`            → `"42"` (plain equality)
+ *  - `"active"`      → `"active"` (plain equality, backward-compat)
+ *  - `"gte.18"`      → `"gte.18"` (pass-through PostgREST string)
+ *  - `[">=", 18]`    → `"gte.18"` (tuple syntax)
+ *  - `["in", [1,2]]` → `"in.(1,2)"` (tuple with array value)
+ *  - `["!=", null]`  → `"neq.null"`
+ */
+function normalizeWhereValue(value: WhereFieldValue): string {
+    // Null → eq.null
+    if (value === null) return "eq.null";
+
+    // Boolean → eq.true / eq.false
+    if (typeof value === "boolean") return `eq.${value}`;
+
+    // Number → plain equality
+    if (typeof value === "number") return String(value);
+
+    // Tuple: [operator, val]
+    if (Array.isArray(value) && value.length === 2) {
+        const [rawOp, val] = value;
+        const op = OP_MAP[rawOp] ?? rawOp;
+
+        if (val === null) return `${op}.null`;
+        if (Array.isArray(val)) return `${op}.(${val.join(",")})`;
+        return `${op}.${val}`;
+    }
+
+    // String — pass through (either plain equality value or PostgREST syntax)
+    return String(value);
+}
+
 export function buildQueryString(params?: FindParams): string {
     if (!params) return "";
     const parts: string[] = [];
@@ -51,7 +101,8 @@ export function buildQueryString(params?: FindParams): string {
 
     if (params.where) {
         for (const [field, value] of Object.entries(params.where)) {
-            parts.push(`${encodeURIComponent(field)}=${encodeURIComponent(String(value))}`);
+            const normalized = normalizeWhereValue(value as WhereFieldValue);
+            parts.push(`${encodeURIComponent(field)}=${encodeURIComponent(normalized)}`);
         }
     }
 

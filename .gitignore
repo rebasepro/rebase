@@ -45,3 +45,4 @@ report.**.json
 /website-astro-v2/.firebase/hosting.ZGlzdA.cache
 app/frontend/debug_trace**
 .rebase-dev-port
+.rebase/

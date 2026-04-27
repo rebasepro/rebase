@@ -105,6 +105,10 @@ export function listenWithPortRetry(
                     } catch {
                         // Non-fatal — the CLI will fall back to parsing stdout
                     }
+
+                    // Write .rebase/state.json so external scripts can discover
+                    // the running server port, URL, etc.
+                    writeStateFile(portFileDir, port);
                 }
 
                 resolve(port);
@@ -116,7 +120,7 @@ export function listenWithPortRetry(
 }
 
 /**
- * Clean up the dev port file (call on graceful shutdown).
+ * Clean up the dev port file and state file (call on graceful shutdown).
  */
 export function cleanupDevPortFile(dir: string): void {
     try {
@@ -126,5 +130,47 @@ export function cleanupDevPortFile(dir: string): void {
         }
     } catch {
         // ignore
+    }
+    try {
+        const stateFile = path.join(dir, ".rebase", "state.json");
+        if (fs.existsSync(stateFile)) {
+            fs.unlinkSync(stateFile);
+        }
+    } catch {
+        // ignore
+    }
+}
+
+/**
+ * Write `.rebase/state.json` with runtime info for external scripts.
+ *
+ * Scripts can read this file to discover:
+ * - `port`      — the actual port the backend is listening on
+ * - `baseUrl`   — full URL including protocol and port
+ * - `pid`       — the backend process ID
+ * - `startedAt` — ISO timestamp of when the server started
+ *
+ * @example Reading from a script:
+ * ```ts
+ * const state = JSON.parse(fs.readFileSync('.rebase/state.json', 'utf-8'));
+ * const apiUrl = state.baseUrl; // "http://localhost:3519"
+ * ```
+ */
+function writeStateFile(projectRoot: string, port: number): void {
+    try {
+        const rebaseDir = path.join(projectRoot, ".rebase");
+        if (!fs.existsSync(rebaseDir)) {
+            fs.mkdirSync(rebaseDir, { recursive: true });
+        }
+        const stateFile = path.join(rebaseDir, "state.json");
+        const state = {
+            port,
+            baseUrl: `http://localhost:${port}`,
+            pid: process.pid,
+            startedAt: new Date().toISOString(),
+        };
+        fs.writeFileSync(stateFile, JSON.stringify(state, null, 2), "utf-8");
+    } catch {
+        // Non-fatal
     }
 }

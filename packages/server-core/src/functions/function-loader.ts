@@ -55,10 +55,11 @@ export async function loadFunctionsFromDirectory(
                     continue;
                 }
 
-                // Accept a Hono instance directly
-                if (exported instanceof Hono) {
+                // Accept a Hono instance — use duck-typing to handle different
+                // Hono versions which may not share the same prototype.
+                if (isHonoLike(exported)) {
                     const name = path.basename(file, path.extname(file));
-                    functions.push({ name, app: exported });
+                    functions.push({ name, app: exported as Hono });
                     console.log(`⚡ Loaded function route: ${name}`);
                     continue;
                 }
@@ -66,16 +67,25 @@ export async function loadFunctionsFromDirectory(
                 // Also accept a factory function that returns a Hono instance
                 if (typeof exported === "function") {
                     const result = exported();
-                    if (result instanceof Hono) {
+                    if (isHonoLike(result)) {
                         const name = path.basename(file, path.extname(file));
-                        functions.push({ name, app: result });
+                        functions.push({ name, app: result as Hono });
                         console.log(`⚡ Loaded function route: ${name}`);
                         continue;
                     }
                 }
 
+                // Provide actionable diagnostics
+                const exportType = typeof exported;
+                const keys = exported && typeof exported === "object"
+                    ? Object.getOwnPropertyNames(Object.getPrototypeOf(exported)).slice(0, 10).join(", ")
+                    : "N/A";
                 console.warn(
-                    `[functions] ${file}: default export is not a Hono app or factory. Skipping.`
+                    `[functions] ${file}: default export is not a Hono app or factory. Skipping.\n` +
+                    `  export type: ${exportType}${exported?.constructor?.name ? ` (${exported.constructor.name})` : ""}\n` +
+                    `  prototype methods: ${keys}\n` +
+                    `  Hint: ensure the function exports a Hono app created with the same hono version as the server.\n` +
+                    `  The loader checks for .fetch() and .routes — any Hono-compatible app will work.`
                 );
             } catch (err: unknown) {
                 const message =
@@ -88,4 +98,19 @@ export async function loadFunctionsFromDirectory(
     }
 
     return functions;
+}
+
+/**
+ * Duck-type check for Hono apps.
+ * We avoid `instanceof Hono` because different Hono versions
+ * installed in the user's project vs. our dependencies will
+ * not share the same prototype, causing false negatives.
+ */
+function isHonoLike(obj: unknown): boolean {
+    if (!obj || typeof obj !== "object") return false;
+    // Hono instances always have .fetch() and .routes
+    return (
+        typeof (obj as any).fetch === "function" &&
+        Array.isArray((obj as any).routes)
+    );
 }

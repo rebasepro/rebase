@@ -1,13 +1,51 @@
 import { Transport, FindParams, FindResponse, buildQueryString } from "./transport";
 import { RebaseWebSocketClient } from "./websocket";
-import { Entity, FilterValues, WhereFilterOp, CollectionAccessor } from "@rebasepro/types";
+import { Entity, FilterValues, WhereFilterOp, CollectionAccessor, WhereFieldValue } from "@rebasepro/types";
 
 import { FilterOperator, QueryBuilder } from "./query_builder";
 
-function parseWhereFilter(where?: Record<string, string>): FilterValues<any> | undefined {
+function parseWhereFilter(where?: Record<string, WhereFieldValue>): FilterValues<any> | undefined {
     if (!where) return undefined;
     const filters: Record<string, [WhereFilterOp, unknown]> = {};
-    for (const [key, value] of Object.entries(where)) {
+    for (const [key, rawValue] of Object.entries(where)) {
+        // Handle null → equality
+        if (rawValue === null) {
+            filters[key] = ["==", null];
+            continue;
+        }
+
+        // Handle boolean → equality
+        if (typeof rawValue === "boolean") {
+            filters[key] = ["==", rawValue];
+            continue;
+        }
+
+        // Handle number → equality
+        if (typeof rawValue === "number") {
+            filters[key] = ["==", rawValue];
+            continue;
+        }
+
+        // Handle tuple: [operator, value]
+        if (Array.isArray(rawValue) && rawValue.length === 2) {
+            const [rawOp, val] = rawValue;
+            const OP_TO_FILTER: Record<string, WhereFilterOp> = {
+                "eq": "==", "neq": "!=",
+                "gt": ">", "gte": ">=",
+                "lt": "<", "lte": "<=",
+                "==": "==", "!=": "!=",
+                ">": ">", ">=": ">=",
+                "<": "<", "<=": "<=",
+                "in": "in", "nin": "not-in", "not-in": "not-in",
+                "cs": "array-contains", "csa": "array-contains-any",
+                "array-contains": "array-contains", "array-contains-any": "array-contains-any",
+            };
+            filters[key] = [OP_TO_FILTER[rawOp] ?? "==", val];
+            continue;
+        }
+
+        // Handle string (original PostgREST format)
+        const value = String(rawValue);
         const dotIndex = value.indexOf(".");
         if (dotIndex > 0) {
             const opStr = value.substring(0, dotIndex);
