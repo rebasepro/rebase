@@ -10,6 +10,9 @@
  * When the backend uses port-retry (i.e. the configured port is busy and it
  * binds to the next free one), the CLI detects the actual port from stdout
  * and injects VITE_API_URL into the frontend so it connects automatically.
+ *
+ * Each project gets a deterministic default port derived from the project
+ * root path, so multiple Rebase instances never collide.
  */
 import arg from "arg";
 import chalk from "chalk";
@@ -26,6 +29,46 @@ import {
 
 /** Well-known filename the backend writes its actual port to. */
 const DEV_PORT_FILENAME = ".rebase-dev-port";
+
+/**
+ * Compute a deterministic port from the project root path.
+ * Range: 3001–3999 (avoids privileged ports and common services).
+ * Two different project directories will almost always get different ports.
+ */
+function getProjectPort(projectRoot: string): number {
+    let hash = 0;
+    for (let i = 0; i < projectRoot.length; i++) {
+        hash = ((hash << 5) - hash + projectRoot.charCodeAt(i)) | 0;
+    }
+    return 3001 + (Math.abs(hash) % 999);
+}
+
+/**
+ * Resolve the best starting port for this project:
+ * 1. Explicit --port flag (highest priority)
+ * 2. PORT env var
+ * 3. Previously used port from .rebase-dev-port (port affinity across restarts)
+ * 4. Deterministic hash from project path (unique per project)
+ */
+function resolveStartPort(projectRoot: string, explicitPort?: number): number {
+    // 1. Explicit flag
+    if (explicitPort) return explicitPort;
+
+    // 2. PORT env var
+    if (process.env.PORT) return parseInt(process.env.PORT, 10);
+
+    // 3. Port affinity — check if we wrote a port file from a previous run
+    try {
+        const portFile = path.join(projectRoot, DEV_PORT_FILENAME);
+        if (fs.existsSync(portFile)) {
+            const saved = parseInt(fs.readFileSync(portFile, "utf-8").trim(), 10);
+            if (saved > 0 && saved < 65536) return saved;
+        }
+    } catch { /* ignore */ }
+
+    // 4. Deterministic hash
+    return getProjectPort(projectRoot);
+}
 
 export async function devCommand(rawArgs: string[]): Promise<void> {
     const args = arg(
@@ -55,6 +98,9 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     const frontendDir = findFrontendDir(projectRoot);
     const backendOnly = args["--backend-only"] || false;
     const frontendOnly = args["--frontend-only"] || false;
+
+    // Resolve the port ONCE, before starting anything
+    const startPort = resolveStartPort(projectRoot, args["--port"]);
 
     console.log("");
     console.log(chalk.bold("  🚀 Rebase Dev Server"));
@@ -102,8 +148,20 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         } catch { /* ignore */ }
 
         children.forEach((child) => {
-            if (!child.killed) {
-                child.kill("SIGTERM");
+            if (child.pid && !child.killed) {
+                try {
+                    if (process.platform === "win32") {
+                        execa.commandSync(`taskkill /pid ${child.pid} /T /F`);
+                    } else {
+                        process.kill(-child.pid, "SIGKILL");
+                    }
+                } catch (e) {
+                    try {
+                        child.kill("SIGKILL");
+                    } catch (err) {
+                        // ignore
+                    }
+                }
             }
         });
         process.exit(0);
@@ -135,6 +193,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                 stdio: ["inherit", "pipe", "pipe"],
                 env: frontendEnv,
                 shell: true,
+                detached: process.platform !== "win32"
             }
         );
         frontendChild.catch(() => {}); // prevent unhandled promise rejection on exit
@@ -176,29 +235,27 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         if (envFile) {
             env.DOTENV_CONFIG_PATH = envFile;
         }
-        if (args["--port"]) {
-            env.PORT = String(args["--port"]);
-        }
 
-        // Check for backend entry point
-        const backendEntry = path.join(backendDir, "src", "index.ts");
-        const watchDirs = [
-            `--watch="${path.join("..", "shared", "**", "*")}"`,
-        ];
+        // Always inject PORT so the backend uses our resolved port instead of
+        // its hardcoded default (3001). This prevents cross-project collisions
+        // when multiple Rebase instances run simultaneously.
+        env.PORT = String(startPort);
 
         console.log(`  ${chalk.cyan("▶")} Backend:  ${chalk.gray(backendDir)}`);
+        console.log(`  ${chalk.gray("↳ PORT")} = ${chalk.white(String(startPort))}`);
 
         /** Whether the frontend has been launched (we only launch it once). */
         let frontendLaunched = false;
 
         const backendChild = execa(
             tsxBin,
-            ["watch", ...watchDirs, "--conditions", "development", "src/index.ts"],
+            ["watch", `--watch="${path.join("..", "shared", "**", "*")}"`, "--conditions", "development", "src/index.ts"],
             {
                 cwd: backendDir,
                 stdio: ["inherit", "pipe", "pipe"],
                 env,
                 shell: true,
+                detached: process.platform !== "win32"
             }
         );
         backendChild.catch(() => {}); // prevent unhandled promise rejection on exit
@@ -272,16 +329,18 @@ ${chalk.green.bold("Usage")}
 ${chalk.green.bold("Options")}
   ${chalk.blue("--backend-only, -b")}   Only start the backend server
   ${chalk.blue("--frontend-only, -f")}  Only start the frontend server
-  ${chalk.blue("--port, -p")}           Backend port (default: 3001)
+  ${chalk.blue("--port, -p")}           Backend port (default: auto-detected per project)
 
 ${chalk.green.bold("Description")}
   Starts both the backend (tsx watch + Express) and frontend (Vite)
   dev servers concurrently with color-coded output prefixes.
 
-  If the backend port is already in use (e.g. another Rebase instance
-  is running), the server will automatically try the next port. The
-  frontend is started only after the backend is ready, and VITE_API_URL
-  is injected automatically so it connects to the correct port.
+  Each project automatically receives a unique default port derived
+  from its directory path, preventing collisions when running multiple
+  Rebase instances simultaneously.
+
+  If the assigned port is already in use, the server will automatically
+  try the next available port. The frontend is started only after the
+  backend is ready, and VITE_API_URL is injected automatically.
 `);
 }
-

@@ -1,10 +1,9 @@
 packages:
-  - 'packages/*'
-  - 'app'
-  - 'app/*'
-  - 'e2e'
-#  - 'examples/*'
-#  - 'saas'
-#  - 'website'
-  - 'website-astro'
+  - packages/*
+  - app
+  - app/*
+  - e2e
+  - website-astro
 
+patchedDependencies:
+  '@radix-ui/react-compose-refs@1.1.2': patches/@radix-ui__react-compose-refs@1.1.2.patch

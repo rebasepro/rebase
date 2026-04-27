@@ -44,6 +44,8 @@ export interface CronJobDefinition {
     handler: (ctx: CronJobContext) => Promise<unknown> | unknown;
 }
 
+import type { RebaseClient } from "../controllers/client";
+
 /**
  * Context passed to each cron handler invocation.
  */
@@ -56,6 +58,9 @@ export interface CronJobContext {
 
     /** A simple logger scoped to this job run. */
     log: (...args: unknown[]) => void;
+
+    /** The RebaseClient instance to interact with the database. */
+    client: RebaseClient<any>;
 }
 
 // =============================================================================

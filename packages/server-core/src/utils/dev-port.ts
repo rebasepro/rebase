@@ -5,6 +5,10 @@
  * the requested one is already in use, and writes the resolved port to a
  * well-known temp file so the CLI / frontend can discover it.
  *
+ * Port affinity: when a port file already exists (e.g. after a tsx watch
+ * restart), the saved port is tried FIRST so the backend stays on the same
+ * port the frontend was configured with.
+ *
  * This module is dev-only and should never run in production.
  */
 import type { Server } from "http";
@@ -19,6 +23,9 @@ export const DEV_PORT_FILENAME = ".rebase-dev-port";
 /**
  * Try to `listen` on `startPort`. If the port is busy (`EADDRINUSE`), increment
  * and retry up to `maxAttempts` times.
+ *
+ * When a port file already exists (written by a previous run), the saved port
+ * is tried first to maintain port affinity across tsx watch restarts.
  *
  * Resolves with the port that was actually bound.
  */
@@ -36,24 +43,50 @@ export function listenWithPortRetry(
     const maxAttempts = options?.maxAttempts ?? MAX_PORT_ATTEMPTS;
     const portFileDir = options?.portFileDir;
 
+    // Read affinity port from a previous run's port file.
+    // This ensures tsx watch restarts land on the same port the frontend was
+    // configured with, even if the CLI-computed port was different.
+    let affinityPort: number | null = null;
+    if (portFileDir) {
+        try {
+            const portFile = path.join(portFileDir, DEV_PORT_FILENAME);
+            if (fs.existsSync(portFile)) {
+                const saved = parseInt(fs.readFileSync(portFile, "utf-8").trim(), 10);
+                if (saved > 0 && saved < 65536 && saved !== startPort) {
+                    affinityPort = saved;
+                }
+            }
+        } catch { /* ignore */ }
+    }
+
     return new Promise<number>((resolve, reject) => {
         let attempt = 0;
+        // Build the ordered list of ports to try:
+        // 1. The affinity port (if different from startPort)
+        // 2. startPort, startPort+1, startPort+2, ...
+        const portsToTry: number[] = [];
+        if (affinityPort) portsToTry.push(affinityPort);
+        for (let i = 0; i < maxAttempts; i++) {
+            const p = startPort + i;
+            if (p !== affinityPort) portsToTry.push(p);
+        }
 
-        function tryPort(port: number) {
+        function tryNext(index: number) {
+            if (index >= portsToTry.length) {
+                reject(new Error(
+                    `All attempted ports are in use. ` +
+                    `Stop other Rebase instances or specify a different port with --port.`
+                ));
+                return;
+            }
+
+            const port = portsToTry[index];
             attempt++;
 
             const onError = (err: NodeJS.ErrnoException) => {
                 if (err.code === "EADDRINUSE") {
-                    if (attempt >= maxAttempts) {
-                        reject(new Error(
-                            `All ports ${startPort}–${startPort + maxAttempts - 1} are in use. ` +
-                            `Stop other Rebase instances or specify a different port.`
-                        ));
-                        return;
-                    }
-                    // Clean up the listener before retrying
                     server.removeListener("error", onError);
-                    tryPort(port + 1);
+                    tryNext(index + 1);
                 } else {
                     reject(err);
                 }
@@ -78,7 +111,7 @@ export function listenWithPortRetry(
             });
         }
 
-        tryPort(startPort);
+        tryNext(0);
     });
 }
 

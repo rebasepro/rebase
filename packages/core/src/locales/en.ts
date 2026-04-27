@@ -403,6 +403,7 @@ export const en: RebaseTranslations = {
     no_filterable_properties: "No filterable properties available",
     apply_filters: "Apply filters",
     list: "List",
+    spreadsheet: "Spreadsheet",
     cards: "Cards",
     board: "Board",
     initialize_kanban_order_desc: "This will assign sequential order values to all items that don't have one. Items will maintain their current order within each column.",

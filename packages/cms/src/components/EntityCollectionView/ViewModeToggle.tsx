@@ -3,6 +3,7 @@ import { CollectionSize, ViewMode } from "@rebasepro/types";
 import {
     AppsIcon,
     Button,
+    FormatListBulletedIcon,
     ListIcon,
     Popover,
     Select,
@@ -58,7 +59,7 @@ export type ViewModeToggleProps = {
     onKanbanPropertyChange?: (property: string) => void;
 }
 
-const ALL_VIEW_MODES: ViewMode[] = ["table", "cards", "kanban"];
+const ALL_VIEW_MODES: ViewMode[] = ["list", "table", "cards", "kanban"];
 
 export function ViewModeToggle({
     viewMode = "table",
@@ -83,27 +84,34 @@ export function ViewModeToggle({
     const getViewModeIcon = () => {
         if (viewMode === "kanban") return <ViewKanbanIcon size="small" />;
         if (viewMode === "cards") return <AppsIcon size="small" />;
-        return <ListIcon size="small" />;
+        if (viewMode === "table") return <ListIcon size="small" />;
+        return <FormatListBulletedIcon size="small" />;
     };
 
     const getViewModeName = () => {
         if (viewMode === "kanban") return t("board");
         if (viewMode === "cards") return t("cards");
+        if (viewMode === "table") return t("spreadsheet");
         return t("list");
     };
 
-    const showSizeSelector = size && onSizeChanged && (viewMode === "table" || viewMode === "cards");
+    const showSizeSelector = size && onSizeChanged && (viewMode === "list" || viewMode === "table" || viewMode === "cards");
     const showKanbanPropertySelector = viewMode === "kanban" &&
         kanbanPropertyOptions &&
         kanbanPropertyOptions.length > 0 &&
         onKanbanPropertyChange;
 
-    // Build toggle options - always include kanban
+    // Build toggle options
     const viewModeOptions: ToggleButtonOption<ViewMode>[] = useMemo(() => {
         const allOptions: ToggleButtonOption<ViewMode>[] = [
             {
-                value: "table",
+                value: "list",
                 label: t("list"),
+                icon: <FormatListBulletedIcon size="small" />
+            },
+            {
+                value: "table",
+                label: t("spreadsheet"),
                 icon: <ListIcon size="small" />
             },
             {

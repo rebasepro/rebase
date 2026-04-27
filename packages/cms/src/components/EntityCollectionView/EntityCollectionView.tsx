@@ -32,6 +32,7 @@ import {
 import { useUserConfigurationPersistence } from "@rebasepro/core";
 import { EntityCollectionViewActions } from "./EntityCollectionViewActions";
 import { EntityCollectionCardView } from "./EntityCollectionCardView";
+import { EntityCollectionListView } from "./EntityCollectionListView";
 import { EntityCollectionBoardView } from "./EntityCollectionBoardView";
 import { ViewModeToggle, KanbanPropertyOption } from "./ViewModeToggle";
 import {
@@ -211,13 +212,13 @@ export const EntityCollectionView = React.memo(
         const [popOverOpen, setPopOverOpen] = useState(false);
 
         // View mode priority: URL > saved user config > collection.defaultViewMode
-        const defaultViewMode = collection.defaultViewMode ?? "table";
+        const defaultViewMode = collection.defaultViewMode ?? "list";
 
         // Parse view from URL
         const getViewFromUrl = useCallback((): ViewMode | null => {
             const params = new URLSearchParams(window.location.search);
             const urlView = params.get("__view");
-            if (urlView && ["table", "kanban", "cards"].includes(urlView)) {
+            if (urlView && ["list", "table", "kanban", "cards"].includes(urlView)) {
                 return urlView as ViewMode;
             }
             return null;
@@ -241,7 +242,7 @@ export const EntityCollectionView = React.memo(
         // Sync URL with current view on init (if view came from saved config)
         useEffect(() => {
             const urlView = getViewFromUrl();
-            if (!urlView && viewMode !== "table") {
+            if (!urlView && viewMode !== "list") {
                 // View came from saved config but URL doesn't have it - update URL without push
                 const url = new URL(window.location.href);
                 url.searchParams.set("__view", viewMode);
@@ -255,7 +256,7 @@ export const EntityCollectionView = React.memo(
 
             // Update URL with __view param
             const url = new URL(window.location.href);
-            if (newMode === "table") {
+            if (newMode === "list") {
                 url.searchParams.delete("__view");
             } else {
                 url.searchParams.set("__view", newMode);
@@ -280,6 +281,9 @@ export const EntityCollectionView = React.memo(
             window.addEventListener("popstate", handlePopState);
             return () => window.removeEventListener("popstate", handlePopState);
         }, [getViewFromUrl, getSavedView, defaultViewMode]);
+
+        // List view size state - controls row height and info density
+        const [listSize, setListSize] = useState<CollectionSize>(collection.defaultSize ?? "m");
 
         // Card view size state - controls the grid column count
         const [cardSize, setCardSize] = useState<CollectionSize>(collection.defaultSize ?? "m");
@@ -422,6 +426,12 @@ export const EntityCollectionView = React.memo(
             onCollectionModifiedForUser(path, localCollection);
         }, [onCollectionModifiedForUser, path]);
 
+        const onListSizeChanged = useCallback((size: CollectionSize) => {
+            setListSize(size);
+            if (userConfigPersistence)
+                onCollectionModifiedForUser(path, { defaultSize: size })
+        }, [onCollectionModifiedForUser, path, userConfigPersistence]);
+
         const onTableSizeChanged = useCallback((size: CollectionSize) => {
             setTableSize(size);
             if (userConfigPersistence)
@@ -470,7 +480,7 @@ export const EntityCollectionView = React.memo(
         }, [resolvedCollection.properties]);
 
         const enabledViews: ViewMode[] = useMemo(() => {
-            const configured = collection.enabledViews ?? ["table", "cards", "kanban"];
+            const configured = collection.enabledViews ?? ["list", "table", "cards", "kanban"];
             if (!hasEnumProperty) {
                 return configured.filter(v => v !== "kanban");
             }
@@ -746,8 +756,8 @@ export const EntityCollectionView = React.memo(
                 viewMode={viewMode}
                 onViewModeChange={onViewModeChange}
                 enabledViews={enabledViews}
-                size={viewMode === "table" ? tableSize : viewMode === "cards" ? cardSize : undefined}
-                onSizeChanged={viewMode === "table" ? onTableSizeChanged : viewMode === "cards" ? setCardSize : undefined}
+                size={viewMode === "list" ? listSize : viewMode === "table" ? tableSize : viewMode === "cards" ? cardSize : undefined}
+                onSizeChanged={viewMode === "list" ? onListSizeChanged : viewMode === "table" ? onTableSizeChanged : viewMode === "cards" ? setCardSize : undefined}
                 open={viewModePopoverOpen}
                 onOpenChange={setViewModePopoverOpen}
                 kanbanPropertyOptions={kanbanPropertyOptions}
@@ -848,6 +858,20 @@ export const EntityCollectionView = React.memo(
                         onScroll={tableController.onScroll}
                         initialScroll={tableController.initialScroll}
                         size={cardSize}
+                        emptyComponent={emptyComponent}
+                    />
+                ) : viewMode === "list" ? (
+                    <EntityCollectionListView
+                        key={`list-view-${path}`}
+                        collection={collection}
+                        tableController={tableController}
+                        onEntityClick={onEntityClick}
+                        selectionController={usedSelectionController}
+                        selectionEnabled={selectionEnabled}
+                        highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                        onScroll={tableController.onScroll}
+                        initialScroll={tableController.initialScroll}
+                        size={listSize}
                         emptyComponent={emptyComponent}
                     />
                 ) : (

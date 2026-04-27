@@ -69,6 +69,7 @@ export function computeNavigationGroups({
 
     // Check collections
     (collections ?? []).forEach(collection => {
+        if (collection.hideFromNavigation) return;
         const entry = collection.slug;
         if (!assignedEntries.has(entry)) {
             const groupName = getGroup(collection);
@@ -79,6 +80,7 @@ export function computeNavigationGroups({
 
     // Check views
     (views ?? []).forEach(view => {
+        if (view.hideFromNavigation) return;
         const entry = Array.isArray(view.slug) ? view.slug[0] : view.slug;
         if (!assignedEntries.has(entry)) {
             const groupName = getGroup(view);
@@ -109,6 +111,7 @@ export function computeNavigationGroups({
 
         // Add collections
         (collections ?? []).forEach(collection => {
+            if (collection.hideFromNavigation) return;
             const name = getGroup(collection);
             const entry = collection.slug;
             if (!groupMap[name]) groupMap[name] = [];
@@ -117,6 +120,7 @@ export function computeNavigationGroups({
 
         // Add views
         (views ?? []).forEach(view => {
+            if (view.hideFromNavigation) return;
             const name = getGroup(view);
             const entry = Array.isArray(view.slug) ? view.slug[0] : view.slug;
             if (!groupMap[name]) groupMap[name] = [];

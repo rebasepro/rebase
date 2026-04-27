@@ -86,6 +86,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             const registry = new PostgresCollectionRegistry();
             if (collections) {
                 registry.registerMultiple(collections);
+                console.log(`📋 [PostgresRegistry] Registered ${registry.getCollections().length} collections: [${registry.getCollections().map(c => c.slug).join(", ")}]`);
             }
 
             // Register tables

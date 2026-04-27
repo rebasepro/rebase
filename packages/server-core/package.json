@@ -53,6 +53,7 @@
         "@aws-sdk/s3-request-presigner": "^3.654.0",
         "@hono/graphql-server": "0.7.0",
         "@hono/node-server": "1.19.12",
+        "@rebasepro/client": "workspace:*",
         "@rebasepro/common": "workspace:*",
         "@rebasepro/types": "workspace:*",
         "@rebasepro/utils": "workspace:*",

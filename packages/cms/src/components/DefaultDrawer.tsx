@@ -63,9 +63,9 @@ export function DefaultDrawer({
 
     let groupsToRender = navigationState.topLevelNavigation?.groups ?? [];
     if (adminModeController.mode === "studio") {
-        groupsToRender = groupsToRender.filter(g => g === "Database" || g === "Schema" || g === "Admin" || g === "Storage");
+        groupsToRender = groupsToRender.filter(g => g === "Database" || g === "Schema" || g === "Admin" || g === "Storage" || g === "Automation");
     } else {
-        groupsToRender = groupsToRender.filter(g => g !== "Database" && g !== "Schema" && g !== "Storage");
+        groupsToRender = groupsToRender.filter(g => g !== "Database" && g !== "Schema" && g !== "Storage" && g !== "Automation");
     }
 
     // Collapsible groups state - using "drawer" namespace for independent state from home page

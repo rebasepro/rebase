@@ -14,7 +14,8 @@ import { getTableName } from "@rebasepro/common";
 export function getCollectionByPath(collectionPath: string, registry: PostgresCollectionRegistry): EntityCollection {
     const collection = registry.getCollectionByPath(collectionPath);
     if (!collection) {
-        throw new Error(`Collection not found: ${collectionPath}`);
+        const registered = registry.getCollections().map(c => c.slug).join(", ");
+        throw new Error(`Collection not found: ${collectionPath}. Registered collections: [${registered}]`);
     }
     return collection;
 }

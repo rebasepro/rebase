@@ -5,8 +5,19 @@ import type {
     CronJobRunState,
     CronJobContext,
 } from "@rebasepro/types";
+import type { RebaseClient } from "@rebasepro/client";
 import type { LoadedCronJob } from "./cron-loader";
 import type { CronStore } from "./cron-store";
+
+/**
+ * Validates a standard cron expression.
+ */
+function isValidCronExpression(schedule: string): boolean {
+    if (!schedule) return false;
+    const parts = schedule.trim().split(/\s+/);
+    // Typical cron has 5 fields.
+    return parts.length === 5 && parts.every(p => p.length > 0);
+}
 
 // ─── Cron expression parser (minimal, no external dependency) ────────
 // Supports standard 5-field cron (minute hour dom month dow).
@@ -114,6 +125,14 @@ export class CronScheduler {
     private jobs = new Map<string, RegisteredJob>();
     private started = false;
     private store?: CronStore;
+    private client?: RebaseClient;
+
+    /**
+     * Set the RebaseClient instance to make it available to cron job handlers.
+     */
+    setClient(client: RebaseClient): void {
+        this.client = client;
+    }
 
     /**
      * Attach a persistence store for cron logs.
@@ -308,6 +327,7 @@ export class CronScheduler {
                 ).join(" ");
                 capturedLogs.push(line);
             },
+            client: this.client!,
         };
 
         job.state = "running";

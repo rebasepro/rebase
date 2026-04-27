@@ -128,7 +128,6 @@ export function createAdminRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
                         email: u.email,
                         displayName: u.displayName,
                         photoURL: u.photoUrl,
-                        provider: u.provider,
                         roles,
                         createdAt: u.createdAt,
                         updatedAt: u.updatedAt
@@ -154,7 +153,6 @@ export function createAdminRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
                     email: u.email,
                     displayName: u.displayName,
                     photoURL: u.photoUrl,
-                    provider: u.provider,
                     roles,
                     createdAt: u.createdAt,
                     updatedAt: u.updatedAt
@@ -178,7 +176,6 @@ export function createAdminRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
                 email: result.user.email,
                 displayName: result.user.displayName,
                 photoURL: result.user.photoUrl,
-                provider: result.user.provider,
                 roles: result.roles.map(r => r.id),
                 createdAt: result.user.createdAt,
                 updatedAt: result.user.updatedAt
@@ -211,8 +208,7 @@ export function createAdminRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         const user = await authRepo.createUser({
             email: email.toLowerCase(),
             displayName: displayName || null,
-            passwordHash,
-            provider: "email"
+            passwordHash
         });
 
         if (roles && Array.isArray(roles) && roles.length > 0) {

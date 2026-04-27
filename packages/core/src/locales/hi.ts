@@ -395,6 +395,7 @@ export const hi: RebaseTranslations = {
     no_filterable_properties: "कोई फ़िल्टर करने योग्य गुण उपलब्ध नहीं हैं",
     apply_filters: "फ़िल्टर लागू करें",
     list: "सूची",
+    spreadsheet: "स्प्रेडशीट",
     cards: "कार्ड",
     board: "बोर्ड",
     initialize_kanban_order_desc: "यह उन सभी आइटम को अनुक्रमिक क्रम मान निर्दिष्ट करेगा जिनके पास एक नहीं है। आइटम प्रत्येक कॉलम के भीतर अपना वर्तमान क्रम बनाए रखेंगे।",

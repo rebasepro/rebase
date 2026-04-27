@@ -253,6 +253,16 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         const subscriptionId = request.subscriptionId;
 
         try {
+            // Early validation: ensure the requested collection exists in the registry
+            const collection = this.registry.getCollectionByPath(request.path);
+            if (!collection) {
+                const registered = this.registry.getCollections().map(c => c.slug).join(", ");
+                const msg = `Collection not found: '${request.path}'. Registered: [${registered}]`;
+                console.error(`[RealtimeService] ${msg}`);
+                this.sendError(clientId, msg, subscriptionId);
+                return;
+            }
+
             // Store subscription with full request parameters and auth context for RLS
             this._subscriptions.set(subscriptionId, {
                 clientId,
@@ -273,7 +283,6 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             // Send initial data
             let entities;
             if (this.driver) {
-                const collection = this.registry.getCollectionByPath(request.path);
                 entities = await this.driver.fetchCollection({
                     path: request.path,
                     collection: collection,
@@ -307,6 +316,16 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         const subscriptionId = request.subscriptionId;
 
         try {
+            // Early validation: ensure the requested collection exists in the registry
+            const collection = this.registry.getCollectionByPath(request.path);
+            if (!collection) {
+                const registered = this.registry.getCollections().map(c => c.slug).join(", ");
+                const msg = `Collection not found: '${request.path}'. Registered: [${registered}]`;
+                console.error(`[RealtimeService] ${msg}`);
+                this.sendError(clientId, msg, subscriptionId);
+                return;
+            }
+
             // Store subscription in memory with auth context for RLS
             this._subscriptions.set(subscriptionId, {
                 clientId,
@@ -319,7 +338,6 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             // Send initial data
             let entity;
             if (this.driver) {
-                const collection = this.registry.getCollectionByPath(request.path);
                 entity = await this.driver.fetchEntity({
                     path: request.path,
                     entityId: request.entityId,

@@ -56,7 +56,7 @@ export function useDataEnhancementPlugin(props?: DataEnhancementPluginProps): Re
         })
     }, [getConfigForPath, authController.user?.uid]);
 
-    return {
+    return React.useMemo(() => ({
         key: "data_enhancement",
         slots: [
             {
@@ -81,5 +81,5 @@ export function useDataEnhancementPlugin(props?: DataEnhancementPluginProps): Re
             enabled: fieldBuilderEnabled
         },
         // loading: configController.loading,
-    };
+    }), [apiKey, getConfigForPath, props?.host, fieldBuilderEnabled]);
 }

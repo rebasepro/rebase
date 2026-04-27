@@ -61,6 +61,19 @@ export function createPostgresWebSocket(
     /** Debug logger that is suppressed in production to prevent PII/data leaks */
     const wsDebug = (...args: unknown[]) => { if (!isProduction) console.debug(...args); };
     const wss = new WebSocketServer({ server });
+
+    // Handle errors on the WSS so that EADDRINUSE from the underlying HTTP
+    // server doesn't surface as an unhandled 'error' event and crash the
+    // process.  The dev-mode `listenWithPortRetry` utility handles retry
+    // logic on the HTTP server side — we just need the WSS not to throw.
+    wss.on("error", (err: NodeJS.ErrnoException) => {
+        if (err.code === "EADDRINUSE") {
+            // Silently absorbed — listenWithPortRetry will retry the next port
+            return;
+        }
+        console.error("❌ [WebSocket Server] Error:", err);
+    });
+
     const requireAuth = authConfig?.requireAuth !== false && authConfig?.jwtSecret;
 
     wss.on("connection", (ws) => {

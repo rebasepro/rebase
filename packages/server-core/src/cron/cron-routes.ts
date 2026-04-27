@@ -61,10 +61,10 @@ export function createCronRoutes(scheduler: CronScheduler): Hono<HonoEnv> {
     // Enable/disable a job
     router.put("/:id", async (c) => {
         const id = c.req.param("id");
-        const body = await c.req.json<{ enabled?: boolean }>().catch(() => ({}));
+        const body = await c.req.json().catch(() => ({})) as { enabled: boolean };
 
-        if (body.enabled === undefined) {
-            return c.json({ error: { message: "Request body must include 'enabled' boolean", code: "BAD_REQUEST" } }, 400);
+        if (typeof body.enabled !== "boolean") {
+            return c.json({ error: { message: "Missing 'enabled' boolean in body" } }, 400);
         }
 
         const job = scheduler.setJobEnabled(id, body.enabled);

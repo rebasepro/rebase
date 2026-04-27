@@ -12,6 +12,7 @@ import { HonoEnv } from "./api/types";
 import { configureLogLevel } from "./utils/logging";
 import { createAdminRoutes, createAuthRoutes, requireAuth, requireAdmin, configureJwt } from "./auth";
 import { createStorageController, createStorageRoutes, DEFAULT_STORAGE_ID, DefaultStorageRegistry, BackendStorageConfig, StorageController, StorageRegistry } from "./storage";
+import { createRebaseClient } from "@rebasepro/client";
 import { createHistoryRoutes } from "./history";
 import { EmailConfig } from "./email";
 import type { OAuthProvider } from "./auth/interfaces";
@@ -173,6 +174,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         if (defaultBootstrapper.initializeHistory) {
             console.log("📜 Bootstrapping entity history via driver protocol...");
             historyConfigResult = await defaultBootstrapper.initializeHistory(config.history, defaultDriverResult);
+
+            // Inject the historyService into the driver so saveEntity/deleteEntity can record history.
+            // The driver was created during initializeDriver() (before history was initialized),
+            // so we must set it retroactively here.
+            if (historyConfigResult?.historyService && defaultDriverResult.internals) {
+                const internals = defaultDriverResult.internals as Record<string, unknown>;
+                const driver = internals.driver as Record<string, unknown> | undefined;
+                if (driver && "historyService" in driver) {
+                    driver.historyService = historyConfigResult.historyService;
+                }
+            }
+
             console.log("✅ Entity history initialized");
         } else {
             console.warn("⚠️ History requested but default bootstrapper does not support initializeHistory");
@@ -321,6 +334,21 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
         if (loadedCronJobs.length > 0) {
             cronScheduler = new CronScheduler();
+            
+            // Create a server-side RebaseClient that bypasses the network.
+            // websocketUrl is explicitly empty to prevent the client from opening
+            // a WebSocket connection — the server isn't listening yet and the
+            // server-side client uses Hono's internal request handler instead.
+            const serverClient = createRebaseClient({
+                baseUrl: "http://localhost",
+                apiPath: basePath,
+                websocketUrl: "",
+                fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+                    return await config.app.request(input as string | Request | URL, init);
+                }
+            });
+            cronScheduler.setClient(serverClient);
+
             cronScheduler.registerJobs(loadedCronJobs);
 
             // Attach database persistence if the driver supports SQL

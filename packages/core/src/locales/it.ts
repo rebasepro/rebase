@@ -395,6 +395,7 @@ export const it: RebaseTranslations = {
     no_filterable_properties: "Nessuna proprietà filtrabile disponibile",
     apply_filters: "Applica filtri",
     list: "Elenco",
+    spreadsheet: "Foglio di calcolo",
     cards: "Schede",
     board: "Bacheca",
     initialize_kanban_order_desc: "Verranno assegnati valori di ordine sequenziali a tutti gli elementi che ne sono privi. Gli elementi manterranno l'ordine corrente all'interno di ciascuna colonna.",

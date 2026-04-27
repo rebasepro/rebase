@@ -17,7 +17,7 @@ const tagsCollection: EntityCollection = {
             }
         },
         name: {
-            name: "Tag Name!",
+            name: "Tag Name",
             type: "string",
             validation: {
                 required: true
@@ -32,6 +32,9 @@ const tagsCollection: EntityCollection = {
             direction: "inverse",
             inverseRelationName: "tags",
         }
+    ],
+    entityViews: [
+        "__rebase_history"
     ]
 };
 

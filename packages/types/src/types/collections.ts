@@ -116,6 +116,12 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
     previewProperties?: string[];
 
     /**
+     * Properties to display as columns in the list view.
+     * If not specified, the list view uses a smart default (Title, Status, Date).
+     */
+    listProperties?: string[];
+
+    /**
      * Title property of the entity. This is the property that will be used
      * as the title in entity related views and references.
      * If not specified, the first property simple text property will be used.
@@ -480,9 +486,13 @@ export interface KanbanConfig<M extends Record<string, unknown> = Record<string,
 
 /**
  * View mode for displaying a collection.
+ * - "list": Simple, clean list view — the classic CMS default
+ * - "table": Spreadsheet-style table with inline editing
+ * - "cards": Grid of visual cards with thumbnails
+ * - "kanban": Board view grouped by a property
  * @group Collections
  */
-export type ViewMode = "table" | "cards" | "kanban";
+export type ViewMode = "list" | "table" | "cards" | "kanban";
 
 /**
  * Parameter passed to the `Actions` prop in the collection configuration.

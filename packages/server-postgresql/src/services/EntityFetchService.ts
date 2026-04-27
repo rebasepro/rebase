@@ -56,6 +56,25 @@ export class EntityFetchService {
     // =============================================================
 
     /**
+     * Resolves the correct Drizzle column for sorting.
+     * Automatically maps owning relation property keys to their underlying foreign key column.
+     */
+    private resolveOrderByField(
+        table: PgTable<any>,
+        orderBy: string,
+        collection?: EntityCollection
+    ): AnyPgColumn | undefined {
+        let orderByField = table[orderBy as keyof typeof table] as AnyPgColumn;
+        if (!orderByField && collection) {
+            const property = collection.properties[orderBy];
+            if (property && property.type === "relation" && "relation" in property && property.relation?.direction === "owning") {
+                orderByField = table[`${orderBy}_id` as keyof typeof table] as AnyPgColumn;
+            }
+        }
+        return orderByField;
+    }
+
+    /**
      * Build the `with` config for Drizzle's relational query API.
      * Converts collection relations to a Drizzle-compatible `with` object.
      *
@@ -424,7 +443,7 @@ export class EntityFetchService {
 
         // Cursor-based pagination (startAfter)
         if (options.startAfter) {
-            const cursorConditions = this.buildCursorConditions(table, idField, idInfo, options);
+            const cursorConditions = this.buildCursorConditions(table, idField, idInfo, options, collectionPath);
             if (cursorConditions.length > 0) allConditions.push(...cursorConditions);
         }
 
@@ -435,7 +454,8 @@ export class EntityFetchService {
         // OrderBy
         const orderExpressions: unknown[] = [];
         if (options.orderBy) {
-            const orderByField = table[options.orderBy as keyof typeof table] as AnyPgColumn;
+            const collection = getCollectionByPath(collectionPath, this.registry);
+            const orderByField = this.resolveOrderByField(table, options.orderBy, collection);
             if (orderByField) {
                 orderExpressions.push(options.order === "asc" ? asc(orderByField) : desc(orderByField));
             }
@@ -459,13 +479,15 @@ export class EntityFetchService {
         table: PgTable<any>,
         idField: AnyPgColumn,
         idInfo: { fieldName: string; type: "string" | "number" },
-        options: { orderBy?: string; order?: "desc" | "asc"; startAfter?: Record<string, unknown> }
+        options: { orderBy?: string; order?: "desc" | "asc"; startAfter?: Record<string, unknown> },
+        collectionPath?: string
     ): SQL[] {
         if (!options.startAfter) return [];
         const cursor = options.startAfter;
 
         if (options.orderBy) {
-            const orderByField = table[options.orderBy as keyof typeof table] as AnyPgColumn;
+            const collection = collectionPath ? getCollectionByPath(collectionPath, this.registry) : undefined;
+            const orderByField = this.resolveOrderByField(table, options.orderBy, collection);
             if (orderByField) {
                 const startAfterOrderValue = (cursor.values as Record<string, unknown> | undefined)?.[options.orderBy] ?? cursor[options.orderBy];
                 const startAfterId = cursor.id ?? cursor[idInfo.fieldName];
@@ -687,7 +709,7 @@ export class EntityFetchService {
 
         const orderExpressions = [];
         if (options.orderBy) {
-            const orderByField = table[options.orderBy as keyof typeof table] as AnyPgColumn;
+            const orderByField = this.resolveOrderByField(table, options.orderBy, collection);
             if (orderByField) {
                 orderExpressions.push(options.order === "asc" ? asc(orderByField) : desc(orderByField));
             }
@@ -696,7 +718,7 @@ export class EntityFetchService {
         if (orderExpressions.length > 0) query = query.orderBy(...orderExpressions);
 
         if (options.startAfter) {
-            const cursorConditions = this.buildCursorConditions(table, idField, idInfo, options);
+            const cursorConditions = this.buildCursorConditions(table, idField, idInfo, options, collectionPath);
             if (cursorConditions.length > 0) {
                 allConditions.push(...cursorConditions);
                 const finalCondition = DrizzleConditionBuilder.combineConditionsWithAnd(allConditions);
@@ -1302,7 +1324,7 @@ export class EntityFetchService {
 
         const orderExpressions = [];
         if (options.orderBy) {
-            const orderByField = table[options.orderBy as keyof typeof table] as AnyPgColumn;
+            const orderByField = this.resolveOrderByField(table, options.orderBy, collection);
             if (orderByField) {
                 orderExpressions.push(options.order === "asc" ? asc(orderByField) : desc(orderByField));
             }
@@ -1388,7 +1410,7 @@ export class EntityFetchService {
 
             // Build orderBy
             if (options.orderBy) {
-                const orderByField = table[options.orderBy as keyof typeof table] as AnyPgColumn;
+                const orderByField = this.resolveOrderByField(table, options.orderBy, collection);
                 if (orderByField) {
                     queryOpts.orderBy = options.order === "asc" ? asc(orderByField) : desc(orderByField);
                 }

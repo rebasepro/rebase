@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
-    Typography, cls, defaultBorderMixin, Button, Chip, Tooltip,
+    Typography, cls, defaultBorderMixin, Button, Chip,
     CircularProgress, IconButton, Card, Paper,
     ScheduleIcon, RefreshIcon, PlayArrowIcon, PauseIcon,
     CheckCircleIcon, ErrorIcon, HistoryIcon,
@@ -154,11 +154,9 @@ export function CronJobsView() {
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                                <Tooltip title={selectedJob.enabled ? "Pause job" : "Enable job"}>
-                                    <IconButton size="small" onClick={() => handleToggle(selectedJob.id, !selectedJob.enabled)}>
-                                        {selectedJob.enabled ? <PauseIcon size="small" /> : <PlayArrowIcon size="small" />}
-                                    </IconButton>
-                                </Tooltip>
+                                <IconButton title={selectedJob.enabled ? "Pause job" : "Enable job"} size="small" onClick={() => handleToggle(selectedJob.id, !selectedJob.enabled)}>
+                                    {selectedJob.enabled ? <PauseIcon size="small" /> : <PlayArrowIcon size="small" />}
+                                </IconButton>
                                 <Button
                                     size="small"
                                     color="primary"

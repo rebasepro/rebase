@@ -11,8 +11,7 @@ import type { CronJobDefinition } from "@rebasepro/types";
 const job: CronJobDefinition = {
     schedule: "*/5 * * * *",
     name: "System Health Check",
-    description: "Runs every 5 minutes to verify system health and log uptime metrics",
-
+    description: "Periodically logs system health metrics.",
     async handler(ctx) {
         ctx.log("Running health check...");
 
@@ -23,10 +22,22 @@ const job: CronJobDefinition = {
         ctx.log(`Heap used: ${Math.round(memUsage.heapUsed / 1024 / 1024)}MB / ${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`);
         ctx.log(`RSS: ${Math.round(memUsage.rss / 1024 / 1024)}MB`);
 
+        // Perform a query using the RebaseClient SDK
+        ctx.log("Pinging database via SDK...");
+        let authorCount = 0;
+        try {
+            const res = await ctx.client.data.authors.findMany({ limit: 1 });
+            authorCount = res.meta?.total || 0;
+            ctx.log(`SDK query successful. Authors found: ${authorCount}`);
+        } catch (e: any) {
+            ctx.log(`SDK query failed: ${e.message}`);
+        }
+
         return {
             uptimeSeconds: Math.round(uptime),
             heapUsedMB: Math.round(memUsage.heapUsed / 1024 / 1024),
             rssMB: Math.round(memUsage.rss / 1024 / 1024),
+            authorCount,
             timestamp: new Date().toISOString(),
         };
     },

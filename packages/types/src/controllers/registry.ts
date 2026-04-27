@@ -35,7 +35,7 @@ export interface RebaseCMSConfig<EC extends EntityCollection = any> {
 }
 
 export interface RebaseStudioConfig {
-    tools?: ("sql" | "js" | "rls" | "schema" | "storage")[];
+    tools?: ("sql" | "js" | "rls" | "schema" | "storage" | "cron")[];
     homePage?: ReactNode;
     devViews?: AppView[];
 }

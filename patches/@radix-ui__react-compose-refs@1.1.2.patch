@@ -1,0 +1,32 @@
+diff --git a/dist/index.js b/dist/index.js
+index 5ba7a95bc7a29605f32aa010a14224ad87bf6589..cfc4234cfb95d803434cdcc8d3cbb823c8a95f3f 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -39,7 +39,10 @@ module.exports = __toCommonJS(index_exports);
+ var React = __toESM(require("react"));
+ function setRef(ref, value) {
+   if (typeof ref === "function") {
+-    return ref(value);
++    const cleanup = ref(value);
++    if (typeof cleanup === "function") {
++      return cleanup;
++    }
+   } else if (ref !== null && ref !== void 0) {
+     ref.current = value;
+   }
+diff --git a/dist/index.mjs b/dist/index.mjs
+index 7dd9172a7228d70a25f708d0fd577cfc69ea15a8..c093616ee2ff539a353031254a83619952e2dcfa 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -2,7 +2,10 @@
+ import * as React from "react";
+ function setRef(ref, value) {
+   if (typeof ref === "function") {
+-    return ref(value);
++    const cleanup = ref(value);
++    if (typeof cleanup === "function") {
++      return cleanup;
++    }
+   } else if (ref !== null && ref !== void 0) {
+     ref.current = value;
+   }

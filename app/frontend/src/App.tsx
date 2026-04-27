@@ -31,19 +31,23 @@ export function App() {
 
     const dataEnhancementPlugin = useDataEnhancementPlugin();
 
+    const collectionEditor = React.useMemo(() => ({
+        getAuthToken: authController.getAuthToken
+    }), [authController.getAuthToken]);
+
+    const plugins = React.useMemo(() => [dataEnhancementPlugin], [dataEnhancementPlugin]);
+
     return (
         <Rebase
             client={rebaseClient}
             authController={authController}
             userManagement={userManagement}
-            plugins={[dataEnhancementPlugin]}
+            plugins={plugins}
         >
             <RebaseAuth />
             <RebaseCMS
                 collections={collections}
-                collectionEditor={{
-                    getAuthToken: authController.getAuthToken
-                }}
+                collectionEditor={collectionEditor}
             />
             <RebaseStudio />
             <RebaseShell title="Rebase" />
