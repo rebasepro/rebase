@@ -17,6 +17,8 @@ const CONSUMER_EXTERNALS = [
     "hono",
     "drizzle-orm",
     "@hono/node-server",
+    "@aws-sdk/client-s3",
+    "@aws-sdk/s3-request-presigner",
     "dotenv",
     "pg",
     "chokidar",

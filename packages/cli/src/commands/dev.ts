@@ -332,7 +332,7 @@ ${chalk.green.bold("Options")}
   ${chalk.blue("--port, -p")}           Backend port (default: auto-detected per project)
 
 ${chalk.green.bold("Description")}
-  Starts both the backend (tsx watch + Express) and frontend (Vite)
+  Starts both the backend (tsx watch + Hono) and frontend (Vite)
   dev servers concurrently with color-coded output prefixes.
 
   Each project automatically receives a unique default port derived

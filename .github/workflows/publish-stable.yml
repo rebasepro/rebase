@@ -1,0 +1,116 @@
+name: Publish Stable Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g., 3.3.0). Leave empty for auto-patch bump."
+        required: false
+        type: string
+      dry_run:
+        description: "Dry run — skip actual npm publish"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: stable-publish
+  cancel-in-progress: false
+
+jobs:
+  publish-stable:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # push tags + release
+      id-token: write   # npm provenance
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history for lerna version detection
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm run build
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
+      - name: Run tests
+        run: pnpm test
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            # Auto-bump: read current version from lerna.json or root package.json
+            CURRENT=$(node -e "console.log(require('./lerna.json').version)" 2>/dev/null || echo "0.0.0")
+            # Bump patch
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+            VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "📦 Publishing version: $VERSION"
+
+      - name: Bump versions
+        run: |
+          pnpm exec lerna version "${{ steps.version.outputs.version }}" \
+            --no-push \
+            --yes \
+            --force-publish
+
+      - name: Publish to npm
+        if: ${{ !inputs.dry_run }}
+        run: pnpm exec lerna publish from-package --yes --no-verify-access
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Push tags
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git push --follow-tags
+
+      - name: Create GitHub Release
+        if: ${{ !inputs.dry_run }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ steps.version.outputs.version }}"
+          name: "v${{ steps.version.outputs.version }}"
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+
+      - name: Summary
+        run: |
+          echo "### 🚀 Stable Release Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** \`${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Dry Run:** \`${{ inputs.dry_run }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Install with:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "pnpm add @rebasepro/core@latest" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

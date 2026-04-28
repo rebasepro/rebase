@@ -105,4 +105,9 @@ cd app
 pnpm run dev
 ```
 
-This starts both the frontend (Vite) and backend (Express) servers.
+This starts both the frontend (Vite) and backend (Hono) servers.
+
+## References
+
+- **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
+- **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)

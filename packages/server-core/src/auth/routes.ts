@@ -727,12 +727,20 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         const allUsers = await authRepo.listUsers();
         const needsSetup = allUsers.length === 0;
         const registrationAllowed = needsSetup || allowRegistration;
+
+        // Build a dynamic map of enabled providers for frontend discovery.
+        // Also maintain legacy boolean fields for backward compatibility.
+        const enabledProviders = (config.oauthProviders || []).map(p => p.id);
+
         return c.json({
             needsSetup,
             registrationEnabled: registrationAllowed,
-            googleEnabled: !!(config.oauthProviders?.some(p => p.id === "google")),
-            linkedinEnabled: !!(config.oauthProviders?.some(p => p.id === "linkedin")),
-            emailServiceEnabled: isEmailConfigured()
+            // Legacy fields (kept for backward compat)
+            googleEnabled: enabledProviders.includes("google"),
+            linkedinEnabled: enabledProviders.includes("linkedin"),
+            emailServiceEnabled: isEmailConfigured(),
+            // New: complete list of available OAuth providers
+            enabledProviders
         });
     });
 

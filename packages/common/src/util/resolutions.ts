@@ -344,7 +344,27 @@ export function getSubcollections<M extends Record<string, unknown> = Record<str
         const manyRelations = collection.relations.filter(r => r.cardinality === "many");
         return manyRelations.map(r => {
             const target = r.target();
-            return r.overrides ? mergeDeep(target, r.overrides) : target;
+            const relationKey = r.relationName || target.slug;
+            
+            // Try to find corresponding property to get custom name
+            let customName: string | undefined;
+            if (collection.properties) {
+                const prop = Object.entries(collection.properties as Record<string, Property>).find(
+                    ([_, p]) => p.type === "relation" && p.relationName === relationKey
+                );
+                if (prop && prop[1].name) {
+                    customName = prop[1].name;
+                }
+            }
+
+            const baseOverrides: Partial<EntityCollection> = { slug: relationKey };
+            if (customName) {
+                baseOverrides.name = customName;
+                baseOverrides.singularName = customName;
+            }
+            
+            const targetWithOverrides = { ...target, ...baseOverrides };
+            return (r.overrides ? mergeDeep(targetWithOverrides, r.overrides) : targetWithOverrides) as EntityCollection<Record<string, unknown>>;
         });
     }
     

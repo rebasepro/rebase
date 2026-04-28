@@ -140,5 +140,5 @@ The `@rebasepro/studio` package includes a built-in `StorageView` component in t
 
 ## References
 
-- **Storage Configuration:** See [references/storage-config.md](references/storage-config.md) for all provider options.
-- **File Upload Properties:** See [references/file-uploads.md](references/file-uploads.md) for collection-level file configuration.
+- **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
+- **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)

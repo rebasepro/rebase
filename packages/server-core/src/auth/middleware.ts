@@ -24,7 +24,7 @@ export interface AuthMiddlewareOptions {
 }
 
 /**
- * Express middleware that requires a valid JWT token
+ * Hono middleware that requires a valid JWT token
  * Returns 401 if token is missing or invalid
  */
 export const requireAuth: MiddlewareHandler<HonoEnv> = async (

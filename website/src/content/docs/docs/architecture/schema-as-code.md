@@ -104,4 +104,4 @@ CREATE TABLE products (
 ## Next Steps
 
 - **[Collections](/docs/collections)** — Full collection configuration reference
-- **[Drizzle Schema Generation](/docs/backend/schema-generation)** — Detailed column type mappings
+- **[Properties](/docs/collections/properties)** — Detailed column type mappings

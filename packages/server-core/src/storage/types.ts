@@ -28,7 +28,7 @@ export interface S3StorageConfig {
     bucket: string;
     /** AWS region (e.g., 'us-east-1') */
     region?: string;
-    /** Custom endpoint URL (required for MinIO) */
+    /** Custom endpoint URL (required for MinIO, Cloudflare R2, Hetzner Object Storage) */
     endpoint?: string;
     /** AWS access key ID */
     accessKeyId: string;
@@ -45,7 +45,16 @@ export interface S3StorageConfig {
 }
 
 /**
- * Storage configuration - either local filesystem or S3-compatible
+ * Storage configuration — local filesystem or S3-compatible.
+ *
+ * **Built-in providers:**
+ * - `local` — Zero-config filesystem storage. Great for dev and single-server deployments (Hetzner, bare metal).
+ * - `s3` — Any S3-compatible provider. AWS S3, Cloudflare R2, MinIO, Hetzner Object Storage,
+ *           Backblaze B2, DigitalOcean Spaces, and even GCS (via its S3-compatible interoperability API).
+ *
+ * **Custom providers:**
+ * For cloud-native storage (GCS, Azure Blob, etc.), implement the `StorageController`
+ * interface and pass the instance directly to the `storage` config.
  */
 export type BackendStorageConfig = LocalStorageConfig | S3StorageConfig;
 
@@ -83,9 +92,12 @@ export interface StorageController {
     }): Promise<StorageListResult>;
 
     /**
-     * Get the storage configuration type
+     * Get the storage provider identifier.
+     *
+     * Built-in values are `'local'` and `'s3'`. Custom implementations
+     * should return their own identifier (e.g. `'gcs'`, `'azure'`).
      */
-    getType(): 'local' | 's3';
+    getType(): string;
 }
 
 /**
@@ -120,3 +132,57 @@ export const DOCUMENT_MIME_TYPES = [
     'text/plain',
     'text/csv'
 ];
+
+/**
+ * Resolve a `BackendStorageConfig` from environment variables.
+ *
+ * Reads `STORAGE_TYPE` and returns the matching config, falling back
+ * to `local` when nothing is set.
+ *
+ * **Supported values for `STORAGE_TYPE`:**
+ *
+ * | Value   | Provider                                              | Required env vars                                      |
+ * |---------|-------------------------------------------------------|--------------------------------------------------------|
+ * | `local` | Local filesystem (default)                            | `STORAGE_PATH` (optional, default: ./uploads)          |
+ * | `s3`    | Any S3-compatible (AWS, R2, MinIO, Hetzner, GCS\*…)   | `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`|
+ *
+ * \* GCS supports S3 interop — use HMAC keys + `S3_ENDPOINT=https://storage.googleapis.com`.
+ *   See: https://cloud.google.com/storage/docs/interoperability
+ *
+ * For custom storage backends (Azure Blob, native GCS SDK, etc.),
+ * implement the `StorageController` interface and pass it directly
+ * to the `storage` config instead of using this helper.
+ *
+ * @param defaults  Fallback values (e.g. `{ localPath: './uploads' }`)
+ */
+export function resolveStorageFromEnv(defaults?: {
+    localPath?: string;
+}): BackendStorageConfig {
+    const storageType = (process.env.STORAGE_TYPE || 'local').toLowerCase();
+
+    switch (storageType) {
+        case 's3':
+            if (!process.env.S3_BUCKET) {
+                throw new Error(
+                    'STORAGE_TYPE=s3 requires S3_BUCKET to be set. ' +
+                    'Also set S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, and optionally S3_REGION, S3_ENDPOINT.'
+                );
+            }
+            return {
+                type: 's3',
+                bucket: process.env.S3_BUCKET,
+                region: process.env.S3_REGION || 'auto',
+                accessKeyId: process.env.S3_ACCESS_KEY_ID || '',
+                secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
+                endpoint: process.env.S3_ENDPOINT,
+                forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
+            };
+
+        case 'local':
+        default:
+            return {
+                type: 'local',
+                basePath: process.env.STORAGE_PATH || defaults?.localPath || './uploads',
+            };
+    }
+}

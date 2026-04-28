@@ -14,7 +14,7 @@
         "access": "public"
     },
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 0",
+        "test": "vitest run",
         "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.json",
         "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f"
     },
@@ -45,7 +45,8 @@
     "devDependencies": {
         "@types/node": "^20.19.17",
         "typescript": "^5.9.3",
-        "vite": "^7.2.4"
+        "vite": "^7.2.4",
+        "vitest": "4.1.5"
     },
     "files": [
         "bin/",

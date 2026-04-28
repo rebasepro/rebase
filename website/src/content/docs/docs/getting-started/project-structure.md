@@ -130,5 +130,5 @@ Changes to collections propagate everywhere automatically.
 
 ## Next Steps
 
-- **[Template Walkthrough](/docs/getting-started/template-walkthrough)** — Line-by-line explanation of the generated code
+- **[Quickstart](/docs/getting-started/quickstart)** — Get started with a new Rebase project
 - **[Configuration](/docs/getting-started/configuration)** — All environment variables and options

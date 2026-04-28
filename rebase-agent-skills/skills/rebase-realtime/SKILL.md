@@ -118,5 +118,5 @@ In Rebase Studio, realtime is built into the data views. The spreadsheet, card, 
 
 ## References
 
-- **WebSocket API:** See [references/websocket-api.md](references/websocket-api.md) for the complete protocol specification.
-- **Client Libraries:** See [references/client-integration.md](references/client-integration.md) for framework-specific integration guides.
+- **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
+- **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)

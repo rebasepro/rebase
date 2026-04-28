@@ -349,7 +349,9 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
 }
 
 // Entry point when called directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+import fsSync from "fs";
+const argv1Real = process.argv[1] ? fsSync.realpathSync(process.argv[1]) : "";
+if (import.meta.url === `file://${argv1Real}`) {
     // Drop node and script path
     runPluginCommand(process.argv.slice(2)).catch(() => process.exit(1));
 }

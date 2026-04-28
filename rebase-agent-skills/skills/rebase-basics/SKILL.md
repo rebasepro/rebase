@@ -123,12 +123,12 @@ The Rebase MCP server provides these tools for AI agents:
 
 # References
 
-- **Collection Definitions:** See [references/collection-definitions.md](references/collection-definitions.md) for how to define collections in TypeScript.
-- **CLI Guide:** See [references/cli-guide.md](references/cli-guide.md) for detailed CLI usage.
-- **MCP Server Setup:** See [references/mcp-setup.md](references/mcp-setup.md) for configuring the MCP server.
+- **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
+- **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)
 
 # Common Issues
 
 - **`DATABASE_URL is not set`:** Ensure `app/.env` exists with `DATABASE_URL=postgresql://user:password@localhost:5432/rebase`
 - **pnpm not found:** Install with `npm install -g pnpm`
 - **Node.js version mismatch:** Rebase requires Node.js v20+. Use `nvm install 20 && nvm use 20`
+

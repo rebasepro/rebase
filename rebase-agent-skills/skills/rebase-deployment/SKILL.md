@@ -126,6 +126,5 @@ npx firebase-tools@latest deploy --only hosting
 
 ## References
 
-- **Docker Guide:** See [references/docker-setup.md](references/docker-setup.md) for complete Docker configuration.
-- **Firebase Hosting:** See [references/firebase-hosting.md](references/firebase-hosting.md) for deploying the frontend.
-- **Environment Config:** See [references/environment-config.md](references/environment-config.md) for all environment variables.
+- **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
+- **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)

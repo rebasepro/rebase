@@ -29,7 +29,7 @@ export function getTableForCollection(collection: EntityCollection, registry: Po
     return table;
 }
 
-export function getPrimaryKeys(collection: EntityCollection, registry: PostgresCollectionRegistry): { fieldName: string; type: "string" | "number" }[] {
+export function getPrimaryKeys(collection: EntityCollection, registry: PostgresCollectionRegistry): { fieldName: string; type: "string" | "number"; isUUID?: boolean }[] {
     const table = getTableForCollection(collection, registry);
 
     // Fallback to explicitly defined isId properties
@@ -38,7 +38,8 @@ export function getPrimaryKeys(collection: EntityCollection, registry: PostgresC
             .filter(([_, prop]) => "isId" in (prop as object) && Boolean((prop as unknown as Record<string, unknown>).isId))
             .map(([key, prop]) => ({
                 fieldName: key,
-                type: prop.type === "number" ? "number" as const : "string" as const
+                type: prop.type === "number" ? "number" as const : "string" as const,
+                isUUID: (prop as unknown as Record<string, unknown>).isId === "uuid"
             }));
 
         if (idProps.length > 0) {
@@ -47,12 +48,13 @@ export function getPrimaryKeys(collection: EntityCollection, registry: PostgresC
     }
 
     // Otherwise infer from Drizzle schema
-    const keys: { fieldName: string; type: "string" | "number" }[] = [];
+    const keys: { fieldName: string; type: "string" | "number"; isUUID?: boolean }[] = [];
     for (const [key, colRaw] of Object.entries(table)) {
         const col = colRaw as AnyPgColumn;
         if (col && typeof col === "object" && "primary" in col && col.primary) {
             const type = col.dataType === "number" || (col as unknown as Record<string, unknown>).columnType === "PgSerial" || (col as unknown as Record<string, unknown>).columnType === "PgInteger" ? "number" : "string";
-            keys.push({ fieldName: key, type });
+            const isUUID = (col as unknown as Record<string, unknown>).columnType === "PgUUID";
+            keys.push({ fieldName: key, type, isUUID });
         }
     }
 
@@ -61,13 +63,14 @@ export function getPrimaryKeys(collection: EntityCollection, registry: PostgresC
     if (keys.length === 0 && "id" in table) {
         const idCol = table["id" as keyof typeof table] as AnyPgColumn;
         const type = idCol.dataType === "number" || (idCol as unknown as Record<string, unknown>).columnType === "PgSerial" || (idCol as unknown as Record<string, unknown>).columnType === "PgInteger" ? "number" : "string";
-        keys.push({ fieldName: "id", type });
+        const isUUID = (idCol as unknown as Record<string, unknown>).columnType === "PgUUID";
+        keys.push({ fieldName: "id", type, isUUID });
     }
 
     return keys;
 }
 
-export function parseIdValues(idValue: string | number, primaryKeys: { fieldName: string; type: "string" | "number" }[]): Record<string, string | number> {
+export function parseIdValues(idValue: string | number, primaryKeys: { fieldName: string; type: "string" | "number"; isUUID?: boolean }[]): Record<string, string | number> {
     const result: Record<string, string | number> = {};
 
     if (primaryKeys.length === 0) {
@@ -76,7 +79,7 @@ export function parseIdValues(idValue: string | number, primaryKeys: { fieldName
 
     if (primaryKeys.length === 1) {
         const pk = primaryKeys[0];
-        if (pk.type === "number") {
+        if (pk.type === "number" && !pk.isUUID) {
             const parsed = typeof idValue === "number" ? idValue : parseInt(String(idValue), 10);
             if (isNaN(parsed)) {
                 throw new Error(`Invalid numeric ID: ${idValue}`);
@@ -97,7 +100,7 @@ export function parseIdValues(idValue: string | number, primaryKeys: { fieldName
     for (let i = 0; i < primaryKeys.length; i++) {
         const pk = primaryKeys[i];
         const val = parts[i];
-        if (pk.type === "number") {
+        if (pk.type === "number" && !pk.isUUID) {
             const parsed = parseInt(val, 10);
             if (isNaN(parsed)) {
                 throw new Error(`Invalid numeric ID component: ${val}`);
@@ -111,7 +114,7 @@ export function parseIdValues(idValue: string | number, primaryKeys: { fieldName
     return result;
 }
 
-export function buildCompositeId(values: Record<string, any>, primaryKeys: { fieldName: string; type: "string" | "number" }[]): string {
+export function buildCompositeId(values: Record<string, any>, primaryKeys: { fieldName: string; type: "string" | "number"; isUUID?: boolean }[]): string {
     if (primaryKeys.length === 0) {
         return "";
     }

@@ -46,3 +46,26 @@ report.**.json
 app/frontend/debug_trace**
 .rebase-dev-port
 .rebase/
+
+# Scratch and debug artifacts (prevent root pollution)
+/scratch.*
+/test-*.js
+/test_*.js
+/fix-*.js
+/fix_*.js
+/fix-*.cjs
+/fix_*.cjs
+/fix-*.mjs
+/fix-*.ts
+/migration-*.ts
+/patch_*.js
+/refactor-*.mjs
+/eslint-errors*.json
+/graph.json
+/lerna-debug.log
+/*.txt
+!/README.md
+!/CHANGELOG.md
+!/CONTRIBUTING.md
+!/PUBLISHING.md
+!/LICENSE

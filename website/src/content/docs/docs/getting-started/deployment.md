@@ -129,4 +129,4 @@ await initializeRebaseBackend({
 ## Next Steps
 
 - **[Backend Overview](/docs/backend)** — Full backend configuration
-- **[Storage Configuration](/docs/storage/configuration)** — S3 setup for production
+- **[Storage Configuration](/docs/storage)** — S3 setup for production

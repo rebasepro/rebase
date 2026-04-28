@@ -152,6 +152,5 @@ The Studio supports:
 
 ## References
 
-- **RLS Policy Syntax:** See [references/rls-policies.md](references/rls-policies.md) for the full policy expression syntax.
-- **Auth Configuration:** See [references/auth-config.md](references/auth-config.md) for all authentication options.
-- **User Management API:** See [references/user-management.md](references/user-management.md) for programmatic user management.
+- **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
+- **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)

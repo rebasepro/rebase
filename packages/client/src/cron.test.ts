@@ -5,7 +5,7 @@ import type { Transport } from "./transport";
 // ─── Mock Transport ─────────────────────────────────────────────────
 
 function createMockTransport(): Transport & { request: jest.Mock } {
-    const requestMock = jest.fn<(...args: unknown[]) => Promise<unknown>>();
+    const requestMock = jest.fn<(...args: any[]) => Promise<any>>();
 
     return {
         request: requestMock,
@@ -31,7 +31,7 @@ describe("createCron", () => {
 
     describe("listJobs", () => {
         it("calls GET /cron", async () => {
-            transport.request.mockResolvedValue({ jobs: [] });
+            (transport.request.mockResolvedValue as any)({ jobs: [] });
             const cron = createCron(transport);
 
             const result = await cron.listJobs();
@@ -43,7 +43,7 @@ describe("createCron", () => {
 
     describe("getJob", () => {
         it("calls GET /cron/:id with encoded ID", async () => {
-            transport.request.mockResolvedValue({ job: { id: "my-job" } });
+            (transport.request.mockResolvedValue as any)({ job: { id: "my-job" } });
             const cron = createCron(transport);
 
             await cron.getJob("my-job");
@@ -52,7 +52,7 @@ describe("createCron", () => {
         });
 
         it("encodes special characters in job ID", async () => {
-            transport.request.mockResolvedValue({ job: {} });
+            (transport.request.mockResolvedValue as any)({ job: {} });
             const cron = createCron(transport);
 
             await cron.getJob("job with spaces");
@@ -66,7 +66,7 @@ describe("createCron", () => {
 
     describe("triggerJob", () => {
         it("calls POST /cron/:id/trigger", async () => {
-            transport.request.mockResolvedValue({ log: {}, job: {} });
+            (transport.request.mockResolvedValue as any)({ log: {}, job: {} });
             const cron = createCron(transport);
 
             await cron.triggerJob("my-job");
@@ -80,7 +80,7 @@ describe("createCron", () => {
 
     describe("getJobLogs", () => {
         it("calls GET /cron/:id/logs without limit", async () => {
-            transport.request.mockResolvedValue({ logs: [] });
+            (transport.request.mockResolvedValue as any)({ logs: [] });
             const cron = createCron(transport);
 
             await cron.getJobLogs("my-job");
@@ -92,7 +92,7 @@ describe("createCron", () => {
         });
 
         it("appends limit query param when provided", async () => {
-            transport.request.mockResolvedValue({ logs: [] });
+            (transport.request.mockResolvedValue as any)({ logs: [] });
             const cron = createCron(transport);
 
             await cron.getJobLogs("my-job", { limit: 5 });
@@ -106,7 +106,7 @@ describe("createCron", () => {
 
     describe("toggleJob", () => {
         it("calls PUT /cron/:id with enabled=true", async () => {
-            transport.request.mockResolvedValue({ job: {} });
+            (transport.request.mockResolvedValue as any)({ job: {} });
             const cron = createCron(transport);
 
             await cron.toggleJob("my-job", true);
@@ -121,7 +121,7 @@ describe("createCron", () => {
         });
 
         it("calls PUT /cron/:id with enabled=false", async () => {
-            transport.request.mockResolvedValue({ job: {} });
+            (transport.request.mockResolvedValue as any)({ job: {} });
             const cron = createCron(transport);
 
             await cron.toggleJob("my-job", false);
@@ -138,7 +138,7 @@ describe("createCron", () => {
 
     describe("custom cronPath", () => {
         it("uses custom path prefix", async () => {
-            transport.request.mockResolvedValue({ jobs: [] });
+            (transport.request.mockResolvedValue as any)({ jobs: [] });
             const cron = createCron(transport, { cronPath: "/admin/scheduled" });
 
             await cron.listJobs();
@@ -150,7 +150,7 @@ describe("createCron", () => {
         });
 
         it("custom path applies to all methods", async () => {
-            transport.request.mockResolvedValue({});
+            (transport.request.mockResolvedValue as any)({});
             const cron = createCron(transport, { cronPath: "/v2/cron" });
 
             await cron.getJob("x");

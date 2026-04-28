@@ -85,7 +85,7 @@ function parseWhereFilter(where?: Record<string, WhereFieldValue>): FilterValues
             if (val === "true") val = true;
             else if (val === "false") val = false;
             else if (val === "null") val = null;
-            else if (typeof val === "string" && /^[0-9]+(\.[0-9]+)?$/.test(val)) val = Number(val);
+            else if (typeof val === "string" && /^[0-9]+(\.[0-9]+)?$/.test(val) && key !== "id" && !key.endsWith("_id")) val = Number(val);
             
             filters[key] = [op, val];
         } else {

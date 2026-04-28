@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "rebase-local": {
+    "rebase": {
       "command": "node",
       "args": [
         "node_modules/@rebasepro/mcp-server/dist/cli.js"

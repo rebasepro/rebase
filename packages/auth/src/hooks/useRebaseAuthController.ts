@@ -375,6 +375,22 @@ export function useRebaseAuthController(
         }
     }, [handleAuthSuccess]);
 
+    // Generic OAuth login — works with any provider registered on the backend
+    const oauthLogin = useCallback(async (providerId: string, payload: Record<string, unknown>) => {
+        setAuthLoading(true);
+        setAuthProviderError(null);
+
+        try {
+            const response = await authApi.oauthLogin(providerId, payload);
+            await handleAuthSuccess(response.user, response.tokens);
+        } catch (error: unknown) {
+            setAuthProviderError(error as Error);
+            throw error;
+        } finally {
+            setAuthLoading(false);
+        }
+    }, [handleAuthSuccess]);
+
     // Sign out
     const signOut = useCallback(async () => {
         try {
@@ -707,6 +723,7 @@ export function useRebaseAuthController(
         emailPasswordLogin,
         register,
         googleLogin,
+        oauthLogin,
         skipLogin,
         forgotPassword,
         resetPassword,
@@ -724,7 +741,8 @@ export function useRebaseAuthController(
             passwordReset: true,
             sessionManagement: true,
             profileUpdate: true,
-            emailVerification: false
+            emailVerification: false,
+            enabledProviders: authConfig?.enabledProviders ?? []
         }
     };
 }

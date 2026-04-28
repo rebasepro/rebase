@@ -213,6 +213,65 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         return { user: session.user, accessToken: session.accessToken, refreshToken: session.refreshToken };
     }
 
+    /**
+     * Generic OAuth sign-in. Posts the given payload to `/auth/{providerId}`.
+     * Use this for any provider registered on the backend.
+     */
+    async function signInWithOAuth(providerId: string, payload: Record<string, unknown>) {
+        const fetchFn = getFetch();
+        const res = await fetchFn(authUrl(`/${providerId}`), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throwApiError(res.status, body, res.statusText);
+        const session = handleAuthResponse(body, "SIGNED_IN");
+        return { user: session.user, accessToken: session.accessToken, refreshToken: session.refreshToken };
+    }
+
+    // Convenience wrappers for all supported OAuth providers
+
+    async function signInWithGitHub(code: string, redirectUri: string) {
+        return signInWithOAuth("github", { code, redirectUri });
+    }
+
+    async function signInWithMicrosoft(code: string, redirectUri: string) {
+        return signInWithOAuth("microsoft", { code, redirectUri });
+    }
+
+    async function signInWithApple(code: string, redirectUri: string, user?: { name?: { firstName?: string; lastName?: string }; email?: string }) {
+        return signInWithOAuth("apple", { code, redirectUri, user });
+    }
+
+    async function signInWithFacebook(code: string, redirectUri: string) {
+        return signInWithOAuth("facebook", { code, redirectUri });
+    }
+
+    async function signInWithTwitter(code: string, redirectUri: string, codeVerifier: string) {
+        return signInWithOAuth("twitter", { code, redirectUri, codeVerifier });
+    }
+
+    async function signInWithDiscord(code: string, redirectUri: string) {
+        return signInWithOAuth("discord", { code, redirectUri });
+    }
+
+    async function signInWithGitLab(code: string, redirectUri: string) {
+        return signInWithOAuth("gitlab", { code, redirectUri });
+    }
+
+    async function signInWithBitbucket(code: string, redirectUri: string) {
+        return signInWithOAuth("bitbucket", { code, redirectUri });
+    }
+
+    async function signInWithSlack(code: string, redirectUri: string) {
+        return signInWithOAuth("slack", { code, redirectUri });
+    }
+
+    async function signInWithSpotify(code: string, redirectUri: string) {
+        return signInWithOAuth("spotify", { code, redirectUri });
+    }
+
     async function signOut() {
         const fetchFn = getFetch();
         try {
@@ -395,6 +454,17 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         signUp,
         signInWithGoogle,
         signInWithLinkedin,
+        signInWithOAuth,
+        signInWithGitHub,
+        signInWithMicrosoft,
+        signInWithApple,
+        signInWithFacebook,
+        signInWithTwitter,
+        signInWithDiscord,
+        signInWithGitLab,
+        signInWithBitbucket,
+        signInWithSlack,
+        signInWithSpotify,
         signOut,
         refreshSession,
         getUser,

@@ -78,9 +78,6 @@ export const Sheet: React.FC<SheetProps> = ({
             modal={modal}
             onOpenChange={onOpenChange}>
             <DialogPrimitive.Portal container={finalContainer}>
-                <DialogPrimitive.Title autoFocus tabIndex={0}>
-                    {title ?? "Sheet"}
-                </DialogPrimitive.Title>
                 {includeBackgroundOverlay && <DialogPrimitive.Overlay
                     className={cls(
                         "outline-none",
@@ -105,7 +102,7 @@ export const Sheet: React.FC<SheetProps> = ({
                         "text-surface-accent-900 dark:text-white",
                         "fixed transform z-50 transition-[transform,opacity] ease-in-out",
                         !displayed ? "duration-150" : "duration-100",
-                        "outline-none focus:outline-none",
+                        "outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus:ring-0",
                         transparent ? "" : "shadow-md bg-white dark:bg-surface-950",
                         side === "top" || side === "bottom" ? "w-full" : "h-full",
                         side === "left" || side === "top" ? "left-0 top-0" : "right-0 bottom-0",
@@ -115,6 +112,9 @@ export const Sheet: React.FC<SheetProps> = ({
                     )}
                     style={style}
                 >
+                    <DialogPrimitive.Title autoFocus tabIndex={0} className="sr-only outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus:ring-0">
+                        {title ?? "Sheet"}
+                    </DialogPrimitive.Title>
                     {children}
                 </DialogPrimitive.Content>
             </DialogPrimitive.Portal>

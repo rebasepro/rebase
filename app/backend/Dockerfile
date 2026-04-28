@@ -4,7 +4,7 @@
 #   docker build -t rebase-backend -f app/backend/Dockerfile .
 
 # ── Stage 1: Install + Build ─────────────────────────────────────────
-FROM node:24-alpine AS builder
+FROM node:22-alpine AS builder
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
@@ -29,28 +29,30 @@ RUN pnpm install --shamefully-hoist
 # Some packages may fail tsc declarations — that's fine, we only need vite bundles + esbuild outputs.
 RUN pnpm --filter './packages/*' -r --no-bail run build; exit 0
 
-# Install tsx globally for running TypeScript at runtime
-RUN npm install -g tsx
+# Build the backend (TypeScript → JavaScript)
+RUN cd app/backend && pnpm run build
 
 # Build frontend (reads .env.production for VITE_API_URL etc.)
 RUN cd app/frontend && npx vite build
 
+# Prune devDependencies to reduce image size
+RUN pnpm install --shamefully-hoist --prod
+
 # ── Stage 2: Production Runtime ──────────────────────────────────────
-FROM node:24-alpine AS runtime
+FROM node:22-alpine AS runtime
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 ENV NODE_ENV=production
 
 RUN corepack enable
-RUN npm install -g tsx
 
 # Security: run as non-root
 RUN addgroup -g 1001 rebase && adduser -u 1001 -G rebase -s /bin/sh -D rebase
 
 WORKDIR /app
 
-# Copy production artifacts
+# Copy only production artifacts (node_modules already pruned of devDependencies)
 COPY --from=builder /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages ./packages
@@ -67,4 +69,5 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1
 
-CMD ["tsx", "--conditions", "development", "src/index.ts"]
+# Run the compiled JavaScript directly — no tsx, no --conditions development
+CMD ["node", "dist/src/index.js"]

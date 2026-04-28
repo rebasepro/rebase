@@ -8,6 +8,7 @@ import {
     NotFoundPage,
     useInternalUserManagementController,
 } from "@rebasepro/core";
+import { CircularProgressCenter } from "@rebasepro/ui";
 
 import { ContentHomePage } from "./HomePage/ContentHomePage";
 import { UsersView } from "./admin/UsersView";
@@ -109,7 +110,7 @@ export function RebaseRouteDefs({ children, layout }: RebaseRouteDefsProps) {
             {/* User Provided Custom Routes */}
             {children}
 
-            <Route path={"*"} element={<NotFoundPage />} />
+            <Route path={"*"} element={navigationStateController.loading ? <CircularProgressCenter /> : <NotFoundPage />} />
         </>
     );
 

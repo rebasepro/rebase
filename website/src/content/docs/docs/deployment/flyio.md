@@ -43,7 +43,7 @@ primary_region = "fra"
   dockerfile = "Dockerfile"
 
 [http_service]
-  internal_port = 3001 # Make sure this matches your Express app port
+  internal_port = 3001 # Make sure this matches your Hono app port
   force_https = true
   auto_stop_machines = true
   auto_start_machines = true

@@ -113,6 +113,5 @@ export function DashboardView() {
 
 ## References
 
-- **Component Catalog:** See [references/component-catalog.md](references/component-catalog.md) for full component API documentation.
-- **Theming:** See [references/theming.md](references/theming.md) for customizing colors, fonts, and dark mode.
-- **Icons:** See [references/icons.md](references/icons.md) for the complete icon set.
+- **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
+- **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)

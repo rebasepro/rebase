@@ -41,7 +41,7 @@ export function useBuildUrlController(props: {
         if (basePath !== "/" && path.startsWith(basePath)) {
             path = path.replace(basePath, "");
         }
-        return path.startsWith(baseCollectionPath);
+        return path === baseCollectionPath || path.startsWith(baseCollectionPath + "/");
     }, [basePath, baseCollectionPath]);
 
     const resolveDatabasePathsFrom = useCallback((path: string): string => {

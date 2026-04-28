@@ -10,7 +10,9 @@ import {
     serveSPA,
     HonoEnv,
     listenWithPortRetry,
-    cleanupDevPortFile
+    cleanupDevPortFile,
+    logger,
+    resolveStorageFromEnv
 } from "@rebasepro/server-core";
 import { createPostgresDatabaseConnection, createPostgresBootstrapper } from "@rebasepro/server-postgresql";
 import { enums, relations, tables } from "./schema.generated";
@@ -43,7 +45,7 @@ app.use("/*", secureHeaders());
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is not set");
 
-const { db, connectionString } = createPostgresDatabaseConnection(databaseUrl);
+const { db, pool, connectionString } = createPostgresDatabaseConnection(databaseUrl);
 
 // ─── Start ───────────────────────────────────────────────────────────
 async function startServer() {
@@ -76,22 +78,29 @@ async function startServer() {
             seedDefaultRoles: true,
             allowRegistration: process.env.ALLOW_REGISTRATION === "true"
         },
-        storage: {
-            type: "local",
-            basePath: path.resolve(__dirname, "../../uploads")
-        },
+        storage: resolveStorageFromEnv({
+            localPath: path.resolve(__dirname, "../../uploads"),
+        }),
         history: true,
     });
 
-    // ─── Your routes ─────────────────────────────────────────────
-    app.get("/health", (c) => c.json({ status: "ok" }));
+    // ─── Health check ─────────────────────────────────────────────
+    app.get("/health", async (c) => {
+        const result = await backend.healthCheck();
+        const status = result.healthy ? 200 : 503;
+        return c.json({
+            status: result.healthy ? "ok" : "degraded",
+            latencyMs: result.latencyMs,
+            ...(result.details ? { details: result.details } : {})
+        }, status);
+    });
 
     // Serve the frontend in production
-    if (process.env.NODE_ENV === "production") {
+    if (isProduction) {
         serveSPA(app, { frontendPath: path.join(__dirname, "../../frontend/dist") });
     }
 
-    if (process.env.NODE_ENV !== "production") {
+    if (!isProduction) {
         // Dev mode: retry the next port if the current one is in use
         const projectRoot = path.resolve(__dirname, "../..");
         const actualPort = await listenWithPortRetry(server, PORT, { portFileDir: projectRoot });
@@ -102,18 +111,30 @@ async function startServer() {
         process.on("SIGTERM", cleanup);
         process.on("exit", cleanup);
 
-        console.log(`🚀 Server running at http://localhost:${actualPort}`);
+        logger.info("Server running", { url: `http://localhost:${actualPort}` });
     } else {
         server.listen(PORT, () => {
-            console.log(`🚀 Server running at http://localhost:${PORT}`);
+            logger.info("Server running", { url: `http://localhost:${PORT}` });
         });
     }
+
+    // ─── Graceful Shutdown ───────────────────────────────────────────────
+    // Uses the framework's built-in shutdown() which drains connections,
+    // stops the cron scheduler, and force-exits after 15s timeout.
+    const gracefulShutdown = async (signal: string) => {
+        logger.info(`Received ${signal}, shutting down...`);
+        await backend.shutdown();
+        await pool.end();
+        logger.info("Database pool closed");
+        process.exit(0);
+    };
+    process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+    process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 }
 
 startServer().catch(err => {
-    console.error("Failed to start server:", err);
+    logger.error("Failed to start server", { error: err instanceof Error ? err : new Error(String(err)) });
     process.exit(1);
 });
 
 export { app };
-

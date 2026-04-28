@@ -137,6 +137,5 @@ server.listen(3001);
 
 ## References
 
-- **Migration Workflow:** See [references/migration-workflow.md](references/migration-workflow.md) for detailed steps.
-- **Drizzle ORM Docs:** See [references/drizzle-guide.md](references/drizzle-guide.md) for Drizzle-specific guidance.
-- **Troubleshooting:** See [references/troubleshooting.md](references/troubleshooting.md) for common database issues.
+- **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
+- **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)

@@ -23,7 +23,6 @@
   ],
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
-  "logo": "./assets/rebase_logo.svg",
   "homepage": "https://github.com/rebaseco/agent-skills",
   "repository": "https://github.com/rebaseco/agent-skills"
 }

@@ -5,19 +5,22 @@ import { toSnakeCase } from "@rebasepro/utils";
 
 // --- Helper Functions ---
 
-const getPrimaryKeyProp = (collection: EntityCollection): { name: string, type: "string" | "number" } => {
+const getPrimaryKeyProp = (collection: EntityCollection): { name: string, type: "string" | "number", isUuid: boolean } => {
     if (collection.properties) {
         const idPropEntry = Object.entries(collection.properties).find(([_, prop]) => "isId" in (prop as object) && Boolean((prop as unknown as Record<string, unknown>).isId));
         if (idPropEntry) {
-            return { name: idPropEntry[0], type: (idPropEntry[1] as Property).type === "number" ? "number" : "string" };
+            const prop = idPropEntry[1] as Property;
+            const isUuid = prop.type === "string" && "isId" in prop && (prop as StringProperty).isId === "uuid";
+            return { name: idPropEntry[0], type: prop.type === "number" ? "number" : "string", isUuid };
         }
     }
     // Fallback
     const idProp = collection.properties?.["id"] as Property | undefined;
     if (idProp?.type === "number") {
-        return { name: "id", type: "number" };
+        return { name: "id", type: "number", isUuid: false };
     }
-    return { name: "id", type: "string" };
+    const isUuid = idProp?.type === "string" && "isId" in idProp && (idProp as StringProperty).isId === "uuid";
+    return { name: "id", type: "string", isUuid: isUuid ?? false };
 };
 
 const isNumericId = (collection: EntityCollection): boolean => {
@@ -36,7 +39,7 @@ const isIdProperty = (propName: string, prop: Property, collection: EntityCollec
     return !hasExplicitId && propName === "id";
 };
 
-const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCollection): string | null => {
+const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCollection, collections: EntityCollection[]): string | null => {
     const colName = toSnakeCase(propName);
     let columnDefinition: string;
 
@@ -160,10 +163,11 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
 
             const fkColumnName = toSnakeCase(relation.localKey);
             const targetTableVar = getTableVarName(getTableName(targetCollection));
-            const targetIdField = getPrimaryKeyName(targetCollection);
-            const baseColumn = isNumericId(targetCollection) ? `integer(\"${fkColumnName}\")` : `varchar(\"${fkColumnName}\")`;
+            const pkProp = getPrimaryKeyProp(targetCollection);
+            const targetIdField = pkProp.name;
+            const baseColumn = pkProp.type === "number" ? `integer("${fkColumnName}")` : (pkProp.isUuid ? `uuid("${fkColumnName}")` : `varchar("${fkColumnName}")`);
 
-            const onUpdate = relation.onUpdate ? `onUpdate: \"${relation.onUpdate}\"` : "";
+            const onUpdate = relation.onUpdate ? `onUpdate: "${relation.onUpdate}"` : "";
             const required = prop.validation?.required;
             const onDeleteVal = relation.onDelete ?? (required ? "cascade" : "set null");
             const onDelete = `onDelete: \"${onDeleteVal}\"`;
@@ -178,6 +182,30 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
             }
 
             return `    ${relation.localKey}: ${columnDef}`;
+        }
+        case "reference": {
+            const refProp = prop as import("@rebasepro/types").ReferenceProperty;
+            const targetCollection = collections.find(c => c.slug === refProp.path || getTableName(c) === refProp.path);
+            if (!targetCollection) {
+                columnDefinition = `varchar("${colName}")`;
+                break;
+            }
+            
+            const pkProp = getPrimaryKeyProp(targetCollection);
+            const targetTableVar = getTableVarName(getTableName(targetCollection));
+            const targetIdField = pkProp.name;
+            const baseColumn = pkProp.type === "number" ? `integer("${colName}")` : (pkProp.isUuid ? `uuid("${colName}")` : `varchar("${colName}")`);
+
+            const required = prop.validation?.required;
+            const onDelete = required ? "cascade" : "set null";
+            const refOptions = `{ onDelete: "${onDelete}" }`;
+            
+            columnDefinition = `${baseColumn}.references(() => ${targetTableVar}.${targetIdField}, ${refOptions})`;
+            if (required) {
+                columnDefinition += ".notNull()";
+            }
+            // Skip the standard notNull() handling below because we did it here with references
+            return `    ${propName}: ${columnDefinition}`;
         }
         default:
             return null;
@@ -424,8 +452,8 @@ export const generateSchema = async (collections: EntityCollection[]): Promise<s
             const onDelete = relation.onDelete ?? "cascade";
             const refOptions = `{ onDelete: \"${onDelete}\" }`;
 
-            const sourceColType = isNumericId(sourceCollection) ? "integer" : "varchar";
-            const targetColType = isNumericId(targetCollection) ? "integer" : "varchar";
+            const sourceColType = isNumericId(sourceCollection) ? "integer" : (getPrimaryKeyProp(sourceCollection).isUuid ? "uuid" : "varchar");
+            const targetColType = isNumericId(targetCollection) ? "integer" : (getPrimaryKeyProp(targetCollection).isUuid ? "uuid" : "varchar");
             const sourceId = getPrimaryKeyName(sourceCollection);
             const targetId = getPrimaryKeyName(targetCollection);
 
@@ -439,7 +467,7 @@ export const generateSchema = async (collections: EntityCollection[]): Promise<s
             schemaContent += `export const ${tableVarName} = pgTable(\"${tableName}\", {\n`;
             const columns = new Set<string>();
             Object.entries(collection.properties ?? {}).forEach(([propName, prop]) => {
-                const columnString = getDrizzleColumn(propName, prop as Property, collection);
+                const columnString = getDrizzleColumn(propName, prop as Property, collection, collections);
                 if (columnString) columns.add(columnString);
             });
 

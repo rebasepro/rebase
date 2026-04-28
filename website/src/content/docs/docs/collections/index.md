@@ -161,5 +161,5 @@ You can set default or forced filters:
 - **[Properties](/docs/collections/properties)** — All property types and options
 - **[Relations](/docs/collections/relations)** — Foreign keys, junction tables, joins
 - **[Security Rules](/docs/collections/security-rules)** — Row Level Security
-- **[View Modes](/docs/collections/view-modes)** — Table, Cards, Kanban
+- **[View Modes](/docs/frontend/view-modes)** — Table, Cards, Kanban
 - **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks

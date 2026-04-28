@@ -219,7 +219,7 @@ async function createProject(options: InitOptions) {
     console.log("");
     console.log(`  ${chalk.cyan("pnpm dev")}`);
     console.log("");
-    console.log(chalk.gray("This starts both the backend (Express + PostgreSQL)")
+    console.log(chalk.gray("This starts both the backend (Hono + PostgreSQL)")
         + chalk.gray(" and the frontend (Vite + React) concurrently."));
     console.log("");
     console.log(chalk.gray("Docs: https://rebase.pro/docs"));

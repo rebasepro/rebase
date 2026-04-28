@@ -154,7 +154,5 @@ rebase db migrate
 
 ## References
 
-- **Property Types:** See [references/property-types.md](references/property-types.md) for the complete property type reference.
-- **Validation Rules:** See [references/validation.md](references/validation.md) for all validation options.
-- **Relations:** See [references/relations.md](references/relations.md) for one-to-many and many-to-many relation setup.
-- **Migration Workflow:** See [references/migration-workflow.md](references/migration-workflow.md) for detailed migration steps.
+- **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
+- **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)

@@ -144,6 +144,18 @@ export function resolveCollectionRelations(
             const relationKey = normalizedRelation.relationName;
             if (relationKey) {
                 relations[relationKey] = normalizedRelation;
+                
+                // Add fallback for slug-based lookups
+                const slugKey = relationKey.replace(/_/g, '-');
+                if (slugKey !== relationKey && !relations[slugKey]) {
+                    relations[slugKey] = normalizedRelation;
+                }
+                
+                // Add fallback for snake_case lookups
+                const snakeKey = relationKey.replace(/-/g, '_');
+                if (snakeKey !== relationKey && !relations[snakeKey]) {
+                    relations[snakeKey] = normalizedRelation;
+                }
             }
         });
     }
@@ -163,7 +175,19 @@ export function resolveCollectionRelations(
                     if (!relation.relationName) {
                         relation.relationName = propKey;
                     }
-                    relations[propKey] = sanitizeRelation(relation, collection); // Already normalized in collection.relations
+                    const normalizedRelation = sanitizeRelation(relation, collection);
+                    relations[propKey] = normalizedRelation;
+                    
+                    // Add fallbacks for property-based relations
+                    const slugKey = propKey.replace(/_/g, '-');
+                    if (slugKey !== propKey && !relations[slugKey]) {
+                        relations[slugKey] = normalizedRelation;
+                    }
+                    
+                    const snakeKey = propKey.replace(/-/g, '_');
+                    if (snakeKey !== propKey && !relations[snakeKey]) {
+                        relations[snakeKey] = normalizedRelation;
+                    }
                 }
             }
         });

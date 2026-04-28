@@ -1,5 +1,4 @@
 <h1 align="center">
-  <img src="assets/rebase-agent-skills_logo.svg" width="48" alt="Logo" style="vertical-align: middle; margin-right: 10px;">
   Rebase Agent Skills
 </h1>
 
@@ -14,7 +13,7 @@ Skills are packaged instructions and scripts that extend agent capabilities, fol
 For most popular AI-assistive tools, you can use the `skills` CLI to install Rebase agent skills:
 
 ```bash
-npx skills add rebaseco/skills
+npx skills add rebaseco/agent-skills
 ```
 
 ### Option 2: Gemini CLI Extension

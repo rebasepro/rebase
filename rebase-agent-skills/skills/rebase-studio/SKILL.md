@@ -104,6 +104,5 @@ This starts both frontend and backend. The Studio is accessible at `http://local
 
 ## References
 
-- **Custom Views:** See [references/custom-views.md](references/custom-views.md) for building custom views.
-- **Collection Editor:** See [references/collection-editor.md](references/collection-editor.md) for the visual schema editor API.
-- **Studio Hooks:** See [references/studio-hooks.md](references/studio-hooks.md) for all available hooks.
+- **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
+- **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)

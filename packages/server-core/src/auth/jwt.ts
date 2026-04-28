@@ -30,10 +30,18 @@ export function configureJwt(config: JwtConfig): void {
         "jwt_secret",
         "your-secret",
         "your-super-secret-jwt-key-change-in-production",
+        "super-secret-jwt-key-change-in-production",
         "change-me",
         "changeme",
         "password",
-        "test"
+        "test",
+        "mysecret",
+        "my-secret",
+        "my_secret",
+        "example-secret",
+        "please-change-me",
+        "replace-this-with-a-real-secret",
+        "default-secret",
     ]);
 
     if (!config.secret || config.secret.length < 32) {

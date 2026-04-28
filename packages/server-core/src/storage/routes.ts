@@ -133,7 +133,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
 
         const filePath = decodeURIComponent(rawPath);
 
-        // For local storage, serve the file directly
+        // For local storage, serve the file directly from disk
         if (controller.getType() === 'local') {
             const localController = controller as LocalStorageController;
             const { bucket, resolvedPath } = parseBucketAndPath(filePath);
@@ -163,7 +163,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             return c.body(new Uint8Array(fileContent)); 
         }
 
-        // For S3 storage, redirect to signed URL
+        // For remote storage (S3, GCS, etc.), redirect to a signed URL
         const downloadConfig = await controller.getDownloadURL(filePath);
         if (downloadConfig.fileNotFound || !downloadConfig.url) {
             throw ApiError.notFound('File not found');

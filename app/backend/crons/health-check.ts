@@ -26,7 +26,7 @@ const job: CronJobDefinition = {
         ctx.log("Pinging database via SDK...");
         let authorCount = 0;
         try {
-            const res = await ctx.client.data.authors.findMany({ limit: 1 });
+            const res = await ctx.client.data.authors.find({ limit: 1 });
             authorCount = res.meta?.total || 0;
             ctx.log(`SDK query successful. Authors found: ${authorCount}`);
         } catch (e: any) {

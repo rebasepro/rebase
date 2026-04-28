@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
     Typography, cls, defaultBorderMixin, Button, Chip,
     CircularProgress, IconButton, Card, Paper,
@@ -42,52 +42,109 @@ export function CronJobsView() {
     const [logsLoading, setLogsLoading] = useState(false);
     const [triggering, setTriggering] = useState<string | null>(null);
 
-    const fetchJobs = useCallback(async () => {
-        if (!client?.cron) return;
+    // Refs so effects never re-fire due to identity changes
+    const clientRef = useRef(client);
+    clientRef.current = client;
+    const snackbarRef = useRef(snackbar);
+    snackbarRef.current = snackbar;
+
+    // ── Fetch jobs on mount + poll every 15s ──
+    useEffect(() => {
+        let cancelled = false;
+
+        async function load() {
+            const c = clientRef.current;
+            if (!c?.cron) {
+                setLoading(false);
+                return;
+            }
+            try {
+                const res = await c.cron.listJobs();
+                if (!cancelled) setJobs(res.jobs);
+            } catch (e: unknown) {
+                if (!cancelled) {
+                    snackbarRef.current.open({
+                        type: "error",
+                        message: e instanceof Error ? e.message : String(e)
+                    });
+                }
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        }
+
+        load();
+        const t = setInterval(load, 15_000);
+        return () => { cancelled = true; clearInterval(t); };
+    }, []); // runs once
+
+    // ── Fetch logs when selection changes ──
+    useEffect(() => {
+        if (!selectedId) {
+            setLogs([]);
+            return;
+        }
+        let cancelled = false;
+        const c = clientRef.current;
+        if (!c?.cron) return;
+
+        setLogsLoading(true);
+        c.cron.getJobLogs(selectedId, { limit: 25 })
+            .then(res => { if (!cancelled) setLogs(res.logs); })
+            .catch(() => { if (!cancelled) setLogs([]); })
+            .finally(() => { if (!cancelled) setLogsLoading(false); });
+
+        return () => { cancelled = true; };
+    }, [selectedId]);
+
+    // ── Imperative helpers (not in any dep array) ──
+    async function refreshJobs() {
+        const c = clientRef.current;
+        if (!c?.cron) return;
         try {
-            const res = await client.cron.listJobs();
+            const res = await c.cron.listJobs();
             setJobs(res.jobs);
-        } catch (e: unknown) {
-            snackbar.open({ type: "error", message: e instanceof Error ? e.message : String(e) });
-        } finally { setLoading(false); }
-    }, [client]);
+        } catch { /* swallow */ }
+    }
 
-    useEffect(() => { fetchJobs(); const t = setInterval(fetchJobs, 15000); return () => clearInterval(t); }, [fetchJobs]);
-
-    const fetchLogs = useCallback(async (id: string) => {
-        if (!client?.cron) return;
+    async function refreshLogs(id: string) {
+        const c = clientRef.current;
+        if (!c?.cron) return;
         setLogsLoading(true);
         try {
-            const res = await client.cron.getJobLogs(id, { limit: 25 });
+            const res = await c.cron.getJobLogs(id, { limit: 25 });
             setLogs(res.logs);
         } catch { setLogs([]); }
         finally { setLogsLoading(false); }
-    }, [client]);
-
-    useEffect(() => { if (selectedId) fetchLogs(selectedId); else setLogs([]); }, [selectedId, fetchLogs]);
-
-    const selectedJob = useMemo(() => jobs.find(j => j.id === selectedId), [jobs, selectedId]);
+    }
 
     const handleTrigger = async (id: string) => {
-        if (!client?.cron) return;
+        const c = clientRef.current;
+        if (!c?.cron) return;
         setTriggering(id);
         try {
-            await client.cron.triggerJob(id);
-            snackbar.open({ type: "success", message: "Job triggered" });
-            await fetchJobs();
-            if (selectedId === id) fetchLogs(id);
-        } catch (e: unknown) { snackbar.open({ type: "error", message: e instanceof Error ? e.message : String(e) }); }
-        finally { setTriggering(null); }
+            await c.cron.triggerJob(id);
+            snackbarRef.current.open({ type: "success", message: "Job triggered" });
+            await refreshJobs();
+            if (selectedId === id) refreshLogs(id);
+        } catch (e: unknown) {
+            snackbarRef.current.open({ type: "error", message: e instanceof Error ? e.message : String(e) });
+        } finally { setTriggering(null); }
     };
 
     const handleToggle = async (id: string, enabled: boolean) => {
-        if (!client?.cron) return;
+        const c = clientRef.current;
+        if (!c?.cron) return;
         try {
-            await client.cron.toggleJob(id, enabled);
-            snackbar.open({ type: "success", message: enabled ? "Job enabled" : "Job paused" });
-            await fetchJobs();
-        } catch (e: unknown) { snackbar.open({ type: "error", message: e instanceof Error ? e.message : String(e) }); }
+            await c.cron.toggleJob(id, enabled);
+            snackbarRef.current.open({ type: "success", message: enabled ? "Job enabled" : "Job paused" });
+            await refreshJobs();
+        } catch (e: unknown) {
+            snackbarRef.current.open({ type: "error", message: e instanceof Error ? e.message : String(e) });
+        }
     };
+
+    const selectedJob = jobs.find(j => j.id === selectedId);
 
     if (loading) return <div className="flex items-center justify-center h-full"><CircularProgress /></div>;
 
@@ -111,7 +168,7 @@ export function CronJobsView() {
                         <Typography variant="subtitle2" className="font-semibold">Cron Jobs</Typography>
                         <Chip size="smallest" className="bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300">{jobs.length}</Chip>
                     </div>
-                    <IconButton size="small" onClick={fetchJobs} title="Refresh"><RefreshIcon size="small" /></IconButton>
+                    <IconButton size="small" onClick={refreshJobs} title="Refresh"><RefreshIcon size="small" /></IconButton>
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
                     {jobs.map(job => (
@@ -199,7 +256,7 @@ export function CronJobsView() {
                                 <HistoryIcon size="small" className="text-surface-400" />
                                 <Typography variant="subtitle2" className="font-semibold text-[13px]">Execution History</Typography>
                             </div>
-                            <IconButton size="small" onClick={() => fetchLogs(selectedJob.id)} title="Refresh logs"><RefreshIcon size="smallest" /></IconButton>
+                            <IconButton size="small" onClick={() => refreshLogs(selectedJob.id)} title="Refresh logs"><RefreshIcon size="smallest" /></IconButton>
                         </div>
                         <div className="flex-1 overflow-y-auto">
                             {logsLoading ? (

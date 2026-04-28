@@ -26,4 +26,5 @@ export * from "./components/StorageView/StorageView";
 export * from "./components/StudioHomePage";
 export * from "./utils/sql_utils";
 export * from "./components/CronJobs/CronJobsView";
+export * from "./components/SchemaVisualizer";
 export * from "./components/RebaseStudio";

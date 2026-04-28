@@ -1,4 +1,4 @@
-import { DataDriver, EntityCollection, BackendBootstrapper, BootstrappedAuth, RealtimeProvider } from "@rebasepro/types";
+import { DataDriver, EntityCollection, BackendBootstrapper, BootstrappedAuth, RealtimeProvider, HealthCheckResult } from "@rebasepro/types";
 import { BackendCollectionRegistry } from "./collections/BackendCollectionRegistry";
 import { loadCollectionsFromDirectory } from "./collections/loader";
 import { DriverRegistry, DEFAULT_DRIVER_ID, DefaultDriverRegistry } from "./services/driver-registry";
@@ -8,8 +8,12 @@ import { RestApiGenerator } from "./api/rest/api-generator";
 import { createAuthMiddleware } from "./auth/middleware";
 import { errorHandler } from "./api/errors";
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
+import { csrf } from "hono/csrf";
 import { HonoEnv } from "./api/types";
 import { configureLogLevel } from "./utils/logging";
+import { logger } from "./utils/logger";
+import { requestLogger } from "./utils/request-logger";
 import { createAdminRoutes, createAuthRoutes, requireAuth, requireAdmin, configureJwt } from "./auth";
 import { createStorageController, createStorageRoutes, DEFAULT_STORAGE_ID, DefaultStorageRegistry, BackendStorageConfig, StorageController, StorageRegistry } from "./storage";
 import { createRebaseClient } from "@rebasepro/client";
@@ -26,6 +30,16 @@ export interface RebaseAuthConfig {
     email?: EmailConfig;
     google?: { clientId: string };
     linkedin?: { clientId: string; clientSecret: string };
+    github?: { clientId: string; clientSecret: string };
+    microsoft?: { clientId: string; clientSecret: string; tenantId?: string };
+    apple?: { clientId: string; teamId: string; keyId: string; privateKey: string };
+    facebook?: { clientId: string; clientSecret: string };
+    twitter?: { clientId: string; clientSecret: string };
+    discord?: { clientId: string; clientSecret: string };
+    gitlab?: { clientId: string; clientSecret: string; baseUrl?: string };
+    bitbucket?: { clientId: string; clientSecret: string };
+    slack?: { clientId: string; clientSecret: string };
+    spotify?: { clientId: string; clientSecret: string };
     defaultRole?: string;
     providers?: OAuthProvider[];
     [key: string]: unknown;
@@ -42,11 +56,42 @@ export interface RebaseBackendConfig {
         level?: "error" | "warn" | "info" | "debug";
     };
     auth?: RebaseAuthConfig;
-    storage?: BackendStorageConfig | Record<string, BackendStorageConfig>;
+    /**
+     * Storage configuration. Accepts:
+     *
+     * - A `BackendStorageConfig` object (`{ type: 'local' | 's3', ... }`)
+     * - A `StorageController` instance (for custom providers like GCS, Azure, etc.)
+     * - A `Record<string, ...>` of either, for multi-backend setups
+     */
+    storage?: BackendStorageConfig | StorageController | Record<string, BackendStorageConfig | StorageController>;
     history?: unknown;
     enableSwagger?: boolean;
     functionsDir?: string;
     cronsDir?: string;
+    /**
+     * Maximum request body size in bytes for API routes (default: 10MB).
+     * Set to 0 to disable the global limit entirely.
+     *
+     * Note: Storage upload routes use their own limit from the storage config's
+     * `maxFileSize` property (default: 50MB), which takes precedence over this.
+     */
+    maxBodySize?: number;
+    /**
+     * CSRF protection configuration. **Opt-in** — disabled by default.
+     *
+     * BaaS APIs are consumed by mobile apps, SPAs on different domains,
+     * and CLI tools, so CSRF is intentionally not enabled unless you
+     * explicitly configure it with allowed origins.
+     *
+     * @example
+     * ```ts
+     * csrf: { origin: ["https://myapp.com", "https://admin.myapp.com"] }
+     * ```
+     */
+    csrf?: {
+        /** Allowed origins for CSRF validation. */
+        origin: string | string[] | ((origin: string) => boolean);
+    };
 }
 
 export interface RebaseBackendInstance {
@@ -60,32 +105,27 @@ export interface RebaseBackendInstance {
     storageController?: StorageController;
     collectionRegistry: BackendCollectionRegistry;
     cronScheduler?: import("./cron").CronScheduler;
+    /**
+     * Deep health check that verifies database connectivity.
+     * Returns latency and component status.
+     */
+    healthCheck(): Promise<HealthCheckResult>;
+    /**
+     * Graceful shutdown helper for the BaaS instance.
+     * Stops the cron scheduler and closes the HTTP server, allowing
+     * in-flight requests to drain within the given timeout.
+     *
+     * @param timeoutMs - Maximum time (ms) to wait for drain before force-exit (default: 15000).
+     *                    Pass 0 to skip the force-exit timer (useful in tests).
+     */
+    shutdown(timeoutMs?: number): Promise<void>;
 }
 
 export async function initializeRebaseBackend(config: RebaseBackendConfig): Promise<RebaseBackendInstance> {
-    try {
-        return await _initializeRebaseBackend(config);
-    } catch (error: unknown) {
-        console.error("❌ Critical error during Rebase Backend initialization:", error);
-
-        const basePath = config.basePath || "/api";
-        config.app.use(`${basePath}/*`, async (c) => {
-            return c.json({
-                error: {
-                    message: "Backend initialization failed. Please check the backend server logs.",
-                    code: "backend-init-failed"
-                }
-            }, 503);
-        });
-
-        return {
-            __failed: true,
-            driverRegistry: DefaultDriverRegistry.create({}),
-            driver: {} as unknown as DataDriver,
-            realtimeServices: {},
-            realtimeService: {} as unknown as RealtimeProvider,
-        } as unknown as RebaseBackendInstance;
-    }
+    // No try/catch: let init errors propagate to the caller.
+    // The app entry point (e.g. startServer()) should catch and process.exit(1).
+    // Returning a fake instance hides critical failures and leads to silent data loss.
+    return await _initializeRebaseBackend(config);
 }
 
 async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<RebaseBackendInstance> {
@@ -95,13 +135,47 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         configureLogLevel();
     }
 
-    console.log("🔥 Initializing Rebase Backend (Bootstrapper Protocol V2)");
+    logger.info("Initializing Rebase Backend (Bootstrapper Protocol V2)");
+
+    const basePath = config.basePath || "/api";
+    const isProduction = process.env.NODE_ENV === "production";
+
+    // ─── Request Body Size Limit ─────────────────────────────────────────
+    const maxBodySize = config.maxBodySize ?? 10 * 1024 * 1024; // 10MB default
+    if (maxBodySize > 0) {
+        config.app.use(`${basePath}/*`, bodyLimit({
+            maxSize: maxBodySize,
+            onError: (c) => {
+                return c.json({
+                    error: {
+                        message: `Request body too large. Maximum size is ${Math.round(maxBodySize / 1024 / 1024)}MB.`,
+                        code: "PAYLOAD_TOO_LARGE"
+                    }
+                }, 413);
+            }
+        }));
+        logger.info("Request body limit configured", { maxSizeMB: Math.round(maxBodySize / 1024 / 1024) });
+    }
+
+    // ─── CSRF Protection (opt-in) ────────────────────────────────────────
+    // BaaS APIs are consumed by mobile apps, SPAs on different origins, and
+    // CLI/SDK tools. CSRF is only enabled when the developer explicitly
+    // configures it with allowed origins.
+    if (config.csrf?.origin) {
+        config.app.use(`${basePath}/*`, csrf({
+            origin: config.csrf.origin
+        }));
+        logger.info("CSRF protection enabled");
+    }
+
+    // ─── Request Logging ─────────────────────────────────────────────────
+    config.app.use(`${basePath}/*`, requestLogger());
 
     const collectionRegistry = new BackendCollectionRegistry();
     let activeCollections = config.collections || [];
     if (config.collectionsDir && activeCollections.length === 0) {
         activeCollections = await loadCollectionsFromDirectory(config.collectionsDir);
-        console.log(`📁 Auto-discovered ${activeCollections.length} collections from ${config.collectionsDir}`);
+        logger.info("Auto-discovered collections", { count: activeCollections.length, dir: config.collectionsDir });
     }
 
     const realtimeServices: Record<string, RealtimeProvider> = {};
@@ -119,7 +193,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // 1. Initialize all drivers
     for (const bootstrapper of bootstrappers) {
         const b = bootstrapper as BackendBootstrapper & { id?: string; isDefault?: boolean };
-        console.log(`📦 Running bootstrapper for driver: "${b.id || bootstrapper.type}"`);
+        logger.info("Running bootstrapper for driver", { driverId: b.id || bootstrapper.type });
         if (b.isDefault) {
             defaultDriverId = b.id || bootstrapper.type;
         }
@@ -161,18 +235,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
 
         if (defaultBootstrapper.initializeAuth) {
-            console.log("🔐 Bootstrapping authentication via driver protocol...");
+            logger.info("Bootstrapping authentication via driver protocol");
             authConfigResult = await defaultBootstrapper.initializeAuth(config.auth, defaultDriverResult);
-            console.log("✅ Authentication initialized");
+            logger.info("Authentication initialized");
         } else {
-            console.warn("⚠️ Auth requested but default bootstrapper does not support initializeAuth");
+            logger.warn("Auth requested but default bootstrapper does not support initializeAuth");
         }
     }
 
     let historyConfigResult: Record<string, unknown> | undefined = undefined;
     if (config.history) {
         if (defaultBootstrapper.initializeHistory) {
-            console.log("📜 Bootstrapping entity history via driver protocol...");
+            logger.info("Bootstrapping entity history via driver protocol");
             historyConfigResult = await defaultBootstrapper.initializeHistory(config.history, defaultDriverResult);
 
             // Inject the historyService into the driver so saveEntity/deleteEntity can record history.
@@ -186,9 +260,9 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 }
             }
 
-            console.log("✅ Entity history initialized");
+            logger.info("Entity history initialized");
         } else {
-            console.warn("⚠️ History requested but default bootstrapper does not support initializeHistory");
+            logger.warn("History requested but default bootstrapper does not support initializeHistory");
         }
     }
 
@@ -197,26 +271,43 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     let storageController: StorageController | undefined;
 
     if (config.storage) {
-        console.log("📁 Configuring storage...");
+        logger.info("Configuring storage");
         const controllers: Record<string, StorageController> = {};
 
-        if (typeof config.storage === "object" && "type" in config.storage) {
-            const controller = createStorageController(config.storage as BackendStorageConfig);
-            controllers[DEFAULT_STORAGE_ID] = controller;
+        // Helper: resolve a single storage entry to a controller
+        const toController = (entry: BackendStorageConfig | StorageController, label: string): StorageController => {
+            // Duck-type: if it has uploadFile, it's already a controller instance
+            if (typeof (entry as StorageController).uploadFile === 'function') {
+                return entry as StorageController;
+            }
+            // Otherwise it's a config object — use the built-in factory
+            const conf = entry as BackendStorageConfig;
+            if (isProduction && conf.type === 'local') {
+                logger.warn(`Storage backend "${label}" uses local filesystem in production. ` +
+                    "Files will be lost on container restart. " +
+                    "Configure S3-compatible storage or a custom StorageController.");
+            }
+            return createStorageController(conf);
+        };
+
+        if (typeof config.storage === 'object' && ('type' in config.storage || typeof (config.storage as StorageController).uploadFile === 'function')) {
+            // Single storage config or controller
+            controllers[DEFAULT_STORAGE_ID] = toController(config.storage as BackendStorageConfig | StorageController, DEFAULT_STORAGE_ID);
         } else {
-            for (const [storageId, storageConfig] of Object.entries(config.storage as Record<string, BackendStorageConfig>)) {
-                controllers[storageId] = createStorageController(storageConfig);
+            // Multi-backend record
+            for (const [storageId, entry] of Object.entries(config.storage as Record<string, BackendStorageConfig | StorageController>)) {
+                controllers[storageId] = toController(entry, storageId);
             }
         }
 
         if (Object.keys(controllers).length > 0) {
             storageRegistry = DefaultStorageRegistry.create(controllers);
             storageController = storageRegistry.getDefault();
-            console.log(`✅ Initialized ${Object.keys(controllers).length} storage backend(s)`);
+            logger.info("Initialized storage backends", { count: Object.keys(controllers).length });
         }
     }
 
-    const basePath = config.basePath || "/api";
+    // basePath already resolved above
 
     // 4. Mount API Routes
     if (config.auth && authConfigResult) {
@@ -230,6 +321,56 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         if (config.auth.linkedin?.clientId && config.auth.linkedin?.clientSecret) {
             const { createLinkedinProvider } = await import("./auth");
             oauthProviders.push(createLinkedinProvider(config.auth.linkedin as { clientId: string; clientSecret: string }));
+        }
+
+        if (config.auth.github?.clientId && config.auth.github?.clientSecret) {
+            const { createGitHubProvider } = await import("./auth");
+            oauthProviders.push(createGitHubProvider(config.auth.github));
+        }
+
+        if (config.auth.microsoft?.clientId && config.auth.microsoft?.clientSecret) {
+            const { createMicrosoftProvider } = await import("./auth");
+            oauthProviders.push(createMicrosoftProvider(config.auth.microsoft));
+        }
+
+        if (config.auth.apple?.clientId && config.auth.apple?.teamId && config.auth.apple?.keyId && config.auth.apple?.privateKey) {
+            const { createAppleProvider } = await import("./auth");
+            oauthProviders.push(createAppleProvider(config.auth.apple));
+        }
+
+        if (config.auth.facebook?.clientId && config.auth.facebook?.clientSecret) {
+            const { createFacebookProvider } = await import("./auth");
+            oauthProviders.push(createFacebookProvider(config.auth.facebook));
+        }
+
+        if (config.auth.twitter?.clientId && config.auth.twitter?.clientSecret) {
+            const { createTwitterProvider } = await import("./auth");
+            oauthProviders.push(createTwitterProvider(config.auth.twitter));
+        }
+
+        if (config.auth.discord?.clientId && config.auth.discord?.clientSecret) {
+            const { createDiscordProvider } = await import("./auth");
+            oauthProviders.push(createDiscordProvider(config.auth.discord));
+        }
+
+        if (config.auth.gitlab?.clientId && config.auth.gitlab?.clientSecret) {
+            const { createGitLabProvider } = await import("./auth");
+            oauthProviders.push(createGitLabProvider(config.auth.gitlab));
+        }
+
+        if (config.auth.bitbucket?.clientId && config.auth.bitbucket?.clientSecret) {
+            const { createBitbucketProvider } = await import("./auth");
+            oauthProviders.push(createBitbucketProvider(config.auth.bitbucket));
+        }
+
+        if (config.auth.slack?.clientId && config.auth.slack?.clientSecret) {
+            const { createSlackProvider } = await import("./auth");
+            oauthProviders.push(createSlackProvider(config.auth.slack));
+        }
+
+        if (config.auth.spotify?.clientId && config.auth.spotify?.clientSecret) {
+            const { createSpotifyProvider } = await import("./auth");
+            oauthProviders.push(createSpotifyProvider(config.auth.spotify));
         }
 
         const authRoutes = createAuthRoutes({
@@ -260,15 +401,37 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             }
             
             config.app.route(`${basePath}/schema-editor`, schemaEditorRoutes);
-            console.log(`✅ Schema Editor mounted at ${basePath}/schema-editor`);
+            logger.info("Schema Editor mounted", { path: `${basePath}/schema-editor` });
         }
     }
 
     if (storageController) {
+        // Storage uploads get their own body limit, derived from the storage config's
+        // maxFileSize (default 50MB), which overrides the global API body limit.
+        const storageMaxSize = (
+            config.storage && typeof config.storage === "object" && "type" in config.storage
+                ? (config.storage as BackendStorageConfig & { maxFileSize?: number }).maxFileSize
+                : undefined
+        ) ?? 50 * 1024 * 1024;
+
         const storageRoutes = createStorageRoutes({
             controller: storageController,
             requireAuth: config.auth?.requireAuth ?? true
         });
+
+        // Apply a permissive body limit specifically for the upload endpoint
+        storageRoutes.use('/upload', bodyLimit({
+            maxSize: storageMaxSize,
+            onError: (c) => {
+                return c.json({
+                    error: {
+                        message: `File too large. Maximum upload size is ${Math.round(storageMaxSize / 1024 / 1024)}MB.`,
+                        code: "PAYLOAD_TOO_LARGE"
+                    }
+                }, 413);
+            }
+        }));
+
         config.app.route(`${basePath}/storage`, storageRoutes);
     }
 
@@ -318,7 +481,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             const fnRoutes = createFunctionRoutes(loadedFunctions);
             functionsRouter.route("/", fnRoutes);
             config.app.route(`${basePath}/functions`, functionsRouter);
-            console.log(`⚡ Mounted ${loadedFunctions.length} custom function(s) at ${basePath}/functions`);
+            logger.info("Mounted custom functions", { count: loadedFunctions.length, path: `${basePath}/functions` });
         }
     }
 
@@ -371,7 +534,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             // Start the scheduler
             cronScheduler.start();
 
-            console.log(`⏰ Mounted ${loadedCronJobs.length} cron job(s) at ${basePath}/cron`);
+            logger.info("Mounted cron jobs", { count: loadedCronJobs.length, path: `${basePath}/cron` });
         }
     }
 
@@ -379,7 +542,63 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         await (defaultBootstrapper as BackendBootstrapper & { initializeWebsockets: (...args: unknown[]) => unknown }).initializeWebsockets(config.server, defaultRealtimeService, defaultDriver, config.auth);
     }
 
-    console.log("✅ Rebase Backend Initialized");
+    logger.info("Rebase Backend Initialized");
+
+    // ── Deep Health Check ─────────────────────────────────────────────────
+    const healthCheck = async (): Promise<HealthCheckResult> => {
+        const start = performance.now();
+        try {
+            // Use executeSql if available (Postgres), otherwise try fetchCollection as a probe
+            if (typeof defaultDriver.executeSql === "function") {
+                await defaultDriver.executeSql("SELECT 1");
+            } else {
+                // Fallback: try a lightweight fetch to confirm driver is responsive
+                await defaultDriver.fetchCollection({ path: "__health_check_nonexistent__", limit: 1 });
+            }
+            const latencyMs = Math.round(performance.now() - start);
+            return { healthy: true, latencyMs };
+        } catch (error: unknown) {
+            const latencyMs = Math.round(performance.now() - start);
+            logger.error("Health check failed", {
+                error: error instanceof Error ? error : new Error(String(error)),
+                latencyMs
+            });
+            return {
+                healthy: false,
+                latencyMs,
+                details: {
+                    error: error instanceof Error ? error.message : String(error)
+                }
+            };
+        }
+    };
+
+    // ── Graceful Shutdown ─────────────────────────────────────────────────
+    const shutdown = (timeoutMs = 15_000): Promise<void> => {
+        return new Promise<void>((resolve) => {
+            logger.info("Shutting down Rebase Backend...");
+
+            // 1. Stop cron scheduler
+            if (cronScheduler) {
+                cronScheduler.stop();
+                logger.info("Cron scheduler stopped");
+            }
+
+            // 2. Close the HTTP server (stop accepting, drain in-flight)
+            config.server.close(() => {
+                logger.info("HTTP server closed");
+                resolve();
+            });
+
+            // 3. Force-resolve after timeout (unless disabled with 0)
+            if (timeoutMs > 0) {
+                setTimeout(() => {
+                    logger.warn(`Forced shutdown after ${timeoutMs / 1000}s timeout`);
+                    resolve();
+                }, timeoutMs).unref();
+            }
+        });
+    };
 
     return {
         driverRegistry,
@@ -391,6 +610,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         storageRegistry,
         storageController,
         collectionRegistry,
-        cronScheduler
+        cronScheduler,
+        healthCheck,
+        shutdown
     };
 }

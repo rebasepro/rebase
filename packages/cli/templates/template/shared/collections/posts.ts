@@ -1,4 +1,6 @@
 import { EntityCollection } from "@rebasepro/types";
+import authorsCollection from "./authors";
+import tagsCollection from "./tags";
 
 const postsCollection: EntityCollection = {
     name: "Posts",
@@ -46,8 +48,44 @@ const postsCollection: EntityCollection = {
                     color: "greenLight"
                 }
             ]
+        },
+        author: {
+            name: "Author",
+            type: "relation",
+            relationName: "author",
+            relation: {
+                relationName: "author",
+                cardinality: "one",
+                direction: "owning",
+                target: () => authorsCollection
+            }
+        },
+        tags: {
+            name: "Tags",
+            type: "relation",
+            relationName: "tags",
+            relation: {
+                relationName: "tags",
+                cardinality: "many",
+                direction: "owning",
+                target: () => tagsCollection
+            }
         }
-    }
+    },
+    relations: [
+        {
+            relationName: "author",
+            target: () => authorsCollection,
+            cardinality: "one",
+            direction: "owning"
+        },
+        {
+            relationName: "tags",
+            target: () => tagsCollection,
+            cardinality: "many",
+            direction: "owning"
+        }
+    ]
 };
 
 export default postsCollection;

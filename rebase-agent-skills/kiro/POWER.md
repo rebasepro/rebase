@@ -46,7 +46,7 @@ Once configured, the MCP server provides Rebase capabilities to your AI assistan
 ## Rebase Services Overview
 
 ### Core Services Available via MCP
-- **Collections & Data**: CRUD operations on Firestore/PostgreSQL collections
+- **Collections & Data**: CRUD operations on PostgreSQL collections
 - **Authentication**: User management, roles, and permissions
 - **Schema Generation**: AI-powered collection schema generation
 - **Data Export**: Export collection data as JSON

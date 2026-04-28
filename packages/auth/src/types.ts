@@ -7,6 +7,8 @@ import { AuthController, Role, User } from "@rebasepro/types";
 export type RebaseAuthController = AuthController & {
     /** Login with Google ID token from frontend Google Sign-In */
     googleLogin: (idToken: string) => Promise<void>;
+    /** Generic OAuth login — works with any provider. Posts payload to /auth/{providerId}. */
+    oauthLogin: (providerId: string, payload: Record<string, unknown>) => Promise<void>;
     /** Login with email and password */
     emailPasswordLogin: (email: string, password: string) => Promise<void>;
     /** Register a new user */

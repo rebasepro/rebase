@@ -126,6 +126,20 @@ export async function linkedinLogin(code: string, redirectUri: string): Promise<
 }
 
 /**
+ * Generic OAuth login — works with any provider registered on the backend.
+ * The `providerId` is used to build the endpoint: `/api/auth/{providerId}`.
+ */
+export async function oauthLogin(providerId: string, payload: Record<string, unknown>): Promise<AuthResponse> {
+    const response = await fetchWithHandling(`${baseApiUrl}/api/auth/${providerId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    });
+
+    return handleResponse<AuthResponse>(response);
+}
+
+/**
  * Refresh access token using refresh token
  */
 export async function refreshAccessToken(refreshToken: string): Promise<RefreshResponse> {
@@ -324,6 +338,8 @@ export interface AuthConfigResponse {
     linkedinEnabled: boolean;
     /** Whether email service is configured */
     emailServiceEnabled: boolean;
+    /** Complete list of enabled OAuth provider IDs (e.g. ["google", "github", "discord"]) */
+    enabledProviders?: string[];
 }
 
 /**

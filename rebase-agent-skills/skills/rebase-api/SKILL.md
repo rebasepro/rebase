@@ -148,6 +148,5 @@ mutation {
 
 ## References
 
-- **REST Query Parsing:** See [references/rest-query-parsing.md](references/rest-query-parsing.md) for detailed filter/sort logic.
-- **GraphQL Schema:** See [references/graphql-schema.md](references/graphql-schema.md) for the full auto-generated schema.
-- **Error Handling:** See [references/error-handling.md](references/error-handling.md) for API error codes and formats.
+- **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
+- **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)

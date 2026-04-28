@@ -16,6 +16,8 @@ export interface AuthCapabilities {
     sessionManagement?: boolean;
     profileUpdate?: boolean;
     emailVerification?: boolean;
+    /** List of enabled OAuth provider IDs (e.g. ["google", "github", "discord"]) */
+    enabledProviders?: string[];
 }
 
 /**
