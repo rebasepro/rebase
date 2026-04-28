@@ -69,7 +69,7 @@ describe("generateDrizzleSchema", () => {
         const cleanResult = cleanSchema(result);
 
         expect(cleanResult).toContain("author_id: varchar(\"author_id\").references(() => users.id, { onDelete: \"set null\" })");
-        const expectedRelation = `export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({ author: one(users, { fields: [posts.author_id], references: [users.id], relationName: \"author\" }) }));`;
+        const expectedRelation = `export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({ "author": one(users, { fields: [posts.author_id], references: [users.id], relationName: \"posts_author_id\" }) }));`;
         expect(cleanResult).toContain(cleanSchema(expectedRelation));
     });
 
@@ -112,7 +112,7 @@ describe("generateDrizzleSchema", () => {
         expect(cleanResult).toContain("post_id: varchar(\"post_id\").notNull().references(() => posts.id, { onDelete: \"cascade\" })");
         expect(cleanResult).toContain("tag_id: varchar(\"tag_id\").notNull().references(() => tags.id, { onDelete: \"cascade\" })");
         expect(cleanResult).toContain("(table) => ({ pk: primaryKey({ columns: [table.post_id, table.tag_id] }) })");
-        expect(cleanResult).toContain("export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({ tags: many(postsToTags, { relationName: \"tags\" }) }));");
+        expect(cleanResult).toContain("export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({ \"tags\": many(postsToTags, { relationName: \"tags\" }) }));");
     });
 
     describe("generateDrizzleSchema Column Types", () => {

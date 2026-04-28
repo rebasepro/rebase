@@ -1,0 +1,1 @@
+CREATE POLICY "test_policy" ON "users" AS PERMISSIVE FOR ALL TO public USING (true);

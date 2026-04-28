@@ -144,4 +144,14 @@ const postsCollection: EntityCollection = {
     ]
 };
 
+postsCollection.securityRules = [
+    {
+        name: "test_policy",
+        as: "permissive",
+        for: "all",
+        to: ["public"],
+        using: "true"
+    }
+];
+
 export default postsCollection;

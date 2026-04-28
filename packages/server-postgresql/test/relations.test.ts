@@ -260,7 +260,7 @@ describe("Comprehensive Relations Test Suite", () => {
             expect(cleanResult).toContain(`export const authorBooks = pgTable("author_books"`);
             expect(cleanResult).toContain(`author_id: varchar("author_id").notNull().references(() => authors.id, { onDelete: "cascade" })`);
             expect(cleanResult).toContain(`book_id: varchar("book_id").notNull().references(() => books.id, { onDelete: "cascade" })`);
-            expect(cleanResult).toContain(`export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({ books: many(authorBooks, { relationName: "books" }) }));`);
+            expect(cleanResult).toContain(`export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({ "books": many(authorBooks, { relationName: "books" }) }));`);
         });
 
         it("should handle a 4-table many-to-many chain with joinPath", async () => {
@@ -368,10 +368,10 @@ describe("Comprehensive Relations Test Suite", () => {
             expect(cleanResult).toContain(`author_id: varchar("author_id").references(() => authors.id, { onDelete: "set null" })`);
 
             // Should create owning relation on profiles
-            expect(cleanResult).toContain(`export const profilesRelations = drizzleRelations(profiles, ({ one, many }) => ({ author: one(authors, { fields: [profiles.author_id], references: [authors.id], relationName: "author" }) }));`);
+            expect(cleanResult).toContain(`export const profilesRelations = drizzleRelations(profiles, ({ one, many }) => ({ "author": one(authors, { fields: [profiles.author_id], references: [authors.id], relationName: "profiles_author_id" }) }));`);
 
             // Should create inverse relation on authors (this was previously missing)
-            expect(cleanResult).toContain(`export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({ profile: one(profiles, { fields: [authors.id], references: [profiles.author_id], relationName: "profile" }) }));`);
+            expect(cleanResult).toContain(`export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({ "profile": one(profiles, { fields: [authors.id], references: [profiles.author_id], relationName: "profiles_author_id" }) }));`);
         });
 
         it("should generate owning one-to-many relations", async () => {
@@ -408,7 +408,7 @@ describe("Comprehensive Relations Test Suite", () => {
             // Should create FK on posts table
             expect(cleanResult).toContain(`category_id: varchar("category_id").references(() => categories.id, { onDelete: "set null" })`);
             // Should create owning relation on posts
-            expect(cleanResult).toContain(`export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({ category: one(categories, { fields: [posts.category_id], references: [categories.id], relationName: "category" }) }));`);
+            expect(cleanResult).toContain(`export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({ "category": one(categories, { fields: [posts.category_id], references: [categories.id], relationName: "posts_category_id" }) }));`);
         });
     });
 
@@ -462,11 +462,11 @@ describe("Comprehensive Relations Test Suite", () => {
 
             // Check owning relation from author to publisher
             expect(cleanResult).toContain(`publisher_id: varchar("publisher_id").references(() => publishers.id, { onDelete: "set null" })`);
-            expect(cleanResult).toContain(`publisher: one(publishers, { fields: [authors.publisher_id], references: [publishers.id], relationName: "publisher" })`);
+            expect(cleanResult).toContain(`"publisher": one(publishers, { fields: [authors.publisher_id], references: [publishers.id], relationName: "authors_publisher_id" })`);
 
             // Check owning relation from book to author
             expect(cleanResult).toContain(`author_id: varchar("author_id").references(() => authors.id, { onDelete: "set null" })`);
-            expect(cleanResult).toContain(`author: one(authors, { fields: [books.author_id], references: [authors.id], relationName: "author" })`);
+            expect(cleanResult).toContain(`"author": one(authors, { fields: [books.author_id], references: [authors.id], relationName: "books_author_id" })`);
         });
     });
 
@@ -655,8 +655,211 @@ describe("Comprehensive Relations Test Suite", () => {
             expect(cleanResult).toContain("export const bEntities = pgTable(\"b_entities\"");
             expect(cleanResult).toContain("a_entity_id: varchar(\"a_entity_id\").references(() => aEntities.id, { onDelete: \"set null\" })");
             // Check that both drizzle relations are generated
-            expect(cleanResult).toContain("export const aEntitiesRelations = drizzleRelations(aEntities, ({ one, many }) => ({ b_entities: many(bEntities, { relationName: \"b_entities\" }) }));");
-            expect(cleanResult).toContain("export const bEntitiesRelations = drizzleRelations(bEntities, ({ one, many }) => ({ a_entity: one(aEntities, { fields: [bEntities.a_entity_id], references: [aEntities.id], relationName: \"a_entity\" }) }));");
+            expect(cleanResult).toContain("\"b_entities\": many(bEntities, { relationName: \"b_entities_a_entity_id\" })");
+            expect(cleanResult).toContain("\"a_entity\": one(aEntities, { fields: [bEntities.a_entity_id], references: [aEntities.id], relationName: \"b_entities_a_entity_id\" })");
         });
+    });
+});
+
+/**
+ * Regression tests for https://github.com/rebasepro/rebase/issues/XXX
+ * Ensures both sides of an owning/inverse relation emit the same `relationName`.
+ */
+describe("Shared relationName regression", () => {
+    const cleanSchema = (schema: string) => {
+        return schema
+            .replace(/\/\/.*$/gm, "")
+            .replace(/\/\*[\s\S]*?\*\//g, "")
+            .replace(/\n{2,}/g, "\n")
+            .replace(/\s+/g, " ")
+            .trim();
+    };
+
+    /**
+     * Helper that extracts all `relationName: "..."` values from generated schema output.
+     */
+    const extractRelationNames = (schema: string): string[] => {
+        const matches = schema.match(/relationName:\s*"([^"]+)"/g) ?? [];
+        return matches.map(m => m.replace(/relationName:\s*"/, "").replace(/"$/, ""));
+    };
+
+    it("should emit identical relationName for one-to-many owning + inverse pair", async () => {
+        const companiesCollection: EntityCollection = {
+            slug: "companies",
+            table: "companies",
+            name: "Companies",
+            properties: {
+                name: { type: "string" },
+            },
+            relations: [
+                {
+                    relationName: "jobs",
+                    target: () => jobsCollection,
+                    cardinality: "many",
+                    direction: "inverse",
+                    foreignKeyOnTarget: "company_id",
+                },
+            ],
+        };
+
+        const jobsCollection: EntityCollection = {
+            slug: "jobs",
+            table: "jobs",
+            name: "Jobs",
+            properties: {
+                title: { type: "string" },
+                company: { type: "relation", relationName: "company" },
+            },
+            relations: [
+                {
+                    relationName: "company",
+                    target: () => companiesCollection,
+                    cardinality: "one",
+                    direction: "owning",
+                    localKey: "company_id",
+                },
+            ],
+        };
+
+        const result = await generateSchema([companiesCollection, jobsCollection]);
+        const cleanResult = cleanSchema(result);
+
+        // Both sides must use the same deterministic name: jobs_company_id
+        const expectedSharedName = "jobs_company_id";
+
+        // Owning side (jobs → companies)
+        expect(cleanResult).toContain(
+            `"company": one(companies, { fields: [jobs.company_id], references: [companies.id], relationName: \"${expectedSharedName}\" })`
+        );
+
+        // Inverse side (companies → jobs)
+        expect(cleanResult).toContain(
+            `"jobs": many(jobs, { relationName: \"${expectedSharedName}\" })`
+        );
+
+        // Verify there are exactly 2 occurrences of the shared name
+        const allNames = extractRelationNames(result);
+        const matchingNames = allNames.filter(n => n === expectedSharedName);
+        expect(matchingNames).toHaveLength(2);
+    });
+
+    it("should emit identical relationName for one-to-one owning + inverse pair", async () => {
+        const usersCollection: EntityCollection = {
+            slug: "users",
+            table: "users",
+            name: "Users",
+            properties: {
+                name: { type: "string" },
+            },
+            relations: [
+                {
+                    relationName: "profile",
+                    target: () => profilesCollection,
+                    cardinality: "one",
+                    direction: "inverse",
+                    foreignKeyOnTarget: "user_id",
+                },
+            ],
+        };
+
+        const profilesCollection: EntityCollection = {
+            slug: "profiles",
+            table: "profiles",
+            name: "Profiles",
+            properties: {
+                bio: { type: "string" },
+                user: { type: "relation", relationName: "user" },
+            },
+            relations: [
+                {
+                    relationName: "user",
+                    target: () => usersCollection,
+                    cardinality: "one",
+                    direction: "owning",
+                    localKey: "user_id",
+                },
+            ],
+        };
+
+        const result = await generateSchema([usersCollection, profilesCollection]);
+        const cleanResult = cleanSchema(result);
+
+        const expectedSharedName = "profiles_user_id";
+
+        // Owning side (profiles → users)
+        expect(cleanResult).toContain(
+            `"user": one(users, { fields: [profiles.user_id], references: [users.id], relationName: \"${expectedSharedName}\" })`
+        );
+
+        // Inverse side (users → profiles)
+        expect(cleanResult).toContain(
+            `"profile": one(profiles, { fields: [users.id], references: [profiles.user_id], relationName: \"${expectedSharedName}\" })`
+        );
+
+        // Both must match
+        const allNames = extractRelationNames(result);
+        const matchingNames = allNames.filter(n => n === expectedSharedName);
+        expect(matchingNames).toHaveLength(2);
+    });
+
+    it("should emit different shared names for multiple relations between same tables", async () => {
+        const companiesCollection: EntityCollection = {
+            slug: "companies",
+            table: "companies",
+            name: "Companies",
+            properties: { name: { type: "string" } },
+            relations: [
+                {
+                    relationName: "employees",
+                    target: () => peopleCollection,
+                    cardinality: "many",
+                    direction: "inverse",
+                    foreignKeyOnTarget: "employer_id",
+                },
+                {
+                    relationName: "founders",
+                    target: () => peopleCollection,
+                    cardinality: "many",
+                    direction: "inverse",
+                    foreignKeyOnTarget: "startup_id",
+                },
+            ],
+        };
+
+        const peopleCollection: EntityCollection = {
+            slug: "people",
+            table: "people",
+            name: "People",
+            properties: {
+                name: { type: "string" },
+                employer: { type: "relation", relationName: "employer" },
+                startup: { type: "relation", relationName: "startup" },
+            },
+            relations: [
+                {
+                    relationName: "employer",
+                    target: () => companiesCollection,
+                    cardinality: "one",
+                    direction: "owning",
+                    localKey: "employer_id",
+                },
+                {
+                    relationName: "startup",
+                    target: () => companiesCollection,
+                    cardinality: "one",
+                    direction: "owning",
+                    localKey: "startup_id",
+                },
+            ],
+        };
+
+        const result = await generateSchema([companiesCollection, peopleCollection]);
+        const allNames = extractRelationNames(result);
+
+        // Each pair should have a distinct shared name
+        const employerNames = allNames.filter(n => n === "people_employer_id");
+        const startupNames = allNames.filter(n => n === "people_startup_id");
+        expect(employerNames).toHaveLength(2);
+        expect(startupNames).toHaveLength(2);
     });
 });

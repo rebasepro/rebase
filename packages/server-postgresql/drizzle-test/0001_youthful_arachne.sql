@@ -1,0 +1,1 @@
+ALTER POLICY "old_policy" ON "test" TO public USING (true);

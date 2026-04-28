@@ -55,23 +55,47 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
     if (subcommand === "generate") {
         console.log("");
         console.log(chalk.bold("  📦 Rebase DB Generate"));
-        console.log(chalk.gray("  Step 1/2: Generating Drizzle schema from collections..."));
+        console.log(chalk.gray("  Step 1/3: Generating Drizzle schema from collections..."));
         console.log("");
-        await schemaCommand("generate", rawArgs);
+        await schemaCommand("generate", [...rawArgs, "--strip-policies"]);
         console.log("");
-        console.log(chalk.gray("  Step 2/2: Generating SQL migration files..."));
+        console.log(chalk.gray("  Step 2/3: Generating SQL migration files..."));
         console.log("");
         await runDrizzleKit("generate", rawArgs);
+        console.log("");
+        console.log(chalk.gray("  Step 3/3: Syncing security policies..."));
+        console.log("");
+        await runSyncPolicies(rawArgs);
         console.log("");
         console.log(`  You can now run ${chalk.bold.green("rebase db migrate")} to apply the migrations to your database.`);
         console.log("");
     } else {
-        // For push/pull/migrate/studio, print a clear header so the user
-        // sees output even when drizzle-kit itself is quiet.
         console.log("");
         console.log(chalk.bold(`  🗄️  Rebase DB ${subcommand.charAt(0).toUpperCase() + subcommand.slice(1)}`));
         console.log("");
-        await runDrizzleKit(subcommand, rawArgs);
+
+        if (subcommand === "push") {
+            console.log(chalk.gray("  Step 1/3: Generating Drizzle schema from collections..."));
+            console.log("");
+            await schemaCommand("generate", [...rawArgs, "--strip-policies"]);
+            console.log("");
+            console.log(chalk.gray("  Step 2/3: Pushing schema to database..."));
+            console.log("");
+            await runDrizzleKit("push", rawArgs);
+            console.log("");
+            console.log(chalk.gray("  Step 3/3: Syncing security policies..."));
+            console.log("");
+            await runSyncPolicies(rawArgs);
+        } else if (subcommand === "migrate") {
+            await runDrizzleKit("migrate", rawArgs);
+            console.log("");
+            console.log(chalk.gray("  Syncing security policies..."));
+            console.log("");
+            await runSyncPolicies(rawArgs);
+        } else {
+            await runDrizzleKit(subcommand, rawArgs);
+        }
+
         console.log("");
         console.log(chalk.green(`  ✓ rebase db ${subcommand} completed successfully.`));
         console.log("");
@@ -272,11 +296,23 @@ async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> 
     }
 
     try {
-        await execa(drizzleKitBin, [action], {
+        const result = await execa(drizzleKitBin, [action], {
             cwd: process.cwd(),
-            stdio: "inherit",
             env: { ...process.env as Record<string, string> },
+            reject: false,
         });
+
+        if (result.stdout) {
+            console.log(result.stdout);
+        }
+        if (result.stderr) {
+            console.error(result.stderr);
+        }
+
+        if (result.exitCode !== 0 || (result.stderr && result.stderr.includes("Error:"))) {
+            console.error(chalk.red(`✗ drizzle-kit ${action} failed.`));
+            process.exit(1);
+        }
     } catch (err: unknown) {
         console.error(chalk.red(`✗ Failed to run drizzle-kit ${action}: ${err instanceof Error ? err.message : String(err)}`));
         process.exit(1);
@@ -331,6 +367,11 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
         if (watch) {
             cmdParts.push("--watch");
         }
+        // When we are doing the db push/generate sequence, we want to hide policies from drizzle-kit
+        // because drizzle-kit misidentifies policy changes as renamed columns/tables and prompts.
+        if (rawArgs.includes("--strip-policies")) {
+            cmdParts.push("--strip-policies");
+        }
 
         try {
             await execa(cmdParts[0], cmdParts.slice(1), {
@@ -344,6 +385,50 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
         }
     } else {
         console.error(chalk.red(`Unknown schema command.`));
+        process.exit(1);
+    }
+}
+
+async function runSyncPolicies(rawArgs: string[]): Promise<void> {
+    const argsList = arg(
+        {
+            "--collections": String,
+            "-c": "--collections",
+        },
+        {
+            argv: rawArgs.slice(2),
+            permissive: true,
+        }
+    );
+
+    const scriptPath = path.join(__dirname, "schema", "sync-policies.ts");
+    if (!fs.existsSync(scriptPath)) {
+        console.error(chalk.red(`✗ Could not find sync-policies.ts at ${scriptPath}`));
+        process.exit(1);
+    }
+    
+    const tsxBin = resolveLocalBin("tsx");
+    if (!tsxBin) {
+        console.error(chalk.red("✗ Could not find tsx binary."));
+        process.exit(1);
+    }
+
+    const collectionsPath = argsList["--collections"] || path.join("..", "shared", "collections");
+
+    const cmdParts = [
+        tsxBin,
+        scriptPath,
+        `--collections=${collectionsPath}`,
+    ];
+
+    try {
+        await execa(cmdParts[0], cmdParts.slice(1), {
+            cwd: process.cwd(),
+            stdio: "inherit",
+            env: { ...process.env as Record<string, string> },
+        });
+    } catch (err: unknown) {
+        console.error(chalk.red(`✗ Failed to sync policies: ${err instanceof Error ? err.message : String(err)}`));
         process.exit(1);
     }
 }

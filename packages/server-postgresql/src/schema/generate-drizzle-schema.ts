@@ -44,7 +44,7 @@ const formatTerminalText = (text: string, options: {
 
 // --- Execution and Watch Logic ---
 
-const runGeneration = async (collectionsFilePath?: string, outputPath?: string) => {
+const runGeneration = async (collectionsFilePath?: string, outputPath?: string, stripPolicies?: boolean) => {
     try {
         if (!collectionsFilePath) {
             console.error("Error: No collections file path provided. Skipping schema generation.");
@@ -89,7 +89,7 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
             return;
         }
 
-        const schemaContent = await generateSchema(collections);
+        const schemaContent = await generateSchema(collections, stripPolicies);
 
         if (outputPath) {
             const outputDir = path.dirname(outputPath);
@@ -120,6 +120,7 @@ const main = () => {
     const outputPath = outputPathArg ? outputPathArg.split("=")[1] : undefined;
 
     const watch = process.argv.includes("--watch");
+    const stripPolicies = process.argv.includes("--strip-policies");
 
     if (!collectionsFilePath) {
         console.log("Usage: ts-node generate-drizzle-schema.ts <path-to-collections-file> [--output <path-to-output-file>] [--watch]");
@@ -138,10 +139,10 @@ const main = () => {
 
         watcher.on("all", (event, filePath) => {
             console.log(`[${event}] ${filePath}. Regenerating schema...`);
-            runGeneration(resolvedPath, resolvedOutputPath);
+            runGeneration(resolvedPath, resolvedOutputPath, stripPolicies);
         });
     } else {
-        runGeneration(resolvedPath, resolvedOutputPath);
+        runGeneration(resolvedPath, resolvedOutputPath, stripPolicies);
     }
 };
 

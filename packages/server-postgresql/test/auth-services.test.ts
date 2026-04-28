@@ -30,7 +30,8 @@ describe("Auth Services", () => {
         mockInsertReturning = jest.fn().mockResolvedValue([]);
         mockInsertValues = jest.fn().mockReturnValue({ 
             returning: mockInsertReturning,
-            onConflictDoUpdate: jest.fn().mockReturnValue({ returning: mockInsertReturning })
+            onConflictDoUpdate: jest.fn().mockReturnValue({ returning: mockInsertReturning }),
+            onConflictDoNothing: jest.fn().mockReturnValue({ returning: mockInsertReturning })
         });
 
         mockSelectWhere = jest.fn().mockResolvedValue([]);
