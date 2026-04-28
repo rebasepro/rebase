@@ -1,20 +1,18 @@
 import type { FieldProps } from "../../types/fields";
 import type { StringProperty } from "@rebasepro/types";
-import React, { useCallback } from "react";
+import React from "react";
 
 import { FieldHelperText, LabelWithIcon } from "../components";
 import { getIconForProperty } from "../../util/property_utils";
-import { CloseIcon, cls, IconButton, Select, SelectItem } from "@rebasepro/ui";
 import { PropertyIdCopyTooltip } from "../../components/PropertyIdCopyTooltip";
-import { useInternalUserManagementController } from "@rebasepro/core";
-import { UserDisplay } from "@rebasepro/core";
-import { User } from "@rebasepro/types";
+import { UserSelector } from "../../components/UserSelector";
 
 type UserSelectProps = FieldProps<StringProperty>;
 
 /**
  * Field binding for selecting a user from the internal user management system.
- * Renders a select dropdown with user information including name and email.
+ * Renders a searchable popover dropdown with user information including name and email,
+ * with server-side search and pagination support.
  *
  * This is one of the internal components that get mapped natively inside forms
  * and tables to the specified properties.
@@ -34,58 +32,28 @@ export function UserSelectFieldBinding({
     size = "large"
 }: UserSelectProps) {
 
-    const userManagementContext = useInternalUserManagementController<User>();
-    const users = userManagementContext?.users ?? [];
-    const getUser = userManagementContext?.getUser;
-
-    const handleClearClick = useCallback((e: React.MouseEvent) => {
-        e.stopPropagation();
-        e.preventDefault();
-        setValue(null);
-    }, [setValue]);
+    const selectorSize: "small" | "medium" | undefined = size === "large" ? "medium" : size;
 
     return (
         <>
-            <Select
-                value={value !== undefined && value != null ? value.toString() : ""}
+            <PropertyIdCopyTooltip propertyKey={propertyKey}>
+                <LabelWithIcon
+                    icon={getIconForProperty(property, "small")}
+                    required={property.validation?.required}
+                    title={property.name}
+                    className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5 my-0"}
+                />
+            </PropertyIdCopyTooltip>
+
+            <UserSelector
+                value={value ?? null}
+                onValueChange={(userId) => {
+                    setValue(userId);
+                }}
                 disabled={disabled}
-                size={size}
-                fullWidth={true}
-                position="item-aligned"
-                inputClassName={cls("w-full")}
-                label={
-                    <PropertyIdCopyTooltip propertyKey={propertyKey}>
-                        <LabelWithIcon
-                            icon={getIconForProperty(property, "small")}
-                            required={property.validation?.required}
-                            title={property.name}
-                            className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5 my-0"}
-                        />
-                    </PropertyIdCopyTooltip>}
-                endAdornment={
-                    property.clearable && !disabled && value && <IconButton
-                        size="small"
-                        onClick={handleClearClick}>
-                        <CloseIcon size={"small"} />
-                    </IconButton>
-                }
-                onValueChange={(updatedValue: string) => {
-                    const newValue = updatedValue || null;
-                    return setValue(newValue);
-                }}
-                renderValue={(userId: string) => {
-                    const user = users.find((u: User) => u.uid === userId) || getUser?.(userId) || null;
-                    return <UserDisplay user={user} />;
-                }}
-            >
-                {users && users.map((user: User) => {
-                    return <SelectItem
-                        key={user.uid}
-                        value={user.uid}>
-                        <UserDisplay user={user} />
-                    </SelectItem>
-                })}
-            </Select>
+                clearable={property.clearable}
+                size={selectorSize}
+            />
 
             <FieldHelperText includeDescription={includeDescription}
                 showError={showError}

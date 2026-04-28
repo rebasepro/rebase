@@ -43,6 +43,7 @@ export interface UserManagement<USER extends User = User> {
         offset?: number;
         orderBy?: string;
         orderDir?: "asc" | "desc";
+        roleId?: string;
     }) => Promise<{ users: USER[]; total: number }>;
 
     usersError?: Error;
@@ -241,22 +242,18 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
     }, [apiRequest]);
 
     /**
-     * Load admin users (users that have roles) for getUser/defineRolesFor lookups.
-     * This is intentionally a small subset — not all app users.
+     * Load users for getUser/defineRolesFor lookups and for UserSelect dropdowns.
      */
-    const loadAdminUsers = useCallback(async (signal?: AbortSignal) => {
+    const loadUsers = useCallback(async (signal?: AbortSignal) => {
         try {
-            // Load all users — for now this is the same endpoint.
-            // In future, a dedicated endpoint could filter by "has roles" on the server.
+            // Load all users to satisfy Rebase CMS UserSelect field bindings
             const data = await apiRequest("/users", "GET", undefined, 6, signal);
             const allUsers: User[] = data.users.map((u: ApiUser) => convertUser(u));
-            // Only keep users that have at least one role assigned
-            const adminUsers = allUsers.filter(u => u.roles && u.roles.length > 0);
-            setUsers(adminUsers);
+            setUsers(allUsers);
             setUsersError(undefined);
         } catch (error: unknown) {
             if (error instanceof Error && error.name === "AbortError") return;
-            console.error("Failed to load admin users:", error);
+            console.error("Failed to load users:", error);
             setUsersError(error instanceof Error ? error : new Error(String(error)));
         }
     }, [apiRequest]);
@@ -287,9 +284,9 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
                     setRolesError(error);
                 }
             }
-            // Then load admin users if not aborted
+            // Then load all users if not aborted
             if (!abortController.signal.aborted) {
-                await loadAdminUsers(abortController.signal);
+                await loadUsers(abortController.signal);
             }
             
             if (!abortController.signal.aborted) {
@@ -301,7 +298,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
         return () => {
             abortController.abort();
         };
-    }, [currentUser, apiRequest, loadAdminUsers]);
+    }, [currentUser, apiRequest, loadUsers]);
 
     /**
      * Search users with server-side pagination.
@@ -313,6 +310,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
         offset?: number;
         orderBy?: string;
         orderDir?: "asc" | "desc";
+        roleId?: string;
     }): Promise<{ users: User[]; total: number }> => {
         const params = new URLSearchParams();
         if (options.limit !== undefined) params.set("limit", String(options.limit));
@@ -320,6 +318,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
         if (options.search) params.set("search", options.search);
         if (options.orderBy) params.set("orderBy", options.orderBy);
         if (options.orderDir) params.set("orderDir", options.orderDir);
+        if (options.roleId) params.set("role", options.roleId);
         const qs = params.toString();
 
         const data = await apiRequest("/users" + (qs ? "?" + qs : ""), "GET");
@@ -378,10 +377,8 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
             roles: roleIds
         });
         const created = convertUser(data.user);
-        // Add to admin users cache if they have roles
-        if (created.roles && created.roles.length > 0) {
-            setUsers(prev => [...prev, created]);
-        }
+        // Add to users cache
+        setUsers(prev => [...prev, created]);
         return {
             user: created,
             invitationSent: data.invitationSent ?? false,
@@ -489,12 +486,12 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
             const data = await apiRequest("/roles");
             const loadedRoles = data.roles.map(convertRole);
             setRoles(loadedRoles);
-            await loadAdminUsers();
+            await loadUsers();
         } catch (error) {
             console.error("Failed to bootstrap admin:", error);
             throw error;
         }
-    }, [apiRequest, loadAdminUsers]);
+    }, [apiRequest, loadUsers]);
 
     return {
         loading,

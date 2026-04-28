@@ -117,7 +117,8 @@ export function createAdminRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
                 offset,
                 search: search || undefined,
                 orderBy: orderBy || undefined,
-                orderDir: orderDir || undefined
+                orderDir: orderDir || undefined,
+                roleId: c.req.query("role") || undefined
             });
 
             const usersWithRoles = await Promise.all(

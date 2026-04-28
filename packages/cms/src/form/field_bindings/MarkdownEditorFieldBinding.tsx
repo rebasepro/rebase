@@ -4,7 +4,7 @@ import { useAuthController, useStorageSource } from "@rebasepro/core";
 import { getIconForProperty } from "../../util/property_utils";
 import type { FieldProps } from "../../types/fields";
 import type { ArrayProperty, StringProperty } from "@rebasepro/types";
-import { cls, fieldBackgroundDisabledMixin, fieldBackgroundHoverMixin, fieldBackgroundMixin } from "@rebasepro/ui";
+import { cls, fieldBackgroundDisabledMixin, fieldBackgroundHoverMixin, fieldBackgroundMixin, IconButton, CloseIcon } from "@rebasepro/ui";
 import { RebaseEditor, RebaseEditorProps } from "../../editor";
 import { resolveStorageFilenameString, resolveStoragePathString } from "@rebasepro/common";
 import { randomString } from "@rebasepro/utils";
@@ -44,17 +44,21 @@ export function MarkdownEditorFieldBinding({
     const internalValue = useRef<string | null>(value);
 
     const onContentChange = useCallback((content: string) => {
-        if (content === value || (value === null && content === "")) {
+        // Guard against markdown roundtrip normalization producing slightly different output
+        // (e.g., trailing newlines added by trailingNodePlugin, whitespace normalization).
+        const normalizedContent = content?.trimEnd() ?? "";
+        const normalizedValue = (value ?? "").trimEnd();
+        if (normalizedContent === normalizedValue) {
             return;
         }
         internalValue.current = content;
         setValue(content);
-    }, [setValue]);
+    }, [setValue, value]);
 
     useEffect(() => {
         if (internalValue.current !== value) {
             internalValue.current = value;
-            setFieldVersion(fieldVersion + 1);
+            setFieldVersion(v => v + 1);
         }
     }, [value]);
 
@@ -121,12 +125,27 @@ export function MarkdownEditorFieldBinding({
 
     return (
         <>
-            <LabelWithIconAndTooltip
-                propertyKey={propertyKey}
-                icon={getIconForProperty(property, "small")}
-                required={property.validation?.required}
-                title={property.name ?? propertyKey}
-                className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5"} />
+            <div className="flex items-center w-full">
+                <LabelWithIconAndTooltip
+                    propertyKey={propertyKey}
+                    icon={getIconForProperty(property, "small")}
+                    required={property.validation?.required}
+                    title={property.name ?? propertyKey}
+                    className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5"} />
+                <div className="flex-grow"/>
+                {property.clearable && !disabled && (
+                    <IconButton
+                        size="small"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            setValue(null);
+                        }}
+                    >
+                        <CloseIcon size={"small"}/>
+                    </IconButton>
+                )}
+            </div>
             <div
                 className={cls("rounded-md", fieldBackgroundMixin, disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin)}>
                 {editor}

@@ -145,6 +145,8 @@ export interface ListUsersOptions {
     orderBy?: string;
     /** Sort direction (default "desc") */
     orderDir?: "asc" | "desc";
+    /** Filter by role ID */
+    roleId?: string;
 }
 
 /**

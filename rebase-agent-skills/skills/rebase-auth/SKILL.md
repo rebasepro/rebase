@@ -109,20 +109,24 @@ const roles = [
 ];
 ```
 
-### 3. Apply RLS Policies
+### 3. Apply Security Rules (RLS)
 
-RLS policies are defined per-collection to restrict data access:
+Security rules are defined per-collection via the `securityRules` array. Rebase generates PostgreSQL RLS policies from these definitions:
 
 ```typescript
 const postsCollection: EntityCollection = {
     name: "Posts",
     table: "posts",
-    rlsPolicies: {
-        select: "auth.uid() IS NOT NULL",  // Any authenticated user can read
-        insert: "'editor' = ANY(auth.roles())",  // Only editors can create
-        update: "auth.uid() = author_id",  // Only the author can update
-        delete: "'admin' = ANY(auth.roles())",  // Only admins can delete
-    },
+    securityRules: [
+        // Any authenticated user can read
+        { operation: "select", access: "authenticated" },
+        // Only editors can create
+        { operation: "insert", roles: ["editor"] },
+        // Only the author can update their own posts
+        { operation: "update", ownerField: "author_id" },
+        // Only admins can delete
+        { operation: "delete", roles: ["admin"] }
+    ],
     properties: {
         // ...
     }

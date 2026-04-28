@@ -158,8 +158,8 @@ You can set default or forced filters:
 
 ## Next Steps
 
+- **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks for syncing data between collections, validation, side effects
 - **[Properties](/docs/collections/properties)** — All property types and options
 - **[Relations](/docs/collections/relations)** — Foreign keys, junction tables, joins
 - **[Security Rules](/docs/collections/security-rules)** — Row Level Security
 - **[View Modes](/docs/frontend/view-modes)** — Table, Cards, Kanban
-- **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks

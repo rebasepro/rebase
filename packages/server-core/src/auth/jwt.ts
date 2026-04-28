@@ -10,6 +10,7 @@ export interface JwtConfig {
 export interface AccessTokenPayload {
     userId: string;
     roles: string[];
+    uid?: string;
 }
 
 let jwtConfig: JwtConfig = {
@@ -120,10 +121,12 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
     }
 
     try {
-        const decoded = jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] }) as jwt.JwtPayload & AccessTokenPayload;
+        const decoded = jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] }) as any;
+        const id = decoded.userId || decoded.uid || decoded.sub;
         return {
-            userId: decoded.userId,
-            roles: decoded.roles
+            userId: id,
+            uid: id,
+            roles: decoded.roles || []
         };
     } catch (error) {
         return null;

@@ -542,11 +542,11 @@ export const generateSchema = async (collections: EntityCollection[]): Promise<s
                 }
 
                 // Source side one(): pairs with owning table's many(junctionTable, { relationName })
-                tableRelations.push(`    ${relation.through.sourceColumn}: one(${sourceTableVar}, {\n        fields: [${tableVarName}.${relation.through.sourceColumn}],\n        references: [${sourceTableVar}.${sourceId}],\n        relationName: \"${owningRelationName}\"\n    })`);
+                tableRelations.push(`    "${relation.through.sourceColumn}": one(${sourceTableVar}, {\n        fields: [${tableVarName}.${relation.through.sourceColumn}],\n        references: [${sourceTableVar}.${sourceId}],\n        relationName: \"${owningRelationName}\"\n    })`);
 
                 // Target side one(): pairs with inverse table's many(junctionTable, { relationName })
                 const targetRelName = inverseRelationName ?? owningRelationName;
-                tableRelations.push(`    ${relation.through.targetColumn}: one(${targetTableVar}, {\n        fields: [${tableVarName}.${relation.through.targetColumn}],\n        references: [${targetTableVar}.${targetId}],\n        relationName: \"${targetRelName}\"\n    })`);
+                tableRelations.push(`    "${relation.through.targetColumn}": one(${targetTableVar}, {\n        fields: [${tableVarName}.${relation.through.targetColumn}],\n        references: [${targetTableVar}.${targetId}],\n        relationName: \"${targetRelName}\"\n    })`);
             }
         } else {
             const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection<any, any>);
@@ -562,10 +562,10 @@ export const generateSchema = async (collections: EntityCollection[]): Promise<s
 
                     if (rel.cardinality === "one") {
                         if (rel.direction === "owning" && rel.localKey) {
-                            tableRelations.push(`    ${relationKey}: one(${targetTableVar}, {\n        fields: [${tableVarName}.${rel.localKey}],\n        references: [${targetTableVar}.${getPrimaryKeyName(target)}],\n        relationName: \"${drizzleRelationName}\"\n    })`);
+                            tableRelations.push(`    "${relationKey}": one(${targetTableVar}, {\n        fields: [${tableVarName}.${rel.localKey}],\n        references: [${targetTableVar}.${getPrimaryKeyName(target)}],\n        relationName: \"${drizzleRelationName}\"\n    })`);
                         } else if (rel.direction === "inverse" && rel.foreignKeyOnTarget) {
                             const sourceIdField = getPrimaryKeyName(collection);
-                            tableRelations.push(`    ${relationKey}: one(${targetTableVar}, {\n        fields: [${tableVarName}.${sourceIdField}],\n        references: [${targetTableVar}.${rel.foreignKeyOnTarget}],\n        relationName: \"${drizzleRelationName}\"\n    })`);
+                            tableRelations.push(`    "${relationKey}": one(${targetTableVar}, {\n        fields: [${tableVarName}.${sourceIdField}],\n        references: [${targetTableVar}.${rel.foreignKeyOnTarget}],\n        relationName: \"${drizzleRelationName}\"\n    })`);
                         } else if (rel.direction === "inverse" && !rel.foreignKeyOnTarget) {
                             // Handle inverse one-to-one relations where the FK is on the target table
                             // but foreignKeyOnTarget is not explicitly specified
@@ -583,7 +583,7 @@ export const generateSchema = async (collections: EntityCollection[]): Promise<s
 
                                 if (correspondingRelation && correspondingRelation.localKey) {
                                     const sourceIdField = getPrimaryKeyName(collection);
-                                    tableRelations.push(`    ${relationKey}: one(${targetTableVar}, {\n        fields: [${tableVarName}.${sourceIdField}],\n        references: [${targetTableVar}.${correspondingRelation.localKey}],\n        relationName: \"${drizzleRelationName}\"\n    })`);
+                                    tableRelations.push(`    "${relationKey}": one(${targetTableVar}, {\n        fields: [${tableVarName}.${sourceIdField}],\n        references: [${targetTableVar}.${correspondingRelation.localKey}],\n        relationName: \"${drizzleRelationName}\"\n    })`);
                                 }
                             } catch (e) {
                                 console.warn(`Could not resolve inverse one-to-one relation '${relationKey}':`, e);
@@ -592,11 +592,11 @@ export const generateSchema = async (collections: EntityCollection[]): Promise<s
                     } else if (rel.cardinality === "many") {
                         if (rel.direction === "inverse" && rel.foreignKeyOnTarget) {
                             // One-to-many inverse relation
-                            tableRelations.push(`    ${relationKey}: many(${targetTableVar}, { relationName: \"${drizzleRelationName}\" })`);
+                            tableRelations.push(`    "${relationKey}": many(${targetTableVar}, { relationName: \"${drizzleRelationName}\" })`);
                         } else if (rel.through) {
                             // Many-to-many owning relation with explicit junction table
                             const junctionTableVar = getTableVarName(rel.through.table);
-                            tableRelations.push(`    ${relationKey}: many(${junctionTableVar}, { relationName: \"${drizzleRelationName}\" })`);
+                            tableRelations.push(`    "${relationKey}": many(${junctionTableVar}, { relationName: \"${drizzleRelationName}\" })`);
                         } else if (rel.direction === "inverse" && rel.inverseRelationName) {
                             // Many-to-many inverse relation - find the corresponding owning relation's junction table
                             try {
@@ -613,7 +613,7 @@ export const generateSchema = async (collections: EntityCollection[]): Promise<s
 
                                 if (correspondingRelation && correspondingRelation.through) {
                                     const junctionTableVar = getTableVarName(correspondingRelation.through.table);
-                                    tableRelations.push(`    ${relationKey}: many(${junctionTableVar}, { relationName: \"${drizzleRelationName}\" })`);
+                                    tableRelations.push(`    "${relationKey}": many(${junctionTableVar}, { relationName: \"${drizzleRelationName}\" })`);
                                 } else {
                                     console.warn(`Could not find corresponding owning many-to-many relation for inverse relation '${relationKey}' on '${collection.name}'`);
                                 }

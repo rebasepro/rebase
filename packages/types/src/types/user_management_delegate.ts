@@ -59,6 +59,7 @@ export interface UserManagementDelegate<USER extends User = User> {
         offset?: number;
         orderBy?: string;
         orderDir?: "asc" | "desc";
+        roleId?: string;
     }) => Promise<{ users: USER[]; total: number }>;
 
     /**

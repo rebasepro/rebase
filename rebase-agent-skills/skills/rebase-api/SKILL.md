@@ -5,6 +5,8 @@ description: Guide for working with Rebase auto-generated REST and GraphQL APIs.
 
 # Rebase Auto-Generated APIs
 
+> **WARNING FOR AGENTS**: If you are writing a script or data task, **default to using the Rebase SDK** (`@rebasepro/client` or `@rebasepro/server-core`) instead of making raw REST or GraphQL API calls (`fetch` / `curl`). Only use raw API calls if specifically instructed to do so or if you are demonstrating HTTP usage to the user.
+
 Every collection defined in Rebase automatically gets full REST CRUD and GraphQL endpoints. No manual route creation needed.
 
 ## REST API

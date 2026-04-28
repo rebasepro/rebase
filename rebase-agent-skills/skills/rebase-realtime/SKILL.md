@@ -55,7 +55,60 @@ server.listen(3001);
 
 ## Client-Side Subscription
 
-### JavaScript/TypeScript Client
+### Rebase SDK (Recommended)
+
+The `@rebasepro/client` SDK provides a high-level API with automatic reconnection, auth token management, and typed responses:
+
+```typescript
+import { createRebaseClient } from "@rebasepro/client";
+
+const client = createRebaseClient({
+    baseUrl: "http://localhost:3001",
+    websocketUrl: "ws://localhost:3001"
+});
+
+// Subscribe to a collection — get called whenever data changes
+const unsubscribe = client.data.listenCollection(
+    "products",
+    {
+        filter: { active: ["==", true] },
+        limit: 50
+    },
+    (entities) => {
+        console.log("Products updated:", entities);
+    }
+);
+
+// Subscribe to a single entity
+const unsubscribe2 = client.data.listenEntity(
+    "products",
+    42,
+    (entity) => {
+        console.log("Product changed:", entity);
+    }
+);
+
+// Unsubscribe when done
+unsubscribe();
+unsubscribe2();
+```
+
+### React Hooks
+
+In a Rebase frontend, use the hooks from `@rebasepro/core`:
+
+```typescript
+import { useRebaseClient } from "@rebasepro/core";
+
+function ProductList() {
+    const client = useRebaseClient();
+    // client.data.listenCollection(...) or client.data.fetchCollection(...)
+}
+```
+
+### Raw WebSocket (Low-Level)
+
+For environments where the SDK is not available:
 
 ```typescript
 const ws = new WebSocket("ws://localhost:3001/ws");

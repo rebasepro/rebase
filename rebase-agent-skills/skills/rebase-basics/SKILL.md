@@ -64,6 +64,8 @@ Please adhere to these principles when working with Rebase, as they ensure relia
 
 7. **Never deploy to production:** Agents should never run `firebase deploy`, `gcloud deploy`, or any command that pushes code to live infrastructure. Provide the exact command and let the user run it themselves.
 
+8. **Scripting and Data Tasks:** Default to using the Rebase SDK (`@rebasepro/client` or `@rebasepro/server-core`) to write scripts or tasks for manipulating data. NEVER default to using raw `psql` queries or raw REST API calls (`fetch`/`curl`) unless explicitly instructed or the SDK lacks the functionality.
+
 # Project Structure
 
 ```

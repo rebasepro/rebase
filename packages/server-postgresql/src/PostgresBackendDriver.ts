@@ -411,7 +411,7 @@ export class PostgresBackendDriver implements DataDriver {
                         collection: resolvedCollection as EntityCollection<M>,
                         path,
                         entityId: savedEntity.id,
-                        values: updatedValues,
+                        values: savedEntity.values,
                         previousValues: previousValuesForHistory,
                         status,
                         context: contextForCallback
@@ -422,7 +422,7 @@ export class PostgresBackendDriver implements DataDriver {
                         collection: resolvedCollection as EntityCollection<M>,
                         path,
                         entityId: savedEntity.id,
-                        values: updatedValues,
+                        values: savedEntity.values,
                         previousValues: previousValuesForHistory,
                         status,
                         context: contextForCallback

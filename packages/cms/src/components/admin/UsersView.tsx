@@ -31,7 +31,9 @@ import {
     SearchBar,
     LockResetIcon,
     ChevronLeftIcon,
-    ChevronRightIcon
+    ChevronRightIcon,
+    Select,
+    SelectItem
 } from "@rebasepro/ui";
 import { RoleChip } from "./RoleChip";
 import { UserManagementDelegate, Role, UserCreationResult } from "@rebasepro/types";
@@ -76,6 +78,7 @@ export function UsersView({ userManagement }: {
 
     // ---- Server-side pagination state ----
     const [searchQuery, setSearchQuery] = useState("");
+    const [roleFilter, setRoleFilter] = useState<string>("");
     const [page, setPage] = useState(0);
     const [paginatedUsers, setPaginatedUsers] = useState<User[]>([]);
     const [totalUsers, setTotalUsers] = useState(0);
@@ -93,13 +96,14 @@ export function UsersView({ userManagement }: {
     /**
      * Fetch a page of users from the server
      */
-    const fetchPage = useCallback(async (pageNum: number, search: string) => {
+    const fetchPage = useCallback(async (pageNum: number, search: string, filterRole: string) => {
         if (!userManagement.searchUsers) return;
         
         setTableLoading(true);
         try {
             const result = await userManagement.searchUsers({
                 search: search || undefined,
+                roleId: filterRole || undefined,
                 limit: PAGE_SIZE,
                 offset: pageNum * PAGE_SIZE,
                 orderBy: "createdAt",
@@ -118,9 +122,9 @@ export function UsersView({ userManagement }: {
     // Load initial page when delegate finishes loading
     useEffect(() => {
         if (!delegateLoading && hasServerSearch) {
-            fetchPage(0, "");
+            fetchPage(0, "", roleFilter);
         }
-    }, [delegateLoading, hasServerSearch, fetchPage]);
+    }, [delegateLoading, hasServerSearch, fetchPage, roleFilter]);
 
     // Handle search changes (debounced)
     const handleSearch = useCallback((value: string) => {
@@ -133,25 +137,33 @@ export function UsersView({ userManagement }: {
 
         if (hasServerSearch) {
             searchTimerRef.current = setTimeout(() => {
-                fetchPage(0, value);
+                fetchPage(0, value, roleFilter);
             }, 300);
         }
-    }, [hasServerSearch, fetchPage]);
+    }, [hasServerSearch, fetchPage, roleFilter]);
+
+    const handleRoleFilterChange = useCallback((newRole: string) => {
+        setRoleFilter(newRole);
+        setPage(0);
+        if (hasServerSearch) {
+            fetchPage(0, searchQuery, newRole);
+        }
+    }, [hasServerSearch, fetchPage, searchQuery]);
 
     // Handle page change
     const handlePageChange = useCallback((newPage: number) => {
         setPage(newPage);
         if (hasServerSearch) {
-            fetchPage(newPage, searchQuery);
+            fetchPage(newPage, searchQuery, roleFilter);
         }
-    }, [hasServerSearch, fetchPage, searchQuery]);
+    }, [hasServerSearch, fetchPage, searchQuery, roleFilter]);
 
     // Refresh current page (after create/update/delete)
     const refreshCurrentPage = useCallback(() => {
         if (hasServerSearch) {
-            fetchPage(page, searchQuery);
+            fetchPage(page, searchQuery, roleFilter);
         }
-    }, [hasServerSearch, fetchPage, page, searchQuery]);
+    }, [hasServerSearch, fetchPage, page, searchQuery, roleFilter]);
 
     // Determine which users to show
     let displayUsers: User[];
@@ -163,9 +175,15 @@ export function UsersView({ userManagement }: {
     } else {
         // Fallback: local filtering for backward compat
         const filtered = allUsers.filter(u => {
-            if (!searchQuery) return true;
-            const q = searchQuery.toLowerCase();
-            return u.email?.toLowerCase().includes(q) || u.displayName?.toLowerCase().includes(q);
+            let matches = true;
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                matches = !!(u.email?.toLowerCase().includes(q) || u.displayName?.toLowerCase().includes(q));
+            }
+            if (matches && roleFilter) {
+                matches = !!u.roles?.includes(roleFilter);
+            }
+            return matches;
         });
         displayTotal = filtered.length;
         displayUsers = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
@@ -265,6 +283,20 @@ export function UsersView({ userManagement }: {
                 <Typography gutterBottom variant="h4" className="grow mb-0" component="h4">
                     {t("users")}
                 </Typography>
+                {roles && roles.length > 0 && (
+                    <Select
+                        value={roleFilter}
+                        onValueChange={(v) => handleRoleFilterChange(v)}
+                        placeholder={t("all_roles") || "All Roles"}
+                        size="small"
+                        className="w-48"
+                    >
+                        <SelectItem value="">{t("all_roles") || "All Roles"}</SelectItem>
+                        {roles.map(role => (
+                            <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
+                        ))}
+                    </Select>
+                )}
                 <SearchBar 
                     placeholder={t("search_users")} 
                     onTextSearch={(v) => handleSearch(v || "")} 
@@ -284,6 +316,7 @@ export function UsersView({ userManagement }: {
                 )}
                 <Table className="w-full">
                     <TableHeader>
+                        <TableCell header className="w-48">{t("id") || "ID"}</TableCell>
                         <TableCell header>{t("email")}</TableCell>
                         <TableCell header>{t("name")}</TableCell>
                         <TableCell header>{t("roles")}</TableCell>
@@ -293,6 +326,7 @@ export function UsersView({ userManagement }: {
                     <TableBody>
                         {displayUsers.map(user => (
                             <TableRow key={user.uid} onClick={() => saveUser && handleEditUser(user)}>
+                                <TableCell className="font-mono text-xs">{user.uid}</TableCell>
                                 <TableCell>{user.email}</TableCell>
                                 <TableCell className="font-medium">{user.displayName}</TableCell>
                                 <TableCell>
@@ -640,6 +674,16 @@ function UserDetailsForm({
 
                 <DialogContent className="h-full grow">
                     <div className="grid grid-cols-12 gap-4">
+                        {!isNewUser && (
+                            <div className="col-span-12">
+                                <TextField
+                                    name="uid"
+                                    value={userProp?.uid || ""}
+                                    label={t("id") || "ID"}
+                                    disabled
+                                />
+                            </div>
+                        )}
                         <div className="col-span-12">
                             <TextField
                                 name="displayName"

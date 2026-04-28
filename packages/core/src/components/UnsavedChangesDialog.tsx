@@ -30,10 +30,8 @@ export function UnsavedChangesDialog({
             <DialogTitle variant={"h6"}>{title}</DialogTitle>
             <DialogContent>
 
-                {body}
-
                 <Typography>
-                    {t("unsaved_changes")}
+                    {body ?? t("unsaved_changes")}
                 </Typography>
 
             </DialogContent>

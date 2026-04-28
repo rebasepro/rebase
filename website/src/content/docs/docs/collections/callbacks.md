@@ -9,10 +9,12 @@ description: Use lifecycle callbacks to run custom logic when entities are creat
 
 Callbacks let you hook into the entity lifecycle to:
 
+- **Sync data between collections** — copy or move entities across tables on status changes
 - **Transform data** before saving (computed fields, slugification)
 - **Validate** business rules beyond schema validation
 - **Trigger side effects** after writes (send emails, sync APIs, update caches)
 - **Filter/transform** data after reading
+- **Cascade operations** — clean up related records on delete
 
 ## Defining Callbacks
 
@@ -189,6 +191,45 @@ properties: {
     }
 }
 ```
+
+## Syncing Data Between Collections
+
+One of the most powerful uses of callbacks is **syncing data across collections**. For example, copying approved submissions to a published table:
+
+```typescript
+const submissionsCollection: EntityCollection = {
+    slug: "job_submissions",
+    callbacks: {
+        afterSave: async ({ values, entityId, previousValues, context }) => {
+            // When a submission is approved, create a published job
+            if (values.status === "approved" && previousValues?.status !== "approved") {
+                const dataSource = context.dataSource;
+                await dataSource.saveEntity({
+                    path: "jobs",
+                    entityId: undefined,
+                    values: {
+                        title: values.title,
+                        description: values.description,
+                        company_id: values.company_id,
+                        status: "published",
+                        source_submission_id: entityId,
+                    },
+                    collection: jobsCollection,
+                    status: "new"
+                });
+            }
+        }
+    },
+    properties: { /* ... */ }
+};
+```
+
+Other cross-collection patterns:
+
+- **Cascade delete**: Use `afterDelete` to remove related records in child collections
+- **Denormalization**: Use `afterSave` to update summary fields in a parent collection
+- **Audit logging**: Use `afterSave` / `afterDelete` to write to an audit log collection
+- **Counters**: Use `afterSave` / `afterDelete` to update count fields on related entities
 
 ## Next Steps
 

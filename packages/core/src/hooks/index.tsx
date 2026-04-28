@@ -2,6 +2,7 @@ export * from "./data/useData";
 export * from "./data/useCollectionFetch";
 export * from "./data/useEntityFetch";
 export * from "./data/useRelationSelector";
+export * from "./data/useUserSelector";
 export * from "./data/save";
 export * from "./data/delete";
 

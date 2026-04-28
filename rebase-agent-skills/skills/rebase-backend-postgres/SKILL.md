@@ -5,6 +5,8 @@ description: Guide for setting up and managing the Rebase PostgreSQL backend wit
 
 # Rebase PostgreSQL Backend
 
+> **WARNING FOR AGENTS**: If you are writing a script or performing data tasks (e.g., seeding, migrating content), **default to using the Rebase SDK** (`@rebasepro/client` or `@rebasepro/server-core`). **NEVER** use `psql` or raw SQL to manipulate data directly unless specifically instructed to do so for low-level debugging. Bypassing the SDK circumvents schema validation, access controls, and lifecycle hooks.
+
 Rebase uses PostgreSQL as its primary database, with Drizzle ORM for type-safe schema management and migrations.
 
 ## Architecture
@@ -127,6 +129,25 @@ server.listen(3001);
 - **`createPostgresBootstrapper()`** — Creates a bootstrapper that registers the Postgres data driver, auth repository, realtime service, and history service.
 - **`bootstrappers: [...]`** — The `initializeRebaseBackend()` coordinator iterates over all bootstrappers, calling `initializeDriver()`, `initializeAuth()`, `initializeRealtime()`, and `initializeHistory()`.
 - **`collectionsDir`** — Auto-discovers collection definition files from the specified directory.
+- **`functionsDir`** — Auto-discovers custom Hono route files from a directory (see the `rebase-custom-functions` skill).
+- **`cronsDir`** — Auto-discovers cron job files from a directory (see the `rebase-cron-jobs` skill).
+
+> [!WARNING]
+> **JWT Dual-Package Hazard (Monorepos / pnpm)**
+> When running a backend inside a monorepo workspace (especially with `tsx` and `--preserve-symlinks`), you may encounter a `RebaseApiError: JWT secret not configured. Call configureJwt() first` error. This occurs because Node.js resolves two different module instances of `@rebasepro/server-core`.
+>
+> **Fix:** Explicitly call `configureJwt` in your backend's entry point **before** `initializeRebaseBackend`:
+> ```typescript
+> import { initializeRebaseBackend, configureJwt } from "@rebasepro/server-core";
+>
+> configureJwt({
+>     secret: process.env.JWT_SECRET!,
+>     accessExpiresIn: "1h",
+>     refreshExpiresIn: "30d"
+> });
+>
+> const backend = await initializeRebaseBackend({ ... });
+> ```
 
 ## Important Notes
 

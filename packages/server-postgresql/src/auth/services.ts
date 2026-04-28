@@ -119,6 +119,7 @@ export class UserService implements UserRepository {
         const search = options?.search?.trim() || "";
         const orderBy = options?.orderBy || "createdAt";
         const orderDir = options?.orderDir || "desc";
+        const roleId = options?.roleId;
 
         // Map camelCase field names to snake_case column names
         const columnMap: Record<string, string> = {
@@ -131,38 +132,35 @@ export class UserService implements UserRepository {
         const orderColumn = columnMap[orderBy] || "created_at";
         const direction = orderDir === "asc" ? sql`ASC` : sql`DESC`;
 
-        let rows: User[];
-        let total: number;
-
+        const conditions = [];
+        if (roleId) {
+            conditions.push(sql`EXISTS (SELECT 1 FROM rebase.user_roles ur WHERE ur.user_id = users.id AND ur.role_id = ${roleId})`);
+        }
         if (search) {
             const pattern = `%${search}%`;
-
-            const countResult = await this.db.execute(sql`
-                SELECT count(*)::int as total FROM rebase.users
-                WHERE email ILIKE ${pattern} OR display_name ILIKE ${pattern}
-            `);
-            total = (countResult.rows[0] as { total: number }).total;
-
-            const dataResult = await this.db.execute(sql`
-                SELECT * FROM rebase.users
-                WHERE email ILIKE ${pattern} OR display_name ILIKE ${pattern}
-                ORDER BY ${sql.raw(orderColumn)} ${direction}
-                LIMIT ${limit} OFFSET ${offset}
-            `);
-            rows = dataResult.rows as User[];
-        } else {
-            const countResult = await this.db.execute(sql`
-                SELECT count(*)::int as total FROM rebase.users
-            `);
-            total = (countResult.rows[0] as { total: number }).total;
-
-            const dataResult = await this.db.execute(sql`
-                SELECT * FROM rebase.users
-                ORDER BY ${sql.raw(orderColumn)} ${direction}
-                LIMIT ${limit} OFFSET ${offset}
-            `);
-            rows = dataResult.rows as User[];
+            conditions.push(sql`(email ILIKE ${pattern} OR display_name ILIKE ${pattern})`);
         }
+
+        const whereClause = conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
+
+        // Sorting: users with roles first if no role filter, then by requested order
+        const orderByClause = roleId
+            ? sql`ORDER BY ${sql.raw(orderColumn)} ${direction}`
+            : sql`ORDER BY (SELECT count(*) FROM rebase.user_roles ur WHERE ur.user_id = users.id) DESC, ${sql.raw(orderColumn)} ${direction}`;
+
+        const countResult = await this.db.execute(sql`
+            SELECT count(*)::int as total FROM rebase.users
+            ${whereClause}
+        `);
+        const total = (countResult.rows[0] as { total: number }).total;
+
+        const dataResult = await this.db.execute(sql`
+            SELECT * FROM rebase.users
+            ${whereClause}
+            ${orderByClause}
+            LIMIT ${limit} OFFSET ${offset}
+        `);
+        const rows = dataResult.rows as User[];
 
         // Map snake_case rows to camelCase UserData
         const mappedUsers: User[] = rows.map((row: Record<string, any>) => ({

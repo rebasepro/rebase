@@ -148,8 +148,16 @@ export const RebaseEditor = ({
   });
 
   const doc = state?.doc;
+  const isInitialDocRef = useRef(true);
   useEffect(() => {
     if (!state) return;
+    // Skip the first flush — it's the initial content being parsed, not a user edit.
+    // The markdown roundtrip (parse → serialize) may produce slightly different output
+    // (e.g. trailing newlines from trailingNodePlugin), which would falsely dirty the form.
+    if (isInitialDocRef.current) {
+      isInitialDocRef.current = false;
+      return;
+    }
     const timeout = setTimeout(() => {
       flushChanges(state);
     }, 250);
