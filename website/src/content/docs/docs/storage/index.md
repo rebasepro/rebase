@@ -29,16 +29,18 @@ await initializeRebaseBackend({
 ### S3 Storage
 
 ```typescript
+import { env } from "./env";
+
 await initializeRebaseBackend({
     // ...
     storage: {
         type: "s3",
-        bucket: "my-media-bucket",
-        region: "us-east-1",
-        accessKeyId: process.env.S3_ACCESS_KEY_ID,
-        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+        bucket: env.S3_BUCKET!,
+        region: env.S3_REGION || "us-east-1",
+        accessKeyId: env.S3_ACCESS_KEY_ID!,
+        secretAccessKey: env.S3_SECRET_ACCESS_KEY!,
         // Optional: custom endpoint for MinIO, R2, etc.
-        endpoint: "https://s3.example.com"
+        endpoint: env.S3_ENDPOINT
     }
 });
 ```

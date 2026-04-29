@@ -17,7 +17,7 @@ export * from "./auth/interfaces";
 export * from "./init";
 
 // Server-side singleton (import { rebase } from "@rebasepro/server-core")
-export { rebase } from "./singleton";
+export { rebase, _setRebaseMock, _resetRebaseMock } from "./singleton";
 
 // Services
 export * from "./services/driver-registry";

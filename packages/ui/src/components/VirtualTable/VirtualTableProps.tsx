@@ -1,5 +1,4 @@
 import React from "react";
-import { WhereFilterOp } from "@rebasepro/types";
 import { FilterFormFieldProps } from "./VirtualTableHeader";
 
 export type OnRowClickParams<T extends Record<string, any>> = {

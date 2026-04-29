@@ -11,24 +11,22 @@ import {
     HonoEnv,
     listenWithPortRetry,
     cleanupDevPortFile,
-    logger,
-    resolveStorageFromEnv
+    logger
 } from "@rebasepro/server-core";
 import { createPostgresDatabaseConnection, createPostgresBootstrapper } from "@rebasepro/server-postgresql";
 import { enums, relations, tables } from "./schema.generated";
-import * as dotenv from "dotenv";
+import { env } from "./env";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.resolve(__dirname, "../../.env") });
-
 // ─── App ─────────────────────────────────────────────────────────────
 const app = new Hono<HonoEnv>();
 
-const isProduction = process.env.NODE_ENV === "production";
+const isProduction = env.NODE_ENV === "production";
+
 const allowedOrigins = isProduction
-    ? (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || "https://yourdomain.com").split(",").map(s => s.trim())
+    ? (env.CORS_ORIGINS || env.FRONTEND_URL || "").split(",").map(s => s.trim()).filter(Boolean)
     : [];
 
 app.use("/*", cors({
@@ -44,22 +42,19 @@ app.use("/*", secureHeaders({
 }));
 
 // ─── Database ────────────────────────────────────────────────────────
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) throw new Error("DATABASE_URL is not set");
-
-const { db, pool, connectionString } = createPostgresDatabaseConnection(databaseUrl, undefined, {
-    max: parseInt(process.env.DB_POOL_MAX || "20", 10),
-    idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT || "30000", 10),
-    connectionTimeoutMillis: parseInt(process.env.DB_POOL_CONNECT_TIMEOUT || "10000", 10),
+const { db, pool, connectionString } = createPostgresDatabaseConnection(env.DATABASE_URL, undefined, {
+    max: env.DB_POOL_MAX,
+    idleTimeoutMillis: env.DB_POOL_IDLE_TIMEOUT,
+    connectionTimeoutMillis: env.DB_POOL_CONNECT_TIMEOUT,
 });
 
 // ─── Start ───────────────────────────────────────────────────────────
 async function startServer() {
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) throw new Error("JWT_SECRET is not set");
-
-    const PORT = parseInt(process.env.PORT || "3001", 10);
     const server = createServer(getRequestListener(app.fetch));
+
+    if (isProduction && !env.FORCE_LOCAL_STORAGE) {
+        logger.warn("Using local file storage in production! Uploaded files will be lost if the container restarts. Set FORCE_LOCAL_STORAGE=true to suppress this warning, or configure an S3/GCS adapter.");
+    }
 
     const backend = await initializeRebaseBackend({
         collectionsDir: path.resolve(__dirname, "../../shared/collections"),
@@ -71,23 +66,34 @@ async function startServer() {
             createPostgresBootstrapper({
                 connection: db,
                 schema: { tables, enums, relations },
-                adminConnectionString: process.env.ADMIN_CONNECTION_STRING || databaseUrl,
+                adminConnectionString: env.ADMIN_CONNECTION_STRING || env.DATABASE_URL,
                 connectionString
             })
         ],
         auth: {
-            jwtSecret,
-            accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "1h",
-            refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "30d",
-            google: process.env.GOOGLE_CLIENT_ID
-                ? { clientId: process.env.GOOGLE_CLIENT_ID }
+            jwtSecret: env.JWT_SECRET,
+            accessExpiresIn: env.JWT_ACCESS_EXPIRES_IN,
+            refreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN,
+            google: env.GOOGLE_CLIENT_ID
+                ? { clientId: env.GOOGLE_CLIENT_ID }
                 : undefined,
             seedDefaultRoles: true,
-            allowRegistration: process.env.ALLOW_REGISTRATION === "true"
+            allowRegistration: env.ALLOW_REGISTRATION
         },
-        storage: resolveStorageFromEnv({
-            localPath: path.resolve(__dirname, "../../uploads"),
-        }),
+        storage: env.STORAGE_TYPE === "s3" 
+            ? {
+                type: "s3",
+                bucket: env.S3_BUCKET!,
+                region: env.S3_REGION || "auto",
+                accessKeyId: env.S3_ACCESS_KEY_ID || "",
+                secretAccessKey: env.S3_SECRET_ACCESS_KEY || "",
+                endpoint: env.S3_ENDPOINT,
+                forcePathStyle: env.S3_FORCE_PATH_STYLE
+            }
+            : {
+                type: "local",
+                basePath: env.STORAGE_PATH || path.resolve(__dirname, "../../uploads")
+            },
         history: true,
         csrf: isProduction
             ? { origin: allowedOrigins }
@@ -113,7 +119,7 @@ async function startServer() {
     if (!isProduction) {
         // Dev mode: retry the next port if the current one is in use
         const projectRoot = path.resolve(__dirname, "../..");
-        const actualPort = await listenWithPortRetry(server, PORT, { portFileDir: projectRoot });
+        const actualPort = await listenWithPortRetry(server, env.PORT, { portFileDir: projectRoot });
 
         // Clean up port file on exit
         const cleanup = () => cleanupDevPortFile(projectRoot);
@@ -123,22 +129,43 @@ async function startServer() {
 
         logger.info(`Server running at http://localhost:${actualPort}`);
     } else {
-        server.listen(PORT, () => {
-            logger.info(`Server running at http://localhost:${PORT}`);
+        server.listen(env.PORT, () => {
+            logger.info(`Server running at http://localhost:${env.PORT}`);
         });
     }
 
     // ─── Graceful Shutdown ───────────────────────────────────────────────
-    // Uses the framework's built-in shutdown() which drains connections,
-    // stops the cron scheduler, and force-exits after 15s timeout.
+    let isShuttingDown = false;
     const gracefulShutdown = async (signal: string) => {
-        logger.info(`Received ${signal}, shutting down...`);
-        await backend.shutdown();
-        // Close DB pool after HTTP server has drained
-        await pool.end();
-        logger.info("Database pool closed");
-        process.exit(0);
+        if (isShuttingDown) return;
+        isShuttingDown = true;
+        
+        logger.info(`Received ${signal}, waiting for HTTP connections to drain...`);
+        
+        // Stop accepting new connections
+        server.close(async (err) => {
+            if (err) {
+                logger.error("Error closing HTTP server:", { error: err instanceof Error ? err : new Error(String(err)) });
+            }
+            logger.info("HTTP server closed. Draining background tasks and database pool...");
+            try {
+                await backend.shutdown();
+                await pool.end();
+                logger.info("Graceful shutdown complete.");
+                process.exit(0);
+            } catch (shutdownErr) {
+                logger.error("Error during shutdown cleanup:", { error: shutdownErr instanceof Error ? shutdownErr : new Error(String(shutdownErr)) });
+                process.exit(1);
+            }
+        });
+
+        // Fallback force exit
+        setTimeout(() => {
+            logger.error("Shutdown timed out after 15 seconds. Forcefully exiting.");
+            process.exit(1);
+        }, 15000).unref();
     };
+
     process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
     process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 }

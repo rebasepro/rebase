@@ -20,8 +20,9 @@ The Rebase backend is a **Node.js server** built on [Hono](https://hono.dev/) th
 Everything is initialized with a single function:
 
 ```typescript
-import { initializeRebaseBackend } from "@rebasepro/backend";
-import { createPostgresBootstrapper } from "@rebasepro/postgresql-backend";
+import { initializeRebaseBackend } from "@rebasepro/server-core";
+import { createPostgresBootstrapper } from "@rebasepro/server-postgresql";
+import { env } from "./env";
 
 const instance = await initializeRebaseBackend({
     app,
@@ -34,11 +35,11 @@ const instance = await initializeRebaseBackend({
         })
     ],
     auth: {
-        jwtSecret: process.env.JWT_SECRET!,
+        jwtSecret: env.JWT_SECRET,
     },
     storage: { type: "local", basePath: "./uploads" },
     history: true,
-    enableSwagger: process.env.NODE_ENV !== "production"
+    enableSwagger: env.NODE_ENV !== "production"
 });
 ```
 

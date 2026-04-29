@@ -41,6 +41,12 @@
       "@rebasepro/common": [
         "../common/src"
       ],
+      "@rebasepro/formex": [
+        "../formex/src"
+      ],
+      "@rebasepro/cms": [
+        "../cms/src"
+      ],
 
       "@rebasepro/plugin-data-enhancement": [
         "../plugin-data-enhancement/src"

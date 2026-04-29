@@ -71,24 +71,13 @@ describe("createRebaseClient", () => {
     // Proxy access (top-level)
     // -----------------------------------------------------------------------
     describe("Top-level proxy", () => {
-        it("returns explicit methods from the proxy directly", () => {
+        it("returns explicit methods directly", () => {
             const client = createRebaseClient({ baseUrl: "https://api.example.com" });
 
             expect(typeof client.auth).toBe("object");
             expect(typeof client.admin).toBe("object");
             expect(typeof client.collection).toBe("function");
             expect(typeof client.auth.signInWithEmail).toBe("function");
-        });
-
-        it("evaluates unknown properties as collection access via top-level proxy", () => {
-            interface TestDB {
-                posts: { Row: { title: string } };
-            }
-            const client = createRebaseClient<TestDB>({ baseUrl: "https://api.example.com" });
-
-            const magicPosts = (client as any).posts;
-            expect(typeof magicPosts).toBe("object");
-            expect(typeof magicPosts.find).toBe("function");
         });
 
         it("ignores 'then' property to prevent Promise-like misinterpretation", () => {

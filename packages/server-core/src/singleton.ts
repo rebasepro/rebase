@@ -11,6 +11,27 @@ export function _initRebase(client: RebaseClient): void {
 }
 
 /**
+ * @internal Allows overriding the underlying instance for unit testing.
+ * Throws an error if used in a non-test environment to prevent production abuse.
+ */
+export function _setRebaseMock(mockInstance: Partial<RebaseClient>): void {
+    if (process.env.NODE_ENV !== "test") {
+        throw new Error("_setRebaseMock can only be called in a test environment (NODE_ENV=test).");
+    }
+    _instance = { ...(_instance || {} as RebaseClient), ...mockInstance } as RebaseClient;
+}
+
+/**
+ * @internal Resets the singleton instance, useful for afterEach() in test suites.
+ */
+export function _resetRebaseMock(): void {
+    if (process.env.NODE_ENV !== "test") {
+        throw new Error("_resetRebaseMock can only be called in a test environment.");
+    }
+    _instance = null;
+}
+
+/**
  * The server-side Rebase singleton.
  *
  * Initialized automatically during server startup. Provides access to all

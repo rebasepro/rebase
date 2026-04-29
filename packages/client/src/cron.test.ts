@@ -4,8 +4,8 @@ import type { Transport } from "./transport";
 
 // ─── Mock Transport ─────────────────────────────────────────────────
 
-function createMockTransport(): Transport & { request: jest.Mock } {
-    const requestMock = jest.fn<() => Promise<unknown>>();
+function createMockTransport() {
+    const requestMock = jest.fn() as unknown as jest.MockedFunction<Transport["request"]>;
 
     return {
         request: requestMock,

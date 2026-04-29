@@ -157,7 +157,7 @@ export default function ClientUIComponentsTeaser() {
 
                 <div className={cardClasses}>
                     <DateTimeField value={selectedDate}
-                        onChange={setSelectedDate}
+                        onChange={(d) => setSelectedDate(d ?? undefined)}
                         label="Select a date"
                         mode="date" />
                 </div>

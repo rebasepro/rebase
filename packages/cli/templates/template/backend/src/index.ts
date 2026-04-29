@@ -11,24 +11,21 @@ import {
     HonoEnv,
     listenWithPortRetry,
     cleanupDevPortFile,
-    logger,
-    resolveStorageFromEnv
+    logger
 } from "@rebasepro/server-core";
 import { createPostgresDatabaseConnection, createPostgresBootstrapper } from "@rebasepro/server-postgresql";
 import { enums, relations, tables } from "./schema.generated";
-import * as dotenv from "dotenv";
+import { env } from "./env";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.resolve(__dirname, "../../.env") });
-
 // ─── App ─────────────────────────────────────────────────────────────
 const app = new Hono<HonoEnv>();
 
-const isProduction = process.env.NODE_ENV === "production";
+const isProduction = env.NODE_ENV === "production";
 const allowedOrigins = isProduction
-    ? (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || "https://yourdomain.com").split(",").map(s => s.trim())
+    ? (env.CORS_ORIGINS || env.FRONTEND_URL || "https://yourdomain.com").split(",").map(s => s.trim())
     : [];
 
 app.use("/*", cors({
@@ -42,17 +39,14 @@ app.use("/*", cors({
 app.use("/*", secureHeaders());
 
 // ─── Database ────────────────────────────────────────────────────────
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) throw new Error("DATABASE_URL is not set");
+const databaseUrl = env.DATABASE_URL;
 
 const { db, pool, connectionString } = createPostgresDatabaseConnection(databaseUrl);
 
 // ─── Start ───────────────────────────────────────────────────────────
 async function startServer() {
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) throw new Error("JWT_SECRET is not set");
-
-    const PORT = parseInt(process.env.PORT || "3001", 10);
+    const jwtSecret = env.JWT_SECRET;
+    const PORT = env.PORT;
     const server = createServer(getRequestListener(app.fetch));
 
     const backend = await initializeRebaseBackend({
@@ -64,23 +58,34 @@ async function startServer() {
             createPostgresBootstrapper({
                 connection: db,
                 schema: { tables, enums, relations },
-                adminConnectionString: process.env.ADMIN_CONNECTION_STRING || databaseUrl,
+                adminConnectionString: env.ADMIN_CONNECTION_STRING || databaseUrl,
                 connectionString
             })
         ],
         auth: {
             jwtSecret,
-            accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "1h",
-            refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "30d",
-            google: process.env.GOOGLE_CLIENT_ID
-                ? { clientId: process.env.GOOGLE_CLIENT_ID }
+            accessExpiresIn: env.JWT_ACCESS_EXPIRES_IN,
+            refreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN,
+            google: env.GOOGLE_CLIENT_ID
+                ? { clientId: env.GOOGLE_CLIENT_ID }
                 : undefined,
             seedDefaultRoles: true,
-            allowRegistration: process.env.ALLOW_REGISTRATION === "true"
+            allowRegistration: env.ALLOW_REGISTRATION
         },
-        storage: resolveStorageFromEnv({
-            localPath: path.resolve(__dirname, "../../uploads"),
-        }),
+        storage: env.STORAGE_TYPE === "s3" 
+            ? {
+                type: "s3",
+                bucket: env.S3_BUCKET!,
+                region: env.S3_REGION || "auto",
+                accessKeyId: env.S3_ACCESS_KEY_ID || "",
+                secretAccessKey: env.S3_SECRET_ACCESS_KEY || "",
+                endpoint: env.S3_ENDPOINT,
+                forcePathStyle: env.S3_FORCE_PATH_STYLE
+            }
+            : {
+                type: "local",
+                basePath: env.STORAGE_PATH || path.resolve(__dirname, "../../uploads")
+            },
         history: true,
     });
 
