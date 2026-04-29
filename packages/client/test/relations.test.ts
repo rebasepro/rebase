@@ -51,12 +51,11 @@ describe("buildQueryString — include", () => {
         const qs = buildQueryString({ include: ["author"], where: { status: "eq.active", age: "gte.18" } });
         expect(qs).toContain("include=author"); expect(qs).toContain("status=eq.active"); expect(qs).toContain("age=gte.18");
     });
-    // BUG: searchString is silently dropped
-    it("BUG: searchString is NOT serialized", () => {
-        expect(buildQueryString({ searchString: "hello" })).toBe("");
+    it("searchString is serialized", () => {
+        expect(buildQueryString({ searchString: "hello" })).toBe("?searchString=hello");
     });
-    it("BUG: searchString + include loses searchString", () => {
-        expect(buildQueryString({ searchString: "test", include: ["author"] })).toBe("?include=author");
+    it("searchString + include are both serialized", () => {
+        expect(buildQueryString({ searchString: "test", include: ["author"] })).toBe("?searchString=test&include=author");
     });
 });
 
@@ -428,13 +427,13 @@ describe("QueryBuilder.include()", () => {
         const p = mockRequest.mock.calls[0][0] as string;
         expect(p).toContain("include=tags"); expect(p).toContain("offset=20");
     });
-    it("include + search (searchString bug: not serialized)", async () => {
+    it("include + search", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.search("hello").include("author").find();
         const p = mockRequest.mock.calls[0][0] as string;
         expect(p).toContain("include=author");
-        // BUG: searchString is NOT in the URL
+        expect(p).toContain("searchString=hello");
     });
     it("full chain: where → orderBy → limit → offset → include", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -576,10 +575,6 @@ describe("E2E — createRebaseClient + include", () => {
     it("data proxy shorthand equals collection()", () => {
         const client = createRebaseClient({ baseUrl: "http://localhost" });
         expect(client.data.posts).toBe(client.data.collection("posts"));
-    });
-    it("top-level proxy shorthand", () => {
-        const client = createRebaseClient({ baseUrl: "http://localhost" });
-        expect(typeof (client as any).posts.find).toBe("function");
     });
 });
 

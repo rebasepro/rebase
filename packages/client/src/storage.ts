@@ -1,4 +1,4 @@
-import { StorageSource, UploadFileProps, UploadFileResult, DownloadConfig, StorageListResult } from "@rebasepro/types";
+import { StorageSource, UploadFileProps, UploadFileResult, DownloadConfig, StorageListResult, DownloadMetadata } from "@rebasepro/types";
 import { Transport } from "./transport";
 
 export function createStorage(transport: Transport): StorageSource {
@@ -72,7 +72,7 @@ export function createStorage(transport: Transport): StorageSource {
         }
 
         try {
-            const result = await transport.request<{ data: Record<string, unknown> }>(`/storage/metadata/${filePath}`);
+            const result = await transport.request<{ data: DownloadMetadata }>(`/storage/metadata/${filePath}`);
             
             const activeToken = await transport.resolveToken();
             const tokenQuery = activeToken ? `?token=${activeToken}` : '';

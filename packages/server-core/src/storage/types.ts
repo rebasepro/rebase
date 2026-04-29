@@ -139,6 +139,10 @@ export const DOCUMENT_MIME_TYPES = [
  * Reads `STORAGE_TYPE` and returns the matching config, falling back
  * to `local` when nothing is set.
  *
+ * @deprecated Build the storage configuration explicitly in your backend entry point
+ * using your validated environment schema (e.g. `env.ts`) instead of relying on
+ * this implicit `process.env` fallback.
+ *
  * **Supported values for `STORAGE_TYPE`:**
  *
  * | Value   | Provider                                              | Required env vars                                      |

@@ -163,7 +163,7 @@ export default function ClientUIComponentsShowcase({
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Search Bar</Typography>
                 <SearchBar innerClassName={"w-full"} />
-                <SearchBar large loading />
+                <SearchBar loading />
             </Card>
 
             <Card className={cardClasses}>

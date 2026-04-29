@@ -3,7 +3,7 @@ packages:
   - app
   - app/*
   - e2e
-  - website-astro
+  - website
 
 patchedDependencies:
   '@radix-ui/react-compose-refs@1.1.2': patches/@radix-ui__react-compose-refs@1.1.2.patch

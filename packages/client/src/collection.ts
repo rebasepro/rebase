@@ -1,10 +1,10 @@
-import { Transport, FindParams, FindResponse, buildQueryString } from "./transport";
+import { Transport, FindParams, buildQueryString } from "./transport";
 import { RebaseWebSocketClient } from "./websocket";
-import { Entity, FilterValues, WhereFilterOp, CollectionAccessor, WhereFieldValue } from "@rebasepro/types";
+import { Entity, FilterValues, WhereFilterOp, CollectionAccessor, WhereFieldValue, FindResponse } from "@rebasepro/types";
 
 import { FilterOperator, QueryBuilder } from "./query_builder";
 
-function parseWhereFilter(where?: Record<string, WhereFieldValue>): FilterValues<Record<string, unknown>> | undefined {
+function parseWhereFilter(where?: Record<string, WhereFieldValue>): FilterValues<string> | undefined {
     if (!where) return undefined;
     const filters: Record<string, [WhereFilterOp, unknown]> = {};
     for (const [key, rawValue] of Object.entries(where)) {
@@ -103,7 +103,7 @@ function parseWhereFilter(where?: Record<string, WhereFieldValue>): FilterValues
  */
 function rowToEntity<M extends Record<string, unknown>>(row: Record<string, unknown>, slug: string): Entity<M> {
     return {
-        id: row.id,
+        id: row.id as string | number,
         path: slug,
         values: row as M
     };
@@ -129,9 +129,9 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
     const basePath = `/data/${slug}`;
 
     return {
-        async find(params?: FindParams) {
+        async find(params?: FindParams): Promise<FindResponse<M>> {
             const qs = buildQueryString(params);
-            const raw = await transport.request<{ data: Record<string, unknown>[]; meta: Record<string, unknown> }>(basePath + qs, { method: "GET" });
+            const raw = await transport.request<{ data: Record<string, unknown>[]; meta: FindResponse<M>["meta"] }>(basePath + qs, { method: "GET" });
             return {
                 data: (raw.data || []).map((row: Record<string, unknown>) => rowToEntity<M>(row, slug)),
                 meta: raw.meta
@@ -171,7 +171,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
         },
 
         ...(ws && {
-            listen(params: FindParams | undefined, onUpdate: (data: { data: Entity<M>[]; meta: Record<string, unknown> }) => void, onError?: (error: Error) => void) {
+            listen(params: FindParams | undefined, onUpdate: (response: FindResponse<M>) => void, onError?: (error: Error) => void) {
                 return ws.listenCollection(
                     {
                         path: slug,

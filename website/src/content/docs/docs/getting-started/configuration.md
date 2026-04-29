@@ -9,6 +9,8 @@ description: All environment variables and configuration options for Rebase proj
 
 All configuration is done via environment variables in your `.env` file at the project root.
 
+> **Important**: Rebase uses **Zod** to validate environment variables at startup in `src/env.ts`. If any required variables are missing or incorrectly formatted (like URLs or ports), the server will fail to start and provide a clear error message.
+
 ### Required
 
 | Variable | Description | Example |
@@ -36,9 +38,9 @@ All configuration is done via environment variables in your `.env` file at the p
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `JWT_SECRET` | Secret for JWT signing (required if auth is enabled) | — |
-| `ACCESS_TOKEN_EXPIRES_IN` | Access token lifetime | `1h` |
-| `REFRESH_TOKEN_EXPIRES_IN` | Refresh token lifetime | `30d` |
-| `ALLOW_REGISTRATION` | Allow new users to register (`true`/`false`). First user can always register. | `false` |
+| `JWT_ACCESS_EXPIRES_IN` | Access token lifetime | `1h` |
+| `JWT_REFRESH_EXPIRES_IN` | Refresh token lifetime | `30d` |
+| `ALLOW_REGISTRATION` | Allow new users to register (`true`/`false`). First user can always register. | `true` |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID (backend validation) | — |
 
 ### Storage
@@ -68,6 +70,8 @@ All configuration is done via environment variables in your `.env` file at the p
 The `RebaseBackendConfig` passed to `initializeRebaseBackend()` provides programmatic control:
 
 ```typescript
+import { env } from "./env";
+
 await initializeRebaseBackend({
     app,
     server,
@@ -82,13 +86,13 @@ await initializeRebaseBackend({
     ],
 
     auth: {                  // Authentication config
-        jwtSecret: process.env.JWT_SECRET!,
-        accessExpiresIn: "1h",
-        refreshExpiresIn: "30d",
+        jwtSecret: env.JWT_SECRET,
+        accessExpiresIn: env.JWT_ACCESS_EXPIRES_IN,
+        refreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN,
         requireAuth: true,    // Require auth for data API (default: true)
-        allowRegistration: false,
+        allowRegistration: env.ALLOW_REGISTRATION,
         google: {
-            clientId: process.env.GOOGLE_CLIENT_ID
+            clientId: env.GOOGLE_CLIENT_ID
         }
     },
 

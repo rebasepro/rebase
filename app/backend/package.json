@@ -16,7 +16,8 @@
         "@rebasepro/server-postgresql": "workspace:*",
         "dotenv": "^16.0.0",
         "drizzle-orm": "^0.44.4",
-        "hono": "^4.2.0"
+        "hono": "^4.2.0",
+        "zod": "4.3.6"
     },
     "devDependencies": {
         "@types/node": "^20.10.5",

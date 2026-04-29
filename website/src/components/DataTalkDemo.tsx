@@ -18,7 +18,7 @@ export function DataTalkDemo({
                              }: {
     height?: string | number;
     exchanges: Exchange[]
-}): JSX.Element {
+}): React.JSX.Element {
     const [currentExchangeIndex, setCurrentExchangeIndex] = useState(0);
     const [displayText, setDisplayText] = useState("");
     const [isTyping, setIsTyping] = useState(true);
