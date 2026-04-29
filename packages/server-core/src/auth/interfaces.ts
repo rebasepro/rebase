@@ -43,7 +43,7 @@ export interface UserIdentityData {
     userId: string;
     provider: string;
     providerId: string;
-    profileData?: Record<string, any> | null;
+    profileData?: Record<string, unknown> | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -69,7 +69,7 @@ export interface OAuthProvider {
     schema: z.ZodSchema<any>;
     
     /** Verify external tokens/codes and return a standardized user profile */
-    verify: (payload: any) => Promise<OAuthProviderProfile | null>;
+    verify: (payload: unknown) => Promise<OAuthProviderProfile | null>;
 }
 
 /**
@@ -193,7 +193,7 @@ export interface UserRepository {
     /**
      * Link a new OAuth identity to a user
      */
-    linkUserIdentity(userId: string, provider: string, providerId: string, profileData?: Record<string, any>): Promise<void>;
+    linkUserIdentity(userId: string, provider: string, providerId: string, profileData?: Record<string, unknown>): Promise<void>;
 
     /**
      * Update a user

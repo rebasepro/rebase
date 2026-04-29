@@ -72,7 +72,7 @@ export function createStorage(transport: Transport): StorageSource {
         }
 
         try {
-            const result = await transport.request<{ data: any }>(`/storage/metadata/${filePath}`);
+            const result = await transport.request<{ data: Record<string, unknown> }>(`/storage/metadata/${filePath}`);
             
             const activeToken = await transport.resolveToken();
             const tokenQuery = activeToken ? `?token=${activeToken}` : '';

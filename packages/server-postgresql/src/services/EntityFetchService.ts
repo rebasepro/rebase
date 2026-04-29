@@ -43,7 +43,7 @@ export class EntityFetchService {
      * Build filter conditions from FilterValues
      * Delegates to DrizzleConditionBuilder.buildFilterConditions
      */
-    buildFilterConditions<M extends Record<string, any>>(
+    buildFilterConditions<M extends Record<string, unknown>>(
         filter: FilterValues<Extract<keyof M, string>>,
         table: PgTable<any>,
         collectionPath: string
@@ -88,7 +88,7 @@ export class EntityFetchService {
         collection: EntityCollection,
         include?: string[]
     ): Record<string, boolean | { with: Record<string, boolean> }> {
-        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection<any, any>);
+        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
         const propertyKeys = new Set(Object.keys(collection.properties || {}));
         const withConfig: Record<string, boolean | { with: Record<string, boolean> }> = {};
 
@@ -160,7 +160,7 @@ export class EntityFetchService {
      * - Converting nested relation objects to { id, path, __type: "relation" } for CMS
      * - Flattening junction-table many-to-many results
      */
-    private drizzleResultToEntity<M extends Record<string, any>>(
+    private drizzleResultToEntity<M extends Record<string, unknown>>(
         row: Record<string, unknown>,
         collection: EntityCollection,
         collectionPath: string,
@@ -168,7 +168,7 @@ export class EntityFetchService {
         databaseId?: string,
         idInfoArray?: { fieldName: string; type: "string" | "number" }[]
     ): Entity<M> {
-        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection<any, any>);
+        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
         const propertyKeys = new Set(Object.keys(collection.properties || {}));
 
         // Normalize non-relation values (dates, numbers, etc.)
@@ -242,7 +242,7 @@ export class EntityFetchService {
         }
 
         return {
-            id: (idInfoArray && idInfoArray.length > 1) ? buildCompositeId(row as Record<string, any>, idInfoArray) : String(row[idInfo.fieldName]),
+            id: (idInfoArray && idInfoArray.length > 1) ? buildCompositeId(row as Record<string, unknown>, idInfoArray) : String(row[idInfo.fieldName]),
             path: collectionPath,
             values: normalizedValues as M,
             databaseId
@@ -254,14 +254,14 @@ export class EntityFetchService {
      * joinPath relations cannot be expressed via Drizzle's `with` config,
      * so they must be loaded separately after the primary query.
      */
-    private async resolveJoinPathRelations<M extends Record<string, any>>(
+    private async resolveJoinPathRelations<M extends Record<string, unknown>>(
         entity: Entity<M>,
         collection: EntityCollection,
         collectionPath: string,
         parsedId: string | number,
         databaseId?: string
     ): Promise<void> {
-        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection<any, any>);
+        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
         const propertyKeys = new Set(Object.keys(collection.properties || {}));
 
         const promises = Object.entries(resolvedRelations)
@@ -303,7 +303,7 @@ export class EntityFetchService {
      * Post-fetch joinPath relations for a batch of entities.
      * Uses batch fetching to avoid N+1 queries for list views.
      */
-    private async resolveJoinPathRelationsBatch<M extends Record<string, any>>(
+    private async resolveJoinPathRelationsBatch<M extends Record<string, unknown>>(
         entities: Entity<M>[],
         collection: EntityCollection,
         collectionPath: string,
@@ -312,7 +312,7 @@ export class EntityFetchService {
     ): Promise<void> {
         if (entities.length === 0) return;
 
-        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection<any, any>);
+        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
         const propertyKeys = new Set(Object.keys(collection.properties || {}));
 
         const joinPathRelations = Object.entries(resolvedRelations)
@@ -365,8 +365,8 @@ export class EntityFetchService {
         idInfo: { fieldName: string; type: "string" | "number" },
         idInfoArray?: { fieldName: string; type: "string" | "number" }[]
     ): Record<string, unknown> {
-        const flat: Record<string, unknown> = { id: (idInfoArray && idInfoArray.length > 1) ? buildCompositeId(row as Record<string, any>, idInfoArray) : String(row[idInfo.fieldName]) };
-        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection<any, any>);
+        const flat: Record<string, unknown> = { id: (idInfoArray && idInfoArray.length > 1) ? buildCompositeId(row as Record<string, unknown>, idInfoArray) : String(row[idInfo.fieldName]) };
+        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
 
         for (const [k, v] of Object.entries(row)) {
             if (k === idInfo.fieldName) continue;
@@ -401,7 +401,7 @@ export class EntityFetchService {
      * Build db.query-compatible options from standard fetch options.
      * Handles filter, search, orderBy, limit, and cursor-based pagination.
      */
-    private buildDrizzleQueryOptions<M extends Record<string, any>>(
+    private buildDrizzleQueryOptions<M extends Record<string, unknown>>(
         table: PgTable<any>,
         idField: AnyPgColumn,
         idInfo: { fieldName: string; type: "string" | "number" },
@@ -414,7 +414,7 @@ export class EntityFetchService {
             searchString?: string;
         },
         collectionPath: string,
-        withConfig?: Record<string, any>
+        withConfig?: Record<string, unknown>
     ): Record<string, unknown> {
         const queryOpts: Record<string, unknown> = {};
 
@@ -521,7 +521,7 @@ export class EntityFetchService {
     /**
      * Fetch a single entity by ID
      */
-    async fetchEntity<M extends Record<string, any>>(
+    async fetchEntity<M extends Record<string, unknown>>(
         collectionPath: string,
         entityId: string | number,
         databaseId?: string
@@ -579,7 +579,7 @@ export class EntityFetchService {
         const values = await parseDataFromServer(raw, collection, this.db, this.registry);
 
         // Load relations based on cardinality (N+1 — only used in fallback)
-        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection<any, any>);
+        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
         const propertyKeys = new Set(Object.keys(collection.properties));
 
         const relationPromises = Object.entries(resolvedRelations)
@@ -634,7 +634,7 @@ export class EntityFetchService {
     /**
      * Unified method to fetch entities with optional search functionality
      */
-    async fetchEntitiesWithConditions<M extends Record<string, any>>(
+    async fetchEntitiesWithConditions<M extends Record<string, unknown>>(
         collectionPath: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
@@ -741,7 +741,7 @@ export class EntityFetchService {
      *
      * Process raw database results into Entity objects with relations.
      */
-    private async processEntityResults<M extends Record<string, any>>(
+    private async processEntityResults<M extends Record<string, unknown>>(
         results: Record<string, unknown>[],
         collection: EntityCollection,
         collectionPath: string,
@@ -758,14 +758,14 @@ export class EntityFetchService {
             return {
                 entity,
                 values,
-                id: (idInfoArray && idInfoArray.length > 1) ? buildCompositeId(entity as Record<string, any>, idInfoArray!) : String(entity[idInfo.fieldName]),
+                id: (idInfoArray && idInfoArray.length > 1) ? buildCompositeId(entity as Record<string, unknown>, idInfoArray!) : String(entity[idInfo.fieldName]),
                 path: collectionPath
             };
         }));
 
         if (!skipRelations) {
             // Second pass: batch load missing one-to-one relations
-            const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection<any, any>);
+            const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
             const propertyKeys = new Set(Object.keys(collection.properties));
 
             for (const [key, relation] of Object.entries(resolvedRelations)) {
@@ -845,7 +845,7 @@ export class EntityFetchService {
     /**
      * Fetch a collection of entities
      */
-    async fetchCollection<M extends Record<string, any>>(
+    async fetchCollection<M extends Record<string, unknown>>(
         collectionPath: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
@@ -868,7 +868,7 @@ export class EntityFetchService {
     /**
      * Search entities by text
      */
-    async searchEntities<M extends Record<string, any>>(
+    async searchEntities<M extends Record<string, unknown>>(
         collectionPath: string,
         searchString: string,
         options: {
@@ -888,7 +888,7 @@ export class EntityFetchService {
     /**
      * Fetch collection from multi-segment path
      */
-    private async fetchCollectionFromPath<M extends Record<string, any>>(
+    private async fetchCollectionFromPath<M extends Record<string, unknown>>(
         path: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
@@ -912,7 +912,7 @@ export class EntityFetchService {
 
         for (let i = 2; i < pathSegments.length; i += 2) {
             const relationKey = pathSegments[i];
-            const resolvedRelations = resolveCollectionRelations(currentCollection as import("@rebasepro/types").PostgresCollection<any, any>);
+            const resolvedRelations = resolveCollectionRelations(currentCollection as import("@rebasepro/types").PostgresCollection);
             const relation = resolvedRelations[relationKey];
 
             if (!relation) {
@@ -941,7 +941,7 @@ export class EntityFetchService {
     /**
      * Count entities in a collection
      */
-    async countEntities<M extends Record<string, any>>(
+    async countEntities<M extends Record<string, unknown>>(
         collectionPath: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
@@ -984,7 +984,7 @@ export class EntityFetchService {
     /**
      * Count entities from multi-segment path
      */
-    private async countEntitiesFromPath<M extends Record<string, any>>(
+    private async countEntitiesFromPath<M extends Record<string, unknown>>(
         path: string,
         options: { filter?: FilterValues<Extract<keyof M, string>>; databaseId?: string } = {}
     ): Promise<number> {
@@ -1000,7 +1000,7 @@ export class EntityFetchService {
 
         for (let i = 2; i < pathSegments.length; i += 2) {
             const relationKey = pathSegments[i];
-            const resolvedRelations = resolveCollectionRelations(currentCollection as import("@rebasepro/types").PostgresCollection<any, any>);
+            const resolvedRelations = resolveCollectionRelations(currentCollection as import("@rebasepro/types").PostgresCollection);
             const relation = resolvedRelations[relationKey];
 
             if (!relation) {
@@ -1082,7 +1082,7 @@ export class EntityFetchService {
      *
      * @param include - Array of relation keys to populate, or ["*"] for all
      */
-    async fetchCollectionForRest<M extends Record<string, any>>(
+    async fetchCollectionForRest<M extends Record<string, unknown>>(
         collectionPath: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
@@ -1135,13 +1135,13 @@ export class EntityFetchService {
 
         if (!include || include.length === 0) {
             return entities.map(entity => ({
-                id: (idInfoArray.length > 1) ? buildCompositeId(entity as Record<string, any>, idInfoArray) : String(entity[idInfo.fieldName]),
+                id: (idInfoArray.length > 1) ? buildCompositeId(entity as Record<string, unknown>, idInfoArray) : String(entity[idInfo.fieldName]),
                 ...entity
             }));
         }
 
         // Fallback relation loading via batch
-        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection<any, any>);
+        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
         const propertyKeys = new Set(Object.keys(collection.properties || {}));
         const shouldInclude = (key: string) =>
             include[0] === "*" || include.includes(key);
@@ -1185,7 +1185,7 @@ export class EntityFetchService {
         }
 
         return entities.map(entity => ({
-            id: (idInfoArray.length > 1) ? buildCompositeId(entity as Record<string, any>, idInfoArray) : String(entity[idInfo.fieldName]),
+            id: (idInfoArray.length > 1) ? buildCompositeId(entity as Record<string, unknown>, idInfoArray) : String(entity[idInfo.fieldName]),
             ...entity
         }));
     }
@@ -1193,7 +1193,7 @@ export class EntityFetchService {
     /**
      * Fetch a single entity with optional relation includes for REST API.
      */
-    async fetchEntityForRest<M extends Record<string, any>>(
+    async fetchEntityForRest<M extends Record<string, unknown>>(
         collectionPath: string,
         entityId: string | number,
         include?: string[],
@@ -1243,14 +1243,14 @@ export class EntityFetchService {
         if (result.length === 0) return null;
 
         const raw = result[0] as Record<string, unknown>;
-        const flatEntity: Record<string, unknown> = { id: (idInfoArray.length > 1) ? buildCompositeId(raw as Record<string, any>, idInfoArray) : String(raw[idInfo.fieldName]), ...raw };
+        const flatEntity: Record<string, unknown> = { id: (idInfoArray.length > 1) ? buildCompositeId(raw as Record<string, unknown>, idInfoArray) : String(raw[idInfo.fieldName]), ...raw };
 
         if (!include || include.length === 0) {
             return flatEntity;
         }
 
         // Fallback relation population
-        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection<any, any>);
+        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
         const propertyKeys = new Set(Object.keys(collection.properties || {}));
         const shouldInclude = (key: string) =>
             include[0] === "*" || include.includes(key);
@@ -1284,7 +1284,7 @@ export class EntityFetchService {
     /**
      * Fetch raw rows without any relation processing (for REST fast path)
      */
-    private async fetchEntitiesWithConditionsRaw<M extends Record<string, any>>(
+    private async fetchEntitiesWithConditionsRaw<M extends Record<string, unknown>>(
         collectionPath: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
@@ -1362,7 +1362,7 @@ export class EntityFetchService {
      * Returns null if the API is not available or the query fails.
      * Note: Primary path now uses `buildWithConfig` + `buildDrizzleQueryOptions`.
      */
-    private async fetchWithDrizzleQuery<M extends Record<string, any>>(
+    private async fetchWithDrizzleQuery<M extends Record<string, unknown>>(
         collectionPath: string,
         collection: EntityCollection,
         options: {
@@ -1384,7 +1384,7 @@ export class EntityFetchService {
             if (!queryTarget?.findMany) return null;
 
             // Build the `with` config from include array
-            const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection<any, any>);
+            const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
             const withConfig: Record<string, boolean> = {};
             for (const [key, relation] of Object.entries(resolvedRelations)) {
                 if (include[0] === "*" || include.includes(key)) {
@@ -1421,7 +1421,7 @@ export class EntityFetchService {
 
             // Flatten the nested Drizzle results into REST format
             return results.map((row: Record<string, unknown>) => {
-                const flat: Record<string, unknown> = { id: (idInfoArray && idInfoArray.length > 1) ? buildCompositeId(row as Record<string, any>, idInfoArray) : String(row[idInfo.fieldName]) };
+                const flat: Record<string, unknown> = { id: (idInfoArray && idInfoArray.length > 1) ? buildCompositeId(row as Record<string, unknown>, idInfoArray) : String(row[idInfo.fieldName]) };
                 for (const [k, v] of Object.entries(row)) {
                     if (k === idInfo.fieldName) continue;
                     if (Array.isArray(v)) {

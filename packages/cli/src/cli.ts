@@ -6,6 +6,7 @@ import { schemaCommand } from "./commands/schema";
 import { dbCommand } from "./commands/db";
 import { devCommand } from "./commands/dev";
 import { authCommand } from "./commands/auth";
+import { doctorCommand } from "./commands/doctor";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -49,7 +50,7 @@ export async function entry(args: string[]) {
     const subcommand = parsedArgs._[1];
 
     // Show global help only when no command given, or --help with no recognized command
-    const namespacedCommands = ["schema", "db", "dev", "auth"];
+    const namespacedCommands = ["schema", "db", "dev", "auth", "doctor"];
     if (!command || (parsedArgs["--help"] && !namespacedCommands.includes(command))) {
         printHelp();
         return;
@@ -100,6 +101,10 @@ export async function entry(args: string[]) {
             await authCommand(effectiveSubcommand, args);
             break;
 
+        case "doctor":
+            await doctorCommand(args);
+            break;
+
         default:
             console.log(chalk.red(`Unknown command: ${command}`));
             console.log("");
@@ -136,6 +141,9 @@ ${chalk.green.bold("SDK")}
 ${chalk.green.bold("Auth")}
   ${chalk.blue.bold("auth reset-password")}     Reset a user's password
   ${chalk.blue.bold("auth")} ${chalk.gray("--help")}              Show auth command help
+
+${chalk.green.bold("Diagnostics")}
+  ${chalk.blue.bold("doctor")}                  Detect schema drift between collections, schema, and DB
 
 ${chalk.green.bold("Options")}
   ${chalk.blue("--version, -v")}   Show version number

@@ -2,7 +2,7 @@
 title: Entity Callbacks
 sidebar_label: Callbacks
 slug: docs/collections/callbacks
-description: Use lifecycle callbacks to run custom logic when entities are created, updated, read, or deleted.
+description: Use lifecycle callbacks to run custom logic when entities are created, updated, read, or deleted. Includes the context.data API for cross-collection operations.
 ---
 
 ## Overview
@@ -192,9 +192,155 @@ properties: {
 }
 ```
 
+## The `context.data` API
+
+Every callback receives a `context` object that includes `context.data` — a unified data access layer for performing **cross-collection operations** from within lifecycle hooks.
+
+### Accessing Collections
+
+`context.data` uses a JavaScript Proxy, so you can access any collection by its slug as a property:
+
+```typescript
+afterSave: async ({ values, entityId, context }) => {
+    // Dynamic property access — works for any collection slug
+    const jobs = context.data.jobs;
+    const users = context.data.users;
+
+    // Alternatively, use the .collection() method for dynamic slugs
+    const collectionName = "jobs";
+    const accessor = context.data.collection(collectionName);
+}
+```
+
+### Available Methods
+
+Each collection accessor (`context.data.<slug>`) provides these methods:
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `.find()` | `find(params?: FindParams) → FindResponse` | Query entities with filters, sorting, and pagination |
+| `.findById()` | `findById(id: string \| number) → Entity \| undefined` | Fetch a single entity by ID |
+| `.create()` | `create(data: Partial<Values>, id?: string) → Entity` | Create a new entity |
+| `.update()` | `update(id: string \| number, data: Partial<Values>) → Entity` | Update an existing entity |
+| `.delete()` | `delete(id: string \| number) → void` | Delete an entity |
+| `.count()` | `count(params?: FindParams) → number` | Count matching entities |
+| `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Real-time subscription (where supported) |
+| `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Listen to a single entity |
+
+### Querying with `.find()`
+
+The `find()` method supports rich filtering:
+
+```typescript
+afterSave: async ({ values, context }) => {
+    // Simple equality
+    const { data: activeJobs } = await context.data.jobs.find({
+        where: { status: "published" },
+        limit: 10,
+        orderBy: "created_at:desc"
+    });
+
+    // PostgREST-style operators
+    const { data: recentJobs } = await context.data.jobs.find({
+        where: {
+            status: "eq.published",
+            salary: "gte.50000"
+        }
+    });
+
+    // Tuple syntax
+    const { data: expensiveJobs } = await context.data.jobs.find({
+        where: {
+            salary: [">=", 100000],
+            role: ["in", ["admin", "manager"]]
+        }
+    });
+}
+```
+
+### Creating Entities
+
+```typescript
+afterSave: async ({ values, entityId, previousValues, context }) => {
+    // Promote an approved submission to a published job
+    if (values.status === "approved" && previousValues?.status !== "approved") {
+        const newJob = await context.data.jobs.create({
+            title: values.title,
+            description: values.description,
+            company_id: values.company_id,
+            status: "published",
+            source_submission_id: entityId,
+        });
+
+        // Link back to the original submission
+        await context.data["job-submissions"].update(entityId, {
+            promoted_job_id: newJob.id,
+        });
+    }
+}
+```
+
+### Security: RLS Bypass Behavior
+
+:::important
+**`context.data` operations in callbacks bypass Row Level Security (RLS).**
+
+When callbacks execute on the backend, they run through the base `PostgresBackendDriver` — not the authenticated wrapper. This means `context.data` has **full database access** regardless of the triggering user's permissions.
+
+This is intentional: server-side lifecycle hooks are trusted code that often needs to write to collections the end-user doesn't have direct access to (e.g., creating an audit log entry, updating a counter on a parent record).
+:::
+
+If you need RLS-scoped operations within a callback, use the authenticated driver directly:
+
+```typescript
+afterSave: async ({ context }) => {
+    // This bypasses RLS (normal for callbacks):
+    await context.data.audit_logs.create({ action: "approved" });
+
+    // To enforce RLS, access the driver and call withAuth():
+    const authDriver = await context.driver.withAuth(context.user);
+    // authDriver.data operations respect RLS
+}
+```
+
+### Transaction Semantics
+
+:::warning
+**`context.data` operations are NOT automatically wrapped in the same transaction as the triggering save.**
+
+The original entity save completes its database transaction first. Then `afterSave` runs and any `context.data` calls open **separate transactions**. If a `context.data` operation fails in `afterSave`, the original save is **not rolled back**.
+:::
+
+This means:
+
+- ✅ The triggering save always succeeds independently
+- ⚠️ Side-effect writes may fail without affecting the original operation
+- ⚠️ There is no atomicity guarantee between the original save and subsequent `context.data` calls
+
+For operations that must be atomic, wrap them in error handling:
+
+```typescript
+afterSave: async ({ values, entityId, context }) => {
+    try {
+        await context.data.jobs.create({
+            title: values.title,
+            status: "published",
+        });
+    } catch (error) {
+        // Log the failure — the original save already succeeded
+        console.error(`Failed to promote job from submission ${entityId}:`, error);
+        // Optionally: mark the submission as "promotion_failed"
+        await context.data["job-submissions"].update(entityId, {
+            promotion_status: "failed",
+            promotion_error: String(error),
+        });
+    }
+}
+```
+
 ## Syncing Data Between Collections
 
-One of the most powerful uses of callbacks is **syncing data across collections**. For example, copying approved submissions to a published table:
+One of the most powerful uses of callbacks is **syncing data across collections** using `context.data`:
 
 ```typescript
 const submissionsCollection: EntityCollection = {
@@ -203,19 +349,17 @@ const submissionsCollection: EntityCollection = {
         afterSave: async ({ values, entityId, previousValues, context }) => {
             // When a submission is approved, create a published job
             if (values.status === "approved" && previousValues?.status !== "approved") {
-                const dataSource = context.dataSource;
-                await dataSource.saveEntity({
-                    path: "jobs",
-                    entityId: undefined,
-                    values: {
-                        title: values.title,
-                        description: values.description,
-                        company_id: values.company_id,
-                        status: "published",
-                        source_submission_id: entityId,
-                    },
-                    collection: jobsCollection,
-                    status: "new"
+                const newJob = await context.data.jobs.create({
+                    title: values.title,
+                    description: values.description,
+                    company_id: values.company_id,
+                    status: "published",
+                    source_submission_id: entityId,
+                });
+
+                // Update the submission with the promoted job reference
+                await context.data["job-submissions"].update(entityId, {
+                    promoted_job_id: newJob.id,
                 });
             }
         }
@@ -231,7 +375,23 @@ Other cross-collection patterns:
 - **Audit logging**: Use `afterSave` / `afterDelete` to write to an audit log collection
 - **Counters**: Use `afterSave` / `afterDelete` to update count fields on related entities
 
+## Full Context Reference
+
+Every callback receives a `context` object of type `RebaseCallContext`:
+
+```typescript
+interface RebaseCallContext {
+    /** The authenticated user, if any */
+    user?: User;
+    /** The underlying data driver (PostgresBackendDriver) */
+    driver: DataDriver;
+    /** Unified data access — context.data.<slug>.create/update/find/delete */
+    data: RebaseData;
+}
+```
+
 ## Next Steps
 
 - **[Security Rules](/docs/collections/security-rules)** — Row Level Security
 - **[Entity History](/docs/backend/history)** — Audit trail
+- **[Custom Functions](/docs/backend/custom-functions)** — Add custom API endpoints

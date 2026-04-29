@@ -102,7 +102,7 @@ export class PostgresBackendDriver implements DataDriver {
 
 
 
-    private resolveCollectionCallbacks<M extends Record<string, any>>(collection: EntityCollection<M> | undefined, path: string) {
+    private resolveCollectionCallbacks<M extends Record<string, unknown>>(collection: EntityCollection<M> | undefined, path: string) {
         if (!collection && !path) return { collection: undefined, callbacks: undefined, propertyCallbacks: undefined };
         const registryCollection = this.registry.getCollectionByPath(path);
         const resolvedCollection = registryCollection
@@ -122,7 +122,7 @@ export class PostgresBackendDriver implements DataDriver {
         };
     }
 
-    async fetchCollection<M extends Record<string, any>>({
+    async fetchCollection<M extends Record<string, unknown>>({
         path,
         collection,
         filter,
@@ -176,7 +176,7 @@ export class PostgresBackendDriver implements DataDriver {
         return entities;
     }
 
-    listenCollection<M extends Record<string, any>>({
+    listenCollection<M extends Record<string, unknown>>({
         path,
         collection,
         filter,
@@ -237,7 +237,7 @@ export class PostgresBackendDriver implements DataDriver {
         };
     }
 
-    async fetchEntity<M extends Record<string, any>>({
+    async fetchEntity<M extends Record<string, unknown>>({
         path,
         entityId,
         databaseId,
@@ -278,7 +278,7 @@ export class PostgresBackendDriver implements DataDriver {
         return entity;
     }
 
-    listenEntity<M extends Record<string, any>>({
+    listenEntity<M extends Record<string, unknown>>({
         path,
         entityId,
         collection,
@@ -323,7 +323,7 @@ export class PostgresBackendDriver implements DataDriver {
         };
     }
 
-    async saveEntity<M extends Record<string, any>>({
+    async saveEntity<M extends Record<string, unknown>>({
         path,
         entityId,
         values,
@@ -489,7 +489,7 @@ export class PostgresBackendDriver implements DataDriver {
         }
     }
 
-    async deleteEntity<M extends Record<string, any>>({
+    async deleteEntity<M extends Record<string, unknown>>({
         entity,
         collection
     }: DeleteEntityProps<M>): Promise<void> {
@@ -598,7 +598,7 @@ export class PostgresBackendDriver implements DataDriver {
     }
 
 
-    async countEntities<M extends Record<string, any>>({
+    async countEntities<M extends Record<string, unknown>>({
         path,
         collection,
         filter,
@@ -941,7 +941,7 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         return result;
     }
 
-    async fetchCollection<M extends Record<string, any>>(props: FetchCollectionProps<M>): Promise<Entity<M>[]> {
+    async fetchCollection<M extends Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<Entity<M>[]> {
         return this.withTransaction((delegate) => delegate.fetchCollection(props));
     }
 
@@ -960,23 +960,23 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         return unsubscribe;
     }
 
-    listenCollection<M extends Record<string, any>>(props: ListenCollectionProps<M>): () => void {
+    listenCollection<M extends Record<string, unknown>>(props: ListenCollectionProps<M>): () => void {
         return this.injectAuthContext(this.delegate.listenCollection(props));
     }
 
-    async fetchEntity<M extends Record<string, any>>(props: FetchEntityProps<M>): Promise<Entity<M> | undefined> {
+    async fetchEntity<M extends Record<string, unknown>>(props: FetchEntityProps<M>): Promise<Entity<M> | undefined> {
         return this.withTransaction((delegate) => delegate.fetchEntity(props));
     }
 
-    listenEntity<M extends Record<string, any>>(props: ListenEntityProps<M>): () => void {
+    listenEntity<M extends Record<string, unknown>>(props: ListenEntityProps<M>): () => void {
         return this.injectAuthContext(this.delegate.listenEntity(props));
     }
 
-    async saveEntity<M extends Record<string, any>>(props: SaveEntityProps<M>): Promise<Entity<M>> {
+    async saveEntity<M extends Record<string, unknown>>(props: SaveEntityProps<M>): Promise<Entity<M>> {
         return this.withTransaction((delegate) => delegate.saveEntity(props));
     }
 
-    async deleteEntity<M extends Record<string, any>>(props: DeleteEntityProps<M>): Promise<void> {
+    async deleteEntity<M extends Record<string, unknown>>(props: DeleteEntityProps<M>): Promise<void> {
         return this.withTransaction((delegate) => delegate.deleteEntity(props));
     }
 
@@ -990,7 +990,7 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         return this.withTransaction((delegate) => delegate.checkUniqueField(path, name, value, entityId, collection));
     }
 
-    async countEntities<M extends Record<string, any>>(props: FetchCollectionProps<M>): Promise<number> {
+    async countEntities<M extends Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<number> {
         return this.withTransaction((delegate) => delegate.countEntities(props));
     }
 

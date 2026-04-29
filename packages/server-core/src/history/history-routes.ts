@@ -8,8 +8,8 @@ import { DataDriver } from "@rebasepro/types";
  * Mounted at `{basePath}/data/:slug/:entityId/history`.
  */
 export interface HistoryService {
-    fetchHistory(tableName: string, entityId: string, options: { limit: number, offset: number }): Promise<{ data: any[], total: number }>;
-    fetchHistoryEntry(historyId: string): Promise<any>;
+    fetchHistory(tableName: string, entityId: string, options: { limit: number, offset: number }): Promise<{ data: Record<string, unknown>[], total: number }>;
+    fetchHistoryEntry(historyId: string): Promise<Record<string, unknown> | null>;
 }
 
 export function createHistoryRoutes(params: {

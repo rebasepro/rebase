@@ -442,7 +442,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             try {
                 if (subscription.type === "entity" && notifyPath === originalPath) {
                     // Send entity update directly (only for exact path matches)
-                    if (entity && (entity as any).values?._rebase_invalidated) {
+                    if (entity && (entity as unknown as Record<string, unknown>).values && ((entity as unknown as Record<string, unknown>).values as Record<string, unknown>)?._rebase_invalidated) {
                         this.debouncedEntityRefetch(subscriptionId, notifyPath, entityId, subscription);
                     } else {
                         this.sendEntityUpdate(subscription.clientId, subscriptionId, entity);
@@ -450,7 +450,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 } else if (subscription.type === "collection" && subscription.collectionRequest) {
                     // Phase 1: Send instant entity-level patch (no DB query)
                     // This gives immediate cross-tab feedback
-                    if (!entity || !(entity as any).values?._rebase_invalidated) {
+                    if (!entity || !((entity as unknown as Record<string, unknown>).values && ((entity as unknown as Record<string, unknown>).values as Record<string, unknown>)?._rebase_invalidated)) {
                         this.sendCollectionEntityPatch(subscription.clientId, subscriptionId, entityId, entity);
                     }
 
@@ -471,7 +471,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 if (!callback) continue;
 
                 if (subscription.type === "entity" && notifyPath === originalPath) {
-                    if (entity && (entity as any).values?._rebase_invalidated) {
+                    if (entity && (entity as unknown as Record<string, unknown>).values && ((entity as unknown as Record<string, unknown>).values as Record<string, unknown>)?._rebase_invalidated) {
                         this.debouncedEntityDriverRefetch(subscriptionId, notifyPath, entityId, subscription, callback);
                     } else {
                         // Call the callback directly with the entity (only for exact path matches)
@@ -605,8 +605,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                         const contextForCallback = {
                             user: { uid: authContext.userId, roles: authContext.roles },
                             driver: this.driver,
-                            data: this.driver ? (this.driver as any).data : undefined
-                        } as any;
+                            data: this.driver ? (this.driver as unknown as Record<string, unknown>).data : undefined
+                        } as unknown as import("@rebasepro/types").RebaseCallContext;
                         
                         return await Promise.all(fetchedEntities.map(async (entity) => {
                             let processedEntity = entity;
@@ -695,7 +695,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         notifyPath: string,
         entityId: string,
         subscription: { clientId: string; authContext?: SubscriptionAuthContext },
-        callback: (data: any) => void
+        callback: (data: Entity[] | Entity | null) => void
     ) {
         const timerKey = `drve_${subscriptionId}`;
         const existing = this.refetchTimers.get(timerKey);
@@ -749,8 +749,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                             const contextForCallback = {
                                 user: { uid: authContext.userId, roles: authContext.roles },
                                 driver: this.driver,
-                                data: this.driver ? (this.driver as any).data : undefined
-                            } as any;
+                                data: this.driver ? (this.driver as unknown as Record<string, unknown>).data : undefined
+                            } as unknown as import("@rebasepro/types").RebaseCallContext;
                             
                             if (callbacks?.afterRead) {
                                 processedEntity = await callbacks.afterRead({

@@ -56,6 +56,7 @@ After initialization, these routes are mounted:
 | `/api/data/:slug/:id/history` | Entity change history (when enabled) |
 | `/api/data/docs` | OpenAPI spec (when `enableSwagger: true`) |
 | `/api/data/swagger` | Swagger UI (dev mode, when `enableSwagger: true`) |
+| `/api/functions/*` | Custom function routes (when `functionsDir` is set) |
 | `/api/cron/*` | Cron job management (admin-only, when `cronsDir` is set) |
 | WebSocket on upgrade | Real-time subscriptions |
 
@@ -171,7 +172,8 @@ If initialization fails (e.g., database connection error), the server still star
 
 - **[Authentication](/docs/auth)** — JWT, Google OAuth, user management
 - **[Storage](/docs/storage)** — Local and S3 file storage
-- **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks
+- **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks and `context.data` API
 - **[Entity History](/docs/backend/history)** — Audit trail
+- **[Custom Functions](/docs/backend/custom-functions)** — Add custom API endpoints
 - **[Cron Jobs](/docs/backend/cron-jobs)** — Scheduled background tasks
 - **[Database Branching](/docs/backend/branching)** — Instant database copies for dev/staging

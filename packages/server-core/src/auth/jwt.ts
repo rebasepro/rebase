@@ -121,7 +121,7 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
     }
 
     try {
-        const decoded = jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] }) as any;
+        const decoded = jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] }) as { userId?: string; uid?: string; sub?: string; roles?: string[] };
         const id = decoded.userId || decoded.uid || decoded.sub;
         return {
             userId: id,

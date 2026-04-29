@@ -24,7 +24,7 @@ export class RelationService {
     /**
      * Fetch entities related to a parent entity through a specific relation
      */
-    async fetchRelatedEntities<M extends Record<string, any>>(
+    async fetchRelatedEntities<M extends Record<string, unknown>>(
         parentCollectionPath: string,
         parentEntityId: string | number,
         relationKey: string,
@@ -39,7 +39,7 @@ export class RelationService {
         } = {}
     ): Promise<Entity<M>[]> {
         const parentCollection = getCollectionByPath(parentCollectionPath, this.registry);
-        const resolvedRelations = resolveCollectionRelations(parentCollection as import("@rebasepro/types").PostgresCollection<any, any>);
+        const resolvedRelations = resolveCollectionRelations(parentCollection as import("@rebasepro/types").PostgresCollection);
         const relation = resolvedRelations[relationKey];
 
         if (!relation) {
@@ -52,7 +52,7 @@ export class RelationService {
     /**
      * Fetch entities using join paths for complex relations
      */
-    async fetchEntitiesUsingJoins<M extends Record<string, any>>(
+    async fetchEntitiesUsingJoins<M extends Record<string, unknown>>(
         parentCollection: EntityCollection,
         parentEntityId: string | number,
         relation: Relation,
@@ -209,14 +209,14 @@ export class RelationService {
     /**
      * Count related entities for a parent entity
      */
-    async countRelatedEntities<M extends Record<string, any>>(
+    async countRelatedEntities<M extends Record<string, unknown>>(
         parentCollectionPath: string,
         parentEntityId: string | number,
         relationKey: string,
         options: { filter?: FilterValues<Extract<keyof M, string>>; databaseId?: string } = {}
     ): Promise<number> {
         const parentCollection = getCollectionByPath(parentCollectionPath, this.registry);
-        const resolvedRelations = resolveCollectionRelations(parentCollection as import("@rebasepro/types").PostgresCollection<any, any>);
+        const resolvedRelations = resolveCollectionRelations(parentCollection as import("@rebasepro/types").PostgresCollection);
         const relation = resolvedRelations[relationKey];
         if (!relation) throw new Error(`Relation '${relationKey}' not found in collection '${parentCollectionPath}'`);
 
@@ -397,13 +397,13 @@ export class RelationService {
     /**
      * Update many-to-many and junction relations
      */
-    async updateRelationsUsingJoins<M extends Record<string, any>>(
+    async updateRelationsUsingJoins<M extends Record<string, unknown>>(
         tx: DrizzleClient,
         collection: EntityCollection,
         entityId: string | number,
         relationValues: Partial<M>
     ) {
-        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection<any, any>);
+        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
 
         for (const [key, value] of Object.entries(relationValues)) {
             const relation = resolvedRelations[key];
@@ -601,7 +601,7 @@ export class RelationService {
 
                 // Check if this is a many-to-many inverse relation
                 if (relation.cardinality === "many" && relation.direction === "inverse") {
-                    const targetCollectionRelations = resolveCollectionRelations(targetCollection as import("@rebasepro/types").PostgresCollection<any, any>);
+                    const targetCollectionRelations = resolveCollectionRelations(targetCollection as import("@rebasepro/types").PostgresCollection);
                     let junctionInfo: { table: string; sourceColumn: string; targetColumn: string } | null = null;
 
                     for (const [relationKey, targetRelation] of Object.entries(targetCollectionRelations)) {

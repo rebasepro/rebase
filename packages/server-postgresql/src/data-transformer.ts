@@ -62,7 +62,7 @@ export function sanitizeAndConvertDates(obj: unknown): unknown {
 /**
  * Transform relations for database storage (relation objects to IDs)
  */
-export function serializeDataToServer<M extends Record<string, any>>(
+export function serializeDataToServer<M extends Record<string, unknown>>(
     entity: M,
     properties: Properties,
     collection?: EntityCollection,
@@ -73,7 +73,7 @@ export function serializeDataToServer<M extends Record<string, any>>(
     const result: Record<string, unknown> = {};
 
     // Get normalized relations if collection is provided
-    const resolvedRelations = collection ? resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection<any, any>) : {};
+    const resolvedRelations = collection ? resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection) : {};
 
     // Track inverse relations that need to be handled separately
     const inverseRelationUpdates: Array<{
@@ -115,7 +115,7 @@ export function serializeDataToServer<M extends Record<string, any>>(
                         relationKey: key,
                         relation,
                         newValue: serializedValue,
-                        currentEntityId: entity.id || buildCompositeId(entity, pks)
+                        currentEntityId: (entity.id as string | number | undefined) || buildCompositeId(entity, pks)
                     });
                     // Don't add the original relation property to the result
                     continue;
@@ -139,7 +139,7 @@ export function serializeDataToServer<M extends Record<string, any>>(
                             relationKey: key,
                             relation,
                             newValue: serializedValue,
-                            currentEntityId: entity.id || buildCompositeId(entity, pks)
+                            currentEntityId: (entity.id as string | number | undefined) || buildCompositeId(entity, pks)
                         });
                     }
                     // Don't add the original relation property to the result
@@ -219,10 +219,10 @@ export function serializePropertyToServer(value: unknown, property: Property): u
 /**
  * Transform IDs back to relation objects for frontend
  */
-export async function parseDataFromServer<M extends Record<string, any>>(
+export async function parseDataFromServer<M extends Record<string, unknown>>(
     data: M,
     collection: EntityCollection,
-    db?: NodePgDatabase<any>,
+    db?: NodePgDatabase<Record<string, unknown>>,
     registry?: PostgresCollectionRegistry
 ): Promise<M> {
     const properties = collection.properties;
@@ -231,7 +231,7 @@ export async function parseDataFromServer<M extends Record<string, any>>(
     const result: Record<string, unknown> = {};
 
     // Get the normalized relations once
-    const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection<any, any>);
+    const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
 
     // Get list of FK columns that are used only for relations and not defined as properties
     const internalFKColumns = new Set<string>();
@@ -403,7 +403,7 @@ export async function parseDataFromServer<M extends Record<string, any>>(
                                 if (relation.cardinality === "one") {
                                     // One-to-one: return single relation object
                                     const joinResult = joinResults[0] as Record<string, unknown>;
-                                    const targetEntity = joinResult[targetTableName] || joinResult;
+                                    const targetEntity = (joinResult[targetTableName] || joinResult) as Record<string, unknown>;
                                     result[propKey] = {
                                         id: buildCompositeId(targetEntity, targetPks),
                                         path: targetCollection.slug,
@@ -412,7 +412,7 @@ export async function parseDataFromServer<M extends Record<string, any>>(
                                 } else {
                                     // One-to-many: return array of relation objects
                                     result[propKey] = joinResults.map((joinResult: Record<string, unknown>) => {
-                                        const targetEntity = joinResult[targetTableName] || joinResult;
+                                        const targetEntity = (joinResult[targetTableName] || joinResult) as Record<string, unknown>;
                                         return {
                                             id: buildCompositeId(targetEntity, targetPks),
                                             path: targetCollection.slug,
@@ -447,11 +447,11 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
             if (typeof value === "string" || typeof value === "number") {
                 let relationDef: Relation | undefined = (property as RelationProperty).relation;
                 if (!relationDef && propertyKey) {
-                    const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection<any, any>);
+                    const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
                     relationDef = resolvedRelations[propertyKey];
                 }
                 if (!relationDef) {
-                    relationDef = (collection as import("@rebasepro/types").PostgresCollection<any, any>).relations?.find((rel) => rel.relationName === (property as RelationProperty).relationName);
+                    relationDef = (collection as import("@rebasepro/types").PostgresCollection).relations?.find((rel) => rel.relationName === (property as RelationProperty).relationName);
                 }
                 
                 if (!relationDef) {
@@ -534,7 +534,7 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
  * Use this instead of `parseDataFromServer` when processing results from
  * `db.query.findFirst/findMany` which return pre-hydrated relation data.
  */
-export function normalizeDbValues<M extends Record<string, any>>(
+export function normalizeDbValues<M extends Record<string, unknown>>(
     data: M,
     collection: EntityCollection
 ): M {
@@ -544,7 +544,7 @@ export function normalizeDbValues<M extends Record<string, any>>(
     const result: Record<string, unknown> = {};
 
     // Get FK columns that are used internally for relations and not defined as properties
-    const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection<any, any>);
+    const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
     const internalFKColumns = new Set<string>();
     Object.values(resolvedRelations).forEach(relation => {
         if (relation.localKey && !properties[relation.localKey]) {

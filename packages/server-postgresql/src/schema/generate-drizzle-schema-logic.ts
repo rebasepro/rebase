@@ -2,7 +2,7 @@ import { EntityCollection, NumberProperty, Property, Relation, RelationProperty,
 import { getPrimaryKeys } from "../services/entity-helpers";
 import { getEnumVarName, getTableName, getTableVarName, resolveCollectionRelations } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
-
+import { createHash } from "crypto";
 // --- Helper Functions ---
 
 const getPrimaryKeyProp = (collection: EntityCollection): { name: string, type: "string" | "number", isUuid: boolean } => {
@@ -134,7 +134,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
         }
         case "relation": {
             const refProp = prop as RelationProperty;
-            const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection<any, any>);
+            const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
             const relation = resolvedRelations[refProp.relationName ?? propName];
 
             // Only owning one-to-one/many-to-one relations create a column here.
@@ -275,6 +275,24 @@ const buildWithCheckClause = (rule: SecurityRule): string | null => {
 };
 
 /**
+ * Generates a deterministic hash based on the rule configuration.
+ */
+const getPolicyNameHash = (rule: SecurityRule): string => {
+    const data = JSON.stringify({
+        a: rule.access,
+        m: rule.mode,
+        op: rule.operation,
+        ops: rule.operations?.slice().sort(),
+        own: rule.ownerField,
+        rol: rule.roles?.slice().sort(),
+        pg: rule.pgRoles?.slice().sort(),
+        u: rule.using,
+        w: rule.withCheck
+    });
+    return createHash("sha1").update(data).digest("hex").substring(0, 7);
+};
+
+/**
  * Generates Drizzle pgPolicy() calls from a declarative SecurityRule definition.
  *
  * Supports the full spectrum:
@@ -290,11 +308,13 @@ const generatePolicyCode = (tableName: string, rule: SecurityRule, index: number
         ? rule.operations
         : [rule.operation ?? "all"];
 
+    const ruleHash = getPolicyNameHash(rule);
+
     // Generate one pgPolicy per operation
     return ops.map((op, opIdx) => {
         const policyName = rule.name
             ? (ops.length > 1 ? `${rule.name}_${op}` : rule.name)
-            : `${tableName}_${op}_policy_${index}${ops.length > 1 ? `_${opIdx}` : ""}`;
+            : `${tableName}_${op}_${ruleHash}${ops.length > 1 ? `_${opIdx}` : ""}`;
 
         return generateSinglePolicyCode(tableName, rule, op, policyName);
     }).join("");
@@ -305,7 +325,7 @@ const generatePolicyCode = (tableName: string, rule: SecurityRule, index: number
  */
 const generateSinglePolicyCode = (tableName: string, rule: SecurityRule, operation: SecurityOperation, policyName: string): string => {
     const mode = rule.mode ?? "permissive";
-    const roles = rule.roles;
+    const roles = rule.roles ? [...rule.roles].sort() : undefined;
 
     // Determine which clauses this operation needs:
     // SELECT, DELETE → USING only
@@ -347,7 +367,7 @@ const generateSinglePolicyCode = (tableName: string, rule: SecurityRule, operati
     const parts: string[] = [];
     parts.push(`as: "${mode}"`);
     parts.push(`for: "${operation}"`);
-    const toRoles = rule.pgRoles ?? ["public"];
+    const toRoles = rule.pgRoles ? [...rule.pgRoles].sort() : ["public"];
     parts.push(`to: [${toRoles.map(r => `"${r}"`).join(", ")}]`);
     if (usingClause) parts.push(`using: ${usingClause}`);
     if (withCheckClause) parts.push(`withCheck: ${withCheckClause}`);
@@ -409,7 +429,7 @@ const computeSharedRelationName = (
         // No explicit foreignKeyOnTarget — try to find the corresponding owning relation
         try {
             const targetCollection = rel.target();
-            const targetResolvedRelations = resolveCollectionRelations(targetCollection as import("@rebasepro/types").PostgresCollection<any, any>);
+            const targetResolvedRelations = resolveCollectionRelations(targetCollection as import("@rebasepro/types").PostgresCollection);
             const correspondingRelation = Object.values(targetResolvedRelations).find(targetRel =>
                 targetRel.direction === "owning" &&
                 targetRel.cardinality === "one" &&
@@ -490,7 +510,7 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
             allTablesToGenerate.set(tableName, { collection });
         }
 
-        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection<any, any>);
+        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
         for (const relation of Object.values(resolvedRelations)) {
             if (relation.through) { // Standard M2M junction table
                 const junctionTableName = relation.through.table;
@@ -604,7 +624,7 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
                 // inverse many() on the target table.
                 let inverseRelationName: string | null = null;
                 try {
-                    const targetRelations = resolveCollectionRelations(targetCollection as import("@rebasepro/types").PostgresCollection<any, any>);
+                    const targetRelations = resolveCollectionRelations(targetCollection as import("@rebasepro/types").PostgresCollection);
                     for (const [, targetRel] of Object.entries(targetRelations)) {
                         if (targetRel.direction === "inverse" &&
                             targetRel.cardinality === "many" &&
@@ -625,7 +645,7 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
                 tableRelations.push(`    "${relation.through.targetColumn}": one(${targetTableVar}, {\n        fields: [${tableVarName}.${relation.through.targetColumn}],\n        references: [${targetTableVar}.${targetId}],\n        relationName: \"${targetRelName}\"\n    })`);
             }
         } else {
-            const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection<any, any>);
+            const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
             for (const [relationKey, rel] of Object.entries(resolvedRelations)) {
                 try {
                     const target = rel.target();
@@ -653,7 +673,7 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
                             // In this case, we need to find the corresponding owning relation on the target
                             try {
                                 const targetCollection = rel.target();
-                                const targetResolvedRelations = resolveCollectionRelations(targetCollection as import("@rebasepro/types").PostgresCollection<any, any>);
+                                const targetResolvedRelations = resolveCollectionRelations(targetCollection as import("@rebasepro/types").PostgresCollection);
 
                                 // Find the owning relation on the target that points back to this collection
                                 const correspondingRelation = Object.values(targetResolvedRelations).find(targetRel =>
@@ -682,7 +702,7 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
                             // Many-to-many inverse relation - find the corresponding owning relation's junction table
                             try {
                                 const targetCollection = rel.target();
-                                const targetResolvedRelations = resolveCollectionRelations(targetCollection as import("@rebasepro/types").PostgresCollection<any, any>);
+                                const targetResolvedRelations = resolveCollectionRelations(targetCollection as import("@rebasepro/types").PostgresCollection);
 
                                 // Find the corresponding owning many-to-many relation on the target
                                 const correspondingRelation = Object.values(targetResolvedRelations).find(targetRel =>

@@ -723,6 +723,86 @@ describe("generateDrizzleSchema V2 improvements", () => {
     });
 });
 
+describe("generateDrizzleSchema Deterministic Policies", () => {
+    it("should generate the same policy name hash for identically configured rules", async () => {
+        const collections1: EntityCollection[] = [{
+            slug: "test1",
+            table: "test_hash",
+            name: "Test",
+            properties: { data: { type: "string" } },
+            securityRules: [
+                { operation: "select", roles: ["admin", "user"] }
+            ]
+        }];
+
+        const collections2: EntityCollection[] = [{
+            slug: "test2",
+            table: "test_hash", // Same table name
+            name: "Test",
+            properties: { data: { type: "string" } },
+            securityRules: [
+                { operation: "select", roles: ["admin", "user"] }
+            ]
+        }];
+
+        const result1 = await generateSchema(collections1);
+        const result2 = await generateSchema(collections2);
+
+        // Extract the generated policy name, which should look like pgPolicy("test_hash_select_<hash>"
+        const match1 = result1.match(/pgPolicy\("test_hash_select_([a-f0-9]{7})"/);
+        const match2 = result2.match(/pgPolicy\("test_hash_select_([a-f0-9]{7})"/);
+
+        expect(match1).not.toBeNull();
+        expect(match2).not.toBeNull();
+        expect(match1![1]).toEqual(match2![1]);
+    });
+
+    it("should generate the exact same SQL output regardless of array order in configuration", async () => {
+        const collectionsUnsorted: EntityCollection[] = [{
+            slug: "test_order",
+            table: "test_order",
+            name: "Test",
+            properties: { data: { type: "string" } },
+            securityRules: [
+                { 
+                    operation: "select", 
+                    roles: ["user", "admin", "manager"], // Unsorted roles
+                    pgRoles: ["service_role", "app_role"]  // Unsorted pgRoles
+                }
+            ]
+        }];
+
+        const collectionsSorted: EntityCollection[] = [{
+            slug: "test_order",
+            table: "test_order",
+            name: "Test",
+            properties: { data: { type: "string" } },
+            securityRules: [
+                { 
+                    operation: "select", 
+                    roles: ["admin", "manager", "user"], // Sorted roles
+                    pgRoles: ["app_role", "service_role"]  // Sorted pgRoles
+                }
+            ]
+        }];
+
+        const resultUnsorted = await generateSchema(collectionsUnsorted);
+        const resultSorted = await generateSchema(collectionsSorted);
+
+        // The policy names should match because the configuration arrays should be sorted before hashing
+        const matchUnsorted = resultUnsorted.match(/pgPolicy\("test_order_select_([a-f0-9]{7})"/);
+        const matchSorted = resultSorted.match(/pgPolicy\("test_order_select_([a-f0-9]{7})"/);
+
+        expect(matchUnsorted).not.toBeNull();
+        expect(matchSorted).not.toBeNull();
+        expect(matchUnsorted![1]).toEqual(matchSorted![1]);
+
+        // The actual generated sql bodies should also be identical due to sorting
+        expect(resultUnsorted).toContain("string_to_array(auth.roles(), ',') @> ARRAY['admin','manager','user']");
+        expect(resultUnsorted).toContain('to: ["app_role", "service_role"]');
+    });
+});
+
 describe("generateDrizzleSchema ID Generation", () => {
     const cleanSchema = (schema: string) => {
         return schema

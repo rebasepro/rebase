@@ -13,14 +13,14 @@ export interface RebaseClientConfig {
  * Re-export from `@rebasepro/types` for backward compatibility.
  */
 export type FindParams = TypesFindParams;
-export type FindResponse<T> = TypesFindResponse<T extends Record<string, any> ? T : any>;
+export type FindResponse<T> = TypesFindResponse<T extends Record<string, unknown> ? T : Record<string, unknown>>;
 
 export class RebaseApiError extends Error {
     status: number;
     code?: string;
-    details?: any;
+    details?: unknown;
 
-    constructor(status: number, message: string, code?: string, details?: any) {
+    constructor(status: number, message: string, code?: string, details?: unknown) {
         super(message);
         this.name = "RebaseApiError";
         this.status = status;
@@ -110,7 +110,7 @@ export function buildQueryString(params?: FindParams): string {
 }
 
 export interface Transport {
-    request: <T = any>(path: string, init?: RequestInit) => Promise<T>;
+    request: <T = unknown>(path: string, init?: RequestInit) => Promise<T>;
     setToken: (newToken: string | null) => void;
     setAuthTokenGetter: (getter: () => Promise<string | null>) => void;
     setOnUnauthorized: (handler: () => Promise<boolean>) => void;
@@ -136,7 +136,7 @@ export function createTransport(config: RebaseClientConfig): Transport {
         };
     }
 
-    async function request<T = any>(path: string, init?: RequestInit): Promise<T> {
+    async function request<T = unknown>(path: string, init?: RequestInit): Promise<T> {
         const url = config.baseUrl.replace(/\/$/, "") + apiPath + path;
         
         let activeToken = token;

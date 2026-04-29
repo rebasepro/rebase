@@ -114,7 +114,7 @@ export function parseIdValues(idValue: string | number, primaryKeys: { fieldName
     return result;
 }
 
-export function buildCompositeId(values: Record<string, any>, primaryKeys: { fieldName: string; type: "string" | "number"; isUUID?: boolean }[]): string {
+export function buildCompositeId(values: Record<string, unknown>, primaryKeys: { fieldName: string; type: "string" | "number"; isUUID?: boolean }[]): string {
     if (primaryKeys.length === 0) {
         return "";
     }

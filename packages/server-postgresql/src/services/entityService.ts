@@ -44,7 +44,7 @@ export class EntityService implements EntityRepository {
     /**
      * Fetch a single entity by ID
      */
-    async fetchEntity<M extends Record<string, any>>(
+    async fetchEntity<M extends Record<string, unknown>>(
         collectionPath: string,
         entityId: string | number,
         databaseId?: string
@@ -55,7 +55,7 @@ export class EntityService implements EntityRepository {
     /**
      * Fetch a collection of entities with optional filtering, ordering, and pagination
      */
-    async fetchCollection<M extends Record<string, any>>(
+    async fetchCollection<M extends Record<string, unknown>>(
         collectionPath: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
@@ -73,7 +73,7 @@ export class EntityService implements EntityRepository {
     /**
      * Search entities by text
      */
-    async searchEntities<M extends Record<string, any>>(
+    async searchEntities<M extends Record<string, unknown>>(
         collectionPath: string,
         searchString: string,
         options: {
@@ -90,7 +90,7 @@ export class EntityService implements EntityRepository {
     /**
      * Count entities in a collection
      */
-    async countEntities<M extends Record<string, any>>(
+    async countEntities<M extends Record<string, unknown>>(
         collectionPath: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
@@ -117,7 +117,7 @@ export class EntityService implements EntityRepository {
     /**
      * Fetch entities related to a parent entity
      */
-    async fetchRelatedEntities<M extends Record<string, any>>(
+    async fetchRelatedEntities<M extends Record<string, unknown>>(
         parentCollectionPath: string,
         parentEntityId: string | number,
         relationKey: string,
@@ -146,7 +146,7 @@ export class EntityService implements EntityRepository {
     /**
      * Save an entity (create or update)
      */
-    async saveEntity<M extends Record<string, any>>(
+    async saveEntity<M extends Record<string, unknown>>(
         collectionPath: string,
         values: Partial<M>,
         entityId?: string | number,

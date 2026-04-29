@@ -54,18 +54,18 @@ export class UserService implements UserRepository {
 
         if (result.rows.length === 0) return null;
         
-        const row = result.rows[0] as Record<string, any>;
+        const row = result.rows[0] as Record<string, unknown>;
         return {
-            id: row.id,
-            email: row.email,
-            passwordHash: row.password_hash ?? null,
-            displayName: row.display_name ?? null,
-            photoUrl: row.photo_url ?? null,
-            emailVerified: row.email_verified ?? false,
-            emailVerificationToken: row.email_verification_token ?? null,
-            emailVerificationSentAt: row.email_verification_sent_at ?? null,
-            createdAt: row.created_at,
-            updatedAt: row.updated_at
+            id: row.id as string,
+            email: row.email as string,
+            passwordHash: (row.password_hash as string | null) ?? null,
+            displayName: (row.display_name as string | null) ?? null,
+            photoUrl: (row.photo_url as string | null) ?? null,
+            emailVerified: (row.email_verified as boolean | undefined) ?? false,
+            emailVerificationToken: (row.email_verification_token as string | null) ?? null,
+            emailVerificationSentAt: (row.email_verification_sent_at as Date | null) ?? null,
+            createdAt: row.created_at as Date,
+            updatedAt: row.updated_at as Date
         } as User;
     }
 
@@ -76,18 +76,18 @@ export class UserService implements UserRepository {
             WHERE user_id = ${userId}
         `);
 
-        return result.rows.map((row: any) => ({
-            id: row.id,
-            userId: row.user_id,
-            provider: row.provider,
-            providerId: row.provider_id,
-            profileData: row.profile_data ?? null,
-            createdAt: row.created_at,
-            updatedAt: row.updated_at
+        return result.rows.map((row: Record<string, unknown>) => ({
+            id: row.id as string,
+            userId: row.user_id as string,
+            provider: row.provider as string,
+            providerId: row.provider_id as string,
+            profileData: (row.profile_data as Record<string, unknown> | null) ?? null,
+            createdAt: row.created_at as Date,
+            updatedAt: row.updated_at as Date
         }));
     }
 
-    async linkUserIdentity(userId: string, provider: string, providerId: string, profileData?: Record<string, any>): Promise<void> {
+    async linkUserIdentity(userId: string, provider: string, providerId: string, profileData?: Record<string, unknown>): Promise<void> {
         await this.db.insert(userIdentities).values({
             userId,
             provider,
@@ -163,17 +163,17 @@ export class UserService implements UserRepository {
         const rows = dataResult.rows as User[];
 
         // Map snake_case rows to camelCase UserData
-        const mappedUsers: User[] = rows.map((row: Record<string, any>) => ({
-            id: row.id,
-            email: row.email,
-            passwordHash: row.password_hash ?? row.passwordHash ?? null,
-            displayName: row.display_name ?? row.displayName ?? null,
-            photoUrl: row.photo_url ?? row.photoUrl ?? null,
-            emailVerified: row.email_verified ?? row.emailVerified ?? false,
-            emailVerificationToken: row.email_verification_token ?? row.emailVerificationToken ?? null,
-            emailVerificationSentAt: row.email_verification_sent_at ?? row.emailVerificationSentAt ?? null,
-            createdAt: row.created_at ?? row.createdAt,
-            updatedAt: row.updated_at ?? row.updatedAt
+        const mappedUsers: User[] = rows.map((row: Record<string, unknown>) => ({
+            id: row.id as string,
+            email: row.email as string,
+            passwordHash: ((row.password_hash ?? row.passwordHash) as string | null) ?? null,
+            displayName: ((row.display_name ?? row.displayName) as string | null) ?? null,
+            photoUrl: ((row.photo_url ?? row.photoUrl) as string | null) ?? null,
+            emailVerified: ((row.email_verified ?? row.emailVerified) as boolean | undefined) ?? false,
+            emailVerificationToken: ((row.email_verification_token ?? row.emailVerificationToken) as string | null) ?? null,
+            emailVerificationSentAt: ((row.email_verification_sent_at ?? row.emailVerificationSentAt) as Date | null) ?? null,
+            createdAt: (row.created_at ?? row.createdAt) as Date,
+            updatedAt: (row.updated_at ?? row.updatedAt) as Date
         })) as User[];
 
         return { users: mappedUsers, total, limit, offset };
@@ -650,7 +650,7 @@ export class PostgresAuthRepository implements AuthRepository {
         return this.userService.getUserIdentities(userId);
     }
 
-    async linkUserIdentity(userId: string, provider: string, providerId: string, profileData?: Record<string, any>): Promise<void> {
+    async linkUserIdentity(userId: string, provider: string, providerId: string, profileData?: Record<string, unknown>): Promise<void> {
         return this.userService.linkUserIdentity(userId, provider, providerId, profileData);
     }
 

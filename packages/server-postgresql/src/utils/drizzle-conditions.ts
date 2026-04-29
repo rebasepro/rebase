@@ -27,7 +27,7 @@ export class DrizzleConditionBuilder {
     /**
      * Build filter conditions from FilterValues
      */
-    static buildFilterConditions<M extends Record<string, any>>(
+    static buildFilterConditions<M extends Record<string, unknown>>(
         filter: FilterValues<Extract<keyof M, string>>,
         table: PgTable<any>,
         collectionPath: string
@@ -635,15 +635,16 @@ export class DrizzleConditionBuilder {
      */
     static buildSearchConditions(
         searchString: string,
-        properties: Record<string, any>,
+        properties: Record<string, unknown>,
         table: PgTable<any>
     ): SQL[] {
         const searchConditions: SQL[] = [];
 
         for (const [key, prop] of Object.entries(properties)) {
+            const p = prop as Record<string, unknown>;
             // Only include string properties that don't have enum defined
             // PostgreSQL enum and uuid columns don't support ILIKE, so we skip them
-            if (prop.type === "string" && !prop.enum && prop.isId !== "uuid") {
+            if (p.type === "string" && !p.enum && p.isId !== "uuid") {
                 const fieldColumn = table[key as keyof typeof table] as AnyPgColumn;
                 if (fieldColumn) {
                     searchConditions.push(ilike(fieldColumn, `%${searchString}%`));
@@ -947,7 +948,7 @@ export class DrizzleConditionBuilder {
             console.debug(`🔍 [findCorrespondingJunctionTable] Target collection: ${targetCollection.slug}`);
 
             // Find the corresponding owning relation on the target collection
-            const targetCollectionRelations = resolveCollectionRelations(targetCollection as import("@rebasepro/types").PostgresCollection<any, any>);
+            const targetCollectionRelations = resolveCollectionRelations(targetCollection as import("@rebasepro/types").PostgresCollection);
             console.debug(`🔍 [findCorrespondingJunctionTable] Target collection relations:`, Object.keys(targetCollectionRelations));
 
             // Look for the owning many-to-many relation that matches our inverseRelationName

@@ -4,8 +4,6 @@ import { primaryKey, pgTable, integer, varchar, text, char, boolean, timestamp, 
 import { relations as drizzleRelations, sql } from 'drizzle-orm';
 
 export const postsStatus = pgEnum("posts_status", ['draft', 'review', 'published', 'archived']);
-export const testEntitiesString_enum = pgEnum("test_entities_string_enum", ['opt_a', 'opt_b']);
-export const testEntitiesNumber_enum = pgEnum("test_entities_number_enum", ['10', '20']);
 
 export const authors = pgTable("authors", {
     id: integer("id").generatedByDefaultAsIdentity().primaryKey(),
@@ -21,7 +19,9 @@ export const posts = pgTable("posts", {
     content: varchar("content"),
     status: postsStatus("status"),
     author_id: integer("author_id").references(() => authors.id, { onDelete: "set null" })
-}).enableRLS();
+}, (table) => ([
+    pgPolicy("test_policy", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
+])).enableRLS();
 
 export const postsTags = pgTable("posts_tags", {
     post_id: integer("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
@@ -36,7 +36,11 @@ export const privateNotes = pgTable("private_notes", {
     content: varchar("content"),
     user_id: varchar("user_id"),
     is_locked: boolean("is_locked")
-}).enableRLS();
+}, (table) => ([
+    pgPolicy("admin_bypass", { as: "permissive", for: "all", to: ["public"], using: sql`(true) AND (string_to_array(auth.roles(), ',') @> ARRAY['admin'])`, withCheck: sql`(true) AND (string_to_array(auth.roles(), ',') @> ARRAY['admin'])` }),
+    pgPolicy("owner_access", { as: "permissive", for: "all", to: ["public"], using: sql`${table.user_id} = auth.uid()`, withCheck: sql`${table.user_id} = auth.uid()` }),
+    pgPolicy("no_update_locked", { as: "restrictive", for: "update", to: ["public"], using: sql`${table.is_locked} = false`, withCheck: sql`${table.is_locked} = false` }),
+])).enableRLS();
 
 export const profiles = pgTable("profiles", {
     id: integer("id").primaryKey().notNull(),
@@ -49,32 +53,6 @@ export const tags = pgTable("tags", {
     id: integer("id").primaryKey().notNull(),
     name: varchar("name").notNull()
 }).enableRLS();
-
-export const testEntities = pgTable("test_entities", {
-    id: integer("id").primaryKey(),
-    string_plain: varchar("string_plain"),
-    string_multiline: varchar("string_multiline"),
-    string_markdown: varchar("string_markdown"),
-    string_url: varchar("string_url"),
-    string_email: varchar("string_email"),
-    string_enum: testEntitiesString_enum("string_enum").notNull(),
-    number_plain: numeric("number_plain"),
-    number_enum: numeric("number_enum"),
-    boolean_plain: boolean("boolean_plain"),
-    date_plain: timestamp("date_plain", { withTimezone: true, mode: 'string' }),
-    date_time: timestamp("date_time", { withTimezone: true, mode: 'string' }),
-    map_plain: jsonb("map_plain"),
-    array_string: jsonb("array_string"),
-    array_enum: jsonb("array_enum"),
-    reference_tags: integer("reference_tags").references(() => tags.id, { onDelete: "set null" })
-}).enableRLS();
-
-export const tagsTestEntities = pgTable("tags_test_entities", {
-    test_entitie_id: integer("test_entitie_id").notNull().references(() => testEntities.id, { onDelete: "cascade" }),
-    test_entity_tag_id: integer("test_entity_tag_id").notNull().references(() => tags.id, { onDelete: "cascade" }),
-}, (table) => ({
-    pk: primaryKey({ columns: [table.test_entitie_id, table.test_entity_tag_id] })
-}));
 
 export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({
     "profile": one(profiles, {
@@ -119,27 +97,7 @@ export const tagsRelations = drizzleRelations(tags, ({ one, many }) => ({
     "posts": many(postsTags, { relationName: "posts" })
 }));
 
-export const testEntitiesRelations = drizzleRelations(testEntities, ({ one, many }) => ({
-    "test_entity_tags": many(tagsTestEntities, { relationName: "test_entity_tags" }),
-    "test-entity-tags": many(tagsTestEntities, { relationName: "test_entity_tags" }),
-    "relation_tags": many(tagsTestEntities, { relationName: "test_entity_tags" }),
-    "relation-tags": many(tagsTestEntities, { relationName: "test_entity_tags" })
-}));
-
-export const tagsTestEntitiesRelations = drizzleRelations(tagsTestEntities, ({ one, many }) => ({
-    "test_entitie_id": one(testEntities, {
-        fields: [tagsTestEntities.test_entitie_id],
-        references: [testEntities.id],
-        relationName: "test_entity_tags"
-    }),
-    "test_entity_tag_id": one(tags, {
-        fields: [tagsTestEntities.test_entity_tag_id],
-        references: [tags.id],
-        relationName: "test_entity_tags"
-    })
-}));
-
-export const tables = { authors, posts, postsTags, privateNotes, profiles, tags, testEntities, tagsTestEntities };
-export const enums = { postsStatus, testEntitiesString_enum, testEntitiesNumber_enum };
-export const relations = { authorsRelations, postsRelations, postsTagsRelations, profilesRelations, tagsRelations, testEntitiesRelations, tagsTestEntitiesRelations };
+export const tables = { authors, posts, postsTags, privateNotes, profiles, tags };
+export const enums = { postsStatus };
+export const relations = { authorsRelations, postsRelations, postsTagsRelations, profilesRelations, tagsRelations };
 

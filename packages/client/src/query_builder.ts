@@ -27,7 +27,7 @@ function mapOperator(op: FilterOperator): string {
     }
 }
 
-export class QueryBuilder<M extends Record<string, any> = any> {
+export class QueryBuilder<M extends Record<string, unknown> = Record<string, unknown>> {
     private params: FindParams = { where: {} };
 
     constructor(private collection: CollectionClient<M>) {}
@@ -37,7 +37,7 @@ export class QueryBuilder<M extends Record<string, any> = any> {
      * @example 
      * client.collection('users').where('age', '>=', 18).find()
      */
-    where(column: keyof M & string, operator: FilterOperator, value: any): this {
+    where(column: keyof M & string, operator: FilterOperator, value: unknown): this {
         if (!this.params.where) {
             this.params.where = {};
         }
@@ -121,6 +121,6 @@ export class QueryBuilder<M extends Record<string, any> = any> {
         if (!this.collection.listen) {
             throw new Error("Listen is only available when RebaseClient is configured with a websocketUrl.");
         }
-        return this.collection.listen(this.params, onUpdate as unknown as (data: { data: Entity<M>[]; meta: any }) => void, onError);
+        return this.collection.listen(this.params, onUpdate as unknown as (data: { data: Entity<M>[]; meta: Record<string, unknown> }) => void, onError);
     }
 }

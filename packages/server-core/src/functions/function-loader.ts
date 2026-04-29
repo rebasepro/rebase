@@ -109,8 +109,9 @@ export async function loadFunctionsFromDirectory(
 function isHonoLike(obj: unknown): boolean {
     if (!obj || typeof obj !== "object") return false;
     // Hono instances always have .fetch() and .routes
+    const record = obj as Record<string, unknown>;
     return (
-        typeof (obj as any).fetch === "function" &&
-        Array.isArray((obj as any).routes)
+        typeof record.fetch === "function" &&
+        Array.isArray(record.routes)
     );
 }

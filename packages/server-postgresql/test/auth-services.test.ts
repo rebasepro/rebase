@@ -5,7 +5,7 @@ import { users, refreshTokens, passwordResetTokens, User } from "../src/schema/a
 // Mock the drizzle-orm functions
 jest.mock("drizzle-orm", () => ({
     eq: jest.fn((field, value) => ({ field, value, type: "eq" })),
-    sql: jest.fn((strings: TemplateStringsArray, ...values: any[]) => ({
+    sql: jest.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
         strings,
         values,
         type: "sql"
@@ -14,7 +14,7 @@ jest.mock("drizzle-orm", () => ({
 }));
 
 describe("Auth Services", () => {
-    let db: jest.Mocked<NodePgDatabase<any>>;
+    let db: jest.Mocked<NodePgDatabase<Record<string, unknown>>>;
     let mockInsertValues: jest.Mock;
     let mockInsertReturning: jest.Mock;
     let mockSelectFrom: jest.Mock;
@@ -53,7 +53,7 @@ describe("Auth Services", () => {
             update: jest.fn().mockReturnValue({ set: mockUpdateSet }),
             delete: jest.fn().mockReturnValue({ where: mockDeleteWhere }),
             execute: mockExecute
-        } as any;
+        } as unknown as jest.Mocked<NodePgDatabase<Record<string, unknown>>>;
     });
 
     describe("UserService", () => {

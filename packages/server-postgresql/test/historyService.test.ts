@@ -1,6 +1,7 @@
 import { HistoryService, findChangedFields } from "../src/history/HistoryService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { DrizzleClient } from "../src/interfaces";
+import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 
 describe("HistoryService - changedFields and history insertion logic", () => {
     describe("findChangedFields", () => {
@@ -69,7 +70,7 @@ describe("HistoryService - changedFields and history insertion logic", () => {
             db = {
                 execute: jest.fn().mockResolvedValue({})
             } as unknown as jest.Mocked<NodePgDatabase>;
-            historyService = new HistoryService(db as unknown as DrizzleClient, {} as any);
+            historyService = new HistoryService(db as unknown as DrizzleClient, {} as unknown as PostgresCollectionRegistry);
             jest.spyOn(console, 'error').mockImplementation(() => {});
         });
 

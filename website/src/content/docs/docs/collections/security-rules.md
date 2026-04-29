@@ -196,7 +196,82 @@ securityRules: [
 ]
 ```
 
+## Anonymous Access (Public Inserts)
+
+A common need is allowing **unauthenticated users** to submit data — contact forms, newsletter signups, public applications. Rebase provides a clean pattern for this.
+
+### Recommended: `access: "public"` with `withCheck`
+
+```typescript
+const contactMessagesCollection: EntityCollection = {
+    slug: "contact_messages",
+    securityRules: [
+        // Anyone can submit a contact message
+        {
+            operation: "insert",
+            access: "public",
+            withCheck: "true"
+        },
+        // Only admins can read, update, or delete messages
+        { operations: ["select", "update", "delete"], roles: ["admin"] }
+    ],
+    properties: { /* ... */ }
+};
+```
+
+The `access: "public"` shortcut generates a policy that allows the operation without requiring authentication.
+
+### For Lead Capture / Signups
+
+```typescript
+const leadSignupsCollection: EntityCollection = {
+    slug: "lead_magnet_signups",
+    securityRules: [
+        // Allow anonymous inserts
+        { operation: "insert", access: "public", withCheck: "true" },
+        // Admins can view all signups
+        { operation: "select", roles: ["admin"] }
+    ],
+    properties: { /* ... */ }
+};
+```
+
+### How Anonymous Requests Work
+
+When a request arrives without a JWT token, the Rebase backend sets the PostgreSQL session variables to:
+
+| Variable | Value |
+|----------|-------|
+| `app.user_id` | `'anonymous'` |
+| `app.user_roles` | `''` (empty) |
+
+This means:
+
+- `auth.uid()` returns `'anonymous'`
+- `auth.roles()` returns an empty string
+- `access: "public"` policies pass because they generate `USING (true)` / `WITH CHECK (true)`
+- `access: "authenticated"` policies fail because they check for a real user ID
+- `ownerField` policies fail because no row will have `user_id = 'anonymous'` (unless explicitly set)
+
+### Advanced: Raw SQL for Anonymous
+
+If you need more granular control, use raw SQL:
+
+```typescript
+securityRules: [
+    {
+        operation: "insert",
+        withCheck: "auth.uid() = 'anonymous' OR auth.uid() IS NOT NULL"
+    }
+]
+```
+
+:::tip
+Avoid the legacy pattern of checking `string_to_array(auth.roles(), ',')` for anonymous access. The `access: "public"` shortcut is simpler and generates the correct policy automatically.
+:::
+
 ## Next Steps
 
 - **[Relations](/docs/collections/relations)** — Foreign keys and joins
 - **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks
+- **[Custom Functions](/docs/backend/custom-functions)** — Custom API endpoints

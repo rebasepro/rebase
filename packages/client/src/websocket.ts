@@ -44,7 +44,7 @@ function rehydrateServerValues(val: unknown): unknown {
 /**
  * Rehydrate all serialised types inside an Entity's `values`.
  */
-function rehydrateEntity<M extends Record<string, any>>(entity: Entity<M>): Entity<M> {
+function rehydrateEntity<M extends Record<string, unknown>>(entity: Entity<M>): Entity<M> {
     if (!entity || !entity.values) return entity;
     return {
         ...entity,
@@ -99,9 +99,9 @@ export class RebaseWebSocketClient {
         onError?: (error: Error) => void
     }>();
 
-    private listeners = new Map<string, Set<Function>>();
+    private listeners = new Map<string, Set<(...args: unknown[]) => void>>();
 
-    public on(event: "connect" | "disconnect" | "reconnect" | "error", cb: Function) {
+    public on(event: "connect" | "disconnect" | "reconnect" | "error", cb: (...args: unknown[]) => void) {
         if (!this.listeners.has(event)) {
             this.listeners.set(event, new Set());
         }
@@ -109,7 +109,7 @@ export class RebaseWebSocketClient {
         return () => this.listeners.get(event)!.delete(cb);
     }
 
-    private emit(event: string, ...args: any[]) {
+    private emit(event: string, ...args: unknown[]) {
         if (this.listeners.has(event)) {
             this.listeners.get(event)!.forEach(cb => cb(...args));
         }
@@ -652,7 +652,7 @@ export class RebaseWebSocketClient {
     }
 
     // Data source methods
-    async fetchCollection<M extends Record<string, any>>(props: FetchCollectionProps<M>): Promise<Entity<M>[]> {
+    async fetchCollection<M extends Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<Entity<M>[]> {
         const response = await this.sendMessage({
             type: "FETCH_COLLECTION",
             payload: props
@@ -660,7 +660,7 @@ export class RebaseWebSocketClient {
         return (response.entities || []).map(e => rehydrateEntity(e));
     }
 
-    async fetchEntity<M extends Record<string, any>>(props: FetchEntityProps<M>): Promise<Entity<M> | undefined> {
+    async fetchEntity<M extends Record<string, unknown>>(props: FetchEntityProps<M>): Promise<Entity<M> | undefined> {
         const response = await this.sendMessage({
             type: "FETCH_ENTITY",
             payload: props
@@ -668,7 +668,7 @@ export class RebaseWebSocketClient {
         return response.entity ? rehydrateEntity(response.entity) : undefined;
     }
 
-    async saveEntity<M extends Record<string, any>>(props: SaveEntityProps<M>): Promise<Entity<M>> {
+    async saveEntity<M extends Record<string, unknown>>(props: SaveEntityProps<M>): Promise<Entity<M>> {
         const response = await this.sendMessage({
             type: "SAVE_ENTITY",
             payload: props
@@ -676,7 +676,7 @@ export class RebaseWebSocketClient {
         return rehydrateEntity(response.entity);
     }
 
-    async deleteEntity<M extends Record<string, any>>(props: DeleteEntityProps<M>): Promise<void> {
+    async deleteEntity<M extends Record<string, unknown>>(props: DeleteEntityProps<M>): Promise<void> {
         await this.sendMessage({
             type: "DELETE_ENTITY",
             payload: props
@@ -713,7 +713,7 @@ export class RebaseWebSocketClient {
         return response.database;
     }
 
-    async checkUniqueField(path: string, name: string, value: any, entityId?: string, collection?: EntityCollection): Promise<boolean> {
+    async checkUniqueField(path: string, name: string, value: unknown, entityId?: string, collection?: EntityCollection): Promise<boolean> {
         const response = await this.sendMessage({
             type: "CHECK_UNIQUE_FIELD",
             payload: {
@@ -727,7 +727,7 @@ export class RebaseWebSocketClient {
         return response.isUnique;
     }
 
-    async countEntities<M extends Record<string, any>>(props: FetchCollectionProps<M>): Promise<number> {
+    async countEntities<M extends Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<number> {
         const response = await this.sendMessage({
             type: "COUNT_ENTITIES",
             payload: props
@@ -881,7 +881,7 @@ export class RebaseWebSocketClient {
     }
 
     // Subscription methods
-    listenCollection<M extends Record<string, any>>(
+    listenCollection<M extends Record<string, unknown>>(
         props: FetchCollectionProps<M>,
         onUpdate: (entities: Entity[]) => void,
         onError?: (error: Error) => void
@@ -977,7 +977,7 @@ export class RebaseWebSocketClient {
         };
     }
 
-    listenEntity<M extends Record<string, any>>(
+    listenEntity<M extends Record<string, unknown>>(
         props: FetchEntityProps<M>,
         onUpdate: (entity: Entity | null) => void,
         onError?: (error: Error) => void
@@ -1139,7 +1139,7 @@ export class RebaseWebSocketClient {
         // Use replacer function (not array) to sort keys at all levels for deterministic output
         return JSON.stringify(key, (_, value) => {
             if (value && typeof value === "object" && !Array.isArray(value)) {
-                return Object.keys(value).sort().reduce((sorted: Record<string, any>, k) => {
+                return Object.keys(value).sort().reduce((sorted: Record<string, unknown>, k) => {
                     sorted[k] = value[k];
                     return sorted;
                 }, {});

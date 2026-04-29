@@ -176,7 +176,7 @@ export function createPostgresWebSocket(
                 }
 
                 // Helper to get correctly scoped delegate for the current request
-                const getScopedDelegate = async () => {
+                const getScopedDelegate = async (): Promise<DataDriver> => {
                     const session = clientSessions.get(clientId);
                     if (session?.user && "withAuth" in driver && typeof (driver as unknown as Record<string, unknown>).withAuth === "function") {
                         try {

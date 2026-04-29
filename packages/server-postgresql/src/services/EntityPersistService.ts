@@ -56,7 +56,7 @@ export class EntityPersistService {
     /**
      * Save an entity (create or update)
      */
-    async saveEntity<M extends Record<string, any>>(
+    async saveEntity<M extends Record<string, unknown>>(
         collectionPath: string,
         values: Partial<M>,
         entityId?: string | number,
@@ -75,7 +75,7 @@ export class EntityPersistService {
 
                 for (let i = 2; i < segments.length; i += 2) {
                     const relationKey = segments[i];
-                    const resolvedRelations = resolveCollectionRelations(currentCollection as import("@rebasepro/types").PostgresCollection<any, any>);
+                    const resolvedRelations = resolveCollectionRelations(currentCollection as import("@rebasepro/types").PostgresCollection);
                     const relation = resolvedRelations[relationKey];
 
                     if (!relation) {
@@ -161,7 +161,7 @@ export class EntityPersistService {
         // Separate relations that require special handling
         const relationValues: Record<string, unknown> = {};
         const otherValues: Partial<M> = { ...effectiveValues };
-        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection<any, any>);
+        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
 
         for (const key in resolvedRelations) {
             const relation = resolvedRelations[key];
@@ -179,7 +179,7 @@ export class EntityPersistService {
         // Extract relation updates before sanitizing
         const inverseRelationUpdates = ((processedData as Record<string, unknown>).__inverseRelationUpdates as Array<{ relationKey: string; relation: Relation; newValue: unknown; currentEntityId?: string | number; }>) || [];
         const joinPathRelationUpdates = ((processedData as Record<string, unknown>).__joinPathRelationUpdates as Array<{ relationKey: string; relation: Relation; newTargetId: string | number | null; }>) || [];
-        const junctionTableInfo = (processedData as Record<string, unknown>).__junction_table_info as { parentCollection: EntityCollection<any, any>; parentId: string | number; relation: Relation; relationKey: string; } | undefined;
+        const junctionTableInfo = (processedData as Record<string, unknown>).__junction_table_info as { parentCollection: EntityCollection; parentId: string | number; relation: Relation; relationKey: string; } | undefined;
         delete (processedData as Record<string, unknown>).__inverseRelationUpdates;
         delete (processedData as Record<string, unknown>).__joinPathRelationUpdates;
         delete (processedData as Record<string, unknown>).__junction_table_info;

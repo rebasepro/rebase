@@ -21,7 +21,7 @@ export interface CreateRebaseClientOptions extends RebaseClientConfig {
 import { RebaseWebSocketClient } from "./websocket";
 import { RebaseClient as BaseRebaseClient, RebaseData, CollectionAccessor, StorageSource } from "@rebasepro/types";
 
-export type RebaseClient<DB = any> = BaseRebaseClient<DB> & {
+export type RebaseClient<DB = Record<string, unknown>> = BaseRebaseClient<DB> & {
     setToken: (token: string | null) => void;
     setAuthTokenGetter: (getter: () => Promise<string | null>) => void;
     setOnUnauthorized: (handler: () => Promise<boolean>) => void;
@@ -31,14 +31,14 @@ export type RebaseClient<DB = any> = BaseRebaseClient<DB> & {
     cron: ReturnType<typeof createCron>;
     ws?: RebaseWebSocketClient;
     storage?: StorageSource;
-    call: <T = any>(endpoint: string, payload?: any) => Promise<T>;
+    call: <T = unknown>(endpoint: string, payload?: unknown) => Promise<T>;
     data: RebaseData & {
         collection<K extends keyof DB>(slug: Extract<K, string>): CollectionClient<
-            DB[K] extends { Row: infer R extends Record<string, any> } ? R : any
+            DB[K] extends { Row: infer R extends Record<string, unknown> } ? R : Record<string, unknown>
         >;
     } & {
         [K in keyof DB]: CollectionClient<
-            DB[K] extends { Row: infer R extends Record<string, any> } ? R : any
+            DB[K] extends { Row: infer R extends Record<string, unknown> } ? R : Record<string, unknown>
         >;
     };
 };
@@ -56,7 +56,7 @@ function deriveWebSocketUrl(baseUrl: string): string {
         .replace(/\/$/, "");
 }
 
-export function createRebaseClient<DB = any>(options: CreateRebaseClientOptions): RebaseClient<DB> {
+export function createRebaseClient<DB = Record<string, unknown>>(options: CreateRebaseClientOptions): RebaseClient<DB> {
     const transport = createTransport(options);
     const auth = createAuth(transport, options.auth);
     const admin = createAdmin(transport, options.admin);
@@ -102,16 +102,16 @@ export function createRebaseClient<DB = any>(options: CreateRebaseClientOptions)
         });
     }
 
-    const collectionClients = new Map<string, CollectionClient<any>>();
+    const collectionClients = new Map<string, CollectionClient<Record<string, unknown>>>();
 
-    function collection(slug: string): CollectionClient<any> {
+    function collection(slug: string): CollectionClient<Record<string, unknown>> {
         if (!collectionClients.has(slug)) {
             collectionClients.set(slug, createCollectionClient(transport, slug, ws));
         }
         return collectionClients.get(slug)!;
     }
 
-    const dataTarget = { collection } as Record<string, any>;
+    const dataTarget = { collection } as Record<string, unknown>;
 
     const dataProxy = new Proxy(dataTarget, {
         get(_target, prop: string | symbol) {
@@ -138,7 +138,7 @@ export function createRebaseClient<DB = any>(options: CreateRebaseClientOptions)
         resolveToken: transport.resolveToken,
         baseUrl: transport.baseUrl,
         collection,
-        call: async <T = any>(endpoint: string, payload?: any): Promise<T> => {
+        call: async <T = unknown>(endpoint: string, payload?: unknown): Promise<T> => {
             const prefix = endpoint.startsWith("/") ? "" : "/";
             const res = await transport.request<{ data: T }>(`${prefix}${endpoint}`, {
                 method: "POST",

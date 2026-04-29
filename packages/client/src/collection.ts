@@ -4,7 +4,7 @@ import { Entity, FilterValues, WhereFilterOp, CollectionAccessor, WhereFieldValu
 
 import { FilterOperator, QueryBuilder } from "./query_builder";
 
-function parseWhereFilter(where?: Record<string, WhereFieldValue>): FilterValues<any> | undefined {
+function parseWhereFilter(where?: Record<string, WhereFieldValue>): FilterValues<Record<string, unknown>> | undefined {
     if (!where) return undefined;
     const filters: Record<string, [WhereFilterOp, unknown]> = {};
     for (const [key, rawValue] of Object.entries(where)) {
@@ -51,7 +51,7 @@ function parseWhereFilter(where?: Record<string, WhereFieldValue>): FilterValues
             const opStr = value.substring(0, dotIndex);
             const valStr = value.substring(dotIndex + 1);
             let op: WhereFilterOp = "==";
-            let val: any = valStr;
+            let val: string | number | boolean | null | string[] = valStr;
             
             switch (opStr) {
                 case "eq": op = "=="; break;
@@ -101,7 +101,7 @@ function parseWhereFilter(where?: Record<string, WhereFieldValue>): FilterValues
  * The `id` is kept inside `values` as well, since collection properties
  * may define an `isId` field that the form binds to `formex.values`.
  */
-function rowToEntity<M extends Record<string, any>>(row: Record<string, any>, slug: string): Entity<M> {
+function rowToEntity<M extends Record<string, unknown>>(row: Record<string, unknown>, slug: string): Entity<M> {
     return {
         id: row.id,
         path: slug,
@@ -115,9 +115,9 @@ function rowToEntity<M extends Record<string, any>>(row: Record<string, any>, sl
  *
  * Additionally it exposes fluent query builder methods like `.where()`, `.orderBy()`.
  */
-export interface CollectionClient<M extends Record<string, any> = any> extends CollectionAccessor<M> {
+export interface CollectionClient<M extends Record<string, unknown> = Record<string, unknown>> extends CollectionAccessor<M> {
     // Fluent Query Builder
-    where(column: keyof M & string, operator: FilterOperator, value: any): QueryBuilder<M>;
+    where(column: keyof M & string, operator: FilterOperator, value: unknown): QueryBuilder<M>;
     orderBy(column: keyof M & string, ascending?: "asc" | "desc"): QueryBuilder<M>;
     limit(count: number): QueryBuilder<M>;
     offset(count: number): QueryBuilder<M>;
@@ -125,21 +125,21 @@ export interface CollectionClient<M extends Record<string, any> = any> extends C
     include(...relations: string[]): QueryBuilder<M>;
 }
 
-export function createCollectionClient<M extends Record<string, any> = any>(transport: Transport, slug: string, ws?: RebaseWebSocketClient): CollectionClient<M> {
+export function createCollectionClient<M extends Record<string, unknown> = Record<string, unknown>>(transport: Transport, slug: string, ws?: RebaseWebSocketClient): CollectionClient<M> {
     const basePath = `/data/${slug}`;
 
     return {
         async find(params?: FindParams) {
             const qs = buildQueryString(params);
-            const raw = await transport.request<{ data: Record<string, any>[]; meta: any }>(basePath + qs, { method: "GET" });
+            const raw = await transport.request<{ data: Record<string, unknown>[]; meta: Record<string, unknown> }>(basePath + qs, { method: "GET" });
             return {
-                data: (raw.data || []).map((row: Record<string, any>) => rowToEntity<M>(row, slug)),
+                data: (raw.data || []).map((row: Record<string, unknown>) => rowToEntity<M>(row, slug)),
                 meta: raw.meta
             };
         },
 
         async findById(id: string | number) {
-            const raw = await transport.request<Record<string, any>>(`${basePath}/${encodeURIComponent(String(id))}`, { method: "GET" });
+            const raw = await transport.request<Record<string, unknown>>(`${basePath}/${encodeURIComponent(String(id))}`, { method: "GET" });
             if (!raw) return undefined;
             return rowToEntity<M>(raw, slug);
         },
@@ -149,7 +149,7 @@ export function createCollectionClient<M extends Record<string, any> = any>(tran
             if (id !== undefined) {
                 body.id = id;
             }
-            const raw = await transport.request<Record<string, any>>(basePath, {
+            const raw = await transport.request<Record<string, unknown>>(basePath, {
                 method: "POST",
                 body: JSON.stringify(body),
             });
@@ -157,7 +157,7 @@ export function createCollectionClient<M extends Record<string, any> = any>(tran
         },
 
         async update(id: string | number, data: Partial<M>) {
-            const raw = await transport.request<Record<string, any>>(`${basePath}/${encodeURIComponent(String(id))}`, {
+            const raw = await transport.request<Record<string, unknown>>(`${basePath}/${encodeURIComponent(String(id))}`, {
                 method: "PUT",
                 body: JSON.stringify(data),
             });
@@ -171,7 +171,7 @@ export function createCollectionClient<M extends Record<string, any> = any>(tran
         },
 
         ...(ws && {
-            listen(params: FindParams | undefined, onUpdate: (data: { data: Entity<M>[]; meta: any }) => void, onError?: (error: Error) => void) {
+            listen(params: FindParams | undefined, onUpdate: (data: { data: Entity<M>[]; meta: Record<string, unknown> }) => void, onError?: (error: Error) => void) {
                 return ws.listenCollection(
                     {
                         path: slug,
@@ -214,7 +214,7 @@ export function createCollectionClient<M extends Record<string, any> = any>(tran
         }),
 
         // Fluent builder instantiation
-        where(column: keyof M & string, operator: FilterOperator, value: any) {
+        where(column: keyof M & string, operator: FilterOperator, value: unknown) {
             return new QueryBuilder<M>(this as unknown as CollectionClient<M>).where(column, operator, value);
         },
         orderBy(column: keyof M & string, ascending?: "asc" | "desc") {

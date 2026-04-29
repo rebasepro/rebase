@@ -15,8 +15,8 @@ export interface RebaseRole {
     id: string;
     name: string;
     isAdmin: boolean;
-    defaultPermissions: Record<string, any> | null;
-    config: Record<string, any> | null;
+    defaultPermissions: Record<string, unknown> | null;
+    config: Record<string, unknown> | null;
 }
 
 export interface CreateAdminOptions {
@@ -76,14 +76,14 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
         return transport.request<{ role: RebaseRole }>(adminPath + "/roles/" + encodeURIComponent(roleId), { method: "GET" });
     }
 
-    async function createRole(data: { id: string, name: string, isAdmin?: boolean, defaultPermissions?: any, config?: any }) {
+    async function createRole(data: { id: string, name: string, isAdmin?: boolean, defaultPermissions?: Record<string, unknown>, config?: Record<string, unknown> }) {
         return transport.request<{ role: RebaseRole }>(adminPath + "/roles", {
             method: "POST",
             body: JSON.stringify(data),
         });
     }
 
-    async function updateRole(roleId: string, data: { name?: string, isAdmin?: boolean, defaultPermissions?: any, config?: any }) {
+    async function updateRole(roleId: string, data: { name?: string, isAdmin?: boolean, defaultPermissions?: Record<string, unknown>, config?: Record<string, unknown> }) {
         return transport.request<{ role: RebaseRole }>(adminPath + "/roles/" + encodeURIComponent(roleId), {
             method: "PUT",
             body: JSON.stringify(data),
