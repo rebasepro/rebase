@@ -8,7 +8,9 @@ import {
     Button,
     DeleteIcon,
     IconButton,
-    Tooltip
+    Tooltip,
+    Popover,
+    MoreVertIcon
 } from "@rebasepro/ui";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { usePermissions } from "@rebasepro/core";
@@ -29,6 +31,8 @@ export type EntityCollectionViewActionsProps<M extends Record<string, unknown>> 
     selectionController: SelectionController<M>;
     tableController: EntityTableController<M>;
     collectionEntitiesCount?: number;
+    compact?: boolean;
+    children?: React.ReactNode;
 }
 
 export function EntityCollectionViewActions<M extends Record<string, unknown>>({
@@ -42,6 +46,8 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
     selectionController,
     tableController,
     collectionEntitiesCount,
+    compact,
+    children
 }: EntityCollectionViewActionsProps<M>) {
 
     const context = useRebaseContext();
@@ -58,7 +64,7 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
     const selectedEntities = selectionController.selectedEntities;
 
     const addButton = canCreate(collection, path) &&
-        onNewClick && (largeLayout
+        onNewClick && (largeLayout && !compact
             ? <Button
                 id={`add_entity_${path}`}
                 onClick={onNewClick}
@@ -70,8 +76,9 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
             : <Button
                 id={`add_entity_${path}`}
                 onClick={onNewClick}
-                variant="filled"
-                color="primary"
+                variant={compact ? "filled" : "filled"}
+                color={compact ? "neutral" : "primary"}
+                size={compact ? "small" : "medium"}
             >
                 <AddIcon size={"small"} />
             </Button>);
@@ -79,7 +86,7 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
     const multipleDeleteEnabled = canDelete(collection, path, null);
 
     let multipleDeleteButton: React.ReactNode | undefined;
-    if (selectionEnabled) {
+    if (selectionEnabled && !compact) {
         const button = largeLayout
             ? <Button
                 variant={"text"}
@@ -125,8 +132,9 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
 
     const pluginActions = useSlot("collection.actions", actionProps as any);
 
-    return (
+    const secondaryActions = (
         <>
+            {children}
             <ErrorBoundary>
                 {actions}
                 {pluginActions}
@@ -142,8 +150,31 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
                     <EditorCollectionAction {...(actionProps as any)} />
                 </ErrorBoundary>
             )}
+        </>
+    );
+
+    const [overflowOpen, setOverflowOpen] = React.useState(false);
+
+    return (
+        <div className="flex items-center gap-1">
+            {!compact ? (
+                secondaryActions
+            ) : (
+                <Popover
+                    open={overflowOpen}
+                    onOpenChange={setOverflowOpen}
+                    trigger={
+                        <IconButton size="small">
+                            <MoreVertIcon size="small" />
+                        </IconButton>
+                    }>
+                    <div className="flex flex-col gap-1 p-2 min-w-[200px]" onClick={() => setOverflowOpen(false)}>
+                        {secondaryActions}
+                    </div>
+                </Popover>
+            )}
             {multipleDeleteButton}
             {addButton}
-        </>
+        </div>
     );
 }

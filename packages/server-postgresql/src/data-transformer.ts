@@ -102,7 +102,7 @@ export function serializeDataToServer<M extends Record<string, unknown>>(
                 if (relation.direction === "owning" && relation.localKey) {
                     // Owning relation: Map relation object to FK column on current table
                     const serializedValue = serializePropertyToServer(value, property);
-                    if (serializedValue !== null && serializedValue !== undefined) {
+                    if (serializedValue !== undefined) {
                         result[relation.localKey] = serializedValue;
                     }
                     // Don't add the original relation property to the result
@@ -188,6 +188,7 @@ export function serializePropertyToServer(value: unknown, property: Property): u
             } else if (typeof value === "object" && value !== null && "id" in value) {
                 return (value as Record<string, unknown>).id;
             }
+            if (value === "") return null;
             return value;
 
         case "array":

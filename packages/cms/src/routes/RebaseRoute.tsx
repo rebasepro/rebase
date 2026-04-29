@@ -91,10 +91,10 @@ export function RebaseRoute() {
         }
         return <EntityCollectionView
             key={`collection_view_${collection.slug}`}
+            {...collection}
             parentCollectionIds={[]}
             path={collection.slug}
             updateUrl={true}
-            {...collection}
             Actions={toArray(collection.Actions)} />
     }
 
@@ -114,10 +114,10 @@ export function RebaseRoute() {
             }
             return <EntityCollectionView
                 key={`collection_view_${collection.slug}`}
+                {...collection}
                 parentCollectionIds={[]}
                 path={collection.slug}
                 updateUrl={true}
-                {...collection}
                 Actions={toArray(collection.Actions)} />;
         }
     }
@@ -140,11 +140,11 @@ export function RebaseRoute() {
         if (collection && (collection.detailLayout ?? "split") === "split") {
             return <EntityCollectionView
                 key={`collection_view_${collection.slug}`}
+                {...collection}
                 parentCollectionIds={[]}
                 path={collection.slug}
                 updateUrl={true}
                 selectedEntityId={lastEntityEntry.entityId}
-                {...collection}
                 Actions={toArray(collection.Actions)} />;
         }
     }
@@ -233,6 +233,9 @@ function EntityFullScreenRoute({
     const lastCollectionEntry = [...navigationEntries].reverse().find((entry) => entry.type === "collection");
 
     if (isNew && !lastCollectionEntry) {
+        if (!collectionRegistry.initialised) {
+            return <CircularProgressCenter />;
+        }
         throw new Error("INTERNAL: No collection found in the navigation");
     }
 

@@ -1,7 +1,6 @@
 import type { EntityCollection } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CollectionSize, Entity, EntityTableController, SelectionController } from "@rebasepro/types";
-import { EntityCollectionListView } from "./EntityCollectionListView";
 import { EntityEditView } from "../EntityEditView";
 import {
     cls,
@@ -37,6 +36,10 @@ export type SplitListViewProps<M extends Record<string, unknown> = Record<string
      * When undefined, no detail panel is shown.
      */
     selectedEntityId?: string | number;
+    /**
+     * The collection view to render on the left side (always the list view).
+     */
+    children: React.ReactNode;
 };
 
 const PANEL_SIZE_KEY = "rebase_split_list_panel_size";
@@ -60,11 +63,7 @@ function savePanelSize(path: string, size: number) {
 
 /**
  * Master-detail split view.
- * Shows the entity list on the left and the entity edit view on the right.
- *
- * The toolbar is NOT rendered here — it lives in the parent EntityCollectionView
- * and switches to "compact" mode when a detail is open. This keeps the component
- * tree identical between full-list and split views, enabling perfect CSS transitions.
+ * Shows the list on the left and the entity edit view on the right.
  *
  * Animation approach:
  * - The list always renders at full width.
@@ -91,7 +90,8 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
     size = "m",
     path,
     parentCollectionIds,
-    selectedEntityId
+    selectedEntityId,
+    children
 }: SplitListViewProps<M>) {
     const largeLayout = useLargeLayout();
     const collectionRegistryController = useCollectionRegistryController();
@@ -252,19 +252,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
                     )}
                     style={{ transitionDuration: `${TRANSITION_DURATION}ms` }}
                 >
-                    <EntityCollectionListView
-                        collection={collection}
-                        tableController={tableController}
-                        onEntityClick={externalOnEntityClick}
-                        selectionController={selectionController}
-                        selectionEnabled={selectionEnabled}
-                        highlightedEntities={highlightedEntities}
-                        emptyComponent={emptyComponent}
-                        onScroll={onScroll}
-                        initialScroll={initialScroll}
-                        size={size}
-                        selectedEntityId={selectedEntityId}
-                    />
+                    {children}
                 </div>
 
                 {/* Detail — slides in from right */}
@@ -303,7 +291,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
             {/* Left panel: list — always present, width animates */}
             <div
                 className={cls(
-                    "flex flex-col h-full overflow-hidden transition-all ease-out",
+                    "flex flex-col h-full overflow-hidden min-w-0 transition-all ease-out",
                     isDetailVisible ? "border-r" : "",
                     isDetailVisible ? defaultBorderMixin : ""
                 )}
@@ -315,19 +303,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
                     minWidth: isDetailVisible && animationPhase !== "entering" ? 240 : undefined,
                 }}
             >
-                <EntityCollectionListView
-                    collection={collection}
-                    tableController={tableController}
-                    onEntityClick={externalOnEntityClick}
-                    selectionController={selectionController}
-                    selectionEnabled={!isDetailVisible}
-                    highlightedEntities={highlightedEntities}
-                    emptyComponent={emptyComponent}
-                    onScroll={onScroll}
-                    initialScroll={initialScroll}
-                    size={isDetailVisible ? "s" : size}
-                    selectedEntityId={selectedEntityId}
-                />
+                {children}
             </div>
 
             {/* Resizable divider handle — only when detail is visible */}

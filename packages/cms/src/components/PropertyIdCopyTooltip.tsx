@@ -26,15 +26,15 @@ export function PropertyIdCopyTooltipContent({ propertyKey }: { propertyKey: str
     const [copied, setCopied] = useState(false);
 
     return (
-        <div className={"flex flex-row gap-2 items-center justify-center text-white"}>
+        <div className={"flex flex-row gap-2 items-center justify-center text-on-surface"}>
             <div>
-                <Typography variant={"caption"} className={"min-w-20 text-surface-accent-400"}
-                    color={"disabled"}>{copied ? "Copied" : "Property ID"}</Typography>
-                <Typography variant={"caption"} className={"text-white"}><code>{propertyKey}</code></Typography>
+                <Typography variant={"caption"} className={"min-w-20 text-on-surface-variant opacity-80"}
+                    color={"inherit"}>{copied ? "Copied" : "Property ID"}</Typography>
+                <Typography variant={"caption"} className={"text-on-surface"}><code>{propertyKey}</code></Typography>
             </div>
             <IconButton size={"small"}>
                 <ContentCopyIcon size={"smallest"}
-                    className={"text-white"}
+                    className={"text-on-surface"}
                     onClick={useCallback(() => {
                         navigator.clipboard.writeText(propertyKey);
                         setCopied(true);

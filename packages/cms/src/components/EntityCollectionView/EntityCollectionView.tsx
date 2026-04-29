@@ -626,6 +626,10 @@ export const EntityCollectionView = React.memo(
 
         const largeLayout = useLargeLayout();
 
+        const isSplitLayout = (collection.detailLayout ?? "split") === "split";
+        const isCompact = isSplitLayout && viewMode === "list" && selectedEntityIdProp !== undefined;
+        const activeSelectionEnabled = !isCompact && selectionEnabled;
+
         const getActionsForEntity = ({
             entity,
             customEntityActions
@@ -680,7 +684,7 @@ export const EntityCollectionView = React.memo(
                     width={width}
                     frozen={frozen}
                     isSelected={isSelected}
-                    selectionEnabled={selectionEnabled}
+                    selectionEnabled={activeSelectionEnabled}
                     size={size}
                     highlightEntity={setHighlightedEntity}
                     unhighlightEntity={unselectNavigatedEntity}
@@ -802,93 +806,177 @@ export const EntityCollectionView = React.memo(
                 </div>
                 : <Typography variant={"label"}>{t("no_results_filter_sort")}</Typography>;
 
+        const toolbarNode = (
+            <CollectionTableToolbar
+                compact={isCompact}
+                loading={tableController.dataLoading}
+                onTextSearch={tableController.setSearchString}
+                viewModeToggle={viewModeToggleElement}
+                actionsStart={<EntityCollectionViewStartActions
+                    parentCollectionIds={parentCollectionIds ?? []}
+                    collection={collection}
+                    tableController={tableController}
+                    path={path}
+                    relativePath={collection.slug}
+                    selectionController={usedSelectionController}
+                    collectionEntitiesCount={docsCount ?? undefined}
+                    resolvedProperties={resolvedCollection.properties}
+                    compact={isCompact} />}
+                actions={
+                    <EntityCollectionViewActions
+                        parentCollectionIds={parentCollectionIds ?? []}
+                        collection={collection}
+                        tableController={tableController}
+                        onMultipleDeleteClick={onMultipleDeleteClick}
+                        onNewClick={onNewClick}
+                        path={path}
+                        relativePath={collection.slug}
+                        selectionController={usedSelectionController}
+                        selectionEnabled={activeSelectionEnabled}
+                        collectionEntitiesCount={docsCount ?? undefined}
+                        compact={isCompact}
+                    >
+                        {pluginToolbarWidgets}
+                    </EntityCollectionViewActions>
+                }
+            />
+        );        const innerView = viewMode === "kanban" ? (
+            <EntityCollectionBoardView
+                key={`kanban-view-${path}-${selectedKanbanProperty}`}
+                collection={collection}
+                tableController={tableController}
+                fullPath={path}
+                parentCollectionIds={parentCollectionIds}
+                columnProperty={selectedKanbanProperty}
+                onEntityClick={onEntityClick}
+                selectionController={usedSelectionController}
+                selectionEnabled={selectionEnabled}
+                highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                deletedEntities={deletedEntities}
+                emptyComponent={emptyComponent}
+            />
+        ) : viewMode === "cards" ? (
+            <EntityCollectionCardView
+                key={`cards-view-${path}`}
+                collection={collection}
+                tableController={tableController}
+                onEntityClick={onEntityClick}
+                selectionController={usedSelectionController}
+                selectionEnabled={selectionEnabled}
+                highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                onScroll={tableController.onScroll}
+                initialScroll={tableController.initialScroll}
+                size={cardSize}
+                emptyComponent={emptyComponent}
+            />
+        ) : viewMode === "list" ? (
+            <EntityCollectionListView
+                key={`list-view-${path}`}
+                collection={collection}
+                tableController={tableController}
+                onEntityClick={onEntityClick}
+                selectionController={usedSelectionController}
+                selectionEnabled={selectionEnabled}
+                highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                onScroll={tableController.onScroll}
+                initialScroll={tableController.initialScroll}
+                size={listSize}
+                emptyComponent={emptyComponent}
+            />
+        ) : (
+            <EntityCollectionTable
+                key={`collection_table_${path}`}
+                hideToolbar={true}
+                additionalFields={additionalFields}
+                tableController={tableController}
+                enablePopupIcon={true}
+                displayedColumnIds={displayedColumnIds}
+                onSizeChanged={onTableSizeChanged}
+                onEntityClick={onEntityClick}
+                onColumnResize={onColumnResize}
+                onValueChange={onValueChange}
+                tableRowActionsBuilder={tableRowActionsBuilder}
+                uniqueFieldValidator={uniqueFieldValidator}
+                selectionController={usedSelectionController}
+                highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                defaultSize={tableSize}
+                properties={resolvedCollection.properties}
+                getPropertyFor={getPropertyFor}
+                onScroll={tableController.onScroll}
+                initialScroll={tableController.initialScroll}
+                emptyComponent={emptyComponent}
+                hoverRow={hoverRow}
+                inlineEditing={checkInlineEditing()}
+                AdditionalHeaderWidget={buildAdditionalHeaderWidget}
+                AddColumnComponent={addColumnComponentInternal}
+                getIdColumnWidth={getIdColumnWidth}
+                additionalIDHeaderWidget={<EntityIdHeaderWidget
+                    path={path}
+                    idPath={path}
+                    collection={collection} />}
+                openEntityMode={openEntityMode}
+                onColumnsOrderChange={(newColumns) => {
+                    // Extract property keys from the new column order
+                    // Filter to only include actual property columns (not frozen columns, not additional fields, etc.)
+                    // Deduplicate to clean up any previously duplicated keys
+                    const seenKeys = new Set<string>();
+                    const newPropertiesOrder = newColumns
+                        .filter(col => !col.frozen && getPropertyInPath(collection.properties, col.key))
+                        .map(col => col.key)
+                        .filter(key => {
+                            if (seenKeys.has(key)) return false;
+                            seenKeys.add(key);
+                            return true;
+                        });
+
+                    // Optimistically update local state to prevent UI flickering
+                    setLocalPropertiesOrder(newPropertiesOrder);
+
+                    // Call each plugin's onColumnsReorder callback
+                    if (customizationController?.plugins) {
+                        customizationController.plugins
+                            .filter(plugin => plugin.hooks?.onColumnsReorder)
+                            .forEach(plugin => {
+                                plugin.hooks!.onColumnsReorder!({
+                                    fullPath: path,
+                                    parentCollectionIds: parentCollectionIds ?? [],
+                                    collection,
+                                    newPropertiesOrder
+                                });
+                            });
+                    }
+                }}
+            />
+        );
+
         return (
             <div className={cls("overflow-hidden h-full w-full rounded-md flex flex-col", className)}
                 ref={containerRef}>
 
-                {/* Unified toolbar — stays visible in both full and compact split mode */}
                 {countFetcher}
-                <CollectionTableToolbar
-                    compact={viewMode === "list" && (collection.detailLayout ?? "split") === "split" && selectedEntityIdProp !== undefined}
-                    loading={tableController.dataLoading}
-                    onTextSearch={tableController.setSearchString}
-                    viewModeToggle={viewModeToggleElement}
-                    actionsStart={<EntityCollectionViewStartActions
-                        parentCollectionIds={parentCollectionIds ?? []}
-                        collection={collection}
-                        tableController={tableController}
-                        path={path}
-                        relativePath={collection.slug}
-                        selectionController={usedSelectionController}
-                        collectionEntitiesCount={docsCount ?? undefined}
-                        resolvedProperties={resolvedCollection.properties} />}
-                    actions={<>
-                        {pluginToolbarWidgets}
-                        <EntityCollectionViewActions
-                            parentCollectionIds={parentCollectionIds ?? []}
-                            collection={collection}
-                            tableController={tableController}
-                            onMultipleDeleteClick={onMultipleDeleteClick}
-                            onNewClick={onNewClick}
-                            path={path}
-                            relativePath={collection.slug}
-                            selectionController={usedSelectionController}
-                            selectionEnabled={selectionEnabled}
-                            collectionEntitiesCount={docsCount ?? undefined}
-                        />
-                    </>}
-                />
+                {toolbarNode}
 
-                {/* View content - only the view-specific content changes */}
-                {viewMode === "kanban" ? (
-                    <EntityCollectionBoardView
-                        key={`kanban-view-${path}-${selectedKanbanProperty}`}
-                        collection={collection}
-                        tableController={tableController}
-                        fullPath={path}
-                        parentCollectionIds={parentCollectionIds}
-                        columnProperty={selectedKanbanProperty}
-                        onEntityClick={onEntityClick}
-                        selectionController={usedSelectionController}
-                        selectionEnabled={selectionEnabled}
-                        highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
-                        deletedEntities={deletedEntities}
-                        emptyComponent={emptyComponent}
-                    />
-                ) : viewMode === "cards" ? (
-                    <EntityCollectionCardView
-                        key={`cards-view-${path}`}
+                {/* List + split layout: always render SplitListView so the
+                    enter/exit animation plays when selectedEntityId changes.
+                    For other view modes: render innerView directly. */}
+                {isSplitLayout && viewMode === "list" ? (
+                    <SplitListView
+                        key={`split-list-view-${path}`}
                         collection={collection}
                         tableController={tableController}
                         onEntityClick={onEntityClick}
+                        onNewClick={onNewClick}
                         selectionController={usedSelectionController}
                         selectionEnabled={selectionEnabled}
                         highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
                         onScroll={tableController.onScroll}
                         initialScroll={tableController.initialScroll}
-                        size={cardSize}
+                        size={listSize}
                         emptyComponent={emptyComponent}
-                    />
-                ) : viewMode === "list" ? (
-                    (collection.detailLayout ?? "split") === "split" ? (
-                        <SplitListView
-                            key={`split-list-view-${path}`}
-                            collection={collection}
-                            tableController={tableController}
-                            onEntityClick={onEntityClick}
-                            onNewClick={onNewClick}
-                            selectionController={usedSelectionController}
-                            selectionEnabled={selectionEnabled}
-                            highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
-                            onScroll={tableController.onScroll}
-                            initialScroll={tableController.initialScroll}
-                            size={listSize}
-                            emptyComponent={emptyComponent}
-                            path={path}
-                            parentCollectionIds={parentCollectionIds}
-                            selectedEntityId={selectedEntityIdProp}
-                        />
-                    ) : (
+                        path={path}
+                        parentCollectionIds={parentCollectionIds}
+                        selectedEntityId={selectedEntityIdProp}
+                    >
                         <EntityCollectionListView
                             key={`list-view-${path}`}
                             collection={collection}
@@ -901,72 +989,11 @@ export const EntityCollectionView = React.memo(
                             initialScroll={tableController.initialScroll}
                             size={listSize}
                             emptyComponent={emptyComponent}
+                            selectedEntityId={selectedEntityIdProp}
                         />
-                    )
+                    </SplitListView>
                 ) : (
-                    <EntityCollectionTable
-                        key={`collection_table_${path}`}
-                        hideToolbar={true}
-                        additionalFields={additionalFields}
-                        tableController={tableController}
-                        enablePopupIcon={true}
-                        displayedColumnIds={displayedColumnIds}
-                        onSizeChanged={onTableSizeChanged}
-                        onEntityClick={onEntityClick}
-                        onColumnResize={onColumnResize}
-                        onValueChange={onValueChange}
-                        tableRowActionsBuilder={tableRowActionsBuilder}
-                        uniqueFieldValidator={uniqueFieldValidator}
-                        selectionController={usedSelectionController}
-                        highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
-                        defaultSize={tableSize}
-                        properties={resolvedCollection.properties}
-                        getPropertyFor={getPropertyFor}
-                        onScroll={tableController.onScroll}
-                        initialScroll={tableController.initialScroll}
-                        emptyComponent={emptyComponent}
-                        hoverRow={hoverRow}
-                        inlineEditing={checkInlineEditing()}
-                        AdditionalHeaderWidget={buildAdditionalHeaderWidget}
-                        AddColumnComponent={addColumnComponentInternal}
-                        getIdColumnWidth={getIdColumnWidth}
-                        additionalIDHeaderWidget={<EntityIdHeaderWidget
-                            path={path}
-                            idPath={path}
-                            collection={collection} />}
-                        openEntityMode={openEntityMode}
-                        onColumnsOrderChange={(newColumns) => {
-                            // Extract property keys from the new column order
-                            // Filter to only include actual property columns (not frozen columns, not additional fields, etc.)
-                            // Deduplicate to clean up any previously duplicated keys
-                            const seenKeys = new Set<string>();
-                            const newPropertiesOrder = newColumns
-                                .filter(col => !col.frozen && getPropertyInPath(collection.properties, col.key))
-                                .map(col => col.key)
-                                .filter(key => {
-                                    if (seenKeys.has(key)) return false;
-                                    seenKeys.add(key);
-                                    return true;
-                                });
-
-                            // Optimistically update local state to prevent UI flickering
-                            setLocalPropertiesOrder(newPropertiesOrder);
-
-                            // Call each plugin's onColumnsReorder callback
-                            if (customizationController?.plugins) {
-                                customizationController.plugins
-                                    .filter(plugin => plugin.hooks?.onColumnsReorder)
-                                    .forEach(plugin => {
-                                        plugin.hooks!.onColumnsReorder!({
-                                            fullPath: path,
-                                            parentCollectionIds: parentCollectionIds ?? [],
-                                            collection,
-                                            newPropertiesOrder
-                                        });
-                                    });
-                            }
-                        }}
-                    />
+                    innerView
                 )}
 
                 {popupCell && <PopupFormField

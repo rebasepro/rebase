@@ -21,6 +21,7 @@ export type EntityCollectionViewStartActionsProps<M extends Record<string, unkno
      * Resolved properties from the collection for the filters dialog
      */
     resolvedProperties?: Properties;
+    compact?: boolean;
 }
 
 export function EntityCollectionViewStartActions<M extends Record<string, unknown>>({
@@ -31,7 +32,8 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
     selectionController,
     tableController,
     collectionEntitiesCount,
-    resolvedProperties
+    resolvedProperties,
+    compact
 }: EntityCollectionViewStartActionsProps<M>) {
 
     const context = useRebaseContext();
@@ -67,7 +69,7 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
                 color="primary"
                 invisible={activeFilterCount === 0}
             >
-                {largeLayout ? (
+                {largeLayout && !compact ? (
                     <Button
                         variant="text"
                         size="small"
