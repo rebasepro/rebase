@@ -1,4 +1,6 @@
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server-core";
+import { rebase } from "@rebasepro/server-core";
 
 /**
  * Example custom function route.
@@ -12,18 +14,33 @@ import { Hono } from "hono";
  *
  * This is a standard Hono app — use any Hono middleware,
  * define any HTTP methods, access the request/response directly.
- * The authenticated user and RLS-scoped driver are available
- * via c.get("user") and c.get("driver").
+ *
+ * The `rebase` singleton gives you admin-level access to all
+ * app-scoped services (data, auth, storage, email) from anywhere.
+ * For request-scoped / RLS-scoped access, use c.get("user") and c.get("driver").
  */
-const app = new Hono();
+const app = new Hono<HonoEnv>();
 
 app.post("/", async (c) => {
     const body = await c.req.json().catch(() => ({}));
-    const user = c.get("user") as any;
+    const user = c.get("user");
+
+    const userId = (user && typeof user === "object" && "userId" in user)
+        ? user.userId
+        : "anonymous";
+
+    // Access any Rebase service — just import and use:
+    // await rebase.email?.send({
+    //     to: "admin@example.com",
+    //     subject: "Function called",
+    //     html: `<p>Hello from ${userId}!</p>`,
+    // });
+    //
+    // const authors = await rebase.data.authors.find({ limit: 5 });
 
     return c.json({
         message: `Hello, ${body.name || "World"}!`,
-        user: user?.userId || "anonymous",
+        user: userId,
     });
 });
 

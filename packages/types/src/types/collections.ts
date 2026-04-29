@@ -135,6 +135,22 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
     openEntityMode?: "side_panel" | "full_screen";
 
     /**
+     * How to display entity details when an entity is selected in list view.
+     * - "navigate": Navigate away to the entity (default, current behavior)
+     * - "split": Show list + entity side-by-side in a master-detail layout
+     *
+     * When "split" is set:
+     * - On large screens: renders as side-by-side split view with resizable panels
+     * - On small screens: falls back to "navigate" behavior
+     *
+     * This is independent of `openEntityMode`. When detailLayout is "split",
+     * the entity renders inline in the split panel rather than using side_panel/full_screen.
+     *
+     * Default: "navigate"
+     */
+    detailLayout?: "navigate" | "split";
+
+    /**
      * Order in which the properties are displayed.
      * If you are specifying your collection as code, the order is the same as the
      * one you define in `properties`. Additional columns are added at the

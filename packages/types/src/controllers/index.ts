@@ -11,6 +11,7 @@ export * from "./navigation";
 export * from "./effective_role";
 
 export * from "./storage";
+export * from "./email";
 export * from "./client";
 export * from "./customization_controller";
 export * from "./side_entity_controller";

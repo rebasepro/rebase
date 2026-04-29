@@ -101,12 +101,12 @@ interface RebaseBackendConfig {
 
 ## The Backend Instance
 
-`initializeRebaseBackend` returns a `RebaseBackendInstance` with access to all services:
+`initializeRebaseBackend` returns a `RebaseBackendInstance` with access to internal services:
 
 ```typescript
 const instance = await initializeRebaseBackend(config);
 
-// Access services
+// Internal service access
 instance.driver              // Default data driver
 instance.driverRegistry      // All drivers (for multi-database)
 instance.realtimeService     // Default realtime service
@@ -118,6 +118,8 @@ instance.collectionRegistry  // Collection metadata
 instance.historyService      // Entity history
 instance.cronScheduler       // Cron job scheduler (when cronsDir is set)
 ```
+
+> **Note:** While the `instance` exposes these internal services, application code (such as custom functions and cron jobs) should use the global `rebase` singleton from `@rebasepro/server-core` to interact with the backend API.
 
 ## REST API
 

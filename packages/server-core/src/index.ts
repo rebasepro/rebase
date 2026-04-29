@@ -16,6 +16,9 @@ export * from "./auth/interfaces";
 // Core functionality
 export * from "./init";
 
+// Server-side singleton (import { rebase } from "@rebasepro/server-core")
+export { rebase } from "./singleton";
+
 // Services
 export * from "./services/driver-registry";
 

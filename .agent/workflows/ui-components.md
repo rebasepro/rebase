@@ -27,3 +27,39 @@ description: Rules for creating UI components in the Rebase codebase
 4. **Use `cls()` from `@rebasepro/ui`** for conditional class merging instead of template literals.
 
 5. **Use `Typography`** for all text rendering — never use raw `<h1>`, `<p>`, `<span>` for visible UI text.
+
+---
+
+## Design Token Rules (MANDATORY — NO EXCEPTIONS)
+
+1. **All borders MUST use `defaultBorderMixin`** from `@rebasepro/ui/styles`. NEVER hardcode border colors. Import and apply via `cls()`.
+
+2. **Use the established color token scale for interactive states**. Look at existing components in the codebase for the correct tokens. NEVER invent arbitrary color values — always reference the existing design system (`surface-accent-*`, `primary-*`, etc.).
+
+3. **No gradients on icons or fallback placeholders** unless the design explicitly calls for it.
+
+4. **Let text fill its container naturally**. Use `truncate` for overflow. Do NOT hardcode `max-w-[Npx]` on text elements.
+
+5. **Interactive controls must always be visible**. Never hide checkboxes, toggles, or action buttons behind hover states.
+
+---
+
+## Responsive Layout Rules (MANDATORY)
+
+1. **Container-aware, not viewport-aware**: Use `ResizeObserver` on the actual container, NOT media queries, for adaptive layout. This ensures correct behavior inside split panels, side panels, and nested layouts.
+
+2. **Refs that observers depend on MUST render unconditionally**. If a component uses `ResizeObserver`, `IntersectionObserver`, or any ref-dependent effect, the element carrying the `ref` MUST NOT be inside a conditional return. Loading, empty, and error states go INSIDE the always-rendered container.
+
+3. **One component, adaptive rendering**: Prefer a single component that adapts to its container width over separate "compact" and "full" variants. This prevents feature drift and keeps the codebase DRY.
+
+---
+
+## Mobile / Small Screen Rules (MANDATORY)
+
+1. **Master-detail views on small screens**: When space is insufficient for side-by-side panels:
+   - If an item IS selected, show the **detail/form view**.
+   - If NO item is selected, show the **list**.
+   - NEVER show only the list when the user has selected something.
+
+2. **Back navigation**: Escape or a back action from the detail view should return to the list.
+

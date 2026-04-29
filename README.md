@@ -5,10 +5,10 @@
 </p>
 
 <h1 align="center">Rebase</h1>
-<h3 align="center">The Ultimate Headless CMS & Admin Panel Framework for React Developers</h3>
+<h3 align="center">The Ultimate Open-Source Backend-as-a-Service & Admin Panel Framework</h3>
 <p align="center">
-  Build powerful, radically extensible back-office apps in minutes.<br/>
-  Own your data, own your code. Perfect for Firebase & PostgreSQL.
+  <strong>Ship production-ready backends and radically extensible back-office apps in minutes.</strong><br/>
+  Own your data, own your code. The absolute easiest way to build on PostgreSQL and Firebase.
 </p>
 
 <p align="center">
@@ -36,8 +36,8 @@
 
 ## What is Rebase?
 
-Rebase is a **developer-first**, open-source headless CMS and admin panel framework built with **React** and **TypeScript**. 
-It's designed exclusively for developers who demand complete control and unlimited extensibility over their internal tools. By abstracting the heavy lifting of UI state, forms, routing, and database synchronization, it allows you to generate robust CRUD panels in minutes—while giving you the freedom to inject any custom React component you need.
+Rebase is a **developer-first**, open-source Backend-as-a-Service (BaaS) and admin panel framework built with **React** and **TypeScript**. 
+It's designed exclusively for developers who demand complete control and unlimited extensibility over their internal tools and backend infrastructure. By abstracting the heavy lifting of API generation, database synchronization, UI state, and routing, it allows you to deploy a fully-featured backend and robust CRUD panels in minutes—while giving you the freedom to inject any custom React component or serverless logic you need.
 
 ### ✨ Key Highlights
 
@@ -50,11 +50,11 @@ It's designed exclusively for developers who demand complete control and unlimit
 
 ---
 
-## Quick Start
+## ⚡ Quick Start: Zero to Production in 60 Seconds
 
-Scaffold a complete, self-hosted Rebase application connected to your database in seconds.
+Scaffold a complete, self-hosted Rebase application connected to your database instantly.
 
-Our template relies on Docker Compose to orchestrate both your Rebase instance and a PostgreSQL database seamlessly across your environments.
+Our powerful CLI relies on Docker Compose to seamlessly orchestrate both your Rebase instance and a PostgreSQL database across any environment. No config nightmares—just pure developer bliss.
 
 ```bash
 npx @rebasepro/create my-rebase-app
@@ -72,51 +72,59 @@ You're done! Your extremely scalable CMS is now alive.
 
 ## Developer Features
 
-### 🏓 Spreadsheet-Style Collection View
+### 🚀 Complete Backend-as-a-Service (BaaS)
 
-An incredibly fast, windowed spreadsheet view with inline editing, real-time updates, filtering, sorting, and text search. Switch flawlessly between multiple view modes: **spreadsheet table**, **card grid**, and **Kanban board**.
+Get a production-ready backend out of the box. Includes a strongly-typed ORM, Authentication, Storage, Email Service, and automatic REST API generation. Interact with your entire system anywhere using the global, type-safe `rebase` singleton.
+
+### 🏓 Premium Admin Panel & CMS
+
+An incredibly fast, windowed spreadsheet view to manage your database with inline editing, real-time updates, filtering, sorting, and text search. Switch flawlessly between multiple view modes: **spreadsheet table**, **card grid**, and **Kanban board**.
+
+### 🔒 Typed Schema & Database Migrations
+
+Define your data models using pure TypeScript collections. Rebase automatically generates your Drizzle ORM schema, handles PostgreSQL database migrations, and keeps your live database perfectly in sync using built-in tooling like `rebase doctor`.
+
+### ⚡ Extensible API & Edge Functions
+
+Effortlessly drop custom Hono routes or scheduled tasks into the `functions/` and `crons/` directories. Rebase auto-loads them and automatically injects database access and JWT authentication middleware.
+
+### 📜 Standalone Scripting
+
+Write standalone data manipulation or maintenance scripts effortlessly. Rebase's CLI automatically persists the local dev server URL to `.rebase-dev-url`, enabling zero-config local scripts that connect directly to your running backend using the `@rebasepro/client` SDK.
 
 ### 🧩 Custom Views & React Extensibility
 
-Because Rebase is just a React framework, you can build entirely custom views (dashboards, previews, native charts) and drop them directly into the main navigation or as entity-level tabs. Utilize built-in hooks like `useSideEntityController`, `useSnackbarController`, and `useAuthController` to interact fluently with Rebase's internal state mechanism.
-
-### 🎨 Visual Schema Editor & Data Inference
-
-Design your data models visually with **20+ field types** and advanced validation rules using pure TypeScript. Even better, connect to an existing legacy database and let Rebase **automatically infer your schema**—going from zero to a strictly typed, full-featured admin panel within minutes.
-
-### ✍️ Notion-Style Rich Text Editor
-
-A beautiful block-based editor natively supporting slash commands, drag-and-drop blocks, keyboard shortcuts, and full AI-powered text completion. Built on TipTap v3.
+Because the Rebase Admin Panel is just a React framework, you can build entirely custom views (dashboards, previews, native charts) and drop them directly into the main navigation or as entity-level tabs. Utilize built-in hooks to interact fluently with Rebase's internal state mechanism.
 
 ### 📥📤 Deep File & Data Management
 
-Import data from **CSV, JSON, and Excel** with an intuitive field mapper. Scale seamlessly with full Firebase Storage hooks for image resizing, video optimization, and file mapping components built-in to the interface.
+Import data from **CSV, JSON, and Excel** with an intuitive field mapper. Scale seamlessly with full Storage hooks for image resizing, video optimization, and file mapping components built-in to the interface.
 
-### 👮 Roles, Permissions & User Management
+### 👮 Roles, Permissions & Security Rules
 
-Deploy granular, role-based access control strategies for collections, fields, and individual actions directly from your codebase logic.
+Deploy granular, role-based access control (RBAC) and context-aware security rules directly from your codebase logic to secure your collections, fields, and serverless functions.
 
 ---
 
-## Core Technologies
+## 🛠️ Core Technologies
 
-Everything is built entirely upon standard modern web conventions:
+We don't reinvent the wheel. Rebase is built entirely upon the most modern, battle-tested web standards:
 
-| Technology | Version |
+| Technology | What we use it for |
 |---|---|
-| TypeScript | 5.x |
-| React | 18+ |
-| Tailwind CSS | v4 |
-| WebSockets | Real-time |
-| Database | Firebase, Postgres, MongoDB |
-| UI Primitives | Radix UI |
-| Editor | TipTap v3 |
+| 💙 **TypeScript 5.x** | End-to-end absolute type safety |
+| ⚛️ **React 18+** | Lightning-fast, component-driven UI |
+| 🌊 **Tailwind CSS v4** | Premium, utility-first styling |
+| 🔌 **WebSockets** | Blazing-fast real-time synchronization |
+| 🗄️ **Drizzle ORM** | Type-safe SQL migrations and query building |
+| 🧱 **Radix UI** | Unstyled, accessible UI primitives |
+| 📝 **TipTap v3** | The ultimate headless rich text editor |
 
 ---
 
-## Standalone UI Library (`@rebasepro/ui`)
+## 🎨 Standalone UI Library (`@rebasepro/ui`)
 
-Rebase exposes its premium design engine as an independent library. Fully typed, accessible, and customizable via Tailwind CSS. Use it instantly in any of your arbitrary React projects:
+Rebase exposes its premium design engine as a completely independent library. Fully typed, highly accessible, and gorgeously customized via Tailwind CSS v4. Drop it into **any** of your React projects instantly:
 
 ```bash
 npm install @rebasepro/ui
@@ -132,9 +140,9 @@ Explore a live interactive sandbox containing all core features — you can modi
 
 ---
 
-## Monorepo Architecture
+## 🏗️ Modular Monorepo Architecture
 
-Rebase is structured as a modular monorepo, allowing you to consume only the layers you strictly need in your projects:
+Don't want the whole framework? No problem. Rebase is structured as an ultra-modular monorepo, allowing you to install **only** the layers you strictly need:
 
 | Package | Description |
 |---|---|

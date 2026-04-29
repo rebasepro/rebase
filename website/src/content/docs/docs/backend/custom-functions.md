@@ -147,36 +147,25 @@ Rebase's JWT middleware is scoped to the built-in API routes (`/api/data`, `/api
 
 Custom functions run alongside Rebase, so you can access the database through two approaches:
 
-### 1. Via the Rebase Backend Instance
+### 1. Via the Rebase Singleton (Recommended)
 
-```typescript
-// backend/src/index.ts
-import path from "path";
-
-const instance = await initializeRebaseBackend({
-    // ... config
-    functionsDir: path.resolve(__dirname, "../functions"),
-});
-
-// The instance is available for use in your functions
-export { instance };
-```
+The `@rebasepro/server-core` package provides a `rebase` singleton that gives you admin-level access to all app-scoped services (data, auth, storage, email) from anywhere in your backend.
 
 ```typescript
 // backend/functions/approve-job.ts
 import { Hono } from "hono";
-import { instance } from "../src/index";
+import { rebase } from "@rebasepro/server-core";
 
 const app = new Hono();
 
 app.post("/:id/approve", async (c) => {
     const id = c.req.param("id");
-    const driver = instance.driver;
 
-    // Use the driver's data API
-    await driver.data.jobs.update(id, {
+    // Use the admin-level data API (bypasses RLS)
+    await rebase.data.saveEntity("jobs", {
+        id,
         status: "published",
-        approved_at: new Date(),
+        approved_at: new Date().toISOString(),
     });
 
     return c.json({ success: true });

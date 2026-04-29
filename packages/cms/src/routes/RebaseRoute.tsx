@@ -122,6 +122,33 @@ export function RebaseRoute() {
         }
     }
 
+    // Check if this is a simple entity route (collection + entity) for a split-layout collection.
+    // If so, render the collection view with the entity shown in the split detail panel
+    // instead of the full-screen editor. This keeps the master-detail UX with clean URLs.
+    const lastEntityEntry = navigationEntries.find((entry) => entry.type === "entity");
+    const firstCollectionEntry = navigationEntries[0];
+    if (
+        !isCopy &&
+        navigationEntries.length === 2 &&
+        firstCollectionEntry?.type === "collection" &&
+        lastEntityEntry?.type === "entity"
+    ) {
+        let collection: EntityCollection<any> | undefined;
+        collection = collectionRegistry.getCollection(firstCollectionEntry.id);
+        if (!collection)
+            collection = collectionRegistry.getCollection(firstCollectionEntry.slug);
+        if (collection && (collection.detailLayout ?? "split") === "split") {
+            return <EntityCollectionView
+                key={`collection_view_${collection.slug}`}
+                parentCollectionIds={[]}
+                path={collection.slug}
+                updateUrl={true}
+                selectedEntityId={lastEntityEntry.entityId}
+                {...collection}
+                Actions={toArray(collection.Actions)} />;
+        }
+    }
+
     return <EntityFullScreenRoute
         pathname={pathname}
         navigationEntries={navigationEntries}

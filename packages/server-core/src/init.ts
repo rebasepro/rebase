@@ -18,8 +18,10 @@ import { createAdminRoutes, createAuthRoutes, requireAuth, requireAdmin, configu
 import { createStorageController, createStorageRoutes, DEFAULT_STORAGE_ID, DefaultStorageRegistry, BackendStorageConfig, StorageController, StorageRegistry } from "./storage";
 import { createRebaseClient } from "@rebasepro/client";
 import { createHistoryRoutes } from "./history";
-import { EmailConfig } from "./email";
+import { EmailConfig, createEmailService } from "./email";
+import type { EmailService } from "./email";
 import type { OAuthProvider } from "./auth/interfaces";
+import { _initRebase } from "./singleton";
 
 export interface RebaseAuthConfig {
     jwtSecret?: string;
@@ -461,6 +463,36 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         config.app.route(`${basePath}/data`, dataRouter);
     }
 
+    // ─── Server-side singleton ────────────────────────────────────────────
+    // Build the admin-level RebaseClient and expose it as the `rebase` singleton.
+    // This client bypasses the network and uses Hono's internal request handler.
+    // websocketUrl is explicitly empty to prevent opening a WebSocket connection.
+    const serverClient = createRebaseClient({
+        baseUrl: "http://localhost",
+        apiPath: basePath,
+        websocketUrl: "",
+        fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+            return await config.app.request(input as string | Request | URL, init);
+        }
+    });
+
+    // Attach email service to the server client when configured.
+    // The email service may come from the auth bootstrapper or from the auth config directly.
+    let emailService: EmailService | undefined;
+    if (authConfigResult?.emailService) {
+        emailService = authConfigResult.emailService as EmailService;
+    } else if (config.auth?.email) {
+        emailService = createEmailService(config.auth.email);
+    }
+
+    if (emailService) {
+        (serverClient as Record<string, unknown>).email = emailService;
+        logger.info("Email service attached to singleton", { configured: emailService.isConfigured() });
+    }
+
+    _initRebase(serverClient);
+    logger.info("Rebase singleton initialized");
+
     // 5. Mount Custom Functions
     if (config.functionsDir) {
         const { loadFunctionsFromDirectory } = await import("./functions/function-loader");
@@ -497,19 +529,9 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
         if (loadedCronJobs.length > 0) {
             cronScheduler = new CronScheduler();
-            
-            // Create a server-side RebaseClient that bypasses the network.
-            // websocketUrl is explicitly empty to prevent the client from opening
-            // a WebSocket connection — the server isn't listening yet and the
-            // server-side client uses Hono's internal request handler instead.
-            const serverClient = createRebaseClient({
-                baseUrl: "http://localhost",
-                apiPath: basePath,
-                websocketUrl: "",
-                fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
-                    return await config.app.request(input as string | Request | URL, init);
-                }
-            });
+
+            // The cron scheduler uses the same serverClient as the singleton.
+            // ctx.client inside cron handlers IS the same `rebase` instance.
             cronScheduler.setClient(serverClient);
 
             cronScheduler.registerJobs(loadedCronJobs);

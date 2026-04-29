@@ -69,7 +69,7 @@ export interface OAuthProvider {
     schema: z.ZodSchema<any>;
     
     /** Verify external tokens/codes and return a standardized user profile */
-    verify: (payload: unknown) => Promise<OAuthProviderProfile | null>;
+    verify: (payload: any) => Promise<OAuthProviderProfile | null>;
 }
 
 /**

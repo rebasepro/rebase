@@ -8,6 +8,7 @@ import {
     Chip,
     CircularProgress,
     cls,
+    defaultBorderMixin,
     Typography,
     Separator,
     ArrowUpwardIcon,
@@ -46,6 +47,22 @@ export type EntityCollectionListViewProps<M extends Record<string, unknown> = Re
      * - "xl": Full detail with all preview fields
      */
     size?: CollectionSize;
+    /**
+     * ID of the currently selected/active entity. When set, the matching
+     * row is visually highlighted with a primary accent.
+     */
+    selectedEntityId?: string | number;
+};
+
+type ListColumnDef = {
+    key: string;
+    label: string;
+    property: Property;
+    isTitle?: boolean;
+    isStatus?: boolean;
+    isDate?: boolean;
+    align: "left" | "center" | "right";
+    width: string;
 };
 
 /**
@@ -121,7 +138,8 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
     emptyComponent,
     onScroll,
     initialScroll,
-    size = "m"
+    size = "m",
+    selectedEntityId
 }: EntityCollectionListViewProps<M>) {
     const authController = useAuthController();
     const customizationController = useCustomizationController();
@@ -169,12 +187,30 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
         return () => observer.disconnect();
     }, [paginationEnabled, noMoreToLoad, dataLoading, itemCount, pageSize, setItemCount]);
 
-    // Scroll restoration
+    // Scroll restoration — deferred to after layout paint so the container
+    // has enough scrollHeight for the scrollTop assignment to stick.
     useEffect(() => {
-        if (containerRef.current && initialScroll && !hasRestoredScroll.current && data.length > 0) {
-            containerRef.current.scrollTop = initialScroll;
-            hasRestoredScroll.current = true;
-        }
+        if (!containerRef.current || !initialScroll || hasRestoredScroll.current || data.length === 0) return;
+
+        let attempts = 0;
+        const maxAttempts = 5;
+
+        const tryRestore = () => {
+            const el = containerRef.current;
+            if (!el) return;
+
+            // If the container is tall enough to scroll to the target, apply it.
+            // Otherwise retry on the next frame (layout may still be pending).
+            if (el.scrollHeight >= initialScroll || attempts >= maxAttempts) {
+                el.scrollTop = initialScroll;
+                hasRestoredScroll.current = true;
+            } else {
+                attempts++;
+                requestAnimationFrame(tryRestore);
+            }
+        };
+
+        requestAnimationFrame(tryRestore);
     }, [initialScroll, data.length]);
 
     // Scroll tracking
@@ -197,6 +233,20 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
         container.addEventListener("scroll", handleScroll, { passive: true });
         return () => container.removeEventListener("scroll", handleScroll);
     }, [onScroll]);
+
+    // Responsive column count: measure container width
+    const [containerWidth, setContainerWidth] = useState(1200);
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        const ro = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                setContainerWidth(entry.contentRect.width);
+            }
+        });
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
 
     const resolvedCollection = collection;
 
@@ -243,16 +293,6 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
         [authController, resolvedCollection, customizationController.propertyConfigs, titlePropertyKey, imagePropertyKey, statusPropertyKey, datePropertyKey]
     );
 
-    type ListColumnDef = {
-        key: string;
-        label: string;
-        property: Property;
-        isTitle?: boolean;
-        isStatus?: boolean;
-        isDate?: boolean;
-        align: "left" | "center" | "right";
-        width: string;
-    };
 
     const columns = useMemo(() => {
         const cols: ListColumnDef[] = [];
@@ -297,13 +337,9 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
             }
         }
 
-        // Calculate how many extra columns we need to reach at least 4 columns total
+        // Collect all candidate columns — visible count determined later by container width
         const showDate = datePropertyKey && size !== "xs";
         const showStatus = statusPropertyKey && size !== "xs" && size !== "s";
-        
-        const existingColsCount = 1 + (showStatus ? 1 : 0) + (showDate ? 1 : 0);
-        const targetColsCount = 3;
-        const neededExtraCols = Math.max(1, targetColsCount - existingColsCount);
 
         // The first previewKey makes a great subtitle (strict rules: no relations, no large blocks).
         const subtitleKey = previewKeys.length > 0 ? previewKeys[0] : undefined;
@@ -320,9 +356,8 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
         ]);
 
         const availableExtraKeys = allKeys.filter(k => !usedKeys.has(k) && resolvedCollection.properties[k]);
-        const extraColKeys = availableExtraKeys.slice(0, neededExtraCols);
 
-        extraColKeys.forEach(key => {
+        availableExtraKeys.forEach(key => {
             const prop = resolvedCollection.properties[key] as Property;
             cols.push({
                 key,
@@ -362,7 +397,38 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
         }
 
         return cols;
-    }, [resolvedCollection, titlePropertyKey, statusPropertyKey, datePropertyKey, size]);
+    }, [resolvedCollection, titlePropertyKey, statusPropertyKey, datePropertyKey, imagePropertyKey, previewKeys, size]);
+
+    const showImage = size !== "xs";
+
+    // Responsive: determine visible columns based on container width.
+    // The first extra column requires significantly more available space (600px)
+    // to ensure the title area has generous room before columns appear.
+    // Each subsequent column needs 160px.
+    const visibleColumns = useMemo(() => {
+        if (columns.length <= 1) return columns;
+
+        const titleCol = columns.find(c => c.isTitle);
+        const extraCols = columns.filter(c => !c.isTitle);
+
+        // Base width consumed by fixed-width elements (padding + checkbox + image + min title)
+        const baseWidth = 40 + (selectionEnabled ? 40 : 0) + (showImage ? 56 : 0) + 200;
+        const availableForExtra = Math.max(0, containerWidth - baseWidth);
+
+        // First extra column needs 500px; each additional needs 160px
+        const FIRST_COL_THRESHOLD = 500;
+        const EXTRA_COL_WIDTH = 160;
+
+        let maxExtraCols = 0;
+        if (availableForExtra >= FIRST_COL_THRESHOLD) {
+            maxExtraCols = 1 + Math.floor((availableForExtra - FIRST_COL_THRESHOLD) / EXTRA_COL_WIDTH);
+        }
+
+        return [
+            ...(titleCol ? [titleCol] : []),
+            ...extraCols.slice(0, maxExtraCols)
+        ];
+    }, [columns, containerWidth, selectionEnabled, showImage]);
 
     const handleEntityClick = useCallback((entity: Entity<M>) => {
         analyticsController.onAnalyticsEvent?.("entity_click", {
@@ -410,44 +476,38 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
         }
     }, [sortBy, setSortBy]);
 
-    // Empty state
-    if (!dataLoading && data.length === 0 && !dataLoadingError) {
-        return (
-            <div className="flex-1 flex items-center justify-center p-8">
-                {emptyComponent ?? (
-                    <Typography variant="label" color="secondary">
-                        No entries found
-                    </Typography>
-                )}
-            </div>
-        );
-    }
-
-    // Error state
-    if (dataLoadingError) {
-        return (
-            <div className="flex-1 flex items-center justify-center p-8">
-                <Typography className="text-red-500">
-                    Error loading data: {dataLoadingError.message}
-                </Typography>
-            </div>
-        );
-    }
-
     const rowClasses = getRowClasses(size);
-    const showImage = size !== "xs";
+
+    // Empty state
+    const isEmpty = !dataLoading && data.length === 0 && !dataLoadingError;
 
     return (
         <div
             ref={containerRef}
-            className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8 bg-surface-50/30 dark:bg-surface-900/10"
+            className="flex-1 overflow-auto bg-white dark:bg-surface-950"
         >
-            <div className="max-w-6xl mx-auto bg-white dark:bg-surface-950 border border-surface-200 dark:border-surface-800 rounded-xl shadow-sm overflow-hidden">
+            {/* Error state */}
+            {dataLoadingError ? (
+                <div className="flex-1 flex items-center justify-center p-8">
+                    <Typography className="text-red-500">
+                        Error loading data: {dataLoadingError.message}
+                    </Typography>
+                </div>
+            ) : isEmpty ? (
+                <div className="flex-1 flex items-center justify-center p-8">
+                    {emptyComponent ?? (
+                        <Typography variant="label" color="secondary">
+                            No entries found
+                        </Typography>
+                    )}
+                </div>
+            ) : (
+            <div className="w-full overflow-hidden">
                 {/* Column header row */}
                 <div className={cls(
                     "flex items-center gap-4 px-5 py-3 sticky top-0 z-10",
                     "bg-surface-50/80 dark:bg-surface-900/80 backdrop-blur-md",
-                    "border-b border-surface-200 dark:border-surface-800",
+                    "border-b", defaultBorderMixin,
                     "text-[11px] font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-widest select-none"
                 )}>
                     {/* Select All Checkbox */}
@@ -466,7 +526,7 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
                     {showImage && <div className="flex-shrink-0 w-10" />}
 
                     {/* Dynamic Columns */}
-                    {columns.map(col => {
+                    {visibleColumns.map(col => {
                         const isOwningRelation = col.property?.type === "relation" && col.property.relation?.direction === "owning";
                         const isSortable = col.property ? (
                             ["string", "number", "boolean", "date"].includes(col.property.type) || isOwningRelation
@@ -509,13 +569,14 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
                         highlighted={isEntityHighlighted(entity)}
                         onSelectionChange={handleSelectionChange}
                         selectionEnabled={selectionEnabled}
-                        columns={columns}
+                        columns={visibleColumns}
                         imagePropertyKey={imagePropertyKey}
-                        previewKeys={previewKeys.length > 0 ? [previewKeys[0]] : []} // First property as subtitle
+                        previewKeys={previewKeys.length > 0 ? [previewKeys[0]] : []}
                         rowClasses={rowClasses}
                         showImage={showImage}
                         size={size}
                         isLast={index === data.length - 1}
+                        isActive={selectedEntityId !== undefined && entity.id === selectedEntityId}
                     />
                 ))}
 
@@ -534,6 +595,7 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
                     )}
                 </div>
             </div>
+            )}
         </div>
     );
 }
@@ -555,7 +617,8 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     rowClasses,
     showImage,
     size,
-    isLast
+    isLast,
+    isActive = false
 }: {
     entity: Entity<M>;
     collection: EntityCollection<M>;
@@ -564,13 +627,14 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     highlighted?: boolean;
     onSelectionChange?: (entity: Entity<M>, selected: boolean) => void;
     selectionEnabled?: boolean;
-    columns: any[];
+    columns: ListColumnDef[];
     imagePropertyKey?: string;
     previewKeys: string[];
     rowClasses: string;
     showImage: boolean;
     size: CollectionSize;
     isLast: boolean;
+    isActive?: boolean;
 }) {
     const imageProperty = imagePropertyKey ? collection.properties[imagePropertyKey] : undefined;
     const ofProp = imageProperty && "of" in imageProperty ? imageProperty.of : undefined;
@@ -615,27 +679,27 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
             className={cls(
                 "flex items-center gap-4 cursor-pointer group transition-all duration-200 relative",
                 rowClasses,
-                !isLast && "border-b border-surface-100 dark:border-surface-800/60",
-                selected
-                    ? "bg-primary-50/60 dark:bg-primary-900/20"
-                    : highlighted
-                        ? "bg-surface-100 dark:bg-surface-800/80"
-                        : "hover:bg-surface-50/80 dark:hover:bg-surface-800/40"
+                !isLast && "border-b",
+                !isLast && defaultBorderMixin,
+                isActive
+                    ? "bg-surface-accent-50 dark:bg-surface-accent-950"
+                    : selected
+                        ? "bg-primary-50/60 dark:bg-primary-900/20"
+                        : highlighted
+                            ? "bg-surface-accent-50 dark:bg-surface-accent-950"
+                            : "hover:bg-surface-50/80 dark:hover:bg-surface-800/40"
             )}
             onClick={handleClick}
         >
             {/* Selection indicator line */}
-            {selected && (
+            {selected && !isActive && (
                 <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary-500 rounded-r-full" />
             )}
 
             {/* Selection Checkbox */}
             {selectionEnabled && (
                 <div
-                    className={cls(
-                        "flex-shrink-0 w-6 transition-opacity duration-200",
-                        !selected && "opacity-0 group-hover:opacity-100"
-                    )}
+                    className="flex-shrink-0 w-6"
                     onClick={handleCheckboxClick}
                 >
                     <Checkbox
@@ -648,13 +712,13 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
 
             {/* Entity Icon / Avatar */}
             {showImage && (
-                <div className="flex-shrink-0 transition-transform duration-200 group-hover:scale-105">
+                <div className="flex-shrink-0">
                     {usedImageValue && usedImageProperty ? (
-                        <div className="w-10 h-10 rounded-lg shadow-sm border border-surface-200/50 dark:border-surface-700/50 relative overflow-hidden bg-surface-100 dark:bg-surface-800">
+                        <div className={cls("w-10 h-10 rounded-lg border relative overflow-hidden bg-surface-100 dark:bg-surface-800", defaultBorderMixin)}>
                             <PropertyPreview propertyKey={imagePropertyKey!} value={usedImageValue} property={usedImageProperty} size="small" fill={true} />
                         </div>
                     ) : (
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-surface-100 to-surface-200 dark:from-surface-800 dark:to-surface-900 flex items-center justify-center shadow-sm border border-surface-200/50 dark:border-surface-700/50">
+                        <div className={cls("w-10 h-10 rounded-lg bg-surface-100 dark:bg-surface-800 flex items-center justify-center border", defaultBorderMixin)}>
                             <IconForView
                                 collectionOrView={collection}
                                 className="text-surface-500 dark:text-surface-400"
@@ -704,7 +768,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                                                 {i > 0 && (
                                                     <span className="text-surface-300 dark:text-surface-600">·</span>
                                                 )}
-                                                <div className="truncate text-xs text-surface-500 dark:text-surface-400 max-w-[200px]">
+                                                <div className="truncate text-xs text-surface-500 dark:text-surface-400">
                                                     <PropertyPreview
                                                         propertyKey={key}
                                                         value={previewValue as never}
@@ -761,11 +825,12 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     highlighted?: boolean;
     onSelectionChange?: (entity: Entity<M>, selected: boolean) => void;
     selectionEnabled?: boolean;
-    columns: any[];
+    columns: ListColumnDef[];
     imagePropertyKey?: string;
     previewKeys: string[];
     rowClasses: string;
     showImage: boolean;
     size: CollectionSize;
     isLast: boolean;
+    isActive?: boolean;
 }) => React.ReactElement;

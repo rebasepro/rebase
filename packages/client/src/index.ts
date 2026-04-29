@@ -146,18 +146,9 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             });
             return res.data ?? (res as unknown as T);
         },
-        data: dataProxy
+        data: dataProxy,
+        email: undefined
     } as unknown as RebaseClient<DB>;
 
-    return new Proxy(target, {
-        get(obj, prop: string | symbol) {
-            if (prop in obj) {
-                return (obj as Record<string, unknown>)[prop as string];
-            }
-            if (typeof prop === "string" && prop !== "then") {
-                return collection(prop as Extract<keyof DB, string>);
-            }
-            return undefined;
-        }
-    }) as RebaseClient<DB>;
+    return target;
 }

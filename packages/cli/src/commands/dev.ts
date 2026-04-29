@@ -145,6 +145,9 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         try {
             const portFile = path.join(projectRoot, DEV_PORT_FILENAME);
             if (fs.existsSync(portFile)) fs.unlinkSync(portFile);
+            
+            const urlFile = path.join(projectRoot, ".rebase-dev-url");
+            if (fs.existsSync(urlFile)) fs.unlinkSync(urlFile);
         } catch { /* ignore */ }
 
         children.forEach((child) => {
@@ -270,6 +273,14 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                     resolvedBackendPort = parseInt(serverMatch[1], 10);
                     backendUrl = "started";
                     printSummary();
+
+                    // Save the url to a temp file for scripts to pick up
+                    const urlFile = path.join(projectRoot, ".rebase-dev-url");
+                    fs.writeFileSync(urlFile, `http://localhost:${resolvedBackendPort}`, "utf-8");
+
+                    // Save the port to .rebase-dev-port for port affinity
+                    const portFile = path.join(projectRoot, DEV_PORT_FILENAME);
+                    fs.writeFileSync(portFile, String(resolvedBackendPort), "utf-8");
 
                     // Start frontend now that we know the real port
                     if (!backendOnly && frontendDir && !frontendLaunched) {

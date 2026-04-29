@@ -1,11 +1,14 @@
-import React from "react";
+import React, { useState } from "react";
 
 import {
     CircularProgress,
     cls,
     defaultBorderMixin,
+    IconButton,
+    Popover,
     SearchBar
 } from "@rebasepro/ui";
+import { MoreVertIcon } from "@rebasepro/ui";
 import { useLargeLayout, useTranslation } from "@rebasepro/core";
 
 interface CollectionTableToolbarProps {
@@ -18,6 +21,13 @@ interface CollectionTableToolbarProps {
     viewModeToggle?: React.ReactNode;
     title?: React.ReactNode,
     onTextSearch?: (searchString?: string) => void;
+    /**
+     * When true the toolbar is in "compact" mode for the split-view left panel.
+     * - Search bar, loading spinner, and view-mode toggle are hidden.
+     * - Secondary actions are collapsed into a "⋮" popover.
+     * - Only `actionsStart` (filters) and the add button (last child of `actions`) remain visible.
+     */
+    compact?: boolean;
 }
 
 export function CollectionTableToolbar({
@@ -26,11 +36,18 @@ export function CollectionTableToolbar({
     loading,
     onTextSearch,
     title,
-    viewModeToggle
+    viewModeToggle,
+    compact = false
 }: CollectionTableToolbarProps) {
 
     const largeLayout = useLargeLayout();
     const { t } = useTranslation();
+    const [overflowOpen, setOverflowOpen] = useState(false);
+
+    // Split actions into "primary" (add button = last child) and "secondary" (everything else)
+    const actionChildren = React.Children.toArray(actions);
+    const addButton = actionChildren.length > 0 ? actionChildren[actionChildren.length - 1] : null;
+    const secondaryActions = actionChildren.slice(0, -1);
 
     return (
         <div
@@ -38,7 +55,13 @@ export function CollectionTableToolbar({
 
             <div className="flex items-center gap-1 md:mr-4 mr-2">
 
-                {viewModeToggle}
+                {/* View toggle — hidden in compact */}
+                <div className={cls(
+                    "transition-all duration-300 ease-out overflow-hidden",
+                    compact ? "max-w-0 opacity-0" : "max-w-[200px] opacity-100"
+                )}>
+                    {viewModeToggle}
+                </div>
 
                 {title && <div className={"hidden lg:block"}>
                     {title}
@@ -50,20 +73,64 @@ export function CollectionTableToolbar({
 
             <div className="flex items-center gap-1">
 
-                {largeLayout && <div className="w-[22px] mr-4">
+                {/* Loading spinner — hidden in compact */}
+                {largeLayout && <div className={cls(
+                    "mr-4 transition-all duration-300 ease-out overflow-hidden",
+                    compact ? "w-0 opacity-0" : "w-[22px] opacity-100"
+                )}>
                     {loading &&
                         <CircularProgress size={"smallest"} />}
                 </div>}
 
-                {onTextSearch &&
-                    <SearchBar
-                        key={"search-bar"}
-                        size={"small"}
-                        placeholder={t("search")}
-                        onTextSearch={onTextSearch}
-                        expandable={true} />}
+                {/* Search bar — hidden in compact */}
+                <div className={cls(
+                    "transition-all duration-300 ease-out overflow-hidden",
+                    compact ? "max-w-0 opacity-0" : "max-w-[300px] opacity-100"
+                )}>
+                    {onTextSearch &&
+                        <SearchBar
+                            key={"search-bar"}
+                            size={"small"}
+                            placeholder={t("search")}
+                            onTextSearch={onTextSearch}
+                            expandable={true} />}
+                </div>
 
-                {actions}
+                {/* Secondary actions — visible normally, collapsed to popover in compact */}
+                <div className={cls(
+                    "flex items-center gap-1 transition-all duration-300 ease-out overflow-hidden",
+                    compact ? "max-w-0 opacity-0 pointer-events-none" : "max-w-[600px] opacity-100"
+                )}>
+                    {secondaryActions}
+                </div>
+
+                {/* Overflow popover — only visible in compact mode */}
+                {secondaryActions.length > 0 && (
+                    <div className={cls(
+                        "transition-all duration-300 ease-out overflow-hidden",
+                        compact ? "max-w-[40px] opacity-100" : "max-w-0 opacity-0 pointer-events-none"
+                    )}>
+                        <Popover
+                            open={overflowOpen}
+                            onOpenChange={setOverflowOpen}
+                            trigger={
+                                <IconButton size="small">
+                                    <MoreVertIcon size="small" />
+                                </IconButton>
+                            }>
+                            <div className="flex flex-col gap-1 p-2 min-w-[200px]">
+                                {secondaryActions.map((child, i) => (
+                                    <div key={i} className="flex items-center" onClick={() => setOverflowOpen(false)}>
+                                        {child}
+                                    </div>
+                                ))}
+                            </div>
+                        </Popover>
+                    </div>
+                )}
+
+                {/* Add button — always visible */}
+                {addButton}
 
             </div>
 

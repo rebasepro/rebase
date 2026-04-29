@@ -46,13 +46,16 @@ export class SMTPEmailService implements EmailService {
             throw new Error("Email service not configured. Provide SMTP config or sendEmail function.");
         }
 
+        const to = Array.isArray(options.to) ? options.to.join(", ") : options.to;
+
         try {
             await this.transporter.sendMail({
                 from: this.config.from,
-                to: options.to,
+                to,
                 subject: options.subject,
                 html: options.html,
-                text: options.text
+                text: options.text,
+                replyTo: options.replyTo
             });
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);

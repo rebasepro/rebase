@@ -53,7 +53,7 @@ export function LocalChangesMenu<M extends Record<string, unknown>>({
     };
 
     const handleApply = () => {
-        const mergedValues = mergeDeep(formex.values, cachedData);
+        const mergedValues = mergeDeep(formex.values, cachedData, true);
         const touched = { ...formex.touched };
         const cachedKeys = flattenKeys(cachedData);
         cachedKeys.forEach((key) => {

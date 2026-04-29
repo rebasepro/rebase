@@ -121,10 +121,10 @@ async function startServer() {
         process.on("SIGTERM", cleanup);
         process.on("exit", cleanup);
 
-        logger.info("Server running", { url: `http://localhost:${actualPort}` });
+        logger.info(`Server running at http://localhost:${actualPort}`);
     } else {
         server.listen(PORT, () => {
-            logger.info("Server running", { url: `http://localhost:${PORT}` });
+            logger.info(`Server running at http://localhost:${PORT}`);
         });
     }
 

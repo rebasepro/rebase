@@ -253,6 +253,7 @@ Persistence is non-blocking. If a database write fails, the scheduler continues 
 ```typescript
 // backend/crons/cleanup-sessions.ts
 import type { CronJobDefinition } from "@rebasepro/types";
+import { rebase } from "@rebasepro/server-core";
 
 const job: CronJobDefinition = {
     schedule: "0 3 * * *",  // daily at 3 AM
@@ -262,8 +263,10 @@ const job: CronJobDefinition = {
     async handler(ctx) {
         ctx.log("Starting session cleanup...");
 
-        // Use your database driver to run cleanup queries
+        // Use the rebase singleton for admin-level database access
+        // const { data: expired } = await rebase.data.findMany("sessions", { ... });
         const count = Math.floor(Math.random() * 50); // placeholder
+
         ctx.log(`Cleaned up ${count} expired sessions`);
 
         return { deletedSessions: count };

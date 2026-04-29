@@ -1,31 +1,15 @@
 /**
- * Email service types and interfaces
+ * Email service types and interfaces.
+ *
+ * The canonical `EmailService` and `EmailSendOptions` live in `@rebasepro/types`
+ * so they can be used on the `RebaseClient` interface without pulling in nodemailer.
+ * This file re-exports them for backward compatibility and adds server-specific
+ * config types (SMTP, template functions, etc.).
  */
 
-/**
- * Options for sending an email
- */
-export interface EmailSendOptions {
-    to: string;
-    subject: string;
-    html: string;
-    text?: string;
-}
+import type { EmailService, EmailSendOptions } from "@rebasepro/types";
 
-/**
- * Email service interface - abstraction for sending emails
- */
-export interface EmailService {
-    /**
-     * Send an email
-     */
-    send(options: EmailSendOptions): Promise<void>;
-
-    /**
-     * Check if the email service is properly configured
-     */
-    isConfigured(): boolean;
-}
+export type { EmailService, EmailSendOptions };
 
 /**
  * SMTP server configuration

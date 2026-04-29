@@ -147,9 +147,9 @@ const postsCollection: EntityCollection = {
 postsCollection.securityRules = [
     {
         name: "test_policy",
-        as: "permissive",
-        for: "all",
-        to: ["public"],
+        mode: "permissive",
+        operation: "all",
+        pgRoles: ["public"],
         using: "true"
     }
 ];

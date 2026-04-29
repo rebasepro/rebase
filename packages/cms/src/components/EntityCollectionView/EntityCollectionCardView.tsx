@@ -132,12 +132,27 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
         return () => observer.disconnect();
     }, [paginationEnabled, noMoreToLoad, dataLoading, itemCount, pageSize, setItemCount]);
 
-    // Scroll restoration: restore initial scroll position
+    // Scroll restoration — deferred to after layout paint
     useEffect(() => {
-        if (containerRef.current && initialScroll && !hasRestoredScroll.current && data.length > 0) {
-            containerRef.current.scrollTop = initialScroll;
-            hasRestoredScroll.current = true;
-        }
+        if (!containerRef.current || !initialScroll || hasRestoredScroll.current || data.length === 0) return;
+
+        let attempts = 0;
+        const maxAttempts = 5;
+
+        const tryRestore = () => {
+            const el = containerRef.current;
+            if (!el) return;
+
+            if (el.scrollHeight >= initialScroll || attempts >= maxAttempts) {
+                el.scrollTop = initialScroll;
+                hasRestoredScroll.current = true;
+            } else {
+                attempts++;
+                requestAnimationFrame(tryRestore);
+            }
+        };
+
+        requestAnimationFrame(tryRestore);
     }, [initialScroll, data.length]);
 
     // Scroll tracking: call onScroll when user scrolls

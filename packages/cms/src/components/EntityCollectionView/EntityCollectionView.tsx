@@ -33,6 +33,7 @@ import { useUserConfigurationPersistence } from "@rebasepro/core";
 import { EntityCollectionViewActions } from "./EntityCollectionViewActions";
 import { EntityCollectionCardView } from "./EntityCollectionCardView";
 import { EntityCollectionListView } from "./EntityCollectionListView";
+import { SplitListView } from "./SplitListView";
 import { EntityCollectionBoardView } from "./EntityCollectionBoardView";
 import { ViewModeToggle, KanbanPropertyOption } from "./ViewModeToggle";
 import {
@@ -71,7 +72,7 @@ import { mergeDeep } from "@rebasepro/utils";
 import { useCollectionRegistryController, useUrlController, useSideEntityController } from "../../index";
 import { useBreadcrumbsController } from "../../index";
 
-const DEFAULT_ENTITY_OPEN_MODE: "side_panel" | "full_screen" = "side_panel";
+const DEFAULT_ENTITY_OPEN_MODE: "side_panel" | "full_screen" = "full_screen";
 
 /**
  * @group Components
@@ -101,6 +102,12 @@ export type EntityCollectionViewProps<M extends Record<string, unknown>> = {
      * If true, this view will store its filter and sorting status in the url params
      */
     updateUrl?: boolean;
+
+    /**
+     * When provided, the split view will render this entity's detail panel.
+     * Used by the router to pass the entity ID from the URL path.
+     */
+    selectedEntityId?: string | number;
 
 } & EntityCollection<M>;
 
@@ -136,6 +143,7 @@ export const EntityCollectionView = React.memo(
         isSubCollection,
         className,
         updateUrl,
+        selectedEntityId: selectedEntityIdProp,
         ...collectionProp
     }: EntityCollectionViewProps<M>
     ) {
@@ -798,9 +806,10 @@ export const EntityCollectionView = React.memo(
             <div className={cls("overflow-hidden h-full w-full rounded-md flex flex-col", className)}
                 ref={containerRef}>
 
-                {/* Unified toolbar - rendered once, outside view conditionals */}
+                {/* Unified toolbar — stays visible in both full and compact split mode */}
                 {countFetcher}
                 <CollectionTableToolbar
+                    compact={viewMode === "list" && (collection.detailLayout ?? "split") === "split" && selectedEntityIdProp !== undefined}
                     loading={tableController.dataLoading}
                     onTextSearch={tableController.setSearchString}
                     viewModeToggle={viewModeToggleElement}
@@ -861,19 +870,39 @@ export const EntityCollectionView = React.memo(
                         emptyComponent={emptyComponent}
                     />
                 ) : viewMode === "list" ? (
-                    <EntityCollectionListView
-                        key={`list-view-${path}`}
-                        collection={collection}
-                        tableController={tableController}
-                        onEntityClick={onEntityClick}
-                        selectionController={usedSelectionController}
-                        selectionEnabled={selectionEnabled}
-                        highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
-                        onScroll={tableController.onScroll}
-                        initialScroll={tableController.initialScroll}
-                        size={listSize}
-                        emptyComponent={emptyComponent}
-                    />
+                    (collection.detailLayout ?? "split") === "split" ? (
+                        <SplitListView
+                            key={`split-list-view-${path}`}
+                            collection={collection}
+                            tableController={tableController}
+                            onEntityClick={onEntityClick}
+                            onNewClick={onNewClick}
+                            selectionController={usedSelectionController}
+                            selectionEnabled={selectionEnabled}
+                            highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                            onScroll={tableController.onScroll}
+                            initialScroll={tableController.initialScroll}
+                            size={listSize}
+                            emptyComponent={emptyComponent}
+                            path={path}
+                            parentCollectionIds={parentCollectionIds}
+                            selectedEntityId={selectedEntityIdProp}
+                        />
+                    ) : (
+                        <EntityCollectionListView
+                            key={`list-view-${path}`}
+                            collection={collection}
+                            tableController={tableController}
+                            onEntityClick={onEntityClick}
+                            selectionController={usedSelectionController}
+                            selectionEnabled={selectionEnabled}
+                            highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                            onScroll={tableController.onScroll}
+                            initialScroll={tableController.initialScroll}
+                            size={listSize}
+                            emptyComponent={emptyComponent}
+                        />
+                    )
                 ) : (
                     <EntityCollectionTable
                         key={`collection_table_${path}`}
@@ -986,7 +1015,8 @@ export const EntityCollectionView = React.memo(
             equal(a.openEntityMode, b.openEntityMode) &&
             equal(a.exportable, b.exportable) &&
             equal(a.history, b.history) &&
-            equal(a.forceFilter, b.forceFilter);
+            equal(a.forceFilter, b.forceFilter) &&
+            equal(a.selectedEntityId, b.selectedEntityId);
     }) as React.FunctionComponent<EntityCollectionViewProps<any>>
 
 function EntitiesCount({

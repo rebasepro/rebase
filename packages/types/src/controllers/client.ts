@@ -1,5 +1,6 @@
 import { User } from "../users";
 import { RebaseData } from "./data";
+import { EmailService } from "./email";
 
 /**
  * Event type for authentication state changes
@@ -53,7 +54,7 @@ export interface AuthClient {
 }
 
 /**
- * Overarching abstraction that unites Data, Auth, and Storage.
+ * Overarching abstraction that unites Data, Auth, Storage, and Email.
  * Adapters for Supabase or Firebase simply need to implement this interface.
  */
 export interface RebaseClient<DB = any> {
@@ -65,6 +66,17 @@ export interface RebaseClient<DB = any> {
     
     /** Unified Storage layer */
     storage?: StorageSource;
+    
+    /**
+     * Server-side email service.
+     *
+     * Available when SMTP (or a custom `sendEmail` function) is configured
+     * in the backend auth config. `undefined` when email is not configured.
+     *
+     * > **Note:** This is only available on the server-side `rebase` singleton.
+     * > The client-side SDK does not include an email service.
+     */
+    email?: EmailService;
     
     /** Optional admin panel specific tasks */
     admin?: any;
