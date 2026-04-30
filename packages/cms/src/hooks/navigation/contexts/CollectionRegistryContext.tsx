@@ -11,10 +11,10 @@ export const CollectionRegistryContext = createContext<CollectionRegistryControl
     initialised: false
 });
 
-export function useCollectionRegistryController<EC extends EntityCollection = EntityCollection<any>>(): CollectionRegistryController<EC> {
+export function useCollectionRegistryController<DB = Record<string, unknown>, EC extends EntityCollection = EntityCollection<any>>(): CollectionRegistryController<DB, EC> {
     const context = React.useContext(CollectionRegistryContext);
     if (context === undefined) {
         throw new Error("useCollectionRegistryController must be used within a CollectionRegistryContext.Provider");
     }
-    return context as CollectionRegistryController<EC>;
+    return context as CollectionRegistryController<DB, EC>;
 }

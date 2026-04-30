@@ -192,7 +192,8 @@ export function buildCollectionFromTableMetadata(
         const property = pgTypeToRebaseProperty(column);
         if (property) {
             // Remove undefined keys so we don't output "validation: undefined"
-            Object.keys(property).forEach(key => (property as unknown as Record<string, unknown>)[key] === undefined && delete (property as unknown as Record<string, unknown>)[key]);
+            const propRecord = property as unknown as Record<string, unknown>;
+            Object.keys(propRecord).forEach(key => propRecord[key] === undefined && delete propRecord[key]);
             
             properties[column.column_name] = property;
             propertiesOrder.push(column.column_name);

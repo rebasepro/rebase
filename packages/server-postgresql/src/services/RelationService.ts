@@ -39,7 +39,7 @@ export class RelationService {
         } = {}
     ): Promise<Entity<M>[]> {
         const parentCollection = getCollectionByPath(parentCollectionPath, this.registry);
-        const resolvedRelations = resolveCollectionRelations(parentCollection as import("@rebasepro/types").PostgresCollection);
+        const resolvedRelations = resolveCollectionRelations(parentCollection);
         const relation = findRelation(resolvedRelations, relationKey);
 
         if (!relation) {
@@ -216,7 +216,7 @@ export class RelationService {
         options: { filter?: FilterValues<Extract<keyof M, string>>; databaseId?: string } = {}
     ): Promise<number> {
         const parentCollection = getCollectionByPath(parentCollectionPath, this.registry);
-        const resolvedRelations = resolveCollectionRelations(parentCollection as import("@rebasepro/types").PostgresCollection);
+        const resolvedRelations = resolveCollectionRelations(parentCollection);
         const relation = findRelation(resolvedRelations, relationKey);
         if (!relation) throw new Error(`Relation '${relationKey}' not found in collection '${parentCollectionPath}'`);
 
@@ -403,7 +403,7 @@ export class RelationService {
         entityId: string | number,
         relationValues: Partial<M>
     ) {
-        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
+        const resolvedRelations = resolveCollectionRelations(collection);
 
         for (const [key, value] of Object.entries(relationValues)) {
             const relation = findRelation(resolvedRelations, key);
@@ -601,7 +601,7 @@ export class RelationService {
 
                 // Check if this is a many-to-many inverse relation
                 if (relation.cardinality === "many" && relation.direction === "inverse") {
-                    const targetCollectionRelations = resolveCollectionRelations(targetCollection as import("@rebasepro/types").PostgresCollection);
+                    const targetCollectionRelations = resolveCollectionRelations(targetCollection);
                     let junctionInfo: { table: string; sourceColumn: string; targetColumn: string } | null = null;
 
                     for (const [relationKey, targetRelation] of Object.entries(targetCollectionRelations)) {

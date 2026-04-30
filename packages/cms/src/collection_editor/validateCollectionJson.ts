@@ -78,7 +78,7 @@ function validateProperty(
                     validateProperty(ofProp, `${path}.of[${index}]`, errors);
                 });
             } else {
-                validateProperty(property.of as Record<string, unknown>, `${path}.of`, errors);
+                validateProperty(property.of as unknown as Record<string, unknown>, `${path}.of`, errors);
             }
         }
         // oneOf validation
@@ -88,15 +88,15 @@ function validateProperty(
                     path: `${path}.oneOf`,
                     message: "Must be an object"
                 });
-            } else if ((property.oneOf as Record<string, unknown>).properties) {
-                validateProperties((property.oneOf as Record<string, unknown>).properties as Record<string, unknown>, `${path}.oneOf.properties`, errors);
+            } else if ((property.oneOf as unknown as Record<string, unknown>).properties) {
+                validateProperties((property.oneOf as unknown as Record<string, unknown>).properties as unknown as Record<string, unknown>, `${path}.oneOf.properties`, errors);
             }
         }
     }
 
     // Validate map properties
     if (property.dataType === "map" && property.properties) {
-        validateProperties(property.properties as Record<string, unknown>, `${path}.properties`, errors);
+        validateProperties(property.properties as unknown as Record<string, unknown>, `${path}.properties`, errors);
     }
 
     // Validate reference path
@@ -147,7 +147,7 @@ function validateProperties(
     }
 
     for (const [key, property] of Object.entries(properties)) {
-        validateProperty(property as Record<string, unknown>, `${path}.${key}`, errors);
+        validateProperty(property as unknown as Record<string, unknown>, `${path}.${key}`, errors);
     }
 }
 
@@ -260,8 +260,8 @@ function validateOptionalFields(
                 path: "kanban",
                 message: "Must be an object"
             });
-        } else if ((collection.kanban as Record<string, unknown>).columnProperty !== undefined &&
-            typeof (collection.kanban as Record<string, unknown>).columnProperty !== "string") {
+        } else if ((collection.kanban as unknown as Record<string, unknown>).columnProperty !== undefined &&
+            typeof (collection.kanban as unknown as Record<string, unknown>).columnProperty !== "string") {
             errors.push({
                 path: "kanban.columnProperty",
                 message: "Must be a string"
@@ -316,7 +316,7 @@ function validateCollectionObject(
 
     // Properties validation
     if (collection.properties !== undefined) {
-        validateProperties(collection.properties as Record<string, unknown>, "properties", errors);
+        validateProperties(collection.properties as unknown as Record<string, unknown>, "properties", errors);
     }
 
     // Optional fields
@@ -369,7 +369,7 @@ export function validateCollectionJson(jsonString: string): CollectionValidation
         };
     }
 
-    validateCollectionObject(parsed as Record<string, unknown>, errors);
+    validateCollectionObject(parsed as unknown as Record<string, unknown>, errors);
 
     return {
         valid: errors.length === 0,

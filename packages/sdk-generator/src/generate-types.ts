@@ -185,6 +185,15 @@ export function generateTypedefs(collections: EntityCollection[]): string {
 
     lines.push(`}`);
     lines.push(``);
+    lines.push(`export type CollectionName = keyof Database;`);
+    lines.push(`export type CollectionsDictionary = { [K in CollectionName]: K };`);
+    lines.push(``);
+    lines.push(`export const collectionsDictionary = {`);
+    for (const collection of collections) {
+        lines.push(`  ${toSafeIdentifier(collection.slug)}: "${collection.slug}",`);
+    }
+    lines.push(`} as const;`);
+    lines.push(``);
 
     return lines.join("\n");
 }

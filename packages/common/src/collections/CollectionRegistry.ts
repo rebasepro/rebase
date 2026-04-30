@@ -182,8 +182,8 @@ export class CollectionRegistry {
         if (newProperty.type === "map" && newProperty.properties) {
             newProperty.properties = this.normalizeProperties(newProperty.properties, relations);
         } else if (newProperty.type === "array") {
-            // Cast via unknown to get a properly typed mutable reference
-            const arrayProp = newProperty as unknown as ArrayProperty;
+            // Cast to get a properly typed mutable reference
+            const arrayProp = newProperty as ArrayProperty;
             if (arrayProp.of) {
                 if (Array.isArray(arrayProp.of)) {
                     (arrayProp as { of: Property | Property[] }).of = arrayProp.of.map(p => this.normalizeProperty(p, relations));
@@ -196,14 +196,14 @@ export class CollectionRegistry {
         } else if ((newProperty.type === "string" || newProperty.type === "number") && newProperty.enum) {
             const stringOrNumberProperty = newProperty as StringProperty | NumberProperty;
             if (typeof stringOrNumberProperty.enum === "object" && !Array.isArray(stringOrNumberProperty.enum)) {
-                (stringOrNumberProperty as unknown as Record<string, unknown>).enum = enumToObjectEntries(stringOrNumberProperty.enum)?.filter((value) => value && (value.id || value.id === 0) && value.label) ?? [];
+                stringOrNumberProperty.enum = enumToObjectEntries(stringOrNumberProperty.enum)?.filter((value) => value && (value.id || value.id === 0) && value.label) ?? [];
             }
         } else if (newProperty.type === "relation") {
             const relationProperty = newProperty as RelationProperty;
             const relation = relations.find(r => r.relationName === relationProperty.relationName);
             if (relation) {
                 // we attach the resolved relation to the property
-                (relationProperty as unknown as Record<string, unknown>).relation = relation;
+                (relationProperty as RelationProperty & { relation?: Relation }).relation = relation;
             } else {
                 console.warn(`Could not find relation for property with relationName: ${relationProperty.relationName}`);
             }
@@ -368,8 +368,8 @@ function areCollectionListsEqual(a: EntityCollection[], b: EntityCollection[]) {
 function areCollectionsEqual(a: EntityCollection, b: EntityCollection) {
     const subcollectionsA = getSubcollections(a);
     const subcollectionsB = getSubcollections(b);
-    const { driver: _dA, ...restA } = a as unknown as Record<string, unknown>;
-    const { driver: _dB, ...restB } = b as unknown as Record<string, unknown>;
+    const { driver: _dA, ...restA } = a as EntityCollection & Record<string, unknown>;
+    const { driver: _dB, ...restB } = b as EntityCollection & Record<string, unknown>;
     // Remove subcollections/relations from comparison objects (already handled above)
     delete restA.subcollections;
     delete restB.subcollections;

@@ -41,7 +41,8 @@ export class DatabasePoolManager {
         const pool = new Pool({
             connectionString: url.toString(),
             max: 10, // Default sensible limit, can be tuned later
-            idleTimeoutMillis: 30000,
+            idleTimeoutMillis: 10000, // Reduced from 30000 for aggressive cleanup
+            allowExitOnIdle: true, // Prevent idle clients from hanging the Node.js process
         });
 
         // Prevent idle client errors from crashing the Node.js process

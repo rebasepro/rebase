@@ -75,7 +75,7 @@ export class EntityPersistService {
 
                 for (let i = 2; i < segments.length; i += 2) {
                     const relationKey = segments[i];
-                    const resolvedRelations = resolveCollectionRelations(currentCollection as import("@rebasepro/types").PostgresCollection);
+                    const resolvedRelations = resolveCollectionRelations(currentCollection);
                     const relation = findRelation(resolvedRelations, relationKey);
 
                     if (!relation) {
@@ -161,7 +161,7 @@ export class EntityPersistService {
         // Separate relations that require special handling
         const relationValues: Record<string, unknown> = {};
         const otherValues: Partial<M> = { ...effectiveValues };
-        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
+        const resolvedRelations = resolveCollectionRelations(collection);
 
         for (const key in resolvedRelations) {
             const relation = resolvedRelations[key];

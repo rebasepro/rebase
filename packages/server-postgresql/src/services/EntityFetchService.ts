@@ -88,7 +88,7 @@ export class EntityFetchService {
         collection: EntityCollection,
         include?: string[]
     ): Record<string, boolean | { with: Record<string, boolean> }> {
-        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
+        const resolvedRelations = resolveCollectionRelations(collection);
         const propertyKeys = new Set(Object.keys(collection.properties || {}));
         const withConfig: Record<string, boolean | { with: Record<string, boolean> }> = {};
 
@@ -168,7 +168,7 @@ export class EntityFetchService {
         databaseId?: string,
         idInfoArray?: { fieldName: string; type: "string" | "number" }[]
     ): Entity<M> {
-        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
+        const resolvedRelations = resolveCollectionRelations(collection);
         const propertyKeys = new Set(Object.keys(collection.properties || {}));
 
         // Normalize non-relation values (dates, numbers, etc.)
@@ -261,7 +261,7 @@ export class EntityFetchService {
         parsedId: string | number,
         databaseId?: string
     ): Promise<void> {
-        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
+        const resolvedRelations = resolveCollectionRelations(collection);
         const propertyKeys = new Set(Object.keys(collection.properties || {}));
 
         const promises = Object.entries(resolvedRelations)
@@ -312,7 +312,7 @@ export class EntityFetchService {
     ): Promise<void> {
         if (entities.length === 0) return;
 
-        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
+        const resolvedRelations = resolveCollectionRelations(collection);
         const propertyKeys = new Set(Object.keys(collection.properties || {}));
 
         const joinPathRelations = Object.entries(resolvedRelations)
@@ -366,7 +366,7 @@ export class EntityFetchService {
         idInfoArray?: { fieldName: string; type: "string" | "number" }[]
     ): Record<string, unknown> {
         const flat: Record<string, unknown> = { id: (idInfoArray && idInfoArray.length > 1) ? buildCompositeId(row as Record<string, unknown>, idInfoArray) : String(row[idInfo.fieldName]) };
-        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
+        const resolvedRelations = resolveCollectionRelations(collection);
 
         for (const [k, v] of Object.entries(row)) {
             if (k === idInfo.fieldName) continue;
@@ -579,7 +579,7 @@ export class EntityFetchService {
         const values = await parseDataFromServer(raw, collection, this.db, this.registry);
 
         // Load relations based on cardinality (N+1 — only used in fallback)
-        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
+        const resolvedRelations = resolveCollectionRelations(collection);
         const propertyKeys = new Set(Object.keys(collection.properties));
 
         const relationPromises = Object.entries(resolvedRelations)
@@ -765,7 +765,7 @@ export class EntityFetchService {
 
         if (!skipRelations) {
             // Second pass: batch load missing one-to-one relations
-            const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
+            const resolvedRelations = resolveCollectionRelations(collection);
             const propertyKeys = new Set(Object.keys(collection.properties));
 
             for (const [key, relation] of Object.entries(resolvedRelations)) {
@@ -912,7 +912,7 @@ export class EntityFetchService {
 
         for (let i = 2; i < pathSegments.length; i += 2) {
             const relationKey = pathSegments[i];
-            const resolvedRelations = resolveCollectionRelations(currentCollection as import("@rebasepro/types").PostgresCollection);
+            const resolvedRelations = resolveCollectionRelations(currentCollection);
             const relation = findRelation(resolvedRelations, relationKey);
 
             if (!relation) {
@@ -1000,7 +1000,7 @@ export class EntityFetchService {
 
         for (let i = 2; i < pathSegments.length; i += 2) {
             const relationKey = pathSegments[i];
-            const resolvedRelations = resolveCollectionRelations(currentCollection as import("@rebasepro/types").PostgresCollection);
+            const resolvedRelations = resolveCollectionRelations(currentCollection);
             const relation = findRelation(resolvedRelations, relationKey);
 
             if (!relation) {
@@ -1141,7 +1141,7 @@ export class EntityFetchService {
         }
 
         // Fallback relation loading via batch
-        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
+        const resolvedRelations = resolveCollectionRelations(collection);
         const propertyKeys = new Set(Object.keys(collection.properties || {}));
         const shouldInclude = (key: string) =>
             include[0] === "*" || include.includes(key);
@@ -1250,7 +1250,7 @@ export class EntityFetchService {
         }
 
         // Fallback relation population
-        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
+        const resolvedRelations = resolveCollectionRelations(collection);
         const propertyKeys = new Set(Object.keys(collection.properties || {}));
         const shouldInclude = (key: string) =>
             include[0] === "*" || include.includes(key);
@@ -1384,7 +1384,7 @@ export class EntityFetchService {
             if (!queryTarget?.findMany) return null;
 
             // Build the `with` config from include array
-            const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
+            const resolvedRelations = resolveCollectionRelations(collection);
             const withConfig: Record<string, boolean> = {};
             for (const [key, relation] of Object.entries(resolvedRelations)) {
                 if (include[0] === "*" || include.includes(key)) {

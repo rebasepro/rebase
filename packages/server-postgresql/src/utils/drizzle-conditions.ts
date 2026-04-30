@@ -948,7 +948,7 @@ export class DrizzleConditionBuilder {
             console.debug(`🔍 [findCorrespondingJunctionTable] Target collection: ${targetCollection.slug}`);
 
             // Find the corresponding owning relation on the target collection
-            const targetCollectionRelations = resolveCollectionRelations(targetCollection as import("@rebasepro/types").PostgresCollection);
+            const targetCollectionRelations = resolveCollectionRelations(targetCollection);
             console.debug(`🔍 [findCorrespondingJunctionTable] Target collection relations:`, Object.keys(targetCollectionRelations));
 
             // Look for the owning many-to-many relation that matches our inverseRelationName

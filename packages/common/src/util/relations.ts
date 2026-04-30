@@ -133,8 +133,9 @@ export function sanitizeRelation(relation: Partial<Relation>, sourceCollection: 
 }
 
 export function resolveCollectionRelations(
-    collection: PostgresCollection,
+    collection: EntityCollection,
 ): Record<string, Relation> {
+    if (!isPostgresCollection(collection)) return {};
     const relations: Record<string, Relation> = {};
 
     // Track which explicit relationName values have been registered so that

@@ -12,7 +12,7 @@ import * as fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
 import chalk from "chalk";
-import { EntityCollection, isPostgresCollection, Property, NumberProperty, StringProperty } from "@rebasepro/types";
+import { EntityCollection, isPostgresCollection, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty } from "@rebasepro/types";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
@@ -65,14 +65,14 @@ export function getExpectedColumnType(prop: Property): string | null {
         case "boolean":
             return "boolean";
         case "date": {
-            const dp = prop as import("@rebasepro/types").DateProperty;
+            const dp = prop as DateProperty;
             if (dp.columnType === "date") return "date";
             if (dp.columnType === "time") return "time without time zone";
             return "timestamp with time zone";
         }
         case "map":
         case "array": {
-            const ap = prop as import("@rebasepro/types").ArrayProperty | import("@rebasepro/types").MapProperty;
+            const ap = prop as ArrayProperty | MapProperty;
             if (ap.columnType === "json") return "json";
             return "jsonb";
         }
@@ -311,7 +311,7 @@ export async function checkCollectionsVsDatabase(
                 if (prop.type === "relation") {
                     // Relation columns are derived from localKey
                     const resolvedRelations = resolveCollectionRelations(collection);
-                    const relation = findRelation(resolvedRelations, (prop as import("@rebasepro/types").RelationProperty).relationName ?? propName);
+                    const relation = findRelation(resolvedRelations, (prop as RelationProperty).relationName ?? propName);
                     if (relation?.direction === "owning" && relation.cardinality === "one" && relation.localKey) {
                         const fkColName = toSnakeCase(relation.localKey);
                         if (!dbColumnMap.has(fkColName)) {

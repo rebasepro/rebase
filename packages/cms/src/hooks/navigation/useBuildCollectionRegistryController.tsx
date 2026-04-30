@@ -2,7 +2,7 @@ import type { EntityCollection } from "@rebasepro/types";
 import { useCallback, useRef, useState } from "react";
 import { CollectionRegistry, getParentReferencesFromPath as commonGetParentReferencesFromPath, removeInitialAndTrailingSlashes, getSubcollections } from "@rebasepro/common";
 import { EntityReference, UserConfigurationPersistence, CollectionRegistryController } from "@rebasepro/types";
-import { mergeDeep } from "@rebasepro/utils";
+import { mergeDeep, toKebabCase } from "@rebasepro/utils";
 
 export function useBuildCollectionRegistryController(props: {
     userConfigPersistence?: UserConfigurationPersistence
@@ -23,9 +23,12 @@ export function useBuildCollectionRegistryController(props: {
         const cleanedPath = removeInitialAndTrailingSlashes(slugOrPath);
         if (!cleanedPath) return undefined;
 
-        const pathSegments = cleanedPath.split("/");
+        const pathSegments = cleanedPath.split("/").map((segment, index) => {
+            // Apply toKebabCase only to the collection segments (even indices)
+            return index % 2 === 0 ? toKebabCase(segment) : segment;
+        });
 
-        let collectionPath = cleanedPath;
+        let collectionPath = pathSegments.join("/");
         // If the path has an even number of segments, it points to an entity, so we get the parent collection
         if (pathSegments.length > 0 && pathSegments.length % 2 === 0) {
             collectionPath = pathSegments.slice(0, -1).join("/");
@@ -73,7 +76,11 @@ export function useBuildCollectionRegistryController(props: {
         const cleanedPath = removeInitialAndTrailingSlashes(slugOrPath);
         if (!cleanedPath) return undefined;
 
-        return registry.getRaw(cleanedPath) as EntityCollection | undefined;
+        const pathSegments = cleanedPath.split("/").map((segment, index) => {
+            return index % 2 === 0 ? toKebabCase(segment) : segment;
+        });
+
+        return registry.getRaw(pathSegments.join("/")) as EntityCollection | undefined;
     }, []);
 
     const getParentReferencesFromPath = useCallback((path: string): EntityReference[] => {
@@ -81,8 +88,13 @@ export function useBuildCollectionRegistryController(props: {
         if (!registry) {
             return [];
         }
+        const cleanedPath = removeInitialAndTrailingSlashes(path);
+        const pathSegments = cleanedPath.split("/").map((segment, index) => {
+            return index % 2 === 0 ? toKebabCase(segment) : segment;
+        });
+
         return commonGetParentReferencesFromPath({
-            path,
+            path: pathSegments.join("/"),
             collections: registry.getCollections()
         });
     }, []);
@@ -92,8 +104,9 @@ export function useBuildCollectionRegistryController(props: {
         if (!registry) {
             return [];
         }
-        const strings = path.split("/");
-        const oddPathSegments = strings.filter((_: any, i: number) => i % 2 === 0);
+        const cleanedPath = removeInitialAndTrailingSlashes(path);
+        const strings = cleanedPath.split("/");
+        const oddPathSegments = strings.filter((_: any, i: number) => i % 2 === 0).map((s) => toKebabCase(s));
         oddPathSegments.pop();
 
         const result: string[][] = [];

@@ -567,8 +567,8 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     function onImportDataSet(data: object[], propertiesOrder?: string[]) {
         importConfig.setInUse(true);
         buildEntityPropertiesFromData(data, getInferenceType)
-            .then((properties: Properties) => {
-                const res = cleanPropertiesFromImport(properties);
+            .then((properties: Record<string, unknown>) => {
+                const res = cleanPropertiesFromImport(properties as unknown as Properties);
 
                 importConfig.setIdColumn(res.idColumn);
                 importConfig.setImportData(data);

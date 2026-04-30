@@ -1,7 +1,7 @@
 import { eq, SQL } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { EntityCollection, Properties, Property, Relation, RelationProperty } from "@rebasepro/types";
+import { EntityCollection, Properties, Property, Relation, RelationProperty, isPostgresCollection } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { DrizzleConditionBuilder } from "./utils/drizzle-conditions";
@@ -73,7 +73,7 @@ export function serializeDataToServer<M extends Record<string, unknown>>(
     const result: Record<string, unknown> = {};
 
     // Get normalized relations if collection is provided
-    const resolvedRelations = collection ? resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection) : {};
+    const resolvedRelations = collection ? resolveCollectionRelations(collection) : {};
 
     // Track inverse relations that need to be handled separately
     const inverseRelationUpdates: Array<{
@@ -88,10 +88,20 @@ export function serializeDataToServer<M extends Record<string, unknown>>(
         newTargetId: string | number | null;
     }> = [];
 
+    // Pre-calculate all local keys used as foreign keys
+    const foreignKeys = new Set<string>();
+    Object.values(resolvedRelations).forEach(relation => {
+        if (relation.localKey) foreignKeys.add(relation.localKey);
+    });
+
     for (const [key, value] of Object.entries(entity)) {
         const property = properties[key as keyof M] as Property;
+        
+        // Coerce empty strings to null for any field that acts as a foreign key
+        const effectiveValue = (foreignKeys.has(key) && value === "") ? null : value;
+
         if (!property) {
-            result[key] = value;
+            result[key] = effectiveValue;
             continue;
         }
 
@@ -101,7 +111,7 @@ export function serializeDataToServer<M extends Record<string, unknown>>(
             if (relation) {
                 if (relation.direction === "owning" && relation.localKey) {
                     // Owning relation: Map relation object to FK column on current table
-                    const serializedValue = serializePropertyToServer(value, property);
+                    const serializedValue = serializePropertyToServer(effectiveValue, property);
                     if (serializedValue !== undefined) {
                         result[relation.localKey] = serializedValue;
                     }
@@ -109,7 +119,7 @@ export function serializeDataToServer<M extends Record<string, unknown>>(
                     continue;
                 } else if (relation.direction === "inverse" && relation.foreignKeyOnTarget) {
                     // Inverse relation: Need to update the target table's FK
-                    const serializedValue = serializePropertyToServer(value, property);
+                    const serializedValue = serializePropertyToServer(effectiveValue, property);
                     const pks = getPrimaryKeys(collection, registry!);
                     inverseRelationUpdates.push({
                         relationKey: key,
@@ -120,7 +130,7 @@ export function serializeDataToServer<M extends Record<string, unknown>>(
                     // Don't add the original relation property to the result
                     continue;
                 } else if (relation.direction === "inverse" && relation.joinPath && relation.joinPath.length > 0) {
-                    const serializedValue = serializePropertyToServer(value, property);
+                    const serializedValue = serializePropertyToServer(effectiveValue, property);
                     if (relation.cardinality === "one") {
                         // One-to-one inverse joinPath: route through joinPathRelationUpdates.
                         // The write ordering in EntityPersistService ensures these are processed
@@ -146,7 +156,7 @@ export function serializeDataToServer<M extends Record<string, unknown>>(
                     continue;
                 } else if (relation.cardinality === "one" && relation.direction === "owning" && relation.joinPath && relation.joinPath.length > 0) {
                     // Owning one-to-one via joinPath: capture as a write intent
-                    const serializedValue = serializePropertyToServer(value, property);
+                    const serializedValue = serializePropertyToServer(effectiveValue, property);
                     joinPathRelationUpdates.push({
                         relationKey: key,
                         relation,
@@ -158,7 +168,7 @@ export function serializeDataToServer<M extends Record<string, unknown>>(
             }
         }
 
-        result[key] = serializePropertyToServer(value, property);
+        result[key] = serializePropertyToServer(effectiveValue, property);
     }
 
     if (inverseRelationUpdates.length > 0) {
@@ -232,7 +242,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
     const result: Record<string, unknown> = {};
 
     // Get the normalized relations once
-    const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
+    const resolvedRelations = resolveCollectionRelations(collection);
 
     // Get list of FK columns that are used only for relations and not defined as properties
     const internalFKColumns = new Set<string>();
@@ -449,11 +459,11 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
             if (typeof value === "string" || typeof value === "number") {
                 let relationDef: Relation | undefined = (property as RelationProperty).relation;
                 if (!relationDef && propertyKey) {
-                    const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
+                    const resolvedRelations = resolveCollectionRelations(collection);
                     relationDef = findRelation(resolvedRelations, propertyKey);
                 }
                 if (!relationDef) {
-                    relationDef = (collection as import("@rebasepro/types").PostgresCollection).relations?.find((rel) => rel.relationName === (property as RelationProperty).relationName);
+                    relationDef = isPostgresCollection(collection) ? collection.relations?.find((rel) => rel.relationName === (property as RelationProperty).relationName) : undefined;
                 }
                 
                 if (!relationDef) {
@@ -546,7 +556,7 @@ export function normalizeDbValues<M extends Record<string, unknown>>(
     const result: Record<string, unknown> = {};
 
     // Get FK columns that are used internally for relations and not defined as properties
-    const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
+    const resolvedRelations = resolveCollectionRelations(collection);
     const internalFKColumns = new Set<string>();
     Object.values(resolvedRelations).forEach(relation => {
         if (relation.localKey && !properties[relation.localKey]) {

@@ -381,27 +381,29 @@ async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> 
         process.exit(1);
     }
 
-    // Ensure env vars (especially DATABASE_URL) are loaded before spawning.
-    // The parent CLI sets DOTENV_CONFIG_PATH to the resolved .env path,
-    // but drizzle.config.ts's `import "dotenv/config"` only reads from cwd
-    // which may not contain the .env file (e.g. backend/ vs project root).
     const env = { ...process.env as Record<string, string> };
-    if (process.env.DOTENV_CONFIG_PATH) {
-        try {
-            const dotenv = await import("dotenv");
-            const parsed = dotenv.config({ path: process.env.DOTENV_CONFIG_PATH });
-            if (parsed.parsed) {
-                Object.assign(env, parsed.parsed);
+    try {
+        const dotenv = await import("dotenv");
+        const envPaths = [
+            process.env.DOTENV_CONFIG_PATH,
+            path.resolve(process.cwd(), ".env"),
+            path.resolve(process.cwd(), "../.env"),
+            path.resolve(process.cwd(), "../../.env")
+        ].filter(Boolean) as string[];
+
+        for (const p of envPaths) {
+            if (fs.existsSync(p)) {
+                const parsed = dotenv.config({ path: p });
+                if (parsed.parsed) {
+                    Object.assign(env, parsed.parsed);
+                    break;
+                }
             }
-        } catch {
-            // dotenv may not be available — fall through
         }
+    } catch {
+        // dotenv may not be available — fall through
     }
 
-    // Interactive actions (generate, push) need stdin for user prompts.
-    // Non-interactive actions (migrate, pull, studio) can capture output
-    // so we can parse and surface actual database errors instead of
-    // drizzle-kit's useless "exit code 1" behind a spinner.
     const interactive = ["generate", "push"].includes(action);
 
     try {
@@ -412,48 +414,42 @@ async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> 
                 env,
             });
         } else {
-            const result = await execa(drizzleKitBin, [action], {
+            const child = execa(drizzleKitBin, [action], {
                 cwd: process.cwd(),
-                stdio: "pipe",
                 env,
                 reject: false,
             });
+            
+            // Natively stream output while still capturing it for error parsing
+            child.stdout?.pipe(process.stdout);
+            child.stderr?.pipe(process.stderr);
+            
+            const result = await child;
 
-            // Strip ANSI escape codes and spinner frames from output
             const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").replace(/\[?[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣷⣯⣟⡿⢿⣻⣽]+\]\s*/g, "");
             const stdout = stripAnsi(result.stdout || "").trim();
             const stderr = stripAnsi(result.stderr || "").trim();
 
             if (result.exitCode !== 0) {
                 console.error(chalk.red(`\n✗ drizzle-kit ${action} failed.\n`));
-                // Surface the actual error — check both streams
                 const errorOutput = stderr || stdout;
                 if (errorOutput) {
-                    // Extract the most useful error line
                     const lines = errorOutput.split("\n").filter((l: string) => l.trim());
                     for (const line of lines) {
                         if (line.toLowerCase().includes("error") || line.includes("cannot") || line.includes("already exists") || line.includes("does not exist") || line.includes("violates") || line.includes("permission denied")) {
                             console.error(chalk.red(`  ${line.trim()}`));
-                        } else {
-                            console.error(chalk.gray(`  ${line.trim()}`));
                         }
                     }
-                } else {
-                    console.error(chalk.gray("  No error details available from drizzle-kit."));
                 }
                 console.error("");
                 process.exit(1);
-            } else if (stdout) {
-                console.log(stdout);
             }
         }
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        // execa includes stdout/stderr in the error for pipe mode
         const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").replace(/\[?[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣷⣯⣟⡿⢿⣻⣽]+\]\s*/g, "");
         const cleaned = stripAnsi(msg).trim();
         console.error(chalk.red(`\n✗ drizzle-kit ${action} failed.\n`));
-        // Try to extract the meaningful Postgres error from the execa message
         const lines = cleaned.split("\n").filter((l: string) => l.trim());
         for (const line of lines) {
             if (line.toLowerCase().includes("error") || line.includes("cannot") || line.includes("already exists") || line.includes("does not exist") || line.includes("violates")) {

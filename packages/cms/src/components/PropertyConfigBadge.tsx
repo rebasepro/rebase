@@ -1,4 +1,4 @@
-import type { PropertyConfig } from "@rebasepro/types";
+import type { PropertyConfig, Property } from "@rebasepro/types";
 import { getDefaultFieldConfig } from "./field_configs";
 import { getIconForWidget } from "../util/property_utils";
 
@@ -15,7 +15,7 @@ export function PropertyConfigBadge({
     const iconSize = size === "extraSmall" ? 14 : size === "small" ? "smallest" : "small";
     const classes = `${sizeClasses} flex-shrink-0 flex items-center justify-center rounded-full shadow-2xs text-white ` + (disabled ? "bg-surface-400 dark:bg-surface-600" : "");
 
-    const defaultPropertyConfig = typeof propertyConfig?.property === "object" ? getDefaultFieldConfig(propertyConfig.property as import("@rebasepro/types").Property) : undefined;
+    const defaultPropertyConfig = typeof propertyConfig?.property === "object" ? getDefaultFieldConfig(propertyConfig.property as Property) : undefined;
 
     return <div
         className={classes}

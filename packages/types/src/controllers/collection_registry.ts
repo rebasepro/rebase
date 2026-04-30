@@ -4,7 +4,10 @@ import { EntityCollection, EntityReference } from "../types";
  * Controller that provides access to the registered entity collections.
  * @group Models
  */
-export type CollectionRegistryController<EC extends EntityCollection = EntityCollection<any>> = {
+export type CollectionRegistryController<
+    DB = Record<string, unknown>,
+    EC extends EntityCollection = EntityCollection<any>
+> = {
 
     /**
      * List of the mapped collections in the CMS.
@@ -23,7 +26,7 @@ export type CollectionRegistryController<EC extends EntityCollection = EntityCol
      * Get the collection configuration for a given path.
      * The collection is resolved from the given path or alias.
      */
-    getCollection: (slugOrPath: string, includeUserOverride?: boolean) => EC | undefined;
+    getCollection: <K extends keyof DB>(slugOrPath: Extract<K, string>, includeUserOverride?: boolean) => EC | undefined;
 
     /**
      * Get the raw, un-normalized collection configuration.

@@ -1,4 +1,4 @@
-import { EntityCollection } from "@rebasepro/types";
+import { EntityCollection, StringProperty, NumberProperty, DateProperty, ArrayProperty, Property } from "@rebasepro/types";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { checkCollectionsVsSchema, getExpectedColumnType } from "../src/schema/doctor";
 import * as fs from "fs";
@@ -102,16 +102,16 @@ describe("Rebase Schema Doctor", () => {
 
         it("should map string types correctly", () => {
             expect(getExpectedColumnType({ type: "string" })).toBe("character varying");
-            expect(getExpectedColumnType({ type: "string", columnType: "text" } as import("@rebasepro/types").StringProperty)).toBe("text");
-            expect(getExpectedColumnType({ type: "string", columnType: "char" } as import("@rebasepro/types").StringProperty)).toBe("character");
+            expect(getExpectedColumnType({ type: "string", columnType: "text" } as StringProperty)).toBe("text");
+            expect(getExpectedColumnType({ type: "string", columnType: "char" } as StringProperty)).toBe("character");
         });
 
         it("should map number types correctly", () => {
             expect(getExpectedColumnType({ type: "number" })).toBe("numeric");
-            expect(getExpectedColumnType({ type: "number", validation: { integer: true } } as import("@rebasepro/types").NumberProperty)).toBe("integer");
-            expect(getExpectedColumnType({ type: "number", columnType: "real" } as import("@rebasepro/types").NumberProperty)).toBe("real");
-            expect(getExpectedColumnType({ type: "number", columnType: "double precision" } as import("@rebasepro/types").NumberProperty)).toBe("double precision");
-            expect(getExpectedColumnType({ type: "number", columnType: "bigint" } as import("@rebasepro/types").NumberProperty)).toBe("bigint");
+            expect(getExpectedColumnType({ type: "number", validation: { integer: true } } as NumberProperty)).toBe("integer");
+            expect(getExpectedColumnType({ type: "number", columnType: "real" } as NumberProperty)).toBe("real");
+            expect(getExpectedColumnType({ type: "number", columnType: "double precision" } as NumberProperty)).toBe("double precision");
+            expect(getExpectedColumnType({ type: "number", columnType: "bigint" } as NumberProperty)).toBe("bigint");
         });
 
         it("should map boolean type correctly", () => {
@@ -120,25 +120,25 @@ describe("Rebase Schema Doctor", () => {
 
         it("should map date types correctly", () => {
             expect(getExpectedColumnType({ type: "date" })).toBe("timestamp with time zone");
-            expect(getExpectedColumnType({ type: "date", columnType: "date" } as import("@rebasepro/types").DateProperty)).toBe("date");
-            expect(getExpectedColumnType({ type: "date", columnType: "time" } as import("@rebasepro/types").DateProperty)).toBe("time without time zone");
+            expect(getExpectedColumnType({ type: "date", columnType: "date" } as DateProperty)).toBe("date");
+            expect(getExpectedColumnType({ type: "date", columnType: "time" } as DateProperty)).toBe("time without time zone");
         });
 
         it("should map json types correctly", () => {
             expect(getExpectedColumnType({ type: "map" })).toBe("jsonb");
             expect(getExpectedColumnType({ type: "array" })).toBe("jsonb");
-            expect(getExpectedColumnType({ type: "array", columnType: "json" } as import("@rebasepro/types").ArrayProperty)).toBe("json");
+            expect(getExpectedColumnType({ type: "array", columnType: "json" } as ArrayProperty)).toBe("json");
         });
 
         it("should map enum string to USER-DEFINED", () => {
             expect(getExpectedColumnType({
                 type: "string",
                 enum: { active: "Active", inactive: "Inactive" }
-            } as import("@rebasepro/types").StringProperty)).toBe("USER-DEFINED");
+            } as StringProperty)).toBe("USER-DEFINED");
         });
 
         it("should return null for relation type", () => {
-            expect(getExpectedColumnType({ type: "relation" } as import("@rebasepro/types").Property)).toBe(null);
+            expect(getExpectedColumnType({ type: "relation" } as Property)).toBe(null);
         });
     });
 

@@ -743,7 +743,7 @@ export function ConditionsEditor({ disabled, collectionProperties }: ConditionsE
         : [];
 
     // Get current conditions from form values
-    const conditions: Record<string, unknown> = ("conditions" in values ? (values as unknown as Record<string, unknown>).conditions : undefined) as Record<string, unknown> ?? {};
+    const conditions: Record<string, unknown> = (values as PropertyWithId & { conditions?: Record<string, unknown> }).conditions ?? {};
 
     // DEBUG: Log conditions to see what's being loaded
     console.log("[ConditionsEditor] Loaded conditions:", conditions);

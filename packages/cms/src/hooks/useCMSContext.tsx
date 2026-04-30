@@ -28,6 +28,7 @@ import {
  * @group Hooks and utilities
  */
 export type CMSContext<
+    DB = Record<string, unknown>,
     USER extends User = User,
     AuthControllerType extends AuthController<USER> = AuthController<USER>
 > = RebaseContext<USER, AuthControllerType> & {
@@ -35,7 +36,7 @@ export type CMSContext<
     sideDialogsController: SideDialogsController;
     urlController: UrlController;
     navigationStateController: NavigationStateController;
-    collectionRegistryController: CollectionRegistryController;
+    collectionRegistryController: CollectionRegistryController<DB>;
 };
 
 /**
@@ -49,15 +50,16 @@ export type CMSContext<
  * @group Hooks and utilities
  */
 export function useCMSContext<
+    DB = Record<string, unknown>,
     USER extends User = User,
     AuthControllerType extends AuthController<USER> = AuthController<USER>
->(): CMSContext<USER, AuthControllerType> {
+>(): CMSContext<DB, USER, AuthControllerType> {
     const baseContext = useRebaseContext<USER, AuthControllerType>();
     const sideEntityController = useSideEntityController();
     const sideDialogsController = useSideDialogsController();
     const urlController = useUrlController();
     const navigationStateController = useNavigationStateController();
-    const collectionRegistryController = useCollectionRegistryController();
+    const collectionRegistryController = useCollectionRegistryController<DB>();
 
     return useMemo(() => ({
         ...baseContext,

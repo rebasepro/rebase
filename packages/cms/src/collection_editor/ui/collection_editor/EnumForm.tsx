@@ -164,11 +164,12 @@ function EnumFormFields({
 
             // add only new enum values
             const newEnumValues = foundEnumValues.filter((enumValue) => {
+                if (!enumValue) return false;
                 return !currentEnumValues?.some((v: EnumValueConfig) => v.id === enumValue.id);
             });
 
             newEnumValues.forEach((enumValue) => {
-                inferredValues.add(enumValue.id);
+                if (enumValue) inferredValues.add(enumValue.id);
             });
             setFieldValue(enumValuesPath, [...newEnumValues, ...currentEnumValues], true);
         }).catch(e => {

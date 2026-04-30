@@ -128,7 +128,7 @@ export interface CollectionClient<M extends Record<string, unknown> = Record<str
 export function createCollectionClient<M extends Record<string, unknown> = Record<string, unknown>>(transport: Transport, slug: string, ws?: RebaseWebSocketClient): CollectionClient<M> {
     const basePath = `/data/${slug}`;
 
-    return {
+    const client: CollectionClient<M> = {
         async find(params?: FindParams): Promise<FindResponse<M>> {
             const qs = buildQueryString(params);
             const raw = await transport.request<{ data: Record<string, unknown>[]; meta: FindResponse<M>["meta"] }>(basePath + qs, { method: "GET" });
@@ -170,67 +170,69 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             });
         },
 
-        ...(ws && {
-            listen(params: FindParams | undefined, onUpdate: (response: FindResponse<M>) => void, onError?: (error: Error) => void) {
-                return ws.listenCollection(
-                    {
-                        path: slug,
-                        filter: parseWhereFilter(params?.where),
-                        limit: params?.limit,
-                        startAfter: params?.offset ? String(params.offset) : undefined,
-                        orderBy: params?.orderBy?.split(":")[0],
-                        order: params?.orderBy?.split(":")[1] as "asc" | "desc",
-                        searchString: params?.searchString
-                    },
-                    (entities: Entity[]) => {
-                        const requestedLimit = params?.limit || 20;
-                        onUpdate({
-                            data: entities as Entity<M>[],
-                            meta: {
-                                total: entities.length,
-                                limit: requestedLimit,
-                                offset: params?.offset || 0,
-                                hasMore: entities.length >= requestedLimit
-                            }
-                        });
-                    },
-                    onError
-                );
-            },
-
-            listenById(id: string | number, onUpdate: (data: Entity<M> | undefined) => void, onError?: (error: Error) => void) {
-                return ws.listenEntity(
-                    { path: slug, entityId: String(id) },
-                    (entity: Entity | null) => {
-                        if (entity) {
-                            onUpdate(entity as Entity<M>);
-                        } else {
-                            onUpdate(undefined);
-                        }
-                    },
-                    onError
-                );
-            }
-        }),
-
         // Fluent builder instantiation
         where(column: keyof M & string, operator: FilterOperator, value: unknown) {
-            return new QueryBuilder<M>(this as unknown as CollectionClient<M>).where(column, operator, value);
+            return new QueryBuilder<M>(client).where(column, operator, value);
         },
         orderBy(column: keyof M & string, ascending?: "asc" | "desc") {
-            return new QueryBuilder<M>(this as unknown as CollectionClient<M>).orderBy(column, ascending);
+            return new QueryBuilder<M>(client).orderBy(column, ascending);
         },
         limit(count: number) {
-            return new QueryBuilder<M>(this as unknown as CollectionClient<M>).limit(count);
+            return new QueryBuilder<M>(client).limit(count);
         },
         offset(count: number) {
-            return new QueryBuilder<M>(this as unknown as CollectionClient<M>).offset(count);
+            return new QueryBuilder<M>(client).offset(count);
         },
         search(searchString: string) {
-            return new QueryBuilder<M>(this as unknown as CollectionClient<M>).search(searchString);
+            return new QueryBuilder<M>(client).search(searchString);
         },
         include(...relations: string[]) {
-            return new QueryBuilder<M>(this as unknown as CollectionClient<M>).include(...relations);
+            return new QueryBuilder<M>(client).include(...relations);
         }
     };
+
+    if (ws) {
+        client.listen = (params: FindParams | undefined, onUpdate: (response: FindResponse<M>) => void, onError?: (error: Error) => void) => {
+            return ws.listenCollection(
+                {
+                    path: slug,
+                    filter: parseWhereFilter(params?.where),
+                    limit: params?.limit,
+                    startAfter: params?.offset ? String(params.offset) : undefined,
+                    orderBy: params?.orderBy?.split(":")[0],
+                    order: params?.orderBy?.split(":")[1] as "asc" | "desc",
+                    searchString: params?.searchString
+                },
+                (entities: Entity[]) => {
+                    const requestedLimit = params?.limit || 20;
+                    onUpdate({
+                        data: entities as Entity<M>[],
+                        meta: {
+                            total: entities.length,
+                            limit: requestedLimit,
+                            offset: params?.offset || 0,
+                            hasMore: entities.length >= requestedLimit
+                        }
+                    });
+                },
+                onError
+            );
+        };
+
+        client.listenById = (id: string | number, onUpdate: (data: Entity<M> | undefined) => void, onError?: (error: Error) => void) => {
+            return ws.listenEntity(
+                { path: slug, entityId: String(id) },
+                (entity: Entity | null) => {
+                    if (entity) {
+                        onUpdate(entity as Entity<M>);
+                    } else {
+                        onUpdate(undefined);
+                    }
+                },
+                onError
+            );
+        };
+    }
+
+    return client;
 }

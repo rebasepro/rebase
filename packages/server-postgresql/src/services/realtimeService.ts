@@ -4,7 +4,7 @@ import { Client as PgClient } from "pg";
 import { randomUUID } from "crypto";
 import { EntityService } from "./entityService";
 
-import { Entity, FetchCollectionProps, ListenCollectionProps, ListenEntityProps, DataDriver, CollectionUpdateMessage, EntityUpdateMessage, CollectionEntityPatchMessage, WebSocketMessage } from "@rebasepro/types";
+import { Entity, FetchCollectionProps, ListenCollectionProps, ListenEntityProps, DataDriver, CollectionUpdateMessage, EntityUpdateMessage, CollectionEntityPatchMessage, WebSocketMessage, FilterValues, EntityCollection, RebaseCallContext } from "@rebasepro/types";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { sql as drizzleSql } from "drizzle-orm";
 import { RealtimeProvider, CollectionSubscriptionConfig, EntitySubscriptionConfig } from "../interfaces";
@@ -575,7 +575,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                             notifyPath,
                             collectionRequest.searchString,
                             {
-                            filter: collectionRequest.filter as import("@rebasepro/types").FilterValues<string>,
+                            filter: collectionRequest.filter as FilterValues<string>,
                             orderBy: collectionRequest.orderBy,
                             order: collectionRequest.order,
                             limit: collectionRequest.limit,
@@ -584,7 +584,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                         );
                     } else {
                         fetchedEntities = await txEntityService.fetchCollection(notifyPath, {
-                        filter: collectionRequest.filter as import("@rebasepro/types").FilterValues<string>,
+                        filter: collectionRequest.filter as FilterValues<string>,
                         orderBy: collectionRequest.orderBy,
                         order: collectionRequest.order,
                         limit: collectionRequest.limit,
@@ -596,7 +596,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                     // Re-apply `afterRead` lifecycle hooks to ensure consistent data structures
                     // between the initial driver fetch and this RLS-bound refetch.
                     const registryCollection = this.registry.getCollectionByPath(notifyPath);
-                    const resolvedCollection = collection ? { ...collection, ...registryCollection } as import("@rebasepro/types").EntityCollection : registryCollection as import("@rebasepro/types").EntityCollection;
+                    const resolvedCollection = collection ? { ...collection, ...registryCollection } as EntityCollection : registryCollection as EntityCollection;
                     
                     const callbacks = resolvedCollection?.callbacks;
                     const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
@@ -606,7 +606,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                             user: { uid: authContext.userId, roles: authContext.roles },
                             driver: this.driver,
                             data: this.driver ? (this.driver as unknown as Record<string, unknown>).data : undefined
-                        } as unknown as import("@rebasepro/types").RebaseCallContext;
+                        } as unknown as RebaseCallContext;
                         
                         return await Promise.all(fetchedEntities.map(async (entity) => {
                             let processedEntity = entity;
@@ -643,7 +643,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 notifyPath,
                 collectionRequest.searchString,
                 {
-                    filter: collectionRequest.filter as import("@rebasepro/types").FilterValues<string>,
+                    filter: collectionRequest.filter as FilterValues<string>,
                     orderBy: collectionRequest.orderBy,
                     order: collectionRequest.order,
                     limit: collectionRequest.limit,
@@ -652,7 +652,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             );
         }
         return await this.entityService.fetchCollection(notifyPath, {
-            filter: collectionRequest.filter as import("@rebasepro/types").FilterValues<string>,
+            filter: collectionRequest.filter as FilterValues<string>,
             orderBy: collectionRequest.orderBy,
             order: collectionRequest.order,
             limit: collectionRequest.limit,
@@ -740,7 +740,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
 
                     if (processedEntity) {
                         const registryCollection = this.registry.getCollectionByPath(notifyPath);
-                        const resolvedCollection = collection ? { ...collection, ...registryCollection } as import("@rebasepro/types").EntityCollection : registryCollection as import("@rebasepro/types").EntityCollection;
+                        const resolvedCollection = collection ? { ...collection, ...registryCollection } as EntityCollection : registryCollection as EntityCollection;
                         
                         const callbacks = resolvedCollection?.callbacks;
                         const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
@@ -750,7 +750,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                                 user: { uid: authContext.userId, roles: authContext.roles },
                                 driver: this.driver,
                                 data: this.driver ? (this.driver as unknown as Record<string, unknown>).data : undefined
-                            } as unknown as import("@rebasepro/types").RebaseCallContext;
+                            } as unknown as RebaseCallContext;
                             
                             if (callbacks?.afterRead) {
                                 processedEntity = await callbacks.afterRead({

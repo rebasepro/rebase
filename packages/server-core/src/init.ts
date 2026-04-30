@@ -1,4 +1,4 @@
-import { DataDriver, EntityCollection, BackendBootstrapper, BootstrappedAuth, RealtimeProvider, HealthCheckResult } from "@rebasepro/types";
+import { DataDriver, EntityCollection, BackendBootstrapper, BootstrappedAuth, RealtimeProvider, HealthCheckResult, InitializedDriver } from "@rebasepro/types";
 import { BackendCollectionRegistry } from "./collections/BackendCollectionRegistry";
 import { loadCollectionsFromDirectory } from "./collections/loader";
 import { DriverRegistry, DEFAULT_DRIVER_ID, DefaultDriverRegistry } from "./services/driver-registry";
@@ -203,7 +203,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     let defaultDriverId = DEFAULT_DRIVER_ID;
 
-    let defaultDriverResult: import("@rebasepro/types").InitializedDriver | undefined = undefined;
+    let defaultDriverResult: InitializedDriver | undefined = undefined;
 
     // 1. Initialize all drivers
     for (const bootstrapper of bootstrappers) {

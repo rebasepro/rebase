@@ -1,4 +1,4 @@
-import { EntityCollection, NumberProperty, Property, Relation, RelationProperty, SecurityOperation, SecurityRule, StringProperty } from "@rebasepro/types";
+import { EntityCollection, NumberProperty, Property, Relation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollection, DateProperty, ArrayProperty, MapProperty, ReferenceProperty } from "@rebasepro/types";
 import { getPrimaryKeys } from "../services/entity-helpers";
 import { getEnumVarName, getTableName, getTableVarName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
@@ -112,7 +112,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
             columnDefinition = `boolean("${colName}")`;
             break;
         case "date": {
-            const dateProp = prop as import("@rebasepro/types").DateProperty;
+            const dateProp = prop as DateProperty;
             if (dateProp.columnType === "date") {
                 columnDefinition = `date("${colName}", { mode: 'string' })`;
             } else if (dateProp.columnType === "time") {
@@ -124,7 +124,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
         }
         case "map":
         case "array": {
-            const arrayOrMapProp = prop as import("@rebasepro/types").ArrayProperty | import("@rebasepro/types").MapProperty;
+            const arrayOrMapProp = prop as ArrayProperty | MapProperty;
             if (arrayOrMapProp.columnType === "json") {
                 columnDefinition = `json("${colName}")`;
             } else {
@@ -134,7 +134,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
         }
         case "relation": {
             const refProp = prop as RelationProperty;
-            const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
+            const resolvedRelations = resolveCollectionRelations(collection);
             const relation = findRelation(resolvedRelations, refProp.relationName ?? propName);
 
             // Only owning one-to-one/many-to-one relations create a column here.
@@ -184,7 +184,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
             return `    ${relation.localKey}: ${columnDef}`;
         }
         case "reference": {
-            const refProp = prop as import("@rebasepro/types").ReferenceProperty;
+            const refProp = prop as ReferenceProperty;
             const targetCollection = collections.find(c => c.slug === refProp.path || getTableName(c) === refProp.path);
             if (!targetCollection) {
                 columnDefinition = `varchar("${colName}")`;
@@ -429,7 +429,7 @@ const computeSharedRelationName = (
         // No explicit foreignKeyOnTarget — try to find the corresponding owning relation
         try {
             const targetCollection = rel.target();
-            const targetResolvedRelations = resolveCollectionRelations(targetCollection as import("@rebasepro/types").PostgresCollection);
+            const targetResolvedRelations = resolveCollectionRelations(targetCollection);
             const correspondingRelation = Object.values(targetResolvedRelations).find(targetRel =>
                 targetRel.direction === "owning" &&
                 targetRel.cardinality === "one" &&
@@ -510,7 +510,7 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
             allTablesToGenerate.set(tableName, { collection });
         }
 
-        const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
+        const resolvedRelations = resolveCollectionRelations(collection);
         for (const relation of Object.values(resolvedRelations)) {
             if (relation.through) { // Standard M2M junction table
                 const junctionTableName = relation.through.table;
@@ -576,7 +576,7 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
 
             schemaContent += `${Array.from(columns).join(",\n")}`;
 
-            const securityRules = (collection as import("@rebasepro/types").PostgresCollection<Record<string, unknown>, import("@rebasepro/types").User>).securityRules;
+            const securityRules = isPostgresCollection(collection) ? collection.securityRules : undefined;
             if (!stripPolicies && securityRules && securityRules.length > 0) {
                 schemaContent += "\n}, (table) => ([\n";
                 securityRules.forEach((rule: SecurityRule, idx: number) => {
@@ -624,7 +624,7 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
                 // inverse many() on the target table.
                 let inverseRelationName: string | null = null;
                 try {
-                    const targetRelations = resolveCollectionRelations(targetCollection as import("@rebasepro/types").PostgresCollection);
+                    const targetRelations = resolveCollectionRelations(targetCollection);
                     for (const [, targetRel] of Object.entries(targetRelations)) {
                         if (targetRel.direction === "inverse" &&
                             targetRel.cardinality === "many" &&
@@ -645,7 +645,7 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
                 tableRelations.push(`    "${relation.through.targetColumn}": one(${targetTableVar}, {\n        fields: [${tableVarName}.${relation.through.targetColumn}],\n        references: [${targetTableVar}.${targetId}],\n        relationName: \"${targetRelName}\"\n    })`);
             }
         } else {
-            const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
+            const resolvedRelations = resolveCollectionRelations(collection);
             // Defensive safety net: track emitted `drizzleRelationName` values
             // to prevent duplicate one()/many() entries in the generated schema.
             // The root deduplication happens inside resolveCollectionRelations,
@@ -685,7 +685,7 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
                             // In this case, we need to find the corresponding owning relation on the target
                             try {
                                 const targetCollection = rel.target();
-                                const targetResolvedRelations = resolveCollectionRelations(targetCollection as import("@rebasepro/types").PostgresCollection);
+                                const targetResolvedRelations = resolveCollectionRelations(targetCollection);
 
                                 // Find the owning relation on the target that points back to this collection
                                 const correspondingRelation = Object.values(targetResolvedRelations).find(targetRel =>
@@ -714,7 +714,7 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
                             // Many-to-many inverse relation - find the corresponding owning relation's junction table
                             try {
                                 const targetCollection = rel.target();
-                                const targetResolvedRelations = resolveCollectionRelations(targetCollection as import("@rebasepro/types").PostgresCollection);
+                                const targetResolvedRelations = resolveCollectionRelations(targetCollection);
 
                                 // Find the corresponding owning many-to-many relation on the target
                                 const correspondingRelation = Object.values(targetResolvedRelations).find(targetRel =>

@@ -106,10 +106,11 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
     const collectionClients = new Map<string, CollectionClient<Record<string, unknown>>>();
 
     function collection(slug: string): CollectionClient<Record<string, unknown>> {
-        if (!collectionClients.has(slug)) {
-            collectionClients.set(slug, createCollectionClient(transport, slug, ws));
+        const kebabSlug = toKebabCase(slug);
+        if (!collectionClients.has(kebabSlug)) {
+            collectionClients.set(kebabSlug, createCollectionClient(transport, kebabSlug, ws));
         }
-        return collectionClients.get(slug)!;
+        return collectionClients.get(kebabSlug)!;
     }
 
     const dataTarget = { collection } as Record<string, unknown>;

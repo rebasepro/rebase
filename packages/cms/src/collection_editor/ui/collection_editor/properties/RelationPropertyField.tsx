@@ -54,7 +54,7 @@ export function RelationPropertyField({
     const relationName = values.relationName ?? "";
     // Transient config object stored on the property for editor use.
     // Contains standard Relation fields plus `_targetSlug` for the UI dropdown.
-    const relationConfig: Record<string, unknown> = ((values as unknown as Record<string, unknown>)._relationConfig as Record<string, unknown>) ?? {};
+    const relationConfig: Record<string, unknown> = (values._relationConfig as Record<string, unknown>) ?? {};
 
     const targetSlug = (relationConfig._targetSlug as string) ?? "";
     const cardinality = (relationConfig.cardinality as string) ?? "one";
@@ -77,7 +77,7 @@ export function RelationPropertyField({
 
     const updateRelationConfig = useCallback(
         (patch: Record<string, unknown>) => {
-            const current = ((values as unknown as Record<string, unknown>)._relationConfig as Record<string, unknown>) ?? {};
+            const current = (values._relationConfig as Record<string, unknown>) ?? {};
             setFieldValue("_relationConfig" as keyof (RelationProperty & { _relationConfig?: unknown }), { ...current, ...patch });
         },
         [values, setFieldValue]
@@ -85,7 +85,7 @@ export function RelationPropertyField({
 
     const updateThrough = useCallback(
         (patch: Record<string, unknown>) => {
-            const current = ((values as unknown as Record<string, unknown>)._relationConfig as Record<string, unknown>) ?? {};
+            const current = (values._relationConfig as Record<string, unknown>) ?? {};
             const currentThrough = (current.through as Record<string, unknown>) ?? {};
             setFieldValue("_relationConfig" as keyof (RelationProperty & { _relationConfig?: unknown }), {
                 ...current,

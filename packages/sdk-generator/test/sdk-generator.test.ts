@@ -65,6 +65,10 @@ describe("generateTypedefs", () => {
         expect(ts).toContain("id?: number;");
         expect(ts).toContain("name?: string;");
         expect(ts).toContain("email?: string;");
+
+        // Dictionary
+        expect(ts).toContain("export const collectionsDictionary = {");
+        expect(ts).toContain("authors: \"authors\",");
     });
 });
 

@@ -1,0 +1,399 @@
+src/components/FirebaseLoginView.tsx(17,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+src/components/FirebaseLoginView.tsx(441,32): error TS7006: Parameter 'event' implicitly has an 'any' type.
+src/components/FirebaseLoginView.tsx(451,40): error TS7006: Parameter 'event' implicitly has an 'any' type.
+src/components/FirebaseLoginView.tsx(587,32): error TS7006: Parameter 'event' implicitly has an 'any' type.
+src/components/FirebaseLoginView.tsx(596,36): error TS7006: Parameter 'event' implicitly has an 'any' type.
+src/components/RebaseFirebaseApp.tsx(29,54): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/AICollectionGeneratorPopover.tsx(15,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/AICollectionGeneratorPopover.tsx(187,28): error TS7006: Parameter 'open' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/AICollectionGeneratorPopover.tsx(216,32): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/CollectionEditorDialog.tsx(6,40): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/CollectionEditorDialog.tsx(25,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/CollectionEditorDialog.tsx(143,28): error TS7006: Parameter 'open' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/CollectionEditorDialog.tsx(640,45): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/CollectionEditorWelcomeView.tsx(6,90): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/CollectionJsonImportDialog.tsx(11,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/CollectionJsonImportDialog.tsx(89,28): error TS7006: Parameter 'open' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/CollectionPropertiesEditorForm.tsx(8,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/CollectionPropertiesEditorForm.tsx(23,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/CollectionRelationsTab.tsx(5,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/CollectionRelationsTab.tsx(94,80): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/CollectionRelationsTab.tsx(120,70): error TS7006: Parameter 'open' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/CollectionRelationsTab.tsx(133,52): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/CollectionRelationsTab.tsx(139,57): error TS7006: Parameter 'val' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/CollectionRelationsTab.tsx(156,57): error TS7006: Parameter 'val' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/CollectionRelationsTab.tsx(165,57): error TS7006: Parameter 'val' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/CollectionRelationsTab.tsx(183,60): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/CollectionRelationsTab.tsx(192,64): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/CollectionRelationsTab.tsx(200,64): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/CollectionRLSTab.tsx(7,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/CollectionRLSTab.tsx(227,63): error TS7006: Parameter 'open' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/CollectionsStudioView.tsx(14,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/CollectionStudioView.tsx(9,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/DisplaySettingsForm.tsx(16,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/DisplaySettingsForm.tsx(93,49): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/DisplaySettingsForm.tsx(145,61): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/DisplaySettingsForm.tsx(148,59): error TS7006: Parameter 'value' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/DisplaySettingsForm.tsx(165,63): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/DisplaySettingsForm.tsx(289,44): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/DisplaySettingsForm.tsx(317,49): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/DisplaySettingsForm.tsx(330,49): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/EnumForm.tsx(23,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/EnumForm.tsx(340,24): error TS7006: Parameter 'open' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/GeneralSettingsForm.tsx(24,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/GeneralSettingsForm.tsx(164,44): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/GeneralSettingsForm.tsx(225,49): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/GetCodeDialog.tsx(3,104): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/GetCodeDialog.tsx(64,27): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/import/CollectionEditorImportDataPreview.tsx(5,40): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/import/CollectionEditorImportDataPreview.tsx(8,28): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/import/CollectionEditorImportMapping.tsx(11,73): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/import/CollectionEditorImportMapping.tsx(241,27): error TS7006: Parameter 'value' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/import/CollectionEditorImportMapping.tsx(245,29): error TS7006: Parameter 'newSelectedWidgetId' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/KanbanConfigSection.tsx(13,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/KanbanConfigSection.tsx(82,33): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/KanbanConfigSection.tsx(92,31): error TS7006: Parameter 'value' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/KanbanConfigSection.tsx(109,35): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/LayoutModeSwitch.tsx(1,83): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/properties/BlockPropertyField.tsx(2,52): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/properties/CommonPropertyFields.tsx(3,36): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/properties/DateTimePropertyField.tsx(6,36): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/properties/DateTimePropertyField.tsx(97,41): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/DateTimePropertyField.tsx(100,39): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/DateTimePropertyField.tsx(123,41): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/DateTimePropertyField.tsx(124,39): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/DateTimePropertyField.tsx(149,41): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/DateTimePropertyField.tsx(150,39): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/DateTimePropertyField.tsx(176,37): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/DateTimePropertyField.tsx(177,35): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/EnumPropertyField.tsx(6,36): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/properties/MapPropertyField.tsx(5,76): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/properties/MapPropertyField.tsx(111,37): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/MarkdownPropertyField.tsx(14,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/properties/MarkdownPropertyField.tsx(109,45): error TS7006: Parameter 'value' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/MarkdownPropertyField.tsx(120,45): error TS7006: Parameter 'value' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/MarkdownPropertyField.tsx(190,44): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/NumberPropertyField.tsx(6,47): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/properties/NumberPropertyField.tsx(39,37): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/NumberPropertyField.tsx(40,35): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/NumberPropertyField.tsx(74,37): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/NumberPropertyField.tsx(79,35): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/ReferencePropertyField.tsx(7,80): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/properties/RelationPropertyField.tsx(10,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/properties/RelationPropertyField.tsx(153,37): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/RelationPropertyField.tsx(157,35): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/RelationPropertyField.tsx(185,37): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/RelationPropertyField.tsx(189,35): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/RelationPropertyField.tsx(306,37): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/RelationPropertyField.tsx(310,35): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/RelationPropertyField.tsx(326,37): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/RelationPropertyField.tsx(330,35): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/RepeatPropertyField.tsx(4,43): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/properties/StoragePropertyField.tsx(12,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/properties/StoragePropertyField.tsx(280,49): error TS7006: Parameter 'value' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/StoragePropertyField.tsx(282,47): error TS7006: Parameter 'selected' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/StoragePropertyField.tsx(302,49): error TS7006: Parameter 'value' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/StoragePropertyField.tsx(304,47): error TS7006: Parameter 'selected' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/StringPropertyField.tsx(7,47): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/properties/StringPropertyField.tsx(75,37): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/StringPropertyField.tsx(76,35): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/StringPropertyField.tsx(104,37): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/StringPropertyField.tsx(109,35): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/collection_editor/ui/collection_editor/properties/UrlPropertyField.tsx(6,47): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/properties/validation/ArrayPropertyValidation.tsx(4,36): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/properties/validation/GeneralPropertyValidation.tsx(4,36): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/properties/validation/NumberPropertyValidation.tsx(4,36): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/properties/validation/StringPropertyValidation.tsx(6,37): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/properties/validation/ValidationPanel.tsx(3,55): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/PropertyEditView.tsx(26,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/PropertyFieldPreview.tsx(3,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/PropertyFieldPreview.tsx(12,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/PropertyTree.tsx(19,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/SwitchControl.tsx(3,49): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/collection_editor/ViewModeSwitch.tsx(2,88): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/EditorCollectionAction.tsx(4,52): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/collection_editor/ui/MissingReferenceWidget.tsx(4,24): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/admin/RoleChip.tsx(2,39): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/admin/RoleChip.tsx(4,61): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/admin/RolesView.tsx(31,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/admin/RolesView.tsx(136,67): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/components/admin/RolesView.tsx(251,44): error TS7006: Parameter 'open' implicitly has an 'any' type.
+../cms/src/components/admin/RolesView.tsx(267,44): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/components/admin/RolesView.tsx(282,44): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/components/admin/RolesView.tsx(294,55): error TS7006: Parameter 'checked' implicitly has an 'any' type.
+../cms/src/components/admin/UsersView.tsx(37,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/admin/UsersView.tsx(289,41): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/components/admin/UsersView.tsx(302,36): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/components/admin/UsersView.tsx(349,63): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/components/admin/UsersView.tsx(362,63): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/components/admin/UsersView.tsx(500,48): error TS7006: Parameter 'open' implicitly has an 'any' type.
+../cms/src/components/admin/UsersView.tsx(529,48): error TS7006: Parameter 'open' implicitly has an 'any' type.
+../cms/src/components/admin/UsersView.tsx(667,44): error TS7006: Parameter 'open' implicitly has an 'any' type.
+../cms/src/components/admin/UsersView.tsx(693,44): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/components/admin/UsersView.tsx(707,44): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/components/app/Scaffold.tsx(2,96): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/app/Scaffold.tsx(6,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/ArrayContainer.tsx(29,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/ClearFilterSortButton.tsx(1,52): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/common/default_entity_actions.tsx(2,52): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/DefaultAppBar.tsx(5,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/DefaultAppBar.tsx(19,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/DefaultDrawer.tsx(9,42): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/DefaultDrawer.tsx(160,75): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/DeleteEntityDialog.tsx(4,93): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/DeleteEntityDialog.tsx(154,28): error TS7006: Parameter 'open' implicitly has an 'any' type.
+../cms/src/components/DrawerNavigationGroup.tsx(3,49): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/DrawerNavigationItem.tsx(4,30): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/column_utils.tsx(5,36): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/EntityCollectionRowActions.tsx(6,99): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/EntityCollectionRowActions.tsx(159,47): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/components/EntityCollectionTable/EntityCollectionTable.tsx(5,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/EntityCollectionTable.tsx(7,56): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/EntityCollectionTable.tsx(17,21): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/EntityCollectionTableProps.tsx(7,36): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/fields/TableMultipleRelationField.tsx(6,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/fields/TableReferenceField.tsx(12,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/fields/TableRelationField.tsx(12,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/fields/TableStorageUpload.tsx(9,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/fields/TableStorageUpload.tsx(13,55): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/fields/VirtualTableDateField.tsx(2,53): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/fields/VirtualTableDateField.tsx(30,24): error TS7006: Parameter 'dateValue' implicitly has an 'any' type.
+../cms/src/components/EntityCollectionTable/fields/VirtualTableInput.tsx(3,73): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/fields/VirtualTableInput.tsx(75,24): error TS7006: Parameter 'evt' implicitly has an 'any' type.
+../cms/src/components/EntityCollectionTable/fields/VirtualTableNumberInput.tsx(2,60): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/fields/VirtualTableSelect.tsx(4,66): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/fields/VirtualTableSwitch.tsx(2,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/internal/CollectionTableToolbar.tsx(10,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/internal/CollectionTableToolbar.tsx(11,30): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/internal/EntityTableCell.tsx(5,50): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/internal/EntityTableCell.tsx(6,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/internal/EntityTableCellActions.tsx(1,39): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/internal/popup_field/PopupFormField.tsx(16,74): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionTable/internal/popup_field/PopupFormField.tsx(396,35): error TS7006: Parameter 'event' implicitly has an 'any' type.
+../cms/src/components/EntityCollectionView/Board.tsx(16,21): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionView/board_types.ts(2,47): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionView/BoardColumn.tsx(7,93): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionView/BoardColumnTitle.tsx(1,74): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionView/BoardSortableList.tsx(5,39): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionView/EntityBoardCard.tsx(8,51): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionView/EntityCard.tsx(14,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionView/EntityCollectionBoardView.tsx(21,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionView/EntityCollectionCardView.tsx(9,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionView/EntityCollectionListView.tsx(16,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionView/EntityCollectionView.tsx(52,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionView/EntityCollectionView.tsx(70,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionView/EntityCollectionViewActions.tsx(14,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionView/EntityCollectionViewActions.tsx(15,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionView/EntityCollectionViewStartActions.tsx(6,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionView/EntityCollectionViewStartActions.tsx(9,73): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionView/FiltersDialog.tsx(14,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionView/FiltersDialog.tsx(19,43): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionView/SplitListView.tsx(8,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionView/SplitListView.tsx(13,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionView/ViewModeToggle.tsx(15,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityCollectionView/ViewModeToggle.tsx(165,45): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/components/EntityCollectionView/ViewModeToggle.tsx(166,43): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/components/EntityCollectionView/ViewModeToggle.tsx(188,45): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/components/EntityCollectionView/ViewModeToggle.tsx(189,43): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/components/EntityEditView.tsx(9,40): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityEditView.tsx(10,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityEditView.tsx(18,106): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityEditView.tsx(441,37): error TS7006: Parameter 'value' implicitly has an 'any' type.
+../cms/src/components/EntityEditViewFormActions.tsx(21,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityEditViewFormActions.tsx(308,23): error TS7006: Parameter 'event' implicitly has an 'any' type.
+../cms/src/components/EntityPreview.tsx(9,101): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityPreview.tsx(184,39): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/components/EntitySidePanel.tsx(6,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntitySidePanel.tsx(9,55): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/EntityView.tsx(6,80): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/field_configs.tsx(40,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/FieldCaption.tsx(2,28): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/history/EntityHistoryEntry.tsx(12,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/history/EntityHistoryView.tsx(11,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/history/EntityHistoryView.tsx(15,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/history/UserChip.tsx(2,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/HomePage/ContentHomePage.tsx(4,38): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/HomePage/ContentHomePage.tsx(7,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/HomePage/FavouritesView.tsx(4,42): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/HomePage/HomePageDnD.tsx(33,21): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/HomePage/NavigationCard.tsx(1,68): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/HomePage/NavigationCardBinding.tsx(4,60): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/HomePage/NavigationCardBinding.tsx(53,27): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/components/HomePage/NavigationGroup.tsx(2,72): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/HomePage/NavigationGroup.tsx(51,31): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/components/HomePage/NavigationGroup.tsx(91,40): error TS7006: Parameter 'open' implicitly has an 'any' type.
+../cms/src/components/HomePage/RenameGroupDialog.tsx(2,86): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/HomePage/SmallNavigationCard.tsx(1,83): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/PropertyCollectionView.tsx(4,48): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/PropertyIdCopyTooltip.tsx(1,66): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/RebaseAuthGate.tsx(6,40): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/RebaseNavigation.tsx(13,40): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/RebaseRouteDefs.tsx(11,40): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/ReferenceTable/EntitySelectionTable.tsx(18,60): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/ReferenceWidget.tsx(9,29): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/RelationSelector.tsx(21,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/RelationSelector.tsx(435,67): error TS7006: Parameter 'event' implicitly has an 'any' type.
+../cms/src/components/SearchIconsView.tsx(3,88): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/SearchIconsView.tsx(38,44): error TS18046: 'e.item' is of type 'unknown'.
+../cms/src/components/SelectableTable/filters/BooleanFilterField.tsx(2,43): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/SelectableTable/filters/BooleanFilterField.tsx(3,40): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/SelectableTable/filters/DateTimeFilterField.tsx(2,43): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/SelectableTable/filters/DateTimeFilterField.tsx(3,51): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/SelectableTable/filters/DateTimeFilterField.tsx(93,37): error TS7006: Parameter 'value' implicitly has an 'any' type.
+../cms/src/components/SelectableTable/filters/DateTimeFilterField.tsx(96,35): error TS7006: Parameter 'op' implicitly has an 'any' type.
+../cms/src/components/SelectableTable/filters/ReferenceFilterField.tsx(4,43): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/SelectableTable/filters/ReferenceFilterField.tsx(7,61): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/SelectableTable/filters/ReferenceFilterField.tsx(157,37): error TS7006: Parameter 'value' implicitly has an 'any' type.
+../cms/src/components/SelectableTable/filters/ReferenceFilterField.tsx(160,35): error TS7006: Parameter 'op' implicitly has an 'any' type.
+../cms/src/components/SelectableTable/filters/ReferenceFilterField.tsx(160,42): error TS7053: Element implicitly has an 'any' type because expression of type 'VirtualTableWhereFilterOp' can't be used to index type '{ "==": string; "!=": string; ">": string; "<": string; ">=": string; "<=": string; in: string; "not-in": string; "array-contains": string; "array-contains-any": string; }'.
+../cms/src/components/SelectableTable/filters/ReferenceFilterField.tsx(195,43): error TS7006: Parameter 'checked' implicitly has an 'any' type.
+../cms/src/components/SelectableTable/filters/RelationFilterField.tsx(2,43): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/SelectableTable/filters/RelationFilterField.tsx(4,53): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/SelectableTable/filters/RelationFilterField.tsx(98,37): error TS7006: Parameter 'newOp' implicitly has an 'any' type.
+../cms/src/components/SelectableTable/filters/RelationFilterField.tsx(101,35): error TS7006: Parameter 'op' implicitly has an 'any' type.
+../cms/src/components/SelectableTable/filters/RelationFilterField.tsx(101,42): error TS7053: Element implicitly has an 'any' type because expression of type 'VirtualTableWhereFilterOp' can't be used to index type '{ "==": string; "!=": string; ">": string; "<": string; ">=": string; "<=": string; in: string; "not-in": string; "array-contains": string; "array-contains-any": string; }'.
+../cms/src/components/SelectableTable/filters/StringNumberFilterField.tsx(3,43): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/SelectableTable/filters/StringNumberFilterField.tsx(12,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/SelectableTable/filters/StringNumberFilterField.tsx(120,37): error TS7006: Parameter 'value' implicitly has an 'any' type.
+../cms/src/components/SelectableTable/filters/StringNumberFilterField.tsx(123,35): error TS7006: Parameter 'op' implicitly has an 'any' type.
+../cms/src/components/SelectableTable/filters/StringNumberFilterField.tsx(140,32): error TS7006: Parameter 'evt' implicitly has an 'any' type.
+../cms/src/components/SelectableTable/filters/StringNumberFilterField.tsx(147,35): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/components/SelectableTable/filters/StringNumberFilterField.tsx(159,41): error TS7006: Parameter 'value' implicitly has an 'any' type.
+../cms/src/components/SelectableTable/filters/StringNumberFilterField.tsx(164,39): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/components/SelectableTable/filters/StringNumberFilterField.tsx(167,39): error TS7006: Parameter 'enumKey' implicitly has an 'any' type.
+../cms/src/components/SelectableTable/filters/StringNumberFilterField.tsx(197,41): error TS7006: Parameter 'value' implicitly has an 'any' type.
+../cms/src/components/SelectableTable/filters/StringNumberFilterField.tsx(198,83): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/components/SelectableTable/filters/StringNumberFilterField.tsx(203,39): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/components/SelectableTable/SelectableTable.tsx(4,70): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/SelectableTable/SelectableTable.tsx(7,38): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/SelectableTable/SelectableTable.tsx(12,35): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/SideDialogs.tsx(5,23): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/SideDialogs.tsx(7,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/components/SideDialogs.tsx(155,32): error TS7006: Parameter 'open' implicitly has an 'any' type.
+../cms/src/components/UserSelector.tsx(20,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/data_export/export/BasicExportAction.tsx(15,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/data_export/export/export.ts(2,10): error TS2724: '"@rebasepro/utils"' has no exported member named 'ArrayValuesCount'. Did you mean 'getArrayValuesCount'?
+../cms/src/data_export/export/ExportCollectionAction.tsx(24,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/data_import/components/DataNewPropertiesMapping.tsx(17,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/data_import/components/DataNewPropertiesMapping.tsx(183,24): error TS7006: Parameter 'event' implicitly has an 'any' type.
+../cms/src/data_import/components/DataNewPropertiesMapping.tsx(188,27): error TS7006: Parameter 'value' implicitly has an 'any' type.
+../cms/src/data_import/components/DataNewPropertiesMapping.tsx(211,24): error TS7006: Parameter 'event' implicitly has an 'any' type.
+../cms/src/data_import/components/DataNewPropertiesMapping.tsx(217,24): error TS7006: Parameter 'event' implicitly has an 'any' type.
+../cms/src/data_import/components/ImportFileUpload.tsx(1,40): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/data_import/components/ImportNewPropertyFieldPreview.tsx(8,65): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/data_import/components/ImportNewPropertyFieldPreview.tsx(45,40): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/data_import/components/ImportSaveInProgress.tsx(4,69): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/data_import/import/ImportCollectionAction.tsx(30,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/editor/components/image-bubble.tsx(5,64): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/editor/components/SlashCommandMenu.tsx(21,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/editor/components/table-bubble.tsx(4,62): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/editor/editor.tsx(4,87): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/editor/extensions/Image.ts(1,41): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/editor/nodeViews/ImageComponent.tsx(3,41): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/editor/selectors/link-selector.tsx(2,78): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/editor/selectors/node-selector.tsx(19,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/editor/selectors/text-buttons.tsx(12,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/components/FieldHelperText.tsx(2,59): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/components/FormEntry.tsx(2,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/components/FormLayout.tsx(2,21): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/components/LabelWithIcon.tsx(2,21): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/components/LocalChangesMenu.tsx(18,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/components/StorageItemPreview.tsx(7,83): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/components/StorageItemPreview.tsx(8,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/components/StorageItemPreview.tsx(50,39): error TS7006: Parameter 'event' implicitly has an 'any' type.
+../cms/src/form/components/StorageUploadProgress.tsx(6,43): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/EntityForm.tsx(9,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/EntityForm.tsx(14,99): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/EntityForm.tsx(32,38): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/EntityFormActions.tsx(16,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/field_bindings/ArrayCustomShapedFieldBinding.tsx(7,45): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/field_bindings/ArrayOfReferencesFieldBinding.tsx(14,90): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/field_bindings/BlockFieldBinding.tsx(13,82): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/field_bindings/BlockFieldBinding.tsx(247,49): error TS7006: Parameter 'value' implicitly has an 'any' type.
+../cms/src/form/field_bindings/DateTimeFieldBinding.tsx(10,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/field_bindings/DateTimeFieldBinding.tsx(50,32): error TS7006: Parameter 'dateValue' implicitly has an 'any' type.
+../cms/src/form/field_bindings/KeyValueFieldBinding.tsx(23,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/field_bindings/KeyValueFieldBinding.tsx(221,23): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/form/field_bindings/KeyValueFieldBinding.tsx(275,28): error TS7006: Parameter 'event' implicitly has an 'any' type.
+../cms/src/form/field_bindings/KeyValueFieldBinding.tsx(306,28): error TS7006: Parameter 'date' implicitly has an 'any' type.
+../cms/src/form/field_bindings/KeyValueFieldBinding.tsx(317,33): error TS7006: Parameter 'newValue' implicitly has an 'any' type.
+../cms/src/form/field_bindings/KeyValueFieldBinding.tsx(393,32): error TS7006: Parameter 'event' implicitly has an 'any' type.
+../cms/src/form/field_bindings/KeyValueFieldBinding.tsx(461,28): error TS7006: Parameter 'event' implicitly has an 'any' type.
+../cms/src/form/field_bindings/KeyValueFieldBinding.tsx(479,28): error TS7006: Parameter 'date' implicitly has an 'any' type.
+../cms/src/form/field_bindings/KeyValueFieldBinding.tsx(486,33): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/form/field_bindings/MapFieldBinding.tsx(8,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/field_bindings/MapFieldBinding.tsx(13,70): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/field_bindings/MapFieldBinding.tsx(108,36): error TS7006: Parameter 'expanded' implicitly has an 'any' type.
+../cms/src/form/field_bindings/MapFieldBinding.tsx(157,27): error TS7006: Parameter 'key' implicitly has an 'any' type.
+../cms/src/form/field_bindings/MarkdownEditorFieldBinding.tsx(7,123): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/field_bindings/MarkdownEditorFieldBinding.tsx(139,35): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/form/field_bindings/MultipleRelationFieldBinding.tsx(12,90): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/field_bindings/MultiSelectFieldBinding.tsx(10,57): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/field_bindings/ReadOnlyFieldBinding.tsx(9,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/field_bindings/ReadOnlyFieldBinding.tsx(11,33): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/field_bindings/ReferenceAsStringFieldBinding.tsx(15,21): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/field_bindings/ReferenceFieldBinding.tsx(17,21): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/field_bindings/RelationFieldBinding.tsx(13,21): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/field_bindings/RepeatFieldBinding.tsx(7,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/field_bindings/RepeatFieldBinding.tsx(11,45): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/field_bindings/SelectFieldBinding.tsx(9,64): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/field_bindings/StorageUploadFieldBinding.tsx(39,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/field_bindings/SwitchFieldBinding.tsx(8,40): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/field_bindings/SwitchFieldBinding.tsx(44,37): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../cms/src/form/field_bindings/TextFieldBinding.tsx(5,132): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/PropertyFieldBinding.tsx(14,28): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/form/PropertyFieldBinding.tsx(16,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/preview/components/ArrayEnumPreview.tsx(6,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/preview/components/BooleanPreview.tsx(3,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/preview/components/EnumValuesChip.tsx(2,22): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/preview/components/ImagePreview.tsx(1,161): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/preview/components/ImagePreview.tsx(113,35): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../cms/src/preview/components/ReferencePreview.tsx(7,26): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/preview/components/ReferencePreview.tsx(8,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/preview/components/RelationPreview.tsx(7,26): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/preview/components/UrlComponentPreview.tsx(6,74): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/preview/components/UserPreview.tsx(7,28): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/preview/property_previews/ArrayOfMapsPreview.tsx(3,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/preview/property_previews/ArrayOfStorageComponentsPreview.tsx(7,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/preview/property_previews/ArrayOfStringsPreview.tsx(5,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/preview/property_previews/ArrayOneOfPreview.tsx(6,41): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/preview/property_previews/ArrayOneOfPreview.tsx(7,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/preview/property_previews/ArrayPropertyPreview.tsx(7,41): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/preview/property_previews/ArrayPropertyPreview.tsx(8,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/preview/property_previews/MapPropertyPreview.tsx(6,53): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/preview/property_previews/MapPropertyPreview.tsx(7,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/preview/property_previews/SkeletonPropertyComponent.tsx(5,26): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/preview/property_previews/StringPropertyPreview.tsx(8,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/preview/property_previews/StringPropertyPreview.tsx(9,50): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/preview/PropertyPreview.tsx(12,26): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/routes/RebaseRoute.tsx(9,40): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/util/property_utils.tsx(22,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../cms/src/util/resolutions.ts(5,29): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../core/src/components/AIIcon.tsx(2,33): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../core/src/components/ConfirmationDialog.tsx(3,90): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../core/src/components/ConfirmationDialog.tsx(25,28): error TS7006: Parameter 'open' implicitly has an 'any' type.
+../core/src/components/Debug/UIReferenceView.tsx(62,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../core/src/components/Debug/UIStyleGuide.tsx(11,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../core/src/components/ErrorTooltip.tsx(2,39): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../core/src/components/ErrorView.tsx(3,49): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../core/src/components/LanguageToggle.tsx(2,82): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../core/src/components/LoginView/LoginView.tsx(13,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../core/src/components/LoginView/LoginView.tsx(492,36): error TS7006: Parameter 'event' implicitly has an 'any' type.
+../core/src/components/LoginView/LoginView.tsx(507,32): error TS7006: Parameter 'event' implicitly has an 'any' type.
+../core/src/components/LoginView/LoginView.tsx(521,32): error TS7006: Parameter 'event' implicitly has an 'any' type.
+../core/src/components/LoginView/LoginView.tsx(711,32): error TS7006: Parameter 'event' implicitly has an 'any' type.
+../core/src/components/NotFoundPage.tsx(3,36): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../core/src/components/UnsavedChangesDialog.tsx(2,87): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../core/src/components/UserDisplay.tsx(1,60): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../core/src/components/UserSelectPopover.tsx(12,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../core/src/components/UserSettingsView.tsx(12,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../core/src/components/UserSettingsView.tsx(136,53): error TS7006: Parameter 'v' implicitly has an 'any' type.
+../core/src/components/UserSettingsView.tsx(151,36): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../core/src/components/UserSettingsView.tsx(156,36): error TS7006: Parameter 'e' implicitly has an 'any' type.
+../core/src/core/Rebase.tsx(6,42): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../core/src/hooks/useSlot.tsx(5,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../core/src/util/enums.ts(2,69): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../core/src/util/icon_list.ts(2,26): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../core/src/util/icon_list.ts(7,11): error TS7006: Parameter 'importName' implicitly has an 'any' type.
+../core/src/util/icons.tsx(2,57): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+../core/src/util/icons.tsx(83,91): error TS7006: Parameter 'key' implicitly has an 'any' type.
