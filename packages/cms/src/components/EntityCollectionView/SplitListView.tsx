@@ -37,6 +37,10 @@ export type SplitListViewProps<M extends Record<string, unknown> = Record<string
      */
     selectedEntityId?: string | number;
     /**
+     * Toolbar to render above the list in the left panel.
+     */
+    toolbar?: React.ReactNode;
+    /**
      * The collection view to render on the left side (always the list view).
      */
     children: React.ReactNode;
@@ -91,6 +95,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
     path,
     parentCollectionIds,
     selectedEntityId,
+    toolbar,
     children
 }: SplitListViewProps<M>) {
     const largeLayout = useLargeLayout();
@@ -252,6 +257,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
                     )}
                     style={{ transitionDuration: `${TRANSITION_DURATION}ms` }}
                 >
+                    {toolbar}
                     {children}
                 </div>
 
@@ -303,6 +309,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
                     minWidth: isDetailVisible && animationPhase !== "entering" ? 240 : undefined,
                 }}
             >
+                {toolbar}
                 {children}
             </div>
 

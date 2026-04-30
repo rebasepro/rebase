@@ -49,14 +49,14 @@ export async function saveEntityWithCallbacks<M extends Record<string, any>>({
 }
 ): Promise<Entity<M>> {
 
-    if (status !== "new" && !entityId) {
+    if (status !== "new" && status !== "copy" && !entityId) {
         throw new Error("Entity id must be specified when updating an existing entity");
     }
 
     const accessor = data.collection(path);
 
     let savePromise: Promise<Entity<M>>;
-    if (status === "new") {
+    if (status === "new" || status === "copy") {
         savePromise = accessor.create(values, entityId);
     } else {
         savePromise = accessor.update(entityId!, values);

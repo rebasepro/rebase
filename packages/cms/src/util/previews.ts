@@ -22,7 +22,7 @@ export function getEntityPreviewKeys(
             .filter(key => {
                 const prop = targetCollection.properties[key];
                 const isIdProp = prop && typeof prop === "object" && "isId" in prop && Boolean((prop as unknown as { isId?: boolean }).isId);
-                return !isIdProp && key !== "id";
+                return !isIdProp;
             })
             .filter(key => {
                 const property = targetCollection.properties[key];

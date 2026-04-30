@@ -627,7 +627,7 @@ export const EntityCollectionView = React.memo(
         const largeLayout = useLargeLayout();
 
         const isSplitLayout = (collection.detailLayout ?? "split") === "split";
-        const isCompact = isSplitLayout && viewMode === "list" && selectedEntityIdProp !== undefined;
+        const isCompact = isSplitLayout && selectedEntityIdProp !== undefined;
         const activeSelectionEnabled = !isCompact && selectionEnabled;
 
         const getActionsForEntity = ({
@@ -954,12 +954,11 @@ export const EntityCollectionView = React.memo(
                 ref={containerRef}>
 
                 {countFetcher}
-                {toolbarNode}
 
-                {/* List + split layout: always render SplitListView so the
-                    enter/exit animation plays when selectedEntityId changes.
-                    For other view modes: render innerView directly. */}
-                {isSplitLayout && viewMode === "list" ? (
+                {/* Split layout: SplitListView is always mounted in list mode (for
+                    animation continuity) and also shown when any entity is selected
+                    (from cards, table, or kanban — always shows list on left). */}
+                {(isSplitLayout && viewMode === "list") || isCompact ? (
                     <SplitListView
                         key={`split-list-view-${path}`}
                         collection={collection}
@@ -976,6 +975,7 @@ export const EntityCollectionView = React.memo(
                         path={path}
                         parentCollectionIds={parentCollectionIds}
                         selectedEntityId={selectedEntityIdProp}
+                        toolbar={toolbarNode}
                     >
                         <EntityCollectionListView
                             key={`list-view-${path}`}
@@ -993,7 +993,10 @@ export const EntityCollectionView = React.memo(
                         />
                     </SplitListView>
                 ) : (
-                    innerView
+                    <>
+                        {toolbarNode}
+                        {innerView}
+                    </>
                 )}
 
                 {popupCell && <PopupFormField
