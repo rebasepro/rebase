@@ -6,6 +6,7 @@ describe("strings utils", () => {
             expect(toKebabCase("helloWorld")).toBe("hello-world");
             expect(toKebabCase("Hello_World")).toBe("hello-world");
             expect(toKebabCase("fooBarBaz")).toBe("foo-bar-baz");
+            expect(toKebabCase("XMLParser")).toBe("xml-parser");
             expect(toKebabCase("")).toBe("");
         });
     });
@@ -15,6 +16,7 @@ describe("strings utils", () => {
             expect(toSnakeCase("helloWorld")).toBe("hello_world");
             expect(toSnakeCase("Hello-World")).toBe("hello_world");
             expect(toSnakeCase("fooBarBaz")).toBe("foo_bar_baz");
+            expect(toSnakeCase("XMLParser")).toBe("xml_parser");
             expect(toSnakeCase("")).toBe("");
         });
     });

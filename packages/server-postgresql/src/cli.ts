@@ -64,6 +64,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         console.log(chalk.gray("  Step 2/2: Generating SQL migration files..."));
         console.log("");
         await runDrizzleKit("generate", rawArgs);
+        await fixMigrationStatementOrder();
         console.log("");
         console.log(`  You can now run ${chalk.bold.green("rebase db migrate")} to apply the migrations to your database.`);
         console.log("");
@@ -277,6 +278,101 @@ function timeAgo(date: Date): string {
     return `${days}d ago`;
 }
 
+/**
+ * Post-process generated migration files to fix statement ordering issues.
+ *
+ * Drizzle-kit can emit DROP POLICY statements *after* ALTER TABLE ... ALTER COLUMN
+ * for the same table. Postgres rejects this with:
+ *   "cannot alter type of a column used in a policy definition"
+ *
+ * This scans the drizzle output directory for the most recently modified .sql file
+ * and reorders statements so that DROP POLICY on a table always precedes any
+ * ALTER TABLE on that same table.
+ */
+async function fixMigrationStatementOrder(): Promise<void> {
+    const drizzleDir = path.join(process.cwd(), "drizzle");
+    if (!fs.existsSync(drizzleDir)) return;
+
+    // Find the most recently modified .sql file
+    const sqlFiles = fs.readdirSync(drizzleDir)
+        .filter(f => f.endsWith(".sql"))
+        .map(f => ({
+            name: f,
+            mtime: fs.statSync(path.join(drizzleDir, f)).mtimeMs,
+        }))
+        .sort((a, b) => b.mtime - a.mtime);
+
+    if (sqlFiles.length === 0) return;
+
+    const latestFile = path.join(drizzleDir, sqlFiles[0].name);
+    const content = fs.readFileSync(latestFile, "utf-8");
+    const DELIMITER = "--> statement-breakpoint";
+    const parts = content.split(DELIMITER);
+
+    // Parse each statement to detect DROP POLICY and ALTER TABLE targets
+    const dropPolicyRe = /DROP\s+POLICY\s+.+?\s+ON\s+"([^"]+)"/i;
+    const alterTableRe = /ALTER\s+TABLE\s+"([^"]+)"\s+ALTER\s+COLUMN/i;
+
+    // Collect indices of DROP POLICY statements and what tables they target
+    const dropPolicyIndices = new Map<string, number[]>(); // table -> indices
+    const alterColumnIndices = new Map<string, number>(); // table -> first ALTER index
+
+    for (let i = 0; i < parts.length; i++) {
+        const stmt = parts[i].trim();
+        const dropMatch = stmt.match(dropPolicyRe);
+        if (dropMatch) {
+            const table = dropMatch[1];
+            if (!dropPolicyIndices.has(table)) dropPolicyIndices.set(table, []);
+            dropPolicyIndices.get(table)!.push(i);
+        }
+        const alterMatch = stmt.match(alterTableRe);
+        if (alterMatch) {
+            const table = alterMatch[1];
+            if (!alterColumnIndices.has(table)) alterColumnIndices.set(table, i);
+        }
+    }
+
+    // Check if any DROP POLICY comes after an ALTER COLUMN on the same table
+    let needsReorder = false;
+    for (const [table, dropIndices] of dropPolicyIndices) {
+        const firstAlter = alterColumnIndices.get(table);
+        if (firstAlter !== undefined) {
+            for (const dropIdx of dropIndices) {
+                if (dropIdx > firstAlter) {
+                    needsReorder = true;
+                    break;
+                }
+            }
+        }
+        if (needsReorder) break;
+    }
+
+    if (!needsReorder) return;
+
+    // Reorder: move DROP POLICY statements for affected tables before their ALTER TABLE
+    // Strategy: stable sort — DROP POLICY on table X gets priority over ALTER on table X
+    const stmtEntries = parts.map((stmt, idx) => ({ stmt, idx }));
+
+    stmtEntries.sort((a, b) => {
+        const aDropMatch = a.stmt.trim().match(dropPolicyRe);
+        const bAlterMatch = b.stmt.trim().match(alterTableRe);
+        const bDropMatch = b.stmt.trim().match(dropPolicyRe);
+        const aAlterMatch = a.stmt.trim().match(alterTableRe);
+
+        // If a is DROP POLICY on table X and b is ALTER on table X, a goes first
+        if (aDropMatch && bAlterMatch && aDropMatch[1] === bAlterMatch[1]) return -1;
+        // If b is DROP POLICY on table X and a is ALTER on table X, b goes first
+        if (bDropMatch && aAlterMatch && bDropMatch[1] === aAlterMatch[1]) return 1;
+        // Otherwise preserve original order
+        return a.idx - b.idx;
+    });
+
+    const reordered = stmtEntries.map(e => e.stmt).join(DELIMITER);
+    fs.writeFileSync(latestFile, reordered, "utf-8");
+
+    console.log(chalk.yellow(`  ⚠ Reordered migration statements in ${sqlFiles[0].name} (DROP POLICY before ALTER COLUMN)`));
+}
+
 async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> {
     const drizzleKitBin = resolveLocalBin("drizzle-kit");
     if (!drizzleKitBin) {
@@ -285,26 +381,89 @@ async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> 
         process.exit(1);
     }
 
+    // Ensure env vars (especially DATABASE_URL) are loaded before spawning.
+    // The parent CLI sets DOTENV_CONFIG_PATH to the resolved .env path,
+    // but drizzle.config.ts's `import "dotenv/config"` only reads from cwd
+    // which may not contain the .env file (e.g. backend/ vs project root).
+    const env = { ...process.env as Record<string, string> };
+    if (process.env.DOTENV_CONFIG_PATH) {
+        try {
+            const dotenv = await import("dotenv");
+            const parsed = dotenv.config({ path: process.env.DOTENV_CONFIG_PATH });
+            if (parsed.parsed) {
+                Object.assign(env, parsed.parsed);
+            }
+        } catch {
+            // dotenv may not be available — fall through
+        }
+    }
+
+    // Interactive actions (generate, push) need stdin for user prompts.
+    // Non-interactive actions (migrate, pull, studio) can capture output
+    // so we can parse and surface actual database errors instead of
+    // drizzle-kit's useless "exit code 1" behind a spinner.
+    const interactive = ["generate", "push"].includes(action);
+
     try {
-        const result = await execa(drizzleKitBin, [action], {
-            cwd: process.cwd(),
-            env: { ...process.env as Record<string, string>, CI: "true" },
-            reject: false,
-        });
+        if (interactive) {
+            await execa(drizzleKitBin, [action], {
+                cwd: process.cwd(),
+                stdio: "inherit",
+                env,
+            });
+        } else {
+            const result = await execa(drizzleKitBin, [action], {
+                cwd: process.cwd(),
+                stdio: "pipe",
+                env,
+                reject: false,
+            });
 
-        if (result.stdout) {
-            console.log(result.stdout);
-        }
-        if (result.stderr) {
-            console.error(result.stderr);
-        }
+            // Strip ANSI escape codes and spinner frames from output
+            const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").replace(/\[?[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣷⣯⣟⡿⢿⣻⣽]+\]\s*/g, "");
+            const stdout = stripAnsi(result.stdout || "").trim();
+            const stderr = stripAnsi(result.stderr || "").trim();
 
-        if (result.exitCode !== 0 || (result.stderr && result.stderr.includes("Error:"))) {
-            console.error(chalk.red(`✗ drizzle-kit ${action} failed.`));
-            process.exit(1);
+            if (result.exitCode !== 0) {
+                console.error(chalk.red(`\n✗ drizzle-kit ${action} failed.\n`));
+                // Surface the actual error — check both streams
+                const errorOutput = stderr || stdout;
+                if (errorOutput) {
+                    // Extract the most useful error line
+                    const lines = errorOutput.split("\n").filter((l: string) => l.trim());
+                    for (const line of lines) {
+                        if (line.toLowerCase().includes("error") || line.includes("cannot") || line.includes("already exists") || line.includes("does not exist") || line.includes("violates") || line.includes("permission denied")) {
+                            console.error(chalk.red(`  ${line.trim()}`));
+                        } else {
+                            console.error(chalk.gray(`  ${line.trim()}`));
+                        }
+                    }
+                } else {
+                    console.error(chalk.gray("  No error details available from drizzle-kit."));
+                }
+                console.error("");
+                process.exit(1);
+            } else if (stdout) {
+                console.log(stdout);
+            }
         }
     } catch (err: unknown) {
-        console.error(chalk.red(`✗ Failed to run drizzle-kit ${action}: ${err instanceof Error ? err.message : String(err)}`));
+        const msg = err instanceof Error ? err.message : String(err);
+        // execa includes stdout/stderr in the error for pipe mode
+        const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").replace(/\[?[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣷⣯⣟⡿⢿⣻⣽]+\]\s*/g, "");
+        const cleaned = stripAnsi(msg).trim();
+        console.error(chalk.red(`\n✗ drizzle-kit ${action} failed.\n`));
+        // Try to extract the meaningful Postgres error from the execa message
+        const lines = cleaned.split("\n").filter((l: string) => l.trim());
+        for (const line of lines) {
+            if (line.toLowerCase().includes("error") || line.includes("cannot") || line.includes("already exists") || line.includes("does not exist") || line.includes("violates")) {
+                console.error(chalk.red(`  ${line.trim()}`));
+            }
+        }
+        if (lines.length === 0) {
+            console.error(chalk.gray(`  ${cleaned}`));
+        }
+        console.error("");
         process.exit(1);
     }
 }

@@ -56,7 +56,9 @@ function RelationPreviewInternal({
         if (customizationController.components?.missingReference) {
             return <customizationController.components.missingReference path={relation.path} />;
         } else {
-            throw Error(`Couldn't find the corresponding collection view for the path: ${relation.path}`);
+            return <EntityPreviewContainer size={size}>
+                <ErrorView error={`Collection not found: ${relation.path}`} />
+            </EntityPreviewContainer>;
         }
     }
 

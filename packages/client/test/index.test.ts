@@ -127,6 +127,60 @@ describe("createRebaseClient", () => {
             const client = createRebaseClient({ baseUrl: "https://api.example.com" });
             expect((client.data as any).$$typeof).toBeUndefined();
         });
+
+        describe("camelCase to kebab-case proxy mapping", () => {
+            it("maps access paths correctly and returns same cached instance", () => {
+                const client = createRebaseClient({ baseUrl: "https://api.example.com" });
+                
+                // 1. Single word
+                const posts = client.data.posts;
+                const postsColl = client.data.collection("posts");
+                expect(posts).toBe(postsColl);
+
+                // 2. Two-word camelCase
+                const companyMembers = (client.data as any).companyMembers;
+                const companyMembersColl = client.data.collection("company-members");
+                expect(companyMembers).toBe(companyMembersColl);
+
+                // 3. Three-word camelCase
+                const talentApplicationStatus = (client.data as any).talentApplicationStatus;
+                const talentApplicationStatusColl = client.data.collection("talent-application-status");
+                expect(talentApplicationStatus).toBe(talentApplicationStatusColl);
+
+                // 4. Single uppercase letter
+                const xY = (client.data as any).xY;
+                const xYColl = client.data.collection("x-y");
+                expect(xY).toBe(xYColl);
+
+                // 5. Leading lowercase (common)
+                const leadMagnetSignups = (client.data as any).leadMagnetSignups;
+                const leadMagnetSignupsColl = client.data.collection("lead-magnet-signups");
+                expect(leadMagnetSignups).toBe(leadMagnetSignupsColl);
+            });
+
+            it("verifies the actual HTTP path uses kebab-case", async () => {
+                const mockFetch = jest.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => {
+                    return {
+                        ok: true,
+                        status: 200,
+                        json: async () => ({ data: [], meta: { total: 0 } }),
+                        headers: new Headers(),
+                    } as unknown as Response;
+                }) as unknown as typeof globalThis.fetch;
+
+                const client = createRebaseClient({
+                    baseUrl: "http://localhost",
+                    fetch: mockFetch,
+                });
+
+                await (client.data as any).companyMembers.find();
+
+                expect(mockFetch).toHaveBeenCalledTimes(1);
+                const urlArg = (mockFetch.mock.calls[0] as any)[0];
+                expect(urlArg.toString()).toContain("/api/data/company-members");
+                expect(urlArg.toString()).not.toContain("companyMembers");
+            });
+        });
     });
 
     // -----------------------------------------------------------------------

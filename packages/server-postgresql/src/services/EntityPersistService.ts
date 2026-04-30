@@ -2,7 +2,7 @@ import { eq, and } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Entity, EntityCollection, Properties, Relation } from "@rebasepro/types";
-import { getTableName, resolveCollectionRelations } from "@rebasepro/common";
+import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
     getCollectionByPath,
@@ -76,7 +76,7 @@ export class EntityPersistService {
                 for (let i = 2; i < segments.length; i += 2) {
                     const relationKey = segments[i];
                     const resolvedRelations = resolveCollectionRelations(currentCollection as import("@rebasepro/types").PostgresCollection);
-                    const relation = resolvedRelations[relationKey];
+                    const relation = findRelation(resolvedRelations, relationKey);
 
                     if (!relation) {
                         throw new Error(`Relation '${relationKey}' not found in collection '${currentCollection.slug}'`);

@@ -83,6 +83,8 @@ services:
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
       S3_ENDPOINT: ${S3_ENDPOINT:-}
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-}
+      # Service key for scripts & server-to-server admin access
+      REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY:-}
     depends_on:
       db:
         condition: service_healthy

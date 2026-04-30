@@ -130,7 +130,7 @@ export function RepeatFieldBinding({
 
             <FieldHelperText includeDescription={includeDescription}
                 showError={showError}
-                error={error ? (typeof error === "string" ? error : "A property of this array/repeat has an error") : undefined}
+                error={error as any}
                 disabled={disabled}
                 property={property} />
 

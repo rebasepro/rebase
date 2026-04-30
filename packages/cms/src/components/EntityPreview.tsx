@@ -11,7 +11,8 @@ import { PropertyPreview, SkeletonPropertyComponent } from "../preview";
 import {
     useAuthController,
     useCustomizationController,
-    useData
+    useData,
+    ErrorView
 } from "@rebasepro/core";
 import { useAnalyticsController } from "@rebasepro/core";
 import { IconForView } from "@rebasepro/core";
@@ -76,7 +77,11 @@ export function EntityPreviewData({
     const collection = collectionProp ?? collectionRegistryController.getCollection(entity.path);
 
     if (!collection) {
-        throw Error(`Couldn't find the corresponding collection view for the path: ${entity.path}`);
+        return (
+            <>
+                <ErrorView error={`Collection not found: ${entity.path}`} />
+            </>
+        );
     }
 
     const listProperties = useMemo(() => previewKeys ?? getEntityPreviewKeys(authController, collection, customizationController.propertyConfigs, previewKeys, size === "medium" || size === "large" ? 3 : 2),

@@ -1,6 +1,6 @@
 import { EntityCollection, NumberProperty, Property, Relation, RelationProperty, SecurityOperation, SecurityRule, StringProperty } from "@rebasepro/types";
 import { getPrimaryKeys } from "../services/entity-helpers";
-import { getEnumVarName, getTableName, getTableVarName, resolveCollectionRelations } from "@rebasepro/common";
+import { getEnumVarName, getTableName, getTableVarName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
 import { createHash } from "crypto";
 // --- Helper Functions ---
@@ -135,7 +135,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
         case "relation": {
             const refProp = prop as RelationProperty;
             const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
-            const relation = resolvedRelations[refProp.relationName ?? propName];
+            const relation = findRelation(resolvedRelations, refProp.relationName ?? propName);
 
             // Only owning one-to-one/many-to-one relations create a column here.
             if (!relation || relation.direction !== "owning" || relation.cardinality !== "one") {
@@ -646,6 +646,11 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
             }
         } else {
             const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
+            // Defensive safety net: track emitted `drizzleRelationName` values
+            // to prevent duplicate one()/many() entries in the generated schema.
+            // The root deduplication happens inside resolveCollectionRelations,
+            // but this guards against any future regressions in that utility.
+            const emittedRelationNames = new Set<string>();
             for (const [relationKey, rel] of Object.entries(resolvedRelations)) {
                 try {
                     const target = rel.target();
@@ -660,6 +665,13 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
                     //   - owning side:  {thisTable}_{localKey}
                     //   - inverse side: {targetTable}_{foreignKeyOnTarget}
                     const drizzleRelationName = computeSharedRelationName(rel, collection, collections);
+
+                    // Skip if we've already emitted a relation with this drizzleRelationName
+                    // for this table — prevents duplicate definitions when
+                    // resolveCollectionRelations returns alias entries for the same FK.
+                    const deduplicationKey = `${drizzleRelationName}::${rel.direction}`;
+                    if (emittedRelationNames.has(deduplicationKey)) continue;
+                    emittedRelationNames.add(deduplicationKey);
 
                     if (rel.cardinality === "one") {
                         if (rel.direction === "owning" && rel.localKey) {

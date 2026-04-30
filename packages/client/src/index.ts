@@ -20,6 +20,7 @@ export interface CreateRebaseClientOptions extends RebaseClientConfig {
 
 import { RebaseWebSocketClient } from "./websocket";
 import { RebaseClient as BaseRebaseClient, RebaseData, CollectionAccessor, StorageSource } from "@rebasepro/types";
+import { toKebabCase } from "@rebasepro/utils";
 
 export type RebaseClient<DB = Record<string, unknown>> = BaseRebaseClient<DB> & {
     setToken: (token: string | null) => void;
@@ -120,7 +121,10 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             }
             if (typeof prop === "symbol") return undefined;
             if (typeof prop === "string" && prop !== "then" && prop !== "toJSON" && prop !== "$$typeof") {
-                return collection(prop);
+                // Convert camelCase property names to kebab-case slugs.
+                // e.g. `companyMembers` → `company-members`
+                const slug = toKebabCase(prop);
+                return collection(slug);
             }
             return undefined;
         }

@@ -10,6 +10,7 @@ import {
     WhereFilterOp,
     WhereFieldValue
 } from "@rebasepro/types";
+import { toKebabCase } from "@rebasepro/utils";
 
 /**
  * Convert where-clause filter object to the internal DataDriver FilterValues format.
@@ -269,7 +270,10 @@ export function buildRebaseData(driver: DataDriver): RebaseData {
             if (typeof prop === "symbol") return undefined;
             // Ignore internal JS properties
             if (prop === "then" || prop === "toJSON" || prop === "$$typeof") return undefined;
-            return getAccessor(prop);
+            
+            // Convert camelCase property names to kebab-case slugs
+            const slug = toKebabCase(prop);
+            return getAccessor(slug);
         }
     });
 }

@@ -66,6 +66,7 @@ async function startServer() {
             jwtSecret,
             accessExpiresIn: env.JWT_ACCESS_EXPIRES_IN,
             refreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN,
+            serviceKey: env.REBASE_SERVICE_KEY,
             google: env.GOOGLE_CLIENT_ID
                 ? { clientId: env.GOOGLE_CLIENT_ID }
                 : undefined,

@@ -13,7 +13,7 @@ import {
 } from "@rebasepro/types";
 import { deepEqual } from "fast-equals";
 
-import { enumToObjectEntries, getSubcollections, getTableName, resolveCollectionRelations } from "../util";
+import { enumToObjectEntries, getSubcollections, getTableName, resolveCollectionRelations, findRelation } from "../util";
 import cloneDeep from "lodash/cloneDeep.js";
 import { removeFunctions, mergeDeep } from "@rebasepro/utils";
 
@@ -265,7 +265,7 @@ export class CollectionRegistry {
                 throw new Error(`Relation path navigation requires a PostgreSQL collection, but '${currentCollection.slug}' uses driver '${currentCollection.driver}'`);
             }
             const resolvedRelations = resolveCollectionRelations(currentCollection);
-            const relation = resolvedRelations[relationKey];
+            const relation = findRelation(resolvedRelations, relationKey);
 
             if (!relation) {
                 throw new Error(`Relation '${relationKey}' not found in collection '${currentCollection.slug}'`);

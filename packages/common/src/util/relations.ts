@@ -137,30 +137,31 @@ export function resolveCollectionRelations(
 ): Record<string, Relation> {
     const relations: Record<string, Relation> = {};
 
-    // 1. Process explicit relations from the new `relations` field
+    // Track which explicit relationName values have been registered so that
+    // property-based entries in section 2 don't re-add the same underlying relation
+    // under a different key (e.g. explicit "company" + property "company_id").
+    const registeredRelationNames = new Set<string>();
+
+    // 1. Process explicit relations from the `relations` field.
+    //    Each relation is stored once under its canonical relationName key.
     if (collection.relations) {
         collection.relations.forEach((relation) => {
             const normalizedRelation = sanitizeRelation(relation, collection);
             const relationKey = normalizedRelation.relationName;
             if (relationKey) {
                 relations[relationKey] = normalizedRelation;
-                
-                // Add fallback for slug-based lookups
-                const slugKey = relationKey.replace(/_/g, '-');
-                if (slugKey !== relationKey && !relations[slugKey]) {
-                    relations[slugKey] = normalizedRelation;
-                }
-                
-                // Add fallback for snake_case lookups
-                const snakeKey = relationKey.replace(/-/g, '_');
-                if (snakeKey !== relationKey && !relations[snakeKey]) {
-                    relations[snakeKey] = normalizedRelation;
-                }
+                registeredRelationNames.add(relationKey);
             }
         });
     }
 
-    // 2. Process properties of type "relation"
+    // 2. Process properties of type "relation".
+    //    Only adds an entry if:
+    //    (a) the property key itself is not already in the map, AND
+    //    (b) the underlying relation (by relationName) hasn't already been registered.
+    //    This prevents duplicate entries when a property key differs from the
+    //    explicit relation's relationName (e.g. property "company_id" referencing
+    //    explicit relation "company").
     if (collection.properties) {
         Object.entries(collection.properties).forEach(([propKey, prop]) => {
             const relation = resolvePropertyRelation({
@@ -169,26 +170,19 @@ export function resolveCollectionRelations(
                 sourceCollection: collection
             });
             if (relation) {
-                // Use property name as relation key if not already defined
-                if (!relations[propKey]) {
-                    // FIX: Set relationName to propKey if not defined, before normalizing
-                    if (!relation.relationName) {
-                        relation.relationName = propKey;
-                    }
-                    const normalizedRelation = sanitizeRelation(relation, collection);
-                    relations[propKey] = normalizedRelation;
-                    
-                    // Add fallbacks for property-based relations
-                    const slugKey = propKey.replace(/_/g, '-');
-                    if (slugKey !== propKey && !relations[slugKey]) {
-                        relations[slugKey] = normalizedRelation;
-                    }
-                    
-                    const snakeKey = propKey.replace(/-/g, '_');
-                    if (snakeKey !== propKey && !relations[snakeKey]) {
-                        relations[snakeKey] = normalizedRelation;
-                    }
+                // Skip if the property key is already registered
+                if (relations[propKey]) return;
+
+                // Skip if the underlying relation was already registered under
+                // its canonical relationName in section 1
+                if (relation.relationName && registeredRelationNames.has(relation.relationName)) return;
+
+                if (!relation.relationName) {
+                    relation.relationName = propKey;
                 }
+                const normalizedRelation = sanitizeRelation(relation, collection);
+                relations[propKey] = normalizedRelation;
+                registeredRelationNames.add(normalizedRelation.relationName ?? propKey);
             }
         });
     }
@@ -236,4 +230,31 @@ export function getEnumVarName(tableName: string, propName: string): string {
 
 export function getColumnName(fullColumn: string): string {
     return fullColumn.includes(".") ? fullColumn.split(".").pop()! : fullColumn;
+}
+
+/**
+ * Look up a relation by key with forgiving normalization.
+ *
+ * `resolveCollectionRelations` stores each relation under a single canonical
+ * key (no aliases). This helper tries the given key as-is, then falls back to
+ * slug form (underscores → hyphens) and snake_case form (hyphens → underscores)
+ * so that callers that receive a key from external input (URL path segments,
+ * user-provided config, etc.) can still find the right entry.
+ */
+export function findRelation(
+    resolvedRelations: Record<string, Relation>,
+    key: string
+): Relation | undefined {
+    // Exact match first
+    if (resolvedRelations[key]) return resolvedRelations[key];
+
+    // Try slug form (e.g. "company_id" → "company-id")
+    const slugKey = key.replace(/_/g, '-');
+    if (slugKey !== key && resolvedRelations[slugKey]) return resolvedRelations[slugKey];
+
+    // Try snake_case form (e.g. "company-id" → "company_id")
+    const snakeKey = key.replace(/-/g, '_');
+    if (snakeKey !== key && resolvedRelations[snakeKey]) return resolvedRelations[snakeKey];
+
+    return undefined;
 }

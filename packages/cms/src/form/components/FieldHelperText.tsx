@@ -13,14 +13,28 @@ function normalizeError(error: unknown): string | undefined {
         // Find the first non-falsy element and extract its message
         const firstError = error.find((e) => !!e);
         if (!firstError) return undefined;
-        if (typeof firstError === "string") return firstError;
-        if (typeof firstError === "object" && firstError !== null && "message" in firstError) {
-            return String(firstError.message);
-        }
-        return String(firstError);
+        return normalizeError(firstError);
     }
-    if (typeof error === "object" && "message" in error) {
-        return String((error as { message: unknown }).message);
+    if (typeof error === "object") {
+        if ("message" in error) {
+            return String((error as { message: unknown }).message);
+        }
+        
+        // Extract all string values from the object (e.g., nested validation errors)
+        const messages: string[] = [];
+        const extractMessages = (obj: any) => {
+            for (const key in obj) {
+                if (typeof obj[key] === "string") {
+                    messages.push(obj[key]);
+                } else if (typeof obj[key] === "object" && obj[key] !== null) {
+                    extractMessages(obj[key]);
+                }
+            }
+        };
+        extractMessages(error);
+        if (messages.length > 0) {
+            return Array.from(new Set(messages)).join(", ");
+        }
     }
     return String(error);
 }

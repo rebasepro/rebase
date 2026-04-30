@@ -29,6 +29,19 @@ export interface RebaseAuthConfig {
     refreshExpiresIn?: string;
     requireAuth?: boolean;
     allowRegistration?: boolean;
+    /**
+     * A static secret key for server-to-server / script authentication.
+     *
+     * When a request includes `Authorization: Bearer <serviceKey>`, it is
+     * granted admin-level access without JWT verification. This is the
+     * Rebase equivalent of a Firebase Service Account key.
+     *
+     * Generate with: `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`
+     *
+     * Set via `REBASE_SERVICE_KEY` in your `.env`.
+     * Must be at least 32 characters.
+     */
+    serviceKey?: string;
     email?: EmailConfig;
     google?: { clientId: string };
     linkedin?: { clientId: string; clientSecret: string };
@@ -225,6 +238,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     // 2. Initialize Auth & History via the default driver's bootstrapper
     let authConfigResult: BootstrappedAuth | undefined = undefined;
+    let serviceKey: string | undefined;
+
     if (config.auth) {
         // Secure JWT setup proactively within core package memory to eliminate dual-package hazards
         const safeAuthConfig = config.auth;
@@ -234,6 +249,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 accessExpiresIn: safeAuthConfig.accessExpiresIn || "1h",
                 refreshExpiresIn: safeAuthConfig.refreshExpiresIn || "30d"
             });
+        }
+
+        // ── Service Key Validation ───────────────────────────────────────
+        if (safeAuthConfig.serviceKey) {
+            if (safeAuthConfig.serviceKey.length < 32) {
+                throw new Error(
+                    "REBASE_SERVICE_KEY is too short. Must be at least 32 characters. " +
+                    "Generate one with: node -e \"console.log(require('crypto').randomBytes(48).toString('base64'))\""
+                );
+            }
+            serviceKey = safeAuthConfig.serviceKey;
+            logger.info("Service key configured for script/server-to-server authentication");
         }
 
         if (defaultBootstrapper.initializeAuth) {
@@ -389,6 +416,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             authRepo: authConfigResult.authRepository as import("./auth/interfaces").AuthRepository ?? authConfigResult.userService as import("./auth/interfaces").AuthRepository,
             emailService: authConfigResult.emailService as import("./email").EmailService,
             emailConfig: config.auth.email,
+            serviceKey,
         });
         config.app.route(`${basePath}/admin`, adminRoutes);
     }
@@ -441,9 +469,24 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         const dataRouter = new Hono<HonoEnv>();
         dataRouter.onError(errorHandler);
 
+        // Secure by default: require auth when auth is configured.
+        // Developers who intentionally want public data access (relying
+        // entirely on Postgres RLS) must explicitly set `auth.requireAuth: false`.
+        const dataRequireAuth = config.auth?.requireAuth !== false;
+
+        if (!dataRequireAuth) {
+            logger.warn(
+                "Data routes running WITHOUT authentication enforcement. " +
+                "Access control is fully delegated to Postgres RLS policies. " +
+                "If no RLS policies exist, data is publicly accessible. " +
+                "Set auth.requireAuth to true (or remove it) to require authentication."
+            );
+        }
+
         dataRouter.use("/*", createAuthMiddleware({
             driver: defaultDriver,
-            requireAuth: false // true BaaS — delegate completely to Postgres RLS
+            requireAuth: dataRequireAuth,
+            serviceKey
         }));
 
         // Mount history routes BEFORE the REST API subcollection catch-all so
@@ -504,10 +547,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             const functionsRouter = new Hono<HonoEnv>();
             functionsRouter.onError(errorHandler);
 
-            // Apply auth middleware — delegates to RLS, per-route auth is up to the function
+            // Custom functions follow the same auth policy as data routes.
+            // Per-route auth can be further refined inside individual functions.
+            const functionsRequireAuth = config.auth?.requireAuth !== false;
+
             functionsRouter.use("/*", createAuthMiddleware({
                 driver: defaultDriver,
-                requireAuth: false
+                requireAuth: functionsRequireAuth,
+                serviceKey
             }));
 
             const fnRoutes = createFunctionRoutes(loadedFunctions);

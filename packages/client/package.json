@@ -38,7 +38,8 @@
         "./package.json": "./package.json"
     },
     "dependencies": {
-        "@rebasepro/types": "workspace:*"
+        "@rebasepro/types": "workspace:*",
+        "@rebasepro/utils": "workspace:*"
     },
     "devDependencies": {
         "@jest/globals": "^29.7.0",
@@ -74,6 +75,10 @@
             "json",
             "node"
         ],
-        "testEnvironment": "node"
+        "testEnvironment": "node",
+        "moduleNameMapper": {
+            "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
+            "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts"
+        }
     }
 }

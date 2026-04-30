@@ -1,4 +1,5 @@
 import { EntityCollection, Property, StringProperty, NumberProperty, ArrayProperty, TableColumnInfo, TableMetadata } from "@rebasepro/types";
+import { prettifyIdentifier } from "@rebasepro/utils";
 
 /**
  * Maps a PostgreSQL column data type to a Rebase property type.
@@ -14,9 +15,7 @@ function pgTypeToRebaseProperty(column: TableColumnInfo): Property | null {
     } = column;
 
     const required = is_nullable === "NO";
-    const prettifiedName = column_name
-        .replace(/_/g, " ")
-        .replace(/\b\w/g, (c: string) => c.toUpperCase());
+    const prettifiedName = prettifyIdentifier(column_name);
 
     // Detect if this column is a primary key (auto-generated id)
     const isAutoId = column_default != null && (
@@ -31,7 +30,7 @@ function pgTypeToRebaseProperty(column: TableColumnInfo): Property | null {
         return {
             type: "string",
             name: prettifiedName,
-            enum: enum_values.map((v: string) => ({ id: v, label: v.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) })),
+            enum: enum_values.map((v: string) => ({ id: v, label: prettifyIdentifier(v) })),
             validation: required ? { required: true } : undefined
         } as StringProperty;
     }
@@ -258,9 +257,7 @@ export function buildCollectionFromTableMetadata(
         }
     }
 
-    const prettifiedName = tableName
-        .replace(/_/g, " ")
-        .replace(/\b\w/g, (c: string) => c.toUpperCase());
+    const prettifiedName = prettifyIdentifier(tableName);
 
     return {
         name: prettifiedName,

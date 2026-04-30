@@ -62,6 +62,24 @@ describe("buildRebaseData", () => {
         expect((data as any).then).toBeUndefined();
     });
 
+    it("converts camelCase properties to kebab-case slugs", () => {
+        const driver = createMockDriver();
+        const data = buildRebaseData(driver);
+
+        const companyMembers = (data as any).companyMembers;
+        const manualCollection = data.collection("company-members");
+        
+        expect(companyMembers).toBe(manualCollection);
+        
+        // Let's also verify that creating uses the correct path
+        companyMembers.create({ name: "Test" });
+        expect(driver.saveEntity).toHaveBeenCalledWith(
+            expect.objectContaining({
+                path: "company-members"
+            })
+        );
+    });
+
     // ── find ────────────────────────────────────────────────
     describe("CollectionAccessor.find", () => {
         it("delegates to driver.fetchCollection", async () => {

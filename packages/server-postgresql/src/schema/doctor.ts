@@ -14,7 +14,7 @@ import { pathToFileURL } from "url";
 import chalk from "chalk";
 import { EntityCollection, isPostgresCollection, Property, NumberProperty, StringProperty } from "@rebasepro/types";
 import { generateSchema } from "./generate-drizzle-schema-logic";
-import { getTableName, resolveCollectionRelations } from "@rebasepro/common";
+import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -311,7 +311,7 @@ export async function checkCollectionsVsDatabase(
                 if (prop.type === "relation") {
                     // Relation columns are derived from localKey
                     const resolvedRelations = resolveCollectionRelations(collection);
-                    const relation = resolvedRelations[(prop as import("@rebasepro/types").RelationProperty).relationName ?? propName];
+                    const relation = findRelation(resolvedRelations, (prop as import("@rebasepro/types").RelationProperty).relationName ?? propName);
                     if (relation?.direction === "owning" && relation.cardinality === "one" && relation.localKey) {
                         const fkColName = toSnakeCase(relation.localKey);
                         if (!dbColumnMap.has(fkColName)) {

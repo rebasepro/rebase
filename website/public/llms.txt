@@ -92,6 +92,7 @@ That's it. Your admin panel is running at `http://localhost:5173` and the API at
 | **Client SDK** | Type-safe JavaScript SDK for your frontend apps |
 | **Plugin System** | Extend every part of the UI — toolbar, forms, fields, home page |
 | **AI Data Enhancement** | LLM-powered autocompletion for text fields |
+| **Cron Jobs** | Scheduled background tasks with monitoring, logging, and Studio dashboard |
 
 ### Next Steps
 
@@ -353,7 +354,7 @@ Changes to collections propagate everywhere automatically.
 
 ### Next Steps
 
-- **[Template Walkthrough](/docs/getting-started/template-walkthrough)** — Line-by-line explanation of the generated code
+- **[Quickstart](/docs/getting-started/quickstart)** — Get started with a new Rebase project
 - **[Configuration](/docs/getting-started/configuration)** — All environment variables and options
 
 ## Environment & Configuration
@@ -361,6 +362,8 @@ Changes to collections propagate everywhere automatically.
 ### Environment Variables
 
 All configuration is done via environment variables in your `.env` file at the project root.
+
+> **Important**: Rebase uses **Zod** to validate environment variables at startup in `src/env.ts`. If any required variables are missing or incorrectly formatted (like URLs or ports), the server will fail to start and provide a clear error message.
 
 #### Required
 
@@ -389,9 +392,9 @@ All configuration is done via environment variables in your `.env` file at the p
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `JWT_SECRET` | Secret for JWT signing (required if auth is enabled) | — |
-| `ACCESS_TOKEN_EXPIRES_IN` | Access token lifetime | `1h` |
-| `REFRESH_TOKEN_EXPIRES_IN` | Refresh token lifetime | `30d` |
-| `ALLOW_REGISTRATION` | Allow new users to register (`true`/`false`). First user can always register. | `false` |
+| `JWT_ACCESS_EXPIRES_IN` | Access token lifetime | `1h` |
+| `JWT_REFRESH_EXPIRES_IN` | Refresh token lifetime | `30d` |
+| `ALLOW_REGISTRATION` | Allow new users to register (`true`/`false`). First user can always register. | `true` |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID (backend validation) | — |
 
 #### Storage
@@ -421,6 +424,7 @@ All configuration is done via environment variables in your `.env` file at the p
 The `RebaseBackendConfig` passed to `initializeRebaseBackend()` provides programmatic control:
 
 ```typescript
+
 await initializeRebaseBackend({
     app,
     server,
@@ -435,13 +439,13 @@ await initializeRebaseBackend({
     ],
 
     auth: {                  // Authentication config
-        jwtSecret: process.env.JWT_SECRET!,
-        accessExpiresIn: "1h",
-        refreshExpiresIn: "30d",
+        jwtSecret: env.JWT_SECRET,
+        accessExpiresIn: env.JWT_ACCESS_EXPIRES_IN,
+        refreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN,
         requireAuth: true,    // Require auth for data API (default: true)
-        allowRegistration: false,
+        allowRegistration: env.ALLOW_REGISTRATION,
         google: {
-            clientId: process.env.GOOGLE_CLIENT_ID
+            clientId: env.GOOGLE_CLIENT_ID
         }
     },
 
@@ -590,7 +594,7 @@ await initializeRebaseBackend({
 ### Next Steps
 
 - **[Backend Overview](/docs/backend)** — Full backend configuration
-- **[Storage Configuration](/docs/storage/configuration)** — S3 setup for production
+- **[Storage Configuration](/docs/storage)** — S3 setup for production
 
 ## Architecture Overview
 
@@ -799,7 +803,7 @@ CREATE TABLE products (
 ### Next Steps
 
 - **[Collections](/docs/collections)** — Full collection configuration reference
-- **[Drizzle Schema Generation](/docs/backend/schema-generation)** — Detailed column type mappings
+- **[Properties](/docs/collections/properties)** — Detailed column type mappings
 
 ## Collections
 
@@ -955,11 +959,11 @@ You can set default or forced filters:
 
 ### Next Steps
 
+- **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks for syncing data between collections, validation, side effects
 - **[Properties](/docs/collections/properties)** — All property types and options
 - **[Relations](/docs/collections/relations)** — Foreign keys, junction tables, joins
 - **[Security Rules](/docs/collections/security-rules)** — Row Level Security
-- **[View Modes](/docs/collections/view-modes)** — Table, Cards, Kanban
-- **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks
+- **[View Modes](/docs/frontend/view-modes)** — Table, Cards, Kanban
 
 ## Properties
 
@@ -1688,10 +1692,85 @@ securityRules: [
 ]
 ```
 
+### Anonymous Access (Public Inserts)
+
+A common need is allowing **unauthenticated users** to submit data — contact forms, newsletter signups, public applications. Rebase provides a clean pattern for this.
+
+#### Recommended: `access: "public"` with `withCheck`
+
+```typescript
+const contactMessagesCollection: EntityCollection = {
+    slug: "contact_messages",
+    securityRules: [
+        // Anyone can submit a contact message
+        {
+            operation: "insert",
+            access: "public",
+            withCheck: "true"
+        },
+        // Only admins can read, update, or delete messages
+        { operations: ["select", "update", "delete"], roles: ["admin"] }
+    ],
+    properties: { /* ... */ }
+};
+```
+
+The `access: "public"` shortcut generates a policy that allows the operation without requiring authentication.
+
+#### For Lead Capture / Signups
+
+```typescript
+const leadSignupsCollection: EntityCollection = {
+    slug: "lead_magnet_signups",
+    securityRules: [
+        // Allow anonymous inserts
+        { operation: "insert", access: "public", withCheck: "true" },
+        // Admins can view all signups
+        { operation: "select", roles: ["admin"] }
+    ],
+    properties: { /* ... */ }
+};
+```
+
+#### How Anonymous Requests Work
+
+When a request arrives without a JWT token, the Rebase backend sets the PostgreSQL session variables to:
+
+| Variable | Value |
+|----------|-------|
+| `app.user_id` | `'anonymous'` |
+| `app.user_roles` | `''` (empty) |
+
+This means:
+
+- `auth.uid()` returns `'anonymous'`
+- `auth.roles()` returns an empty string
+- `access: "public"` policies pass because they generate `USING (true)` / `WITH CHECK (true)`
+- `access: "authenticated"` policies fail because they check for a real user ID
+- `ownerField` policies fail because no row will have `user_id = 'anonymous'` (unless explicitly set)
+
+#### Advanced: Raw SQL for Anonymous
+
+If you need more granular control, use raw SQL:
+
+```typescript
+securityRules: [
+    {
+        operation: "insert",
+        withCheck: "auth.uid() = 'anonymous' OR auth.uid() IS NOT NULL"
+    }
+]
+```
+
+:::tip
+Avoid the legacy pattern of checking `string_to_array(auth.roles(), ',')` for anonymous access. The `access: "public"` shortcut is simpler and generates the correct policy automatically.
+:::
+
 ### Next Steps
 
 - **[Relations](/docs/collections/relations)** — Foreign keys and joins
 - **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks
+- **[Custom Functions](/docs/backend/custom-functions)** — Custom API endpoints
 
 ## Entity Callbacks
 
@@ -1699,10 +1778,12 @@ securityRules: [
 
 Callbacks let you hook into the entity lifecycle to:
 
+- **Sync data between collections** — copy or move entities across tables on status changes
 - **Transform data** before saving (computed fields, slugification)
 - **Validate** business rules beyond schema validation
 - **Trigger side effects** after writes (send emails, sync APIs, update caches)
 - **Filter/transform** data after reading
+- **Cascade operations** — clean up related records on delete
 
 ### Defining Callbacks
 
@@ -1880,10 +1961,209 @@ properties: {
 }
 ```
 
+### The `context.data` API
+
+Every callback receives a `context` object that includes `context.data` — a unified data access layer for performing **cross-collection operations** from within lifecycle hooks.
+
+#### Accessing Collections
+
+`context.data` uses a JavaScript Proxy, so you can access any collection by its slug as a property:
+
+```typescript
+afterSave: async ({ values, entityId, context }) => {
+    // Dynamic property access — works for any collection slug
+    const jobs = context.data.jobs;
+    const users = context.data.users;
+
+    // Alternatively, use the .collection() method for dynamic slugs
+    const collectionName = "jobs";
+    const accessor = context.data.collection(collectionName);
+}
+```
+
+#### Available Methods
+
+Each collection accessor (`context.data.<slug>`) provides these methods:
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `.find()` | `find(params?: FindParams) → FindResponse` | Query entities with filters, sorting, and pagination |
+| `.findById()` | `findById(id: string \| number) → Entity \| undefined` | Fetch a single entity by ID |
+| `.create()` | `create(data: Partial<Values>, id?: string) → Entity` | Create a new entity |
+| `.update()` | `update(id: string \| number, data: Partial<Values>) → Entity` | Update an existing entity |
+| `.delete()` | `delete(id: string \| number) → void` | Delete an entity |
+| `.count()` | `count(params?: FindParams) → number` | Count matching entities |
+| `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Real-time subscription (where supported) |
+| `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Listen to a single entity |
+
+#### Querying with `.find()`
+
+The `find()` method supports rich filtering:
+
+```typescript
+afterSave: async ({ values, context }) => {
+    // Simple equality
+    const { data: activeJobs } = await context.data.jobs.find({
+        where: { status: "published" },
+        limit: 10,
+        orderBy: "created_at:desc"
+    });
+
+    // PostgREST-style operators
+    const { data: recentJobs } = await context.data.jobs.find({
+        where: {
+            status: "eq.published",
+            salary: "gte.50000"
+        }
+    });
+
+    // Tuple syntax
+    const { data: expensiveJobs } = await context.data.jobs.find({
+        where: {
+            salary: [">=", 100000],
+            role: ["in", ["admin", "manager"]]
+        }
+    });
+}
+```
+
+#### Creating Entities
+
+```typescript
+afterSave: async ({ values, entityId, previousValues, context }) => {
+    // Promote an approved submission to a published job
+    if (values.status === "approved" && previousValues?.status !== "approved") {
+        const newJob = await context.data.jobs.create({
+            title: values.title,
+            description: values.description,
+            company_id: values.company_id,
+            status: "published",
+            source_submission_id: entityId,
+        });
+
+        // Link back to the original submission
+        await context.data["job-submissions"].update(entityId, {
+            promoted_job_id: newJob.id,
+        });
+    }
+}
+```
+
+#### Security: RLS Bypass Behavior
+
+:::important
+**`context.data` operations in callbacks bypass Row Level Security (RLS).**
+
+When callbacks execute on the backend, they run through the base `PostgresBackendDriver` — not the authenticated wrapper. This means `context.data` has **full database access** regardless of the triggering user's permissions.
+
+This is intentional: server-side lifecycle hooks are trusted code that often needs to write to collections the end-user doesn't have direct access to (e.g., creating an audit log entry, updating a counter on a parent record).
+:::
+
+If you need RLS-scoped operations within a callback, use the authenticated driver directly:
+
+```typescript
+afterSave: async ({ context }) => {
+    // This bypasses RLS (normal for callbacks):
+    await context.data.audit_logs.create({ action: "approved" });
+
+    // To enforce RLS, access the driver and call withAuth():
+    const authDriver = await context.driver.withAuth(context.user);
+    // authDriver.data operations respect RLS
+}
+```
+
+#### Transaction Semantics
+
+:::warning
+**`context.data` operations are NOT automatically wrapped in the same transaction as the triggering save.**
+
+The original entity save completes its database transaction first. Then `afterSave` runs and any `context.data` calls open **separate transactions**. If a `context.data` operation fails in `afterSave`, the original save is **not rolled back**.
+:::
+
+This means:
+
+- ✅ The triggering save always succeeds independently
+- ⚠️ Side-effect writes may fail without affecting the original operation
+- ⚠️ There is no atomicity guarantee between the original save and subsequent `context.data` calls
+
+For operations that must be atomic, wrap them in error handling:
+
+```typescript
+afterSave: async ({ values, entityId, context }) => {
+    try {
+        await context.data.jobs.create({
+            title: values.title,
+            status: "published",
+        });
+    } catch (error) {
+        // Log the failure — the original save already succeeded
+        console.error(`Failed to promote job from submission ${entityId}:`, error);
+        // Optionally: mark the submission as "promotion_failed"
+        await context.data["job-submissions"].update(entityId, {
+            promotion_status: "failed",
+            promotion_error: String(error),
+        });
+    }
+}
+```
+
+### Syncing Data Between Collections
+
+One of the most powerful uses of callbacks is **syncing data across collections** using `context.data`:
+
+```typescript
+const submissionsCollection: EntityCollection = {
+    slug: "job_submissions",
+    callbacks: {
+        afterSave: async ({ values, entityId, previousValues, context }) => {
+            // When a submission is approved, create a published job
+            if (values.status === "approved" && previousValues?.status !== "approved") {
+                const newJob = await context.data.jobs.create({
+                    title: values.title,
+                    description: values.description,
+                    company_id: values.company_id,
+                    status: "published",
+                    source_submission_id: entityId,
+                });
+
+                // Update the submission with the promoted job reference
+                await context.data["job-submissions"].update(entityId, {
+                    promoted_job_id: newJob.id,
+                });
+            }
+        }
+    },
+    properties: { /* ... */ }
+};
+```
+
+Other cross-collection patterns:
+
+- **Cascade delete**: Use `afterDelete` to remove related records in child collections
+- **Denormalization**: Use `afterSave` to update summary fields in a parent collection
+- **Audit logging**: Use `afterSave` / `afterDelete` to write to an audit log collection
+- **Counters**: Use `afterSave` / `afterDelete` to update count fields on related entities
+
+### Full Context Reference
+
+Every callback receives a `context` object of type `RebaseCallContext`:
+
+```typescript
+interface RebaseCallContext {
+    /** The authenticated user, if any */
+    user?: User;
+    /** The underlying data driver (PostgresBackendDriver) */
+    driver: DataDriver;
+    /** Unified data access — context.data.<slug>.create/update/find/delete */
+    data: RebaseData;
+}
+```
+
 ### Next Steps
 
 - **[Security Rules](/docs/collections/security-rules)** — Row Level Security
 - **[Entity History](/docs/backend/history)** — Audit trail
+- **[Custom Functions](/docs/backend/custom-functions)** — Add custom API endpoints
 
 ## Backend Overview
 
@@ -1897,6 +2177,7 @@ The Rebase backend is a **Node.js server** built on [Hono](https://hono.dev/) th
 - **WebSocket** — Real-time data sync via PostgreSQL LISTEN/NOTIFY
 - **Entity History** — Audit trail for every data change
 - **Database Branching** — Instant, isolated database copies for dev/staging/testing
+- **Cron Jobs** — Scheduled background tasks with monitoring dashboard
 
 Everything is initialized with a single function:
 
@@ -1913,11 +2194,11 @@ const instance = await initializeRebaseBackend({
         })
     ],
     auth: {
-        jwtSecret: process.env.JWT_SECRET!,
+        jwtSecret: env.JWT_SECRET,
     },
     storage: { type: "local", basePath: "./uploads" },
     history: true,
-    enableSwagger: process.env.NODE_ENV !== "production"
+    enableSwagger: env.NODE_ENV !== "production"
 });
 ```
 
@@ -1935,6 +2216,8 @@ After initialization, these routes are mounted:
 | `/api/data/:slug/:id/history` | Entity change history (when enabled) |
 | `/api/data/docs` | OpenAPI spec (when `enableSwagger: true`) |
 | `/api/data/swagger` | Swagger UI (dev mode, when `enableSwagger: true`) |
+| `/api/functions/*` | Custom function routes (when `functionsDir` is set) |
+| `/api/cron/*` | Cron job management (admin-only, when `cronsDir` is set) |
 | WebSocket on upgrade | Real-time subscriptions |
 
 ### Configuration Reference
@@ -1968,6 +2251,9 @@ interface RebaseBackendConfig {
     // Custom API endpoints
     functionsDir?: string;    // Auto-load Hono routes from a directory
 
+    // Scheduled tasks
+    cronsDir?: string;        // Auto-load cron jobs from a directory
+
     // Logging
     logging?: { level?: "error" | "warn" | "info" | "debug" };
 }
@@ -1975,12 +2261,12 @@ interface RebaseBackendConfig {
 
 ### The Backend Instance
 
-`initializeRebaseBackend` returns a `RebaseBackendInstance` with access to all services:
+`initializeRebaseBackend` returns a `RebaseBackendInstance` with access to internal services:
 
 ```typescript
 const instance = await initializeRebaseBackend(config);
 
-// Access services
+// Internal service access
 instance.driver              // Default data driver
 instance.driverRegistry      // All drivers (for multi-database)
 instance.realtimeService     // Default realtime service
@@ -1990,7 +2276,10 @@ instance.storageController   // Default storage
 instance.storageRegistry     // All storage backends
 instance.collectionRegistry  // Collection metadata
 instance.historyService      // Entity history
+instance.cronScheduler       // Cron job scheduler (when cronsDir is set)
 ```
+
+> **Note:** While the `instance` exposes these internal services, application code (such as custom functions and cron jobs) should use the global `rebase` singleton from `@rebasepro/server-core` to interact with the backend API.
 
 ### REST API
 
@@ -2045,8 +2334,10 @@ If initialization fails (e.g., database connection error), the server still star
 
 - **[Authentication](/docs/auth)** — JWT, Google OAuth, user management
 - **[Storage](/docs/storage)** — Local and S3 file storage
-- **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks
+- **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks and `context.data` API
 - **[Entity History](/docs/backend/history)** — Audit trail
+- **[Custom Functions](/docs/backend/custom-functions)** — Add custom API endpoints
+- **[Cron Jobs](/docs/backend/cron-jobs)** — Scheduled background tasks
 - **[Database Branching](/docs/backend/branching)** — Instant database copies for dev/staging
 
 ## Entity History
@@ -2138,6 +2429,281 @@ The backend runs a global prune sweep every 6 hours.
 - **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks
 - **[Backend Overview](/docs/backend)** — Full backend configuration
 
+## Cron Jobs
+
+### Overview
+
+Rebase includes a built-in **cron job scheduler** for running recurring background tasks — data cleanup, report generation, health checks, external API syncs, and more.
+
+Cron jobs follow the same **file-based discovery** pattern as custom functions: drop a TypeScript file in your `crons/` directory, and Rebase automatically registers and schedules it.
+
+- **Zero dependencies** — No external scheduler libraries required
+- **Admin API** — REST endpoints to list, trigger, enable/disable, and view logs
+- **Studio dashboard** — Monitor all jobs, view execution history, and trigger runs manually
+- **Database persistence** — Execution logs stored in PostgreSQL, surviving restarts
+- **In-memory cache** — Fast ring buffer (last 50 runs) for the dashboard, backed by the DB
+
+### Defining a Cron Job
+
+Create a file in your `backend/crons/` directory that default-exports a `CronJobDefinition`:
+
+```typescript
+// backend/crons/health-check.ts
+
+const job: CronJobDefinition = {
+    schedule: "*/5 * * * *",     // every 5 minutes
+    name: "System Health Check",
+    description: "Monitors uptime and memory usage",
+
+    async handler(ctx) {
+        ctx.log("Running health check...");
+
+        const uptime = process.uptime();
+        const mem = process.memoryUsage();
+
+        ctx.log(`Uptime: ${Math.round(uptime)}s`);
+        ctx.log(`Heap: ${Math.round(mem.heapUsed / 1024 / 1024)}MB`);
+
+        return {
+            uptimeSeconds: Math.round(uptime),
+            heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
+        };
+    },
+};
+
+export default job;
+```
+
+The **filename** (without extension) becomes the job's unique ID — e.g., `health-check`.
+
+### Configuration
+
+Enable cron jobs by adding `cronsDir` to your backend config:
+
+```typescript
+const instance = await initializeRebaseBackend({
+    // ... other config
+    functionsDir: path.resolve(__dirname, "../functions"),
+    cronsDir: path.resolve(__dirname, "../crons"),  // ← add this
+});
+```
+
+That's it. Rebase will:
+
+1. Scan the directory for `.ts` / `.js` files
+2. Register each default export as a cron job
+3. Auto-create the `rebase.cron_logs` table in PostgreSQL (if the driver supports SQL)
+4. Start the scheduler and seed counters from existing DB logs
+5. Mount admin REST routes at `/api/cron`
+
+### Schedule Syntax
+
+Cron expressions use the standard **5-field format**:
+
+```
+┌───────────── minute (0–59)
+│ ┌─────────── hour (0–23)
+│ │ ┌───────── day of month (1–31)
+│ │ │ ┌─────── month (1–12)
+│ │ │ │ ┌───── day of week (0–6, Sunday = 0)
+│ │ │ │ │
+* * * * *
+```
+
+| Expression | Meaning |
+|------------|---------|
+| `* * * * *` | Every minute |
+| `0 * * * *` | Every hour |
+| `0 3 * * *` | Daily at 3:00 AM |
+| `0 0 * * 1` | Every Monday at midnight |
+| `0 9 1 * *` | First day of each month at 9:00 AM |
+| `0,30 * * * *` | Every 30 minutes (on :00 and :30) |
+| `0 9-17 * * 1-5` | Hourly, 9 AM–5 PM, weekdays only |
+
+Step values (`*/n`), ranges (`a-b`), and lists (`a,b,c`) are all supported.
+
+### CronJobDefinition Reference
+
+```typescript
+interface CronJobDefinition {
+    // Cron schedule expression (5-field format)
+    schedule: string;
+
+    // Human-readable name shown in Studio
+    name: string;
+
+    // Optional description shown in Studio
+    description?: string;
+
+    // Whether the job starts enabled (default: true)
+    enabled?: boolean;
+
+    // Max execution time in seconds (default: 300)
+    timeoutSeconds?: number;
+
+    // The function to run on each tick
+    handler: (ctx: CronJobContext) => Promise<unknown> | unknown;
+}
+```
+
+### Handler Context
+
+Each handler receives a `CronJobContext`:
+
+```typescript
+interface CronJobContext {
+    // The job's unique ID (derived from filename)
+    jobId: string;
+
+    // The scheduled tick timestamp
+    scheduledAt: Date;
+
+    // Logger — captured lines appear in Studio and the logs API
+    log: (...args: unknown[]) => void;
+}
+```
+
+Use `ctx.log()` to emit structured output. These lines are captured in the execution log and visible in Studio and via the REST API.
+
+:::tip
+The handler can return any JSON-serializable value. It will be stored in the log entry as `result` and displayed in Studio's execution history.
+:::
+
+### REST API
+
+All cron routes require **admin authentication** (`requireAuth` + `requireAdmin`).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/cron` | List all registered cron jobs |
+| `GET` | `/api/cron/:id` | Get a single job's status |
+| `POST` | `/api/cron/:id/trigger` | Manually trigger a job |
+| `GET` | `/api/cron/:id/logs` | Get execution history (`?limit=N`) |
+| `PUT` | `/api/cron/:id` | Enable/disable a job (`{ "enabled": true }`) |
+
+#### Example: List All Jobs
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3001/api/cron
+```
+
+```json
+{
+    "jobs": [
+        {
+            "id": "health-check",
+            "name": "System Health Check",
+            "schedule": "*/5 * * * *",
+            "enabled": true,
+            "state": "idle",
+            "totalRuns": 12,
+            "totalFailures": 0,
+            "lastRunAt": "2026-04-24T08:15:00.000Z",
+            "nextRunAt": "2026-04-24T08:20:00.000Z",
+            "lastDurationMs": 3
+        }
+    ]
+}
+```
+
+#### Example: Trigger a Job Manually
+
+```bash
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+    http://localhost:3001/api/cron/health-check/trigger
+```
+
+### Client SDK
+
+The Rebase client SDK exposes a `cron` namespace for all operations:
+
+```typescript
+
+const client = createRebaseClient({ baseUrl: "http://localhost:3001" });
+
+// List all jobs
+const { jobs } = await client.cron.listJobs();
+
+// Get a single job
+const { job } = await client.cron.getJob("health-check");
+
+// Trigger manually
+const { log, job: updated } = await client.cron.triggerJob("health-check");
+
+// View execution history
+const { logs } = await client.cron.getJobLogs("health-check", { limit: 10 });
+
+// Enable or disable
+await client.cron.toggleJob("health-check", false); // pause
+await client.cron.toggleJob("health-check", true);  // resume
+```
+
+### Studio Dashboard
+
+When cron jobs are configured, a **Cron Jobs** tool appears in Rebase Studio under the **Automation** section. The dashboard provides:
+
+- **Job list** — All registered jobs with live status indicators
+- **Detail panel** — Schedule, next/last run, duration, and error information
+- **Execution history** — Expandable log entries with captured output and results
+- **Manual trigger** — Run any job on demand with one click
+- **Enable/disable** — Pause and resume jobs without restarting the server
+
+The dashboard auto-refreshes every 15 seconds.
+
+### Persistence
+
+When the database driver supports SQL (e.g. PostgreSQL), execution logs are **automatically persisted** to a `rebase.cron_logs` table. This means:
+
+- Execution history **survives server restarts** and deployments
+- `totalRuns` and `totalFailures` counters are **seeded from the database** on startup
+- The `/api/cron/:id/logs` endpoint queries the database, not just in-memory
+- Multiple server instances share the same execution history
+
+The table is auto-created on first startup — no migrations needed.
+
+:::tip
+Persistence is non-blocking. If a database write fails, the scheduler continues running and the in-memory log buffer is still available as a fallback.
+:::
+
+### Error Handling & Timeouts
+
+- If a handler **throws**, the error is captured in the log entry and the job state is set to `"error"`. The scheduler continues running — the next scheduled tick will still fire.
+- If a handler exceeds `timeoutSeconds` (default: 300), it is terminated with a timeout error.
+- All execution metrics (success count, failure count, last error) are tracked per job and accessible via the API.
+- Failed persistence writes are logged but never crash the scheduler.
+
+### Example: Daily Cleanup Job
+
+```typescript
+// backend/crons/cleanup-sessions.ts
+
+const job: CronJobDefinition = {
+    schedule: "0 3 * * *",  // daily at 3 AM
+    name: "Cleanup Expired Sessions",
+    description: "Removes user sessions older than 30 days",
+
+    async handler(ctx) {
+        ctx.log("Starting session cleanup...");
+
+        // Use the rebase singleton for admin-level database access
+        // const { data: expired } = await rebase.data.findMany("sessions", { ... });
+        const count = Math.floor(Math.random() * 50); // placeholder
+
+        ctx.log(`Cleaned up ${count} expired sessions`);
+
+        return { deletedSessions: count };
+    },
+};
+
+export default job;
+```
+
+### Next Steps
+
+- **[Backend Overview](/docs/backend)** — Full backend configuration reference
+- **[Entity Callbacks](/docs/collections/callbacks)** — Run logic on data changes
+- **[Webhook Integration](/docs/recipes/webhooks)** — Send notifications on events
+
 ## Authentication
 
 ### Overview
@@ -2145,7 +2711,7 @@ The backend runs a global prune sweep every 6 hours.
 Rebase includes a complete authentication system:
 
 - **JWT tokens** — Access and refresh token flow
-- **Google OAuth** — Sign in with Google
+- **OAuth Plugins** — Pluggable architecture for Google, LinkedIn, and more
 - **User management** — Signup, login, password reset
 - **Role-based access** — Assign roles to users, check permissions in collections
 - **Auto-bootstrapping** — First user automatically gets admin role
@@ -2153,6 +2719,7 @@ Rebase includes a complete authentication system:
 ### Backend Configuration
 
 ```typescript
+
 await initializeRebaseBackend({
     // ...
     auth: {
@@ -2161,9 +2728,13 @@ await initializeRebaseBackend({
         refreshExpiresIn: "30d",             // Refresh token lifetime
         requireAuth: true,                   // Require auth for data API
         allowRegistration: false,            // Allow new signups
-        google: {
-            clientId: process.env.GOOGLE_CLIENT_ID  // Optional
-        },
+        oauthProviders: [
+            createGoogleProvider(process.env.GOOGLE_CLIENT_ID!),
+            createLinkedinProvider({
+                clientId: process.env.LINKEDIN_CLIENT_ID!,
+                clientSecret: process.env.LINKEDIN_CLIENT_SECRET!
+            })
+        ],
         email: {                             // Optional — for password reset
             smtpHost: "smtp.gmail.com",
             smtpPort: 587,
@@ -2184,7 +2755,7 @@ Auth tables (`rebase.users`, `rebase.roles`, `rebase.user_roles`, `rebase.refres
 | `POST` | `/api/auth/register` | Create a new account |
 | `POST` | `/api/auth/login` | Login with email/password |
 | `POST` | `/api/auth/refresh` | Refresh the access token |
-| `POST` | `/api/auth/google` | Login with Google OAuth token |
+| `POST` | `/api/auth/<provider-id>` | Dynamic sign in endpoint for any configured OAuth provider (e.g. `/api/auth/google`, `/api/auth/linkedin`) |
 | `POST` | `/api/auth/logout` | Revoke refresh token |
 | `POST` | `/api/auth/forgot-password` | Send password reset email |
 | `POST` | `/api/auth/reset-password` | Reset password with token |
@@ -2307,16 +2878,17 @@ await initializeRebaseBackend({
 #### S3 Storage
 
 ```typescript
+
 await initializeRebaseBackend({
     // ...
     storage: {
         type: "s3",
-        bucket: "my-media-bucket",
-        region: "us-east-1",
-        accessKeyId: process.env.S3_ACCESS_KEY_ID,
-        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+        bucket: env.S3_BUCKET!,
+        region: env.S3_REGION || "us-east-1",
+        accessKeyId: env.S3_ACCESS_KEY_ID!,
+        secretAccessKey: env.S3_SECRET_ACCESS_KEY!,
         // Optional: custom endpoint for MinIO, R2, etc.
-        endpoint: "https://s3.example.com"
+        endpoint: env.S3_ENDPOINT
     }
 });
 ```

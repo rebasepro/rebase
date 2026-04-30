@@ -39,7 +39,7 @@ export function TableReferenceField(props: TableReferenceFieldProps) {
         if (customizationController.components?.missingReference) {
             return <customizationController.components.missingReference path={path} />;
         } else {
-            throw Error(`Couldn't find the corresponding collection view for the path: ${path}`);
+            return <ErrorView error={`Collection not found: ${path}`} />;
         }
     }
     return <TableReferenceFieldInternal {...props} collection={collection} />;

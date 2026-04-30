@@ -1,0 +1,59 @@
+import { rebase, _initRebase, _setRebaseMock, _resetRebaseMock } from "../src/singleton";
+import type { RebaseClient } from "@rebasepro/types";
+
+describe("rebase singleton", () => {
+    afterEach(() => {
+        // Reset after each test to avoid interference
+        process.env.NODE_ENV = "test";
+        _resetRebaseMock();
+    });
+
+    it("should throw when accessing properties before initialization", () => {
+        expect(() => rebase.data).toThrowError(/server not initialized yet/);
+    });
+
+    it("should allow property access after initialization", () => {
+        const mockData = { find: jest.fn() };
+        _setRebaseMock({ data: mockData } as Partial<RebaseClient>);
+
+        expect(rebase.data).toBe(mockData);
+    });
+
+    it("should throw on property assignment (set trap)", () => {
+        _setRebaseMock({ data: {} } as Partial<RebaseClient>);
+
+        expect(() => {
+            (rebase as Record<string, unknown>).data = "overwritten";
+        }).toThrowError(/Cannot set rebase\.data directly/);
+    });
+
+    it("should reset properly with _resetRebaseMock", () => {
+        _setRebaseMock({ data: {} } as Partial<RebaseClient>);
+        expect(() => rebase.data).not.toThrow();
+
+        _resetRebaseMock();
+        expect(() => rebase.data).toThrowError(/server not initialized yet/);
+    });
+
+    it("should throw if _setRebaseMock is called outside test env", () => {
+        const originalEnv = process.env.NODE_ENV;
+        process.env.NODE_ENV = "production";
+
+        expect(() => _setRebaseMock({} as Partial<RebaseClient>)).toThrowError(
+            /can only be called in a test environment/
+        );
+
+        process.env.NODE_ENV = originalEnv;
+    });
+
+    it("should throw if _resetRebaseMock is called outside test env", () => {
+        const originalEnv = process.env.NODE_ENV;
+        process.env.NODE_ENV = "production";
+
+        expect(() => _resetRebaseMock()).toThrowError(
+            /can only be called in a test environment/
+        );
+
+        process.env.NODE_ENV = originalEnv;
+    });
+});

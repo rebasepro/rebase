@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Highlight, themes } from "prism-react-renderer";
+import { toSnakeCase } from "@rebasepro/utils";
 import {
     Button,
     Typography,
@@ -112,16 +113,7 @@ interface MatchedJSCollection {
     pkColumn: string;
 }
 
-/**
- * Slugs may be camelCase or kebab-case while table/slug data may also be snake_case.
- * Normalise to lowercase with underscores for comparison.
- */
-function normaliseSlug(slug: string): string {
-    return slug
-        .replace(/([a-z])([A-Z])/g, "$1_$2")
-        .replace(/[-\s]+/g, "_")
-        .toLowerCase();
-}
+
 
 /**
  * Given the raw SDK result, try to detect which collections are present.
@@ -169,10 +161,10 @@ function detectCollectionsInResult(
 
     const matched: MatchedJSCollection[] = [];
     for (const slug of mentionedSlugs) {
-        const normalised = normaliseSlug(slug);
+        const normalised = toSnakeCase(slug);
         const col = collections.find(c => {
-            const tableName = (c as any).table || normaliseSlug(c.slug);
-            return c.slug === slug || tableName === normalised || normaliseSlug(c.slug) === normalised;
+            const tableName = (c as any).table || toSnakeCase(c.slug);
+            return c.slug === slug || tableName === normalised || toSnakeCase(c.slug) === normalised;
         });
         if (col) {
             matched.push({

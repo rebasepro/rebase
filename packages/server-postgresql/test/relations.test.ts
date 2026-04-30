@@ -863,3 +863,222 @@ describe("Shared relationName regression", () => {
         expect(startupNames).toHaveLength(2);
     });
 });
+
+/**
+ * Regression tests for duplicate relation emission.
+ *
+ * Bug: resolveCollectionRelations used to add slug/snake_case alias entries
+ * for every relation. When the schema generator iterated the dictionary, it
+ * emitted multiple one() definitions with the same `relationName`, causing
+ * Drizzle ORM to throw:
+ *   "There are multiple relations with name 'jobs_company_id' in table 'jobs'"
+ *
+ * Also, property-based entries (e.g. `company_id: { type: "relation", relationName: "company" }`)
+ * duplicated explicit relation entries because the deduplication only compared
+ * property key vs relation key — not the underlying relationName.
+ *
+ * This suite covers both scenarios.
+ */
+describe("Duplicate relation deduplication regression", () => {
+    const cleanSchema = (schema: string) => {
+        return schema
+            .replace(/\/\/.*$/gm, "")
+            .replace(/\/\*[\s\S]*?\*\//g, "")
+            .replace(/\n{2,}/g, "\n")
+            .replace(/\s+/g, " ")
+            .trim();
+    };
+
+    const extractRelationNames = (schema: string): string[] => {
+        const matches = schema.match(/relationName:\s*"([^"]+)"/g) ?? [];
+        return matches.map(m => m.replace(/relationName:\s*"/, "").replace(/"$/, ""));
+    };
+
+    /**
+     * Count how many one() definitions exist for a specific relation key pattern.
+     * This matches `"<key>": one(` in the generated schema.
+     */
+    const countOneEntries = (schema: string, keyPattern: string): number => {
+        const regex = new RegExp(`"${keyPattern}":\\s*one\\(`, "g");
+        return (schema.match(regex) ?? []).length;
+    };
+
+    it("should emit exactly one one() per FK when explicit relation + property share the same FK", async () => {
+        // This models the exact Sustentalent scenario:
+        //   - Explicit relation: { relationName: "company", localKey: "company_id", ... }
+        //   - Property:          { company_id: { type: "relation", relationName: "company" } }
+        // Both reference the same FK `company_id`, but under different keys.
+        const companiesCollection: EntityCollection = {
+            slug: "companies",
+            table: "companies",
+            name: "Companies",
+            properties: {
+                name: { type: "string" },
+            },
+            relations: [
+                {
+                    relationName: "jobs",
+                    target: () => jobsCollection,
+                    cardinality: "many",
+                    direction: "inverse",
+                    foreignKeyOnTarget: "company_id",
+                },
+            ],
+        };
+
+        const jobsCollection: EntityCollection = {
+            slug: "jobs",
+            table: "jobs",
+            name: "Jobs",
+            properties: {
+                title: { type: "string" },
+                // Property referencing the same FK as the explicit relation
+                company: {
+                    type: "relation",
+                    relationName: "company",
+                },
+            },
+            relations: [
+                {
+                    relationName: "company",
+                    target: () => companiesCollection,
+                    cardinality: "one",
+                    direction: "owning",
+                    localKey: "company_id",
+                },
+            ],
+        };
+
+        const result = await generateSchema([companiesCollection, jobsCollection]);
+        const cleanResult = cleanSchema(result);
+
+        // The jobs table should have exactly ONE one() entry for company_id
+        const jobsRelationNames = extractRelationNames(result);
+        const companyIdRelNames = jobsRelationNames.filter(n => n === "jobs_company_id");
+
+        // Exactly 2: one on the owning side (jobs), one on the inverse side (companies)
+        expect(companyIdRelNames).toHaveLength(2);
+
+        // There must be no duplicate one() definitions within jobsRelations
+        const jobsRelationsBlock = result.match(/export const jobsRelations[\s\S]*?\}\)\);/)?.[0] ?? "";
+        const oneEntriesInJobs = (jobsRelationsBlock.match(/:\s*one\(/g) ?? []).length;
+        expect(oneEntriesInJobs).toBe(1);
+
+        // The companies table should have exactly ONE many() entry for jobs
+        const companiesRelationsBlock = result.match(/export const companiesRelations[\s\S]*?\}\)\);/)?.[0] ?? "";
+        const manyEntriesInCompanies = (companiesRelationsBlock.match(/:\s*many\(/g) ?? []).length;
+        expect(manyEntriesInCompanies).toBe(1);
+    });
+
+    it("should not create aliases when relation key contains underscores", async () => {
+        // Verify that resolving a collection with a snake_case relation name
+        // does NOT produce slug-variant alias entries in the generated schema
+        const parentCollection: EntityCollection = {
+            slug: "departments",
+            table: "departments",
+            name: "Departments",
+            properties: {
+                name: { type: "string" },
+            },
+            relations: [
+                {
+                    relationName: "team_members",
+                    target: () => memberCollection,
+                    cardinality: "many",
+                    direction: "inverse",
+                    foreignKeyOnTarget: "department_id",
+                },
+            ],
+        };
+
+        const memberCollection: EntityCollection = {
+            slug: "team-members",
+            table: "team_members",
+            name: "Team Members",
+            properties: {
+                name: { type: "string" },
+                department: {
+                    type: "relation",
+                    relationName: "department",
+                },
+            },
+            relations: [
+                {
+                    relationName: "department",
+                    target: () => parentCollection,
+                    cardinality: "one",
+                    direction: "owning",
+                    localKey: "department_id",
+                },
+            ],
+        };
+
+        const result = await generateSchema([parentCollection, memberCollection]);
+
+        // team_members table should have exactly one one() definition
+        const teamMembersRelBlock = result.match(/export const teamMembersRelations[\s\S]*?\}\)\);/)?.[0] ?? "";
+        const oneEntries = (teamMembersRelBlock.match(/:\s*one\(/g) ?? []).length;
+        expect(oneEntries).toBe(1);
+
+        // No duplicate relation names anywhere
+        const allNames = extractRelationNames(result);
+        const nameCountMap = new Map<string, number>();
+        for (const name of allNames) {
+            nameCountMap.set(name, (nameCountMap.get(name) ?? 0) + 1);
+        }
+        // Every relation name should appear exactly twice (once per side)
+        for (const [name, count] of nameCountMap) {
+            expect(count).toBeLessThanOrEqual(2);
+        }
+    });
+
+    it("should handle multiple different relations to the same target without duplicates", async () => {
+        // Two separate FKs from one table to the same target table
+        const usersCollection: EntityCollection = {
+            slug: "users",
+            table: "users",
+            name: "Users",
+            properties: { name: { type: "string" } },
+            relations: [],
+        };
+
+        const messagesCollection: EntityCollection = {
+            slug: "messages",
+            table: "messages",
+            name: "Messages",
+            properties: {
+                content: { type: "string" },
+                sender: { type: "relation", relationName: "sender" },
+                recipient: { type: "relation", relationName: "recipient" },
+            },
+            relations: [
+                {
+                    relationName: "sender",
+                    target: () => usersCollection,
+                    cardinality: "one",
+                    direction: "owning",
+                    localKey: "sender_id",
+                },
+                {
+                    relationName: "recipient",
+                    target: () => usersCollection,
+                    cardinality: "one",
+                    direction: "owning",
+                    localKey: "recipient_id",
+                },
+            ],
+        };
+
+        const result = await generateSchema([usersCollection, messagesCollection]);
+
+        // messages table should have exactly TWO one() entries (one per FK)
+        const messagesRelBlock = result.match(/export const messagesRelations[\s\S]*?\}\)\);/)?.[0] ?? "";
+        const oneEntries = (messagesRelBlock.match(/:\s*one\(/g) ?? []).length;
+        expect(oneEntries).toBe(2);
+
+        // The two must have DIFFERENT relationName values
+        const namesInMessages = extractRelationNames(messagesRelBlock);
+        expect(namesInMessages).toHaveLength(2);
+        expect(namesInMessages[0]).not.toBe(namesInMessages[1]);
+    });
+});

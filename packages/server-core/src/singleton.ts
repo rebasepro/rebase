@@ -60,4 +60,10 @@ export const rebase: RebaseClient = new Proxy({} as RebaseClient, {
         }
         return (_instance as Record<string, unknown>)[prop as string];
     },
+    set(_, prop) {
+        throw new Error(
+            `Cannot set rebase.${String(prop)} directly. ` +
+            "The singleton is read-only. Use _initRebase() during server startup."
+        );
+    },
 });

@@ -14,9 +14,11 @@ When contributing to the Rebase monorepo, you MUST adhere strictly to the follow
 - Provide exhaustive typings for all core modules (`init.ts`, routing, middlewares).
 - Treat `RebaseBackendConfig` and similar orchestrating structures as first-class schemas. Avoid abstracting them too far unless strictly bounded by Generics.
 
-## 3. Delegation over Gatekeeping
+## 3. Secure by Default, Delegation by Choice
 - Rebase acts as a true Backend-as-a-Service (BaaS).
-- **Let the DB Decide**: API routers should not blindly reject unauthenticated requests (`requireAuth: true`) if the endpoints represent database mutations or access. Pass the identity downward (even if it is the `"anon"` identity) and allow Postgres Row-Level Security (RLS) to evaluate the request.
+- **Secure by default**: All data routes require authentication unless the developer explicitly opts out with `requireAuth: false`. This prevents accidental public exposure when no Postgres RLS policies exist.
+- **Delegation to RLS is opt-in**: Developers who want anonymous access must explicitly set `auth.requireAuth: false`, acknowledging that access control is fully delegated to Postgres RLS policies. When doing so, the middleware still scopes the driver via `withAuth({ uid: "anon" })` so RLS policies can evaluate the request.
+- **Fail closed**: The raw unscoped driver is never exposed to request handlers. Every code path either scopes via `withAuth()` or rejects with an error. Silent fallbacks to unscoped access are forbidden.
 
 ## 4. Strict ES Modules (ESM) Only (NO `require`)
 - **No dynamic `require()` statements**: Rebase handles monorepo build tools, Vite, and ESM environments. Using inline `require("@rebasepro/...")` inside logic blocks will trigger critical `ReferenceError: require is not defined` errors.

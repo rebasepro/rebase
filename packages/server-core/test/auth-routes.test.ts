@@ -824,7 +824,7 @@ describe("Auth Routes (Integration)", () => {
         });
 
         it("returns correct flags when users exist", async () => {
-            const app = createApp({ allowRegistration: false });
+            const app = createApp({ allowRegistration: false, withEmail: false });
             mockAuthRepo.listUsers.mockResolvedValueOnce([mockUser()]);
 
             const res = await app.request("/auth/config");
@@ -837,7 +837,6 @@ describe("Auth Routes (Integration)", () => {
 
         it("reports Google enabled when configured", async () => {
             const app = createApp();
-            (isGoogleOAuthConfigured as jest.Mock).mockReturnValue(true);
             mockAuthRepo.listUsers.mockResolvedValueOnce([mockUser()]);
 
             const res = await app.request("/auth/config");

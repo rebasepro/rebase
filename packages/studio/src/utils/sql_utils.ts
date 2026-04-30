@@ -61,15 +61,7 @@ export function extractTablesFromQuery(sqlString: string): ExtractedTable[] {
     }
 }
 
-/**
- * Convert a slug like "blogPosts" or "blog-posts" to snake_case "blog_posts".
- */
-function slugToSnakeCase(slug: string): string {
-    return slug
-        .replace(/([a-z])([A-Z])/g, "$1_$2")
-        .replace(/[-\s]+/g, "_")
-        .toLowerCase();
-}
+import { toSnakeCase } from "@rebasepro/utils";
 
 /**
  * Resolve which collections are referenced by a SQL query.
@@ -112,7 +104,7 @@ export function resolveQueryCollections(
     for (const table of tables) {
         // Match table name against collection table or slug->snake_case
         const matched = collections.find(c => {
-            const tableName = (c as any).table || slugToSnakeCase(c.slug);
+            const tableName = (c as any).table || toSnakeCase(c.slug);
             return tableName === table.name;
         });
 

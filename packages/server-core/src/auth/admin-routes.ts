@@ -1,9 +1,13 @@
 import { Hono } from "hono";
 import { ApiError, errorHandler } from "../api/errors";
 import type { AuthRepository } from "./interfaces";
-import { requireAuth, requireAdmin } from "./middleware";
+import { requireAuth, requireAdmin, createRequireAuth } from "./middleware";
 import { hashPassword, validatePasswordStrength } from "./password";
 import { AuthModuleConfig } from "./routes";
+
+interface AdminRouteOptions extends AuthModuleConfig {
+    serviceKey?: string;
+}
 import { HonoEnv } from "../api/types";
 import { randomBytes, createHash } from "crypto";
 import { getUserInvitationTemplate, getPasswordResetTemplate } from "../email/templates";
@@ -51,7 +55,7 @@ function hashToken(token: string): string {
 /**
  * Create admin routes for user and role management
  */
-export function createAdminRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
+export function createAdminRoutes(config: AdminRouteOptions): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
     const authRepo = config.authRepo;
     const { emailService, emailConfig } = config;
@@ -60,8 +64,8 @@ export function createAdminRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     // instead of caught by Hono's default error handler from the sub-router.
     router.onError(errorHandler);
 
-    // Apply auth middleware to all routes
-    router.use("/*", requireAuth);
+    // Apply auth middleware to all routes (service-key-aware when configured)
+    router.use("/*", createRequireAuth({ serviceKey: config.serviceKey }));
 
     router.post("/bootstrap", async (c) => {
         const user = c.get("user");

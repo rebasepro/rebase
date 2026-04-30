@@ -2,7 +2,7 @@ import { and, eq, inArray, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { DrizzleClient } from "../interfaces";
 import { Entity, EntityCollection, FilterValues, Relation } from "@rebasepro/types";
-import { getTableName, resolveCollectionRelations } from "@rebasepro/common";
+import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
     getCollectionByPath,
@@ -40,7 +40,7 @@ export class RelationService {
     ): Promise<Entity<M>[]> {
         const parentCollection = getCollectionByPath(parentCollectionPath, this.registry);
         const resolvedRelations = resolveCollectionRelations(parentCollection as import("@rebasepro/types").PostgresCollection);
-        const relation = resolvedRelations[relationKey];
+        const relation = findRelation(resolvedRelations, relationKey);
 
         if (!relation) {
             throw new Error(`Relation '${relationKey}' not found in collection '${parentCollectionPath}'`);
@@ -217,7 +217,7 @@ export class RelationService {
     ): Promise<number> {
         const parentCollection = getCollectionByPath(parentCollectionPath, this.registry);
         const resolvedRelations = resolveCollectionRelations(parentCollection as import("@rebasepro/types").PostgresCollection);
-        const relation = resolvedRelations[relationKey];
+        const relation = findRelation(resolvedRelations, relationKey);
         if (!relation) throw new Error(`Relation '${relationKey}' not found in collection '${parentCollectionPath}'`);
 
         const targetCollection = relation.target();
@@ -406,7 +406,7 @@ export class RelationService {
         const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
 
         for (const [key, value] of Object.entries(relationValues)) {
-            const relation = resolvedRelations[key];
+            const relation = findRelation(resolvedRelations, key);
             if (!relation || relation.cardinality !== "many") continue;
 
             const targetEntityIds = (value && Array.isArray(value)) ? value.map((rel: { id: string | number }) => rel.id) : [];

@@ -2,7 +2,7 @@ import { eq, SQL } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { EntityCollection, Properties, Property, Relation, RelationProperty } from "@rebasepro/types";
-import { getTableName, resolveCollectionRelations } from "@rebasepro/common";
+import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { DrizzleConditionBuilder } from "./utils/drizzle-conditions";
 import { getPrimaryKeys, buildCompositeId } from "./services/entity-helpers";
@@ -97,7 +97,7 @@ export function serializeDataToServer<M extends Record<string, unknown>>(
 
         // Handle relation properties specially
         if (property.type === "relation" && collection) {
-            const relation = resolvedRelations[key];
+            const relation = findRelation(resolvedRelations, key);
             if (relation) {
                 if (relation.direction === "owning" && relation.localKey) {
                     // Owning relation: Map relation object to FK column on current table
@@ -263,7 +263,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
     for (const [propKey, property] of Object.entries(properties)) {
         if (property.type === "relation" && !(propKey in result)) {
             // Find the normalized relation for this property
-            const relation = resolvedRelations[propKey];
+            const relation = findRelation(resolvedRelations, propKey);
             if (relation) {
                 if (relation.direction === "owning" && relation.localKey && relation.localKey in data) {
                     // Owning relation: FK is in current table
@@ -449,7 +449,7 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
                 let relationDef: Relation | undefined = (property as RelationProperty).relation;
                 if (!relationDef && propertyKey) {
                     const resolvedRelations = resolveCollectionRelations(collection as import("@rebasepro/types").PostgresCollection);
-                    relationDef = resolvedRelations[propertyKey];
+                    relationDef = findRelation(resolvedRelations, propertyKey);
                 }
                 if (!relationDef) {
                     relationDef = (collection as import("@rebasepro/types").PostgresCollection).relations?.find((rel) => rel.relationName === (property as RelationProperty).relationName);

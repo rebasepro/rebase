@@ -1,7 +1,7 @@
 import { and, asc, count, desc, eq, getTableName, gt, lt, or, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { Entity, EntityCollection, FilterValues, Relation } from "@rebasepro/types";
-import { resolveCollectionRelations } from "@rebasepro/common";
+import { resolveCollectionRelations, findRelation } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
     getCollectionByPath,
@@ -371,7 +371,7 @@ export class EntityFetchService {
         for (const [k, v] of Object.entries(row)) {
             if (k === idInfo.fieldName) continue;
 
-            const relation = resolvedRelations[k];
+            const relation = findRelation(resolvedRelations, k);
             if (Array.isArray(v) && relation) {
                 // Many relation — flatten each nested entity, handling junction tables
                 flat[k] = v.map((item: Record<string, unknown>) => {
@@ -913,7 +913,7 @@ export class EntityFetchService {
         for (let i = 2; i < pathSegments.length; i += 2) {
             const relationKey = pathSegments[i];
             const resolvedRelations = resolveCollectionRelations(currentCollection as import("@rebasepro/types").PostgresCollection);
-            const relation = resolvedRelations[relationKey];
+            const relation = findRelation(resolvedRelations, relationKey);
 
             if (!relation) {
                 throw new Error(`Relation '${relationKey}' not found in collection '${currentCollection.slug}'`);
@@ -1001,7 +1001,7 @@ export class EntityFetchService {
         for (let i = 2; i < pathSegments.length; i += 2) {
             const relationKey = pathSegments[i];
             const resolvedRelations = resolveCollectionRelations(currentCollection as import("@rebasepro/types").PostgresCollection);
-            const relation = resolvedRelations[relationKey];
+            const relation = findRelation(resolvedRelations, relationKey);
 
             if (!relation) {
                 throw new Error(`Relation '${relationKey}' not found`);

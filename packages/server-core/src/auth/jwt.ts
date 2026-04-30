@@ -123,14 +123,17 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
     try {
         const decoded = jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] }) as { userId?: string; uid?: string; sub?: string; roles?: string[] };
         const id = decoded.userId || decoded.uid || decoded.sub;
-        if (!id) return null;
+        if (!id) {
+            console.error("[JWT] Verification failed: missing id in payload", decoded);
+            return null;
+        }
         
         return {
             userId: id,
-            uid: id,
             roles: decoded.roles || []
         };
     } catch (error) {
+        console.error("[JWT] Verification failed:", error, "Token start:", token.substring(0, 15));
         return null;
     }
 }
