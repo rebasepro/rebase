@@ -11,6 +11,7 @@ export interface Database {
       email: string;
       picture?: string;
       userid?: string;
+      profile?: { id: string | number; path: string; __type: "relation"; data?: any };
     };
     Insert: {
       id?: number;
@@ -33,6 +34,7 @@ export interface Database {
       bio?: string;
       website?: string;
       authorId?: string | number;
+      author?: { id: string | number; path: string; __type: "relation"; data?: any };
     };
     Insert: {
       id: number;
@@ -54,6 +56,9 @@ export interface Database {
       content?: string;
       status?: "draft" | "review" | "published" | "archived";
       authorId?: string | number;
+      author?: { id: string | number; path: string; __type: "relation"; data?: any };
+      profile?: { id: string | number; path: string; __type: "relation"; data?: any };
+      tags?: Array<{ id: string | number; path: string; __type: "relation"; data?: any }>;
     };
     Insert: {
       id: number;

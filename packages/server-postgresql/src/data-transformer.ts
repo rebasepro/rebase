@@ -245,8 +245,9 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
 
     // Process only the properties that are defined in the collection
     for (const [key, value] of Object.entries(data)) {
-        // Skip internal FK columns that aren't defined as properties
+        // Keep internal FK columns as primitives
         if (internalFKColumns.has(key)) {
+            result[key] = value === null ? null : (typeof value === "number" ? value : String(value));
             continue;
         }
 
@@ -554,8 +555,11 @@ export function normalizeDbValues<M extends Record<string, unknown>>(
     });
 
     for (const [key, value] of Object.entries(data)) {
-        // Skip internal FK columns
-        if (internalFKColumns.has(key)) continue;
+        // Keep internal FK columns as primitives
+        if (internalFKColumns.has(key)) {
+            result[key] = value === null ? null : (typeof value === "number" ? value : String(value));
+            continue;
+        }
 
         const property = properties[key as keyof M] as Property;
         if (!property) continue; // Skip DB columns not defined in properties

@@ -30,4 +30,8 @@ When contributing to the Rebase monorepo, you MUST adhere strictly to the follow
 - **Find the Native, Architectural Solution**: Always investigate until you find the true root cause. Solve it the proper way, even if it requires more effort, reading documentation, or deep architectural refactoring.
 - **This is a serious project**: Duct-tape fixes are strictly prohibited. We build for long-term stability and reliability.
 
+## 6. Foreign Keys and Relations
+- **Principle of Least Astonishment**: When exposing relational data via APIs or SDKs, foreign key fields (e.g., `company_id`) MUST always return primitive scalars (`string` or `number`).
+- **Simultaneous Access**: Do not strip the raw foreign key from the payload just because the relation is expanded. Both the primitive key (`company_id`) and the hydrated relation object (`company`) must co-exist to maintain backward compatibility and type safety.
+
 *These rules were instated because lazy abstractions, dynamic requires, and hacking around problems instead of fixing the root cause have previously caused critical technical debt and system instability.*

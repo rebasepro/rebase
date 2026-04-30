@@ -115,6 +115,20 @@ export function generateTypedefs(collections: EntityCollection[]): string {
                 emittedKeys.add(fkKey);
             }
         }
+        
+        // 3. Relation fields
+        for (const [key, rawProp] of Object.entries(properties)) {
+            const prop = rawProp as Property;
+            if (prop.type === "relation") {
+                if (emittedKeys.has(key)) continue;
+                const relation = resolvedRelations[key];
+                const isArray = relation?.cardinality === "many";
+                const relType = `{ id: string | number; path: string; __type: "relation"; data?: any }`;
+                const tsType = isArray ? `Array<${relType}>` : relType;
+                lines.push(`      ${toSafeIdentifier(key)}?: ${tsType};`);
+                emittedKeys.add(key);
+            }
+        }
         lines.push(`    };`);
 
         // ── Insert Type ──

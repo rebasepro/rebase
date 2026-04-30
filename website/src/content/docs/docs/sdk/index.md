@@ -181,15 +181,29 @@ function MyComponent() {
 }
 ```
 
+## Relations and Foreign Keys
+
+When fetching data that includes relations, the Rebase SDK returns both the raw scalar foreign key and the hydrated relation object side-by-side in the response.
+
+```typescript
+const job = await client.data.fetchEntity("jobs", 123);
+
+// The scalar foreign key is available as a primitive
+console.log(job.values.company_id); // "uuid-1234"
+
+// If the relation was expanded, the populated object is accessible via the relation property
+console.log(job.values.company?.data?.name); // "Acme Corp"
+```
+
 ## SDK Generator
 
 Generate a fully typed client SDK from your collection definitions:
 
 ```bash
-rebase generate_sdk
+rebase generate-sdk
 ```
 
-This creates TypeScript types for all your entities, so you get autocomplete and type checking when using the client.
+This creates TypeScript types for all your entities, so you get autocomplete and type checking when using the client. Both scalar foreign keys and relation objects are included in the generated `Database` types.
 
 ## Next Steps
 
