@@ -205,28 +205,8 @@ export const DefaultAppBar = function DefaultAppBar({
                     {endAdornment}
                 </ErrorBoundary>}
 
-            {navigation && (
-                <div className="mr-2 hidden sm:flex bg-surface-100 dark:bg-surface-800 rounded-lg p-0.5 border border-surface-200 dark:border-surface-700">
-                    <button
-                        onClick={() => {
-                            adminModeController.setMode("content");
-                            navigate(navigation?.basePath ?? "/");
-                        }}
-                        className={cls("px-3 py-1 text-xs font-semibold rounded-md transition-all", adminModeController.mode === "content" ? "bg-white dark:bg-surface-900 shadow-sm text-primary dark:text-primary-400" : "text-surface-500 hover:text-surface-900 dark:hover:text-white")}
-                    >
-                        Content
-                    </button>
-                    <button
-                        onClick={() => {
-                            adminModeController.setMode("studio");
-                            navigate(navigation?.basePath === "/" ? "/s" : `${navigation?.basePath ?? ""}/s`);
-                        }}
-                        className={cls("px-3 py-1 text-xs font-semibold rounded-md transition-all", adminModeController.mode === "studio" ? "bg-white dark:bg-surface-900 shadow-sm text-primary dark:text-primary-400" : "text-surface-500 hover:text-surface-900 dark:hover:text-white")}
-                    >
-                        Studio
-                    </button>
-                </div>
-            )}
+
+
 
             <LanguageToggle />
 

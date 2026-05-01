@@ -1,14 +1,15 @@
 import type { NavigationEntry, NavigationResult } from "@rebasepro/types";
 import React from "react";
 
-import { useCollapsedGroups, useLargeLayout, useAdminModeController, useEffectiveRoleController, useTranslation, useSlot, useRebaseContext, useAnalyticsController } from "@rebasepro/core";
+import { useCollapsedGroups, useLargeLayout, useAdminModeController, useEffectiveRoleController, useTranslation, useSlot, useRebaseContext, useAnalyticsController, useRebaseRegistry } from "@rebasepro/core";
 import { useNavigationStateController, useUrlController } from "../hooks";
 
 import { Link, useNavigate } from "react-router-dom";
 import { AnalyticsEvent } from "@rebasepro/types";
 import { cls, Tooltip, Typography } from "@rebasepro/ui";
 import { DrawerNavigationGroup } from "./DrawerNavigationGroup";
-import { RebaseLogo } from "@rebasepro/core";import { useApp } from "./app/useApp";
+import { RebaseLogo } from "@rebasepro/core";
+import { useApp } from "./app/useApp";
 
 /**
  * Default drawer used in the CMS
@@ -58,6 +59,7 @@ export function DefaultDrawer({
     const navigate = useNavigate();
     const adminModeController = useAdminModeController();
     const effectiveRoleController = useEffectiveRoleController();
+    const registry = useRebaseRegistry();
 
     const adminViews = navigationState.topLevelNavigation?.navigationEntries.filter(e => e.type === "admin") ?? [];
 
@@ -107,12 +109,19 @@ export function DefaultDrawer({
                     drawerHovered={drawerHovered}
                 />
 
+                {registry.studioConfig && (
+                    <DrawerModeSwitch
+                        drawerOpen={drawerOpen}
+                        drawerHovered={drawerHovered}
+                    />
+                )}
+
                 {headerSlot}
 
                 <div
                     ref={scrollRef}
                     onScroll={handleScroll}
-                    className={"mt-1 flex-grow overflow-scroll no-scrollbar"}
+                    className={"mt-1 flex-grow overflow-y-auto overflow-x-visible no-scrollbar"}
                     style={{
                         maskImage: scrolled
                             ? "linear-gradient(to bottom, transparent 0, black 20px, black calc(100% - 20px), transparent 100%)"
@@ -271,6 +280,63 @@ export function DrawerToggle({
                     </div>
                 </div>
             </Tooltip>
+        </div>
+    );
+}
+
+/**
+ * Segmented Content / Studio switch rendered inside the drawer.
+ * Animates in/out with the drawer open state via opacity + max-height.
+ */
+function DrawerModeSwitch({
+    drawerOpen,
+    drawerHovered,
+}: {
+    drawerOpen: boolean;
+    drawerHovered: boolean;
+}) {
+    const adminModeController = useAdminModeController();
+    const urlController = useUrlController();
+    const navigate = useNavigate();
+    const showSwitch = drawerOpen || drawerHovered;
+
+    return (
+        <div
+            className={cls(
+                "overflow-hidden transition-all duration-200 ease-in-out px-3",
+                showSwitch ? "opacity-100 h-7 mt-2 mb-0.5" : "opacity-0 pointer-events-none h-2 mt-1 mb-0"
+            )}
+        >
+            <div className="flex bg-surface-100 dark:bg-surface-800 rounded-lg p-0.5 border border-surface-200 dark:border-surface-700">
+                <button
+                    onClick={() => {
+                        adminModeController.setMode("content");
+                        navigate(urlController.basePath ?? "/");
+                    }}
+                    className={cls(
+                        "flex-1 px-3 py-0.5 text-xs font-semibold rounded-md transition-all text-center",
+                        adminModeController.mode === "content"
+                            ? "bg-white dark:bg-surface-900 shadow-sm text-primary dark:text-primary-400"
+                            : "text-surface-500 hover:text-surface-900 dark:hover:text-white"
+                    )}
+                >
+                    Content
+                </button>
+                <button
+                    onClick={() => {
+                        adminModeController.setMode("studio");
+                        navigate(urlController.basePath === "/" ? "/s" : `${urlController.basePath ?? ""}/s`);
+                    }}
+                    className={cls(
+                        "flex-1 px-3 py-0.5 text-xs font-semibold rounded-md transition-all text-center",
+                        adminModeController.mode === "studio"
+                            ? "bg-white dark:bg-surface-900 shadow-sm text-primary dark:text-primary-400"
+                            : "text-surface-500 hover:text-surface-900 dark:hover:text-white"
+                    )}
+                >
+                    Studio
+                </button>
+            </div>
         </div>
     );
 }

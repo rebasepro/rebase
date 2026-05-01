@@ -217,6 +217,13 @@ export class CollectionRegistry {
         const bySlug = this.collectionsBySlug.get(path);
         if (bySlug) return bySlug;
 
+        // Fallback: normalize hyphens → underscores (URLs use kebab-case, slugs use snake_case)
+        if (path.includes("-")) {
+            const normalized = path.replace(/-/g, "_");
+            const byNormalized = this.collectionsBySlug.get(normalized);
+            if (byNormalized) return byNormalized;
+        }
+
         // Fallback to table name lookup
         return this.collectionsByTableName.get(path);
     }
@@ -228,6 +235,14 @@ export class CollectionRegistry {
     getRaw(path: string): EntityCollection | undefined {
         const bySlug = this.rawCollectionsBySlug.get(path);
         if (bySlug) return bySlug;
+
+        // Fallback: normalize hyphens → underscores (URLs use kebab-case, slugs use snake_case)
+        if (path.includes("-")) {
+            const normalized = path.replace(/-/g, "_");
+            const byNormalized = this.rawCollectionsBySlug.get(normalized);
+            if (byNormalized) return byNormalized;
+        }
+
         return this.rawCollectionsByTableName.get(path);
     }
 

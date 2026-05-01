@@ -3,7 +3,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { CollectionSize, Entity, EntityTableController, SelectionController } from "@rebasepro/types";
 import { getEntityImagePreviewPropertyKey } from "@rebasepro/common";
 import {
-    Avatar,
     Checkbox,
     Chip,
     CircularProgress,
@@ -20,6 +19,7 @@ import { useAnalyticsController } from "@rebasepro/core";
 import { getEntityTitlePropertyKey, getEntityPreviewKeys } from "../../util/previews";
 import { IconForView } from "@rebasepro/core";
 import { getValueInPath } from "@rebasepro/utils";
+import { useCollectionSlotKeys, resolveEntitySlots, type CollectionSlotKeys } from "./useEntityPreviewSlots";
 
 export type EntityCollectionListViewProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     collection: EntityCollection<M>;
@@ -88,6 +88,95 @@ function getRowClasses(size: CollectionSize): string {
         case "xl": return "py-5 px-5 min-h-[88px]";
         default: return "py-3 px-5 min-h-[64px]";
     }
+}
+
+/**
+ * Returns true if a property type should NOT be rendered via
+ * PropertyPreview in list row columns (because it would blow up height).
+ */
+function isComplexPropertyType(property: Property): boolean {
+    return property.type === "array"
+        || property.type === "map"
+        || property.type === "reference"
+        || property.type === "relation";
+}
+
+/**
+ * Render a complex value as a compact, single-line string.
+ * - Arrays  → "Item, Item +3"
+ * - Maps    → "4 fields"
+ * - Refs    → entity ID
+ * - Relations → entity ID or name
+ */
+function compactValueSummary(value: unknown, property: Property): string | null {
+    if (value === undefined || value === null) return null;
+
+    if (property.type === "array") {
+        if (!Array.isArray(value)) return null;
+        if (value.length === 0) return null;
+
+        const of = "of" in property ? property.of : undefined;
+        const innerProp = of ? (Array.isArray(of) ? of[0] : of) : undefined;
+
+        // String/number arrays → join
+        const labels = value.map((v: unknown) => {
+            if (typeof v === "string") return v;
+            if (typeof v === "number") return String(v);
+            // Reference inside array
+            if (v && typeof v === "object" && "id" in v) return String((v as Record<string, unknown>).id);
+            // Enum label lookup
+            if (innerProp && "enum" in innerProp && innerProp.enum && typeof v === "string") {
+                const enumValues = innerProp.enum;
+                if (Array.isArray(enumValues)) {
+                    const match = enumValues.find((e: unknown) =>
+                        typeof e === "object" && e !== null && "id" in e && (e as Record<string, unknown>).id === v
+                    );
+                    if (match && typeof match === "object" && "label" in match) return String((match as Record<string, unknown>).label);
+                } else if (typeof enumValues === "object") {
+                    const label = (enumValues as Record<string, unknown>)[v];
+                    if (typeof label === "string") return label;
+                    if (label && typeof label === "object" && "label" in label) return String((label as Record<string, unknown>).label);
+                }
+                return v;
+            }
+            return "•";
+        });
+
+        const MAX_SHOWN = 2;
+        const shown = labels.slice(0, MAX_SHOWN).join(", ");
+        const remaining = labels.length - MAX_SHOWN;
+        return remaining > 0 ? `${shown} +${remaining}` : shown;
+    }
+
+    if (property.type === "map") {
+        if (typeof value !== "object" || value === null) return null;
+        const count = Object.keys(value).length;
+        return count === 0 ? null : `${count} field${count !== 1 ? "s" : ""}`;
+    }
+
+    if (property.type === "reference") {
+        if (typeof value === "string") return value;
+        if (value && typeof value === "object" && "id" in value) return String((value as Record<string, unknown>).id);
+        return null;
+    }
+
+    if (property.type === "relation") {
+        // Relation data is often populated as { id, data: { ... } }
+        if (typeof value === "string" || typeof value === "number") return String(value);
+        if (value && typeof value === "object") {
+            const obj = value as Record<string, unknown>;
+            // Try to find a display name in relation data
+            if (obj.data && typeof obj.data === "object") {
+                const data = obj.data as Record<string, unknown>;
+                const name = data.name ?? data.title ?? data.display_name ?? data.displayName ?? data.email;
+                if (name) return String(name);
+            }
+            if ("id" in obj) return String(obj.id);
+        }
+        return null;
+    }
+
+    return null;
 }
 
 /**
@@ -245,42 +334,15 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
 
     const resolvedCollection = collection;
 
-    const titlePropertyKey = useMemo(
-        () => getEntityTitlePropertyKey(resolvedCollection, customizationController.propertyConfigs),
-        [resolvedCollection, customizationController.propertyConfigs]
+    // ── Shared slot resolution (replaces 4 individual useMemo calls) ──
+    const slotKeys = useCollectionSlotKeys(
+        resolvedCollection as EntityCollection<Record<string, unknown>>,
+        authController,
+        customizationController.propertyConfigs
     );
+    const { titleKey: titlePropertyKey, imageKey: imagePropertyKey, subtitleKey, statusKey: statusPropertyKey, dateKey: datePropertyKey } = slotKeys;
 
-    const imagePropertyKey = useMemo(
-        () => getEntityImagePreviewPropertyKey(resolvedCollection),
-        [resolvedCollection]
-    );
 
-    const previewCount = getPreviewCount(size);
-
-    // Detect date properties for "last modified" style display
-    const datePropertyKey = useMemo(() => {
-        const candidates = ["updated_at", "updatedAt", "modified_at", "modifiedAt", "created_at", "createdAt"];
-        for (const candidate of candidates) {
-            if (resolvedCollection.properties[candidate]) return candidate;
-        }
-        // Fall back to any date/datetime property
-        for (const [key, prop] of Object.entries(resolvedCollection.properties)) {
-            const p = prop as Property;
-            if (p.type === "date") return key;
-        }
-        return undefined;
-    }, [resolvedCollection.properties]);
-
-    // Detect enum/status properties for chip display
-    const statusPropertyKey = useMemo(() => {
-        for (const [key, prop] of Object.entries(resolvedCollection.properties)) {
-            const p = prop as Property;
-            if (p.type === "string" && "enum" in p && p.enum && key !== titlePropertyKey) {
-                return key;
-            }
-        }
-        return undefined;
-    }, [resolvedCollection.properties, titlePropertyKey]);
 
     const previewKeys = useMemo(
         () => getEntityPreviewKeys(authController, resolvedCollection, customizationController.propertyConfigs, undefined, 10)
@@ -488,8 +550,7 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
                         onSelectionChange={handleSelectionChange}
                         selectionEnabled={selectionEnabled}
                         columns={visibleColumns}
-                        imagePropertyKey={imagePropertyKey}
-                        previewKeys={previewKeys.length > 0 ? [previewKeys[0]] : []}
+                        slotKeys={slotKeys}
                         rowClasses={rowClasses}
                         showImage={showImage}
                         size={size}
@@ -519,7 +580,12 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
 }
 
 /**
- * Single row in the list view
+ * Single row in the list view.
+ * Uses the shared slot system for a fixed editorial layout:
+ *   [Checkbox] [Image] [Title + Subtitle] → spacer → [Status] [Date]
+ *
+ * When collection.listProperties is explicitly set, falls back to
+ * the column system for developer-defined table layouts.
  */
 const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     entity,
@@ -530,8 +596,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     onSelectionChange,
     selectionEnabled,
     columns,
-    imagePropertyKey,
-    previewKeys,
+    slotKeys,
     rowClasses,
     showImage,
     size,
@@ -546,23 +611,19 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     onSelectionChange?: (entity: Entity<M>, selected: boolean) => void;
     selectionEnabled?: boolean;
     columns: ListColumnDef[];
-    imagePropertyKey?: string;
-    previewKeys: string[];
+    slotKeys: CollectionSlotKeys;
     rowClasses: string;
     showImage: boolean;
     size: CollectionSize;
     isLast: boolean;
     isActive?: boolean;
 }) {
-    const imageProperty = imagePropertyKey ? collection.properties[imagePropertyKey] : undefined;
-    const ofProp = imageProperty && "of" in imageProperty ? imageProperty.of : undefined;
-    const usedImageProperty = ofProp ? (Array.isArray(ofProp) ? ofProp[0] : ofProp) : imageProperty;
-    const imageValue = imagePropertyKey ? getValueInPath(entity.values, imagePropertyKey) : undefined;
-    const usedImageValue = imageProperty !== undefined
-        ? ("of" in imageProperty
-            ? (((imageValue as unknown[]) ?? []).length > 0 ? (imageValue as unknown[])[0] : undefined)
-            : imageValue)
-        : undefined;
+    // ── Resolve slots (pure function, no hooks) ──
+    const slots = resolveEntitySlots(
+        entity as Entity<Record<string, unknown>>,
+        collection as EntityCollection<Record<string, unknown>>,
+        slotKeys
+    );
 
     const handleClick = useCallback((e: React.MouseEvent) => {
         // Cmd+click (Mac) or Ctrl+click (Windows) toggles selection
@@ -582,15 +643,9 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
         onSelectionChange?.(entity, checked);
     }, [entity, onSelectionChange]);
 
-    // Resolve image URL string for the avatar
-    const imageUrl = useMemo(() => {
-        if (!usedImageValue) return undefined;
-        if (typeof usedImageValue === "string") return usedImageValue;
-        if (typeof usedImageValue === "object" && usedImageValue !== null && "url" in usedImageValue) {
-            return (usedImageValue as { url: string }).url;
-        }
-        return undefined;
-    }, [usedImageValue]);
+    // Developer-defined column mode (listProperties is explicitly set)
+    const useColumnMode = !!collection.listProperties && collection.listProperties.length > 0;
+    const extraColumns = useColumnMode ? columns.filter(c => !c.isTitle) : [];
 
     return (
         <div
@@ -628,12 +683,12 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                 </div>
             )}
 
-            {/* Entity Icon / Avatar */}
+            {/* MEDIA slot → Image / Icon */}
             {showImage && (
                 <div className="flex-shrink-0">
-                    {usedImageValue && usedImageProperty ? (
+                    {slots.image ? (
                         <div className={cls("w-10 h-10 rounded-lg border relative overflow-hidden bg-surface-100 dark:bg-surface-800", defaultBorderMixin)}>
-                            <PropertyPreview propertyKey={imagePropertyKey!} value={usedImageValue} property={usedImageProperty} size="small" fill={true} />
+                            <PropertyPreview propertyKey={slots.image.propertyKey} value={slots.image.value} property={slots.image.property} size="small" fill={true} />
                         </div>
                     ) : (
                         <div className={cls("w-10 h-10 rounded-lg bg-surface-100 dark:bg-surface-800 flex items-center justify-center border", defaultBorderMixin)}>
@@ -647,92 +702,137 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                 </div>
             )}
 
-            {/* Content Columns */}
-            {columns.map((col, i) => {
-                const value = getValueInPath(entity.values, col.key);
+            {/* PRIMARY slot → Title + subtitle + byline */}
+            <div className={cls("min-w-[180px]", useColumnMode ? "flex-1" : "flex-1 max-w-xl")}>
+                <div className="truncate">
+                    {slots.title?.value !== undefined ? (
+                        <Typography component="div" variant="body2" className="font-semibold text-surface-900 dark:text-surface-50 truncate transition-colors group-hover:text-primary-600 dark:group-hover:text-primary-400">
+                            <PropertyPreview
+                                propertyKey={slots.title.propertyKey}
+                                value={slots.title.value}
+                                property={slots.title.property}
+                                size="small"
+                            />
+                        </Typography>
+                    ) : (
+                        <Typography component="div" variant="body2" className="font-semibold text-surface-500 dark:text-surface-400 font-mono text-xs transition-colors group-hover:text-primary-600 dark:group-hover:text-primary-400">
+                            {entity.id}
+                        </Typography>
+                    )}
+                </div>
 
-                if (col.isTitle) {
-                    return (
-                        <div key={col.key} className={col.width}>
-                            <div className="flex items-center gap-2">
-                                <div className="truncate">
-                                    {value !== undefined ? (
-                                        <Typography component="div" variant="body2" className="font-semibold text-surface-900 dark:text-surface-50 truncate transition-colors group-hover:text-primary-600 dark:group-hover:text-primary-400">
-                                            <PropertyPreview
-                                                propertyKey={col.key}
-                                                value={value}
-                                                property={col.property}
-                                                size="small"
-                                            />
-                                        </Typography>
-                                    ) : (
-                                        <Typography component="div" variant="body2" className="font-semibold text-surface-500 dark:text-surface-400 font-mono text-xs transition-colors group-hover:text-primary-600 dark:group-hover:text-primary-400">
-                                            {entity.id}
-                                        </Typography>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Preview property lines */}
-                            {previewKeys.length > 0 && !collection.listProperties && (
-                                <div className="flex items-center gap-2 mt-0.5">
-                                    {previewKeys.map((key, i) => {
-                                        const property = collection.properties[key] as Property;
-                                        if (!property) return null;
-                                        const previewValue = getValueInPath(entity.values, key);
-                                        if (previewValue === undefined || previewValue === null || previewValue === "") return null;
-                                        return (
-                                            <React.Fragment key={key}>
-                                                {i > 0 && (
-                                                    <span className="text-surface-300 dark:text-surface-600">·</span>
-                                                )}
-                                                <div className="truncate text-xs text-surface-500 dark:text-surface-400">
-                                                    <PropertyPreview
-                                                        propertyKey={key}
-                                                        value={previewValue as never}
-                                                        property={property}
-                                                        size="small"
-                                                    />
-                                                </div>
-                                            </React.Fragment>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    );
-                }
-
-                if (col.isStatus || (col.property.type === "string" && "enum" in col.property)) {
-                    return (
-                        <div key={col.key} className={cls(col.width, "flex", col.align === "center" ? "justify-center" : col.align === "right" ? "justify-end" : "justify-start")}>
-                            {value ? (
-                                <PropertyPreview propertyKey={col.key} value={value} property={col.property} size="small" />
-                            ) : <span className="text-surface-400">—</span>}
-                        </div>
-                    );
-                }
-
-                if (col.isDate || col.property.type === "date") {
-                    return (
-                        <div key={col.key} className={cls(col.width, col.align === "center" ? "text-center" : col.align === "right" ? "text-right" : "text-left")}>
-                            <Typography variant="caption" className="whitespace-nowrap text-surface-400 dark:text-surface-500 font-medium">
-                                {formatDateValue(value) ?? "—"}
-                            </Typography>
-                        </div>
-                    );
-                }
-
-                return (
-                    <div key={col.key} className={cls(col.width, "truncate", col.align === "center" ? "text-center" : col.align === "right" ? "text-right" : "text-left")}>
-                        <Typography component="div" variant="body2" className="text-surface-600 dark:text-surface-300 truncate">
-                            {value !== undefined ? (
-                                <PropertyPreview propertyKey={col.key} value={value} property={col.property} size="small" />
-                            ) : "—"}
+                {/* SUBTITLE slot — always plain truncated text */}
+                {slots.subtitle && (
+                    <div className="truncate mt-0.5">
+                        <Typography variant="caption" className="text-surface-500 dark:text-surface-400 truncate">
+                            {typeof slots.subtitle.value === "string"
+                                ? slots.subtitle.value
+                                : slots.subtitle.value != null
+                                    ? String(slots.subtitle.value)
+                                    : "—"}
                         </Typography>
                     </div>
-                );
-            })}
+                )}
+
+                {/* RELATION CHIPS slot — compact chips for all relations */}
+                {!useColumnMode && slots.relations.length > 0 && (
+                    <div className="flex items-center gap-1 mt-1 overflow-hidden max-w-full">
+                        {slots.relations.map((rel) => (
+                            rel.items.map((item) => (
+                                <Chip
+                                    key={`${rel.propertyKey}-${item.id}`}
+                                    size="smallest"
+                                    colorScheme={rel.colorScheme}
+                                    className="!text-[10px] !leading-tight !py-0 shrink-0 max-w-[120px] truncate"
+                                >
+                                    {item.displayName}
+                                </Chip>
+                            ))
+                        ))}
+                        {slots.relations.some(r => r.totalCount > r.items.length) && (
+                            <span className="text-[10px] text-surface-400 dark:text-surface-500 shrink-0">
+                                +{slots.relations.reduce((acc, r) => acc + Math.max(0, r.totalCount - r.items.length), 0)}
+                            </span>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {useColumnMode ? (
+                /* ── COLUMN MODE (developer-defined listProperties) ── */
+                <>
+                    {extraColumns.map((col) => {
+                        const value = getValueInPath(entity.values, col.key);
+
+                        if (col.isStatus || (col.property.type === "string" && "enum" in col.property)) {
+                            return (
+                                <div key={col.key} className={cls(col.width, "flex", col.align === "center" ? "justify-center" : col.align === "right" ? "justify-end" : "justify-start")}>
+                                    {value ? (
+                                        <PropertyPreview propertyKey={col.key} value={value} property={col.property} size="small" />
+                                    ) : <span className="text-surface-400">—</span>}
+                                </div>
+                            );
+                        }
+
+                        if (col.isDate || col.property.type === "date") {
+                            return (
+                                <div key={col.key} className={cls(col.width, col.align === "center" ? "text-center" : col.align === "right" ? "text-right" : "text-left")}>
+                                    <Typography variant="caption" className="whitespace-nowrap text-surface-400 dark:text-surface-500 font-medium">
+                                        {formatDateValue(value) ?? "—"}
+                                    </Typography>
+                                </div>
+                            );
+                        }
+
+                        // Complex types → compact single-line summary
+                        if (isComplexPropertyType(col.property)) {
+                            const summary = compactValueSummary(value, col.property);
+                            return (
+                                <div key={col.key} className={cls(col.width, "truncate", col.align === "center" ? "text-center" : col.align === "right" ? "text-right" : "text-left")}>
+                                    <Typography variant="caption" className="text-surface-500 dark:text-surface-400 truncate">
+                                        {summary ?? "—"}
+                                    </Typography>
+                                </div>
+                            );
+                        }
+
+                        // Simple scalar → PropertyPreview (single-line)
+                        return (
+                            <div key={col.key} className={cls(col.width, "truncate", col.align === "center" ? "text-center" : col.align === "right" ? "text-right" : "text-left")}>
+                                <Typography component="div" variant="body2" className="text-surface-600 dark:text-surface-300 truncate">
+                                    {value !== undefined ? (
+                                        <PropertyPreview propertyKey={col.key} value={value} property={col.property} size="small" />
+                                    ) : "—"}
+                                </Typography>
+                            </div>
+                        );
+                    })}
+                </>
+            ) : (
+                /* ── SLOT MODE (editorial scanner layout) ── */
+                <>
+                    {/* STATUS slot */}
+                    {slots.status && (
+                        <div className="flex-shrink-0">
+                            <PropertyPreview
+                                propertyKey={slots.status.propertyKey}
+                                value={slots.status.value}
+                                property={slots.status.property}
+                                size="small"
+                            />
+                        </div>
+                    )}
+
+                    {/* DATE slot */}
+                    {slots.date && (
+                        <div className="flex-shrink-0 text-right min-w-[80px]">
+                            <Typography variant="caption" className="whitespace-nowrap text-surface-400 dark:text-surface-500 font-medium">
+                                {slots.date.formatted ?? "—"}
+                            </Typography>
+                        </div>
+                    )}
+                </>
+            )}
         </div>
     );
 }) as <M extends Record<string, unknown>>(props: {
@@ -744,11 +844,11 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     onSelectionChange?: (entity: Entity<M>, selected: boolean) => void;
     selectionEnabled?: boolean;
     columns: ListColumnDef[];
-    imagePropertyKey?: string;
-    previewKeys: string[];
+    slotKeys: CollectionSlotKeys;
     rowClasses: string;
     showImage: boolean;
     size: CollectionSize;
     isLast: boolean;
     isActive?: boolean;
 }) => React.ReactElement;
+

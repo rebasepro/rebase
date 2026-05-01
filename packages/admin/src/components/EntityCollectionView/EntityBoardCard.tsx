@@ -1,15 +1,12 @@
 import type { EntityCollection } from "@rebasepro/types";
-import type { Property } from "@rebasepro/types";
 import React, { memo, useCallback, useMemo } from "react";
 import { Entity } from "@rebasepro/types";
-import { getEntityImagePreviewPropertyKey } from "@rebasepro/common";
-import { getEntityTitlePropertyKey } from "../../util/previews";
-import { IconForView } from "@rebasepro/core";
-import { Checkbox, cls, defaultBorderMixin } from "@rebasepro/ui";
+import { Checkbox, Chip, cls, defaultBorderMixin } from "@rebasepro/ui";
 import { PropertyPreview } from "../../preview";
-import { useCustomizationController } from "@rebasepro/core";
+import { useAuthController, useCustomizationController } from "@rebasepro/core";
+import { IconForView } from "@rebasepro/core";
 import { BoardItemViewProps } from "./board_types";
-import { getValueInPath } from "@rebasepro/utils";
+import { useCollectionSlotKeys, resolveEntitySlots } from "./useEntityPreviewSlots";
 
 export type EntityBoardCardProps<M extends Record<string, unknown> = Record<string, unknown>> = BoardItemViewProps<M> & {
     collection: EntityCollection<M>;
@@ -21,7 +18,7 @@ export type EntityBoardCardProps<M extends Record<string, unknown> = Record<stri
 
 /**
  * Compact card component for displaying an entity in a Kanban board.
- * Shows thumbnail, title, and optional selection checkbox.
+ * Uses the shared slot system for consistent preview rendering.
  */
 function EntityBoardCardInner<M extends Record<string, unknown> = Record<string, unknown>>({
     item,
@@ -35,32 +32,23 @@ function EntityBoardCardInner<M extends Record<string, unknown> = Record<string,
     selectionEnabled = false
 }: EntityBoardCardProps<M>) {
     const entity = item.entity;
+    const authController = useAuthController();
     const customizationController = useCustomizationController();
 
-    // v4: use collection directly without resolving
-    const titlePropertyKey = useMemo(
-        () => getEntityTitlePropertyKey(collection, customizationController.propertyConfigs),
-        [collection, customizationController.propertyConfigs]
+    const slotKeys = useCollectionSlotKeys(
+        collection as EntityCollection<Record<string, unknown>>,
+        authController,
+        customizationController.propertyConfigs
     );
 
-    const imagePropertyKey = useMemo(
-        () => getEntityImagePreviewPropertyKey(collection),
-        [collection]
+    const slots = useMemo(
+        () => resolveEntitySlots(
+            entity as Entity<Record<string, unknown>>,
+            collection as EntityCollection<Record<string, unknown>>,
+            slotKeys
+        ),
+        [entity, collection, slotKeys]
     );
-
-    const imageProperty = imagePropertyKey ? collection.properties[imagePropertyKey] : undefined;
-    const ofProp = imageProperty && "of" in imageProperty ? imageProperty.of : undefined;
-    const usedImageProperty = ofProp ? (Array.isArray(ofProp) ? ofProp[0] : ofProp) : imageProperty;
-
-    const imageValue = imagePropertyKey ? getValueInPath(entity.values, imagePropertyKey) : undefined;
-    const usedImageValue = imageProperty !== undefined
-        ? ("of" in imageProperty
-            ? (((imageValue as unknown[]) ?? []).length > 0 ? (imageValue as unknown[])[0] : undefined)
-            : imageValue)
-        : undefined;
-
-    const titleValue = titlePropertyKey ? getValueInPath(entity.values, titlePropertyKey) : undefined;
-    const titleProperty = titlePropertyKey ? collection.properties[titlePropertyKey] as Property : undefined;
 
     const handleClick = useCallback((e: React.MouseEvent) => {
         // Cmd+click (Mac) or Ctrl+click (Windows) toggles selection
@@ -116,14 +104,14 @@ function EntityBoardCardInner<M extends Record<string, unknown> = Record<string,
             onClick={handleClick}
         >
             <div className={cardClassName}>
-                {/* Thumbnail */}
-                {usedImageProperty && usedImageValue ? (
+                {/* Image slot → thumbnail */}
+                {slots.image ? (
                     <div className="w-10 h-10 rounded-md overflow-hidden shrink-0 mr-2">
                         <PropertyPreview
-                            property={usedImageProperty}
-                            propertyKey={imagePropertyKey as string}
+                            property={slots.image.property}
+                            propertyKey={slots.image.propertyKey}
                             size="small"
-                            value={usedImageValue}
+                            value={slots.image.value}
                             fill={true}
                         />
                     </div>
@@ -140,13 +128,13 @@ function EntityBoardCardInner<M extends Record<string, unknown> = Record<string,
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
-                    {/* Title */}
+                    {/* Title slot */}
                     <div className="line-clamp-2 text-sm font-medium">
-                        {titleProperty && titleValue ? (
+                        {slots.title ? (
                             <PropertyPreview
-                                propertyKey={titlePropertyKey as string}
-                                value={titleValue}
-                                property={titleProperty}
+                                propertyKey={slots.title.propertyKey}
+                                value={slots.title.value}
+                                property={slots.title.property}
                                 size="small"
                             />
                         ) : (
@@ -157,6 +145,28 @@ function EntityBoardCardInner<M extends Record<string, unknown> = Record<string,
                     <div className="text-xs text-surface-500 font-mono truncate">
                         {entity.id}
                     </div>
+                    {/* Relation chips slot */}
+                    {slots.relations.length > 0 && (
+                        <div className="flex items-center gap-1 mt-1 overflow-hidden max-w-full flex-wrap">
+                            {slots.relations.map((rel) => (
+                                rel.items.map((item) => (
+                                    <Chip
+                                        key={`${rel.propertyKey}-${item.id}`}
+                                        size="smallest"
+                                        colorScheme={rel.colorScheme}
+                                        className="!text-[10px] !leading-tight !py-0 shrink-0 max-w-[90px] truncate"
+                                    >
+                                        {item.displayName}
+                                    </Chip>
+                                ))
+                            ))}
+                            {slots.relations.some(r => r.totalCount > r.items.length) && (
+                                <span className="text-[10px] text-surface-400 dark:text-surface-500 shrink-0">
+                                    +{slots.relations.reduce((acc, r) => acc + Math.max(0, r.totalCount - r.items.length), 0)}
+                                </span>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* Selection checkbox */}

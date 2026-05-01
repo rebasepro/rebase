@@ -128,7 +128,7 @@ describe("createRebaseClient", () => {
             expect((client.data as any).$$typeof).toBeUndefined();
         });
 
-        describe("camelCase to kebab-case proxy mapping", () => {
+        describe("camelCase to snake_case proxy mapping", () => {
             it("maps access paths correctly and returns same cached instance", () => {
                 const client = createRebaseClient({ baseUrl: "https://api.example.com" });
                 
@@ -139,26 +139,31 @@ describe("createRebaseClient", () => {
 
                 // 2. Two-word camelCase
                 const companyMembers = (client.data as any).companyMembers;
-                const companyMembersColl = client.data.collection("company-members");
+                const companyMembersColl = client.data.collection("company_members");
                 expect(companyMembers).toBe(companyMembersColl);
 
                 // 3. Three-word camelCase
                 const talentApplicationStatus = (client.data as any).talentApplicationStatus;
-                const talentApplicationStatusColl = client.data.collection("talent-application-status");
+                const talentApplicationStatusColl = client.data.collection("talent_application_status");
                 expect(talentApplicationStatus).toBe(talentApplicationStatusColl);
 
                 // 4. Single uppercase letter
                 const xY = (client.data as any).xY;
-                const xYColl = client.data.collection("x-y");
+                const xYColl = client.data.collection("x_y");
                 expect(xY).toBe(xYColl);
 
                 // 5. Leading lowercase (common)
                 const leadMagnetSignups = (client.data as any).leadMagnetSignups;
-                const leadMagnetSignupsColl = client.data.collection("lead-magnet-signups");
+                const leadMagnetSignupsColl = client.data.collection("lead_magnet_signups");
                 expect(leadMagnetSignups).toBe(leadMagnetSignupsColl);
+
+                // 6. Already snake_case (no-op)
+                const privateNotes = (client.data as any).private_notes;
+                const privateNotesColl = client.data.collection("private_notes");
+                expect(privateNotes).toBe(privateNotesColl);
             });
 
-            it("verifies the actual HTTP path uses kebab-case", async () => {
+            it("verifies the actual HTTP path uses snake_case", async () => {
                 const mockFetch = jest.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => {
                     return {
                         ok: true,
@@ -177,7 +182,7 @@ describe("createRebaseClient", () => {
 
                 expect(mockFetch).toHaveBeenCalledTimes(1);
                 const urlArg = (mockFetch.mock.calls[0] as any)[0];
-                expect(urlArg.toString()).toContain("/api/data/company-members");
+                expect(urlArg.toString()).toContain("/api/data/company_members");
                 expect(urlArg.toString()).not.toContain("companyMembers");
             });
         });

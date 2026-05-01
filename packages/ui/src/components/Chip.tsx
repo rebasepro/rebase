@@ -4,6 +4,10 @@ import { CHIP_COLORS, cls, getColorSchemeForKey } from "../util";
 export type ChipColorScheme = {
     color: string;
     text: string;
+    /** Background color override for dark mode */
+    darkColor?: string;
+    /** Text color override for dark mode */
+    darkText?: string;
 }
 
 export type ChipColorKey = keyof typeof CHIP_COLORS;
@@ -28,6 +32,15 @@ const sizeClassNames = {
 }
 
 /**
+ * Detect if the app is currently in dark mode by checking the
+ * Tailwind `dark` class on the document root.
+ */
+function isDarkMode(): boolean {
+    return typeof document !== "undefined" &&
+        document.documentElement.classList.contains("dark");
+}
+
+/**
  * @group Preview components
  */
 export function Chip({
@@ -43,6 +56,16 @@ export function Chip({
                      }: ChipProps) {
 
     const usedColorScheme = typeof colorScheme === "string" ? getColorSchemeForKey(colorScheme) : colorScheme;
+
+    // Resolve theme-aware colors
+    const dark = isDarkMode();
+    const bgColor = usedColorScheme
+        ? (dark && usedColorScheme.darkColor ? usedColorScheme.darkColor : usedColorScheme.color)
+        : undefined;
+    const textColor = usedColorScheme
+        ? (dark && usedColorScheme.darkText ? usedColorScheme.darkText : usedColorScheme.text)
+        : undefined;
+
     return (
         <div
             className={cls("rounded-lg max-w-full w-max h-fit font-regular inline-flex gap-1",
@@ -55,13 +78,10 @@ export function Chip({
                 className)}
             onClick={onClick}
             style={{
-                backgroundColor: error || !usedColorScheme ? undefined : usedColorScheme.color,
-                color: error || !usedColorScheme ? undefined : usedColorScheme.text,
+                backgroundColor: error ? undefined : bgColor,
+                color: error ? undefined : textColor,
                 overflow: "hidden",
                 ...style
-                // display: "-webkit-box",
-                // WebkitLineClamp: 1,
-                // WebkitBoxOrient: "vertical",
             }}
         >
             {children}

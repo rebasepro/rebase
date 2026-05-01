@@ -91,6 +91,15 @@ export const pt: RebaseTranslations = {
     data_type_not_supported: "Tipo de dados {{dataType}} ainda não suportado",
     passkey_error_unsupported: "O seu dispositivo ou browser não suporta passkeys.",
 
+    // ─── Entity form feedback ─────────────────────────────────────
+    saved_correctly: "Guardado com sucesso",
+    error_before_saving: "Erro ao preparar os dados",
+    error_after_saving: "Erro no processamento pós-gravação",
+    error_saving_entity: "Erro ao guardar a entidade",
+    entity_does_not_exist: "Esta entidade não existe na base de dados",
+    form_modified: "Este formulário foi modificado",
+    form_in_sync: "O formulário atual está sincronizado com a base de dados",
+
     admin: "Administrador",
     home: "Início",
     this_form_has_errors: "Este formulário tem erros",

@@ -1,27 +1,21 @@
 import type { EntityCollection } from "@rebasepro/types";
 import React, { useMemo } from "react";
 import { CollectionSize, Entity } from "@rebasepro/types";
-import { getEntityImagePreviewPropertyKey } from "@rebasepro/common";
 import {
     Card,
     Checkbox,
+    Chip,
     cls,
-    KeyboardTabIcon,
-    IconButton,
-    Skeleton,
-    Tooltip,
     Typography
 } from "@rebasepro/ui";
-import { PropertyPreview, SkeletonPropertyComponent } from "../../preview";
+import { PropertyPreview } from "../../preview";
 import {
     useAuthController,
     useCustomizationController
 } from "@rebasepro/core";
 import { useAnalyticsController } from "@rebasepro/core";
-import { getEntityTitlePropertyKey, getEntityPreviewKeys } from "../../util/previews";
 import { IconForView } from "@rebasepro/core";
-import { getValueInPath } from "@rebasepro/utils";
-import { useCollectionRegistryController, useSideEntityController } from "../../index";
+import { useCollectionSlotKeys, resolveEntitySlots } from "./useEntityPreviewSlots";
 
 export type EntityCardProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     entity: Entity<M>;
@@ -39,7 +33,7 @@ export type EntityCardProps<M extends Record<string, unknown> = Record<string, u
 
 /**
  * Card component for displaying an entity in a grid view.
- * Shows thumbnail, title, and preview properties.
+ * Shows thumbnail, title, and preview properties via the shared slot system.
  */
 export function EntityCard<M extends Record<string, unknown> = Record<string, unknown>>({
     entity,
@@ -53,41 +47,22 @@ export function EntityCard<M extends Record<string, unknown> = Record<string, un
 }: EntityCardProps<M>) {
     const authController = useAuthController();
     const analyticsController = useAnalyticsController();
-    const sideEntityController = useSideEntityController();
     const customizationController = useCustomizationController();
-    const collectionRegistryController = useCollectionRegistryController();
 
-    const resolvedCollection = collection;
-
-    const titlePropertyKey = useMemo(
-        () => getEntityTitlePropertyKey(resolvedCollection, customizationController.propertyConfigs),
-        [resolvedCollection, customizationController.propertyConfigs]
+    const slotKeys = useCollectionSlotKeys(
+        collection as EntityCollection<Record<string, unknown>>,
+        authController,
+        customizationController.propertyConfigs
     );
 
-    const imagePropertyKey = useMemo(
-        () => getEntityImagePreviewPropertyKey(resolvedCollection),
-        [resolvedCollection]
+    const slots = useMemo(
+        () => resolveEntitySlots(
+            entity as Entity<Record<string, unknown>>,
+            collection as EntityCollection<Record<string, unknown>>,
+            slotKeys
+        ),
+        [entity, collection, slotKeys]
     );
-
-    const previewKeys = useMemo(
-        () => getEntityPreviewKeys(authController, resolvedCollection, customizationController.propertyConfigs, undefined, 2)
-            .filter(key => key !== titlePropertyKey && key !== imagePropertyKey),
-        [authController, resolvedCollection, customizationController.propertyConfigs, titlePropertyKey, imagePropertyKey]
-    );
-
-    const imageProperty = imagePropertyKey ? resolvedCollection.properties[imagePropertyKey] : undefined;
-    const ofProp = imageProperty && "of" in imageProperty ? imageProperty.of : undefined;
-    const usedImageProperty = ofProp ? (Array.isArray(ofProp) ? ofProp[0] : ofProp) : imageProperty;
-
-    const imageValue = imagePropertyKey ? getValueInPath(entity.values, imagePropertyKey) : undefined;
-    const usedImageValue = imageProperty !== undefined
-        ? ("of" in imageProperty
-            ? (((imageValue as unknown[]) ?? []).length > 0 ? (imageValue as unknown[])[0] : undefined)
-            : imageValue)
-        : undefined;
-
-    const titleValue = titlePropertyKey ? getValueInPath(entity.values, titlePropertyKey) : undefined;
-    const titleProperty = titlePropertyKey ? resolvedCollection.properties[titlePropertyKey] : undefined;
 
     const handleClick = (e?: React.MouseEvent) => {
         // Cmd+click (Mac) or Ctrl+click (Windows) toggles selection
@@ -124,15 +99,15 @@ export function EntityCard<M extends Record<string, unknown> = Record<string, un
             )}
             onClick={handleClick}
         >
-            {/* Thumbnail area */}
+            {/* Thumbnail area — image slot */}
             <div className="aspect-[4/3] relative overflow-hidden bg-surface-100 dark:bg-surface-800">
-                {usedImageProperty && usedImageValue ? (
+                {slots.image ? (
                     <div className="w-full h-full">
                         <PropertyPreview
-                            property={usedImageProperty}
-                            propertyKey={imagePropertyKey as string}
+                            property={slots.image.property}
+                            propertyKey={slots.image.propertyKey}
                             size="medium"
-                            value={usedImageValue}
+                            value={slots.image.value}
                             fill={true}
                         />
                     </div>
@@ -181,13 +156,13 @@ export function EntityCard<M extends Record<string, unknown> = Record<string, un
                     {entity.id}
                 </Typography>
 
-                {/* Title */}
+                {/* Title slot */}
                 <div className="truncate my-1 text-sm font-medium min-h-[20px]">
-                    {titleProperty && titleValue ? (
+                    {slots.title ? (
                         <PropertyPreview
-                            propertyKey={titlePropertyKey as string}
-                            value={titleValue}
-                            property={titleProperty}
+                            propertyKey={slots.title.propertyKey}
+                            value={slots.title.value}
+                            property={slots.title.property}
                             size="small"
                         />
                     ) : (
@@ -197,22 +172,52 @@ export function EntityCard<M extends Record<string, unknown> = Record<string, un
                     )}
                 </div>
 
-                {/* Preview properties */}
-                {previewKeys.slice(0, 2).map((key) => {
-                    const property = resolvedCollection.properties[key];
-                    if (!property) return null;
-                    const value = getValueInPath(entity.values, key);
-                    return (
-                        <div key={key} className="truncate text-xs text-surface-600 dark:text-surface-400">
-                            <PropertyPreview
-                                propertyKey={key}
-                                value={value as never}
-                                property={property}
-                                size="small"
-                            />
-                        </div>
-                    );
-                })}
+                {/* Subtitle slot */}
+                {slots.subtitle && (
+                    <div className="truncate text-xs text-surface-600 dark:text-surface-400">
+                        <PropertyPreview
+                            propertyKey={slots.subtitle.propertyKey}
+                            value={slots.subtitle.value}
+                            property={slots.subtitle.property}
+                            size="small"
+                        />
+                    </div>
+                )}
+
+                {/* Relation chips slot */}
+                {slots.relations.length > 0 && (
+                    <div className="flex items-center gap-1 mt-1 overflow-hidden max-w-full flex-wrap">
+                        {slots.relations.map((rel) => (
+                            rel.items.map((item) => (
+                                <Chip
+                                    key={`${rel.propertyKey}-${item.id}`}
+                                    size="smallest"
+                                    colorScheme={rel.colorScheme}
+                                    className="!text-[10px] !leading-tight !py-0 shrink-0 max-w-[100px] truncate"
+                                >
+                                    {item.displayName}
+                                </Chip>
+                            ))
+                        ))}
+                        {slots.relations.some(r => r.totalCount > r.items.length) && (
+                            <span className="text-[10px] text-surface-400 dark:text-surface-500 shrink-0">
+                                +{slots.relations.reduce((acc, r) => acc + Math.max(0, r.totalCount - r.items.length), 0)}
+                            </span>
+                        )}
+                    </div>
+                )}
+
+                {/* Status slot */}
+                {slots.status && (
+                    <div className="mt-1">
+                        <PropertyPreview
+                            propertyKey={slots.status.propertyKey}
+                            value={slots.status.value}
+                            property={slots.status.property}
+                            size="small"
+                        />
+                    </div>
+                )}
             </div>
         </Card>
     );

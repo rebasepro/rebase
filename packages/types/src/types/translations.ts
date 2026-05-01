@@ -145,6 +145,22 @@ export interface RebaseTranslations {
     are_you_sure_leave: string;
     passkey_error_unsupported: string;
 
+    // ─── Entity form feedback ─────────────────────────────────────
+    /** Snackbar message after a successful save */
+    saved_correctly: string;
+    /** Snackbar title when a beforeSave callback throws */
+    error_before_saving: string;
+    /** Snackbar title when an afterSave callback throws */
+    error_after_saving: string;
+    /** Snackbar title when the save itself fails */
+    error_saving_entity: string;
+    /** Alert shown when the entity does not exist in the database */
+    entity_does_not_exist: string;
+    /** Tooltip when the form has unsaved modifications */
+    form_modified: string;
+    /** Tooltip when the form is in sync with the database */
+    form_in_sync: string;
+
     admin: string;
     home: string;
     this_form_has_errors: string;

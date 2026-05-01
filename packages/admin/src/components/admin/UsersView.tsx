@@ -285,13 +285,13 @@ export function UsersView({ userManagement }: {
                 </Typography>
                 {roles && roles.length > 0 && (
                     <Select
-                        value={roleFilter}
-                        onValueChange={(v) => handleRoleFilterChange(v)}
+                        value={roleFilter || "__all__"}
+                        onValueChange={(v) => handleRoleFilterChange(v === "__all__" ? "" : v)}
                         placeholder={t("all_roles") || "All Roles"}
                         size="small"
                         className="w-48"
                     >
-                        <SelectItem value="">{t("all_roles") || "All Roles"}</SelectItem>
+                        <SelectItem value="__all__">{t("all_roles") || "All Roles"}</SelectItem>
                         {roles.map(role => (
                             <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
                         ))}

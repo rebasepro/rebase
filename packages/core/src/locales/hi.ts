@@ -86,6 +86,15 @@ export const hi: RebaseTranslations = {
     data_type_not_supported: "डेटा प्रकार {{dataType}} अभी समर्थित नहीं है",
     passkey_error_unsupported: "आपका डिवाइस या ब्राउज़र पासकी का समर्थन नहीं करता है।",
 
+    // ─── Entity form feedback ─────────────────────────────────────
+    saved_correctly: "सफलतापूर्वक सहेजा गया",
+    error_before_saving: "डेटा तैयार करने में त्रुटि",
+    error_after_saving: "सहेजने के बाद की प्रक्रिया में त्रुटि",
+    error_saving_entity: "प्रविष्टि सहेजने में त्रुटि",
+    entity_does_not_exist: "यह प्रविष्टि डेटाबेस में मौजूद नहीं है",
+    form_modified: "इस फ़ॉर्म में बदलाव किए गए हैं",
+    form_in_sync: "वर्तमान फ़ॉर्म डेटाबेस के साथ सिंक में है",
+
     admin: "एडमिन",
     home: "होम",
     this_form_has_errors: "इस फॉर्म में त्रुटियाँ हैं",
