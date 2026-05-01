@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { deepEqual as equal } from "fast-equals"
 
-import { MarkdownEditorFieldBinding } from "@rebasepro/cms";
+import { MarkdownEditorFieldBinding } from "@rebasepro/admin";
 import { FieldProps, NumberProperty, PluginFieldBuilderParams, Property, StringProperty } from "@rebasepro/types";
 import {
     AutoAwesomeIcon,
@@ -20,7 +20,7 @@ import { SUPPORTED_FIELDS_ENHANCEMENT } from "../utils/fields";
 import { EnhanceTextFieldBinding } from "./fields/EnhanceTextField";
 import { EnhancedDataResult, EnhanceParams } from "../types/data_enhancement_controller";
 import { countStringCharacters } from "../utils/strings_counter";
-import { EditorAIController } from "@rebasepro/cms";
+import { EditorAIController } from "@rebasepro/admin";
 
 export function fieldBuilder<P extends Property = Property>
     (params: PluginFieldBuilderParams<P>): React.ComponentType<FieldProps<P>> | null {

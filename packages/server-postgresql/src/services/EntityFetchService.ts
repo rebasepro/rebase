@@ -97,8 +97,6 @@ export class EntityFetchService {
 
         for (const [key, relation] of Object.entries(resolvedRelations)) {
             if (!shouldInclude(key)) continue;
-            // Only include relations that map to actual properties (or include all for REST)
-            if (!include && !propertyKeys.has(key)) continue;
 
             const drizzleRelName = relation.relationName || key;
 
@@ -176,7 +174,6 @@ export class EntityFetchService {
 
         // Convert nested relation objects to CMS-style { id, path, __type: "relation" }
         for (const [key, relation] of Object.entries(resolvedRelations)) {
-            if (!propertyKeys.has(key)) continue;
             const drizzleRelName = relation.relationName || key;
             const relData = row[drizzleRelName];
 
@@ -265,7 +262,7 @@ export class EntityFetchService {
         const propertyKeys = new Set(Object.keys(collection.properties || {}));
 
         const promises = Object.entries(resolvedRelations)
-            .filter(([key, relation]) => propertyKeys.has(key) && relation.joinPath && relation.joinPath.length > 0)
+            .filter(([key, relation]) => relation.joinPath && relation.joinPath.length > 0)
             .map(async ([key, relation]) => {
                 try {
                     const relatedEntities = await this.relationService.fetchRelatedEntities(
@@ -316,7 +313,7 @@ export class EntityFetchService {
         const propertyKeys = new Set(Object.keys(collection.properties || {}));
 
         const joinPathRelations = Object.entries(resolvedRelations)
-            .filter(([key, relation]) => propertyKeys.has(key) && relation.joinPath && relation.joinPath.length > 0);
+            .filter(([key, relation]) => relation.joinPath && relation.joinPath.length > 0);
 
         if (joinPathRelations.length === 0) return;
 
@@ -337,7 +334,7 @@ export class EntityFetchService {
                 for (const entity of entities) {
                     const parsed = parseIdValues(entity.id, [idInfo]);
                     const entityId = parsed[idInfo.fieldName] as string | number;
-                    const relatedEntity = resultMap.get(entityId);
+                    const relatedEntity = resultMap.get(String(entityId));
 
                     if (relatedEntity) {
                         if (relation.cardinality === "one") {
@@ -352,6 +349,84 @@ export class EntityFetchService {
                 }
             } catch (e) {
                 console.warn(`Could not batch resolve joinPath relation '${key}':`, e);
+            }
+        }
+    }
+
+    /**
+     * Resolves joinPath relations for raw REST rows and directly injects them.
+     * Uses RelationService to query the database and maps results back to the flattened objects.
+     */
+    private async resolveJoinPathRelationsBatchRest(
+        rows: Record<string, unknown>[],
+        collection: EntityCollection,
+        collectionPath: string,
+        idInfoArray: { fieldName: string; type: "string" | "number" }[],
+        include?: string[]
+    ): Promise<void> {
+        if (rows.length === 0) return;
+
+        const resolvedRelations = resolveCollectionRelations(collection);
+        const propertyKeys = new Set(Object.keys(collection.properties || {}));
+        const shouldInclude = (key: string) =>
+            !include || include.length === 0 || include[0] === "*" || include.includes(key);
+
+        const joinPathRelations = Object.entries(resolvedRelations)
+            .filter(([key, relation]) => relation.joinPath && relation.joinPath.length > 0 && propertyKeys.has(key) && shouldInclude(key));
+
+        if (joinPathRelations.length === 0) return;
+
+        const idInfo = idInfoArray[0];
+
+        for (const [key, relation] of joinPathRelations) {
+            try {
+                // Determine the parent IDs based on the parsed string ID from the REST row
+                const entityIds = rows.map(r => {
+                    const parsed = parseIdValues(String(r.id), idInfoArray);
+                    return parsed[idInfo.fieldName] as string | number;
+                });
+
+                if (relation.cardinality === "one") {
+                    const resultMap = await this.relationService.batchFetchRelatedEntities(
+                        collectionPath,
+                        entityIds,
+                        key,
+                        relation
+                    );
+                    
+                    for (const row of rows) {
+                        const parsed = parseIdValues(String(row.id), idInfoArray);
+                        const entityId = parsed[idInfo.fieldName] as string | number;
+                        const relatedEntity = resultMap.get(String(entityId));
+
+                        if (relatedEntity) {
+                            row[key] = {
+                                id: relatedEntity.id,
+                                ...relatedEntity.values
+                            };
+                        } else {
+                            row[key] = null;
+                        }
+                    }
+                } else if (relation.cardinality === "many") {
+                    const resultMap = await this.batchFetchManyRelatedEntities(
+                        collectionPath,
+                        entityIds,
+                        key
+                    );
+
+                    for (const row of rows) {
+                        const parsed = parseIdValues(String(row.id), idInfoArray);
+                        const entityId = parsed[idInfo.fieldName] as string | number;
+                        const relatedList = resultMap.get(String(entityId)) || [];
+                        row[key] = relatedList.map(e => ({
+                            id: e.id,
+                            ...e.values
+                        }));
+                    }
+                }
+            } catch (e) {
+                console.warn(`Could not batch resolve joinPath relation '${key}' for REST:`, e);
             }
         }
     }
@@ -791,7 +866,7 @@ export class EntityFetchService {
 
                     entitiesMissingRelation.forEach(item => {
                         const entityId = item.entity[idInfo.fieldName] as string | number;
-                        const relatedEntity = relationResults.get(entityId);
+                        const relatedEntity = relationResults.get(String(entityId));
                         if (relatedEntity) {
                             (item.values as Record<string, unknown>)[key] = {
                                 id: relatedEntity.id,
@@ -1122,9 +1197,14 @@ export class EntityFetchService {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic query config
                 const results = await qb.findMany(queryOpts as unknown as Parameters<NonNullable<typeof qb>["findMany"]>[0]);
 
-                return (results as Record<string, unknown>[]).map(row =>
+                const restRows = (results as Record<string, unknown>[]).map(row =>
                     this.drizzleResultToRestRow(row, collection, idInfo, idInfoArray)
                 );
+
+                // Drizzle relational query API doesn't resolve joinPath relations, fetch manually
+                await this.resolveJoinPathRelationsBatchRest(restRows, collection, collectionPath, idInfoArray, include);
+
+                return restRows;
             } catch (e) {
                 console.warn(`[fetchCollectionForRest] db.query.findMany failed for ${collectionPath}, falling back:`, e);
             }
@@ -1156,7 +1236,7 @@ export class EntityFetchService {
                 );
                 for (const entity of entities) {
                     const eid = entity[idInfo.fieldName] as string | number;
-                    const related = batchResults.get(eid);
+                    const related = batchResults.get(String(eid));
                     if (related) {
                         (entity as Record<string, unknown>)[key] = { id: related.id, ...related.values };
                     }
@@ -1227,7 +1307,12 @@ export class EntityFetchService {
 
                 if (!row) return null;
 
-                return this.drizzleResultToRestRow(row, collection, idInfo, idInfoArray);
+                const restRow = this.drizzleResultToRestRow(row, collection, idInfo, idInfoArray);
+
+                // Drizzle relational query API doesn't resolve joinPath relations, fetch manually
+                await this.resolveJoinPathRelationsBatchRest([restRow], collection, collectionPath, idInfoArray, include);
+
+                return restRow;
             } catch (e) {
                 console.warn(`[fetchEntityForRest] db.query.findFirst failed for ${collectionPath}, falling back:`, e);
             }

@@ -11,7 +11,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createRebaseClient } from "@rebasepro/client";
-// import type { Database } from "../shared/database.types"; // Optional: For fully typed collections
+// import type { Database } from "../config/database.types"; // Optional: For fully typed collections
 
 // Find the backend URL
 let baseUrl = process.env.REBASE_URL;

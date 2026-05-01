@@ -174,9 +174,10 @@ export function resolveCollectionRelations(
                 // Skip if the property key is already registered
                 if (relations[propKey]) return;
 
-                // Skip if the underlying relation was already registered under
-                // its canonical relationName in section 1
-                if (relation.relationName && registeredRelationNames.has(relation.relationName)) return;
+                // We previously skipped if the underlying relation was already registered under
+                // its canonical relationName in section 1. But we need to keep the property mapping
+                // for EntityFetchService to hydrate the relation back to the correct property key.
+                // Deduplication for Drizzle schema generation is handled in generate-drizzle-schema-logic.ts.
 
                 if (!relation.relationName) {
                     relation.relationName = propKey;

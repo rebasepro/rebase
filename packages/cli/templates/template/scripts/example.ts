@@ -23,7 +23,7 @@ import fs from "node:fs";
 import path from "node:path";
 import * as dotenv from "dotenv";
 import { createRebaseClient } from "@rebasepro/client";
-// import type { Database } from "../shared/database.types"; // Optional: For fully typed collections
+// import type { Database } from "../config/database.types"; // Optional: For fully typed collections
 
 // Load .env from project root (same file the backend uses)
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });

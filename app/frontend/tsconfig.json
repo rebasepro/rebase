@@ -51,8 +51,8 @@
       "@rebasepro/common": [
         "../../packages/common/src"
       ],
-      "@rebasepro/cms": [
-        "../../packages/cms/src"
+      "@rebasepro/admin": [
+        "../../packages/admin/src"
       ],
       "@rebasepro/client": [
         "../../packages/client/src"
@@ -63,8 +63,8 @@
       "@rebasepro/schema-inference": [
         "../../packages/schema-inference/src"
       ],
-      "shared": [
-        "../shared"
+      "config": [
+        "../config"
       ]
     }
   },

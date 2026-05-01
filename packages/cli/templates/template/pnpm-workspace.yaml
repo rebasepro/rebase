@@ -1,4 +1,4 @@
 packages:
   - "frontend"
   - "backend"
-  - "shared"
+  - "config"

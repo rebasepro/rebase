@@ -21,13 +21,13 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Copy workspace packages
 COPY frontend ./frontend
-COPY shared ./shared
+COPY config ./config
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Build shared first, then frontend
-RUN pnpm --filter "*-shared" run build
+# Build config first, then frontend
+RUN pnpm --filter "*-config" run build
 RUN pnpm --filter "*-frontend" run build
 
 # ── Stage 2: Serve with nginx ────────────────────────────────────────

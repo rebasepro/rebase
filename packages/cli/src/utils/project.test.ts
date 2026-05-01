@@ -58,7 +58,7 @@ describe("findProjectRoot", () => {
     it("finds root by backend/ + shared/ sibling directories", () => {
         const projectDir = createDir("my-app");
         createDir("my-app", "backend");
-        createDir("my-app", "shared");
+        createDir("my-app", "config");
         writeJSON(path.join(projectDir, "package.json"), { name: "my-app" });
 
         expect(findProjectRoot(projectDir)).toBe(projectDir);
@@ -67,7 +67,7 @@ describe("findProjectRoot", () => {
     it("finds root from a nested subdirectory", () => {
         const projectDir = createDir("my-app");
         createDir("my-app", "backend", "src");
-        createDir("my-app", "shared");
+        createDir("my-app", "config");
         writeJSON(path.join(projectDir, "package.json"), { name: "my-app" });
 
         const nestedDir = path.join(projectDir, "backend", "src");
@@ -78,7 +78,7 @@ describe("findProjectRoot", () => {
         const projectDir = createDir("workspace-app");
         writeJSON(path.join(projectDir, "package.json"), {
             name: "workspace-app",
-            workspaces: ["backend", "frontend", "shared"],
+            workspaces: ["backend", "frontend", "config"],
         });
 
         expect(findProjectRoot(projectDir)).toBe(projectDir);
@@ -105,7 +105,7 @@ describe("findProjectRoot", () => {
     it("ignores malformed package.json gracefully", () => {
         const projectDir = createDir("broken-app");
         createDir("broken-app", "backend");
-        createDir("broken-app", "shared");
+        createDir("broken-app", "config");
         writeFile(path.join(projectDir, "package.json"), "{ not valid json }}}");
 
         // Should still match via sibling directory check (which doesn't require valid JSON)

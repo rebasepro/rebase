@@ -49,13 +49,13 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
                 console.error(chalk.red("✗ Could not find tsx binary."));
                 process.exit(1);
             }
-            await execa(tsxBin, [pluginCli, "db", subcommand, ...rawArgs.slice(2)], {
+            await execa(tsxBin, [pluginCli, ...rawArgs.slice(2)], {
                 cwd: backendDir,
                 stdio: "inherit",
                 env,
             });
         } else {
-            await execa("node", [pluginCli, "db", subcommand, ...rawArgs.slice(2)], {
+            await execa("node", [pluginCli, ...rawArgs.slice(2)], {
                 cwd: backendDir,
                 stdio: "inherit",
                 env,

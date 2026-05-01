@@ -25,7 +25,7 @@ import {
     useBuildModeController,
     useBuildNavigationStateController
 } from "@rebasepro/core";
-import { RebaseRoute } from "@rebasepro/cms";
+import { RebaseRoute } from "@rebasepro/admin";
 import { CircularProgressCenter } from "@rebasepro/ui";
 import { collections } from "virtual:rebase-collections";
 import { Route, Outlet } from "react-router-dom";

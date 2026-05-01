@@ -50,7 +50,7 @@ async function startServer() {
     const server = createServer(getRequestListener(app.fetch));
 
     const backend = await initializeRebaseBackend({
-        collectionsDir: path.resolve(__dirname, "../../shared/collections"),
+        collectionsDir: path.resolve(__dirname, "../../config/collections"),
         functionsDir: path.resolve(__dirname, "../functions"),
         server,
         app,

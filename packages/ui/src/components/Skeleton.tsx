@@ -35,7 +35,7 @@ export function Skeleton({
         className={
         cls(
             "block relative overflow-hidden",
-            "bg-surface-accent-200 dark:bg-surface-accent-800 rounded-md",
+            "bg-surface-accent-50 dark:bg-surface-accent-800 rounded-md",
             "max-w-full max-h-full",
             className)
     }>

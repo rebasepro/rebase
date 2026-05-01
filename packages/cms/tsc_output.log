@@ -1,7 +1,0 @@
-src/components/EntityCollectionView/hooks/useCollectionInlineEditor.ts(4,29): error TS2724: '"@rebasepro/core"' has no exported member named 'RebaseContext'. Did you mean 'useRebaseContext'?
-src/components/EntityCollectionView/hooks/useCollectionInlineEditor.ts(4,91): error TS2724: '"@rebasepro/core"' has no exported member named 'RebaseData'. Did you mean 'RebaseAuth'?
-src/components/EntityCollectionView/hooks/useKanbanDragAndDrop.ts(4,35): error TS2724: '"@rebasepro/core"' has no exported member named 'RebaseData'. Did you mean 'RebaseAuth'?
-src/components/EntityCollectionView/hooks/useKanbanDragAndDrop.ts(4,47): error TS2724: '"@rebasepro/core"' has no exported member named 'RebaseContext'. Did you mean 'useRebaseContext'?
-../ui/src/components/VirtualTable/VirtualTable.tsx(582,41): error TS2322: Type 'ComponentType<CellRendererParams<Record<string, unknown>>>' is not assignable to type '(props: CellRendererParams<any>) => ReactNode'.
-  Type 'ComponentClass<CellRendererParams<Record<string, unknown>>, any>' is not assignable to type '(props: CellRendererParams<any>) => ReactNode'.
-    Type 'ComponentClass<CellRendererParams<Record<string, unknown>>, any>' provides no match for the signature '(props: CellRendererParams<any>): ReactNode'.

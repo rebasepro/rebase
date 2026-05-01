@@ -56,7 +56,7 @@ async function simulateInit(projectName: string): Promise<string> {
         "package.json",
         "frontend/package.json",
         "backend/package.json",
-        "shared/package.json",
+        "config/package.json",
         "frontend/index.html",
         "README.md",
     ];
@@ -80,8 +80,8 @@ describe("template structure", () => {
     it("contains all required directories", () => {
         expect(fs.existsSync(path.join(TEMPLATE_DIR, "backend"))).toBe(true);
         expect(fs.existsSync(path.join(TEMPLATE_DIR, "frontend"))).toBe(true);
-        expect(fs.existsSync(path.join(TEMPLATE_DIR, "shared"))).toBe(true);
-        expect(fs.existsSync(path.join(TEMPLATE_DIR, "shared", "collections"))).toBe(true);
+        expect(fs.existsSync(path.join(TEMPLATE_DIR, "config"))).toBe(true);
+        expect(fs.existsSync(path.join(TEMPLATE_DIR, "config", "collections"))).toBe(true);
     });
 
     it("contains essential config files", () => {
@@ -142,10 +142,10 @@ describe("placeholder replacement", () => {
         expect(pkg.name).toBe("test-project-frontend");
     });
 
-    it("replaces {{PROJECT_NAME}} in shared package.json", async () => {
+    it("replaces {{PROJECT_NAME}} in config package.json", async () => {
         const targetDir = await simulateInit("test-project");
-        const pkg = JSON.parse(fs.readFileSync(path.join(targetDir, "shared", "package.json"), "utf-8"));
-        expect(pkg.name).toBe("test-project-shared");
+        const pkg = JSON.parse(fs.readFileSync(path.join(targetDir, "config", "package.json"), "utf-8"));
+        expect(pkg.name).toBe("test-project-config");
     });
 
     it("replaces {{PROJECT_NAME}} in README.md", async () => {
@@ -161,7 +161,7 @@ describe("placeholder replacement", () => {
             "package.json",
             "frontend/package.json",
             "backend/package.json",
-            "shared/package.json",
+            "config/package.json",
             "README.md",
         ];
 
@@ -181,14 +181,14 @@ describe("placeholder replacement", () => {
 
 describe("template collections", () => {
     it("has a collections index that exports an array", () => {
-        const indexPath = path.join(TEMPLATE_DIR, "shared", "collections", "index.ts");
+        const indexPath = path.join(TEMPLATE_DIR, "config", "collections", "index.ts");
         const content = fs.readFileSync(indexPath, "utf-8");
         expect(content).toContain("export");
         expect(content).toContain("collections");
     });
 
     it("has at least posts, authors, and tags collections", () => {
-        const collectionsDir = path.join(TEMPLATE_DIR, "shared", "collections");
+        const collectionsDir = path.join(TEMPLATE_DIR, "config", "collections");
         const files = fs.readdirSync(collectionsDir).filter(f => f.endsWith(".ts") && f !== "index.ts");
         const basenames = files.map(f => f.replace(".ts", ""));
 
@@ -198,7 +198,7 @@ describe("template collections", () => {
     });
 
     it("each collection file exports a valid EntityCollection shape", () => {
-        const collectionsDir = path.join(TEMPLATE_DIR, "shared", "collections");
+        const collectionsDir = path.join(TEMPLATE_DIR, "config", "collections");
         const files = fs.readdirSync(collectionsDir).filter(f => f.endsWith(".ts") && f !== "index.ts");
 
         for (const file of files) {
@@ -212,7 +212,7 @@ describe("template collections", () => {
     });
 
     it("posts collection demonstrates an enum property", () => {
-        const postsPath = path.join(TEMPLATE_DIR, "shared", "collections", "posts.ts");
+        const postsPath = path.join(TEMPLATE_DIR, "config", "collections", "posts.ts");
         const content = fs.readFileSync(postsPath, "utf-8");
         expect(content).toContain("enum:");
         expect(content).toContain("draft");
@@ -220,14 +220,14 @@ describe("template collections", () => {
     });
 
     it("posts collection demonstrates a relation to authors", () => {
-        const postsPath = path.join(TEMPLATE_DIR, "shared", "collections", "posts.ts");
+        const postsPath = path.join(TEMPLATE_DIR, "config", "collections", "posts.ts");
         const content = fs.readFileSync(postsPath, "utf-8");
         expect(content).toContain("relation:");
         expect(content).toContain("authorsCollection");
     });
 
     it("posts collection demonstrates a many-to-many relation to tags", () => {
-        const postsPath = path.join(TEMPLATE_DIR, "shared", "collections", "posts.ts");
+        const postsPath = path.join(TEMPLATE_DIR, "config", "collections", "posts.ts");
         const content = fs.readFileSync(postsPath, "utf-8");
         expect(content).toContain("tagsCollection");
         expect(content).toContain("\"many\"");
@@ -274,8 +274,8 @@ describe("template package.json contracts", () => {
         expect(pkg.dependencies).toHaveProperty("react-dom");
     });
 
-    it("shared package.json depends on @rebasepro/types", () => {
-        const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "shared", "package.json"), "utf-8"));
+    it("config package.json depends on @rebasepro/types", () => {
+        const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "config", "package.json"), "utf-8"));
         expect(pkg.dependencies).toHaveProperty("@rebasepro/types");
     });
 
@@ -283,7 +283,7 @@ describe("template package.json contracts", () => {
         const workspace = fs.readFileSync(path.join(TEMPLATE_DIR, "pnpm-workspace.yaml"), "utf-8");
         expect(workspace).toContain("backend");
         expect(workspace).toContain("frontend");
-        expect(workspace).toContain("shared");
+        expect(workspace).toContain("config");
     });
 });
 

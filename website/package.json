@@ -22,7 +22,7 @@
         "@firebase/analytics": "^0.10.18",
         "@firebase/app-check": "^0.11.0",
         "@rebasepro/core": "workspace:*",
-        "@rebasepro/cms": "workspace:*",
+        "@rebasepro/admin": "workspace:*",
         "@rebasepro/plugin-data-enhancement": "workspace:*",
         "@rebasepro/client-firebase": "workspace:*",
         "@rebasepro/ui": "workspace:*",

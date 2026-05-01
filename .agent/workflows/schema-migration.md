@@ -45,7 +45,7 @@ For production deployments, use migrations for version-controlled, reviewable ch
 
 ### 1. Modify Your Collection Definitions
 
-Edit your collection file (e.g., `app/shared/collections.ts`):
+Edit your collection file (e.g., `app/config/collections.ts`):
 
 ```typescript
 const postsCollection: EntityCollection = {

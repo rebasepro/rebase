@@ -1,5 +1,5 @@
 const fs = require('fs');
-let content = fs.readFileSync('/Users/francesco/rebase/app/shared/collections/posts.ts', 'utf8');
+let content = fs.readFileSync('/Users/francesco/rebase/app/config/collections/posts.ts', 'utf8');
 content = content.replace('export default postsCollection;', `
 postsCollection.securityRules = [
     {
@@ -13,4 +13,4 @@ postsCollection.securityRules = [
 
 export default postsCollection;
 `);
-fs.writeFileSync('/Users/francesco/rebase/app/shared/collections/posts.ts', content);
+fs.writeFileSync('/Users/francesco/rebase/app/config/collections/posts.ts', content);

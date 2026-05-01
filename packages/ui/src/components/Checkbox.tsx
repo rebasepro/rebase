@@ -26,13 +26,13 @@ const outerSizeClasses = {
     medium: "w-10 h-10",
     small: "w-8 h-8",
     large: "w-12 h-12 ",
-    smallest: "w-6 h-6"
+    smallest: "w-8 h-8"
 }
 const paddingClasses = {
     medium: "p-2",
     small: "p-2",
     large: "p-2",
-    smallest: ""
+    smallest: "p-2"
 }
 
 const colorClasses = {

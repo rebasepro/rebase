@@ -4,7 +4,7 @@ import { EntityCollection } from "./collections";
 
 /**
  * Context passed to custom fields and entity views.
- * This is the base definition — `@rebasepro/cms` re-exports a
+ * This is the base definition — `@rebasepro/admin` re-exports a
  * fully-typed version that narrows the `formex` field.
  * @group Form custom fields
  */
@@ -50,7 +50,7 @@ export interface FormContext<M extends Record<string, any> = any> {
 
     /**
      * The underlying formex controller that powers the form.
-     * Prefer importing `FormContext` from `@rebasepro/cms` for the
+     * Prefer importing `FormContext` from `@rebasepro/admin` for the
      * fully-typed `FormexController<M>` version.
      */
     formex: Record<string, unknown>;

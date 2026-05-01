@@ -21,7 +21,7 @@ interface ClientSession {
 const clientSessions = new Map<string, ClientSession>();
 
 /** Maximum messages per client per window */
-const WS_RATE_LIMIT = 200;
+const WS_RATE_LIMIT = 2000;
 /** Rate limit window in milliseconds (60 seconds) */
 const WS_RATE_WINDOW_MS = 60_000;
 

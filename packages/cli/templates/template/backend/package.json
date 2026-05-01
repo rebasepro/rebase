@@ -5,12 +5,12 @@
     "main": "src/index.ts",
     "type": "module",
     "scripts": {
-        "dev": "tsx watch --watch=\"../shared/**/*\" src/index.ts",
+        "dev": "tsx watch --watch=\"../config/**/*\" src/index.ts",
         "build": "tsc --noEmit",
         "start": "tsx src/index.ts"
     },
     "dependencies": {
-        "{{PROJECT_NAME}}-shared": "0.0.1",
+        "{{PROJECT_NAME}}-config": "0.0.1",
         "@rebasepro/server-core": "workspace:*",
         "@rebasepro/server-postgresql": "workspace:*",
         "drizzle-orm": "^0.44.4",

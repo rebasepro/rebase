@@ -40,7 +40,7 @@ import {
 let VirtualTableInput: React.ComponentType<any> | null = null;
 try {
     // @ts-ignore — optional peer dependency
-    const cms = require("@rebasepro/cms");
+    const cms = require("@rebasepro/admin");
     VirtualTableInput = cms.VirtualTableInput;
 } catch { /* CMS not available */ }
 import { useRebaseContext, useSnackbarController, ConfirmationDialog, ErrorView, useTranslation } from "@rebasepro/core";

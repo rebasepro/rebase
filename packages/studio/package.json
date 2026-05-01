@@ -21,14 +21,14 @@
         "prism-react-renderer": "^2.4.1"
     },
     "peerDependencies": {
-        "@rebasepro/cms": "workspace:*",
+        "@rebasepro/admin": "workspace:*",
         "react": ">=19.0.0",
         "react-dom": ">=19.0.0",
         "react-router": "^7.0.0",
         "react-router-dom": "^7.0.0"
     },
     "peerDependenciesMeta": {
-        "@rebasepro/cms": {
+        "@rebasepro/admin": {
             "optional": true
         }
     },

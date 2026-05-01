@@ -44,7 +44,7 @@
       "@rebasepro/formex": [
         "../formex/src"
       ],
-      "@rebasepro/cms": [
+      "@rebasepro/admin": [
         "../cms/src"
       ],
 

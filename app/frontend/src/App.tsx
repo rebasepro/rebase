@@ -4,7 +4,7 @@ import "typeface-rubik";
 
 import { useRebaseAuthController, useBackendUserManagement, RebaseAuth } from "@rebasepro/auth";
 import { Rebase } from "@rebasepro/core";
-import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
+import { RebaseCMS, RebaseShell } from "@rebasepro/admin";
 import { useDataEnhancementPlugin } from "@rebasepro/plugin-data-enhancement";
 import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";

@@ -47,13 +47,13 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
                 console.error(chalk.red("✗ Could not find tsx binary."));
                 process.exit(1);
             }
-            await execa(tsxBin, [pluginCli, "doctor", ...rawArgs.slice(2)], {
+            await execa(tsxBin, [pluginCli, ...rawArgs.slice(2)], {
                 cwd: backendDir,
                 stdio: "inherit",
                 env,
             });
         } else {
-            await execa("node", [pluginCli, "doctor", ...rawArgs.slice(2)], {
+            await execa("node", [pluginCli, ...rawArgs.slice(2)], {
                 cwd: backendDir,
                 stdio: "inherit",
                 env,

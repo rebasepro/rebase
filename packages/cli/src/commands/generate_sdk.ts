@@ -1,7 +1,7 @@
 /**
  * CLI command: generate-sdk
  *
- * Reads collection definitions from a specified directory (default: ./shared/collections),
+ * Reads collection definitions from a specified directory (default: ./config/collections),
  * generates a typed JS SDK, and writes it to the output directory (default: ./generated/sdk).
  *
  * Uses jiti for dynamic TypeScript import of collection files.
@@ -23,7 +23,7 @@ interface GenerateSDKArgs {
  * Dynamically load collection definitions from a directory.
  *
  * Expects the directory to have an index.ts/index.js that exports a default
- * array of EntityCollection objects (matching the app/shared/collections pattern).
+ * array of EntityCollection objects (matching the app/config/collections pattern).
  */
 async function loadCollections(collectionsDir: string): Promise<EntityCollection[]> {
     const absDir = path.resolve(collectionsDir);

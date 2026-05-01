@@ -232,7 +232,7 @@ async function replacePlaceholders(options: InitOptions) {
         "package.json",
         "frontend/package.json",
         "backend/package.json",
-        "shared/package.json",
+        "config/package.json",
         "frontend/index.html"
     ];
 

@@ -24,7 +24,7 @@ import {
     CollectionRegistryContext,
     UrlContext,
     NavigationStateContext
-} from "@rebasepro/cms";
+} from "@rebasepro/admin";
 import { PropertyConfig } from "@rebasepro/types";
 import { CenteredView, CircularProgressCenter } from "@rebasepro/ui";
 import { buildRebaseData } from "@rebasepro/common";

@@ -15,7 +15,7 @@ export function UserDisplay({
 
     return (
         <div className={cls(
-            "inline-flex items-center gap-4 px-2 py-1 rounded-xl text-left",
+            "inline-flex items-center gap-4 px-2 py-1 rounded-xl text-left max-w-full overflow-hidden",
             "bg-surface-accent-100 dark:bg-surface-accent-800",
             "border",
             defaultBorderMixin

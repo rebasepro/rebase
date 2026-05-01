@@ -1,6 +1,6 @@
 # Rebase PostgreSQL App Example
 
-A complete example application demonstrating how to use Rebase with a PostgreSQL backend, featuring a unified monorepo structure with shared collections and optimal developer experience.
+A complete example application demonstrating how to use Rebase with a PostgreSQL backend, featuring a unified monorepo structure with config collections and optimal developer experience.
 
 ## 🏗️ Architecture
 
@@ -8,7 +8,7 @@ This application consists of three main parts:
 
 - **`frontend/`** - React application using Rebase with PostgreSQL data source
 - **`backend/`** - Node.js server with PostgreSQL/Drizzle ORM and WebSocket support
-- **`shared/`** - Shared collections and types used by both frontend and backend
+- **`config/`** - Shared collections and types used by both frontend and backend
 
 ## 🚀 Quick Start
 
@@ -108,7 +108,7 @@ app/
 │   ├── src/
 │   ├── package.json
 │   └── drizzle.config.ts
-└── shared/            # Shared collections and types
+└── config/            # Shared collections and types
     ├── collections/
     ├── index.ts
     └── package.json
@@ -152,7 +152,7 @@ Currently configured with Firebase Authentication, but can be easily adapted to 
 
 ## 🎯 Development Tips
 
-1. **Shared Collections**: Edit collections in `shared/collections/` - changes are immediately available to both frontend and backend
+1. **Shared Collections**: Edit collections in `config/collections/` - changes are immediately available to both frontend and backend
 2. **Environment Variables**: All configuration is in the root `.env` file
 3. **Hot Reloading**: Both frontend and backend support hot reloading during development
 4. **Database Schema**: Run `rebase schema generate` and then `rebase db push` after changing collections

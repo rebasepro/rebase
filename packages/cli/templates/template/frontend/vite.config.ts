@@ -21,6 +21,6 @@ export default defineConfig({
         svgr(),
         react({}),
         tailwindcss(),
-        rebaseCollectionsPlugin({ collectionsDir: "../shared/collections" })
+        rebaseCollectionsPlugin({ collectionsDir: "../config/collections" })
     ]
 });

@@ -23,13 +23,13 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Copy workspace packages
 COPY backend ./backend
-COPY shared ./shared
+COPY config ./config
 
 # Install all deps (including devDependencies for build)
 RUN pnpm install --frozen-lockfile
 
-# Build shared first, then backend
-RUN pnpm --filter "*-shared" run build
+# Build config first, then backend
+RUN pnpm --filter "*-config" run build
 RUN pnpm --filter "*-backend" run build
 
 # Prune dev dependencies for a smaller runtime
@@ -53,7 +53,7 @@ WORKDIR /app
 COPY --from=builder /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/backend ./backend
-COPY --from=builder /app/shared ./shared
+COPY --from=builder /app/config ./config
 
 # Create uploads directory
 RUN mkdir -p /app/backend/uploads && chown -R rebase:rebase /app

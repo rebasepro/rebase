@@ -32,7 +32,7 @@ yarn add @rebasepro/collection_editor_firebase
 
 ```tsx
 import React from "react";
-import { RebaseCMS } from "@rebasepro/cms";
+import { RebaseCMS } from "@rebasepro/admin";
 import { useFirestoreCollectionsConfigController } from "@rebasepro/collection_editor_firebase";
 
 export default function App() {
@@ -103,7 +103,7 @@ You can customize collection editor behavior with these options using the `colle
 You can combine collections defined in code with those created in the UI:
 
 ```tsx
-import { mergeCollections } from "@rebasepro/cms/collection_editor";
+import { mergeCollections } from "@rebasepro/admin/collection_editor";
 
 
 const collectionsBuilder = useCallback(() => {

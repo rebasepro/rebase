@@ -66,7 +66,7 @@ Backend (Hono + PostgreSQL) on port 3001, frontend (Vite + React) on port 5173.
 │   ├── Dockerfile      # Multi-stage production build
 │   ├── functions/      # Custom API endpoints (auto-discovered)
 │   └── src/
-├── shared/             # Shared collection definitions
+├── config/             # Shared collection definitions
 │   └── collections/    # Schema-as-Code TypeScript files
 ├── docker-compose.yml  # Production stack (Postgres + Backend + Frontend)
 ├── .env.template       # Environment variable template
@@ -92,7 +92,7 @@ Call from the client SDK: `client.call("functions/hello", { name: "World" })`
 
 ### Shared Collections
 
-Collections are defined once in `shared/collections/` and used by both the frontend and backend. This ensures your schema stays in sync across the stack.
+Collections are defined once in `config/collections/` and used by both the frontend and backend. This ensures your schema stays in sync across the stack.
 
 ## Production Deployment
 

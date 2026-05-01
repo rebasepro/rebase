@@ -265,7 +265,7 @@ export class RelationService {
         parentEntityIds: (string | number)[],
         _relationKey: string,
         relation: Relation
-    ): Promise<Map<string | number, Entity<Record<string, unknown>>>> {
+    ): Promise<Map<string, Entity<Record<string, unknown>>>> {
         if (parentEntityIds.length === 0) return new Map();
 
         const parentCollection = getCollectionByPath(parentCollectionPath, this.registry);
@@ -322,21 +322,25 @@ export class RelationService {
             query = query.where(inArray(parentIdField, parsedParentIds));
 
             const results = await query;
+            console.log("joinPath SQL:", query.toSQL());
+            console.log("joinPath raw results length:", results.length);
             const targetTableName = relation.joinPath[relation.joinPath.length - 1].table;
-            const resultMap = new Map<string | number, Entity<Record<string, unknown>>>();
+            const resultMap = new Map<string, Entity<Record<string, unknown>>>();
 
             // Group results by parent ID
-            results.forEach((row: Record<string, unknown>) => {
+            for (const row of results as Array<Record<string, unknown>>) {
                 const parentEntity = (row[getTableName(parentCollection)] || row) as Record<string, unknown>;
                 const targetEntity = (row[targetTableName] || row) as Record<string, unknown>;
                 const parentId = parentEntity[parentIdInfo.fieldName] as string | number;
 
-                resultMap.set(parentId, {
+                const parsedValues = await parseDataFromServer(targetEntity, targetCollection, this.db, this.registry);
+
+                resultMap.set(String(parentId), {
                     id: String(targetEntity[targetIdInfo.fieldName]),
                     path: targetCollection.slug,
-                    values: targetEntity
+                    values: parsedValues as Record<string, unknown>
                 });
-            });
+            }
 
             return resultMap;
         }
@@ -359,10 +363,10 @@ export class RelationService {
         );
 
         const results = await query;
-        const resultMap = new Map<string | number, Entity<Record<string, unknown>>>();
+        const resultMap = new Map<string, Entity<Record<string, unknown>>>();
 
         // Map results back to parent entities
-        results.forEach((row: Record<string, unknown>) => {
+        for (const row of results as Array<Record<string, unknown>>) {
             const targetEntity = (row[getTableName(targetCollection)] || row) as Record<string, unknown>;
 
             // Determine the parent ID this result belongs to based on the relation type
@@ -375,7 +379,7 @@ export class RelationService {
                 parentId = targetEntity[inferredForeignKeyName] as string | number | undefined;
             } else if (relation.direction === "owning" && relation.localKey) {
                 for (const parsedParentId of parsedParentIds) {
-                    if (!resultMap.has(parsedParentId)) {
+                    if (!resultMap.has(String(parsedParentId))) {
                         parentId = parsedParentId;
                         break;
                     }
@@ -383,13 +387,14 @@ export class RelationService {
             }
 
             if (parentId !== undefined && parsedParentIds.includes(parentId)) {
-                resultMap.set(parentId, {
+                const parsedValues = await parseDataFromServer(targetEntity, targetCollection, this.db, this.registry);
+                resultMap.set(String(parentId), {
                     id: String(targetEntity[targetIdInfo.fieldName]),
                     path: targetCollection.slug,
-                    values: targetEntity
+                    values: parsedValues as Record<string, unknown>
                 });
             }
-        });
+        }
 
         return resultMap;
     }

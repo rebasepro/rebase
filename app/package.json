@@ -7,7 +7,7 @@
     "workspaces": [
         "frontend",
         "backend",
-        "shared"
+        "config"
     ],
     "scripts": {
         "dev": "rebase dev",

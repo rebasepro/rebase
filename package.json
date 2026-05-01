@@ -20,7 +20,7 @@
         "packages/auth",
         "packages/cli",
         "packages/studio",
-        "packages/cms",
+        "packages/admin",
         "packages/client-postgresql",
         "packages/server-postgresql",
         "packages/server-mongodb",
@@ -32,7 +32,7 @@
         "app",
         "app/frontend",
         "app/backend",
-        "app/shared"
+        "app/config"
     ],
     "scripts": {
         "test": "pnpm -r test",

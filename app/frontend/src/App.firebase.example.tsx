@@ -11,7 +11,7 @@ import React from "react";
 import { initializeApp } from "@firebase/app";
 import { Rebase } from "@rebasepro/core";
 import { RebaseAuth } from "@rebasepro/auth";
-import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
+import { RebaseCMS, RebaseShell } from "@rebasepro/admin";
 import {
     useFirebaseAuthController,
     useFirestoreDriver,

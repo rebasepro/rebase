@@ -252,7 +252,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
 
         const backendChild = execa(
             tsxBin,
-            ["watch", `--watch="${path.join("..", "shared", "**", "*")}"`, "--conditions", "development", "src/index.ts"],
+            ["watch", `--watch="${path.join("..", "config", "**", "*")}"`, "--conditions", "development", "src/index.ts"],
             {
                 cwd: backendDir,
                 stdio: ["inherit", "pipe", "pipe"],

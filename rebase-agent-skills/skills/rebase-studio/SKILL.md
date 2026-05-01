@@ -88,7 +88,7 @@ const myCustomView = {
 |---------|-------------|
 | `@rebasepro/core` | Core framework, hooks, types |
 | `@rebasepro/studio` | Studio admin panel components |
-| `@rebasepro/cms` | CMS frontend application |
+| `@rebasepro/admin` | CMS frontend application |
 | `@rebasepro/plugin-data-enhancement` | AI-powered autofill |
 | `@rebasepro/schema-inference` | Auto-infer schema from data |
 

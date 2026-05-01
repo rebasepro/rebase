@@ -5,9 +5,9 @@
     "type": "module",
     "dependencies": {
         "@fontsource/jetbrains-mono": "^5.2.5",
+        "@rebasepro/admin": "workspace:*",
         "@rebasepro/auth": "workspace:*",
         "@rebasepro/client": "workspace:*",
-        "@rebasepro/cms": "workspace:*",
         "@rebasepro/core": "workspace:*",
         "@rebasepro/plugin-data-enhancement": "workspace:*",
         "@rebasepro/studio": "workspace:*",

@@ -5,7 +5,7 @@
     "main": "src/index.ts",
     "type": "module",
     "scripts": {
-        "dev": "tsx watch --watch=\"../shared/**/*\" --watch=\"../../packages/server-core/src/**/*\" --conditions development src/index.ts",
+        "dev": "tsx watch --watch=\"../config/**/*\" --watch=\"../../packages/server-core/src/**/*\" --conditions development src/index.ts",
         "build": "tsc",
         "start": "node dist/src/index.js",
         "start:dev": "tsx src/index.ts"

@@ -57,7 +57,7 @@ async function startServer() {
     }
 
     const backend = await initializeRebaseBackend({
-        collectionsDir: path.resolve(__dirname, "../../shared/collections"),
+        collectionsDir: path.resolve(__dirname, "../../config/collections"),
         functionsDir: path.resolve(__dirname, "../functions"),
         cronsDir: path.resolve(__dirname, "../crons"),
         server,
@@ -78,7 +78,8 @@ async function startServer() {
                 ? { clientId: env.GOOGLE_CLIENT_ID }
                 : undefined,
             seedDefaultRoles: true,
-            allowRegistration: env.ALLOW_REGISTRATION
+            allowRegistration: env.ALLOW_REGISTRATION,
+            serviceKey: env.REBASE_SERVICE_KEY
         },
         storage: env.STORAGE_TYPE === "s3" 
             ? {

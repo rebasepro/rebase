@@ -11,7 +11,7 @@ import {
     useCustomizationController,
     useSnackbarController
 } from "@rebasepro/core";
-import { useUrlController } from "@rebasepro/cms";
+import { useUrlController } from "@rebasepro/admin";
 import { DataDriver, Entity, EntityCollection, PluginFormActionProps } from "@rebasepro/types";
 import { enhanceDataAPIStream, fetchEntityPromptSuggestion } from "../api";
 import { getAppendableSuggestion } from "../utils/suggestions";

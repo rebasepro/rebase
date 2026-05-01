@@ -46,7 +46,7 @@ Please adhere to these principles when working with Rebase, as they ensure relia
    - `packages/core` — Core framework, types, hooks, and components
    - `packages/types` — Shared TypeScript type definitions
    - `packages/ui` — Standalone component library (Tailwind CSS v4 + Radix)
-   - `packages/cms` — CMS frontend application
+   - `packages/admin` — CMS frontend application
    - `packages/studio` — Admin panel, collection editor, visual schema editor
    - `packages/auth` — Authentication module
    - `packages/client` — Client SDK
@@ -82,7 +82,7 @@ rebase/
 │   ├── core/                 # @rebasepro/core — framework core
 │   ├── types/                # @rebasepro/types — shared types
 │   ├── ui/                   # @rebasepro/ui — component library
-│   ├── cms/                  # @rebasepro/cms — CMS frontend
+│   ├── cms/                  # @rebasepro/admin — CMS frontend
 │   ├── studio/               # @rebasepro/studio — admin panel
 │   ├── auth/                 # @rebasepro/auth — authentication
 │   ├── cli/                  # @rebasepro/cli — CLI tool

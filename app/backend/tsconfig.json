@@ -26,13 +26,13 @@
       "@rebasepro/common": [
         "../../packages/common/src"
       ],
-      "shared": [
-        "../shared"
+      "config": [
+        "../config"
       ],
       "@rebasepro/server-postgresql": [
         "../../packages/server-postgresql/src"
       ]
     }
   },
-  "include": ["src/**/*", "../shared/**/*", "drizzle.config.ts"]
+  "include": ["src/**/*", "../config/**/*", "drizzle.config.ts"]
 }

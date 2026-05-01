@@ -40,7 +40,7 @@
       "@rebasepro/types": [
         "../types/src"
       ],
-      "@rebasepro/cms": [
+      "@rebasepro/admin": [
         "../cms/src"
       ],
       "@rebasepro/schema-inference": [

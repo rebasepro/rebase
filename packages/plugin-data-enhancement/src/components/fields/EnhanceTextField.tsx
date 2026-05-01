@@ -1,7 +1,7 @@
 import React from "react";
 import { deepEqual as equal } from "fast-equals"
 
-import { FieldHelperText, LabelWithIconAndTooltip, PropertyIdCopyTooltip, useClearRestoreValue, getIconForProperty } from "@rebasepro/cms";
+import { FieldHelperText, LabelWithIconAndTooltip, PropertyIdCopyTooltip, useClearRestoreValue, getIconForProperty } from "@rebasepro/admin";
 import { FieldProps, NumberProperty, StringProperty } from "@rebasepro/types";
 import { AdvancedTextField } from "./AdvancedTextField";
 

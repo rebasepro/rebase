@@ -38,7 +38,7 @@ export function findProjectRoot(startDir: string = process.cwd()): string | null
             }
 
             // Check for sibling backend directory
-            if (fs.existsSync(path.join(dir, "backend")) && fs.existsSync(path.join(dir, "shared"))) {
+            if (fs.existsSync(path.join(dir, "backend")) && fs.existsSync(path.join(dir, "config"))) {
                 return dir;
             }
         }

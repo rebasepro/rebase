@@ -79,7 +79,7 @@ export async function entry(args: string[]) {
                 }
             );
             await generateSdkCommand({
-                collectionsDir: sdkArgs["--collections-dir"] || "./shared/collections",
+                collectionsDir: sdkArgs["--collections-dir"] || "./config/collections",
                 output: sdkArgs["--output"] || "./generated/sdk",
                 cwd: process.cwd(),
             });
