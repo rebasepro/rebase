@@ -213,3 +213,25 @@ You now have a fully functional blog CMS with:
 - Auto-generated URL slugs
 - RLS policies limiting authors to their own posts
 - Full audit trail via entity history
+
+## Querying from the SDK
+
+Use the client SDK to fetch articles with their relations:
+
+```typescript
+// Fetch published articles with author and categories included
+const { data: articles } = await client.data.articles
+    .where("status", "==", "published")
+    .include("author", "categories")
+    .orderBy("published_at", "desc")
+    .limit(10)
+    .find();
+
+for (const article of articles) {
+    console.log(article.values.title);
+    console.log(article.values.author?.name);    // Hydrated relation
+    console.log(article.values.author_id);       // Scalar FK
+    console.log(article.values.categories);      // Array of related entities
+}
+```
+

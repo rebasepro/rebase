@@ -6,7 +6,7 @@ import { generateAccessToken, generateRefreshToken, hashRefreshToken, getRefresh
 import { hashPassword, verifyPassword, validatePasswordStrength } from "./password";
 import { requireAuth } from "./middleware";
 import { EmailService, EmailConfig } from "../email";
-import { getPasswordResetTemplate, getEmailVerificationTemplate } from "../email/templates";
+import { getPasswordResetTemplate, getEmailVerificationTemplate, getWelcomeEmailTemplate } from "../email/templates";
 import { HonoEnv } from "../api/types";
 import { defaultAuthLimiter, strictAuthLimiter } from "./rate-limiter";
 import { z } from "zod";
@@ -143,6 +143,28 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     }
 
     /**
+     * Send welcome email to a newly registered user (fire-and-forget).
+     */
+    function sendWelcomeEmail(user: { email: string; displayName?: string | null }) {
+        if (!isEmailConfigured()) return;
+        const appName = emailConfig?.appName || "Rebase";
+        const loginUrl = emailConfig?.resetPasswordUrl || ""; // reuse base URL → the login / app page
+        const templateFn = emailConfig?.templates?.welcomeEmail;
+        const emailContent = templateFn
+            ? templateFn(user, appName)
+            : getWelcomeEmailTemplate(user, appName, loginUrl ? `${loginUrl}/app` : undefined);
+
+        emailService!.send({
+            to: user.email,
+            subject: emailContent.subject,
+            html: emailContent.html,
+            text: emailContent.text
+        }).catch(err => {
+            console.error("Failed to send welcome email:", err instanceof Error ? err.message : err);
+        });
+    }
+
+    /**
      * POST /auth/register
      * Create a new account with email/password
      */
@@ -201,6 +223,9 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
             userAgent,
             ipAddress
         );
+
+        // Send welcome email (fire-and-forget, don't block registration)
+        sendWelcomeEmail({ email: user.email, displayName: user.displayName });
 
         return c.json(buildAuthResponse(user, roleIds, accessToken, refreshToken), 201);
     });
@@ -295,6 +320,9 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
                         } else if (config.defaultRole) {
                             await authRepo.assignDefaultRole(user.id, config.defaultRole);
                         }
+
+                        // Send welcome email for new OAuth users (fire-and-forget)
+                        sendWelcomeEmail({ email: user.email, displayName: user.displayName });
                     }
                 } else {
                     // Update profile info from external provider

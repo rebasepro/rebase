@@ -191,6 +191,56 @@ relations: [
 | `"set null"` | Set the FK column to NULL |
 | `"set default"` | Set the FK column to its default value |
 
+## Fetching Relations in the SDK
+
+When querying data through the Rebase Client SDK, relations are **not** included by default. Use the `include()` method to request related entities alongside the primary data.
+
+### Include specific relations
+
+```typescript
+const { data } = await client.data.articles
+    .include("author", "categories")
+    .find();
+```
+
+### Include all relations
+
+```typescript
+const { data } = await client.data.articles
+    .include("*")
+    .find();
+```
+
+### Using params syntax
+
+```typescript
+const { data } = await client.data.articles.find({
+    include: ["author", "categories"]
+});
+```
+
+### Response structure
+
+When included, the response contains both the **scalar foreign key** and the **hydrated relation object**:
+
+```typescript
+const { data } = await client.data.articles
+    .include("author")
+    .find();
+
+for (const article of data) {
+    // Scalar FK — always present
+    article.values.author_id;     // "uuid-1234"
+
+    // Hydrated relation — only present when included
+    article.values.author?.name;  // "Jane Doe"
+}
+```
+
+> The relation names passed to `include()` must match the `relationName` defined in the collection's `relations` array.
+
+For the full query builder reference (filtering, sorting, pagination, real-time), see the [Client SDK documentation](/docs/sdk).
+
 ## Full Relation Interface
 
 ```typescript

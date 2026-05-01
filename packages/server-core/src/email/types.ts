@@ -49,6 +49,14 @@ export type UserInvitationTemplateFunction = (
 ) => { subject: string; html: string; text?: string };
 
 /**
+ * Template function for welcome emails sent after registration
+ */
+export type WelcomeEmailTemplateFunction = (
+    user: { email: string; displayName?: string | null },
+    appName: string
+) => { subject: string; html: string; text?: string };
+
+/**
  * Complete email configuration
  */
 export interface EmailConfig {
@@ -92,5 +100,6 @@ export interface EmailConfig {
         passwordReset?: PasswordResetTemplateFunction;
         emailVerification?: EmailVerificationTemplateFunction;
         userInvitation?: UserInvitationTemplateFunction;
+        welcomeEmail?: WelcomeEmailTemplateFunction;
     };
 }

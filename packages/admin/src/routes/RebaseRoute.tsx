@@ -23,6 +23,7 @@ export function RebaseRoute() {
     const isSidePanel = hash.includes("#side");
     const isNew = hash.includes("#new") || hash.includes("#new_side");
     const isCopy = hash.includes("#copy");
+    const isFullScreen = hash.includes("#full");
 
     const pathname = location.pathname;
     const navigationPath = urlController.urlPathToDataPath(pathname);
@@ -128,6 +129,7 @@ export function RebaseRoute() {
     const lastEntityEntry = navigationEntries.find((entry) => entry.type === "entity");
     const firstCollectionEntry = navigationEntries[0];
     if (
+        !isFullScreen &&
         !isCopy &&
         navigationEntries.length === 2 &&
         firstCollectionEntry?.type === "collection" &&

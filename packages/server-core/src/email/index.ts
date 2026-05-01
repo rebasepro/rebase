@@ -9,9 +9,10 @@ export type {
     EmailConfig,
     PasswordResetTemplateFunction,
     EmailVerificationTemplateFunction,
-    UserInvitationTemplateFunction
+    UserInvitationTemplateFunction,
+    WelcomeEmailTemplateFunction
 } from "./types";
 
 export { SMTPEmailService, createEmailService } from "./smtp-email-service";
 
-export { getPasswordResetTemplate, getEmailVerificationTemplate, getUserInvitationTemplate } from "./templates";
+export { getPasswordResetTemplate, getEmailVerificationTemplate, getUserInvitationTemplate, getWelcomeEmailTemplate } from "./templates";

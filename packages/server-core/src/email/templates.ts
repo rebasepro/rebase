@@ -299,3 +299,82 @@ If you weren't expecting this invitation, you can safely ignore this email.
 
     return { subject, html, text };
 }
+
+/**
+ * Default welcome email template
+ * Sent automatically when a new user registers
+ */
+export function getWelcomeEmailTemplate(
+    user: TemplateUser,
+    appName: string = "Rebase",
+    loginUrl?: string
+): { subject: string; html: string; text: string } {
+    const greeting = getGreeting(user);
+    const url = loginUrl || "";
+
+    const subject = `¡Bienvenido/a a ${appName}!`;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc;">
+    <div style="${styles.container}">
+        <div style="${styles.card}">
+            <h1 style="${styles.heading}">¡Bienvenido/a a ${appName}!</h1>
+            
+            <p style="${styles.paragraph}">
+                Hola ${greeting},
+            </p>
+            
+            <p style="${styles.paragraph}">
+                Tu cuenta en ${appName} ha sido creada exitosamente. 
+                Estamos encantados de tenerte con nosotros.
+            </p>
+            
+            <p style="${styles.paragraph}">
+                Ya puedes acceder a tu panel y empezar a explorar todas las oportunidades 
+                que tenemos para ti.
+            </p>
+
+            ${url ? `
+            <div style="text-align: center;">
+                <a href="${url}" style="${styles.button}">Ir a mi Panel</a>
+            </div>
+            ` : ""}
+            
+            <p style="${styles.paragraph}">
+                Si tienes alguna pregunta, no dudes en contactarnos respondiendo a este correo.
+            </p>
+            
+            <div style="${styles.footer}">
+                <p style="margin: 0;">
+                    Este correo fue enviado porque se creó una cuenta con esta dirección de email en ${appName}.
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+    `.trim();
+
+    const text = `
+¡Bienvenido/a a ${appName}!
+
+Hola ${greeting},
+
+Tu cuenta en ${appName} ha sido creada exitosamente. Estamos encantados de tenerte con nosotros.
+
+Ya puedes acceder a tu panel y empezar a explorar todas las oportunidades que tenemos para ti.
+
+${url ? `Ir a mi panel: ${url}` : ""}
+
+Si tienes alguna pregunta, no dudes en contactarnos respondiendo a este correo.
+    `.trim();
+
+    return { subject, html, text };
+}

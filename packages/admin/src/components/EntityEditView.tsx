@@ -15,7 +15,7 @@ import {
     resolveDefaultSelectedView,
 } from "@rebasepro/common";
 import { resolvedSelectedEntityView } from "../util/resolutions";
-import { CenteredView, CircularProgress, cls, CodeIcon, defaultBorderMixin, Tab, Tabs, Typography, Skeleton } from "@rebasepro/ui";
+import { CenteredView, CircularProgress, cls, CodeIcon, defaultBorderMixin, IconButton, OpenInFullIcon, Tab, Tabs, Tooltip, Typography, Skeleton } from "@rebasepro/ui";
 import {
     useCustomizationController,
     useEntityFetch,
@@ -30,6 +30,8 @@ import { EntityEditViewFormActions } from "./EntityEditViewFormActions";
 import { EntityJsonPreview } from "../components/EntityJsonPreview";
 import { createFormexStub, getEntityFromCache } from "@rebasepro/core";
 import { usePermissions } from "@rebasepro/core";
+import { useUrlController } from "../index";
+import { useNavigate } from "react-router-dom";
 
 export const MAIN_TAB_VALUE = "__main_##Q$SC^#S6";
 export const JSON_TAB_VALUE = "__json";
@@ -159,6 +161,8 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
 }) {
 
     const context = useRebaseContext();
+    const urlController = useUrlController();
+    const navigate = useNavigate();
 
     const [usedEntity, setUsedEntity] = useState<Entity<M> | undefined>(entity);
 
@@ -413,12 +417,28 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
             </Tab>
         );
 
-    const shouldShowTopBar = Boolean(barActions) || hasAdditionalViews;
+    const shouldShowTopBar = Boolean(barActions) || hasAdditionalViews || layout === "side_panel";
+
+    const fullScreenButton = layout === "side_panel" && entityId ? (
+        <Tooltip title={"Open full screen"}>
+            <IconButton
+                size="small"
+                onClick={() => {
+                    const entityUrl = urlController.buildUrlCollectionPath(`${path}/${entityId}`);
+                    navigate(`${entityUrl}#full`);
+                }}
+            >
+                <OpenInFullIcon size="small" />
+            </IconButton>
+        </Tooltip>
+    ) : null;
 
     let result = <div className="relative flex flex-col h-full w-full bg-white dark:bg-surface-900">
 
         {shouldShowTopBar && <div
             className={cls("h-14 items-center flex overflow-hidden w-full h-14 border-b pl-2 pr-2 pt-1 flex bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
+
+            {fullScreenButton}
 
             {barActions?.({
                 path,

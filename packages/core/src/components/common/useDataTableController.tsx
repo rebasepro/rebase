@@ -245,9 +245,15 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         const whereParams = Object.keys(whereMap).length > 0 ? whereMap : undefined;
         const orderByParams = sortByProperty ? `${String(sortByProperty)}:${currentSort}` : undefined;
 
-        // Note: For now, offset is determined based on how many elements we already have.
-        // Actually, this is a table controller; fetching the whole list up to itemCount is how it worked.
-        // So offset: 0, limit: itemCount.
+        // Eagerly include relations to avoid N+1 fetches in the table view.
+        // If the collection has any relation or reference properties, request
+        // all relations up-front so that RelationPreview/ReferencePreview
+        // components receive pre-fetched data instead of triggering individual
+        // API calls per cell.
+        const hasRelations = collection.properties && Object.values(collection.properties).some(
+            (p: any) => p.type === "relation" || p.type === "reference"
+        );
+        const includeParams = hasRelations ? ["*"] : undefined;
         
         let unsubscribe: (() => void) | undefined;
         
@@ -256,14 +262,16 @@ export function useDataTableController<M extends Record<string, any> = any, USER
                 where: whereParams,
                 limit: itemCount,
                 orderBy: orderByParams,
-                searchString
+                searchString,
+                include: includeParams
             }, (res: FindResponse<M>) => onEntitiesUpdate(res.data), onError);
         } else {
             accessor.find({
                 where: whereParams,
                 limit: itemCount,
                 orderBy: orderByParams,
-                searchString
+                searchString,
+                include: includeParams
             })
                 .then((res: FindResponse<M>) => onEntitiesUpdate(res.data))
                 .catch(onError);

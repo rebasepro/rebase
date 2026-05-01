@@ -123,19 +123,27 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
 
         const accessor = dataClient.collection(path);
         
+        // Eagerly include relations to avoid N+1 fetches.
+        const hasRelations = collection.properties && Object.values(collection.properties).some(
+            (p: any) => p.type === "relation" || p.type === "reference"
+        );
+        const includeParams = hasRelations ? ["*"] : undefined;
+
         if (accessor.listen) {
             return accessor.listen({
                 where: whereParams,
                 limit: itemCount,
                 orderBy: orderByParams,
-                searchString
+                searchString,
+                include: includeParams
             }, onEntitiesUpdate, onError);
         } else {
             accessor.find({
                 where: whereParams,
                 limit: itemCount,
                 orderBy: orderByParams,
-                searchString
+                searchString,
+                include: includeParams
             })
                 .then(onEntitiesUpdate)
                 .catch(onError);
