@@ -43,8 +43,11 @@ export const callbacksTestCollection: PostgresCollection = {
         afterRead: (props: EntityAfterReadProps) => {
             console.log("🔥 [BACKEND_CALLBACK] afterRead Triggered!", props);
             return {
-                ...props.entity.values,
-                hasFetchTriggered: true
+                ...props.entity,
+                values: {
+                    ...props.entity.values,
+                    hasFetchTriggered: true
+                }
             };
         },
         beforeDelete: (props: EntityBeforeDeleteProps) => {

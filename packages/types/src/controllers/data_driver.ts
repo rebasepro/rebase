@@ -6,17 +6,17 @@ import { TableMetadata } from "../types/websockets";
 /**
  * @internal
  */
-export interface FetchEntityProps<M extends Record<string, any> = any> {
+export interface FetchEntityProps<M extends Record<string, unknown> = Record<string, unknown>> {
     path: string;
     entityId: string | number;
     databaseId?: string;
-    collection?: EntityCollection<M, any>
+    collection?: EntityCollection<M>
 }
 
 /**
  * @internal
  */
-export type ListenEntityProps<M extends Record<string, any> = any> =
+export type ListenEntityProps<M extends Record<string, unknown> = Record<string, unknown>> =
     FetchEntityProps<M>
     & {
         onUpdate: (entity: Entity<M> | null) => void,
@@ -26,7 +26,7 @@ export type ListenEntityProps<M extends Record<string, any> = any> =
 /**
  * @internal
  */
-export interface FetchCollectionProps<M extends Record<string, any> = any> {
+export interface FetchCollectionProps<M extends Record<string, unknown> = Record<string, unknown>> {
     path: string;
     collection?: EntityCollection<M>;
     filter?: FilterValues<Extract<keyof M, string>>,
@@ -40,7 +40,7 @@ export interface FetchCollectionProps<M extends Record<string, any> = any> {
 /**
  * @internal
  */
-export type ListenCollectionProps<M extends Record<string, any> = any> =
+export type ListenCollectionProps<M extends Record<string, unknown> = Record<string, unknown>> =
     FetchCollectionProps<M> &
     {
         onUpdate: (entities: Entity<M>[]) => void;
@@ -50,7 +50,7 @@ export type ListenCollectionProps<M extends Record<string, any> = any> =
 /**
  * @internal
  */
-export interface SaveEntityProps<M extends Record<string, any> = any> {
+export interface SaveEntityProps<M extends Record<string, unknown> = Record<string, unknown>> {
     path: string;
     values: Partial<EntityValues<M>>;
     entityId?: string | number; // can be empty for new entities
@@ -62,7 +62,7 @@ export interface SaveEntityProps<M extends Record<string, any> = any> {
 /**
  * @internal
  */
-export interface DeleteEntityProps<M extends Record<string, any> = any> {
+export interface DeleteEntityProps<M extends Record<string, unknown> = Record<string, unknown>> {
     entity: Entity<M>;
     collection?: EntityCollection<M>;
 }
@@ -70,8 +70,8 @@ export interface DeleteEntityProps<M extends Record<string, any> = any> {
 export type FilterCombinationValidProps = {
     path: string;
     databaseId?: string;
-    collection: EntityCollection<any>;
-    filterValues: FilterValues<any>;
+    collection: EntityCollection;
+    filterValues: FilterValues<string>;
     sortBy?: [string, "asc" | "desc"];
 };
 
@@ -97,7 +97,7 @@ export interface DataDriver {
      * @param props
      * @return Promise of entities
      */
-    fetchCollection<M extends Record<string, any> = any>(props: FetchCollectionProps<M>): Promise<Entity<M>[]>;
+    fetchCollection<M extends Record<string, unknown> = Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<Entity<M>[]>;
 
     /**
      * Listen to a collection in a given path. If you don't implement this method
@@ -105,33 +105,33 @@ export interface DataDriver {
      * @param props
      * @return Function to cancel subscription
      */
-    listenCollection?<M extends Record<string, any> = any>(props: ListenCollectionProps<M>): () => void;
+    listenCollection?<M extends Record<string, unknown> = Record<string, unknown>>(props: ListenCollectionProps<M>): () => void;
 
     /**
      * Retrieve an entity given a path and a collection
      * @param props
      */
-    fetchEntity<M extends Record<string, any> = any>(props: FetchEntityProps<M>): Promise<Entity<M> | undefined>;
+    fetchEntity<M extends Record<string, unknown> = Record<string, unknown>>(props: FetchEntityProps<M>): Promise<Entity<M> | undefined>;
 
     /**
      * Get realtime updates on one entity.
      * @param props
      * @return Function to cancel subscription
      */
-    listenEntity?<M extends Record<string, any> = any>(props: ListenEntityProps<M>): () => void;
+    listenEntity?<M extends Record<string, unknown> = Record<string, unknown>>(props: ListenEntityProps<M>): () => void;
 
     /**
      * Save entity to the specified path
      * @param props
      */
-    saveEntity<M extends Record<string, any> = any>(props: SaveEntityProps<M>): Promise<Entity<M>>;
+    saveEntity<M extends Record<string, unknown> = Record<string, unknown>>(props: SaveEntityProps<M>): Promise<Entity<M>>;
 
     /**
      * Delete an entity
      * @param props
      * @return was the whole deletion flow successful
      */
-    deleteEntity<M extends Record<string, any> = any>(props: DeleteEntityProps<M>): Promise<void>;
+    deleteEntity<M extends Record<string, unknown> = Record<string, unknown>>(props: DeleteEntityProps<M>): Promise<void>;
 
     /**
      * Check if the given property is unique in the given collection
@@ -153,7 +153,7 @@ export interface DataDriver {
     /**
      * Count the number of entities in a collection
      */
-    countEntities?<M extends Record<string, any> = any>(props: FetchCollectionProps<M>): Promise<number>;
+    countEntities?<M extends Record<string, unknown> = Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<number>;
 
     /**
      * Check if the given filter combination is valid
@@ -207,16 +207,22 @@ export interface DataDriver {
     // simple use cases. For capability-based access, use `driver.admin`
     // with `isSQLAdmin()` / `isSchemaAdmin()` type guards.
 
+    /** @deprecated Use `driver.admin` with `isSQLAdmin()` type guard instead. */
     executeSql?(sql: string, options?: { database?: string; role?: string }): Promise<Record<string, unknown>[]>;
 
+    /** @deprecated Use `driver.admin` with `isSchemaAdmin()` type guard instead. */
     fetchAvailableDatabases?(): Promise<string[]>;
 
+    /** @deprecated Use `driver.admin` with `isSchemaAdmin()` type guard instead. */
     fetchAvailableRoles?(): Promise<string[]>;
 
+    /** @deprecated Use `driver.admin` with `isSchemaAdmin()` type guard instead. */
     fetchCurrentDatabase?(): Promise<string | undefined>;
 
+    /** @deprecated Use `driver.admin` with `isSchemaAdmin()` type guard instead. */
     fetchUnmappedTables?(mappedPaths?: string[]): Promise<string[]>;
 
+    /** @deprecated Use `driver.admin` with `isSchemaAdmin()` type guard instead. */
     fetchTableMetadata?(tableName: string): Promise<TableMetadata>;
 
 }

@@ -529,7 +529,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     }
 
     if (emailService) {
-        (serverClient as Record<string, unknown>).email = emailService;
+        Object.assign(serverClient, { email: emailService });
         logger.info("Email service attached to singleton", { configured: emailService.isConfigured() });
     }
 

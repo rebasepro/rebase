@@ -58,7 +58,7 @@ export const rebase: RebaseClient = new Proxy({} as RebaseClient, {
                 "The singleton is available after Rebase starts — don't call it at import time."
             );
         }
-        return (_instance as Record<string, unknown>)[prop as string];
+        return _instance[prop as keyof RebaseClient];
     },
     set(_, prop) {
         throw new Error(

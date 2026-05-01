@@ -51,18 +51,7 @@ export interface DataSourceCapabilities {
  * Useful when you only need to check capabilities without UI metadata.
  * @group Models
  */
-export type DataSourceFeatures = Pick<
-    DataSourceCapabilities,
-    | "supportsRelations"
-    | "supportsSubcollections"
-    | "supportsRLS"
-    | "supportsReferences"
-    | "supportsColumnTypes"
-    | "supportsRealtime"
-    | "supportsSQLAdmin"
-    | "supportsDocumentAdmin"
-    | "supportsSchemaAdmin"
->;
+export type DataSourceFeatures = Omit<DataSourceCapabilities, "key" | "label">;
 
 // ── Built-in driver capabilities ─────────────────────────────────────
 

@@ -9,7 +9,7 @@ import { RebaseCallContext } from "../rebase_context";
  * Useful for adding your own logic or blocking the execution of the operation.
  * @group Models
  */
-export type EntityCallbacks<M extends Record<string, any> = any, USER extends User = User> = {
+export type EntityCallbacks<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> = {
 
     /**
      * Callback used after fetching data
@@ -65,12 +65,12 @@ export type EntityCallbacks<M extends Record<string, any> = any, USER extends Us
  * Parameters passed to hooks when an entity is fetched
  * @group Models
  */
-export interface EntityAfterReadProps<M extends Record<string, any> = any, USER extends User = User> {
+export interface EntityAfterReadProps<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> {
 
     /**
      * Collection of the entity
      */
-    collection: EntityCollection<Record<string, unknown>, any>;
+    collection: EntityCollection<M>;
 
     /**
      * Full path of the CMS where this collection is being fetched.
@@ -93,7 +93,7 @@ export interface EntityAfterReadProps<M extends Record<string, any> = any, USER 
  * Parameters passed to hooks before an entity is saved
  * @group Models
  */
-export type EntityBeforeSaveProps<M extends Record<string, any> = any, USER extends User = User> =
+export type EntityBeforeSaveProps<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> =
     Omit<EntityAfterSaveProps<M, USER>, "entityId">
     & {
         entityId?: string | number;
@@ -102,7 +102,7 @@ export type EntityBeforeSaveProps<M extends Record<string, any> = any, USER exte
  * Parameters passed to hooks before an entity is saved
  * @group Models
  */
-export type EntityAfterSaveErrorProps<M extends Record<string, any> = any, USER extends User = User> =
+export type EntityAfterSaveErrorProps<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> =
     Omit<EntityAfterSaveProps<M, USER>, "entityId">
     & {
         entityId?: string | number;
@@ -112,12 +112,12 @@ export type EntityAfterSaveErrorProps<M extends Record<string, any> = any, USER 
  * Parameters passed to hooks when an entity is saved
  * @group Models
  */
-export interface EntityAfterSaveProps<M extends Record<string, any> = any, USER extends User = User> {
+export interface EntityAfterSaveProps<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> {
 
     /**
      * Resolved collection of the entity
      */
-    collection: EntityCollection<Record<string, unknown>, any>;
+    collection: EntityCollection<M>;
 
     /**
      * Full path of the CMS where this entity is being saved.
@@ -155,12 +155,12 @@ export interface EntityAfterSaveProps<M extends Record<string, any> = any, USER 
  * Parameters passed to hooks when an entity is deleted
  * @group Models
  */
-export interface EntityBeforeDeleteProps<M extends Record<string, any> = any, USER extends User = User> {
+export interface EntityBeforeDeleteProps<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> {
 
     /**
      * collection of the entity being deleted
      */
-    collection: EntityCollection<Record<string, unknown>, any>;
+    collection: EntityCollection<M>;
 
     /**
      * Path of the parent collection
@@ -187,12 +187,12 @@ export interface EntityBeforeDeleteProps<M extends Record<string, any> = any, US
  * Parameters passed to hooks after an entity is deleted
  * @group Models
  */
-export interface EntityAfterDeleteProps<M extends Record<string, any> = any, USER extends User = User> {
+export interface EntityAfterDeleteProps<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> {
 
     /**
      * collection of the entity being deleted
      */
-    collection: EntityCollection<Record<string, unknown>, any>;
+    collection: EntityCollection<M>;
 
     /**
      * Path of the parent collection

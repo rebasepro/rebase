@@ -65,7 +65,7 @@ export type EntityActionClickProps<M extends Record<string, unknown>, USER exten
     context: RebaseContext<USER>;
 
     path?: string;
-    collection?: EntityCollection<Record<string, unknown>, any>;
+    collection?: EntityCollection<M>;
 
     /**
      * Optional form context, present if the action is being called from a form.

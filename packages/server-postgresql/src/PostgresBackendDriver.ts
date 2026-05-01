@@ -167,7 +167,7 @@ export class PostgresBackendDriver implements DataDriver {
                         path,
                         entity: fetched,
                         context: contextForCallback
-                    }) ?? fetched;
+                    }) as Entity<M> ?? fetched;
                 }
                 return fetched;
             }));
@@ -271,7 +271,7 @@ export class PostgresBackendDriver implements DataDriver {
                     path,
                     entity,
                     context: contextForCallback
-                }) ?? entity;
+                }) as Entity<M> ?? entity;
             }
         }
 
@@ -401,7 +401,7 @@ export class PostgresBackendDriver implements DataDriver {
                         path,
                         entity: savedEntity,
                         context: contextForCallback
-                    }) ?? savedEntity;
+                    }) as Entity<M> ?? savedEntity;
                 }
             }
 

@@ -9,10 +9,7 @@ import {
     CircularProgress,
     cls,
     defaultBorderMixin,
-    Typography,
-    Separator,
-    ArrowUpwardIcon,
-    ArrowDownwardIcon
+    Typography
 } from "@rebasepro/ui";
 import { PropertyPreview } from "../../preview";
 import {
@@ -157,9 +154,7 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
         itemCount,
         setItemCount,
         pageSize = 50,
-        paginationEnabled,
-        sortBy,
-        setSortBy
+        paginationEnabled
     } = tableController;
 
     const isLoadingMore = useRef(false);
@@ -450,31 +445,7 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
         return highlightedEntities?.some(e => e.id === entity.id && e.path === entity.path) ?? false;
     }, [highlightedEntities]);
 
-    // Select all toggle
-    const allSelected = data.length > 0 && data.every(e => isEntitySelected(e));
-    const someSelected = data.some(e => isEntitySelected(e));
 
-    const handleSelectAll = useCallback(() => {
-        if (allSelected) {
-            selectionController?.setSelectedEntities([]);
-        } else {
-            selectionController?.setSelectedEntities(data);
-        }
-    }, [allSelected, data, selectionController]);
-
-    // Sort handler for column headers
-    const handleSort = useCallback((propertyKey: string) => {
-        if (!setSortBy) return;
-        if (sortBy && sortBy[0] === propertyKey) {
-            if (sortBy[1] === "asc") {
-                setSortBy([propertyKey, "desc"]);
-            } else {
-                setSortBy(undefined);
-            }
-        } else {
-            setSortBy([propertyKey, "asc"]);
-        }
-    }, [sortBy, setSortBy]);
 
     const rowClasses = getRowClasses(size);
 
@@ -503,60 +474,7 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
                 </div>
             ) : (
             <div className="w-full overflow-hidden">
-                {/* Column header row */}
-                <div className={cls(
-                    "flex items-center gap-4 px-5 py-3 sticky top-0 z-10",
-                    "bg-surface-50/80 dark:bg-surface-900/80 backdrop-blur-md",
-                    "border-b", defaultBorderMixin,
-                    "text-[11px] font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-widest select-none"
-                )}>
-                    {/* Select All Checkbox */}
-                    {selectionEnabled && (
-                        <div className="flex-shrink-0 w-8">
-                            <Checkbox
-                                checked={allSelected}
-                                indeterminate={someSelected && !allSelected}
-                                onCheckedChange={handleSelectAll}
-                                size="smallest"
-                            />
-                        </div>
-                    )}
 
-                    {/* Thumbnail placeholder */}
-                    {showImage && <div className="flex-shrink-0 w-10" />}
-
-                    {/* Dynamic Columns */}
-                    {visibleColumns.map(col => {
-                        const isOwningRelation = col.property?.type === "relation" && col.property.relation?.direction === "owning";
-                        const isSortable = col.property ? (
-                            ["string", "number", "boolean", "date"].includes(col.property.type) || isOwningRelation
-                        ) : false;
-                        
-                        return (
-                            <div
-                                key={col.key}
-                                className={cls(
-                                    col.width,
-                                    "flex items-center gap-1.5 transition-colors group",
-                                    isSortable ? "cursor-pointer hover:text-surface-800 dark:hover:text-surface-100" : "cursor-default text-surface-400 dark:text-surface-500",
-                                    col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"
-                                )}
-                                onClick={() => isSortable && handleSort(col.key)}
-                            >
-                                <span>{col.label}</span>
-                                {isSortable && (
-                                    sortBy && sortBy[0] === col.key ? (
-                                        sortBy[1] === "asc"
-                                            ? <ArrowUpwardIcon size="smallest" className="text-primary-500" />
-                                            : <ArrowDownwardIcon size="smallest" className="text-primary-500" />
-                                    ) : (
-                                        <ArrowDownwardIcon size="smallest" className="opacity-0 group-hover:opacity-30 transition-opacity" />
-                                    )
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
 
                 {/* Entity rows */}
                 {data.map((entity, index) => (

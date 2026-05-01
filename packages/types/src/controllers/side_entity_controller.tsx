@@ -4,7 +4,7 @@ import { Entity, EntityCollection } from "../types";
  * Props used to open a side dialog
  * @group Hooks and utilities
  */
-export interface EntitySidePanelProps<M extends Record<string, any> = any> {
+export interface EntitySidePanelProps<M extends Record<string, unknown> = Record<string, unknown>> {
 
     /**
      * Absolute path of the entity
@@ -51,7 +51,7 @@ export interface EntitySidePanelProps<M extends Record<string, any> = any> {
      * Callback when the entity is updated
      * @param params
      */
-    onUpdate?: (params: { entity: Entity<any> }) => void;
+    onUpdate?: (params: { entity: Entity<M> }) => void;
 
     /**
      * Callback when the dialog is closed
@@ -66,7 +66,7 @@ export interface EntitySidePanelProps<M extends Record<string, any> = any> {
     /**
      * Override some form properties
      */
-    formProps?: any;
+    formProps?: Record<string, unknown>;
 
     /**
      * Allow the user to open the entity fullscreen
@@ -93,11 +93,11 @@ export interface SideEntityController {
      * (or a new one with that id).
      * @param props
      */
-    open: <M extends Record<string, any> = any>(props: EntitySidePanelProps<M>) => void;
+    open: <M extends Record<string, unknown> = Record<string, unknown>>(props: EntitySidePanelProps<M>) => void;
 
     /**
      * Replace the last open entity panel with the given one.
      * @param props
      */
-    replace: <M extends Record<string, any> = any>(props: EntitySidePanelProps<M>) => void;
+    replace: <M extends Record<string, unknown> = Record<string, unknown>>(props: EntitySidePanelProps<M>) => void;
 }

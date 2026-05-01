@@ -78,7 +78,7 @@ export interface FindParams {
  * Paginated response from a collection query.
  * @group Data
  */
-export interface FindResponse<M extends Record<string, any> = any> {
+export interface FindResponse<M extends Record<string, unknown> = Record<string, unknown>> {
     /** Array of entities matching the query */
     data: Entity<M>[];
     /** Pagination metadata */
@@ -99,7 +99,7 @@ export interface FindResponse<M extends Record<string, any> = any> {
  *
  * @group Data
  */
-export interface CollectionAccessor<M extends Record<string, any> = any> {
+export interface CollectionAccessor<M extends Record<string, unknown> = Record<string, unknown>> {
     /**
      * Find multiple records with optional filtering, pagination, and sorting.
      */

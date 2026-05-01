@@ -98,7 +98,7 @@ export interface SlotContribution<K extends SlotName = SlotName> {
     /**
      * Additional props to merge into the slot props before rendering.
      */
-    props?: Record<string, any>;
+    props?: Record<string, unknown>;
 
     /**
      * Ordering hint. Lower values render first. Defaults to 50.

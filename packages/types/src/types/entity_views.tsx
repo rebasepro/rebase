@@ -8,7 +8,7 @@ import { EntityCollection } from "./collections";
  * fully-typed version that narrows the `formex` field.
  * @group Form custom fields
  */
-export interface FormContext<M extends Record<string, any> = any> {
+export interface FormContext<M extends Record<string, unknown> = Record<string, unknown>> {
 
     /**
      * Current values of the entity
@@ -59,7 +59,7 @@ export interface FormContext<M extends Record<string, any> = any> {
 }
 
 
-export type EntityCustomView<M extends Record<string, any> = any> = {
+export type EntityCustomView<M extends Record<string, unknown> = Record<string, unknown>> = {
     key: string;
     name: string;
     tabComponent?: React.ReactNode;
@@ -68,7 +68,7 @@ export type EntityCustomView<M extends Record<string, any> = any> = {
     position?: "start" | "end";
 };
 
-export interface EntityCustomViewParams<M extends Record<string, any> = any> {
+export interface EntityCustomViewParams<M extends Record<string, unknown> = Record<string, unknown>> {
     collection: EntityCollection<M>;
     entity?: Entity<M>;
     modifiedValues?: EntityValues<M>;

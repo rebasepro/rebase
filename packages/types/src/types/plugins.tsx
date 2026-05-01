@@ -2,7 +2,7 @@ import React, { PropsWithChildren } from "react";
 
 import { EntityCollection, CollectionActionsProps, EntityTableController, SelectionController } from "./collections";
 import { EntityStatus } from "./entities";
-import { Property } from "./properties";
+import { InferPropertyType, Property } from "./properties";
 import { FormContext } from "./entity_views";
 import { RebaseContext } from "../rebase_context";
 import { NavigationGroupMapping, AppView } from "../controllers";
@@ -10,7 +10,84 @@ import { UserManagementDelegate } from "./user_management_delegate";
 import { User } from "../users";
 import { SlotContribution } from "./slots";
 
-export type FieldProps<T = any, CustomProps = any, M extends Record<string, any> = any> = any;
+/**
+ * Props interface for custom field components.
+ *
+ * The `@rebasepro/admin` package re-exports a narrower version of this
+ * interface that adds `formex` and layout-specific fields. This base
+ * definition captures the core contract that every field renderer must
+ * satisfy, regardless of where it is rendered.
+ *
+ * @typeParam P - The property type this field is bound to
+ * @typeParam CustomProps - Extra props injected via the property's `customProps`
+ * @typeParam M - The entity model type
+ * @group Form custom fields
+ */
+export interface FieldProps<
+    P extends Property = Property,
+    CustomProps = unknown,
+    M extends Record<string, unknown> = Record<string, unknown>
+> {
+    /** Key of the property (e.g. "user.name" for a nested path) */
+    propertyKey: string;
+
+    /** Current value of this field */
+    value: InferPropertyType<P> | null;
+
+    /** Set value of field directly */
+    setValue: (value: InferPropertyType<P> | null, shouldValidate?: boolean) => void;
+
+    /** Set value of a different field directly */
+    setFieldValue: (propertyKey: string, value: unknown, shouldValidate?: boolean) => void;
+
+    /** Is the form currently submitting */
+    isSubmitting?: boolean;
+
+    /** Should this field show the error indicator */
+    showError?: boolean;
+
+    /** Error message for this field, or undefined if valid */
+    error?: string;
+
+    /** Has this field been touched */
+    touched?: boolean;
+
+    /** Property related to this field */
+    property: P;
+
+    /** Should this field include a description */
+    includeDescription?: boolean;
+
+    /** Flag to indicate that the underlying value has been updated in the driver */
+    underlyingValueHasChanged?: boolean;
+
+    /** Is this field part of an array */
+    partOfArray?: boolean;
+
+    /** Is this field part of a block */
+    partOfBlock?: boolean;
+
+    /** Display the child properties directly, without being wrapped in an extendable panel */
+    minimalistView?: boolean;
+
+    /** Should this field autofocus on mount */
+    autoFocus?: boolean;
+
+    /** Additional properties set by the developer */
+    customProps?: CustomProps;
+
+    /** Additional values related to the state of the form or the entity */
+    context: FormContext<M>;
+
+    /** Flag to indicate if this field should be disabled */
+    disabled?: boolean;
+
+    /** Size of the field */
+    size?: "small" | "medium" | "large";
+
+    /** Callback when internal property state changes (e.g. panel expansion) */
+    onPropertyChange?: (property: Partial<Property>) => void;
+}
 
 // ── Plugin ────────────────────────────────────────────────────────────
 
@@ -89,12 +166,12 @@ export interface PluginProvider {
      * Typed loosely because extra props are passed via the `props` field;
      * strict signatures cause contravariance issues.
      */
-    Component: React.ComponentType<any>;
+    Component: React.ComponentType<PropsWithChildren<Record<string, unknown>>>;
 
     /**
      * Additional props passed to the Component.
      */
-    props?: Record<string, any>;
+    props?: Record<string, unknown>;
 }
 
 // ── Hooks ─────────────────────────────────────────────────────────────
@@ -189,7 +266,7 @@ export interface PluginLifecycle {
      * Called when a collection's visible entities change.
      * Useful for analytics, caching, or cross-plugin coordination.
      */
-    onCollectionChange?: (slug: string, entities: any[]) => void;
+    onCollectionChange?: (slug: string, entities: unknown[]) => void;
 }
 
 // ── Field Builder ─────────────────────────────────────────────────────
@@ -202,7 +279,7 @@ export interface FieldBuilderConfig {
     /**
      * Returns a wrapped field component, or null to skip wrapping.
      */
-    wrap: <T>(params: PluginFieldBuilderParams) => React.ComponentType<FieldProps<any>> | null;
+    wrap: <T>(params: PluginFieldBuilderParams) => React.ComponentType<FieldProps<Property>> | null;
 
     /**
      * Optional guard — return false to skip wrapping for this field.
@@ -216,7 +293,7 @@ export interface FieldBuilderConfig {
  * Props passed to home page collection card action components.
  * @group Models
  */
-export interface PluginHomePageActionsProps<EP extends object = object, M extends Record<string, any> = any, USER extends User = User, EC extends EntityCollection<M> = EntityCollection<M>> {
+export interface PluginHomePageActionsProps<EP extends object = object, M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User, EC extends EntityCollection<M> = EntityCollection<M>> {
     slug: string;
     collection: EC;
     context: RebaseContext<USER>;
@@ -242,7 +319,7 @@ export interface PluginFormActionProps<USER extends User = User, EC extends Enti
  * Parameters passed to the field builder wrap function.
  * @group Models
  */
-export type PluginFieldBuilderParams<M extends Record<string, any> = any, EC extends EntityCollection<M> = EntityCollection<M>> = {
+export type PluginFieldBuilderParams<M extends Record<string, unknown> = Record<string, unknown>, EC extends EntityCollection<M> = EntityCollection<M>> = {
     fieldConfigId: string;
     propertyKey: string;
     property: Property;

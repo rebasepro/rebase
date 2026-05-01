@@ -81,21 +81,47 @@ export type InferPropertyType<P extends Property> =
     never;
 
 /**
+ * Helper type that determines whether a property is required.
+ * Uses direct structural matching against `{ validation: { required: true } }`
+ * (without the optional marker on `validation`), which correctly narrows
+ * literal `true` while treating widened `boolean` as not-required.
+ */
+type IsRequired<P extends Property> = P extends { validation: { required: true } } ? true : false;
+
+/**
+ * Extract keys from Properties where the property is required.
+ */
+type RequiredPropertyKeys<P extends Properties> = {
+    [K in keyof P]: IsRequired<P[K]> extends true ? K : never;
+}[keyof P];
+
+/**
+ * Extract keys from Properties where the property is optional.
+ */
+type OptionalPropertyKeys<P extends Properties> = {
+    [K in keyof P]: IsRequired<P[K]> extends true ? never : K;
+}[keyof P];
+
+/**
  * A generic type that converts a `Properties` schema definition into a corresponding
  * TypeScript entity type. It correctly handles required and optional properties.
  *
+ * A property is considered required when it has `validation: { required: true }`.
+ * The `true` must be a literal type — if `required` is typed as `boolean`,
+ * the property will be treated as optional (use `as const` for literal inference).
+ *
  * @example
  * const productSchema = {
- * name: { type: 'string', validation: { required: true } },
- * price: { type: 'number' }
- * };
+ *   name: { type: 'string', validation: { required: true } },
+ *   price: { type: 'number' }
+ * } as const satisfies Properties;
  * type Product = InferEntityType<typeof productSchema>;
  * // Result: { name: string; price?: number; }
  */
 export type InferEntityType<P extends Properties> = {
-    -readonly [K in keyof P as P[K] extends { validation?: { required: true } } ? K : never]: InferPropertyType<P[K]>;
+    -readonly [K in RequiredPropertyKeys<P>]: InferPropertyType<P[K]>;
 } & {
-    -readonly [K in keyof P as P[K] extends { validation?: { required: true } } ? never : K]?: InferPropertyType<P[K]>;
+    -readonly [K in OptionalPropertyKeys<P>]?: InferPropertyType<P[K]>;
 };
 
 /**
@@ -1210,12 +1236,12 @@ export interface ConditionContext {
      * Current form/entity values.
      * Date values are converted to Unix timestamps (milliseconds).
      */
-    values: Record<string, any>;
+    values: Record<string, unknown>;
 
     /**
      * Previous values before the current edit session.
      */
-    previousValues: Record<string, any>;
+    previousValues: Record<string, unknown>;
 
     /**
      * Current value of this property specifically.

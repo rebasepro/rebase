@@ -759,9 +759,19 @@ export type SecurityOperation = "select" | "insert" | "update" | "delete" | "all
  * operation. Permissive rules are OR'd together (any one passing is enough).
  * Restrictive rules are AND'd (all must pass). This mirrors Supabase behavior.
  *
+ * **Mutual exclusivity:** `ownerField`, `access`, and raw SQL (`using`/`withCheck`)
+ * cannot be combined. The type system enforces this — attempting to set
+ * conflicting fields will produce a compile-time error.
+ *
  * @group Models
  */
-export interface SecurityRule {
+export type SecurityRule = OwnerSecurityRule | PublicSecurityRule | RawSQLSecurityRule | RolesOnlySecurityRule;
+
+/**
+ * Shared fields for all SecurityRule variants.
+ * @group Models
+ */
+export interface SecurityRuleBase {
     /**
      * Optional human-readable name for the policy.
      * If not provided, one will be auto-generated from the table name and operation.
@@ -817,39 +827,6 @@ export interface SecurityRule {
      */
     mode?: "permissive" | "restrictive";
 
-    // ── Convenience shortcuts ───────────────────────────────────────────
-
-    /**
-     * **Shortcut.** The property (column) that stores the owner's user ID.
-     * Generates a USING/WITH CHECK clause like:
-     *   `<column> = auth.uid()`
-     *
-     * Cannot be combined with `using` / `withCheck` / `access`.
-     *
-     * @example
-     * { operation: "all", ownerField: "user_id" }
-     */
-    ownerField?: string;
-
-    /**
-     * **Shortcut.** Grant unrestricted row access (no row filtering) for this operation.
-     * Generates `USING (true)`.
-     *
-     * This means "no row-level filter", NOT "anonymous/unauthenticated access".
-     * Authentication is still enforced at the API layer — this only controls which
-     * *rows* authenticated users can see.
-     *
-     * Typically used alone for genuinely public read endpoints, or combined with
-     * `roles` to give certain roles an unfiltered view of the table.
-     *
-     * Cannot be combined with `using` / `withCheck` / `ownerField`.
-     *
-     * @example
-     * // Public read (any authenticated user sees all rows)
-     * { operation: "select", access: "public" }
-     */
-    access?: "public";
-
     /**
      * **Shortcut.** Restrict this rule to users that have one of these
      * application-level roles.
@@ -873,81 +850,6 @@ export interface SecurityRule {
      * { operation: "select", roles: ["admin"], using: "true" }
      */
     roles?: string[];
-
-    // ── Raw SQL expressions (full power) ────────────────────────────────
-
-    /**
-     * Raw SQL expression for the `USING` clause.
-     * This controls which *existing* rows are visible / can be modified / deleted.
-     * Applied to SELECT, UPDATE, and DELETE.
-     *
-     * You can reference columns via `{column_name}` which will be resolved to
-     * `table.column_name` in the generated Drizzle code. You can also use any
-     * valid PostgreSQL expression.
-     *
-     * Cannot be combined with `ownerField` or `access`.
-     *
-     * @example
-     * // Rows published in the last 30 days are visible
-     * { operation: "select", using: "{published_at} > now() - interval '30 days'" }
-     *
-     * @example
-     * // Only the owner, or users with 'moderator' role
-     * {
-     *   operation: "select",
-     *   using: "{user_id} = auth.uid() OR auth.roles() ~ 'moderator'"
-     * }
-     *
-     * @example
-     * // Cross-table subquery: only if user belongs to the org
-     * {
-     *   operation: "select",
-     *   using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = auth.uid())"
-     * }
-     */
-    using?: string;
-
-    /**
-     * Raw SQL expression for the `WITH CHECK` clause.
-     * This controls which *new/updated* row values are allowed.
-     * Applied to INSERT and UPDATE.
-     *
-     * Same syntax as `using` — use `{column_name}` to reference columns.
-     *
-     * **Important for UPDATE:** PostgreSQL evaluates two row states — the
-     * *existing* row (`USING`) and the *incoming new* row (`WITH CHECK`).
-     * If you only specify `using`, the same expression is used for both.
-     * For security-sensitive updates, always specify `withCheck` explicitly
-     * to constrain what the new row values can be.
-     *
-     * If not provided on INSERT/UPDATE policies, falls back to `using`
-     * (which matches PostgreSQL's own default behavior).
-     *
-     * Cannot be combined with `ownerField` or `access`.
-     *
-     * @example
-     * // Users can only insert rows where they are the owner
-     * { operation: "insert", withCheck: "{user_id} = auth.uid()" }
-     *
-     * @example
-     * // Prevent changing the status to 'archived' unless admin
-     * {
-     *   operation: "update",
-     *   using: "{user_id} = auth.uid()",
-     *   withCheck: "{status} != 'archived' OR auth.roles() ~ 'admin'"
-     * }
-     *
-     * @example
-     * // Restrictive gate: prevent locking AND unlocking unless admin.
-     * // `using` checks the old row state, `withCheck` checks the new.
-     * {
-     *   operation: "update",
-     *   mode: "restrictive",
-     *   using: "{is_locked} = false",
-     *   withCheck: "{is_locked} = false"
-     * }
-     */
-    withCheck?: string;
 
     // ── Advanced: native PostgreSQL role targeting ───────────────────────
 
@@ -973,4 +875,110 @@ export interface SecurityRule {
      * { operation: "select", access: "public", pgRoles: ["app_role"] }
      */
     pgRoles?: string[];
+}
+
+/**
+ * Security rule that grants access based on row ownership.
+ * Generates a USING/WITH CHECK clause like: `<column> = auth.uid()`
+ *
+ * Cannot be combined with `using`, `withCheck`, or `access`.
+ *
+ * @example
+ * { operation: "all", ownerField: "user_id" }
+ *
+ * @group Models
+ */
+export interface OwnerSecurityRule extends SecurityRuleBase {
+    /** The property (column) that stores the owner's user ID. */
+    ownerField: string;
+    access?: never;
+    using?: never;
+    withCheck?: never;
+}
+
+/**
+ * Security rule that grants unrestricted row access (no row filtering).
+ * Generates `USING (true)`.
+ *
+ * This means "no row-level filter", NOT "anonymous/unauthenticated access".
+ * Authentication is still enforced at the API layer — this only controls which
+ * *rows* authenticated users can see.
+ *
+ * Cannot be combined with `using`, `withCheck`, or `ownerField`.
+ *
+ * @example
+ * // Public read (any authenticated user sees all rows)
+ * { operation: "select", access: "public" }
+ *
+ * @group Models
+ */
+export interface PublicSecurityRule extends SecurityRuleBase {
+    /** Grant unrestricted row access for this operation. */
+    access: "public";
+    ownerField?: never;
+    using?: never;
+    withCheck?: never;
+}
+
+/**
+ * Security rule using raw SQL expressions for full PostgreSQL RLS power.
+ *
+ * Cannot be combined with `ownerField` or `access`.
+ *
+ * You can reference columns via `{column_name}` which will be resolved to
+ * `table.column_name` in the generated Drizzle code.
+ *
+ * @example
+ * // Rows published in the last 30 days are visible
+ * { operation: "select", using: "{published_at} > now() - interval '30 days'" }
+ *
+ * @example
+ * // Only the owner, or users with 'moderator' role
+ * {
+ *   operation: "select",
+ *   using: "{user_id} = auth.uid() OR auth.roles() ~ 'moderator'"
+ * }
+ *
+ * @group Models
+ */
+export interface RawSQLSecurityRule extends SecurityRuleBase {
+    /**
+     * Raw SQL expression for the `USING` clause.
+     * This controls which *existing* rows are visible / can be modified / deleted.
+     * Applied to SELECT, UPDATE, and DELETE.
+     */
+    using: string;
+
+    /**
+     * Raw SQL expression for the `WITH CHECK` clause.
+     * This controls which *new/updated* row values are allowed.
+     * Applied to INSERT and UPDATE.
+     *
+     * If not provided on INSERT/UPDATE policies, falls back to `using`
+     * (which matches PostgreSQL's own default behavior).
+     */
+    withCheck?: string;
+
+    ownerField?: never;
+    access?: never;
+}
+
+/**
+ * Security rule that only filters by application roles, without any
+ * row-level condition (USING/WITH CHECK).
+ *
+ * Useful for simple "only admins can access this table" rules where
+ * no per-row filtering is needed.
+ *
+ * @example
+ * // Only admins can delete
+ * { operation: "delete", roles: ["admin"] }
+ *
+ * @group Models
+ */
+export interface RolesOnlySecurityRule extends SecurityRuleBase {
+    ownerField?: never;
+    access?: never;
+    using?: never;
+    withCheck?: never;
 }
