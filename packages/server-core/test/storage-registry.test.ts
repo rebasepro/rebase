@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
     StorageRegistry,
     DefaultStorageRegistry,
@@ -10,12 +11,12 @@ import { StorageController } from "../src/storage/types";
  */
 function createMockStorageController(type: 'local' | 's3'): StorageController {
     return {
-        uploadFile: jest.fn().mockResolvedValue({ path: "test/file.txt" }),
-        getDownloadURL: jest.fn().mockResolvedValue({ url: "http://example.com/file.txt" }),
-        getFile: jest.fn().mockResolvedValue(null),
-        deleteFile: jest.fn().mockResolvedValue(undefined),
-        list: jest.fn().mockResolvedValue({ items: [], prefixes: [] }),
-        getType: jest.fn().mockReturnValue(type)
+        putObject: vi.fn().mockResolvedValue({ path: "test/file.txt" }),
+        getSignedUrl: vi.fn().mockResolvedValue({ url: "http://example.com/file.txt" }),
+        getObject: vi.fn().mockResolvedValue(null),
+        deleteObject: vi.fn().mockResolvedValue(undefined),
+        listObjects: vi.fn().mockResolvedValue({ items: [], prefixes: [] }),
+        getType: vi.fn().mockReturnValue(type)
     };
 }
 
@@ -117,7 +118,7 @@ describe("StorageRegistry", () => {
             });
 
             it("should fallback to default when id not found", () => {
-                const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
+                const consoleSpy = vi.spyOn(console, "warn").mockImplementation();
 
                 expect(registry.getOrDefault("non-existent")).toBe(defaultController);
                 expect(consoleSpy).toHaveBeenCalledWith(
@@ -140,7 +141,7 @@ describe("StorageRegistry", () => {
                 const original = createMockStorageController('local');
                 const replacement = createMockStorageController('s3');
 
-                const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
+                const consoleSpy = vi.spyOn(console, "warn").mockImplementation();
 
                 registry.register("my-storage", original);
                 registry.register("my-storage", replacement);
@@ -215,7 +216,7 @@ describe("StorageRegistry", () => {
                 const local = createMockStorageController('local');
                 const s3 = createMockStorageController('s3');
 
-                const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
+                const consoleSpy = vi.spyOn(console, "warn").mockImplementation();
 
                 const registry = DefaultStorageRegistry.create({
                     "primary": local,

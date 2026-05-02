@@ -105,12 +105,12 @@ export function MarkdownEditorFieldBinding({
         handleImageUpload={async (file: File) => {
             const storagePath = storagePathBuilder(file);
             const fileName = await fileNameBuilder(file);
-            const result = await storageSource.uploadFile({
+            const key = `${storagePath}/${fileName}`.replace(/^\/+/, '').replace(/\/+/g, '/');
+            const result = await storageSource.putObject({
                 file,
-                fileName,
-                path: storagePath,
+                key,
             });
-            const downloadConfig = await storageSource.getDownloadURL(result.path);
+            const downloadConfig = await storageSource.getSignedUrl(result.key);
             const url = downloadConfig.url;
             if (!url) {
                 throw new Error("Error uploading image");

@@ -22,15 +22,14 @@ import { EnhancedDataResult, EnhanceParams } from "../types/data_enhancement_con
 import { countStringCharacters } from "../utils/strings_counter";
 import { EditorAIController } from "@rebasepro/admin";
 
-export function fieldBuilder<P extends Property = Property>
-    (params: PluginFieldBuilderParams<P>): React.ComponentType<FieldProps<P>> | null {
+export function fieldBuilder(params: PluginFieldBuilderParams): React.ComponentType<FieldProps<Property>> | null {
 
     const {
         fieldConfigId,
         property
     } = params;
 
-    const wrappedComponent = React.useMemo(() => function FieldWrapper(props: FieldProps<P, any, any>) {
+    const wrappedComponent = React.useMemo(() => function FieldWrapper(props: FieldProps<Property, any, any>) {
 
         const {
             enabled,
@@ -48,7 +47,7 @@ export function fieldBuilder<P extends Property = Property>
 
         return <FieldInner
             loading={loading}
-            props={props as FieldProps}
+            props={props}
             suggestedValue={suggestedValue}
             enabled={enabled}
             enoughData={enoughData}
@@ -70,16 +69,16 @@ export function fieldBuilder<P extends Property = Property>
 
 interface FieldInnerParams<P extends Property = Property, M extends Record<string, any> = any> {
     loading: boolean;
-    props: FieldProps<P, any, M>;
+    props: FieldProps<Property, any, M>;
     suggestedValue: string | number;
     enabled: boolean;
     enoughData: boolean;
-    Field: React.ComponentType<FieldProps<P, any, M>>;
+    Field: React.ComponentType<FieldProps<Property, any, M>>;
     enhance: (props: EnhanceParams<M>) => Promise<EnhancedDataResult | null>;
     editorAIController?: EditorAIController;
 }
 
-const FieldInner = React.memo(function FieldInner<P extends Property = Property, M extends Record<string, any> = any>({
+const FieldInner = React.memo(function FieldInner<M extends Record<string, any> = any>({
     loading,
     props,
     suggestedValue,
@@ -88,7 +87,7 @@ const FieldInner = React.memo(function FieldInner<P extends Property = Property,
     Field,
     enhance,
     editorAIController
-}: FieldInnerParams<P, M>) {
+}: FieldInnerParams<Property, M>) {
 
     const [dataLoading, setDataLoading] = useState(false);
 
@@ -104,7 +103,7 @@ const FieldInner = React.memo(function FieldInner<P extends Property = Property,
         if (property.widthPercentage !== undefined) {
             return "top-4";
         } else {
-            if (property.type === "array" && property.of?.type === "string") {
+            if (property.type === "array" && !Array.isArray(property.of) && property.of?.type === "string") {
                 return "top-4";
             }
             return property.type === "string" && property.markdown ? "top-3" : "-top-4";
@@ -120,7 +119,7 @@ const FieldInner = React.memo(function FieldInner<P extends Property = Property,
     const showEnhanceIcon = !props.disabled && (
         !props.value
         || (property.type === "string" && (property.multiline || property.markdown))
-        || (property.type === "array" && property.of?.type === "string")
+        || (property.type === "array" && !Array.isArray(property.of) && property.of?.type === "string")
     );
 
     const indexOfSuggestion = props.value && typeof props.value === "string" && typeof suggestedValue === "string" && props.value.endsWith(suggestedValue) ?
@@ -133,7 +132,7 @@ const FieldInner = React.memo(function FieldInner<P extends Property = Property,
 
     let fieldBinding: React.ReactElement;
     if (property.type === "string" && property.markdown) {
-        fieldBinding = <MarkdownEditorFieldBinding {...props as FieldProps<StringProperty>}
+        fieldBinding = <MarkdownEditorFieldBinding {...props as any}
             customProps={{
                 highlight: highlightRange,
                 editorProps: {
@@ -141,10 +140,10 @@ const FieldInner = React.memo(function FieldInner<P extends Property = Property,
                 }
             }} />;
     } else if (property.type === "string" && !property.enum) {
-        fieldBinding = <EnhanceTextFieldBinding {...props as FieldProps<StringProperty | NumberProperty>}
+        fieldBinding = <EnhanceTextFieldBinding {...props as any}
             highlight={suggestedValue as string} />;
     } else {
-        fieldBinding = <Field {...props} />;
+        fieldBinding = <Field {...props as any} />;
     }
 
     const enhanceData = (instructions?: string) => {

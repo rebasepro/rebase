@@ -264,7 +264,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
                 orderBy: orderByParams,
                 searchString,
                 include: includeParams
-            }, (res: FindResponse<M>) => onEntitiesUpdate(res.data), onError);
+            }, ((res: FindResponse<M>) => onEntitiesUpdate(res.data)) as any, onError);
         } else {
             accessor.find({
                 where: whereParams,
@@ -273,7 +273,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
                 searchString,
                 include: includeParams
             })
-                .then((res: FindResponse<M>) => onEntitiesUpdate(res.data))
+                .then(((res: FindResponse<M>) => onEntitiesUpdate(res.data)) as any)
                 .catch(onError);
             unsubscribe = () => undefined;
         }

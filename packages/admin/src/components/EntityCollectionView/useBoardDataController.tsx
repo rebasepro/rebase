@@ -268,7 +268,7 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
                 where: whereMap,
                 limit: itemCount,
                 orderBy: orderByParam
-            }, res => onUpdate(res.data), onError);
+            }, res => onUpdate(res.data as Entity<M>[]), onError);
             unsubscribersRef.current[column] = unsubscribe;
         } else {
             accessor.find({
@@ -276,7 +276,7 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
                 limit: itemCount,
                 orderBy: orderByParam
             })
-                .then(res => onUpdate(res.data))
+                .then(res => onUpdate(res.data as Entity<M>[]))
                 .catch(onError);
         }
     }, []); // No dependencies - uses refs for all values

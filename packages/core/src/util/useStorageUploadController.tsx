@@ -131,7 +131,7 @@ export function useStorageUploadController<M extends Record<string, unknown>>({
         }
 
         if (storage.storeUrl) {
-            uploadPathOrDownloadUrl = (await storageSource.getDownloadURL(uploadedPath)).url;
+            uploadPathOrDownloadUrl = (await storageSource.getSignedUrl(uploadedPath)).url;
         }
         if (storage.postProcess && uploadPathOrDownloadUrl) {
             uploadPathOrDownloadUrl = await storage.postProcess(uploadPathOrDownloadUrl);

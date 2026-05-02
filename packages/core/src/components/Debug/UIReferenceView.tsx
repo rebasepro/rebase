@@ -875,7 +875,7 @@ export function UIReferenceView() {
                                                 <div className="flex items-center gap-1.5">
                                                     <span className="font-medium">{col.name}</span>
                                                     <Tooltip title="No security rules defined — all operations unrestricted">
-                                                        <Chip size="smallest" colorScheme="grayLight">no rules</Chip>
+                                                        <Chip size="smallest" colorScheme="gray">no rules</Chip>
                                                     </Tooltip>
                                                 </div>
                                                 <span className="text-xs text-surface-400 font-mono">{col.slug}</span>

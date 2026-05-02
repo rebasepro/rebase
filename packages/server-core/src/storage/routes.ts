@@ -91,26 +91,40 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             throw ApiError.badRequest('No file provided');
         }
 
-        const storagePath = typeof body['path'] === 'string' ? body['path'] : '';
+        const key = typeof body['key'] === 'string' ? body['key'] : '';
         const bucket = typeof body['bucket'] === 'string' ? body['bucket'] : undefined;
-        let fileName = typeof body['fileName'] === 'string' ? body['fileName'] : undefined;
+
+        // Backward compatibility support for older clients sending path and fileName
+        const legacyPath = typeof body['path'] === 'string' ? body['path'] : '';
+        const legacyFileName = typeof body['fileName'] === 'string' ? body['fileName'] : undefined;
         
-        if (!fileName) {
-            fileName = uploadedFile.name;
+        let finalKey = key;
+        if (!finalKey) {
+            if (legacyPath || legacyFileName) {
+                const parts = [];
+                if (legacyPath) parts.push(legacyPath);
+                if (legacyFileName) {
+                    parts.push(legacyFileName);
+                } else {
+                    parts.push(uploadedFile.name || 'unnamed');
+                }
+                finalKey = parts.join('/');
+            } else {
+                finalKey = uploadedFile.name || 'unnamed';
+            }
         }
 
         // Extract custom metadata from request body
         const metadata: Record<string, unknown> = {};
-        for (const [key, value] of Object.entries(body)) {
-            if (key.startsWith('metadata_')) {
-                metadata[key.replace('metadata_', '')] = value;
+        for (const [k, value] of Object.entries(body)) {
+            if (k.startsWith('metadata_')) {
+                metadata[k.replace('metadata_', '')] = value;
             }
         }
 
-        const result = await controller.uploadFile({
+        const result = await controller.putObject({
             file: uploadedFile,
-            fileName: fileName || 'unnamed',
-            path: storagePath,
+            key: finalKey,
             metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
             bucket
         });
@@ -164,7 +178,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         }
 
         // For remote storage (S3, GCS, etc.), redirect to a signed URL
-        const downloadConfig = await controller.getDownloadURL(filePath);
+        const downloadConfig = await controller.getSignedUrl(filePath);
         if (downloadConfig.fileNotFound || !downloadConfig.url) {
             throw ApiError.notFound('File not found');
         }
@@ -188,7 +202,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         const filePath = decodeURIComponent(rawPath);
         const { bucket, resolvedPath } = parseBucketAndPath(filePath);
 
-        const downloadConfig = await controller.getDownloadURL(resolvedPath, bucket);
+        const downloadConfig = await controller.getSignedUrl(resolvedPath, bucket);
 
         if (downloadConfig.fileNotFound) {
             throw ApiError.notFound('File not found');
@@ -212,7 +226,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         const filePath = decodeURIComponent(rawPath);
         const { bucket, resolvedPath } = parseBucketAndPath(filePath);
 
-        await controller.deleteFile(resolvedPath, bucket);
+        await controller.deleteObject(resolvedPath, bucket);
 
         return c.json({
             success: true,
@@ -224,13 +238,14 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
      * GET /list - List files in a path
      */
     router.get('/list', writeAuthMiddleware, async (c) => {
-        const storagePath = c.req.query('path') || '';
+        // Fallback to path for backward compatibility
+        const storagePrefix = c.req.query('prefix') || c.req.query('path') || '';
         const bucket = c.req.query('bucket');
         const maxResults = c.req.query('maxResults');
         const pageToken = c.req.query('pageToken');
 
-        const result = await controller.list(
-            storagePath,
+        const result = await controller.listObjects(
+            storagePrefix,
             {
                 bucket,
                 maxResults: maxResults ? parseInt(maxResults, 10) : undefined,

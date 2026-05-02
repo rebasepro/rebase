@@ -28,17 +28,11 @@ export interface ColorPickerProps {
 }
 
 // Base colors in display order
-const BASE_COLORS = ["blue", "cyan", "teal", "green", "yellow", "orange", "red", "pink", "purple", "gray"] as const;
-
-// Variants in display order (darker to lighter for better visual flow)
-const VARIANTS = ["Darker", "Dark", "Light", "Lighter"] as const;
+const BASE_COLORS = ["blue", "indigo", "violet", "purple", "fuchsia", "pink", "rose", "red", "orange", "yellow", "green", "emerald", "teal", "cyan", "gray"] as const;
 
 // Helper to get readable name from color key
 function getColorDisplayName(colorKey: ChipColorKey): string {
-    // Convert camelCase to readable format: "blueLighter" -> "Blue Lighter"
-    const base = colorKey.replace(/(Lighter|Light|Dark|Darker)$/, "");
-    const variant = colorKey.replace(base, "");
-    return `${base.charAt(0).toUpperCase()}${base.slice(1)} ${variant}`;
+    return `${colorKey.charAt(0).toUpperCase()}${colorKey.slice(1)}`;
 }
 
 /**
@@ -85,49 +79,47 @@ export function ColorPicker({
                 </button>
             )}
 
-            <div className="grid grid-cols-10 gap-1">
-                {VARIANTS.map((variant) => (
-                    BASE_COLORS.map((base) => {
-                        const colorKey = `${base}${variant}` as ChipColorKey;
-                        const colorScheme = CHIP_COLORS[colorKey] as ChipColorScheme;
-                        const isSelected = value === colorKey;
-                        const displayName = getColorDisplayName(colorKey);
+            <div className="flex flex-wrap gap-1.5">
+                {BASE_COLORS.map((base) => {
+                    const colorKey = base as ChipColorKey;
+                    const colorScheme = CHIP_COLORS[colorKey] as ChipColorScheme;
+                    const isSelected = value === colorKey;
+                    const displayName = getColorDisplayName(colorKey);
 
-                        return (
-                            <Tooltip
-                                key={colorKey}
-                                title={displayName}
-                                delayDuration={300}
+                    return (
+                        <Tooltip
+                            key={colorKey}
+                            title={displayName}
+                            delayDuration={300}
+                        >
+                            <button
+                                type="button"
+                                disabled={disabled}
+                                onClick={() => onChange(colorKey)}
+                                className={cls(
+                                    swatchSize,
+                                    "rounded-full transition-all flex items-center justify-center",
+                                    "hover:scale-110 hover:shadow-md",
+                                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
+                                    disabled && "opacity-50 cursor-not-allowed hover:scale-100",
+                                    isSelected && "ring-2 ring-primary ring-offset-1"
+                                )}
+                                style={{
+                                    backgroundColor: colorScheme.color,
+                                }}
+                                aria-label={displayName}
+                                aria-pressed={isSelected}
                             >
-                                <button
-                                    type="button"
-                                    disabled={disabled}
-                                    onClick={() => onChange(colorKey)}
-                                    className={cls(
-                                        swatchSize,
-                                        "rounded-full transition-all flex items-center justify-center",
-                                        "hover:scale-110 hover:shadow-md",
-                                        "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
-                                        disabled && "opacity-50 cursor-not-allowed hover:scale-100",
-                                        isSelected && "ring-2 ring-primary ring-offset-1"
-                                    )}
-                                    style={{
-                                        backgroundColor: colorScheme.color,
-                                    }}
-                                    aria-label={displayName}
-                                    aria-pressed={isSelected}
-                                >
-                                    {isSelected && (
-                                        <CheckIcon
-                                            size={checkSize}
-                                            style={{ color: colorScheme.text }}
-                                        />
-                                    )}
-                                </button>
-                            </Tooltip>
-                        );
-                    })
-                ))}
+                                {isSelected && (
+                                    <CheckIcon
+                                        size={checkSize}
+                                        style={{ color: colorScheme.text }}
+                                    />
+                                )}
+                            </button>
+                        </Tooltip>
+                    );
+                })}
             </div>
         </div>
     );

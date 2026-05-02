@@ -5,23 +5,9 @@ import { getEntityImagePreviewPropertyKey } from "@rebasepro/common";
 import { getEntityTitlePropertyKey, getEntityPreviewKeys } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
 import type { AuthController } from "@rebasepro/types";
-import type { ChipColorScheme } from "@rebasepro/ui";
+import { ChipColorScheme, CHIP_COLORS } from "@rebasepro/ui";
 
-// Curated palette of pastel/lighter colors for relation chips.
-// Each relation property gets a distinct color via index.
-// darkColor/darkText provide legible variants for dark mode.
-const RELATION_CHIP_PALETTE: ChipColorScheme[] = [
-    { color: "#cfdfff", text: "#102046", darkColor: "#2750ae", darkText: "#cfdfff" }, // blue
-    { color: "#c2f5e9", text: "#012524", darkColor: "#06a09b", darkText: "#daf3e9" }, // teal
-    { color: "#ffeab6", text: "#3b2501", darkColor: "#b87503", darkText: "#ffeab6" }, // yellow
-    { color: "#ffdaf6", text: "#400832", darkColor: "#b2158b", darkText: "#ffdaf6" }, // pink
-    { color: "#ede2fe", text: "#280b42", darkColor: "#6b1cb0", darkText: "#ede2fe" }, // purple
-    { color: "#d0f0fd", text: "#04283f", darkColor: "#0b76b7", darkText: "#d0f0fd" }, // cyan
-    { color: "#fee2d5", text: "#6b2613", darkColor: "#d74d26", darkText: "#fee2d5" }, // orange
-    { color: "#d1f7c4", text: "#0b1d05", darkColor: "#338a17", darkText: "#d1f7c4" }, // green
-    { color: "#ffdce5", text: "#4c0c1c", darkColor: "#ba1e45", darkText: "#ffdce5" }, // red
-    { color: "#eee",    text: "#040404", darkColor: "#444",    darkText: "#eee" },    // gray
-];
+
 
 // ── Slot types ────────────────────────────────────────────────────────
 
@@ -340,7 +326,8 @@ export function resolveEntitySlots(
 
         if (items.length > 0) {
             const relIndex = relationKeys.indexOf(relKey);
-            const colorScheme = RELATION_CHIP_PALETTE[relIndex % RELATION_CHIP_PALETTE.length];
+            const chipColors = Object.values(CHIP_COLORS);
+            const colorScheme = chipColors[relIndex % chipColors.length];
             relations.push({
                 property: prop,
                 propertyKey: relKey,

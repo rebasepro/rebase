@@ -369,7 +369,7 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
             const allDocsRes = await dataClient.collection(fullPath).find({
                 limit: 10000 // Fetch all
             });
-            const allDocs = allDocsRes.data;
+            const allDocs = allDocsRes.data as Entity<M>[];
             console.log(`Fetched ${allDocs.length} documents`);
 
             // Find entities missing order property

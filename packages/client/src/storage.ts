@@ -9,18 +9,16 @@ export function createStorage(transport: Transport): StorageSource {
     // Transport has `.request` which hits `${config.baseUrl}${config.apiPath}${path}`.
     // Assuming `config.apiPath` is "/api", we just request(`/storage/upload`, ...).
 
-    async function uploadFile({
+    async function putObject({
         file,
-        fileName,
-        path,
+        key,
         metadata,
         bucket
     }: UploadFileProps): Promise<UploadFileResult> {
         const formData = new FormData();
         formData.append("file", file);
 
-        if (fileName) formData.append("fileName", fileName);
-        if (path) formData.append("path", path);
+        if (key) formData.append("key", key);
         if (bucket) formData.append("bucket", bucket);
 
         if (metadata) {
@@ -49,15 +47,15 @@ export function createStorage(transport: Transport): StorageSource {
         return result.data;
     }
 
-    async function getDownloadURL(
-        pathOrUrl: string,
+    async function getSignedUrl(
+        keyOrUrl: string,
         bucket?: string
     ): Promise<DownloadConfig> {
-        const cacheKey = bucket ? `${bucket}/${pathOrUrl}` : pathOrUrl;
+        const cacheKey = bucket ? `${bucket}/${keyOrUrl}` : keyOrUrl;
         const cached = urlsCache.get(cacheKey);
         if (cached) return cached;
 
-        let filePath = pathOrUrl;
+        let filePath = keyOrUrl;
 
         if (filePath && (filePath.startsWith("local://") || filePath.startsWith("s3://"))) {
             filePath = filePath.substring(filePath.indexOf("://") + 3);
@@ -92,11 +90,11 @@ export function createStorage(transport: Transport): StorageSource {
         }
     }
 
-    async function getFile(
-        path: string,
+    async function getObject(
+        key: string,
         bucket?: string
     ): Promise<File | null> {
-        let filePath = path;
+        let filePath = key;
 
         if (filePath && (filePath.startsWith("local://") || filePath.startsWith("s3://"))) {
             filePath = filePath.substring(filePath.indexOf("://") + 3);
@@ -126,11 +124,11 @@ export function createStorage(transport: Transport): StorageSource {
         return new File([blob], fileName, { type: blob.type });
     }
 
-    async function deleteFile(
-        path: string,
+    async function deleteObject(
+        key: string,
         bucket?: string
     ): Promise<void> {
-        let filePath = path;
+        let filePath = key;
 
         if (filePath && (filePath.startsWith("local://") || filePath.startsWith("s3://"))) {
             filePath = filePath.substring(filePath.indexOf("://") + 3);
@@ -150,11 +148,11 @@ export function createStorage(transport: Transport): StorageSource {
             if (!(e instanceof Error && 'status' in e && (e as { status: number }).status === 404)) throw e;
         }
 
-        urlsCache.delete(bucket ? `${bucket}/${path}` : path);
+        urlsCache.delete(bucket ? `${bucket}/${key}` : key);
     }
 
-    async function list(
-        path: string,
+    async function listObjects(
+        prefix: string,
         options?: {
             bucket?: string;
             maxResults?: number;
@@ -162,7 +160,7 @@ export function createStorage(transport: Transport): StorageSource {
         }
     ): Promise<StorageListResult> {
         const params = new URLSearchParams();
-        if (path) params.set("path", path);
+        if (prefix) params.set("prefix", prefix);
         if (options?.bucket) params.set("bucket", options.bucket);
         if (options?.maxResults) params.set("maxResults", String(options.maxResults));
         if (options?.pageToken) params.set("pageToken", options.pageToken);
@@ -172,10 +170,10 @@ export function createStorage(transport: Transport): StorageSource {
     }
 
     return {
-        uploadFile,
-        getDownloadURL,
-        getFile,
-        deleteFile,
-        list
+        putObject,
+        getSignedUrl,
+        getObject,
+        deleteObject,
+        listObjects
     };
 }

@@ -228,7 +228,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         </RebaseI18nProvider>
     );
 
-    const resolvedApiUrl = apiUrl ?? client?.baseUrl;
+    const resolvedApiUrl = apiUrl ?? (client as any)?.baseUrl;
 
     if (resolvedApiUrl) {
         return (

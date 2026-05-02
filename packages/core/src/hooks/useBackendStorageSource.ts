@@ -67,21 +67,17 @@ export function useBackendStorageSource({
     /**
      * Upload a file to storage
      */
-    const uploadFile = useCallback(async ({
+    const putObject = useCallback(async ({
         file,
-        fileName,
-        path,
+        key,
         metadata,
         bucket
     }: UploadFileProps): Promise<UploadFileResult> => {
         const formData = new FormData();
         formData.append('file', file);
 
-        if (fileName) {
-            formData.append('fileName', fileName);
-        }
-        if (path) {
-            formData.append('path', path);
+        if (key) {
+            formData.append('key', key);
         }
         if (bucket) {
             formData.append('bucket', bucket);
@@ -116,19 +112,19 @@ export function useBackendStorageSource({
     /**
      * Get download URL for a file
      */
-    const getDownloadURL = useCallback(async (
-        pathOrUrl: string,
+    const getSignedUrl = useCallback(async (
+        keyOrUrl: string,
         bucket?: string
     ): Promise<DownloadConfig> => {
         // Check cache first
-        const cacheKey = bucket ? `${bucket}/${pathOrUrl}` : pathOrUrl;
+        const cacheKey = bucket ? `${bucket}/${keyOrUrl}` : keyOrUrl;
         const cached = urlsCache.get(cacheKey);
         if (cached) {
             return cached;
         }
 
         // Build the file path for the API
-        let filePath = pathOrUrl;
+        let filePath = keyOrUrl;
 
         // Handle local:// and s3:// URLs
         if (filePath && (filePath.startsWith('local://') || filePath.startsWith('s3://'))) {
@@ -179,11 +175,11 @@ export function useBackendStorageSource({
     /**
      * Get file as a File object
      */
-    const getFile = useCallback(async (
-        path: string,
+    const getObject = useCallback(async (
+        key: string,
         bucket?: string
     ): Promise<File | null> => {
-        let filePath = path;
+        let filePath = key;
 
         // Handle protocol URLs
         if (filePath && (filePath.startsWith('local://') || filePath.startsWith('s3://'))) {
@@ -217,11 +213,11 @@ export function useBackendStorageSource({
     /**
      * Delete a file
      */
-    const deleteFile = useCallback(async (
-        path: string,
+    const deleteObject = useCallback(async (
+        key: string,
         bucket?: string
     ): Promise<void> => {
-        let filePath = path;
+        let filePath = key;
 
         // Handle protocol URLs
         if (filePath && (filePath.startsWith('local://') || filePath.startsWith('s3://'))) {
@@ -247,14 +243,14 @@ export function useBackendStorageSource({
         }
 
         // Clear from cache
-        urlsCache.delete(bucket ? `${bucket}/${path}` : path);
+        urlsCache.delete(bucket ? `${bucket}/${key}` : key);
     }, [fetchWithAuth, storageBasePath, urlsCache]);
 
     /**
      * List files in a path
      */
-    const list = useCallback(async (
-        path: string,
+    const listObjects = useCallback(async (
+        prefix: string,
         options?: {
             bucket?: string;
             maxResults?: number;
@@ -262,7 +258,7 @@ export function useBackendStorageSource({
         }
     ): Promise<StorageListResult> => {
         const params = new URLSearchParams();
-        if (path) params.set('path', path);
+        if (prefix) params.set('prefix', prefix);
         if (options?.bucket) params.set('bucket', options.bucket);
         if (options?.maxResults) params.set('maxResults', String(options.maxResults));
         if (options?.pageToken) params.set('pageToken', options.pageToken);
@@ -282,10 +278,10 @@ export function useBackendStorageSource({
 
     // Return memoized StorageSource
     return useMemo<StorageSource>(() => ({
-        uploadFile,
-        getDownloadURL,
-        getFile,
-        deleteFile,
-        list
-    }), [uploadFile, getDownloadURL, getFile, deleteFile, list]);
+        putObject,
+        getSignedUrl,
+        getObject,
+        deleteObject,
+        listObjects
+    }), [putObject, getSignedUrl, getObject, deleteObject, listObjects]);
 }

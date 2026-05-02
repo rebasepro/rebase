@@ -157,11 +157,11 @@ interface DownloadConfig {
 }
 
 interface StorageSource {
-    uploadFile(props: UploadFileProps): Promise<UploadFileResult>;
-    getDownloadURL(pathOrUrl: string, bucket?: string): Promise<DownloadConfig>;
-    getFile(path: string, bucket?: string): Promise<File | null>;
-    deleteFile(path: string, bucket?: string): Promise<void>;
-    list(path: string, options?: { bucket?: string; maxResults?: number; pageToken?: string }): Promise<any>;
+    putObject(props: UploadFileProps): Promise<UploadFileResult>;
+    getSignedUrl(pathOrUrl: string, bucket?: string): Promise<DownloadConfig>;
+    getObject(path: string, bucket?: string): Promise<File | null>;
+    deleteObject(path: string, bucket?: string): Promise<void>;
+    listObjects(path: string, options?: { bucket?: string; maxResults?: number; pageToken?: string }): Promise<any>;
 }
 
 type RebaseData = {

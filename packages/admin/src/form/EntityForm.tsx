@@ -501,9 +501,9 @@ export function EntityForm<M extends Record<string, unknown>>({
         parentCollectionIds,
         path: path,
         status,
-        collection,
+        collection: collection as any,
         context,
-        formContext,
+        formContext: formContext as any,
         openEntityMode,
         disabled: actionsDisabled,
     };

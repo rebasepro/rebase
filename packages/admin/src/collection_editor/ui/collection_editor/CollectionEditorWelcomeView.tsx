@@ -67,7 +67,7 @@ export function CollectionEditorWelcomeView({
                     </Typography>
                 </div>
 
-                {parentCollection && <Chip colorScheme={"tealDarker"}>
+                {parentCollection && <Chip colorScheme={"teal"}>
                     <Typography variant={"caption"}>
                         This is a subcollection of <b>{parentCollection.name}</b>
                     </Typography>
@@ -83,7 +83,7 @@ export function CollectionEditorWelcomeView({
 
                         {filteredUnmappedTables.map((tableName) => (
                             <Chip key={tableName}
-                                colorScheme={"purpleLighter"}
+                                colorScheme={"purple"}
                                 onClick={() => {
                                     if (onImportFromTable) {
                                         setImportingTable(tableName);
@@ -116,7 +116,7 @@ export function CollectionEditorWelcomeView({
 
                         {filteredSuggestions?.map((suggestion, index) => (
                             <Chip key={suggestion}
-                                colorScheme={"cyanLighter"}
+                                colorScheme={"cyan"}
                                 onClick={() => {
                                     setFieldValue("name", prettifyIdentifier(suggestion));
                                     setFieldValue("id", suggestion);

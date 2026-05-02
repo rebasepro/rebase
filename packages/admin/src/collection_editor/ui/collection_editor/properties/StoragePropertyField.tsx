@@ -177,7 +177,7 @@ export function StoragePropertyField({
                                     form
                                 }: FormexFieldProps) => {
                                     return <SwitchControl
-                                        label={"Include bucket URL (gs://...) in saved value"}
+                                        label={"Include bucket URL (s3://...) in saved value"}
                                         disabled={existing || disabled}
                                         form={form}
                                         field={field} />;
@@ -186,7 +186,7 @@ export function StoragePropertyField({
 
                             <Typography variant={"caption"} className={"ml-3.5 mt-1 mb-2"}>
                                 Turn this setting on if you want to save a fully-qualified storage URL
-                                (e.g. <code>gs://my-bucket/path/to/file</code>) instead of just the storage path.
+                                (e.g. <code>s3://my-bucket/path/to/file</code>) instead of just the storage path.
                                 You can only change this prop upon creation.
                             </Typography>
 

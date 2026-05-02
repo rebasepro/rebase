@@ -185,7 +185,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
         status,
         collection: collection!,
         context,
-        formContext,
+        formContext: formContext as FormContext<Record<string, unknown>> | undefined,
         openEntityMode: layout,
         disabled: false
     };
@@ -272,7 +272,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                         parentCollectionIds={parentCollectionIds}
                         entity={usedEntity}
                         modifiedValues={usedFormContext?.formex?.values ?? usedEntity?.values}
-                        formContext={usedFormContext}
+                        formContext={usedFormContext as unknown as FormContext<Record<string, unknown>>}
                     />}
                 </ErrorBoundary>
             </div>;
@@ -386,7 +386,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
             onSaved?.(res);
             formProps?.onSaved?.(res);
         }}
-        Builder={selectedSecondaryForm?.Builder}
+        Builder={selectedSecondaryForm?.Builder as any}
     />;
 
     const subcollectionTabs = subcollections && subcollections.map((subcollection) =>

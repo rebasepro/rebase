@@ -29,10 +29,9 @@ export function useFirebaseStorageSource({
     const projectId = firebaseApp?.options?.projectId;
     const urlsCache: Record<string, DownloadConfig> = {};
     return {
-        uploadFile({
+        putObject({
             file,
-            fileName,
-            path,
+            key,
             metadata,
             bucket
         }: UploadFileProps)
@@ -42,9 +41,8 @@ export function useFirebaseStorageSource({
                 const storageBucketUrl = bucket ?? bucketUrl;
                 const storage = getStorage(firebaseApp, storageBucketUrl);
                 if (!storage) throw Error("useFirebaseStorageSource Firebase not initialised");
-                const usedFilename = fileName ?? file.name;
 
-                const storageRef = ref(storage, `${path}/${usedFilename}`);
+                const storageRef = ref(storage, key);
                 const uploadTask = uploadBytesResumable(storageRef, file, metadata);
 
                 return new Promise((resolve, reject) => {
@@ -111,9 +109,9 @@ export function useFirebaseStorageSource({
                             const fullPath = uploadTask.snapshot.ref.fullPath;
                             const bucketName = uploadTask.snapshot.ref.bucket;
                             resolve({
-                                path: fullPath,
+                                key: fullPath,
                                 bucket: bucketName,
-                                storageUrl: `gs://${bucketName}/${fullPath}`
+                                storageUrl: `s3://${bucketName}/${fullPath}`
                             });
                         }
                     );
@@ -123,7 +121,7 @@ export function useFirebaseStorageSource({
             }
         },
 
-        async getFile(path: string, bucket?: string): Promise<File | null> {
+        async getObject(path: string, bucket?: string): Promise<File | null> {
             try {
                 if (!firebaseApp) throw Error("useFirebaseStorageSource Firebase not initialised");
                 const storageBucketUrl = bucket ?? bucketUrl;
@@ -140,15 +138,16 @@ export function useFirebaseStorageSource({
             }
         },
 
-        async getDownloadURL(storagePathOrUrl: string, bucket?: string): Promise<DownloadConfig> {
+        async getSignedUrl(storagePathOrUrl: string, bucket?: string): Promise<DownloadConfig> {
             if (!firebaseApp) throw Error("useFirebaseStorageSource Firebase not initialised");
 
-            // Support fully-qualified gs:// URLs
+            // Support fully-qualified s3:// and gs:// URLs for backward compatibility
             let resolvedPathOrUrl = storagePathOrUrl;
             let resolvedBucket = bucket;
-            if (storagePathOrUrl.startsWith("gs://")) {
-                // Format: gs://<bucket>/<path>
-                const withoutProtocol = storagePathOrUrl.substring("gs://".length);
+            const match = storagePathOrUrl.match(/^(s3|gs):\/\//);
+            if (match) {
+                const protocolLength = match[0].length;
+                const withoutProtocol = storagePathOrUrl.substring(protocolLength);
                 const firstSlash = withoutProtocol.indexOf("/");
                 if (firstSlash > 0) {
                     resolvedBucket = withoutProtocol.substring(0, firstSlash);
@@ -180,7 +179,7 @@ export function useFirebaseStorageSource({
             }
         },
 
-        async list(path: string, options?: {
+        async listObjects(prefix: string, options?: {
             bucket?: string,
             maxResults?: number,
             pageToken?: string
@@ -189,14 +188,14 @@ export function useFirebaseStorageSource({
             const storageBucketUrl = options?.bucket ?? bucketUrl;
             const storage = getStorage(firebaseApp, storageBucketUrl);
             if (!storage) throw Error("useFirebaseStorageSource Firebase not initialised");
-            const folderRef = ref(storage, path);
+            const folderRef = ref(storage, prefix);
             return await list(folderRef, {
                 maxResults: options?.maxResults,
                 pageToken: options?.pageToken
             });
         },
 
-        async deleteFile(path: string, bucket?: string): Promise<void> {
+        async deleteObject(path: string, bucket?: string): Promise<void> {
             if (!firebaseApp) throw Error("useFirebaseStorageSource Firebase not initialised");
             const storageBucketUrl = bucket ?? bucketUrl;
             const storage = getStorage(firebaseApp, storageBucketUrl);

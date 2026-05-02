@@ -54,6 +54,8 @@ export interface RebaseTranslations {
     clear_filter: string;
     clear_filter_sort: string;
     clear_sort: string;
+    /** Reset all active filters */
+    clear_all: string;
     no_items: string;
     no_entries_found: string;
     all_entries_loaded: string;
@@ -327,6 +329,8 @@ export interface RebaseTranslations {
 
     only_admins_edit_roles: string;
     error_user_not_found: string;
+    /** Placeholder / label for the "all roles" filter option */
+    all_roles: string;
     role: string;
     name_of_this_role: string;
     id_of_this_role: string;

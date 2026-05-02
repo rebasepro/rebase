@@ -101,10 +101,9 @@ export class LocalStorageController implements StorageController {
         }
     }
 
-    async uploadFile({
+    async putObject({
         file,
-        fileName,
-        path: storagePath,
+        key,
         metadata,
         bucket
     }: UploadFileProps): Promise<UploadFileResult> {
@@ -112,10 +111,7 @@ export class LocalStorageController implements StorageController {
 
         // Always use a bucket (default to 'default')
         const usedBucket = bucket ?? 'default';
-        const usedFileName = fileName ?? file.name;
-        // Normalize storage path to remove leading/trailing slashes
-        const normalizedPath = storagePath ? normalizeStoragePath(storagePath) : '';
-        const fullStoragePath = normalizedPath ? `${normalizedPath}/${usedFileName}` : usedFileName;
+        const fullStoragePath = key;
         const fullPath = this.getFullPath(fullStoragePath, usedBucket);
 
         // Ensure parent directory exists
@@ -136,19 +132,19 @@ export class LocalStorageController implements StorageController {
         }, null, 2));
 
         return {
-            path: fullStoragePath,
+            key: fullStoragePath,
             bucket: usedBucket,
             storageUrl: `local://${usedBucket}/${fullStoragePath}`
         };
     }
 
-    async getDownloadURL(storagePath: string, bucket?: string): Promise<DownloadConfig> {
+    async getSignedUrl(key: string, bucket?: string): Promise<DownloadConfig> {
         // Handle local:// URLs
-        let resolvedPath = storagePath;
+        let resolvedPath = key;
         let resolvedBucket = bucket;
 
-        if (storagePath.startsWith('local://')) {
-            const withoutProtocol = storagePath.substring('local://'.length);
+        if (key.startsWith('local://')) {
+            const withoutProtocol = key.substring('local://'.length);
             const firstSlash = withoutProtocol.indexOf('/');
             if (firstSlash > 0) {
                 resolvedBucket = withoutProtocol.substring(0, firstSlash);
@@ -212,13 +208,13 @@ export class LocalStorageController implements StorageController {
         };
     }
 
-    async getFile(storagePath: string, bucket?: string): Promise<File | null> {
+    async getObject(key: string, bucket?: string): Promise<File | null> {
         // Handle local:// URLs
-        let resolvedPath = storagePath;
+        let resolvedPath = key;
         let resolvedBucket = bucket;
 
-        if (storagePath.startsWith('local://')) {
-            const withoutProtocol = storagePath.substring('local://'.length);
+        if (key.startsWith('local://')) {
+            const withoutProtocol = key.substring('local://'.length);
             const firstSlash = withoutProtocol.indexOf('/');
             if (firstSlash > 0) {
                 resolvedBucket = withoutProtocol.substring(0, firstSlash);
@@ -252,13 +248,13 @@ export class LocalStorageController implements StorageController {
         }
     }
 
-    async deleteFile(storagePath: string, bucket?: string): Promise<void> {
+    async deleteObject(key: string, bucket?: string): Promise<void> {
         // Handle local:// URLs
-        let resolvedPath = storagePath;
+        let resolvedPath = key;
         let resolvedBucket = bucket;
 
-        if (storagePath.startsWith('local://')) {
-            const withoutProtocol = storagePath.substring('local://'.length);
+        if (key.startsWith('local://')) {
+            const withoutProtocol = key.substring('local://'.length);
             const firstSlash = withoutProtocol.indexOf('/');
             if (firstSlash > 0) {
                 resolvedBucket = withoutProtocol.substring(0, firstSlash);
@@ -286,13 +282,13 @@ export class LocalStorageController implements StorageController {
         }
     }
 
-    async list(storagePath: string, options?: {
+    async listObjects(prefix: string, options?: {
         bucket?: string;
         maxResults?: number;
         pageToken?: string;
     }): Promise<StorageListResult> {
         // Normalize path to handle leading/trailing slashes
-        const normalizedPath = normalizeStoragePath(storagePath);
+        const normalizedPath = normalizeStoragePath(prefix);
         const fullPath = this.getFullPath(normalizedPath, options?.bucket);
         const items: StorageReference[] = [];
         const prefixes: StorageReference[] = [];
@@ -313,7 +309,7 @@ export class LocalStorageController implements StorageController {
                     continue;
                 }
 
-                const entryPath = storagePath ? `${storagePath}/${entry.name}` : entry.name;
+                const entryPath = prefix ? `${prefix}/${entry.name}` : entry.name;
                 const bucket = options?.bucket ?? 'default';
 
                 const ref: StorageReference = {
@@ -355,8 +351,8 @@ export class LocalStorageController implements StorageController {
      * Get the absolute filesystem path for serving files
      * Used by the storage routes to serve files directly
      */
-    getAbsolutePath(storagePath: string, bucket?: string): string {
-        return this.getFullPath(storagePath, bucket);
+    getAbsolutePath(key: string, bucket?: string): string {
+        return this.getFullPath(key, bucket);
     }
 
     /**

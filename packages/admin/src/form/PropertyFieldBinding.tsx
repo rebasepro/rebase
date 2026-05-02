@@ -323,14 +323,14 @@ function useWrappedComponent<T, M extends Record<string, any> = any>(
                         fieldConfigId: fieldId,
                         propertyKey,
                         property,
-                        Field: Component,
+                        Field: Component as any,
                         plugin,
                         path,
-                        collection,
+                        collection: collection as any,
                     };
                     const enabled = plugin.fieldBuilder.enabled?.(params);
                     if (enabled === undefined || enabled)
-                        Wrapper = plugin.fieldBuilder.wrap(params) || Wrapper;
+                        Wrapper = plugin.fieldBuilder.wrap(params) as any || Wrapper;
                 }
                 if (!fieldId) {
                     console.warn("INTERNAL: Field id not found for property", property);

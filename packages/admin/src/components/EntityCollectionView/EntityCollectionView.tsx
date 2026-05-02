@@ -430,7 +430,7 @@ export const EntityCollectionView = React.memo(
             const collection = collectionRef.current;
             // Only for property columns
             if (!getPropertyInPath(collection.properties, key)) return;
-            const localCollection = buildPropertyWidthOverwrite(key, width);
+            const localCollection = buildPropertyWidthOverwrite(key, width) as PartialEntityCollection<M>;
             onCollectionModifiedForUser(path, localCollection);
         }, [onCollectionModifiedForUser, path]);
 

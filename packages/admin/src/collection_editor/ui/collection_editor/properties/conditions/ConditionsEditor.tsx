@@ -356,7 +356,7 @@ function ConditionRow({
                                 style={{ backgroundColor: field.color }}
                             />
                             <span>{field.label}</span>
-                            <Chip size="small" colorScheme="grayLight" className="ml-auto">
+                            <Chip size="small" colorScheme="gray" className="ml-auto">
                                 {field.dataType}
                             </Chip>
                         </div>
@@ -384,7 +384,7 @@ function ConditionRow({
                                     style={{ backgroundColor: color }}
                                 />
                                 <span>{field}</span>
-                                <Chip size="small" colorScheme="grayLight" className="ml-auto">
+                                <Chip size="small" colorScheme="gray" className="ml-auto">
                                     {hasEnum ? "enum" : dataType}
                                 </Chip>
                             </div>

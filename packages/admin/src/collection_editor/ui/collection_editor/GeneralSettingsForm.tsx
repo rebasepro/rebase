@@ -105,7 +105,7 @@ export function GeneralSettingsForm({
                         </Tooltip>
                     </div>
 
-                    {parentCollection && <Chip colorScheme={"tealDarker"}>
+                    {parentCollection && <Chip colorScheme={"teal"}>
                         <Typography variant={"caption"}>
                             This is a subcollection of <b>{parentCollection.name}</b>
                         </Typography>

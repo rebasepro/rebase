@@ -305,8 +305,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
         // Helper: resolve a single storage entry to a controller
         const toController = (entry: BackendStorageConfig | StorageController, label: string): StorageController => {
-            // Duck-type: if it has uploadFile, it's already a controller instance
-            if (typeof (entry as StorageController).uploadFile === 'function') {
+            // Duck-type: if it has putObject, it's already a controller instance
+            if (typeof (entry as StorageController).putObject === 'function') {
                 return entry as StorageController;
             }
             // Otherwise it's a config object — use the built-in factory
@@ -319,7 +319,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             return createStorageController(conf);
         };
 
-        if (typeof config.storage === 'object' && ('type' in config.storage || typeof (config.storage as StorageController).uploadFile === 'function')) {
+        if (typeof config.storage === 'object' && ('type' in config.storage || typeof (config.storage as StorageController).putObject === 'function')) {
             // Single storage config or controller
             controllers[DEFAULT_STORAGE_ID] = toController(config.storage as BackendStorageConfig | StorageController, DEFAULT_STORAGE_ID);
         } else {

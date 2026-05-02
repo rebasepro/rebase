@@ -73,11 +73,11 @@ export function createUserManagementAdminViews({ userManagement, apiUrl, getAuth
 function RoleChip({ role }: { role: Role }) {
     let colorScheme: ChipColorScheme | ChipColorKey;
     if (role.isAdmin) {
-        colorScheme = "blueDarker";
+        colorScheme = "blue";
     } else if (role.id === "editor") {
-        colorScheme = "yellowLight";
+        colorScheme = "yellow";
     } else if (role.id === "viewer") {
-        colorScheme = "grayLight";
+        colorScheme = "gray";
     } else {
         colorScheme = getColorSchemeForSeed(role.id);
     }
@@ -776,7 +776,7 @@ function CollectionPermissionsMatrix({ roleId, isAdmin, collections }: { roleId:
                                             <span className="font-medium">{collection.name}</span>
                                             {noRules && !isAdmin && (
                                                 <Tooltip title="No security rules — unrestricted">
-                                                    <Chip className="text-xs" colorScheme="yellowLight">No rules</Chip>
+                                                    <Chip className="text-xs" colorScheme="yellow">No rules</Chip>
                                                 </Tooltip>
                                             )}
                                         </div>

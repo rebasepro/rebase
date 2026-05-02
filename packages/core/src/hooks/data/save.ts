@@ -57,9 +57,9 @@ export async function saveEntityWithCallbacks<M extends Record<string, any>>({
 
     let savePromise: Promise<Entity<M>>;
     if (status === "new" || status === "copy") {
-        savePromise = accessor.create(values, entityId);
+        savePromise = accessor.create(values, entityId) as any;
     } else {
-        savePromise = accessor.update(entityId!, values);
+        savePromise = accessor.update(entityId!, values) as any;
     }
 
     return savePromise.then((entity) => {

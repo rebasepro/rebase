@@ -355,7 +355,7 @@ describe("Permissions Evaluator", () => {
 
     test("32. withCheck without using: evaluated independently", () => {
         const collection = createMockCollection([
-            { operation: "update", withCheck: "status = 'draft'" }
+            { operation: "update", using: "true", withCheck: "status = 'draft'" }
         ]);
         expect(canEditEntity(collection, mockAuthController, "test", createMockEntity({ status: "draft" }))).toBe(true);
         expect(canEditEntity(collection, mockAuthController, "test", createMockEntity({ status: "published" }))).toBe(false);
@@ -644,9 +644,9 @@ describe("Permissions Evaluator", () => {
                 // Anyone can read published content
                 { operation: "select", using: "status = 'published'" },
                 // Authors can only create drafts
-                { operation: "insert", roles: ["author"], withCheck: "status = 'draft'" },
+                { operation: "insert", roles: ["author"], using: "true", withCheck: "status = 'draft'" },
                 // Authors can only edit their own draft or review content
-                { operation: "update", roles: ["author"], ownerField: "author_id", using: "status != 'published'" },
+                { operation: "update", roles: ["author"], using: "author_id = current_setting('app.user_id') AND status != 'published'" },
                 // Editors can move anything to/from review/published
                 { operation: "update", roles: ["editor"] },
                 // Only admins can delete

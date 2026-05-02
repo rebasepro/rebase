@@ -45,7 +45,7 @@ export function StorageThumbnailInternal({
         if (!storagePathOrDownloadUrl)
             return;
         let unmounted = false;
-        storage.getDownloadURL(storagePathOrDownloadUrl)
+        storage.getSignedUrl(storagePathOrDownloadUrl)
             .then(function (downloadConfig) {
                 if (!unmounted) {
                     setDownloadConfig(downloadConfig);

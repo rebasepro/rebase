@@ -43,6 +43,7 @@ export const pt: RebaseTranslations = {
     clear_filter: "Limpar filtro",
     clear_filter_sort: "Limpar filtro/ordenação",
     clear_sort: "Limpar ordenação",
+    clear_all: "Limpar tudo",
     no_items: "Sem itens",
     no_entries_found: "Nenhum registo encontrado",
     all_entries_loaded: "Todos os {{count}} registos carregados",
@@ -317,6 +318,7 @@ export const pt: RebaseTranslations = {
 
     only_admins_edit_roles: "Apenas administradores podem editar funções",
     error_user_not_found: "Utilizador não encontrado",
+    all_roles: "Todos os papéis",
     role: "Função",
     name_of_this_role: "Nome desta função",
     id_of_this_role: "ID desta função",

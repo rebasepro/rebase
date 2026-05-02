@@ -38,6 +38,7 @@ export const it: RebaseTranslations = {
     clear_filter: "Cancella filtro",
     clear_filter_sort: "Cancella filtro/ordinamento",
     clear_sort: "Cancella ordinamento",
+    clear_all: "Cancella tutto",
     no_items: "Nessun elemento",
     no_entries_found: "Nessuna voce trovata",
     all_entries_loaded: "Tutte le {{count}} voci caricate",
@@ -312,6 +313,7 @@ export const it: RebaseTranslations = {
 
     only_admins_edit_roles: "Solo gli amministratori possono modificare i ruoli",
     error_user_not_found: "Utente non trovato",
+    all_roles: "Tutti i ruoli",
     role: "Ruolo",
     name_of_this_role: "Nome di questo ruolo",
     id_of_this_role: "ID di questo ruolo",

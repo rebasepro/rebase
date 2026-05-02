@@ -70,7 +70,7 @@ export function DataEnhancementControllerProvider({
     const snackbarController = useSnackbarController();
 
 
-    const properties = useMemo(() => getSimplifiedProperties(collection.properties, formContext?.values), [formContext?.values]);
+    const properties = useMemo(() => getSimplifiedProperties(collection.properties, formContext?.values ?? {}), [formContext?.values]);
     // const preEnhanceValuesRef = React.useRef(formContext?.values ?? {});
     const valuesRef = React.useRef(formContext?.values ?? {});
     useEffect(() => {

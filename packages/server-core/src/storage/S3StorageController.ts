@@ -75,17 +75,14 @@ export class S3StorageController implements StorageController {
         return bucket ?? this.config.bucket;
     }
 
-    async uploadFile({
+    async putObject({
         file,
-        fileName,
-        path: storagePath,
+        key,
         metadata,
         bucket
     }: UploadFileProps): Promise<UploadFileResult> {
         this.validateFile(file);
 
-        const usedFileName = fileName ?? file.name;
-        const key = storagePath ? `${storagePath}/${usedFileName}` : usedFileName;
         const usedBucket = this.getBucket(bucket);
 
         // Convert File to Buffer
@@ -103,7 +100,7 @@ export class S3StorageController implements StorageController {
         await this.client.send(command);
 
         return {
-            path: key,
+            key,
             bucket: usedBucket,
             storageUrl: `s3://${usedBucket}/${key}`
         };
@@ -124,13 +121,15 @@ export class S3StorageController implements StorageController {
         return flattened;
     }
 
-    async getDownloadURL(storagePath: string, bucket?: string): Promise<DownloadConfig> {
-        // Handle s3:// URLs
-        let resolvedPath = storagePath;
+    async getSignedUrl(key: string, bucket?: string): Promise<DownloadConfig> {
+        // Handle s3:// and gs:// URLs for backward compatibility
+        let resolvedPath = key;
         let resolvedBucket = this.getBucket(bucket);
 
-        if (storagePath.startsWith('s3://')) {
-            const withoutProtocol = storagePath.substring('s3://'.length);
+        const match = key.match(/^(s3|gs):\/\//);
+        if (match) {
+            const protocolLength = match[0].length;
+            const withoutProtocol = key.substring(protocolLength);
             const firstSlash = withoutProtocol.indexOf('/');
             if (firstSlash > 0) {
                 resolvedBucket = withoutProtocol.substring(0, firstSlash);
@@ -181,13 +180,15 @@ export class S3StorageController implements StorageController {
         }
     }
 
-    async getFile(storagePath: string, bucket?: string): Promise<File | null> {
-        // Handle s3:// URLs
-        let resolvedPath = storagePath;
+    async getObject(key: string, bucket?: string): Promise<File | null> {
+        // Handle s3:// and gs:// URLs
+        let resolvedPath = key;
         let resolvedBucket = this.getBucket(bucket);
 
-        if (storagePath.startsWith('s3://')) {
-            const withoutProtocol = storagePath.substring('s3://'.length);
+        const match = key.match(/^(s3|gs):\/\//);
+        if (match) {
+            const protocolLength = match[0].length;
+            const withoutProtocol = key.substring(protocolLength);
             const firstSlash = withoutProtocol.indexOf('/');
             if (firstSlash > 0) {
                 resolvedBucket = withoutProtocol.substring(0, firstSlash);
@@ -229,13 +230,15 @@ export class S3StorageController implements StorageController {
         }
     }
 
-    async deleteFile(storagePath: string, bucket?: string): Promise<void> {
-        // Handle s3:// URLs
-        let resolvedPath = storagePath;
+    async deleteObject(key: string, bucket?: string): Promise<void> {
+        // Handle s3:// and gs:// URLs
+        let resolvedPath = key;
         let resolvedBucket = this.getBucket(bucket);
 
-        if (storagePath.startsWith('s3://')) {
-            const withoutProtocol = storagePath.substring('s3://'.length);
+        const match = key.match(/^(s3|gs):\/\//);
+        if (match) {
+            const protocolLength = match[0].length;
+            const withoutProtocol = key.substring(protocolLength);
             const firstSlash = withoutProtocol.indexOf('/');
             if (firstSlash > 0) {
                 resolvedBucket = withoutProtocol.substring(0, firstSlash);
@@ -251,7 +254,7 @@ export class S3StorageController implements StorageController {
         await this.client.send(command);
     }
 
-    async list(storagePath: string, options?: {
+    async listObjects(prefix: string, options?: {
         bucket?: string;
         maxResults?: number;
         pageToken?: string;
@@ -260,7 +263,7 @@ export class S3StorageController implements StorageController {
 
         const command = new ListObjectsV2Command({
             Bucket: resolvedBucket,
-            Prefix: storagePath || undefined,
+            Prefix: prefix || undefined,
             MaxKeys: options?.maxResults ?? 1000,
             ContinuationToken: options?.pageToken,
             Delimiter: '/' // This gives us folder-like behavior

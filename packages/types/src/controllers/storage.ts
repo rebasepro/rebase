@@ -3,8 +3,7 @@
  */
 export interface UploadFileProps {
     file: File,
-    fileName?: string,
-    path?: string,
+    key: string,
     metadata?: Record<string, unknown>,
     bucket?: string
 }
@@ -14,9 +13,9 @@ export interface UploadFileProps {
  */
 export interface UploadFileResult {
     /**
-     * Storage path including the file name where the file was uploaded.
+     * Storage key including the file name where the file was uploaded.
      */
-    path: string;
+    key: string;
     /**
      * Bucket where the file was uploaded
      */
@@ -25,7 +24,7 @@ export interface UploadFileResult {
     /**
      * Fully qualified storage URL for the uploaded file.
      *
-     * For example: `gs://my-bucket/path/to/file.png`.
+     * For example: `s3://my-bucket/path/to/file.png`.
      *
      * This is optional for backwards compatibility.
      */
@@ -82,49 +81,47 @@ export declare interface DownloadMetadata {
  */
 export interface StorageSource {
     /**
-     * Upload a file, specifying a name and a path
+     * Upload an object, specifying a key
      * @param file
-     * @param fileName
-     * @param path
+     * @param key
      * @param metadata
      * @param bucket
      */
-    uploadFile: ({
+    putObject: ({
                      file,
-                     fileName,
-                     path,
+                     key,
                      metadata,
                      bucket
                  }: UploadFileProps) => Promise<UploadFileResult>;
 
     /**
-     * Convert a storage path or URL into a download configuration
-     * @param path
+     * Convert a storage key or URL into a download configuration (signed URL equivalent)
+     * @param keyOrUrl
      * @param bucket
      */
-    getDownloadURL: (pathOrUrl: string, bucket?: string) => Promise<DownloadConfig>;
+    getSignedUrl: (keyOrUrl: string, bucket?: string) => Promise<DownloadConfig>;
 
     /**
-     * Get a file from a storage path.
-     * It returns null if the file does not exist.
-     * @param props
+     * Get an object from a storage key.
+     * It returns null if the object does not exist.
+     * @param key
      * @param bucket
      */
-    getFile: (path: string, bucket?: string) => Promise<File | null>;
+    getObject: (key: string, bucket?: string) => Promise<File | null>;
 
     /**
-     * Delete a file.
-     * @param path
+     * Delete an object.
+     * @param key
      * @param bucket
      */
-    deleteFile: (path: string, bucket?: string) => Promise<void>;
+    deleteObject: (key: string, bucket?: string) => Promise<void>;
 
     /**
-     * List the contents of a path.
-     * @param path
+     * List the contents of a prefix.
+     * @param prefix
      * @param options
      */
-    list: (path: string, options?: {
+    listObjects: (prefix: string, options?: {
         bucket?: string,
         maxResults?: number,
         pageToken?: string
@@ -158,15 +155,15 @@ export declare interface StorageListResult {
 }
 
 /**
- * Represents a reference to a Google Cloud Storage object. Developers can
+ * Represents a reference to an S3-compatible storage object. Developers can
  * upload, download, and delete objects, as well as get/set object metadata.
  * @public
  */
 export declare interface StorageReference {
     /**
-     * Returns a gs:// URL for this object in the form
-     *   `gs://<bucket>/<path>/<to>/<object>`
-     * @returns The gs:// URL.
+     * Returns a s3:// URL for this object in the form
+     *   `s3://<bucket>/<path>/<to>/<object>`
+     * @returns The s3:// URL.
      */
     toString(): string;
 

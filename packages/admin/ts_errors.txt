@@ -1,0 +1,76 @@
+src/components/EntityCollectionView/EntityCollectionBoardView.tsx(369,60): error TS2558: Expected 0 type arguments, but got 1.
+src/components/EntityCollectionView/EntityCollectionBoardView.tsx(376,53): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(predicate: (value: Entity<Record<string, unknown>>, index: number, array: Entity<Record<string, unknown>>[]) => value is Entity<Record<string, unknown>>, thisArg?: any): Entity<...>[]', gave the following error.
+    Argument of type '(entity: Entity<M>) => boolean' is not assignable to parameter of type '(value: Entity<Record<string, unknown>>, index: number, array: Entity<Record<string, unknown>>[]) => value is Entity<Record<string, unknown>>'.
+      Types of parameters 'entity' and 'value' are incompatible.
+        Type 'Entity<Record<string, unknown>>' is not assignable to type 'Entity<M>'.
+          Type 'Record<string, unknown>' is not assignable to type 'M'.
+            'Record<string, unknown>' is assignable to the constraint of type 'M', but 'M' could be instantiated with a different subtype of constraint 'Record<string, unknown>'.
+  Overload 2 of 2, '(predicate: (value: Entity<Record<string, unknown>>, index: number, array: Entity<Record<string, unknown>>[]) => unknown, thisArg?: any): Entity<Record<string, unknown>>[]', gave the following error.
+    Argument of type '(entity: Entity<M>) => boolean' is not assignable to parameter of type '(value: Entity<Record<string, unknown>>, index: number, array: Entity<Record<string, unknown>>[]) => unknown'.
+      Types of parameters 'entity' and 'value' are incompatible.
+        Type 'Entity<Record<string, unknown>>' is not assignable to type 'Entity<M>'.
+          Type 'Record<string, unknown>' is not assignable to type 'M'.
+            'Record<string, unknown>' is assignable to the constraint of type 'M', but 'M' could be instantiated with a different subtype of constraint 'Record<string, unknown>'.
+src/components/EntityCollectionView/EntityCollectionBoardView.tsx(384,38): error TS2345: Argument of type '(entity: Entity<M>, index: number) => void' is not assignable to parameter of type '(value: Entity<Record<string, unknown>>, index: number, array: Entity<Record<string, unknown>>[]) => void'.
+  Types of parameters 'entity' and 'value' are incompatible.
+    Type 'Entity<Record<string, unknown>>' is not assignable to type 'Entity<M>'.
+      Type 'Record<string, unknown>' is not assignable to type 'M'.
+        'Record<string, unknown>' is assignable to the constraint of type 'M', but 'M' could be instantiated with a different subtype of constraint 'Record<string, unknown>'.
+src/components/EntityCollectionView/useBoardDataController.tsx(265,55): error TS2558: Expected 0 type arguments, but got 1.
+src/components/EntityCollectionView/useBoardDataController.tsx(271,32): error TS2345: Argument of type 'Entity<Record<string, unknown>>[]' is not assignable to parameter of type 'Entity<M>[]'.
+  Type 'Entity<Record<string, unknown>>' is not assignable to type 'Entity<M>'.
+    Type 'Record<string, unknown>' is not assignable to type 'M'.
+      'Record<string, unknown>' is assignable to the constraint of type 'M', but 'M' could be instantiated with a different subtype of constraint 'Record<string, unknown>'.
+src/components/EntityCollectionView/useBoardDataController.tsx(279,39): error TS2345: Argument of type 'Entity<Record<string, unknown>>[]' is not assignable to parameter of type 'Entity<M>[]'.
+  Type 'Entity<Record<string, unknown>>' is not assignable to type 'Entity<M>'.
+    Type 'Record<string, unknown>' is not assignable to type 'M'.
+      'Record<string, unknown>' is assignable to the constraint of type 'M', but 'M' could be instantiated with a different subtype of constraint 'Record<string, unknown>'.
+src/components/EntityCollectionView/useBoardDataController.tsx(318,63): error TS2558: Expected 0 type arguments, but got 1.
+src/components/EntityEditView.tsx(188,9): error TS2322: Type 'FormContext<M> | undefined' is not assignable to type 'FormContext<Record<string, unknown>> | undefined'.
+  Type 'FormContext<M>' is not assignable to type 'FormContext<Record<string, unknown>>'.
+    Types of property 'save' are incompatible.
+      Type '(values: M) => void' is not assignable to type '(values: Record<string, unknown>) => void'.
+        Types of parameters 'values' and 'values' are incompatible.
+          Type 'Record<string, unknown>' is not assignable to type 'M'.
+            'Record<string, unknown>' is assignable to the constraint of type 'M', but 'M' could be instantiated with a different subtype of constraint 'Record<string, unknown>'.
+src/components/EntityEditView.tsx(275,25): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: EntityCustomViewParams<Record<string, unknown>>, context?: any): string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | ... 4 more ... | undefined', gave the following error.
+    Type 'FormContext<M>' is not assignable to type 'FormContext<Record<string, unknown>>'.
+      Types of property 'save' are incompatible.
+        Type '(values: M) => void' is not assignable to type '(values: Record<string, unknown>) => void'.
+          Types of parameters 'values' and 'values' are incompatible.
+            Type 'Record<string, unknown>' is not assignable to type 'M'.
+              'Record<string, unknown>' is assignable to the constraint of type 'M', but 'M' could be instantiated with a different subtype of constraint 'Record<string, unknown>'.
+  Overload 2 of 2, '(props: EntityCustomViewParams<Record<string, unknown>>): string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | ... 4 more ... | undefined', gave the following error.
+    Type 'FormContext<M>' is not assignable to type 'FormContext<Record<string, unknown>>'.
+      Types of property 'save' are incompatible.
+        Type '(values: M) => void' is not assignable to type '(values: Record<string, unknown>) => void'.
+          Types of parameters 'values' and 'values' are incompatible.
+            Type 'Record<string, unknown>' is not assignable to type 'M'.
+              'Record<string, unknown>' is assignable to the constraint of type 'M', but 'M' could be instantiated with a different subtype of constraint 'Record<string, unknown>'.
+src/components/EntityEditView.tsx(389,9): error TS2322: Type 'ComponentType<EntityCustomViewParams<Record<string, unknown>>> | undefined' is not assignable to type 'ComponentType<EntityCustomViewParams<M>> | undefined'.
+  Type 'ComponentClass<EntityCustomViewParams<Record<string, unknown>>, any>' is not assignable to type 'ComponentType<EntityCustomViewParams<M>> | undefined'.
+    Type 'ComponentClass<EntityCustomViewParams<Record<string, unknown>>, any>' is not assignable to type 'ComponentClass<EntityCustomViewParams<M>, any>'.
+      Types of property 'defaultProps' are incompatible.
+        Type 'Partial<EntityCustomViewParams<Record<string, unknown>>> | undefined' is not assignable to type 'Partial<EntityCustomViewParams<M>> | undefined'.
+          Type 'Partial<EntityCustomViewParams<Record<string, unknown>>>' is not assignable to type 'Partial<EntityCustomViewParams<M>>'.
+            Types of property 'collection' are incompatible.
+              Type 'EntityCollection<Record<string, unknown>> | undefined' is not assignable to type 'EntityCollection<M> | undefined'.
+                Type 'PostgresCollection<Record<string, unknown>, User>' is not assignable to type 'EntityCollection<M> | undefined'.
+                  Type 'PostgresCollection<Record<string, unknown>, User>' is not assignable to type 'PostgresCollection<M, User>'.
+                    Types of property 'callbacks' are incompatible.
+                      Type 'EntityCallbacks<Record<string, unknown>, User> | undefined' is not assignable to type 'EntityCallbacks<M, User> | undefined'.
+                        Type 'EntityCallbacks<Record<string, unknown>, User>' is not assignable to type 'EntityCallbacks<M, User>'.
+                          Types of property 'afterRead' are incompatible.
+                            Type '((props: EntityAfterReadProps<Record<string, unknown>, User>) => Entity<Record<string, unknown>> | Promise<Entity<Record<string, unknown>>>) | undefined' is not assignable to type '((props: EntityAfterReadProps<M, User>) => Entity<M> | Promise<Entity<M>>) | undefined'.
+                              Type '(props: EntityAfterReadProps<Record<string, unknown>, User>) => Entity<Record<string, unknown>> | Promise<Entity<Record<string, unknown>>>' is not assignable to type '(props: EntityAfterReadProps<M, User>) => Entity<M> | Promise<Entity<M>>'.
+                                Type 'Entity<Record<string, unknown>> | Promise<Entity<Record<string, unknown>>>' is not assignable to type 'Entity<M> | Promise<Entity<M>>'.
+                                  Type 'Entity<Record<string, unknown>>' is not assignable to type 'Entity<M> | Promise<Entity<M>>'.
+                                    Type 'Entity<Record<string, unknown>>' is not assignable to type 'Entity<M>'.
+                                      Type 'Record<string, unknown>' is not assignable to type 'M'.
+                                        'Record<string, unknown>' is assignable to the constraint of type 'M', but 'M' could be instantiated with a different subtype of constraint 'Record<string, unknown>'.
+src/data_export/export/ExportCollectionAction.tsx(121,68): error TS2345: Argument of type 'Entity<Record<string, unknown>>[]' is not assignable to parameter of type 'Entity<M>[]'.
+  Type 'Entity<Record<string, unknown>>' is not assignable to type 'Entity<M>'.
+    Type 'Record<string, unknown>' is not assignable to type 'M'.
+      'Record<string, unknown>' is assignable to the constraint of type 'M', but 'M' could be instantiated with a different subtype of constraint 'Record<string, unknown>'.

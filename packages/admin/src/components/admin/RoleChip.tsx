@@ -6,11 +6,11 @@ import { getColorSchemeForSeed, getColorSchemeForKey } from "@rebasepro/ui";
 export function RoleChip({ role }: { role: Role }) {
     let colorScheme: ChipColorScheme;
     if (role.isAdmin) {
-        colorScheme = getColorSchemeForKey("blueDarker");
+        colorScheme = getColorSchemeForKey("blue");
     } else if (role.id === "editor") {
-        colorScheme = getColorSchemeForKey("yellowLight");
+        colorScheme = getColorSchemeForKey("yellow");
     } else if (role.id === "viewer") {
-        colorScheme = getColorSchemeForKey("grayLight");
+        colorScheme = getColorSchemeForKey("gray");
     } else {
         colorScheme = getColorSchemeForSeed(role.id);
     }

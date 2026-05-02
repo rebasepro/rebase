@@ -1,28 +1,28 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { S3StorageController } from "../src/storage/S3StorageController";
 
 // Mock the AWS SDK before importing the controller
-jest.mock("@aws-sdk/client-s3", () => ({
-    S3Client: jest.fn().mockImplementation(() => ({
-        send: jest.fn()
-    })),
-    PutObjectCommand: jest.fn(),
-    GetObjectCommand: jest.fn(),
-    DeleteObjectCommand: jest.fn(),
-    ListObjectsV2Command: jest.fn(),
-    HeadObjectCommand: jest.fn()
+vi.mock("@aws-sdk/client-s3", () => ({
+    S3Client: vi.fn().mockImplementation(function() {
+        return { send: vi.fn() };
+    }),
+    PutObjectCommand: vi.fn(),
+    GetObjectCommand: vi.fn(),
+    DeleteObjectCommand: vi.fn(),
+    ListObjectsV2Command: vi.fn(),
+    HeadObjectCommand: vi.fn()
 }));
 
-jest.mock("@aws-sdk/s3-request-presigner", () => ({
-    getSignedUrl: jest.fn().mockResolvedValue("https://presigned-url.example.com")
+vi.mock("@aws-sdk/s3-request-presigner", () => ({
+    getSignedUrl: vi.fn().mockResolvedValue("https://presigned-url.example.com")
 }));
 
-// Import the mocked modules
-const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command } = require("@aws-sdk/client-s3");
-const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 describe("S3StorageController", () => {
     let controller: S3StorageController;
-    let mockSend: jest.Mock;
+    let mockSend: vi.Mock;
 
     const defaultConfig = {
         bucket: "test-bucket",
@@ -32,11 +32,11 @@ describe("S3StorageController", () => {
     };
 
     beforeEach(() => {
-        jest.clearAllMocks();
-        mockSend = jest.fn();
-        (S3Client as jest.Mock).mockImplementation(() => ({
-            send: mockSend
-        }));
+        vi.clearAllMocks();
+        mockSend = vi.fn();
+        vi.mocked(S3Client).mockImplementation(function() {
+            return { send: mockSend };
+        } as any);
         controller = new S3StorageController(defaultConfig);
     });
 
@@ -52,7 +52,7 @@ describe("S3StorageController", () => {
         });
 
         it("should initialize with endpoint for S3-compatible services", () => {
-            jest.clearAllMocks();
+            vi.clearAllMocks();
             new S3StorageController({
                 ...defaultConfig,
                 endpoint: "https://minio.example.com",
@@ -70,17 +70,16 @@ describe("S3StorageController", () => {
         });
     });
 
-    describe("uploadFile", () => {
+    describe("putObject", () => {
         it("should upload file using PutObjectCommand", async () => {
             const content = Buffer.from("Test content");
             const file = new File([content], "test.txt", { type: "text/plain" });
 
             mockSend.mockResolvedValueOnce({});
 
-            const result = await controller.uploadFile({
+            const result = await controller.putObject({
                 file,
-                fileName: "test.txt",
-                path: "uploads"
+                key: "uploads/test.txt"
             });
 
             expect(PutObjectCommand).toHaveBeenCalledWith(expect.objectContaining({
@@ -97,10 +96,9 @@ describe("S3StorageController", () => {
 
             mockSend.mockResolvedValueOnce({});
 
-            await controller.uploadFile({
+            await controller.putObject({
                 file,
-                fileName: "test.txt",
-                path: "uploads",
+                key: "uploads/test.txt",
                 metadata: { customKey: "customValue" }
             });
 
@@ -116,10 +114,9 @@ describe("S3StorageController", () => {
 
             mockSend.mockResolvedValueOnce({});
 
-            await controller.uploadFile({
+            await controller.putObject({
                 file,
-                fileName: "test.txt",
-                path: "uploads",
+                key: "uploads/test.txt",
                 bucket: "custom-bucket"
             });
 
@@ -129,7 +126,7 @@ describe("S3StorageController", () => {
         });
     });
 
-    describe("getDownloadURL", () => {
+    describe("getSignedUrl", () => {
         it("should generate presigned URL", async () => {
             mockSend.mockResolvedValueOnce({
                 ContentType: "text/plain",
@@ -138,7 +135,7 @@ describe("S3StorageController", () => {
                 Metadata: {}
             });
 
-            const result = await controller.getDownloadURL("uploads/test.txt");
+            const result = await controller.getSignedUrl("uploads/test.txt");
 
             expect(getSignedUrl).toHaveBeenCalled();
             expect(result.url).toBe("https://presigned-url.example.com");
@@ -153,30 +150,30 @@ describe("S3StorageController", () => {
                 Metadata: { originalName: "photo.png" }
             });
 
-            const result = await controller.getDownloadURL("images/photo.png");
+            const result = await controller.getSignedUrl("images/photo.png");
 
             expect(result.metadata).toBeDefined();
             expect(result.metadata?.contentType).toBe("image/png");
         });
     });
 
-    describe("getFile", () => {
+    describe("getObject", () => {
         it("should return null for non-existent file", async () => {
             const error = new Error("NoSuchKey");
             (error as any).name = "NoSuchKey";
             mockSend.mockRejectedValueOnce(error);
 
-            const result = await controller.getFile("nonexistent.txt");
+            const result = await controller.getObject("nonexistent.txt");
 
             expect(result).toBeNull();
         });
     });
 
-    describe("deleteFile", () => {
+    describe("deleteObject", () => {
         it("should delete file from S3", async () => {
             mockSend.mockResolvedValueOnce({});
 
-            await controller.deleteFile("uploads/test.txt");
+            await controller.deleteObject("uploads/test.txt");
 
             expect(DeleteObjectCommand).toHaveBeenCalledWith(expect.objectContaining({
                 Bucket: "test-bucket",
@@ -187,7 +184,7 @@ describe("S3StorageController", () => {
         it("should not throw for non-existent file", async () => {
             mockSend.mockResolvedValueOnce({});
 
-            await expect(controller.deleteFile("nonexistent.txt")).resolves.not.toThrow();
+            await expect(controller.deleteObject("nonexistent.txt")).resolves.not.toThrow();
         });
     });
 
@@ -202,7 +199,7 @@ describe("S3StorageController", () => {
                 IsTruncated: false
             });
 
-            const result = await controller.list("uploads");
+            const result = await controller.listObjects("uploads");
 
             expect(ListObjectsV2Command).toHaveBeenCalledWith(expect.objectContaining({
                 Bucket: "test-bucket",
@@ -221,7 +218,7 @@ describe("S3StorageController", () => {
                 NextContinuationToken: "token123"
             });
 
-            const result = await controller.list("uploads", { maxResults: 1 });
+            const result = await controller.listObjects("uploads", { maxResults: 1 });
 
             expect(ListObjectsV2Command).toHaveBeenCalledWith(expect.objectContaining({
                 MaxKeys: 1
@@ -239,7 +236,7 @@ describe("S3StorageController", () => {
                 IsTruncated: false
             });
 
-            const result = await controller.list("uploads");
+            const result = await controller.listObjects("uploads");
 
             expect(result.prefixes).toHaveLength(2);
         });
@@ -251,7 +248,7 @@ describe("S3StorageController", () => {
                 IsTruncated: false
             });
 
-            await controller.list("uploads", { pageToken: "continue-token" });
+            await controller.listObjects("uploads", { pageToken: "continue-token" });
 
             expect(ListObjectsV2Command).toHaveBeenCalledWith(expect.objectContaining({
                 ContinuationToken: "continue-token"

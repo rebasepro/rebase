@@ -42,15 +42,15 @@ export function StorageUploadProgress({
         setError(undefined);
         setLoading(true);
 
-        storageSource.uploadFile({
+        const key = storagePath && fileName ? `${storagePath}/${fileName}` : fileName || storagePath || 'unnamed';
+        storageSource.putObject({
             file,
-            fileName,
-            path: storagePath,
+            key,
             metadata
         })
-            .then(async ({ path, storageUrl }) => {
-                console.debug("Upload successful", path);
-                await onFileUploadComplete(path, entry, metadata, storageUrl);
+            .then(async ({ key: resultKey, storageUrl }) => {
+                console.debug("Upload successful", resultKey);
+                await onFileUploadComplete(resultKey, entry, metadata, storageUrl);
                 if (mounted.current)
                     setLoading(false);
             })

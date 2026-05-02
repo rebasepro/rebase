@@ -68,7 +68,7 @@ export function useDataEnhancementPlugin(props?: DataEnhancementPluginProps): Re
         providers: [
             {
                 scope: "form" as const,
-                Component: DataEnhancementControllerProvider,
+                Component: DataEnhancementControllerProvider as React.ComponentType<any>,
                 props: {
                     apiKey,
                     getConfigForPath,

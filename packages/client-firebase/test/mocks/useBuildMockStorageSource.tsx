@@ -3,11 +3,15 @@ import { DownloadConfig, StorageSource, UploadFileProps, UploadFileResult } from
 export function useBuildMockStorageSource(): StorageSource {
 
     return {
-        getDownloadURL(pathOrUrl: string): Promise<DownloadConfig> {
+        getSignedUrl(pathOrUrl: string): Promise<DownloadConfig> {
             throw new Error("Function not implemented.");
-        }, getFile(path: string): Promise<File | null> {
+        }, getObject(key: string): Promise<File | null> {
             throw new Error("Function not implemented.");
-        }, uploadFile({ file, fileName, path, metadata }: UploadFileProps): Promise<UploadFileResult> {
+        }, putObject({ file, key, metadata }: UploadFileProps): Promise<UploadFileResult> {
+            throw new Error("Function not implemented.");
+        }, listObjects(prefix: string): Promise<any> {
+            throw new Error("Function not implemented.");
+        }, deleteObject(key: string): Promise<void> {
             throw new Error("Function not implemented.");
         }
     };

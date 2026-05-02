@@ -82,10 +82,10 @@ export function useEntityFetch<M extends Record<string, any>, USER extends User 
             const accessor = dataClient.collection(path);
             
             if (accessor.listenById) {
-                return accessor.listenById(entityId, onEntityUpdate, onError);
+                return accessor.listenById(entityId, onEntityUpdate as any, onError);
             } else {
                 accessor.findById(entityId)
-                    .then(onEntityUpdate)
+                    .then(onEntityUpdate as any)
                     .catch(onError);
                 return () => {
                 };

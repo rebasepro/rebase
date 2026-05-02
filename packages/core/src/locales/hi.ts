@@ -38,6 +38,7 @@ export const hi: RebaseTranslations = {
     clear_filter: "फ़िल्टर साफ़ करें",
     clear_filter_sort: "फ़िल्टर/सॉर्ट साफ़ करें",
     clear_sort: "सॉर्ट साफ़ करें",
+    clear_all: "सभी साफ़ करें",
     no_items: "कोई आइटम नहीं",
     no_entries_found: "कोई प्रविष्टि नहीं मिली",
     all_entries_loaded: "सभी {{count}} प्रविष्टियाँ लोड हो गईं",
@@ -312,6 +313,7 @@ export const hi: RebaseTranslations = {
 
     only_admins_edit_roles: "केवल व्यवस्थापक (Admins) ही भूमिकाएँ संपादित कर सकते हैं",
     error_user_not_found: "उपयोगकर्ता नहीं मिला",
+    all_roles: "सभी भूमिकाएँ",
     role: "भूमिका",
     name_of_this_role: "इस भूमिका का नाम",
     id_of_this_role: "इस भूमिका की ID",

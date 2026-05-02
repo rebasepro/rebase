@@ -116,7 +116,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
         setDataLoading(true);
         dataClient.collection(path).find({})
             .then(async (res) => {
-                const data = res.data;
+                const data = res.data as Entity<M>[];
                 setDataLoadingError(undefined);
                 const additionalData = await fetchAdditionalFields(data);
                 const additionalHeaders = [

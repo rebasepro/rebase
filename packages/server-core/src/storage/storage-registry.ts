@@ -178,10 +178,10 @@ function isStorageController(obj: unknown): obj is StorageController {
     const controller = obj as StorageController;
     // Check for required StorageController properties
     return (
-        typeof controller.uploadFile === "function" &&
-        typeof controller.getDownloadURL === "function" &&
-        typeof controller.deleteFile === "function" &&
-        typeof controller.list === "function" &&
+        typeof controller.putObject === "function" &&
+        typeof controller.getSignedUrl === "function" &&
+        typeof controller.deleteObject === "function" &&
+        typeof controller.listObjects === "function" &&
         typeof controller.getType === "function"
     );
 }

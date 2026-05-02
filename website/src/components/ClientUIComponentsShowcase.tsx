@@ -218,8 +218,8 @@ export default function ClientUIComponentsShowcase({
                 <Typography variant="subtitle2" component="div">Chip</Typography>
                 <div className={"flex flex-row flex-wrap gap-2"}>
                     <Chip>Basic Chip</Chip>
-                    <Chip colorScheme="redLighter">Red Light Chip</Chip>
-                    <Chip colorScheme="blueDarker" size="small">Small Chip</Chip>
+                    <Chip colorScheme="red">Red Chip</Chip>
+                    <Chip colorScheme="blue" size="small">Small Chip</Chip>
                     <Chip icon={<FaceIcon size="small" />}>Chip with Icon</Chip>
                     <Chip onClick={() => console.log("Chip clicked")}>Clickable Chip</Chip>
                 </div>

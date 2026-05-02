@@ -401,7 +401,7 @@ function CollectionPermissionsMatrix({ roleId, isAdmin }: { roleId: string; isAd
                                             <span className="font-medium">{collection.name}</span>
                                             {noRules && !isAdmin && (
                                                 <Tooltip title={t("no_security_rules_defined")}>
-                                                    <Chip size="smallest" colorScheme="grayLight">{t("no_rules")}</Chip>
+                                                    <Chip size="smallest" colorScheme="gray">{t("no_rules")}</Chip>
                                                 </Tooltip>
                                             )}
                                         </div>

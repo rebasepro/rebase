@@ -33,7 +33,8 @@ import {
     ChevronLeftIcon,
     ChevronRightIcon,
     Select,
-    SelectItem
+    SelectItem,
+    Skeleton
 } from "@rebasepro/ui";
 import { RoleChip } from "./RoleChip";
 import { UserManagementDelegate, Role, UserCreationResult } from "@rebasepro/types";
@@ -309,11 +310,6 @@ export function UsersView({ userManagement }: {
             </div>
 
             <div className="overflow-auto">
-                {tableLoading && (
-                    <div className="flex justify-center py-4">
-                        <CircularProgress size="small" />
-                    </div>
-                )}
                 <Table className="w-full">
                     <TableHeader>
                         <TableCell header className="w-48">{t("id") || "ID"}</TableCell>
@@ -324,7 +320,36 @@ export function UsersView({ userManagement }: {
                         <TableCell header className="w-24 text-right">{t("actions")}</TableCell>
                     </TableHeader>
                     <TableBody>
-                        {displayUsers.map(user => (
+                        {tableLoading ? (
+                            [
+                                { email: "w-48", name: "w-32", roles: ["w-16", "w-20"] },
+                                { email: "w-32", name: "w-24", roles: ["w-24"] },
+                                { email: "w-40", name: "w-36", roles: ["w-16", "w-16"] },
+                            ].map((row, i) => (
+                                <TableRow key={`skeleton-${i}`}>
+                                    <TableCell className="font-mono text-xs"><Skeleton className="h-3 w-40" /></TableCell>
+                                    <TableCell><Skeleton className={`h-4 ${row.email}`} /></TableCell>
+                                    <TableCell className="font-medium"><Skeleton className={`h-4 ${row.name}`} /></TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-wrap gap-2">
+                                            {row.roles.map((w, j) => (
+                                                <Skeleton key={j} className={`h-6 ${w} rounded-full`} />
+                                            ))}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap text-sm">
+                                        <Skeleton className="h-4 w-20" />
+                                    </TableCell>
+                                    <TableCell className="text-right whitespace-nowrap">
+                                        <div className="flex justify-end items-center gap-1">
+                                            <Skeleton className="h-7 w-7 rounded-md" />
+                                            <Skeleton className="h-7 w-7 rounded-md" />
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        ) : (
+                            displayUsers.map(user => (
                             <TableRow key={user.uid} onClick={() => saveUser && handleEditUser(user)}>
                                 <TableCell className="font-mono text-xs">{user.uid}</TableCell>
                                 <TableCell>{user.email}</TableCell>
@@ -371,7 +396,7 @@ export function UsersView({ userManagement }: {
                                     </div>
                                 </TableCell>
                             </TableRow>
-                        ))}
+                        )))}
 
                         {displayUsers.length === 0 && !tableLoading && (
                             <TableRow>

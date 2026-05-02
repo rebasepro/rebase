@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -30,15 +31,14 @@ describe("LocalStorageController", () => {
         });
     });
 
-    describe("uploadFile", () => {
+    describe("putObject", () => {
         it("should upload a file and return metadata", async () => {
             const content = Buffer.from("Hello, World!");
             const file = new File([content], "test.txt", { type: "text/plain" });
 
-            const result = await controller.uploadFile({
+            const result = await controller.putObject({
                 file,
-                fileName: "test.txt",
-                path: "uploads"
+                key: "uploads/test.txt"
             });
 
             expect(result.path).toContain("uploads");
@@ -54,10 +54,9 @@ describe("LocalStorageController", () => {
             const content = Buffer.from("Nested content");
             const file = new File([content], "nested.txt", { type: "text/plain" });
 
-            await controller.uploadFile({
+            await controller.putObject({
                 file,
-                fileName: "nested.txt",
-                path: "level1/level2/level3"
+                key: "level1/level2/level3/nested.txt"
             });
 
             const filePath = path.join(tempDir, "default", "level1", "level2", "level3", "nested.txt");
@@ -69,10 +68,9 @@ describe("LocalStorageController", () => {
             const content = Buffer.from("Bucket content");
             const file = new File([content], "bucket.txt", { type: "text/plain" });
 
-            await controller.uploadFile({
+            await controller.putObject({
                 file,
-                fileName: "bucket.txt",
-                path: "files",
+                key: "files/bucket.txt",
                 bucket: "custom-bucket"
             });
 
@@ -85,10 +83,9 @@ describe("LocalStorageController", () => {
             const content = Buffer.from("With metadata");
             const file = new File([content], "meta.txt", { type: "text/plain" });
 
-            await controller.uploadFile({
+            await controller.putObject({
                 file,
-                fileName: "meta.txt",
-                path: "uploads",
+                key: "uploads/meta.txt",
                 metadata: { customField: "customValue" }
             });
 
@@ -99,39 +96,37 @@ describe("LocalStorageController", () => {
         });
     });
 
-    describe("getFile", () => {
+    describe("getObject", () => {
         it("should retrieve an uploaded file using local:// URL format", async () => {
             const content = Buffer.from("Retrieve me");
             const file = new File([content], "retrieve.txt", { type: "text/plain" });
 
-            const uploadResult = await controller.uploadFile({
+            const uploadResult = await controller.putObject({
                 file,
-                fileName: "retrieve.txt",
-                path: "uploads"
+                key: "uploads/retrieve.txt"
             });
 
             // Use the storageUrl from upload result (local:// format)
-            const retrieved = await controller.getFile(uploadResult.storageUrl!);
+            const retrieved = await controller.getObject(uploadResult.storageUrl!);
 
             expect(retrieved).not.toBeNull();
             expect(retrieved?.name).toBe("retrieve.txt");
         });
 
         it("should return null for non-existent file", async () => {
-            const result = await controller.getFile("local://default/nonexistent/file.txt");
+            const result = await controller.getObject("local://default/nonexistent/file.txt");
             expect(result).toBeNull();
         });
     });
 
-    describe("deleteFile", () => {
+    describe("deleteObject", () => {
         it("should delete an uploaded file using local:// URL format", async () => {
             const content = Buffer.from("Delete me");
             const file = new File([content], "delete.txt", { type: "text/plain" });
 
-            const uploadResult = await controller.uploadFile({
+            const uploadResult = await controller.putObject({
                 file,
-                fileName: "delete.txt",
-                path: "uploads"
+                key: "uploads/delete.txt"
             });
 
             // Verify file exists
@@ -140,7 +135,7 @@ describe("LocalStorageController", () => {
             expect(exists).toBe(true);
 
             // Delete the file using local:// URL format
-            await controller.deleteFile(uploadResult.storageUrl!);
+            await controller.deleteObject(uploadResult.storageUrl!);
 
             // Verify file no longer exists
             exists = await fs.promises.access(filePath).then(() => true).catch(() => false);
@@ -148,21 +143,20 @@ describe("LocalStorageController", () => {
         });
 
         it("should not throw when deleting non-existent file", async () => {
-            await expect(controller.deleteFile("local://default/nonexistent/file.txt")).resolves.not.toThrow();
+            await expect(controller.deleteObject("local://default/nonexistent/file.txt")).resolves.not.toThrow();
         });
 
         it("should also delete metadata file", async () => {
             const content = Buffer.from("Delete with metadata");
             const file = new File([content], "withmeta.txt", { type: "text/plain" });
 
-            const uploadResult = await controller.uploadFile({
+            const uploadResult = await controller.putObject({
                 file,
-                fileName: "withmeta.txt",
-                path: "uploads",
+                key: "uploads/withmeta.txt",
                 metadata: { key: "value" }
             });
 
-            await controller.deleteFile(uploadResult.storageUrl!);
+            await controller.deleteObject(uploadResult.storageUrl!);
 
             const metadataPath = path.join(tempDir, "default", "uploads", "withmeta.txt.metadata.json");
             const exists = await fs.promises.access(metadataPath).then(() => true).catch(() => false);
@@ -175,48 +169,46 @@ describe("LocalStorageController", () => {
             // Upload some test files
             for (let i = 1; i <= 5; i++) {
                 const file = new File([`Content ${i}`], `file${i}.txt`, { type: "text/plain" });
-                await controller.uploadFile({
+                await controller.putObject({
                     file,
-                    fileName: `file${i}.txt`,
-                    path: "listtest"
+                    key: `listtest/file${i}.txt`
                 });
             }
         });
 
         it("should list files in a directory", async () => {
-            const result = await controller.list("listtest", { bucket: "default" });
+            const result = await controller.listObjects("listtest", { bucket: "default" });
 
             // Items should be the actual files (not metadata files)
             expect(result.items.length).toBeGreaterThanOrEqual(5);
         });
 
         it("should return empty list for non-existent directory", async () => {
-            const result = await controller.list("nonexistent", { bucket: "default" });
+            const result = await controller.listObjects("nonexistent", { bucket: "default" });
 
             expect(result.items).toHaveLength(0);
         });
     });
 
-    describe("getDownloadURL", () => {
+    describe("getSignedUrl", () => {
         it("should return download URL for existing file", async () => {
             const content = Buffer.from("Download me");
             const file = new File([content], "download.txt", { type: "text/plain" });
 
-            const uploadResult = await controller.uploadFile({
+            const uploadResult = await controller.putObject({
                 file,
-                fileName: "download.txt",
-                path: "uploads"
+                key: "uploads/download.txt"
             });
 
             // Use the storageUrl from upload result
-            const result = await controller.getDownloadURL(uploadResult.storageUrl!);
+            const result = await controller.getSignedUrl(uploadResult.storageUrl!);
 
             expect(result.url).toBeTruthy();
             expect(result.fileNotFound).toBeFalsy();
         });
 
         it("should return fileNotFound for non-existent file", async () => {
-            const result = await controller.getDownloadURL("local://default/nonexistent/file.txt");
+            const result = await controller.getSignedUrl("local://default/nonexistent/file.txt");
 
             expect(result.fileNotFound).toBe(true);
         });

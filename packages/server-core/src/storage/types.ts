@@ -63,29 +63,29 @@ export type BackendStorageConfig = LocalStorageConfig | S3StorageConfig;
  */
 export interface StorageController {
     /**
-     * Upload a file
+     * Upload an object
      */
-    uploadFile(props: UploadFileProps): Promise<UploadFileResult>;
+    putObject(props: UploadFileProps): Promise<UploadFileResult>;
 
     /**
-     * Get a download URL for a file
+     * Get a download URL (signed URL equivalent) for an object
      */
-    getDownloadURL(path: string, bucket?: string): Promise<DownloadConfig>;
+    getSignedUrl(key: string, bucket?: string): Promise<DownloadConfig>;
 
     /**
-     * Get file as a File object
+     * Get object as a File
      */
-    getFile(path: string, bucket?: string): Promise<File | null>;
+    getObject(key: string, bucket?: string): Promise<File | null>;
 
     /**
-     * Delete a file
+     * Delete an object
      */
-    deleteFile(path: string, bucket?: string): Promise<void>;
+    deleteObject(key: string, bucket?: string): Promise<void>;
 
     /**
-     * List files in a path
+     * List objects in a prefix
      */
-    list(path: string, options?: {
+    listObjects(prefix: string, options?: {
         bucket?: string;
         maxResults?: number;
         pageToken?: string;
@@ -132,61 +132,3 @@ export const DOCUMENT_MIME_TYPES = [
     'text/plain',
     'text/csv'
 ];
-
-/**
- * Resolve a `BackendStorageConfig` from environment variables.
- *
- * Reads `STORAGE_TYPE` and returns the matching config, falling back
- * to `local` when nothing is set.
- *
- * @deprecated Build the storage configuration explicitly in your backend entry point
- * using your validated environment schema (e.g. `env.ts`) instead of relying on
- * this implicit `process.env` fallback.
- *
- * **Supported values for `STORAGE_TYPE`:**
- *
- * | Value   | Provider                                              | Required env vars                                      |
- * |---------|-------------------------------------------------------|--------------------------------------------------------|
- * | `local` | Local filesystem (default)                            | `STORAGE_PATH` (optional, default: ./uploads)          |
- * | `s3`    | Any S3-compatible (AWS, R2, MinIO, Hetzner, GCS\*…)   | `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`|
- *
- * \* GCS supports S3 interop — use HMAC keys + `S3_ENDPOINT=https://storage.googleapis.com`.
- *   See: https://cloud.google.com/storage/docs/interoperability
- *
- * For custom storage backends (Azure Blob, native GCS SDK, etc.),
- * implement the `StorageController` interface and pass it directly
- * to the `storage` config instead of using this helper.
- *
- * @param defaults  Fallback values (e.g. `{ localPath: './uploads' }`)
- */
-export function resolveStorageFromEnv(defaults?: {
-    localPath?: string;
-}): BackendStorageConfig {
-    const storageType = (process.env.STORAGE_TYPE || 'local').toLowerCase();
-
-    switch (storageType) {
-        case 's3':
-            if (!process.env.S3_BUCKET) {
-                throw new Error(
-                    'STORAGE_TYPE=s3 requires S3_BUCKET to be set. ' +
-                    'Also set S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, and optionally S3_REGION, S3_ENDPOINT.'
-                );
-            }
-            return {
-                type: 's3',
-                bucket: process.env.S3_BUCKET,
-                region: process.env.S3_REGION || 'auto',
-                accessKeyId: process.env.S3_ACCESS_KEY_ID || '',
-                secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
-                endpoint: process.env.S3_ENDPOINT,
-                forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
-            };
-
-        case 'local':
-        default:
-            return {
-                type: 'local',
-                basePath: process.env.STORAGE_PATH || defaults?.localPath || './uploads',
-            };
-    }
-}

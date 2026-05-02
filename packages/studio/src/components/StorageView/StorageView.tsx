@@ -564,7 +564,7 @@ export const StorageView = () => {
         setLoading(true);
         setError(null);
         try {
-            const result: StorageListResult = await storageSource.list(path);
+            const result: StorageListResult = await storageSource.listObjects(path);
 
             const folderItems: StorageFile[] = (result.prefixes ?? []).map(ref => ({
                 name: ref.name,
@@ -576,7 +576,7 @@ export const StorageView = () => {
             const fileItems: StorageFile[] = await Promise.all(
                 (result.items ?? []).map(async (ref) => {
                     try {
-                        const downloadConfig = await storageSource.getDownloadURL(ref.fullPath);
+                        const downloadConfig = await storageSource.getSignedUrl(ref.fullPath);
                         return {
                             name: ref.name,
                             fullPath: ref.fullPath,
@@ -630,7 +630,7 @@ export const StorageView = () => {
             setSelectedDownloadUrl(file.downloadUrl);
         } else {
             try {
-                const config = await storageSource.getDownloadURL(file.fullPath);
+                const config = await storageSource.getSignedUrl(file.fullPath);
                 setSelectedDownloadUrl(config.url);
             } catch {
                 setSelectedDownloadUrl(null);
@@ -641,7 +641,7 @@ export const StorageView = () => {
     // Upload files
     const handleUpload = useCallback(async (uploadFiles: File[]) => {
         for (const file of uploadFiles) {
-            await storageSource.uploadFile({
+            await storageSource.putObject({
                 file,
                 fileName: file.name,
                 path: currentPath || undefined
@@ -657,7 +657,7 @@ export const StorageView = () => {
     // Delete a file
     const handleDeleteFile = useCallback(async (file: StorageFile) => {
         try {
-            await storageSource.deleteFile(file.fullPath);
+            await storageSource.deleteObject(file.fullPath);
             snackbarController.open({ type: "success", message: `"${file.name}" deleted` });
             setSelectedFile(null);
             setSelectedDownloadUrl(null);

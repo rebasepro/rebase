@@ -136,7 +136,7 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
                 orderBy: orderByParams,
                 searchString,
                 include: includeParams
-            }, onEntitiesUpdate, onError);
+            }, onEntitiesUpdate as any, onError);
         } else {
             accessor.find({
                 where: whereParams,
@@ -145,7 +145,7 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
                 searchString,
                 include: includeParams
             })
-                .then(onEntitiesUpdate)
+                .then(onEntitiesUpdate as any)
                 .catch(onError);
             return () => {
             };

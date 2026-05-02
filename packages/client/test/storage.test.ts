@@ -23,21 +23,20 @@ describe("Storage", () => {
     });
 
     // -----------------------------------------------------------------------
-    // uploadFile
+    // putObject
     // -----------------------------------------------------------------------
-    describe("uploadFile", () => {
+    describe("putObject", () => {
         it("uploads a file and returns the result", async () => {
             const storage = createStorage(mockTransport);
             const mockFile = new File(["content"], "test.txt", { type: "text/plain" });
 
             mockTransport.request.mockResolvedValueOnce({
-                data: { fileName: "test.txt", path: "test.txt" }
+                data: { key: "uploads/test.txt" }
             });
 
-            const result = await storage.uploadFile({
+            const result = await storage.putObject({
                 file: mockFile,
-                fileName: "test.txt",
-                path: "uploads/test.txt",
+                key: "uploads/test.txt",
                 bucket: "my-bucket",
                 metadata: { customField: "value1", numericField: 123 }
             });
@@ -46,7 +45,7 @@ describe("Storage", () => {
                 method: "POST",
                 body: expect.any(FormData)
             }));
-            expect(result).toEqual({ fileName: "test.txt", path: "test.txt" });
+            expect(result).toEqual({ key: "uploads/test.txt" });
         });
 
         it("appends all FormData fields correctly", async () => {
@@ -55,18 +54,16 @@ describe("Storage", () => {
 
             mockTransport.request.mockResolvedValueOnce({ data: {} });
 
-            await storage.uploadFile({
+            await storage.putObject({
                 file: mockFile,
-                fileName: "photo.jpg",
-                path: "images/",
+                key: "images/photo.jpg",
                 bucket: "media",
                 metadata: { alt: "A photo", width: 800 }
             });
 
             const formData = mockTransport.request.mock.calls[0][1]!.body as FormData;
             expect(formData.get("file")).toBeDefined();
-            expect(formData.get("fileName")).toBe("photo.jpg");
-            expect(formData.get("path")).toBe("images/");
+            expect(formData.get("key")).toBe("images/photo.jpg");
             expect(formData.get("bucket")).toBe("media");
             expect(formData.get("metadata_alt")).toBe("A photo");
             expect(formData.get("metadata_width")).toBe("800"); // JSON.stringify for non-string
@@ -76,15 +73,14 @@ describe("Storage", () => {
             const storage = createStorage(mockTransport);
             const mockFile = new File(["data"], "file.bin");
 
-            mockTransport.request.mockResolvedValueOnce({ data: { fileName: "file.bin" } });
+            mockTransport.request.mockResolvedValueOnce({ data: { key: "file.bin" } });
 
-            const result = await storage.uploadFile({ file: mockFile });
-            expect(result).toEqual({ fileName: "file.bin" });
+            const result = await storage.putObject({ file: mockFile, key: "file.bin" });
+            expect(result).toEqual({ key: "file.bin" });
 
             const formData = mockTransport.request.mock.calls[0][1]!.body as FormData;
             expect(formData.get("file")).toBeDefined();
-            expect(formData.get("fileName")).toBeNull();
-            expect(formData.get("path")).toBeNull();
+            expect(formData.get("key")).toBe("file.bin");
             expect(formData.get("bucket")).toBeNull();
         });
 
@@ -94,8 +90,9 @@ describe("Storage", () => {
 
             mockTransport.request.mockResolvedValueOnce({ data: {} });
 
-            await storage.uploadFile({
+            await storage.putObject({
                 file: mockFile,
+                key: "file.bin",
                 metadata: { valid: "yes", nope: undefined, alsoNope: null } as any
             });
 
@@ -107,16 +104,16 @@ describe("Storage", () => {
     });
 
     // -----------------------------------------------------------------------
-    // getDownloadURL
+    // getSignedUrl
     // -----------------------------------------------------------------------
-    describe("getDownloadURL", () => {
+    describe("getSignedUrl", () => {
         it("fetches metadata and returns a download config", async () => {
             const storage = createStorage(mockTransport);
 
             mockTransport.request.mockResolvedValueOnce({ data: { size: 100 } });
             mockTransport.resolveToken.mockResolvedValueOnce("my-token");
 
-            const result = await storage.getDownloadURL("file.jpg", "bucket");
+            const result = await storage.getSignedUrl("file.jpg", "bucket");
 
             expect(mockTransport.request).toHaveBeenCalledWith("/storage/metadata/bucket/file.jpg");
             expect(result).toEqual({
@@ -131,7 +128,7 @@ describe("Storage", () => {
             mockTransport.request.mockResolvedValueOnce({ data: { size: 100 } });
             mockTransport.resolveToken.mockResolvedValueOnce(null);
 
-            const result = await storage.getDownloadURL("local://file.jpg");
+            const result = await storage.getSignedUrl("local://file.jpg");
 
             expect(mockTransport.request).toHaveBeenCalledWith("/storage/metadata/file.jpg");
             expect(result).toEqual({
@@ -146,7 +143,7 @@ describe("Storage", () => {
             mockTransport.request.mockResolvedValueOnce({ data: {} });
             mockTransport.resolveToken.mockResolvedValueOnce(null);
 
-            await storage.getDownloadURL("s3://bucket/file.jpg");
+            await storage.getSignedUrl("s3://bucket/file.jpg");
 
             expect(mockTransport.request).toHaveBeenCalledWith("/storage/metadata/bucket/file.jpg");
         });
@@ -157,7 +154,7 @@ describe("Storage", () => {
             mockTransport.request.mockResolvedValueOnce({ data: {} });
             mockTransport.resolveToken.mockResolvedValueOnce(null);
 
-            await storage.getDownloadURL("mybucket/file.jpg", "mybucket");
+            await storage.getSignedUrl("mybucket/file.jpg", "mybucket");
 
             expect(mockTransport.request).toHaveBeenCalledWith("/storage/metadata/mybucket/file.jpg");
         });
@@ -168,7 +165,7 @@ describe("Storage", () => {
             mockTransport.request.mockResolvedValueOnce({ data: {} });
             mockTransport.resolveToken.mockResolvedValueOnce(null);
 
-            const result = await storage.getDownloadURL("file.jpg");
+            const result = await storage.getSignedUrl("file.jpg");
             expect(result.url).toBe("http://localhost:3000/api/storage/file/file.jpg");
             expect(result.url).not.toContain("?token=");
         });
@@ -179,8 +176,8 @@ describe("Storage", () => {
             mockTransport.request.mockResolvedValueOnce({ data: { size: 50 } });
             mockTransport.resolveToken.mockResolvedValueOnce("tok");
 
-            const first = await storage.getDownloadURL("cached.jpg");
-            const second = await storage.getDownloadURL("cached.jpg");
+            const first = await storage.getSignedUrl("cached.jpg");
+            const second = await storage.getSignedUrl("cached.jpg");
 
             expect(first).toEqual(second);
             expect(mockTransport.request).toHaveBeenCalledTimes(1); // Only one actual request
@@ -191,11 +188,11 @@ describe("Storage", () => {
 
             mockTransport.request.mockResolvedValueOnce({ data: { size: 1 } });
             mockTransport.resolveToken.mockResolvedValueOnce(null);
-            await storage.getDownloadURL("file.jpg", "bucket-a");
+            await storage.getSignedUrl("file.jpg", "bucket-a");
 
             mockTransport.request.mockResolvedValueOnce({ data: { size: 2 } });
             mockTransport.resolveToken.mockResolvedValueOnce(null);
-            await storage.getDownloadURL("file.jpg", "bucket-b");
+            await storage.getSignedUrl("file.jpg", "bucket-b");
 
             expect(mockTransport.request).toHaveBeenCalledTimes(2);
         });
@@ -207,7 +204,7 @@ describe("Storage", () => {
             (error as any).status = 404;
             mockTransport.request.mockRejectedValueOnce(error);
 
-            const result = await storage.getDownloadURL("missing.jpg");
+            const result = await storage.getSignedUrl("missing.jpg");
             expect(result).toEqual({ url: null, fileNotFound: true });
         });
 
@@ -218,14 +215,14 @@ describe("Storage", () => {
             (error as any).status = 500;
             mockTransport.request.mockRejectedValueOnce(error);
 
-            await expect(storage.getDownloadURL("error.jpg")).rejects.toThrow("Server Error");
+            await expect(storage.getSignedUrl("error.jpg")).rejects.toThrow("Server Error");
         });
     });
 
     // -----------------------------------------------------------------------
-    // getFile
+    // getObject
     // -----------------------------------------------------------------------
-    describe("getFile", () => {
+    describe("getObject", () => {
         it("returns a File object on success", async () => {
             const storage = createStorage(mockTransport);
             const mockBlob = new Blob(["content"], { type: "text/plain" });
@@ -236,7 +233,7 @@ describe("Storage", () => {
                 blob: async () => mockBlob
             } as any);
 
-            const result = await storage.getFile("my_file.txt");
+            const result = await storage.getObject("my_file.txt");
 
             expect(mockTransport.fetchFn).toHaveBeenCalledWith(
                 "http://localhost:3000/api/storage/file/my_file.txt",
@@ -256,7 +253,7 @@ describe("Storage", () => {
                 ok: false,
             } as any);
 
-            const result = await storage.getFile("missing.txt");
+            const result = await storage.getObject("missing.txt");
             expect(result).toBeNull();
         });
 
@@ -268,7 +265,7 @@ describe("Storage", () => {
                 ok: false,
             } as any);
 
-            await expect(storage.getFile("error.txt")).rejects.toThrow("Failed to get file");
+            await expect(storage.getObject("error.txt")).rejects.toThrow("Failed to get file");
         });
 
         it("strips local:// prefix", async () => {
@@ -281,7 +278,7 @@ describe("Storage", () => {
                 blob: async () => mockBlob
             } as any);
 
-            await storage.getFile("local://images/photo.jpg");
+            await storage.getObject("local://images/photo.jpg");
 
             expect(mockTransport.fetchFn).toHaveBeenCalledWith(
                 "http://localhost:3000/api/storage/file/images/photo.jpg",
@@ -299,7 +296,7 @@ describe("Storage", () => {
                 blob: async () => mockBlob
             } as any);
 
-            await storage.getFile("s3://bucket/file.dat");
+            await storage.getObject("s3://bucket/file.dat");
 
             expect(mockTransport.fetchFn).toHaveBeenCalledWith(
                 "http://localhost:3000/api/storage/file/bucket/file.dat",
@@ -317,7 +314,7 @@ describe("Storage", () => {
                 blob: async () => mockBlob
             } as any);
 
-            await storage.getFile("photo.jpg", "media");
+            await storage.getObject("photo.jpg", "media");
 
             expect(mockTransport.fetchFn).toHaveBeenCalledWith(
                 "http://localhost:3000/api/storage/file/media/photo.jpg",
@@ -335,7 +332,7 @@ describe("Storage", () => {
                 blob: async () => mockBlob
             } as any);
 
-            await storage.getFile("media/photo.jpg", "media");
+            await storage.getObject("media/photo.jpg", "media");
 
             expect(mockTransport.fetchFn).toHaveBeenCalledWith(
                 "http://localhost:3000/api/storage/file/media/photo.jpg",
@@ -353,32 +350,32 @@ describe("Storage", () => {
                 blob: async () => mockBlob
             } as any);
 
-            const result = await storage.getFile("deep/nested/image.png");
+            const result = await storage.getObject("deep/nested/image.png");
             expect(result?.name).toBe("image.png");
         });
     });
 
     // -----------------------------------------------------------------------
-    // deleteFile
+    // deleteObject
     // -----------------------------------------------------------------------
-    describe("deleteFile", () => {
+    describe("deleteObject", () => {
         it("calls delete request and clears cache", async () => {
             const storage = createStorage(mockTransport);
 
             // Pre-warm the cache from a get call
             mockTransport.request.mockResolvedValueOnce({ data: {} });
             mockTransport.resolveToken.mockResolvedValueOnce(null);
-            await storage.getDownloadURL("file.txt", "bucket");
+            await storage.getSignedUrl("file.txt", "bucket");
 
             mockTransport.request.mockResolvedValueOnce({});
-            await storage.deleteFile("file.txt", "bucket");
+            await storage.deleteObject("file.txt", "bucket");
 
             expect(mockTransport.request).toHaveBeenCalledWith("/storage/file/bucket/file.txt", { method: "DELETE" });
 
             // Ensure cache is cleared by verifying a new request is made
             mockTransport.request.mockResolvedValueOnce({ data: {} });
             mockTransport.resolveToken.mockResolvedValueOnce(null);
-            await storage.getDownloadURL("file.txt", "bucket");
+            await storage.getSignedUrl("file.txt", "bucket");
             expect(mockTransport.request).toHaveBeenCalledTimes(3); // 1st meta + delete + 2nd meta
         });
 
@@ -389,7 +386,7 @@ describe("Storage", () => {
             (error as any).status = 404;
             mockTransport.request.mockRejectedValueOnce(error);
 
-            await expect(storage.deleteFile("missing.txt")).resolves.toBeUndefined();
+            await expect(storage.deleteObject("missing.txt")).resolves.toBeUndefined();
         });
 
         it("throws other errors", async () => {
@@ -399,14 +396,14 @@ describe("Storage", () => {
             (error as any).status = 500;
             mockTransport.request.mockRejectedValueOnce(error);
 
-            await expect(storage.deleteFile("error.txt")).rejects.toThrow("Server Error");
+            await expect(storage.deleteObject("error.txt")).rejects.toThrow("Server Error");
         });
 
         it("strips local:// prefix on delete", async () => {
             const storage = createStorage(mockTransport);
             mockTransport.request.mockResolvedValueOnce({});
 
-            await storage.deleteFile("local://files/doc.pdf");
+            await storage.deleteObject("local://files/doc.pdf");
             expect(mockTransport.request).toHaveBeenCalledWith("/storage/file/files/doc.pdf", { method: "DELETE" });
         });
 
@@ -414,7 +411,7 @@ describe("Storage", () => {
             const storage = createStorage(mockTransport);
             mockTransport.request.mockResolvedValueOnce({});
 
-            await storage.deleteFile("doc.pdf", "docs");
+            await storage.deleteObject("doc.pdf", "docs");
             expect(mockTransport.request).toHaveBeenCalledWith("/storage/file/docs/doc.pdf", { method: "DELETE" });
         });
     });
@@ -430,13 +427,13 @@ describe("Storage", () => {
                 data: { files: [], nextPageToken: "token" }
             });
 
-            const result = await storage.list("folder/", {
+            const result = await storage.listObjects("folder/", {
                 bucket: "my-bucket",
                 maxResults: 10,
                 pageToken: "startToken"
             });
 
-            expect(mockTransport.request).toHaveBeenCalledWith("/storage/list?path=folder%2F&bucket=my-bucket&maxResults=10&pageToken=startToken");
+            expect(mockTransport.request).toHaveBeenCalledWith("/storage/list?prefix=folder%2F&bucket=my-bucket&maxResults=10&pageToken=startToken");
             expect(result).toEqual({ files: [], nextPageToken: "token" });
         });
 
@@ -447,8 +444,8 @@ describe("Storage", () => {
                 data: { files: [{ name: "a.txt" }] }
             });
 
-            const result = await storage.list("uploads/");
-            expect(mockTransport.request).toHaveBeenCalledWith("/storage/list?path=uploads%2F");
+            const result = await storage.listObjects("uploads/");
+            expect(mockTransport.request).toHaveBeenCalledWith("/storage/list?prefix=uploads%2F");
             expect(result).toEqual({ files: [{ name: "a.txt" }] });
         });
 
@@ -457,7 +454,7 @@ describe("Storage", () => {
 
             mockTransport.request.mockResolvedValueOnce({ data: { files: [] } });
 
-            await storage.list("");
+            await storage.listObjects("");
             // Path would be empty, so it should still call with the query
             expect(mockTransport.request).toHaveBeenCalledWith(expect.stringContaining("/storage/list?"));
         });
