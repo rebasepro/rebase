@@ -322,8 +322,6 @@ export class RelationService {
             query = query.where(inArray(parentIdField, parsedParentIds));
 
             const results = await query;
-            console.log("joinPath SQL:", query.toSQL());
-            console.log("joinPath raw results length:", results.length);
             const targetTableName = relation.joinPath[relation.joinPath.length - 1].table;
             const resultMap = new Map<string, Entity<Record<string, unknown>>>();
 
@@ -333,7 +331,7 @@ export class RelationService {
                 const targetEntity = (row[targetTableName] || row) as Record<string, unknown>;
                 const parentId = parentEntity[parentIdInfo.fieldName] as string | number;
 
-                const parsedValues = await parseDataFromServer(targetEntity, targetCollection, this.db, this.registry);
+                const parsedValues = await parseDataFromServer(targetEntity, targetCollection);
 
                 resultMap.set(String(parentId), {
                     id: String(targetEntity[targetIdInfo.fieldName]),
@@ -387,12 +385,135 @@ export class RelationService {
             }
 
             if (parentId !== undefined && parsedParentIds.includes(parentId)) {
-                const parsedValues = await parseDataFromServer(targetEntity, targetCollection, this.db, this.registry);
+                const parsedValues = await parseDataFromServer(targetEntity, targetCollection);
                 resultMap.set(String(parentId), {
                     id: String(targetEntity[targetIdInfo.fieldName]),
                     path: targetCollection.slug,
                     values: parsedValues as Record<string, unknown>
                 });
+            }
+        }
+
+        return resultMap;
+    }
+
+    /**
+     * Batch fetch many-cardinality related entities for multiple parent entities.
+     * Returns a Map<parentId, Entity[]> instead of Map<parentId, Entity>.
+     * Uses a single SQL query with IN clause to avoid N+1.
+     */
+    async batchFetchRelatedEntitiesMany(
+        parentCollectionPath: string,
+        parentEntityIds: (string | number)[],
+        _relationKey: string,
+        relation: Relation
+    ): Promise<Map<string, Entity<Record<string, unknown>>[]>> {
+        if (parentEntityIds.length === 0) return new Map();
+
+        const parentCollection = getCollectionByPath(parentCollectionPath, this.registry);
+        const targetCollection = relation.target();
+        const targetTable = getTableForCollection(targetCollection, this.registry);
+        const targetPks = getPrimaryKeys(targetCollection, this.registry);
+        const targetIdInfo = targetPks[0];
+        const targetIdField = targetTable[targetIdInfo.fieldName as keyof typeof targetTable] as AnyPgColumn;
+
+        const parentPks = getPrimaryKeys(parentCollection, this.registry);
+        const parentIdInfo = parentPks[0];
+        const parentTable = this.registry.getTable(getTableName(parentCollection));
+        if (!parentTable) throw new Error("Parent table not found");
+        const parentIdCol = parentTable[parentIdInfo.fieldName as keyof typeof parentTable] as AnyPgColumn;
+
+        const parsedParentIds = parentEntityIds.map(id => parseIdValues(id, parentPks)[parentIdInfo.fieldName]);
+
+        // Handle join path relations (many-to-many through junction tables)
+        if (relation.joinPath && relation.joinPath.length > 0) {
+            let query = this.db.select().from(parentTable).$dynamic();
+            let currentTable = parentTable;
+
+            for (const join of relation.joinPath) {
+                const joinTable = this.registry.getTable(join.table);
+                if (!joinTable) throw new Error(`Join table not found: ${join.table}`);
+
+                const fromColumn = Array.isArray(join.on.from) ? join.on.from[0] : join.on.from;
+                const toColumn = Array.isArray(join.on.to) ? join.on.to[0] : join.on.to;
+                const fromColName = fromColumn.split(".").pop()!;
+                const toColName = toColumn.split(".").pop()!;
+
+                const fromCol = currentTable[fromColName as keyof typeof currentTable] as AnyPgColumn;
+                const toCol = joinTable[toColName as keyof typeof joinTable] as AnyPgColumn;
+                if (!fromCol || !toCol) throw new Error(`Join columns not found: ${fromColumn} -> ${toColumn}`);
+
+                // @ts-expect-error Drizzle mutates base query generic on innerJoin
+                query = query.innerJoin(joinTable, eq(fromCol, toCol));
+                currentTable = joinTable;
+            }
+
+            const parentIdField = parentTable[getPrimaryKeys(parentCollection, this.registry)[0].fieldName as keyof typeof parentTable] as AnyPgColumn;
+            query = query.where(inArray(parentIdField, parsedParentIds));
+
+            const results = await query;
+            const targetTableName = relation.joinPath[relation.joinPath.length - 1].table;
+            const resultMap = new Map<string, Entity<Record<string, unknown>>[]>();
+
+            for (const row of results as Array<Record<string, unknown>>) {
+                const parentEntity = (row[getTableName(parentCollection)] || row) as Record<string, unknown>;
+                const targetEntity = (row[targetTableName] || row) as Record<string, unknown>;
+                const parentId = String(parentEntity[parentIdInfo.fieldName]);
+                const parsedValues = await parseDataFromServer(targetEntity, targetCollection);
+
+                const arr = resultMap.get(parentId) || [];
+                arr.push({
+                    id: String(targetEntity[targetIdInfo.fieldName]),
+                    path: targetCollection.slug,
+                    values: parsedValues as Record<string, unknown>
+                });
+                resultMap.set(parentId, arr);
+            }
+
+            return resultMap;
+        }
+
+        // Handle FK-based relations (one-to-many inverse)
+        let query = this.db.select().from(targetTable).$dynamic();
+
+        // @ts-expect-error buildRelationQuery uses dynamic queries
+        query = DrizzleConditionBuilder.buildRelationQuery(
+            query,
+            relation,
+            parsedParentIds,
+            targetTable,
+            parentTable,
+            parentIdCol,
+            targetIdField,
+            this.registry,
+            []
+        );
+
+        const results = await query;
+        const resultMap = new Map<string, Entity<Record<string, unknown>>[]>();
+
+        for (const row of results as Array<Record<string, unknown>>) {
+            const targetEntity = (row[getTableName(targetCollection)] || row) as Record<string, unknown>;
+
+            let parentId: string | number | undefined;
+
+            if (relation.direction === "inverse" && relation.foreignKeyOnTarget) {
+                parentId = targetEntity[relation.foreignKeyOnTarget] as string | number | undefined;
+            } else if (relation.direction === "inverse" && relation.inverseRelationName) {
+                const inferredForeignKeyName = `${relation.inverseRelationName}_id`;
+                parentId = targetEntity[inferredForeignKeyName] as string | number | undefined;
+            }
+
+            if (parentId !== undefined && parsedParentIds.includes(parentId)) {
+                const parsedValues = await parseDataFromServer(targetEntity, targetCollection);
+                const key = String(parentId);
+                const arr = resultMap.get(key) || [];
+                arr.push({
+                    id: String(targetEntity[targetIdInfo.fieldName]),
+                    path: targetCollection.slug,
+                    values: parsedValues as Record<string, unknown>
+                });
+                resultMap.set(key, arr);
             }
         }
 

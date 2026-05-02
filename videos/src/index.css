@@ -1,0 +1,29 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  --primary: #0070F4;
+  --primary-dark: #0058C4;
+  --accent-pink: #FF3773;
+  --accent-orange: #FFA400;
+  --surface-950: #0a0a0a;
+  --surface-900: #171717;
+  --surface-800: #262626;
+  --surface-700: #404040;
+  --surface-500: #737373;
+  --surface-400: #a3a3a3;
+  --surface-300: #d4d4d4;
+  --white: #ffffff;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #000;
+  color: var(--white);
+  -webkit-font-smoothing: antialiased;
+}

@@ -44,10 +44,10 @@ export function RealtimeMiniDemo() {
 
             {/* Window 1 (User A) */}
             <div className="flex-1 rounded border border-surface-800 bg-[#161618] flex flex-col overflow-hidden z-10 shadow-lg">
-                <div className="h-4 bg-surface-800/80 border-b border-surface-700/50 flex items-center px-1 gap-0.5 shrink-0">
-                    <div className="h-1.5 w-1.5 rounded-full bg-red-400"></div>
-                    <div className="h-1.5 w-1.5 rounded-full bg-amber-400"></div>
-                    <div className="h-1.5 w-1.5 rounded-full bg-green-400"></div>
+                <div className="flex gap-1 items-center px-2 py-1.5 border-b border-surface-800 bg-surface-900">
+                    <div className="h-1.5 w-1.5 rounded-full bg-rose-500/80"></div>
+                    <div className="h-1.5 w-1.5 rounded-full bg-amber-400/80"></div>
+                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-400/80"></div>
                     <span className="text-[7px] text-surface-400 ml-1 font-mono tracking-wider">alice</span>
                 </div>
                 <div className="p-2 flex-1 flex flex-col gap-1 items-center justify-center text-[10px] text-white">
@@ -66,10 +66,10 @@ export function RealtimeMiniDemo() {
 
             {/* Window 2 (User B) */}
             <div className="flex-1 rounded border border-surface-800 bg-[#161618] flex flex-col overflow-hidden z-10 shadow-lg">
-                <div className="h-4 bg-surface-800/80 border-b border-surface-700/50 flex items-center px-1 gap-0.5 shrink-0">
-                    <div className="h-1.5 w-1.5 rounded-full bg-surface-600"></div>
-                    <div className="h-1.5 w-1.5 rounded-full bg-surface-600"></div>
-                    <div className="h-1.5 w-1.5 rounded-full bg-surface-600"></div>
+                <div className="flex gap-1 items-center px-2 py-1.5 border-b border-surface-800 bg-surface-900">
+                    <div className="h-1.5 w-1.5 rounded-full bg-rose-500/80"></div>
+                    <div className="h-1.5 w-1.5 rounded-full bg-amber-400/80"></div>
+                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-400/80"></div>
                     <span className="text-[7px] text-surface-400 ml-1 font-mono tracking-wider">bob</span>
                 </div>
                 <div className="p-2 flex-1 flex flex-col gap-1 items-center justify-center text-[10px] text-white">

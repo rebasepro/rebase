@@ -1,5 +1,6 @@
 ---
 import SectionBackgroundAccents from "./SectionBackgroundAccents.astro";
+import { TableProperties, LayoutDashboard, Database, Code, Globe, GitFork } from "lucide-react";
 
 // Code is defined in frontmatter so whitespace is preserved exactly
 const codeHtml = `<span class="text-primary-light">import</span> { buildCollection } <span class="text-primary-light">from</span> <span class="text-green-400">"@rebasepro/core"</span>;
@@ -41,7 +42,25 @@ const codeHtml = `<span class="text-primary-light">import</span> { buildCollecti
             admin UI, forms, database schema, REST &amp; GraphQL APIs, and TypeScript types.
         </p>
         <div class="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-full border border-surface-700 bg-surface-900/60 text-surface-300 text-sm font-medium">
-            <span class="material-symbols-rounded text-surface-300" style="font-size:16px">auto_awesome</span>
+            
+<svg
+  class="lucide lucide-sparkles"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" />
+  <path d="M20 2v4" />
+  <path d="M22 4h-4" />
+  <circle cx="4" cy="20" r="2" />
+</svg>
+
             Code as Truth
         </div>
     </div>
@@ -158,11 +177,43 @@ const codeHtml = `<span class="text-primary-light">import</span> { buildCollecti
                     <span class="text-sm text-white font-medium">Products</span>
                     <div class="flex items-center gap-1.5">
                         <div class="h-7 bg-surface-800/60 rounded-md px-2.5 flex items-center gap-1.5">
-                            <span class="material-symbols-rounded text-surface-400" style="font-size:12px">search</span>
+                            
+<svg
+  class="lucide lucide-search"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="m21 21-4.34-4.34" />
+  <circle cx="11" cy="11" r="8" />
+</svg>
+
                             <span class="text-[11px] text-surface-500">Search…</span>
                         </div>
                         <div class="w-7 h-7 rounded-md flex items-center justify-center bg-surface-800/60 hover:bg-surface-700/60">
-                            <span class="material-symbols-rounded text-white opacity-50" style="font-size:14px">add</span>
+                            
+<svg
+  class="lucide lucide-plus"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M5 12h14" />
+  <path d="M12 5v14" />
+</svg>
+
                         </div>
                     </div>
                 </div>
@@ -206,7 +257,22 @@ const codeHtml = `<span class="text-primary-light">import</span> { buildCollecti
                     <div class="flex items-center justify-between">
                         <span class="text-base font-medium text-white">Wireless Headphones</span>
                         <span class="inline-flex items-center gap-1 text-[10px] font-medium text-green-400 bg-green-950/60 border border-green-800/40 px-1.5 py-0.5 rounded-full">
-                            <span class="material-symbols-rounded text-green-400" style="font-size:10px">check</span>
+                            
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+
                             Saved
                         </span>
                     </div>
@@ -225,7 +291,22 @@ const codeHtml = `<span class="text-primary-light">import</span> { buildCollecti
                         <span class="absolute top-1.5 left-3 text-[10px] text-surface-400 font-medium">Category</span>
                         <div class="px-3 pt-6 pb-2 flex items-center justify-between">
                             <span class="rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-blue-950 text-blue-300">Electronics</span>
-                            <span class="material-symbols-rounded text-white opacity-30" style="font-size:14px">expand_more</span>
+                            
+<svg
+  class="lucide lucide-chevron-down"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="m6 9 6 6 6-6" />
+</svg>
+
                         </div>
                     </div>
                     {/* Price field */}
@@ -276,18 +357,21 @@ const codeHtml = `<span class="text-primary-light">import</span> { buildCollecti
                 <p class="text-xs text-surface-500 font-mono">→ generates all of the following</p>
                 <div class="flex flex-wrap justify-center gap-2">
                     {[
-                        { icon: "table_chart",       label: "Admin views" },
-                        { icon: "dashboard",         label: "Entity Form" },
-                        { icon: "database",          label: "DB Schema" },
-                        { icon: "code",              label: "Typed SDK" },
-                        { icon: "language",           label: "REST API" },
-                        { icon: "fork_right",        label: "GraphQL" },
-                    ].map(item => (
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-surface-800 bg-surface-900/60 text-surface-400 text-[11px]">
-                            <span class="material-symbols-rounded text-surface-400" style="font-size:12px">{item.icon}</span>
-                            {item.label}
-                        </span>
-                    ))}
+                        { icon: TableProperties,     label: "Admin views" },
+                        { icon: LayoutDashboard,     label: "Entity Form" },
+                        { icon: Database,            label: "DB Schema" },
+                        { icon: Code,                label: "Typed SDK" },
+                        { icon: Globe,               label: "REST API" },
+                        { icon: GitFork,             label: "GraphQL" },
+                    ].map(item => {
+                        const IconComp = item.icon;
+                        return (
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-surface-800 bg-surface-900/60 text-surface-400 text-[11px]">
+                                <IconComp class="text-surface-400 w-3 h-3" />
+                                {item.label}
+                            </span>
+                        );
+                    })}
                 </div>
             </div>
         </div>
@@ -297,7 +381,24 @@ const codeHtml = `<span class="text-primary-light">import</span> { buildCollecti
             {/* DB Schema — offset up */}
             <div data-card class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl xl:-mt-10 w-[270px] xl:w-[310px] ml-2 xl:ml-6">
                 <div class="flex items-center gap-2 px-4 py-2.5 border-b border-surface-800 bg-surface-900/60">
-                    <span class="material-symbols-rounded text-surface-400" style="font-size:14px">database</span>
+                    
+<svg
+  class="lucide lucide-database"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <ellipse cx="12" cy="5" rx="9" ry="3" />
+  <path d="M3 5V19A9 3 0 0 0 21 19V5" />
+  <path d="M3 12A9 3 0 0 0 21 12" />
+</svg>
+
                     <span class="text-[11px] uppercase tracking-wider font-semibold text-surface-400 font-mono">DB Schema</span>
                     <img src="https://www.postgresql.org/media/img/about/press/elephant.png" class="h-3 opacity-35 grayscale filter brightness-200 ml-auto" alt="postgres"/>
                 </div>
@@ -319,7 +420,23 @@ const codeHtml = `<span class="text-primary-light">import</span> { buildCollecti
             {/* Typed SDK */}
             <div data-card class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl w-[350px] xl:w-[420px] ml-4 xl:ml-8 relative z-10">
                 <div class="flex items-center gap-2 px-4 py-2.5 border-b border-surface-800 bg-surface-900/60">
-                    <span class="material-symbols-rounded text-surface-400" style="font-size:14px">code</span>
+                    
+<svg
+  class="lucide lucide-code"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="m16 18 6-6-6-6" />
+  <path d="m8 6-6 6 6 6" />
+</svg>
+
                     <span class="text-[11px] uppercase tracking-wider font-semibold text-surface-400 font-mono">Typed SDK</span>
                     <span class="ml-auto text-[10px] font-bold text-blue-400 font-mono">TS</span>
                 </div>
@@ -350,7 +467,24 @@ const codeHtml = `<span class="text-primary-light">import</span> { buildCollecti
                 {/* REST API */}
                 <div data-card class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl w-[185px] xl:w-[200px] shrink-0">
                     <div class="flex items-center gap-2 px-3 py-2.5 border-b border-surface-800 bg-surface-900/60">
-                        <span class="material-symbols-rounded text-surface-400" style="font-size:14px">language</span>
+                        
+<svg
+  class="lucide lucide-globe"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <circle cx="12" cy="12" r="10" />
+  <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
+  <path d="M2 12h20" />
+</svg>
+
                         <span class="text-[11px] uppercase tracking-wider font-semibold text-surface-400 font-mono">REST API</span>
                     </div>
                     <div class="divide-y divide-surface-800/50">
@@ -371,7 +505,26 @@ const codeHtml = `<span class="text-primary-light">import</span> { buildCollecti
                 {/* GraphQL */}
                 <div data-card class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl flex-1 max-w-[260px]">
                     <div class="flex items-center gap-2 px-4 py-2.5 border-b border-surface-800 bg-surface-900/60">
-                        <span class="material-symbols-rounded text-surface-400" style="font-size:14px">fork_right</span>
+                        
+<svg
+  class="lucide lucide-git-fork"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <circle cx="12" cy="18" r="3" />
+  <circle cx="6" cy="6" r="3" />
+  <circle cx="18" cy="6" r="3" />
+  <path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9" />
+  <path d="M12 12v3" />
+</svg>
+
                         <span class="text-[11px] uppercase tracking-wider font-semibold text-surface-400 font-mono">GraphQL</span>
                         <span class="ml-auto text-[10px] font-bold text-pink-400 font-mono">GQL</span>
                     </div>

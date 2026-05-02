@@ -31,6 +31,7 @@ export interface FetchCollectionProps<M extends Record<string, unknown> = Record
     collection?: EntityCollection<M>;
     filter?: FilterValues<Extract<keyof M, string>>,
     limit?: number;
+    offset?: number;
     startAfter?: unknown;
     orderBy?: string;
     searchString?: string;

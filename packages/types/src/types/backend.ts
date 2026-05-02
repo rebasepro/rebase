@@ -46,6 +46,7 @@ export interface FetchCollectionOptions<M extends Record<string, unknown> = Reco
     orderBy?: string;
     order?: "desc" | "asc";
     limit?: number;
+    offset?: number;
     startAfter?: unknown;
     searchString?: string;
     databaseId?: string;

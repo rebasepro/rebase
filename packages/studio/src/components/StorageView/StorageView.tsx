@@ -641,10 +641,10 @@ export const StorageView = () => {
     // Upload files
     const handleUpload = useCallback(async (uploadFiles: File[]) => {
         for (const file of uploadFiles) {
+            const key = currentPath ? `${currentPath}/${file.name}` : file.name;
             await storageSource.putObject({
                 file,
-                fileName: file.name,
-                path: currentPath || undefined
+                key
             });
         }
         snackbarController.open({

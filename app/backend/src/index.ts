@@ -77,6 +77,7 @@ async function startServer() {
             google: env.GOOGLE_CLIENT_ID
                 ? { clientId: env.GOOGLE_CLIENT_ID }
                 : undefined,
+            defaultRole: "admin",
             seedDefaultRoles: true,
             allowRegistration: env.ALLOW_REGISTRATION,
             serviceKey: env.REBASE_SERVICE_KEY

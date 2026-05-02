@@ -20,6 +20,7 @@
         "zod": "4.3.6"
     },
     "devDependencies": {
+        "@faker-js/faker": "10.4.0",
         "@types/node": "^20.10.5",
         "drizzle-kit": "^0.31.4",
         "tsx": "^4.20.6",

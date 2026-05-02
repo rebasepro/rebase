@@ -50,6 +50,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             orderBy?: string;
             order?: "desc" | "asc";
             limit?: number;
+            offset?: number;
             startAfter?: Record<string, unknown>;
             databaseId?: string;
             searchString?: string;
@@ -111,6 +112,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             orderBy?: string;
             order?: "desc" | "asc";
             limit?: number;
+            offset?: number;
             startAfter?: Record<string, unknown>;
             databaseId?: string;
             searchString?: string;
@@ -494,7 +496,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private debouncedCollectionRefetch(
         subscriptionId: string,
         notifyPath: string,
-        subscription: { clientId: string; collectionRequest?: { filter?: Record<string, unknown>; orderBy?: string; order?: "desc" | "asc"; limit?: number; startAfter?: Record<string, unknown>; databaseId?: string; searchString?: string }; authContext?: SubscriptionAuthContext }
+        subscription: { clientId: string; collectionRequest?: { filter?: Record<string, unknown>; orderBy?: string; order?: "desc" | "asc"; limit?: number; offset?: number; startAfter?: Record<string, unknown>; databaseId?: string; searchString?: string }; authContext?: SubscriptionAuthContext }
     ) {
         const timerKey = `ws_${subscriptionId}`;
         const existing = this.refetchTimers.get(timerKey);
@@ -520,7 +522,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private debouncedDriverRefetch(
         subscriptionId: string,
         notifyPath: string,
-        subscription: { collectionRequest?: { filter?: Record<string, unknown>; orderBy?: string; order?: "desc" | "asc"; limit?: number; startAfter?: Record<string, unknown>; databaseId?: string; searchString?: string }; authContext?: SubscriptionAuthContext },
+        subscription: { collectionRequest?: { filter?: Record<string, unknown>; orderBy?: string; order?: "desc" | "asc"; limit?: number; offset?: number; startAfter?: Record<string, unknown>; databaseId?: string; searchString?: string }; authContext?: SubscriptionAuthContext },
         callback: (data: Entity[] | Entity | null) => void
     ) {
         const timerKey = `drv_${subscriptionId}`;
@@ -546,7 +548,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      */
     private async fetchCollectionWithAuth(
         notifyPath: string,
-        collectionRequest: { filter?: Record<string, unknown>; orderBy?: string; order?: "desc" | "asc"; limit?: number; startAfter?: Record<string, unknown>; databaseId?: string; searchString?: string },
+        collectionRequest: { filter?: Record<string, unknown>; orderBy?: string; order?: "desc" | "asc"; limit?: number; offset?: number; startAfter?: Record<string, unknown>; databaseId?: string; searchString?: string },
         authContext?: SubscriptionAuthContext
     ): Promise<Entity[]> {
         if (this.driver) {
@@ -558,6 +560,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 orderBy: collectionRequest.orderBy,
                 order: collectionRequest.order,
                 limit: collectionRequest.limit,
+                offset: collectionRequest.offset,
                 startAfter: collectionRequest.startAfter,
                 searchString: collectionRequest.searchString
             });
@@ -588,6 +591,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                         orderBy: collectionRequest.orderBy,
                         order: collectionRequest.order,
                         limit: collectionRequest.limit,
+                        offset: collectionRequest.offset,
                         startAfter: collectionRequest.startAfter,
                         databaseId: collectionRequest.databaseId
                     });
@@ -656,6 +660,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             orderBy: collectionRequest.orderBy,
             order: collectionRequest.order,
             limit: collectionRequest.limit,
+            offset: collectionRequest.offset,
             startAfter: collectionRequest.startAfter,
             databaseId: collectionRequest.databaseId
         });

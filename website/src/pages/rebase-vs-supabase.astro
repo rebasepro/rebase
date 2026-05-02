@@ -38,7 +38,22 @@ const breadcrumbs = [
               <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div>
                   <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-3">
-                    <span class="material-symbols-rounded text-primary" style="font-size:18px">security</span>
+                    
+<svg
+  class="lucide lucide-shield"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+</svg>
+
                     Security & RBAC
                   </div>
                   <h3 class="text-2xl font-bold text-white">RLS without the Footgun</h3>
@@ -54,7 +69,24 @@ const breadcrumbs = [
                   <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-[50px] -mr-16 -mt-16"></div>
                   <div class="relative">
                     <div class="flex items-center gap-2 mb-3">
-                      <span class="material-symbols-rounded text-red-500/80" style="font-size:20px">error</span>
+                      
+<svg
+  class="lucide lucide-circle-alert"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <circle cx="12" cy="12" r="10" />
+  <line x1="12" x2="12" y1="8" y2="12" />
+  <line x1="12" x2="12.01" y1="16" y2="16" />
+</svg>
+
                       <h4 class="text-white font-semibold">The Supabase Pain</h4>
                     </div>
                     <p class="text-surface-400 text-sm leading-relaxed">PostgreSQL Row Level Security (RLS) policies are notoriously difficult to write, test, and debug. Poorly written policies destroy performance via implicit JOINs, and Supabase lacks a built-in out-of-the-box RBAC UI.</p>
@@ -66,16 +98,77 @@ const breadcrumbs = [
                   <div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] -mr-16 -mt-16"></div>
                   <div class="relative">
                     <div class="flex items-center gap-2 mb-3">
-                      <span class="material-symbols-rounded text-primary" style="font-size:20px">check_circle</span>
+                      
+<svg
+  class="lucide lucide-circle-check-big"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+  <path d="m9 11 3 3L22 4" />
+</svg>
+
                       <h4 class="text-white font-semibold">How Rebase Solves This</h4>
                     </div>
                     <p class="text-surface-300 leading-relaxed text-sm mb-4">
                       Rebase embraces Native Postgres RLS but surrounds it with powerful tooling. Instead of writing opaque SQL, you define dynamic policies purely in TypeScript. Real-time inference generates user-friendly configuration UI.
                     </p>
                     <ul class="text-surface-400 space-y-3 text-sm">
-                      <li class="flex items-start"><span class="material-symbols-rounded text-primary mr-2 mt-0.5" style="font-size:18px">done</span> <span class="leading-relaxed">Built-in visual RLS policy editor.</span></li>
-                  <li class="flex items-start"><span class="material-symbols-rounded text-primary mr-2 mt-0.5" style="font-size:18px">done</span> <span class="leading-relaxed">Define dynamic context directly in TypeScript instead of complex JOINs.</span></li>
-                  <li class="flex items-start"><span class="material-symbols-rounded text-primary mr-2 mt-0.5" style="font-size:18px">done</span> <span class="leading-relaxed">Granular access control applied logically.</span></li>
+                      <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Built-in visual RLS policy editor.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Define dynamic context directly in TypeScript instead of complex JOINs.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Granular access control applied logically.</span></li>
                     </ul>
                   </div>
                 </div>
@@ -87,7 +180,25 @@ const breadcrumbs = [
               <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div>
                   <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-3">
-                    <span class="material-symbols-rounded text-primary" style="font-size:18px">dns</span>
+                    
+<svg
+  class="lucide lucide-server"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <rect width="20" height="8" x="2" y="2" rx="2" ry="2" />
+  <rect width="20" height="8" x="2" y="14" rx="2" ry="2" />
+  <line x1="6" x2="6.01" y1="6" y2="6" />
+  <line x1="6" x2="6.01" y1="18" y2="18" />
+</svg>
+
                     Infrastructure
                   </div>
                   <h3 class="text-2xl font-bold text-white">True Self-Hosting Symmetry</h3>
@@ -103,7 +214,24 @@ const breadcrumbs = [
                   <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-[50px] -mr-16 -mt-16"></div>
                   <div class="relative">
                     <div class="flex items-center gap-2 mb-3">
-                      <span class="material-symbols-rounded text-red-500/80" style="font-size:20px">error</span>
+                      
+<svg
+  class="lucide lucide-circle-alert"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <circle cx="12" cy="12" r="10" />
+  <line x1="12" x2="12" y1="8" y2="12" />
+  <line x1="12" x2="12.01" y1="16" y2="16" />
+</svg>
+
                       <h4 class="text-white font-semibold">The Supabase Pain</h4>
                     </div>
                     <p class="text-surface-400 text-sm leading-relaxed">Self-hosting Supabase is an infrastructure nightmare. It is a massive constellation of microservices: PostgREST (Haskell), GoTrue (Go), Realtime (Elixir), and Edge Functions (Deno). Upgrading these services independently is nearly impossible for small teams.</p>
@@ -115,16 +243,77 @@ const breadcrumbs = [
                   <div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] -mr-16 -mt-16"></div>
                   <div class="relative">
                     <div class="flex items-center gap-2 mb-3">
-                      <span class="material-symbols-rounded text-primary" style="font-size:20px">check_circle</span>
+                      
+<svg
+  class="lucide lucide-circle-check-big"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+  <path d="m9 11 3 3L22 4" />
+</svg>
+
                       <h4 class="text-white font-semibold">How Rebase Solves This</h4>
                     </div>
                     <p class="text-surface-300 leading-relaxed text-sm mb-4">
                       Rebase is unified. It is a single Node.js backend using standard Hono and Drizzle ORM.
                     </p>
                     <ul class="text-surface-400 space-y-3 text-sm">
-                      <li class="flex items-start"><span class="material-symbols-rounded text-primary mr-2 mt-0.5" style="font-size:18px">done</span> <span class="leading-relaxed">One service to deploy via Docker, Railway, Fly, or bare metal.</span></li>
-                  <li class="flex items-start"><span class="material-symbols-rounded text-primary mr-2 mt-0.5" style="font-size:18px">done</span> <span class="leading-relaxed">Written completely in TypeScript — the language you already know.</span></li>
-                  <li class="flex items-start"><span class="material-symbols-rounded text-primary mr-2 mt-0.5" style="font-size:18px">done</span> <span class="leading-relaxed">Tightly coupled and fully integrated without black-box binaries.</span></li>
+                      <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">One service to deploy via Docker, Railway, Fly, or bare metal.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Written completely in TypeScript — the language you already know.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Tightly coupled and fully integrated without black-box binaries.</span></li>
                     </ul>
                   </div>
                 </div>
@@ -136,7 +325,23 @@ const breadcrumbs = [
               <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div>
                   <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-3">
-                    <span class="material-symbols-rounded text-primary" style="font-size:18px">code</span>
+                    
+<svg
+  class="lucide lucide-code"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="m16 18 6-6-6-6" />
+  <path d="m8 6-6 6 6 6" />
+</svg>
+
                     Architecture
                   </div>
                   <h3 class="text-2xl font-bold text-white">Schema-as-Code Workflow</h3>
@@ -152,7 +357,24 @@ const breadcrumbs = [
                   <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-[50px] -mr-16 -mt-16"></div>
                   <div class="relative">
                     <div class="flex items-center gap-2 mb-3">
-                      <span class="material-symbols-rounded text-red-500/80" style="font-size:20px">error</span>
+                      
+<svg
+  class="lucide lucide-circle-alert"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <circle cx="12" cy="12" r="10" />
+  <line x1="12" x2="12" y1="8" y2="12" />
+  <line x1="12" x2="12.01" y1="16" y2="16" />
+</svg>
+
                       <h4 class="text-white font-semibold">The Supabase Pain</h4>
                     </div>
                     <p class="text-surface-400 text-sm leading-relaxed">With Supabase, the database *is* the state. Local development, staging, and production environments quickly fall out of sync. Managing version control for RPCs, Triggers, and RLS inside raw SQL files requires extreme discipline.</p>
@@ -164,16 +386,77 @@ const breadcrumbs = [
                   <div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] -mr-16 -mt-16"></div>
                   <div class="relative">
                     <div class="flex items-center gap-2 mb-3">
-                      <span class="material-symbols-rounded text-primary" style="font-size:20px">check_circle</span>
+                      
+<svg
+  class="lucide lucide-circle-check-big"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+  <path d="m9 11 3 3L22 4" />
+</svg>
+
                       <h4 class="text-white font-semibold">How Rebase Solves This</h4>
                     </div>
                     <p class="text-surface-300 leading-relaxed text-sm mb-4">
                       Rebase pioneers a Git-backed hybrid approach. Your schema definitions live purely as standalone TypeScript configuration files (`/collections/products.ts`).
                     </p>
                     <ul class="text-surface-400 space-y-3 text-sm">
-                      <li class="flex items-start"><span class="material-symbols-rounded text-primary mr-2 mt-0.5" style="font-size:18px">done</span> <span class="leading-relaxed">The Rebase Studio uses AST manipulation to inject fields into your code safely.</span></li>
-                  <li class="flex items-start"><span class="material-symbols-rounded text-primary mr-2 mt-0.5" style="font-size:18px">done</span> <span class="leading-relaxed">Drizzle migrations are automatically synced and deployed.</span></li>
-                  <li class="flex items-start"><span class="material-symbols-rounded text-primary mr-2 mt-0.5" style="font-size:18px">done</span> <span class="leading-relaxed">Code is the source of truth, guaranteeing environmental parity.</span></li>
+                      <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">The Rebase Studio uses AST manipulation to inject fields into your code safely.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Drizzle migrations are automatically synced and deployed.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Code is the source of truth, guaranteeing environmental parity.</span></li>
                     </ul>
                   </div>
                 </div>
@@ -194,11 +477,43 @@ const breadcrumbs = [
         <div class="flex items-center justify-center gap-x-6">
           <a href="/docs" class="inline-flex items-center gap-x-2 rounded-md bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-dark transition-all duration-200 ease-in-out btn-glow">
             Get Started
-            <span class="material-symbols-rounded text-white" style="font-size:20px">arrow_forward</span>
+            
+<svg
+  class="lucide lucide-arrow-right"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M5 12h14" />
+  <path d="m12 5 7 7-7 7" />
+</svg>
+
           </a>
           <a href="https://github.com/rebasepro/rebase" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold">
             View on GitHub
-            <span class="material-symbols-rounded text-white" style="font-size:16px">arrow_forward</span>
+            
+<svg
+  class="lucide lucide-arrow-right"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M5 12h14" />
+  <path d="m12 5 7 7-7 7" />
+</svg>
+
           </a>
         </div>
       </div>

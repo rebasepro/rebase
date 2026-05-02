@@ -1,23 +1,11 @@
 ---
 import NavigationDropdown from "./NavigationDropdown.astro";
 
-const currentPath = Astro.url.pathname.replace(/\/$/, "");
+import {
+    Layers, LayoutDashboard, Server, Bot, Code, Terminal, SquareTerminal, ShieldCheck, Rocket, ArrowRightLeft, Briefcase, FilePenLine
+} from "lucide-react";
 
-// Mapping from icon identifiers to Material Symbols names
-const iconMap: Record<string, string> = {
-    "layers": "layers",
-    "layout-dashboard": "dashboard",
-    "server": "dns",
-    "bot": "smart_toy",
-    "code": "code",
-    "terminal": "terminal",
-    "square-terminal": "terminal",
-    "shield-check": "verified_user",
-    "rocket": "rocket_launch",
-    "git-compare-arrows": "compare_arrows",
-    "briefcase": "work",
-    "edit-note": "edit_note",
-};
+const currentPath = Astro.url.pathname.replace(/\/$/, "");
 
 const navLinks = [
     {
@@ -29,19 +17,19 @@ const navLinks = [
                     href: "/features",
                     label: "Features",
                     description: "Everything Rebase can do, at a glance.",
-                    icon: "layers"
+                    icon: Layers
                 },
                 {
                     href: "/studio",
                     label: "Rebase Studio",
                     description: "Visual schema editor, spreadsheet views, rich text.",
-                    icon: "layout-dashboard"
+                    icon: LayoutDashboard
                 },
                 {
                     href: "/editing",
                     label: "Editing Experience",
                     description: "Notion-style editor, Kanban boards, inline editing.",
-                    icon: "edit-note"
+                    icon: FilePenLine
                 },
             ],
             [
@@ -49,13 +37,13 @@ const navLinks = [
                     href: "/backend",
                     label: "Backend & APIs",
                     description: "Hono server, REST, GraphQL, WebSockets.",
-                    icon: "server"
+                    icon: Server
                 },
                 {
                     href: "/ai",
                     label: "AI & Agents",
                     description: "MCP server, AI autofill, natural language queries.",
-                    icon: "bot"
+                    icon: Bot
                 },
             ],
         ]
@@ -69,13 +57,13 @@ const navLinks = [
                     href: "/developers",
                     label: "Developer Overview",
                     description: "Schema-as-code, React extensibility, callbacks.",
-                    icon: "code"
+                    icon: Code
                 },
                 {
                     href: "/sdk",
                     label: "Client SDK",
                     description: "Typed queries, auth, storage, realtime.",
-                    icon: "terminal"
+                    icon: Terminal
                 },
             ],
             [
@@ -83,13 +71,13 @@ const navLinks = [
                     href: "/cli",
                     label: "CLI & Tooling",
                     description: "Scaffold, generate, migrate, deploy.",
-                    icon: "square-terminal"
+                    icon: SquareTerminal
                 },
                 {
                     href: "/security",
                     label: "Security & Auth",
                     description: "JWT auth, RLS policies, role-based access.",
-                    icon: "shield-check"
+                    icon: ShieldCheck
                 },
             ],
         ]
@@ -103,13 +91,13 @@ const navLinks = [
                     href: "/startups",
                     label: "For Startups",
                     description: "Ship your back-office in a sprint.",
-                    icon: "rocket"
+                    icon: Rocket
                 },
                 {
                     href: "/why-rebase",
                     label: "Why Rebase",
                     description: "See how Rebase compares to alternatives.",
-                    icon: "git-compare-arrows"
+                    icon: ArrowRightLeft
                 },
             ],
             [
@@ -117,7 +105,7 @@ const navLinks = [
                     href: "/agencies",
                     label: "For Agencies",
                     description: "Deliver bespoke client projects, faster.",
-                    icon: "briefcase"
+                    icon: Briefcase
                 },
             ],
         ]
@@ -144,19 +132,19 @@ const navLinks = [
                                 <div class="grid grid-cols-2 gap-x-8 gap-y-4 max-w-3xl">
                                     {link.dropdown.map(column => (
                                             <div class="flex flex-col gap-4 ">
-                                                {column.map(subLink => (
+                                                {column.map(subLink => {
+                                                    const IconComp = subLink.icon;
+                                                    return (
                                                         <a href={subLink.href}
                                                            class="flex items-start gap-4 p-3 rounded-lg hover:bg-surface-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60">
-                                                            <span
-                                                                    class="material-symbols-rounded text-primary"
-                                                                    style="font-size:24px"
-                                                            >{iconMap[subLink.icon] || subLink.icon}</span>
+                                                            <IconComp class="text-primary w-6 h-6 flex-shrink-0" />
                                                             <div>
                                                                 <p class="font-semibold text-white">{subLink.label}</p>
                                                                 <p class="text-surface-400 text-sm">{subLink.description}</p>
                                                             </div>
                                                         </a>
-                                                ))}
+                                                    );
+                                                })}
                                             </div>
                                     ))}
                                 </div>
@@ -181,7 +169,23 @@ const navLinks = [
                     id="header-start-building-desktop"
             >
                 Get Early Access
-                <span class="material-symbols-rounded text-white" style="font-size:16px">arrow_forward</span>
+                
+<svg
+  class="lucide lucide-arrow-right"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M5 12h14" />
+  <path d="m12 5 7 7-7 7" />
+</svg>
+
             </a>
             <!-- Mobile menu button -->
             <button
@@ -263,7 +267,23 @@ const navLinks = [
                         id="header-start-building-mobile"
                 >
                     Get Early Access
-                    <span class="material-symbols-rounded text-white" style="font-size:20px">arrow_forward</span>
+                    
+<svg
+  class="lucide lucide-arrow-right"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M5 12h14" />
+  <path d="m12 5 7 7-7 7" />
+</svg>
+
                 </a>
             </nav>
         </div>

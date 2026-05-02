@@ -1,9 +1,9 @@
-import { EntityCollection } from "@rebasepro/types";
+import { PostgresCollection } from "@rebasepro/types";
 import authorsCollection from "./authors";
 import profilesCollection from "./profiles";
 import tagsCollection from "./tags";
 
-const postsCollection: EntityCollection = {
+const postsCollection: PostgresCollection = {
     name: "Posts",
     singularName: "Post",
     slug: "posts",

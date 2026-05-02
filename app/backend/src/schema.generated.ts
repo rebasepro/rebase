@@ -3,7 +3,9 @@
 import { primaryKey, pgTable, integer, varchar, text, char, boolean, timestamp, date, time, jsonb, json, pgEnum, numeric, real, doublePrecision, bigint, serial, bigserial, pgPolicy, uuid } from 'drizzle-orm/pg-core';
 import { relations as drizzleRelations, sql } from 'drizzle-orm';
 
+export const ordersStatus = pgEnum("orders_status", ['pending', 'shipped', 'delivered', 'cancelled']);
 export const postsStatus = pgEnum("posts_status", ['draft', 'review', 'published', 'archived']);
+export const productsCategory = pgEnum("products_category", ['electronics', 'clothing', 'home']);
 
 export const authors = pgTable("authors", {
     id: integer("id").generatedByDefaultAsIdentity().primaryKey(),
@@ -12,6 +14,21 @@ export const authors = pgTable("authors", {
     picture: varchar("picture"),
     userId: varchar("user_id")
 }).enableRLS();
+
+export const orders = pgTable("orders", {
+    id: integer("id").primaryKey().notNull(),
+    customer_name: varchar("customer_name").notNull(),
+    status: ordersStatus("status")
+}, (table) => ([
+    pgPolicy("test_policy", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
+])).enableRLS();
+
+export const ordersProducts = pgTable("orders_products", {
+    order_id: integer("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+    product_id: integer("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+}, (table) => ({
+    pk: primaryKey({ columns: [table.order_id, table.product_id] })
+}));
 
 export const posts = pgTable("posts", {
     id: integer("id").primaryKey().notNull(),
@@ -42,6 +59,17 @@ export const privateNotes = pgTable("private_notes", {
     pgPolicy("no_update_locked", { as: "restrictive", for: "update", to: ["public"], using: sql`${table.is_locked} = false`, withCheck: sql`${table.is_locked} = false` }),
 ])).enableRLS();
 
+export const products = pgTable("products", {
+    id: integer("id").primaryKey().notNull(),
+    name: varchar("name").notNull(),
+    description: varchar("description"),
+    price: numeric("price").notNull(),
+    stock: numeric("stock").notNull(),
+    category: productsCategory("category")
+}, (table) => ([
+    pgPolicy("test_policy", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
+])).enableRLS();
+
 export const profiles = pgTable("profiles", {
     id: integer("id").primaryKey().notNull(),
     bio: varchar("bio"),
@@ -61,6 +89,23 @@ export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({
         relationName: "profiles_author_id"
     }),
     "posts": many(posts, { relationName: "posts_author_id" })
+}));
+
+export const ordersRelations = drizzleRelations(orders, ({ one, many }) => ({
+    "products": many(ordersProducts, { relationName: "products" })
+}));
+
+export const ordersProductsRelations = drizzleRelations(ordersProducts, ({ one, many }) => ({
+    "order_id": one(orders, {
+        fields: [ordersProducts.order_id],
+        references: [orders.id],
+        relationName: "products"
+    }),
+    "product_id": one(products, {
+        fields: [ordersProducts.product_id],
+        references: [products.id],
+        relationName: "products"
+    })
 }));
 
 export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({
@@ -97,7 +142,7 @@ export const tagsRelations = drizzleRelations(tags, ({ one, many }) => ({
     "posts": many(postsTags, { relationName: "posts" })
 }));
 
-export const tables = { authors, posts, postsTags, privateNotes, profiles, tags };
-export const enums = { postsStatus };
-export const relations = { authorsRelations, postsRelations, postsTagsRelations, profilesRelations, tagsRelations };
+export const tables = { authors, orders, ordersProducts, posts, postsTags, privateNotes, products, profiles, tags };
+export const enums = { ordersStatus, postsStatus, productsCategory };
+export const relations = { authorsRelations, ordersRelations, ordersProductsRelations, postsRelations, postsTagsRelations, profilesRelations, tagsRelations };
 

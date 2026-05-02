@@ -147,6 +147,11 @@ const KANBAN_COLUMNS: KanbanColumn[] = [
   },
 ];
 
+import { 
+  Filter, Pencil, MoreVertical, Image as ImageIcon, User, ChevronDown, 
+  Tag, Home, Languages, Moon, ChevronsRight, List, Kanban, Folder
+} from "lucide-react";
+
 /* ─── Material icon helper ─── */
 function MI({
   children,
@@ -159,12 +164,28 @@ function MI({
   className?: string;
   filled?: boolean;
 }) {
+  const IconComponent = {
+    "filter_list": Filter,
+    "edit": Pencil,
+    "more_vert": MoreVertical,
+    "image": ImageIcon,
+    "person": User,
+    "keyboard_arrow_down": ChevronDown,
+    "tag": Tag,
+    "home": Home,
+    "translate": Languages,
+    "dark_mode": Moon,
+    "expand_more": ChevronDown,
+    "keyboard_double_arrow_right": ChevronsRight,
+    "list": List,
+    "view_kanban": Kanban,
+    "folder": Folder,
+    "sell": Tag,
+  }[children] || Folder;
+
   return (
-    <span
-      className={`material-symbols-rounded select-none ${className}`}
-      style={{ fontSize: size, lineHeight: 1, ...(filled ? { fontVariationSettings: "'FILL' 1" } : {}) }}
-    >
-      {children}
+    <span className={`inline-flex items-center justify-center select-none ${className}`}>
+      <IconComponent size={size} />
     </span>
   );
 }

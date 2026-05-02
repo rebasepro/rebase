@@ -73,6 +73,7 @@ export class RestApiGenerator {
                     {
                         filter: queryOptions.where as FetchCollectionProps["filter"],
                         limit: queryOptions.limit,
+                        offset: queryOptions.offset,
                         orderBy: queryOptions.orderBy?.[0]?.field,
                         order: queryOptions.orderBy?.[0]?.direction === "desc" ? "desc" : "asc",
                         searchString,

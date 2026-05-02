@@ -485,6 +485,7 @@ export class EntityFetchService {
             orderBy?: string;
             order?: "desc" | "asc";
             limit?: number;
+            offset?: number;
             startAfter?: Record<string, unknown>;
             searchString?: string;
         },
@@ -543,6 +544,9 @@ export class EntityFetchService {
         // Limit
         const limitValue = options.searchString ? (options.limit || 50) : options.limit;
         if (limitValue) queryOpts.limit = limitValue;
+
+        // Offset (numeric pagination)
+        if (options.offset && options.offset > 0) queryOpts.offset = options.offset;
 
         return queryOpts;
     }
@@ -716,6 +720,7 @@ export class EntityFetchService {
             orderBy?: string;
             order?: "desc" | "asc";
             limit?: number;
+            offset?: number;
             startAfter?: Record<string, unknown>;
             searchString?: string;
             databaseId?: string;
@@ -733,15 +738,20 @@ export class EntityFetchService {
 
         // Primary path: use db.query.findMany with relation loading
         // Skip when searchString is present (same reason as fetchCollectionForRest)
+        // Skip when collection has relations — lateral JOINs are catastrophically
+        // slow for large collections (7s+ for 350 rows). The db.select fallback
+        // path uses batch relation resolution which is 50x faster.
         
         const tableName = getTableName(table);
 
         const qb = this.getQueryBuilder(tableName);
-        if (qb && !options.searchString) {
+        const withConfig = this.buildWithConfig(collection);
+        const hasRelations = withConfig && Object.keys(withConfig).length > 0;
+
+        if (qb && !options.searchString && !hasRelations) {
             try {
-                const withConfig = this.buildWithConfig(collection);
                 const queryOpts = this.buildDrizzleQueryOptions<M>(
-                    table, idField, idInfo, options, collectionPath, withConfig
+                    table, idField, idInfo, options, collectionPath, undefined
                 );
 
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic query config
@@ -750,9 +760,6 @@ export class EntityFetchService {
                 const entities = (results as Record<string, unknown>[]).map(row =>
                     this.drizzleResultToEntity<M>(row, collection, collectionPath, idInfo, options.databaseId, idInfoArray)
                 );
-
-                // Post-fetch joinPath relations that Drizzle's `with` can't express
-                await this.resolveJoinPathRelationsBatch(entities, collection, collectionPath, idInfo, options.databaseId);
 
                 return entities;
             } catch (e) {
@@ -804,6 +811,9 @@ export class EntityFetchService {
         const limitValue = options.searchString ? (options.limit || 50) : options.limit;
         if (limitValue) query = query.limit(limitValue);
 
+        // Offset (numeric pagination)
+        if (options.offset && options.offset > 0) query = query.offset(options.offset);
+
         const results = await query;
 
         return this.processEntityResults<M>(results, collection, collectionPath, idInfo, options.databaseId, false, idInfoArray);
@@ -827,9 +837,14 @@ export class EntityFetchService {
     ): Promise<Entity<M>[]> {
         if (results.length === 0) return [];
 
-        // First pass: parse all entities
+        // First pass: parse all entities WITHOUT per-entity relation queries.
+        // We deliberately omit db/registry so parseDataFromServer only does type
+        // coercion (dates, numbers, FK→relation stubs for owning relations) and
+        // does NOT issue individual SQL queries for inverse relations.  The second
+        // pass below batch-loads all inverse/many relations in O(1) queries per
+        // relation type, avoiding the N+1 that plagued the old path.
         const entitiesWithValues = await Promise.all(results.map(async (entity: Record<string, unknown>) => {
-            const values = await parseDataFromServer(entity as M, collection, this.db, this.registry);
+            const values = await parseDataFromServer(entity as M, collection);
             return {
                 entity,
                 values,
@@ -881,32 +896,35 @@ export class EntityFetchService {
                 }
             }
 
-            // Handle many relations
-            const manyRelationPromises = entitiesWithValues.map(async (item) => {
-                const manyRelationQueries = Object.entries(resolvedRelations)
-                    .filter(([key, relation]) => propertyKeys.has(key) && relation.cardinality === "many")
-                    .map(async ([key]) => {
-                        try {
-                            const relatedEntities = await this.relationService.fetchRelatedEntities(
-                                collectionPath,
-                                item.entity[idInfo.fieldName] as string | number,
-                                key,
-                                {}
-                            );
-                            (item.values as Record<string, unknown>)[key] = relatedEntities.map(e => ({
-                                id: e.id,
-                                path: e.path,
-                                __type: "relation",
-                                data: e
-                            }));
-                        } catch (e) {
-                            console.warn(`Could not resolve many relation property: ${key}`, e);
-                        }
-                    });
-                await Promise.all(manyRelationQueries);
-            });
+            // Batch load many-cardinality relations (1 query per relation type
+            // instead of N queries per entity)
+            const manyRelations = Object.entries(resolvedRelations)
+                .filter(([key, relation]) => propertyKeys.has(key) && relation.cardinality === "many");
 
-            await Promise.all(manyRelationPromises);
+            for (const [key, relation] of manyRelations) {
+                try {
+                    const entityIds = entitiesWithValues.map(item => item.entity[idInfo.fieldName] as string | number);
+                    const relationResults = await this.relationService.batchFetchRelatedEntitiesMany(
+                        collectionPath,
+                        entityIds,
+                        key,
+                        relation
+                    );
+
+                    entitiesWithValues.forEach(item => {
+                        const entityId = String(item.entity[idInfo.fieldName]);
+                        const relatedEntities = relationResults.get(entityId) || [];
+                        (item.values as Record<string, unknown>)[key] = relatedEntities.map(e => ({
+                            id: e.id,
+                            path: e.path,
+                            __type: "relation",
+                            data: e
+                        }));
+                    });
+                } catch (e) {
+                    console.warn(`Could not batch load many relation property: ${key}`, e);
+                }
+            }
         }
 
         return entitiesWithValues.map(item => ({
@@ -927,6 +945,7 @@ export class EntityFetchService {
             orderBy?: string;
             order?: "desc" | "asc";
             limit?: number;
+            offset?: number;
             startAfter?: Record<string, unknown>;
             searchString?: string;
             databaseId?: string;
@@ -1164,6 +1183,7 @@ export class EntityFetchService {
             orderBy?: string;
             order?: "desc" | "asc";
             limit?: number;
+            offset?: number;
             startAfter?: Record<string, unknown>;
             searchString?: string;
             databaseId?: string;
@@ -1376,6 +1396,7 @@ export class EntityFetchService {
             orderBy?: string;
             order?: "desc" | "asc";
             limit?: number;
+            offset?: number;
             startAfter?: Record<string, unknown>;
             searchString?: string;
         } = {}
@@ -1419,6 +1440,9 @@ export class EntityFetchService {
 
         const limitValue = options.searchString ? (options.limit || 50) : options.limit;
         if (limitValue) query = query.limit(limitValue);
+
+        // Offset (numeric pagination)
+        if (options.offset && options.offset > 0) query = query.offset(options.offset);
 
         return await query as Record<string, unknown>[];
     }
@@ -1551,21 +1575,25 @@ export class EntityFetchService {
         parentIds: (string | number)[],
         relationKey: string
     ): Promise<Map<string, Entity[]>> {
-        const resultMap = new Map<string, Entity[]>();
+        if (parentIds.length === 0) return new Map();
 
-        // Fetch for all parents using Promise.all (limited batch)
-        const batchPromises = parentIds.map(async (parentId) => {
-            try {
-                const related = await this.relationService.fetchRelatedEntities(
-                    parentCollectionPath, parentId, relationKey, {}
-                );
-                resultMap.set(String(parentId), related);
-            } catch (e) {
-                resultMap.set(String(parentId), []);
-            }
-        });
+        // Resolve the relation definition so we can use the true batch method
+        const collection = getCollectionByPath(parentCollectionPath, this.registry);
+        const resolvedRelations = resolveCollectionRelations(collection);
+        const relation = resolvedRelations[relationKey];
 
-        await Promise.all(batchPromises);
-        return resultMap;
+        if (!relation) {
+            console.warn(`[batchFetchManyRelatedEntities] Relation '${relationKey}' not found, skipping`);
+            return new Map();
+        }
+
+        // Delegate to RelationService.batchFetchRelatedEntitiesMany which
+        // uses a single SQL query with IN(...) — O(1) instead of O(N).
+        return this.relationService.batchFetchRelatedEntitiesMany(
+            parentCollectionPath,
+            parentIds,
+            relationKey,
+            relation
+        );
     }
 }

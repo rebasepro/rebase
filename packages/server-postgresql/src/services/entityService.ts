@@ -62,6 +62,7 @@ export class EntityService implements EntityRepository {
             orderBy?: string;
             order?: "desc" | "asc";
             limit?: number;
+            offset?: number;
             startAfter?: Record<string, unknown>;
             searchString?: string;
             databaseId?: string;

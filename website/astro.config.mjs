@@ -287,11 +287,15 @@ export default defineConfig({
             yaml()
         ],
         resolve: {
+            dedupe: ['react', 'react-dom'],
             alias: {
                 "@rebasepro/ui": path.resolve(new URL(".", import.meta.url).pathname, "../packages/ui/src"),
                 "@rebasepro/editor": path.resolve(new URL(".", import.meta.url).pathname, "../packages/editor/src"),
                 "@rebasepro/admin": path.resolve(new URL(".", import.meta.url).pathname, "../packages/admin/src"),
             }
+        },
+        ssr: {
+            noExternal: ['lucide-react']
         },
         server: {
             fs: {
