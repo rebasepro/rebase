@@ -38,11 +38,11 @@ export type SplitListViewProps<M extends Record<string, unknown> = Record<string
      */
     selectedEntityId?: string | number;
     /**
-     * Toolbar to render above the list in the left panel.
+     * Toolbar to render above the content in the left panel.
      */
     toolbar?: React.ReactNode;
     /**
-     * The collection view to render on the left side (always the list view).
+     * The collection view to render on the left side.
      */
     children: React.ReactNode;
 };

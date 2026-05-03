@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo, useRef } from "react";
 import { CollectionSize, ViewMode } from "@rebasepro/types";
 import {
     AppsIcon,
@@ -129,77 +129,99 @@ export function ViewModeToggle({
         return allOptions;
     }, []);
 
+    const closeTimer = useRef<ReturnType<typeof setTimeout>>(null);
+
+    const handleMouseEnter = useCallback(() => {
+        if (closeTimer.current) {
+            clearTimeout(closeTimer.current);
+            closeTimer.current = null;
+        }
+        onOpenChange?.(true);
+    }, [onOpenChange]);
+
+    const handleMouseLeave = useCallback(() => {
+        closeTimer.current = setTimeout(() => {
+            onOpenChange?.(false);
+        }, 150);
+    }, [onOpenChange]);
+
     return (
-        <Popover
-            open={open}
-            onOpenChange={onOpenChange}
-            modal={true}
-            trigger={
-                <Button size="small">
-                    {getViewModeIcon()}
-                    <span className="ml-1 text-sm">{getViewModeName()}</span>
-                </Button>
-            }
-        >
-            <div className="p-3 flex flex-col gap-3 min-w-[240px]">
-                {/* View mode toggle using ToggleButtonGroup */}
-                {viewModeOptions.length > 1 && (
-                    <ToggleButtonGroup
-                        value={viewMode}
-                        onValueChange={onViewModeChange}
-                        options={viewModeOptions}
-                    />
-                )}
+        <div onMouseEnter={handleMouseEnter}
+             onMouseLeave={handleMouseLeave}>
+            <Popover
+                open={open}
+                onOpenChange={onOpenChange}
+                modal={false}
+                sideOffset={0}
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
+                trigger={
+                    <Button size="small">
+                        {getViewModeIcon()}
+                        <span className="ml-1 text-sm">{getViewModeName()}</span>
+                    </Button>
+                }
+            >
+                <div className="p-3 flex flex-col gap-3 min-w-[240px]">
+                    {/* View mode toggle using ToggleButtonGroup */}
+                    {viewModeOptions.length > 1 && (
+                        <ToggleButtonGroup
+                            value={viewMode}
+                            onValueChange={onViewModeChange}
+                            options={viewModeOptions}
+                        />
+                    )}
 
-                {/* Size selector */}
-                {showSizeSelector && (
-                    <div className="flex flex-row items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 text-sm text-surface-600 dark:text-surface-300">
-                            <ViewColumnIcon size="small" />
-                            <span>{t("size_label")}</span>
+                    {/* Size selector */}
+                    {showSizeSelector && (
+                        <div className="flex flex-row items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 text-sm text-surface-600 dark:text-surface-300">
+                                <ViewColumnIcon size="small" />
+                                <span>{t("size_label")}</span>
+                            </div>
+                            <Select
+                                value={size}
+                                size="small"
+                                className="w-20"
+                                onValueChange={(v) => onSizeChanged?.(v as CollectionSize)}
+                                renderValue={(v) => <span className="font-medium">{v.toUpperCase()}</span>}
+                            >
+                                {["xs", "s", "m", "l", "xl"].map((s) => (
+                                    <SelectItem key={s} value={s} className="font-medium text-center">
+                                        {s.toUpperCase()}
+                                    </SelectItem>
+                                ))}
+                            </Select>
                         </div>
-                        <Select
-                            value={size}
-                            size="small"
-                            className="w-20"
-                            onValueChange={(v) => onSizeChanged?.(v as CollectionSize)}
-                            renderValue={(v) => <span className="font-medium">{v.toUpperCase()}</span>}
-                        >
-                            {["xs", "s", "m", "l", "xl"].map((s) => (
-                                <SelectItem key={s} value={s} className="font-medium text-center">
-                                    {s.toUpperCase()}
-                                </SelectItem>
-                            ))}
-                        </Select>
-                    </div>
-                )}
+                    )}
 
-                {/* Kanban column property selector */}
-                {showKanbanPropertySelector && (
-                    <div className="flex flex-row items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 text-sm text-surface-600 dark:text-surface-300">
-                            <ViewKanbanIcon size="small" />
-                            <span>{t("group_by")}</span>
+                    {/* Kanban column property selector */}
+                    {showKanbanPropertySelector && (
+                        <div className="flex flex-row items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 text-sm text-surface-600 dark:text-surface-300">
+                                <ViewKanbanIcon size="small" />
+                                <span>{t("group_by")}</span>
+                            </div>
+                            <Select
+                                value={selectedKanbanProperty}
+                                size="small"
+                                className="w-32"
+                                onValueChange={(v) => onKanbanPropertyChange?.(v)}
+                                renderValue={(v) => {
+                                    const option = kanbanPropertyOptions?.find(o => o.key === v);
+                                    return <span className="font-medium truncate">{option?.label ?? v}</span>;
+                                }}
+                            >
+                                {kanbanPropertyOptions?.map((option) => (
+                                    <SelectItem key={option.key} value={option.key}>
+                                        {option.label}
+                                    </SelectItem>
+                                ))}
+                            </Select>
                         </div>
-                        <Select
-                            value={selectedKanbanProperty}
-                            size="small"
-                            className="w-32"
-                            onValueChange={(v) => onKanbanPropertyChange?.(v)}
-                            renderValue={(v) => {
-                                const option = kanbanPropertyOptions?.find(o => o.key === v);
-                                return <span className="font-medium truncate">{option?.label ?? v}</span>;
-                            }}
-                        >
-                            {kanbanPropertyOptions?.map((option) => (
-                                <SelectItem key={option.key} value={option.key}>
-                                    {option.label}
-                                </SelectItem>
-                            ))}
-                        </Select>
-                    </div>
-                )}
-            </div>
-        </Popover>
+                    )}
+                </div>
+            </Popover>
+        </div>
     );
 }

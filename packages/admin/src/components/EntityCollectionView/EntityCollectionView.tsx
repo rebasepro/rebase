@@ -958,10 +958,12 @@ export const EntityCollectionView = React.memo(
 
                 {countFetcher}
 
-                {/* Split layout: SplitListView is always mounted in list mode (for
-                    animation continuity) and also shown when any entity is selected
-                    (from cards, table, or kanban — always shows list on left). */}
-                {(isSplitLayout && viewMode === "list") || isCompact ? (
+                {/* When isSplitLayout, SplitListView is ALWAYS mounted — regardless
+                    of viewMode. The toolbar + current view live in the left panel;
+                    the right panel (entity detail) shows/hides based on selection.
+                    This keeps the toolbar's React tree position stable across view
+                    mode switches, preventing the ViewModeToggle popover from flashing. */}
+                {isSplitLayout ? (
                     <SplitListView
                         key={`split-list-view-${path}`}
                         collection={collection}
@@ -980,20 +982,41 @@ export const EntityCollectionView = React.memo(
                         selectedEntityId={selectedEntityIdProp}
                         toolbar={toolbarNode}
                     >
-                        <EntityCollectionListView
-                            key={`list-view-${path}`}
-                            collection={collection}
-                            tableController={tableController}
-                            onEntityClick={onEntityClick}
-                            selectionController={usedSelectionController}
-                            selectionEnabled={selectionEnabled}
-                            highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
-                            onScroll={tableController.onScroll}
-                            initialScroll={tableController.initialScroll}
-                            size={listSize}
-                            emptyComponent={emptyComponent}
-                            selectedEntityId={selectedEntityIdProp}
-                        />
+                        {/* When detail panel is open, left panel is always the list
+                            view — regardless of which view mode triggered the entity
+                            click. When no detail, show the active view mode. */}
+                        {selectedEntityIdProp !== undefined ? (
+                            <EntityCollectionListView
+                                key={`list-view-${path}`}
+                                collection={collection}
+                                tableController={tableController}
+                                onEntityClick={onEntityClick}
+                                selectionController={usedSelectionController}
+                                selectionEnabled={selectionEnabled}
+                                highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                                onScroll={tableController.onScroll}
+                                initialScroll={tableController.initialScroll}
+                                size={listSize}
+                                emptyComponent={emptyComponent}
+                                selectedEntityId={selectedEntityIdProp}
+                            />
+                        ) : viewMode === "list" ? (
+                            <EntityCollectionListView
+                                key={`list-view-${path}`}
+                                collection={collection}
+                                tableController={tableController}
+                                onEntityClick={onEntityClick}
+                                selectionController={usedSelectionController}
+                                selectionEnabled={selectionEnabled}
+                                highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                                onScroll={tableController.onScroll}
+                                initialScroll={tableController.initialScroll}
+                                size={listSize}
+                                emptyComponent={emptyComponent}
+                            />
+                        ) : (
+                            innerView
+                        )}
                     </SplitListView>
                 ) : (
                     <>
