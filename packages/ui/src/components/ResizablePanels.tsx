@@ -14,6 +14,7 @@ export type ResizablePanelsProps = {
     onPanelSizeChange: (sizePercent: number) => void;
     minPanelSizePx?: number;
     orientation?: 'horizontal' | 'vertical';
+    animateLayout?: boolean;
     className?: string;
 };
 
@@ -26,6 +27,7 @@ export function ResizablePanels({
     onPanelSizeChange,
     minPanelSizePx = 200,
     orientation = 'horizontal',
+    animateLayout = true,
     className
 }: ResizablePanelsProps) {
 
@@ -83,22 +85,26 @@ export function ResizablePanels({
 
         const handleMouseUp = () => {
             if (isResizingRef.current && containerRef.current && firstPanelRef.current) {
-                isResizingRef.current = false;
-                setIsResizing(false);
-                document.body.style.cursor = "";
-                document.body.style.userSelect = "";
-
-                // Calculate the final percentage and notify parent
+                // Calculate the final percentage
                 const containerRect = containerRef.current.getBoundingClientRect();
                 const firstPanelRect = firstPanelRef.current.getBoundingClientRect();
 
                 const containerSize = isHorizontal ? containerRect.width : containerRect.height;
                 const finalSize = isHorizontal ? firstPanelRect.width : firstPanelRect.height;
 
+                // Pre-set the DOM to the exact % value BEFORE re-enabling transitions.
+                // This prevents the visual "snap" that occurs when switching from px → %
+                // with the CSS transition active.
                 if (containerSize > 0) {
                     const newPercent = (finalSize / containerSize) * 100;
+                    firstPanelRef.current.style.flexBasis = `${newPercent}%`;
                     onPanelSizeChange(Math.max(0, Math.min(100, newPercent)));
                 }
+
+                isResizingRef.current = false;
+                setIsResizing(false);
+                document.body.style.cursor = "";
+                document.body.style.userSelect = "";
             }
         };
 
@@ -128,7 +134,7 @@ export function ResizablePanels({
                 ref={firstPanelRef}
                 className={cls(
                     "relative flex-shrink-0 flex flex-col overflow-hidden",
-                    !isResizing && "transition-[flex-basis] duration-300 ease-in-out",
+                    !isResizing && animateLayout && "transition-[flex-basis] duration-150 ease-out",
                     !showFirstPanel && "hidden"
                 )}
                 style={{

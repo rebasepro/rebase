@@ -476,7 +476,7 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
     // Error: no enum properties available for Kanban columns
     if (!columnProperty || enumColumns.length === 0) {
         return (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 gap-4">
+            <div className="h-full flex flex-col items-center justify-center p-8 gap-4">
                 <Typography variant="h6">
                     {t("kanban_view_not_available")}
                 </Typography>
@@ -494,7 +494,7 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
     // No columns
     if (columns.length === 0) {
         return (
-            <div className="flex-1 flex items-center justify-center p-8">
+            <div className="h-full flex items-center justify-center p-8">
                 <Typography variant="label" color="secondary">
                     {t("no_enum_values_configured", { property: columnProperty })}
                 </Typography>

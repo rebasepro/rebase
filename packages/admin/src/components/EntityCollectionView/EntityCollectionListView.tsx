@@ -9,6 +9,7 @@ import {
     Checkbox,
     Chip,
     CircularProgress,
+    CircularProgressCenter,
     cls,
     defaultBorderMixin,
     Typography
@@ -493,6 +494,8 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
 
     const rowClasses = getRowClasses(size);
 
+    // Initial loading state (no data yet)
+    const isInitialLoading = dataLoading && data.length === 0;
     // Empty state
     const isEmpty = !dataLoading && data.length === 0 && !dataLoadingError;
 
@@ -533,13 +536,15 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
         >
             {/* Error state */}
             {dataLoadingError ? (
-                <div className="flex-1 flex items-center justify-center p-8">
+                <div className="h-full flex items-center justify-center p-8">
                     <Typography className="text-red-500">
                         Error loading data: {dataLoadingError.message}
                     </Typography>
                 </div>
+            ) : isInitialLoading ? (
+                <CircularProgressCenter />
             ) : isEmpty ? (
-                <div className="flex-1 flex items-center justify-center p-8">
+                <div className="h-full flex items-center justify-center p-8">
                     {emptyComponent ?? (
                         <Typography variant="label" color="secondary">
                             No entries found

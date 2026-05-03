@@ -5,6 +5,7 @@ import { EntityCard } from "./EntityCard";
 import {
     cls,
     CircularProgress,
+    CircularProgressCenter,
     Typography
 } from "@rebasepro/ui";
 import { useAuthController, useCustomizationController } from "@rebasepro/core";
@@ -192,10 +193,15 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
         return highlightedEntities?.some(e => e.id === entity.id && e.path === entity.path) ?? false;
     }, [highlightedEntities]);
 
+    // Show initial loading state
+    if (dataLoading && data.length === 0 && !dataLoadingError) {
+        return <CircularProgressCenter />;
+    }
+
     // Show empty state
     if (!dataLoading && data.length === 0 && !dataLoadingError) {
         return (
-            <div className="flex-1 flex items-center justify-center p-8">
+            <div className="h-full flex items-center justify-center p-8">
                 {emptyComponent ?? (
                     <Typography variant="label" color="secondary">
                         No entries found
@@ -208,7 +214,7 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
     // Show error state
     if (dataLoadingError) {
         return (
-            <div className="flex-1 flex items-center justify-center p-8">
+            <div className="h-full flex items-center justify-center p-8">
                 <Typography className="text-red-500">
                     Error loading data: {dataLoadingError.message}
                 </Typography>

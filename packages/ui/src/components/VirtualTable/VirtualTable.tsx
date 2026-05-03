@@ -199,7 +199,6 @@ export const VirtualTable = React.memo<VirtualTableProps<any>>(
     // Removed redundant ResizeObserver to prevent performance issues and UI flickering.
 
         const [measureRef, bounds] = useMeasure({
-            debounce: 50,
             polyfill: ResizeObserver,
             scroll: true,
             // This is important for handling zooming in react-flow

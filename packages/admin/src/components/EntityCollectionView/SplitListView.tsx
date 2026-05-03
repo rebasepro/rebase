@@ -5,6 +5,7 @@ import { EntityEditView } from "../EntityEditView";
 import {
     cls,
     defaultBorderMixin,
+    ResizablePanels
 } from "@rebasepro/ui";
 import { useLargeLayout } from "@rebasepro/core";
 import { useCollectionRegistryController } from "../../index";
@@ -121,7 +122,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
     const animationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Transition duration (ms) — keep in sync with CSS
-    const TRANSITION_DURATION = 300;
+    const TRANSITION_DURATION = 150;
 
     useEffect(() => {
         if (animationTimer.current) {
@@ -288,87 +289,46 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
         );
     }
 
-    // ── Large layout: animated split ──
-    // The list is always rendered. Its width transitions between 100% (full) and panelSize% (compact).
-    // The detail panel is conditionally rendered and slides in from the right.
+    // ── Large layout: animated split using ResizablePanels ──
+
+    const listPanel = (
+        <div className="flex flex-col h-full overflow-hidden min-w-0">
+            {toolbar}
+            {children}
+        </div>
+    );
+
+    const detailPanel = isDetailVisible && renderedEntityId !== undefined ? (
+        <div
+            className={cls(
+                "flex-1 flex flex-col min-w-0 h-full transition-all ease-out",
+                animationPhase === "entered"
+                    ? "opacity-100 translate-x-0"
+                    : "opacity-0 translate-x-8"
+            )}
+            style={{ transitionDuration: `${TRANSITION_DURATION}ms` }}
+        >
+            <ErrorBoundary>
+                <EntityEditView
+                    key={String(renderedEntityId)}
+                    path={path}
+                    collection={collection as EntityCollection<Record<string, unknown>>}
+                    entityId={renderedEntityId!}
+                    parentCollectionIds={usedParentCollectionIds}
+                    layout="side_panel"
+                />
+            </ErrorBoundary>
+        </div>
+    ) : <></>;
 
     return (
-        <div className="flex h-full w-full overflow-hidden">
-            {/* Left panel: list — always present, width animates */}
-            <div
-                className={cls(
-                    "flex flex-col h-full overflow-hidden min-w-0 transition-all ease-out",
-                    isDetailVisible ? "border-r" : "",
-                    isDetailVisible ? defaultBorderMixin : ""
-                )}
-                style={{
-                    transitionDuration: `${TRANSITION_DURATION}ms`,
-                    width: isDetailVisible
-                        ? (animationPhase === "entering" ? "100%" : `${panelSize}%`)
-                        : "100%",
-                    minWidth: isDetailVisible && animationPhase !== "entering" ? 240 : undefined,
-                }}
-            >
-                {toolbar}
-                {children}
-            </div>
-
-            {/* Resizable divider handle — only when detail is visible */}
-            {isDetailVisible && (
-                <div
-                    className={cls(
-                        "flex-shrink-0 w-1 cursor-col-resize relative group transition-opacity ease-out",
-                        animationPhase === "entered" ? "opacity-100" : "opacity-0"
-                    )}
-                    style={{ transitionDuration: `${TRANSITION_DURATION}ms` }}
-                    onMouseDown={(e) => {
-                        e.preventDefault();
-                        const startX = e.clientX;
-                        const container = e.currentTarget.parentElement;
-                        if (!container) return;
-                        const containerWidth = container.getBoundingClientRect().width;
-                        const startSize = panelSize;
-
-                        const onMouseMove = (moveEvent: MouseEvent) => {
-                            const delta = moveEvent.clientX - startX;
-                            const newSize = Math.max(15, Math.min(60, startSize + (delta / containerWidth) * 100));
-                            setPanelSize(newSize);
-                        };
-                        const onMouseUp = () => {
-                            document.removeEventListener("mousemove", onMouseMove);
-                            document.removeEventListener("mouseup", onMouseUp);
-                        };
-                        document.addEventListener("mousemove", onMouseMove);
-                        document.addEventListener("mouseup", onMouseUp);
-                    }}
-                >
-                    <div className="absolute inset-y-0 -left-0.5 -right-0.5 group-hover:bg-primary-400/40 dark:group-hover:bg-primary-500/30 transition-colors rounded-full" />
-                </div>
-            )}
-
-            {/* Right panel: entity detail — slides in/out */}
-            {isDetailVisible && (
-                <div
-                    className={cls(
-                        "flex-1 flex flex-col min-w-0 h-full transition-all ease-out",
-                        animationPhase === "entered"
-                            ? "opacity-100 translate-x-0"
-                            : "opacity-0 translate-x-8"
-                    )}
-                    style={{ transitionDuration: `${TRANSITION_DURATION}ms` }}
-                >
-                    <ErrorBoundary>
-                        <EntityEditView
-                            key={String(renderedEntityId)}
-                            path={path}
-                            collection={collection as EntityCollection<Record<string, unknown>>}
-                            entityId={renderedEntityId!}
-                            parentCollectionIds={usedParentCollectionIds}
-                            layout="side_panel"
-                        />
-                    </ErrorBoundary>
-                </div>
-            )}
-        </div>
+        <ResizablePanels
+            firstPanel={listPanel}
+            secondPanel={detailPanel}
+            showSecondPanel={isDetailVisible}
+            panelSizePercent={animationPhase === "entering" ? 100 : panelSize}
+            onPanelSizeChange={setPanelSize}
+            minPanelSizePx={240}
+        />
     );
 }
