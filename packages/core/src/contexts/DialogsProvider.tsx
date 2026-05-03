@@ -1,5 +1,5 @@
 import type { DialogControllerEntryProps, DialogsController } from "@rebasepro/types";
-import React, { PropsWithChildren, useCallback, useRef, useState } from "react";
+import React, { PropsWithChildren, useCallback, useRef, useState, useMemo } from "react";
 ;
 
 export const DialogsControllerContext = React.createContext<DialogsController>({} as DialogsController);
@@ -37,11 +37,13 @@ export const DialogsProvider: React.FC<PropsWithChildren> = ({ children }) => {
         }
     }, [dialogEntries]);
 
+    const dialogsController = useMemo(() => ({
+        open,
+        close
+    }), [open, close]);
+
     return (
-        <DialogsControllerContext.Provider value={{
-            open,
-            close
-        }}>
+        <DialogsControllerContext.Provider value={dialogsController}>
             {children}
             {dialogEntries.map((entry, i) => <entry.Component
                 key={`dialog_${i}`}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 
 import { ModeController } from "./index";
 
@@ -64,8 +64,8 @@ export function useBuildModeController(): ModeController {
         }
     }, [prefersDarkModeQuery]);
 
-    return {
+    return useMemo(() => ({
         mode,
         setMode: setModeInternal
-    };
+    }), [mode, setModeInternal]);
 }

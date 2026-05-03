@@ -87,7 +87,9 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
     const ref = useRef<HTMLDivElement>(null);
 
     const largeLayout = useLargeLayout();
-    const selectedEntities = (selectionController?.selectedEntities?.length > 0 ? selectionController?.selectedEntities : highlightedEntities)?.filter(Boolean);
+    const selectedEntities = useMemo(() => {
+        return (selectionController?.selectedEntities?.length > 0 ? selectionController?.selectedEntities : highlightedEntities)?.filter(Boolean);
+    }, [selectionController?.selectedEntities, highlightedEntities]);
 
     const context: RebaseContext<USER> = useRebaseContext<USER>();
 
@@ -240,7 +242,7 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
 
     }, [size]);
 
-    const collectionColumns: VirtualTableColumn[] = (() => {
+    const collectionColumns: VirtualTableColumn[] = useMemo(() => {
         const columnsResult: VirtualTableColumn[] = propertiesToColumns({
             properties,
             sortable,
@@ -265,9 +267,9 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
                 }))
             : [];
         return [...columnsResult, ...additionalTableColumns];
-    })();
+    }, [properties, sortable, forceFilter, AdditionalHeaderWidget, additionalFields]);
 
-    const idColumn: VirtualTableColumn = {
+    const idColumn: VirtualTableColumn = useMemo(() => ({
         key: "id_ewcfedcswdf3",
         width: getIdColumnWidth?.() ?? (largeLayout ? 140 : 120),
         title: "ID",
@@ -276,9 +278,9 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
         headerAlign: "center",
         align: "center",
         AdditionalHeaderWidget: () => additionalIDHeaderWidget
-    }
+    }), [getIdColumnWidth, largeLayout, additionalIDHeaderWidget]);
 
-    const columns: VirtualTableColumn[] = [
+    const columns: VirtualTableColumn[] = useMemo(() => [
         idColumn,
         ...(displayedColumnIds
             ? displayedColumnIds
@@ -286,7 +288,7 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
                     return collectionColumns.find(c => c.key === p.key);
                 }).filter(Boolean)
             : collectionColumns) as VirtualTableColumn[]
-    ];
+    ], [idColumn, displayedColumnIds, collectionColumns]);
 
     const cellRenderer = useCallback((props: CellRendererParams<any>) => {
         const column = props.column;
@@ -361,7 +363,7 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
                 inlineEditing={inlineEditing}
                 cellRenderer={cellRenderer}
                 onEntityClick={onEntityClick}
-                highlightedRow={(entity: Entity<M>) => Boolean(selectedEntities?.find(e => e.id === entity.id && e.path === entity.path))}
+                highlightedRow={useCallback((entity: Entity<M>) => Boolean(selectedEntities?.find(e => e.id === entity.id && e.path === entity.path)), [selectedEntities])}
                 tableController={tableController}
                 onValueChange={onValueChange}
                 initialScroll={initialScroll}

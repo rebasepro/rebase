@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { setIn } from "@rebasepro/formex";
 import { EntityCollection, SaveEntityProps, RebaseData, RebaseContext } from "@rebasepro/types";
 import { saveEntityWithCallbacks } from "@rebasepro/core";
@@ -147,5 +147,5 @@ export function useKanbanDragAndDrop<M extends Record<string, unknown>>({
         }
     }, [collection, columnProperty, orderProperty, context, dataClient, calculateNewOrder, boardDataController, analyticsController, fullPath]);
 
-    return { calculateNewOrder, handleItemsReorder };
+    return useMemo(() => ({ calculateNewOrder, handleItemsReorder }), [calculateNewOrder, handleItemsReorder]);
 }

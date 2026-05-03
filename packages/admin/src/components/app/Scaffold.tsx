@@ -1,4 +1,4 @@
-import React, { PropsWithChildren, useCallback } from "react";
+import React, { PropsWithChildren, useCallback, useMemo } from "react";
 import { ChevronLeftIcon, cls, defaultBorderMixin, IconButton, MenuIcon, Sheet, Tooltip } from "@rebasepro/ui";
 import { deepEqual as equal } from "fast-equals"
 
@@ -91,17 +91,18 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
         const isStudioDark = adminModeController.mode === "studio";
 
         const hasAppBar = Boolean(appBarChildren.length > 0);
+        const appContextValue = useMemo(() => ({
+            hasDrawer: Boolean(includeDrawer),
+            drawerOpen: computedDrawerOpen,
+            drawerHovered: computedDrawerHovered,
+            openDrawer: handleDrawerOpen,
+            closeDrawer: handleDrawerClose,
+            closeHover: setOnHoverFalse,
+            logo
+        }), [includeDrawer, computedDrawerOpen, computedDrawerHovered, handleDrawerOpen, handleDrawerClose, setOnHoverFalse, logo]);
+
         return (
-            <AppContext.Provider
-                value={{
-                    hasDrawer: Boolean(includeDrawer),
-                    drawerOpen: computedDrawerOpen,
-                    drawerHovered: computedDrawerHovered,
-                    openDrawer: () => setDrawerOpen(true),
-                    closeDrawer: () => setDrawerOpen(false),
-                    closeHover: () => setOnHover(false),
-                    logo
-                }}>
+            <AppContext.Provider value={appContextValue}>
                 <div
                     className={cls("flex h-screen w-screen overflow-hidden",
                         isStudioDark ? "bg-surface-50 dark:bg-surface-950" : "bg-surface-50 dark:bg-surface-900",

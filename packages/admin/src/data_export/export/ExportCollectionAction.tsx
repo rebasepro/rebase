@@ -3,9 +3,9 @@ import React, { useCallback } from "react";
 import {
     useAuthController,
     useCustomizationController,
-    useData,
-    useRebaseContext
+    useData
 } from "@rebasepro/core";
+import { useCMSContext } from "../../hooks";
 import { CollectionActionsProps, Entity, EntityCollection, ExportConfig, RebaseContext, User } from "@rebasepro/types";
 import { getDefaultValuesFor } from "@rebasepro/common";
 import {
@@ -48,7 +48,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
     const [exportType, setExportType] = React.useState<"csv" | "json">("csv");
     const [dateExportType, setDateExportType] = React.useState<"timestamp" | "string">("string");
 
-    const context = useRebaseContext<USER>();
+    const context = useCMSContext<USER>();
     const dataClient = useData();
 
     const canExport = !exportAllowed || exportAllowed({

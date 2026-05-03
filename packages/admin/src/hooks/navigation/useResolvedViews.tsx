@@ -187,11 +187,11 @@ export function useResolvedViews<USER extends User>(
         user
     ]);
 
-    return {
+    return useMemo(() => ({
         views: resolvedViews,
         adminViews: resolvedAdminViews,
         loading,
         error,
         refresh
-    };
+    }), [resolvedViews, resolvedAdminViews, loading, error, refresh]);
 }

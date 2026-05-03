@@ -1,5 +1,5 @@
 import type { SideDialogPanelProps } from "../hooks/useSideDialogsController";
-import React, { useCallback, useContext, useEffect, useState } from "react";
+import React, { useCallback, useContext, useEffect, useState, useMemo } from "react";
 import { useSideDialogsController } from "../hooks";
 ;
 import { Sheet } from "@rebasepro/ui";
@@ -125,7 +125,7 @@ function SideDialogView({
         setDrawerCloseRequested(false);
     };
 
-    const onCloseRequest = (force?: boolean) => {
+    const onCloseRequest = useCallback((force?: boolean) => {
         if (blocked && !force) {
             setDrawerCloseRequested(true);
             triggerDialog();
@@ -133,19 +133,20 @@ function SideDialogView({
             sideDialogsController.close();
             panel?.onClose?.();
         }
-    };
+    }, [blocked, triggerDialog, sideDialogsController, panel]);
+
+    const contextValue = useMemo(() => ({
+        blocked,
+        setBlocked,
+        setBlockedNavigationMessage,
+        width,
+        close: onCloseRequest,
+        pendingClose,
+        setPendingClose
+    }), [blocked, setBlockedNavigationMessage, width, onCloseRequest, pendingClose]);
 
     return (
-        <SideDialogContext.Provider
-            value={{
-                blocked,
-                setBlocked,
-                setBlockedNavigationMessage,
-                width,
-                close: onCloseRequest,
-                pendingClose,
-                setPendingClose
-            }}>
+        <SideDialogContext.Provider value={contextValue}>
 
             <Sheet
                 open={Boolean(panel)}

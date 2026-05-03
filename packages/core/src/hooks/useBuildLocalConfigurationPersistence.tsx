@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { PartialEntityCollection, UserConfigurationPersistence } from "@rebasepro/types";
 import { stripCollectionPath } from "@rebasepro/common";
 import { mergeDeep } from "@rebasepro/utils";
@@ -53,7 +53,7 @@ export function useBuildLocalConfigurationPersistence(): UserConfigurationPersis
         _setCollapsedGroups(paths);
     }, []);
 
-    return {
+    return useMemo(() => ({
         onCollectionModified,
         getCollectionConfig,
         recentlyVisitedPaths,
@@ -62,5 +62,14 @@ export function useBuildLocalConfigurationPersistence(): UserConfigurationPersis
         setFavouritePaths,
         collapsedGroups,
         setCollapsedGroups
-    }
+    }), [
+        onCollectionModified,
+        getCollectionConfig,
+        recentlyVisitedPaths,
+        setRecentlyVisitedPaths,
+        favouritePaths,
+        setFavouritePaths,
+        collapsedGroups,
+        setCollapsedGroups
+    ]);
 }

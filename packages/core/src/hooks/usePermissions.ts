@@ -2,7 +2,7 @@ import type { EntityCollection } from "@rebasepro/types";
 import { useAuthController } from "./useAuthController";
 import { Entity } from "@rebasepro/types";
 import { canCreateEntity, canEditEntity, canDeleteEntity, canReadCollection } from "@rebasepro/common";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 
 /**
  * Hook to evaluate roles and permissions for the current user.
@@ -35,10 +35,10 @@ export function usePermissions() {
         [authController]
     );
 
-    return {
+    return useMemo(() => ({
         canCreate,
         canEdit,
         canDelete,
         canRead
-    };
+    }), [canCreate, canEdit, canDelete, canRead]);
 }

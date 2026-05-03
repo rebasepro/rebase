@@ -1,0 +1,10 @@
+--- packages/admin/src/contexts/BreacrumbsContext.tsx
++++ packages/admin/src/contexts/BreacrumbsContext.tsx
+@@ -32,6 +32,7 @@
+     }, []);
+ 
+     const updateCount = useCallback((id: string, count: number | null | undefined) => {
++        console.log("BreadcrumbsContext.updateCount", id, count);
+         setBreadcrumbs(prev => prev.map(entry =>
+             entry.id === id ? { ...entry, count } : entry
+         ));

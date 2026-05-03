@@ -174,7 +174,7 @@ export function EntityCard<M extends Record<string, unknown> = Record<string, un
 
                 {/* Subtitle slot */}
                 {slots.subtitle && (
-                    <div className="truncate text-xs text-surface-600 dark:text-surface-400">
+                    <div className="line-clamp-3 [&_div]:line-clamp-3 text-xs text-surface-600 dark:text-surface-400 [&_p]:!my-1 [&_p:first-child]:!mt-0 [&_p:last-child]:!mb-0">
                         <PropertyPreview
                             propertyKey={slots.subtitle.propertyKey}
                             value={slots.subtitle.value}

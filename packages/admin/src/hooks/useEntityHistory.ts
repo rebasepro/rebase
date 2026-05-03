@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useApiConfig } from "@rebasepro/core";
 
 export interface HistoryEntryData {
@@ -153,7 +153,7 @@ export function useEntityHistory(params: {
         setRefreshTrigger(prev => prev + 1);
     }, [apiConfig, slug, entityId]);
 
-    return {
+    return useMemo(() => ({
         entries,
         total,
         isLoading,
@@ -161,5 +161,5 @@ export function useEntityHistory(params: {
         error,
         loadMore,
         revert
-    };
+    }), [entries, total, isLoading, hasMore, error, loadMore, revert]);
 }

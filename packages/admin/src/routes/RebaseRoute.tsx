@@ -54,14 +54,12 @@ export function RebaseRoute() {
                         // count: undefined (not applicable for custom views)
                     });
                 } else if (entry.type === "collection") {
-                    // Only show count badge (loading state) when viewing this collection directly
-                    // Don't show count for parent collections when viewing an entity
                     const showCount = isLastEntry && isViewingCollection;
                     return ({
                         title: entry.collection.name,
                         url: urlController.buildUrlCollectionPath(entry.path),
                         id: entry.path,
-                        ...(showCount ? { count: null } : {}) // null = loading, undefined = no badge
+                        ...(showCount ? { count: null } : {})
                     });
                 } else {
                     throw new Error("Unexpected navigation entry type");

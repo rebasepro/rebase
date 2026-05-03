@@ -1,5 +1,5 @@
 import type { EntityCollection } from "@rebasepro/types";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Entity, FilterValues, User } from "@rebasepro/types";
 import { useData } from "./useData";
 /**
@@ -152,11 +152,11 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
         }
     }, [path, itemCount, currentSort, sortByProperty, filterValues, searchString]);
 
-    return {
+    return useMemo(() => ({
         data,
         dataLoading,
         dataLoadingError,
         noMoreToLoad
-    };
+    }), [data, dataLoading, dataLoadingError, noMoreToLoad]);
 
 }

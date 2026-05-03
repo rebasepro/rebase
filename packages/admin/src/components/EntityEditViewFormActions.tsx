@@ -21,7 +21,6 @@ import {
 } from "@rebasepro/ui";
 import {
     useCustomizationController,
-    useRebaseContext,
     useSnackbarController,
     useTranslation
 } from "@rebasepro/core";

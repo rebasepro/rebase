@@ -343,7 +343,75 @@ export class RelationService {
             return resultMap;
         }
 
-        // Handle other relation types with batching
+        // Handle owning relations with proper FK-based batching.
+        // For owning relations, parent entities hold the FK (e.g. posts.author_id).
+        // We need to:
+        //   1. Fetch FK values from the parent table in a single query
+        //   2. Query the target table with unique FK values
+        //   3. Map results back to parent entities via their FK values
+        if (relation.direction === "owning" && relation.localKey) {
+            const localKeyCol = parentTable[relation.localKey as keyof typeof parentTable] as AnyPgColumn;
+            if (!localKeyCol) {
+                throw new Error(`Local key column '${relation.localKey}' not found in parent table`);
+            }
+
+            // Step 1: Fetch all FK values from parent table in ONE query
+            const fkRows = await this.db
+                .select({
+                    parentId: parentIdCol,
+                    fkValue: localKeyCol
+                })
+                .from(parentTable)
+                .where(inArray(parentIdCol, parsedParentIds));
+
+            // Build parentId → fkValue mapping and collect unique FK values
+            const parentToFk = new Map<string, string | number>();
+            const uniqueFkValues: (string | number)[] = [];
+            const seenFks = new Set<string>();
+
+            for (const row of fkRows as Array<{ parentId: string | number; fkValue: string | number | null }>) {
+                if (row.fkValue == null) continue;
+                parentToFk.set(String(row.parentId), row.fkValue);
+                const fkStr = String(row.fkValue);
+                if (!seenFks.has(fkStr)) {
+                    seenFks.add(fkStr);
+                    uniqueFkValues.push(row.fkValue);
+                }
+            }
+
+            if (uniqueFkValues.length === 0) return new Map();
+
+            // Step 2: Fetch all target entities in ONE query
+            const targetResults = await this.db
+                .select()
+                .from(targetTable)
+                .where(inArray(targetIdField, uniqueFkValues));
+
+            // Index target entities by their ID
+            const targetById = new Map<string, Record<string, unknown>>();
+            for (const row of targetResults as Array<Record<string, unknown>>) {
+                const tid = String(row[targetIdInfo.fieldName]);
+                targetById.set(tid, row);
+            }
+
+            // Step 3: Map back to parent entities
+            const resultMap = new Map<string, Entity<Record<string, unknown>>>();
+            for (const [parentIdStr, fkValue] of parentToFk) {
+                const targetEntity = targetById.get(String(fkValue));
+                if (targetEntity) {
+                    const parsedValues = await parseDataFromServer(targetEntity, targetCollection);
+                    resultMap.set(parentIdStr, {
+                        id: String(targetEntity[targetIdInfo.fieldName]),
+                        path: targetCollection.slug,
+                        values: parsedValues as Record<string, unknown>
+                    });
+                }
+            }
+
+            return resultMap;
+        }
+
+        // Handle inverse relation types with batching
         let query = this.db.select().from(targetTable).$dynamic();
 
         // Build the relation query with ALL parent IDs
@@ -375,13 +443,6 @@ export class RelationService {
             } else if (relation.direction === "inverse" && relation.cardinality === "one" && relation.inverseRelationName) {
                 const inferredForeignKeyName = `${relation.inverseRelationName}_id`;
                 parentId = targetEntity[inferredForeignKeyName] as string | number | undefined;
-            } else if (relation.direction === "owning" && relation.localKey) {
-                for (const parsedParentId of parsedParentIds) {
-                    if (!resultMap.has(String(parsedParentId))) {
-                        parentId = parsedParentId;
-                        break;
-                    }
-                }
             }
 
             if (parentId !== undefined && parsedParentIds.includes(parentId)) {

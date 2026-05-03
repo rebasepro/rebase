@@ -83,13 +83,13 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         ...((plugins ?? []).flatMap((p) => p.slots ?? [])),
     ], [directSlots, plugins]);
 
-    const userManagement = plugins?.find((p) => p.userManagement)?.userManagement
+    const userManagement = useMemo(() => plugins?.find((p) => p.userManagement)?.userManagement
         ?? _userManagement
         ?? {
             loading: false,
             users: [],
             getUser: (uid: string) => null
-        } as unknown as UserManagementDelegate<USER>;
+        } as unknown as UserManagementDelegate<USER>, [plugins, _userManagement]);
 
     // Auth fallback logic
     const clientAuthController = useAuthSubscription(authControllerProp ? undefined : client?.auth);
@@ -152,7 +152,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
 
     const loading = authController.initialLoading || pluginsLoading;
 
-    const customizationController: CustomizationController = {
+    const customizationController: CustomizationController = useMemo(() => ({
         dateTimeFormat,
         locale,
         entityLinkBuilder,
@@ -162,7 +162,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         entityActions: entityActions ?? [],
         propertyConfigs: propertyConfigs ?? {},
         components
-    };
+    }), [dateTimeFormat, locale, entityLinkBuilder, plugins, resolvedSlots, entityViews, entityActions, propertyConfigs, components]);
 
     const analyticsController = useMemo(() => ({
         onAnalyticsEvent

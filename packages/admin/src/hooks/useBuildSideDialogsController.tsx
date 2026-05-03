@@ -1,5 +1,5 @@
 import type { SideDialogPanelProps, SideDialogsController } from "../hooks/useSideDialogsController";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 ;
 import { deepEqual as equal } from "fast-equals"
@@ -24,10 +24,10 @@ export function useBuildSideDialogsController(): SideDialogsController {
     const routesStore = useRef<Record<string, SideDialogPanelProps>>({});
     const routesCount = useRef<number>(0);
 
-    const updateSidePanels = (newPanels: SideDialogPanelProps[]) => {
+    const updateSidePanels = useCallback((newPanels: SideDialogPanelProps[]) => {
         sidePanelsRef.current = newPanels;
         setSidePanels(newPanels);
-    };
+    }, []);
 
     useEffect(() => {
         const state = location.state as SideDialogLocationState | null;
@@ -135,11 +135,11 @@ export function useBuildSideDialogsController(): SideDialogsController {
 
     }, [navigate]);
 
-    return {
+    return useMemo(() => ({
         sidePanels,
         setSidePanels: updateSidePanels,
         close,
         open,
         replace
-    };
+    }), [sidePanels, updateSidePanels, close, open, replace]);
 }

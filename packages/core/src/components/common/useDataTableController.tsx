@@ -88,21 +88,6 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         return true;
     }, []);
 
-    const onScroll = ({
-        scrollOffset
-    }: {
-        scrollOffset: number
-    }) => {
-        if (scrollRestoration) {
-            scrollRestoration.updateCollectionScroll({
-                path,
-                scrollOffset,
-                data: rawData,
-                filters: filterValues
-            });
-        }
-    }
-
     const sortInternal = useMemo(() => {
         if (sort && forceFilter && !checkFilterCombination(forceFilter, sort)) {
             console.warn("Initial sort is not compatible with the force filter. Ignoring initial sort");
@@ -168,6 +153,21 @@ export function useDataTableController<M extends Record<string, any> = any, USER
     const context: RebaseContext<USER> = useRebaseContext();
 
     const [rawData, setRawData] = useState<Entity<M>[]>(collectionScroll?.data ?? []);
+
+    const onScroll = useCallback(({
+        scrollOffset
+    }: {
+        scrollOffset: number
+    }) => {
+        if (scrollRestoration) {
+            scrollRestoration.updateCollectionScroll({
+                path,
+                scrollOffset,
+                data: rawData,
+                filters: filterValues
+            });
+        }
+    }, [scrollRestoration, path, rawData, filterValues]);
 
     const [dataLoading, setDataLoading] = useState<boolean>(false);
     const [dataLoadingError, setDataLoadingError] = useState<Error | undefined>();
@@ -284,7 +284,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
     // });
     const data = orderedData;
 
-    return {
+    return useMemo(() => ({
         data,
         dataLoading,
         noMoreToLoad,
@@ -305,7 +305,24 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         checkFilterCombination,
         popupCell,
         setPopupCell
-    }
+    }), [
+        data,
+        dataLoading,
+        noMoreToLoad,
+        dataLoadingError,
+        filterValues,
+        updateFilterValues,
+        sortBy,
+        searchString,
+        clearFilter,
+        itemCount,
+        collectionScroll?.scrollOffset,
+        onScroll,
+        paginationEnabled,
+        pageSize,
+        checkFilterCombination,
+        popupCell
+    ]);
 }
 
 function useUpdateUrl<M extends Record<string, any> = any>(

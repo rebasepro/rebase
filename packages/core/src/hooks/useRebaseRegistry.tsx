@@ -71,7 +71,7 @@ export function useRebaseRegistry(): RebaseRegistryController {
     if (!dispatch) {
         throw new Error("useRebaseRegistry must be used within RebaseRegistryProvider");
     }
-    return { ...state, ...dispatch };
+    return useMemo(() => ({ ...state, ...dispatch }), [state, dispatch]);
 }
 
 /**

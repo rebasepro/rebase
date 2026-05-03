@@ -251,7 +251,7 @@ export function useTopLevelNavigation(
         onNavigationEntriesOrderUpdate
     ]);
 
-    return {
+    return useMemo(() => ({
         topLevelNavigation
-    };
+    }), [topLevelNavigation]);
 }

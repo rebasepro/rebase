@@ -1,6 +1,6 @@
 import type { EntityCollection, EntityCustomView } from "@rebasepro/types";
 import { Entity, RebaseContext, User } from "@rebasepro/types";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { getNavigationEntriesFromPath } from "@rebasepro/common";
 import { useCMSContext } from "./useCMSContext";
 
@@ -147,9 +147,10 @@ export function useResolvedNavigationFrom<M extends Record<string, unknown>>(
 
     }, [path, context]);
 
-    if (!navigationStateController) {
-        return { dataLoading: true };
-    }
-
-    return { data, dataLoading, dataLoadingError };
+    return useMemo(() => {
+        if (!navigationStateController) {
+            return { dataLoading: true };
+        }
+        return { data, dataLoading, dataLoadingError };
+    }, [navigationStateController, data, dataLoading, dataLoadingError]);
 }

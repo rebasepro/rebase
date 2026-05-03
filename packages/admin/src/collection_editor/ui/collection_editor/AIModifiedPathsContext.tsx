@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useState } from "react";
+import React, { createContext, useCallback, useContext, useState, useMemo } from "react";
 import { CollectionOperation } from "../../api/generateCollectionApi";
 
 export interface AIModifiedPathsContextType {
@@ -68,15 +68,17 @@ export function AIModifiedPathsProvider({ children }: { children: React.ReactNod
         return false;
     }, [modifiedPaths]);
 
+    const contextValue = useMemo(() => ({
+        modifiedPaths,
+        generationCounter,
+        addModifiedPaths,
+        clearPath,
+        clearAllPaths,
+        isPathModified
+    }), [modifiedPaths, generationCounter, addModifiedPaths, clearPath, clearAllPaths, isPathModified]);
+
     return (
-        <AIModifiedPathsContext.Provider value={{
-            modifiedPaths,
-            generationCounter,
-            addModifiedPaths,
-            clearPath,
-            clearAllPaths,
-            isPathModified
-        }}>
+        <AIModifiedPathsContext.Provider value={contextValue}>
             {children}
         </AIModifiedPathsContext.Provider>
     );

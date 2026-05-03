@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useRef, useState, useEffect } from "react";
+import React, { createContext, useContext, useRef, useState, useEffect, useMemo } from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { cls } from "../util";
 import { defaultBorderMixin } from "../styles";
@@ -73,7 +73,9 @@ export function Tabs({
         }
     };
 
-    return <TabsContext.Provider value={{ variant }}>
+    const contextValue = useMemo(() => ({ variant }), [variant]);
+
+    return <TabsContext.Provider value={contextValue}>
         <TabsPrimitive.Root
             value={value}
             onValueChange={onValueChange}

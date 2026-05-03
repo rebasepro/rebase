@@ -1,5 +1,5 @@
 import type { EntityCollection } from "@rebasepro/types";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, useMemo } from "react";
 import { CollectionRegistry, getParentReferencesFromPath as commonGetParentReferencesFromPath, removeInitialAndTrailingSlashes, getSubcollections } from "@rebasepro/common";
 import { EntityReference, UserConfigurationPersistence, CollectionRegistryController } from "@rebasepro/types";
 import { mergeDeep } from "@rebasepro/utils";
@@ -148,7 +148,7 @@ export function useBuildCollectionRegistryController(props: {
         setInitialised(true);
     }
 
-    return {
+    return useMemo(() => ({
         collections,
         initialised,
         getCollection,
@@ -157,5 +157,13 @@ export function useBuildCollectionRegistryController(props: {
         getParentCollectionIds,
         convertIdsToPaths,
         collectionRegistryRef
-    };
+    }), [
+        collections,
+        initialised,
+        getCollection,
+        getRawCollection,
+        getParentReferencesFromPath,
+        getParentCollectionIds,
+        convertIdsToPaths
+    ]);
 }

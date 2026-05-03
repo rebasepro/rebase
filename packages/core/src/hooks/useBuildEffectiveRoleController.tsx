@@ -1,5 +1,5 @@
 import type { EffectiveRoleController } from "@rebasepro/types";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useMemo } from "react";
 ;
 
 /**
@@ -24,8 +24,8 @@ export function useBuildEffectiveRoleController(): EffectiveRoleController {
         setEffectiveRole(newRole);
     }, []);
 
-    return {
+    return useMemo(() => ({
         effectiveRole,
         setEffectiveRole: setRoleInternal
-    };
+    }), [effectiveRole, setRoleInternal]);
 }

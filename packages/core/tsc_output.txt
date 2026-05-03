@@ -1,0 +1,29 @@
+src/components/AIIcon.tsx(2,33): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+src/components/ConfirmationDialog.tsx(3,90): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+src/components/ConfirmationDialog.tsx(25,28): error TS7006: Parameter 'open' implicitly has an 'any' type.
+src/components/Debug/UIReferenceView.tsx(62,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+src/components/Debug/UIStyleGuide.tsx(11,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+src/components/ErrorTooltip.tsx(2,39): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+src/components/ErrorView.tsx(3,49): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+src/components/LanguageToggle.tsx(2,82): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+src/components/LoginView/LoginView.tsx(13,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+src/components/LoginView/LoginView.tsx(492,36): error TS7006: Parameter 'event' implicitly has an 'any' type.
+src/components/LoginView/LoginView.tsx(507,32): error TS7006: Parameter 'event' implicitly has an 'any' type.
+src/components/LoginView/LoginView.tsx(521,32): error TS7006: Parameter 'event' implicitly has an 'any' type.
+src/components/LoginView/LoginView.tsx(711,32): error TS7006: Parameter 'event' implicitly has an 'any' type.
+src/components/NotFoundPage.tsx(3,36): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+src/components/UnsavedChangesDialog.tsx(2,87): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+src/components/UserDisplay.tsx(1,60): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+src/components/UserSelectPopover.tsx(12,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+src/components/UserSettingsView.tsx(12,8): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+src/components/UserSettingsView.tsx(136,53): error TS7006: Parameter 'v' implicitly has an 'any' type.
+src/components/UserSettingsView.tsx(151,36): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/UserSettingsView.tsx(156,36): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/core/Rebase.tsx(6,42): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+src/hooks/useBuildModeController.tsx(67,12): error TS2304: Cannot find name 'useMemo'.
+src/hooks/useSlot.tsx(5,31): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+src/util/enums.ts(2,69): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+src/util/icon_list.ts(2,26): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+src/util/icon_list.ts(7,11): error TS7006: Parameter 'importName' implicitly has an 'any' type.
+src/util/icons.tsx(2,57): error TS2307: Cannot find module '@rebasepro/ui' or its corresponding type declarations.
+src/util/icons.tsx(83,91): error TS7006: Parameter 'key' implicitly has an 'any' type.

@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { setIn } from "@rebasepro/formex";
 import { EntityCollection, SaveEntityProps, RebaseData, RebaseContext } from "@rebasepro/types";
 import { OnCellValueChange, saveEntityWithCallbacks, UniqueFieldValidator } from "@rebasepro/core";
@@ -72,8 +72,8 @@ export function useCollectionInlineEditor<M extends Record<string, unknown>>({
 
     }, [path, collection, dataClient, context]);
 
-    return {
+    return useMemo(() => ({
         onValueChange,
         uniqueFieldValidator
-    };
+    }), [onValueChange, uniqueFieldValidator]);
 }

@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { removeInitialAndTrailingSlashes, resolveCollectionPathIds } from "@rebasepro/common";
 import { CollectionRegistry } from "@rebasepro/common";
 
@@ -44,7 +44,7 @@ export function useNavigationURLs(basePath: string, baseCollectionPath: string, 
         return resolveCollectionPathIds(path, registry.getCollections());
     }, [collectionRegistryRef]);
 
-    return {
+    return useMemo(() => ({
         homeUrl,
         fullCollectionPath,
         buildAppUrlPath,
@@ -52,5 +52,5 @@ export function useNavigationURLs(basePath: string, baseCollectionPath: string, 
         isUrlCollectionPath,
         urlPathToDataPath,
         resolveDatabasePathsFrom
-    };
+    }), [homeUrl, fullCollectionPath, buildAppUrlPath, buildUrlCollectionPath, isUrlCollectionPath, urlPathToDataPath, resolveDatabasePathsFrom]);
 }

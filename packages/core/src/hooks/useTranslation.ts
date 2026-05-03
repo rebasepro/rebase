@@ -1,4 +1,5 @@
 import { useTranslation as useI18nTranslation } from "react-i18next";
+import { useCallback, useMemo } from "react";
 
 const REBASE_NS = "rebase_core";
 
@@ -24,8 +25,8 @@ export function useTranslation() {
      *   t("add_to_field", { fieldName: "Tags" })
      *   t("error_deleting", { message: err.message })
      */
-    const typedT = (key: string, vars?: Record<string, string>): string =>
-        t(key, vars) as string;
+    const typedT = useCallback((key: string, vars?: Record<string, string>): string =>
+        t(key, vars) as string, [t]);
 
-    return { t: typedT, i18n };
+    return useMemo(() => ({ t: typedT, i18n }), [typedT, i18n]);
 }

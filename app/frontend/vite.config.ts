@@ -31,7 +31,9 @@ export default defineConfig({
     css: {
         preprocessorOptions: {
             scss: {
-                includePaths: [path.resolve(__dirname, "../../packages")]
+                includePaths: [path.resolve(__dirname, "../../packages")],
+                api: 'modern-compiler',
+                silenceDeprecations: ['mixed-decls', 'color-functions', 'global-builtin', 'import', 'legacy-js-api', 'slash-div']
             }
         }
     },

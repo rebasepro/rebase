@@ -161,12 +161,12 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
 
     const [selectedCell, setSelectedCell] = React.useState<SelectedCellProps<M> | undefined>(undefined);
 
-    const loadNextPage = () => {
+    const loadNextPage = useCallback(() => {
         if (!paginationEnabled || dataLoading || noMoreToLoad)
             return;
         if (itemCount !== undefined)
             setItemCount?.(itemCount + pageSize);
-    };
+    }, [paginationEnabled, dataLoading, noMoreToLoad, itemCount, pageSize, setItemCount]);
 
     const resetPagination = useCallback(() => {
         setItemCount?.(pageSize);

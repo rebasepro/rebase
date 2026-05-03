@@ -140,7 +140,12 @@ export const MultiSelect = React.forwardRef<
             setSelectedValues(value ?? []);
         }, [value]);
 
-        function onItemClick(newValue: any) {
+        const updateValues = React.useCallback((values: any[]) => {
+            setSelectedValues(values);
+            onValueChange?.(values);
+        }, [onValueChange]);
+
+        const onItemClick = React.useCallback((newValue: any) => {
             let newSelectedValues: any[];
             if (selectedValues.some(v => String(v) === String(newValue))) {
                 newSelectedValues = selectedValues.filter(v => String(v) !== String(newValue));
@@ -148,12 +153,7 @@ export const MultiSelect = React.forwardRef<
                 newSelectedValues = [...selectedValues, newValue];
             }
             updateValues(newSelectedValues);
-        }
-
-        function updateValues(values: any[]) {
-            setSelectedValues(values);
-            onValueChange?.(values);
-        }
+        }, [selectedValues, updateValues]);
 
         const handleInputKeyDown = (
             event: React.KeyboardEvent<HTMLInputElement>
@@ -198,12 +198,13 @@ export const MultiSelect = React.forwardRef<
   // width: 400px;
 } `)
 
+        const contextValue = React.useMemo(() => ({
+            fieldValue: selectedValues,
+            onItemClick
+        }), [selectedValues, onItemClick]);
+
         return (
-            <MultiSelectContext.Provider
-                value={{
-                    fieldValue: selectedValues,
-                    onItemClick
-                }}>
+            <MultiSelectContext.Provider value={contextValue}>
 
                 {typeof label === "string" ? <SelectInputLabel error={error}>{label}</SelectInputLabel> : label}
 

@@ -1,5 +1,5 @@
 import type { EntityCollection } from "@rebasepro/types";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useData } from "./useData";
 import { Entity, EntityRelation, FilterValues } from "@rebasepro/types";
 export interface RelationItem {
@@ -237,7 +237,7 @@ export function useRelationSelector<M extends Record<string, any> = any>(
         };
     }, []);
 
-    return {
+    return useMemo(() => ({
         items,
         isLoading,
         error,
@@ -245,5 +245,5 @@ export function useRelationSelector<M extends Record<string, any> = any>(
         loadMore,
         hasMore,
         entityToRelationItem,
-    };
+    }), [items, isLoading, error, search, loadMore, hasMore, entityToRelationItem]);
 }

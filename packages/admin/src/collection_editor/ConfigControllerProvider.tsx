@@ -135,7 +135,7 @@ export const ConfigControllerProvider = React.memo(
             deleteCollections: true
         }), []);
 
-        const editCollection = ({
+        const editCollection = useCallback(({
             id,
             path,
             parentCollectionIds,
@@ -169,9 +169,9 @@ export const ConfigControllerProvider = React.memo(
                 initialView,
                 expandKanban
             });
-        };
+        }, [onAnalyticsEvent, pathSuggestions]);
 
-        const editProperty = ({
+        const editProperty = useCallback(({
             propertyKey,
             property,
             editedCollectionId,
@@ -211,9 +211,9 @@ export const ConfigControllerProvider = React.memo(
                 existingEntities,
                 collection
             });
-        };
+        }, [onAnalyticsEvent]);
 
-        const createCollection = ({
+        const createCollection = useCallback(({
             parentCollectionIds,
             parentCollection,
             initialValues,
@@ -256,7 +256,7 @@ export const ConfigControllerProvider = React.memo(
                 redirect,
                 pathSuggestions
             });
-        };
+        }, [onAnalyticsEvent, pathSuggestions]);
 
         // Build the dialog props objects that will be consumed by
         // CollectionEditorDialogs (rendered inside RebaseShell where CMS
@@ -385,17 +385,18 @@ export const ConfigControllerProvider = React.memo(
             propertyDialogProps
         }), [collectionDialogProps, propertyDialogProps]);
 
+        const collectionEditorContextValue = useMemo(() => ({
+            editCollection,
+            createCollection,
+            editProperty,
+            configPermissions: configPermissions ?? defaultConfigPermissions,
+            pathSuggestions,
+            configController: collectionConfigController
+        }), [editCollection, createCollection, editProperty, configPermissions, defaultConfigPermissions, pathSuggestions, collectionConfigController]);
+
         return (
             <ConfigControllerContext.Provider value={collectionConfigController}>
-                <CollectionEditorContext.Provider
-                    value={{
-                        editCollection,
-                        createCollection,
-                        editProperty,
-                        configPermissions: configPermissions ?? defaultConfigPermissions,
-                        pathSuggestions,
-                        configController: collectionConfigController
-                    }}>
+                <CollectionEditorContext.Provider value={collectionEditorContextValue}>
                     <CollectionEditorDialogsContext.Provider value={dialogsState}>
                         {children}
                     </CollectionEditorDialogsContext.Provider>

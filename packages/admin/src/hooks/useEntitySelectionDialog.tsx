@@ -1,6 +1,6 @@
 import { EntitySelectionProps, EntitySelectionTable } from "../components";
 import type { EntityCollection } from "@rebasepro/types";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useSideDialogsController } from "../index";
 import { useCollectionRegistryController } from "../index";
 
@@ -49,9 +49,9 @@ export function useEntitySelectionDialog<M extends Record<string, unknown>>(refe
         sideDialogsController.close();
     }, [sideDialogsController]);
 
-    return {
+    return useMemo(() => ({
         open,
         close
-    }
+    }), [open, close]);
 
 }

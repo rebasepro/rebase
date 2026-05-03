@@ -114,7 +114,7 @@ export function DataEnhancementControllerProvider({
         });
     }, []);
 
-    const appendValueDelta = (propertyKey: string, delta: string) => {
+    const appendValueDelta = useCallback((propertyKey: string, delta: string) => {
 
         const property = getPropertyFromKey(properties, propertyKey);
         if (delta === null || property?.disabled) {
@@ -136,9 +136,9 @@ export function DataEnhancementControllerProvider({
             ...prev,
             [propertyKey]: (prev[propertyKey] ?? "") + delta
         }));
-    };
+    }, [properties, formContext]);
 
-    const updateSuggestedValues = (currentValues: object, updatedValues: Record<string, string | number>, replaceValues: boolean) => {
+    const updateSuggestedValues = useCallback((currentValues: object, updatedValues: Record<string, string | number>, replaceValues: boolean) => {
 
         setLoadingSuggestions((prev) => {
             return prev.filter(p => !Object.keys(updatedValues).includes(p));
@@ -191,19 +191,23 @@ export function DataEnhancementControllerProvider({
                     };
                 }, {})
         }));
-    };
+    }, [properties, formContext]);
 
-    function displayNeededSubscriptionSnackbar(projectId: any) {
+    const displayNeededSubscriptionSnackbar = useCallback((projectId: any) => {
         snackbarController.open({
             type: "warning",
             message: "A valid subscription is needed in order to use this function.",
             autoHideDuration: 4000
-        })
-    }
+        });
+    }, [snackbarController]);
 
     const editorAIController = useEditorAIController({ getAuthToken: authController.getAuthToken });
 
-    const enhance = async (props: EnhanceParams<any>): Promise<EnhancedDataResult | null> => {
+    const clearAllSuggestions = useCallback(() => {
+        setSuggestions({});
+    }, []);
+
+    const enhance = useCallback(async (props: EnhanceParams<any>): Promise<EnhancedDataResult | null> => {
 
         if (!authController.user) {
             snackbarController.open({
@@ -285,12 +289,11 @@ export function DataEnhancementControllerProvider({
             } catch (e: any) {
                 onError(e);
             }
-        })
-    };
-
-    const clearAllSuggestions = useCallback(() => {
-        setSuggestions({});
-    }, []);
+        });
+    }, [
+        authController, urlController, path, clearSuggestion, clearAllSuggestions,
+        properties, host, apiKey, collection, updateSuggestedValues, appendValueDelta, displayNeededSubscriptionSnackbar, snackbarController
+    ]);
 
     const getSamplePrompts = useCallback(async (entityName: string, input?: string) => {
         const firebaseToken = await authController.getAuthToken()
@@ -301,9 +304,9 @@ export function DataEnhancementControllerProvider({
             apiKey,
             input
         });
-    }, [apiKey, authController.getAuthToken]);
+    }, [apiKey, authController.getAuthToken, host]);
 
-    const dataEnhancementController: DataEnhancementController = {
+    const dataEnhancementController: DataEnhancementController = useMemo(() => ({
         enabled,
         suggestions,
         clearSuggestion,
@@ -313,7 +316,17 @@ export function DataEnhancementControllerProvider({
         getSamplePrompts,
         loadingSuggestions,
         editorAIController
-    };
+    }), [
+        enabled,
+        suggestions,
+        clearSuggestion,
+        enhance,
+        allowReferenceDataSelection,
+        clearAllSuggestions,
+        getSamplePrompts,
+        loadingSuggestions,
+        editorAIController
+    ]);
 
     return (
         <DataEnhancementControllerContext.Provider

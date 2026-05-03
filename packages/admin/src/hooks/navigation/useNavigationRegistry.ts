@@ -1,5 +1,5 @@
 import type { EntityCollection } from "@rebasepro/types";
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useMemo } from "react";
 import { CollectionRegistry, getParentReferencesFromPath, getSubcollections, removeInitialAndTrailingSlashes } from "@rebasepro/common";
 import { EntityReference, UserConfigurationPersistence } from "@rebasepro/types";
 import { mergeDeep } from "@rebasepro/utils";
@@ -135,12 +135,18 @@ export function useNavigationRegistry(userConfigPersistence?: UserConfigurationP
         return paths;
     }, []);
 
-    return {
+    return useMemo(() => ({
         collectionRegistryRef,
         getCollection,
         getRawCollection,
         getParentReferencesFromPath: getAllParentReferencesForPath,
         getParentCollectionIds,
         convertIdsToPaths
-    };
+    }), [
+        getCollection,
+        getRawCollection,
+        getAllParentReferencesForPath,
+        getParentCollectionIds,
+        convertIdsToPaths
+    ]);
 }

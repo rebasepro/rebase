@@ -7,10 +7,10 @@ import {
     useAuthController,
     useCustomizationController,
     useData,
-    useRebaseContext,
     useSnackbarController,
     useTranslation
 } from "@rebasepro/core";
+import { useCMSContext } from "../hooks";
 import { EntityView } from "./EntityView";
 
 export interface DeleteEntityDialogProps<M extends Record<string, unknown>> {
@@ -43,7 +43,7 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
     const { t } = useTranslation();
     const [loading, setLoading] = useState(false);
 
-    const context = useRebaseContext();
+    const context = useCMSContext();
     const entityOrEntities = Array.isArray(entityOrEntitiesToDelete) && entityOrEntitiesToDelete.length === 1
         ? entityOrEntitiesToDelete[0]
         : entityOrEntitiesToDelete;

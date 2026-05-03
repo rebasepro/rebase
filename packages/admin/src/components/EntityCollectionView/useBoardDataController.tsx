@@ -497,7 +497,7 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
         return errors[0];
     }, [columnData]);
 
-    return {
+    return useMemo(() => ({
         columnData: columnData as Record<COLUMN, BoardColumnData<M>>,
         loadMoreColumn,
         refreshColumn,
@@ -506,5 +506,14 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
         decrementColumnCounts,
         loading,
         error
-    };
+    }), [
+        columnData,
+        loadMoreColumn,
+        refreshColumn,
+        refreshAll,
+        updateColumnCounts,
+        decrementColumnCounts,
+        loading,
+        error
+    ]);
 }

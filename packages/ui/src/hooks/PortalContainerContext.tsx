@@ -1,5 +1,5 @@
 "use client";
-import React, { createContext, useContext } from "react";
+import React, { createContext, useContext, useMemo } from "react";
 
 export interface PortalContainerContextType {
     container: HTMLElement | null;
@@ -28,8 +28,10 @@ export interface PortalContainerProviderProps {
  * ```
  */
 export function PortalContainerProvider({ container, children }: PortalContainerProviderProps) {
+    const contextValue = useMemo(() => ({ container }), [container]);
+
     return (
-        <PortalContainerContext.Provider value={{ container }}>
+        <PortalContainerContext.Provider value={contextValue}>
             {children}
         </PortalContainerContext.Provider>
     );

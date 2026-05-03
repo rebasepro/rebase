@@ -121,7 +121,7 @@ export function DefaultDrawer({
                 <div
                     ref={scrollRef}
                     onScroll={handleScroll}
-                    className={"mt-1 flex-grow overflow-y-auto overflow-x-visible no-scrollbar"}
+                    className={"flex-grow overflow-y-auto overflow-x-visible no-scrollbar"}
                     style={{
                         maskImage: scrolled
                             ? "linear-gradient(to bottom, transparent 0, black 20px, black calc(100% - 20px), transparent 100%)"
@@ -304,7 +304,7 @@ function DrawerModeSwitch({
         <div
             className={cls(
                 "overflow-hidden transition-all duration-200 ease-in-out px-3",
-                showSwitch ? "opacity-100 h-7 mt-2 mb-0.5" : "opacity-0 pointer-events-none h-2 mt-1 mb-0"
+                showSwitch ? "opacity-100 h-7 mt-2 mb-0" : "opacity-0 pointer-events-none h-2 mt-1 mb-0"
             )}
         >
             <div className="flex bg-surface-100 dark:bg-surface-800 rounded-lg p-0.5 border border-surface-200 dark:border-surface-700">

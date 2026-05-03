@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { deepEqual as equal } from "fast-equals";
 
 import { AuthController, Authenticator, RebaseData, StorageSource, User } from "@rebasepro/types";
@@ -106,10 +106,10 @@ export function useValidateAuthenticator<USER extends User = any>
         checkAuthentication();
     }, [checkAuthentication]);
 
-    return {
+    return useMemo(() => ({
         canAccessMainView,
         authLoading: authenticationEnabled && authLoading,
         notAllowedError,
         authVerified
-    }
+    }), [canAccessMainView, authenticationEnabled, authLoading, notAllowedError, authVerified]);
 }

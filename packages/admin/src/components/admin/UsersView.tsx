@@ -77,30 +77,36 @@ export function UsersView({ userManagement }: {
     const [userToReset, setUserToReset] = useState<User | undefined>();
     const [resetInProgress, setResetInProgress] = useState(false);
 
+    // Check if server-side search is available
+    const hasServerSearch = !!userManagement.searchUsers;
+
     // ---- Server-side pagination state ----
     const [searchQuery, setSearchQuery] = useState("");
     const [roleFilter, setRoleFilter] = useState<string>("");
     const [page, setPage] = useState(0);
     const [paginatedUsers, setPaginatedUsers] = useState<User[]>([]);
     const [totalUsers, setTotalUsers] = useState(0);
-    const [tableLoading, setTableLoading] = useState(false);
+    const [tableLoading, setTableLoading] = useState(hasServerSearch);
 
     // Debounce timer ref for search
     const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    // Check if server-side search is available
-    const hasServerSearch = !!userManagement.searchUsers;
 
     // Fallback: use in-memory users if no searchUsers
     const allUsers = userManagement.users;
 
     /**
-     * Fetch a page of users from the server
+     * Fetch a page of users from the server.
+     * Only shows the loading skeleton when we have no data yet (initial load).
+     * Subsequent re-fetches (pagination, search) update in-place without flashing.
      */
-    const fetchPage = useCallback(async (pageNum: number, search: string, filterRole: string) => {
+    const fetchPage = useCallback(async (pageNum: number, search: string, filterRole: string, forceLoading = false) => {
         if (!userManagement.searchUsers) return;
-        
-        setTableLoading(true);
+
+        // Only show skeleton on initial load or explicit requests (search/filter/page change).
+        // This avoids flashing skeletons when the effect re-fires from dep changes.
+        if (forceLoading) {
+            setTableLoading(true);
+        }
         try {
             const result = await userManagement.searchUsers({
                 search: search || undefined,
@@ -120,12 +126,19 @@ export function UsersView({ userManagement }: {
         }
     }, [userManagement.searchUsers, snackbarController]);
 
-    // Load initial page when delegate finishes loading
+    // Stable ref for fetchPage so the initial-load effect doesn't re-fire
+    // every time fetchPage's reference changes (which happens on parent re-renders).
+    const fetchPageRef = useRef(fetchPage);
+    fetchPageRef.current = fetchPage;
+    const initialFetchDone = useRef(false);
+
+    // Load initial page when delegate finishes loading — runs exactly once.
     useEffect(() => {
-        if (!delegateLoading && hasServerSearch) {
-            fetchPage(0, "", roleFilter);
+        if (!delegateLoading && hasServerSearch && !initialFetchDone.current) {
+            initialFetchDone.current = true;
+            fetchPageRef.current(0, "", roleFilter, true);
         }
-    }, [delegateLoading, hasServerSearch, fetchPage, roleFilter]);
+    }, [delegateLoading, hasServerSearch, roleFilter]);
 
     // Handle search changes (debounced)
     const handleSearch = useCallback((value: string) => {
@@ -138,7 +151,7 @@ export function UsersView({ userManagement }: {
 
         if (hasServerSearch) {
             searchTimerRef.current = setTimeout(() => {
-                fetchPage(0, value, roleFilter);
+                fetchPage(0, value, roleFilter, true);
             }, 300);
         }
     }, [hasServerSearch, fetchPage, roleFilter]);
@@ -147,7 +160,7 @@ export function UsersView({ userManagement }: {
         setRoleFilter(newRole);
         setPage(0);
         if (hasServerSearch) {
-            fetchPage(0, searchQuery, newRole);
+            fetchPage(0, searchQuery, newRole, true);
         }
     }, [hasServerSearch, fetchPage, searchQuery]);
 
@@ -155,7 +168,7 @@ export function UsersView({ userManagement }: {
     const handlePageChange = useCallback((newPage: number) => {
         setPage(newPage);
         if (hasServerSearch) {
-            fetchPage(newPage, searchQuery, roleFilter);
+            fetchPage(newPage, searchQuery, roleFilter, true);
         }
     }, [hasServerSearch, fetchPage, searchQuery, roleFilter]);
 

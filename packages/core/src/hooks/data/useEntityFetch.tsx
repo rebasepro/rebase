@@ -1,5 +1,5 @@
 import type { EntityCollection } from "@rebasepro/types";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Entity, RebaseContext, User } from "@rebasepro/types";
 import { useData } from "./useData";
 import { useRebaseContext } from "../useRebaseContext";
@@ -99,10 +99,10 @@ export function useEntityFetch<M extends Record<string, any>, USER extends User 
         }
     }, [entityId, path]);
 
-    return {
+    return useMemo(() => ({
         entity,
         dataLoading,
         dataLoadingError
-    };
+    }), [entity, dataLoading, dataLoadingError]);
 
 }

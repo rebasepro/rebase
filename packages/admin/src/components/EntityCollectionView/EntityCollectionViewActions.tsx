@@ -1,7 +1,7 @@
 import type { EntityCollection } from "@rebasepro/types";
 import React from "react";
 
-import { useAuthController, useRebaseContext, useLargeLayout, useTranslation, useSlot } from "@rebasepro/core";
+import { useAuthController, useLargeLayout, useTranslation, useSlot } from "@rebasepro/core";
 import { CollectionActionsProps, EntityTableController, SelectionController, ViewMode } from "@rebasepro/types";
 import {
     AddIcon,
@@ -19,6 +19,7 @@ import { ImportCollectionAction } from "../../data_import/import";
 import { ExportCollectionAction } from "../../data_export/export";
 import { EditorCollectionAction } from "../../collection_editor/ui/EditorCollectionAction";
 import { useCollectionEditorController } from "../../collection_editor/useCollectionEditorController";
+import { useCMSContext } from "../../index";
 
 export type EntityCollectionViewActionsProps<M extends Record<string, unknown>> = {
     collection: EntityCollection<M>;
@@ -49,8 +50,7 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
     compact,
     children
 }: EntityCollectionViewActionsProps<M>) {
-
-    const context = useRebaseContext();
+    const context = useCMSContext();
 
     const { canCreate, canDelete } = usePermissions();
 

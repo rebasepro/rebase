@@ -4,6 +4,8 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 import { deepEqual as equal } from "fast-equals"
 
+const EMPTY_ARRAY: any[] = [];
+
 import { CollectionSize, Entity, EntityReference, EntityTableController, FilterValues, PartialEntityCollection, SaveEntityProps, ViewMode } from "@rebasepro/types";
 import {
     EntityCollectionRowActions,
@@ -23,7 +25,6 @@ import {
     useCustomizationController,
     useData,
     useDataTableController,
-    useRebaseContext,
     useLargeLayout,
     usePermissions,
     useTranslation,
@@ -48,7 +49,8 @@ import {
     SearchIcon,
     Skeleton,
     Tooltip,
-    Typography
+    Typography,
+    VirtualTableColumn
 } from "@rebasepro/ui";
 import { setIn } from "@rebasepro/formex";
 import { getSubcollectionColumnId } from "../EntityCollectionTable/internal/common";
@@ -69,7 +71,7 @@ import { addRecentId, getRecentIds } from "./utils";
 import { useScrollRestoration } from "@rebasepro/core";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { mergeDeep } from "@rebasepro/utils";
-import { useCollectionRegistryController, useUrlController, useSideEntityController } from "../../index";
+import { useCollectionRegistryController, useUrlController, useSideEntityController, useCMSContext } from "../../index";
 import { useBreadcrumbsController } from "../../index";
 
 const DEFAULT_ENTITY_OPEN_MODE: "side_panel" | "full_screen" = "full_screen";
@@ -149,7 +151,7 @@ export const EntityCollectionView = React.memo(
     ) {
 
         const { t } = useTranslation();
-        const context = useRebaseContext();
+        const context = useCMSContext();
         const collectionRegistry = useCollectionRegistryController();
         const urlController = useUrlController();
         const breadcrumbs = useBreadcrumbsController();
@@ -393,14 +395,14 @@ export const EntityCollectionView = React.memo(
 
         const pluginAddColumnComponents = useSlot("collection.add-column", {
             path,
-            parentCollectionIds: parentCollectionIds ?? [],
+            parentCollectionIds: parentCollectionIds ?? EMPTY_ARRAY,
             collection,
             tableController
         });
 
         const pluginToolbarWidgets = useSlot("collection.toolbar", {
             path,
-            parentCollectionIds: parentCollectionIds ?? [],
+            parentCollectionIds: parentCollectionIds ?? EMPTY_ARRAY,
             collection: collection,
             tableController: tableController,
             selectionController: usedSelectionController
@@ -408,7 +410,7 @@ export const EntityCollectionView = React.memo(
 
         const pluginEmptyStates = useSlot("collection.empty-state", {
             path,
-            parentCollectionIds: parentCollectionIds ?? [],
+            parentCollectionIds: parentCollectionIds ?? EMPTY_ARRAY,
             collection,
             canCreate: canCreateEntities,
             onNewClick
@@ -612,10 +614,10 @@ export const EntityCollectionView = React.memo(
                         </Button>
                     )
                 };
-            }) ?? [];
+            }) ?? EMPTY_ARRAY;
 
             return [
-                ...(collection.additionalFields ?? []),
+                ...(collection.additionalFields ?? EMPTY_ARRAY),
                 ...subcollectionColumns
             ];
         }, [collection, path, sideEntityController]);
@@ -630,7 +632,7 @@ export const EntityCollectionView = React.memo(
         const isCompact = isSplitLayout && selectedEntityIdProp !== undefined;
         const activeSelectionEnabled = !isCompact && selectionEnabled;
 
-        const getActionsForEntity = ({
+        const getActionsForEntity = useCallback(({
             entity,
             customEntityActions
         }: {
@@ -646,15 +648,15 @@ export const EntityCollectionView = React.memo(
             if (customEntityActions)
                 return mergeEntityActions(actions, customEntityActions);
             return actions;
-        };
+        }, [canDelete, collection, path, createEnabled]);
 
-        const getIdColumnWidth = () => {
+        const getIdColumnWidth = useCallback(() => {
             const entityActions = getActionsForEntity({});
             const collapsedActions = entityActions.filter(a => a.collapsed !== false);
             const uncollapsedActions = entityActions.filter(a => a.collapsed === false);
             const actionsWidth = uncollapsedActions.length * (largeLayout ? 40 : 30);
             return (largeLayout ? (80 + actionsWidth) : (70 + actionsWidth)) + (collapsedActions.length > 0 ? (largeLayout ? 40 : 30) : 0);
-        };
+        }, [getActionsForEntity, largeLayout]);
 
         const tableRowActionsBuilder = useCallback(({
             entity,
@@ -669,7 +671,7 @@ export const EntityCollectionView = React.memo(
         }) => {
 
             const isSelected = Boolean(usedSelectionController.selectedEntities.find(e => e.id == entity.id && e.path == entity.path));
-            const customEntityActions = (collection.entityActions ?? [])
+            const customEntityActions = (collection.entityActions ?? EMPTY_ARRAY)
                 .map(action => resolveEntityAction(action, customizationController.entityActions))
                 .filter(Boolean) as EntityAction<M>[];
 
@@ -717,9 +719,9 @@ export const EntityCollectionView = React.memo(
         const { resolvedSlots } = customizationController;
 
         // Pre-compute header action slot contributions (avoid useSlot inside callback)
-        const headerActionContributions = resolvedSlots
+        const headerActionContributions = useMemo(() => resolvedSlots
             .filter(s => s.slot === "collection.header.action")
-            .sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
+            .sort((a, b) => (a.order ?? 50) - (b.order ?? 50)), [resolvedSlots]);
 
         const buildAdditionalHeaderWidget = useCallback(({
             property,
@@ -738,7 +740,7 @@ export const EntityCollectionView = React.memo(
                 path,
                 collection: collection as unknown as EntityCollection,
                 tableController: tableController as unknown as EntityTableController,
-                parentCollectionIds: parentCollectionIds ?? []
+                parentCollectionIds: parentCollectionIds ?? EMPTY_ARRAY
             };
             return <>{headerActionContributions.map((s, i) => (
                 <ErrorBoundary key={`header_action_${propertyKey}_${i}`}>
@@ -756,7 +758,38 @@ export const EntityCollectionView = React.memo(
                 );
             }
             : undefined;
+            
+        const onColumnsOrderChange = useCallback((newColumns: VirtualTableColumn[]) => {
+            // Extract property keys from the new column order
+            // Filter to only include actual property columns (not frozen columns, not additional fields, etc.)
+            // Deduplicate to clean up any previously duplicated keys
+            const seenKeys = new Set<string>();
+            const newPropertiesOrder = newColumns
+                .filter(col => !col.frozen && getPropertyInPath(collection.properties, col.key))
+                .map(col => col.key)
+                .filter(key => {
+                    if (seenKeys.has(key)) return false;
+                    seenKeys.add(key);
+                    return true;
+                });
 
+            // Optimistically update local state to prevent UI flickering
+            setLocalPropertiesOrder(newPropertiesOrder);
+
+            // Call each plugin's onColumnsReorder callback
+            if (customizationController?.plugins) {
+                customizationController.plugins
+                    .filter(plugin => plugin.hooks?.onColumnsReorder)
+                    .forEach(plugin => {
+                        plugin.hooks!.onColumnsReorder!({
+                            fullPath: path,
+                            parentCollectionIds: parentCollectionIds ?? EMPTY_ARRAY,
+                            collection,
+                            newPropertiesOrder
+                        });
+                    });
+            }
+        }, [collection, setLocalPropertiesOrder, customizationController, path, parentCollectionIds]);
 
 
         // Popover open state managed at parent level to prevent closing when view changes
@@ -813,7 +846,7 @@ export const EntityCollectionView = React.memo(
                 onTextSearch={tableController.setSearchString}
                 viewModeToggle={viewModeToggleElement}
                 actionsStart={<EntityCollectionViewStartActions
-                    parentCollectionIds={parentCollectionIds ?? []}
+                    parentCollectionIds={parentCollectionIds ?? EMPTY_ARRAY}
                     collection={collection}
                     tableController={tableController}
                     path={path}
@@ -824,7 +857,7 @@ export const EntityCollectionView = React.memo(
                     compact={isCompact} />}
                 actions={
                     <EntityCollectionViewActions
-                        parentCollectionIds={parentCollectionIds ?? []}
+                        parentCollectionIds={parentCollectionIds ?? EMPTY_ARRAY}
                         collection={collection}
                         tableController={tableController}
                         onMultipleDeleteClick={onMultipleDeleteClick}
@@ -915,37 +948,7 @@ export const EntityCollectionView = React.memo(
                     idPath={path}
                     collection={collection} />}
                 openEntityMode={openEntityMode}
-                onColumnsOrderChange={(newColumns) => {
-                    // Extract property keys from the new column order
-                    // Filter to only include actual property columns (not frozen columns, not additional fields, etc.)
-                    // Deduplicate to clean up any previously duplicated keys
-                    const seenKeys = new Set<string>();
-                    const newPropertiesOrder = newColumns
-                        .filter(col => !col.frozen && getPropertyInPath(collection.properties, col.key))
-                        .map(col => col.key)
-                        .filter(key => {
-                            if (seenKeys.has(key)) return false;
-                            seenKeys.add(key);
-                            return true;
-                        });
-
-                    // Optimistically update local state to prevent UI flickering
-                    setLocalPropertiesOrder(newPropertiesOrder);
-
-                    // Call each plugin's onColumnsReorder callback
-                    if (customizationController?.plugins) {
-                        customizationController.plugins
-                            .filter(plugin => plugin.hooks?.onColumnsReorder)
-                            .forEach(plugin => {
-                                plugin.hooks!.onColumnsReorder!({
-                                    fullPath: path,
-                                    parentCollectionIds: parentCollectionIds ?? [],
-                                    collection,
-                                    newPropertiesOrder
-                                });
-                            });
-                    }
-                }}
+                onColumnsOrderChange={onColumnsOrderChange}
             />
         );
 

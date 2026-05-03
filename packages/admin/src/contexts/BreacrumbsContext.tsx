@@ -22,10 +22,17 @@ export const BreadcrumbsProvider: React.FC<BreadcrumbsProviderProps> = ({ childr
     const set = useCallback((props: {
         breadcrumbs: BreadcrumbEntry[];
     }) => {
-        setBreadcrumbs(props.breadcrumbs);
+        setBreadcrumbs(prev => props.breadcrumbs.map(newEntry => {
+            const prevEntry = newEntry.id ? prev.find(p => p.id === newEntry.id) : undefined;
+            if (prevEntry && newEntry.count === null && typeof prevEntry.count === "number") {
+                return { ...newEntry, count: prevEntry.count };
+            }
+            return newEntry;
+        }));
     }, []);
 
     const updateCount = useCallback((id: string, count: number | null | undefined) => {
+        console.log("BreadcrumbsContext.updateCount", id, count);
         setBreadcrumbs(prev => prev.map(entry =>
             entry.id === id ? { ...entry, count } : entry
         ));

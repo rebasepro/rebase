@@ -1,5 +1,5 @@
 import type { EntityCollection, RebasePlugin } from "@rebasepro/types";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 
 import { AuthController, CollectionRegistryController, RebaseData,  User } from "@rebasepro/types";
 import type { EntityCollectionsBuilder } from "@rebasepro/types";
@@ -124,10 +124,10 @@ export function useResolvedCollections<EC extends EntityCollection, USER extends
         user
     ]);
 
-    return {
+    return useMemo(() => ({
         collections: resolvedCollections,
         loading,
         error,
         refresh
-    };
+    }), [resolvedCollections, loading, error, refresh]);
 }

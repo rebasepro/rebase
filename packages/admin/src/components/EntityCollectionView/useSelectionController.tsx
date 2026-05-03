@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Entity, SelectionController } from "@rebasepro/types";
 
 export function useSelectionController<M extends Record<string, unknown> = Record<string, unknown>>(
@@ -34,10 +34,10 @@ export function useSelectionController<M extends Record<string, unknown> = Recor
         return Boolean(selectedEntities.find(e => e.id === entity.id && e.path === entity.path));
     }, [selectedEntities]);
 
-    return {
+    return useMemo(() => ({
         selectedEntities,
         setSelectedEntities,
         isEntitySelected,
         toggleEntitySelection
-    };
+    }), [selectedEntities, setSelectedEntities, isEntitySelected, toggleEntitySelection]);
 }

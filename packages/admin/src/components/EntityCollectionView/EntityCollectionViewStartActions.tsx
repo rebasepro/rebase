@@ -1,7 +1,7 @@
 import type { Properties } from "@rebasepro/types";
 import type { EntityCollection } from "@rebasepro/types";
 import React, { useState, useCallback } from "react";
-import { useAuthController, useRebaseContext, useLargeLayout, useTranslation, useSlot } from "@rebasepro/core";
+import { useAuthController, useLargeLayout, useTranslation, useSlot } from "@rebasepro/core";
 import { CollectionActionsProps, EntityTableController, SelectionController } from "@rebasepro/types";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { ClearFilterSortButton } from "../ClearFilterSortButton";
@@ -9,7 +9,7 @@ import { FiltersDialog } from "./FiltersDialog";
 import { Badge, Button, cls, FilterListIcon, ArrowBackIcon, IconButton, Tooltip } from "@rebasepro/ui";
 import { toArray } from "@rebasepro/utils";
 import { useNavigate } from "react-router-dom";
-import { useUrlController } from "../../index";
+import { useUrlController, useCMSContext } from "../../index";
 
 export type EntityCollectionViewStartActionsProps<M extends Record<string, unknown>> = {
     collection: EntityCollection<M>;
@@ -38,7 +38,7 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
     compact
 }: EntityCollectionViewStartActionsProps<M>) {
 
-    const context = useRebaseContext();
+    const context = useCMSContext();
     const largeLayout = useLargeLayout();
     const { t } = useTranslation();
 

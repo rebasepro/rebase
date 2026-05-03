@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 
 const STORAGE_KEY_PREFIX = "rebase-collapsed-groups";
 
@@ -64,9 +64,9 @@ export function useCollapsedGroups(groupNames: string[], namespace: string = "de
         setCollapsedGroups(prev => ({ ...prev, [name]: !prev[name] }));
     }, []);
 
-    return {
+    return useMemo(() => ({
         isGroupCollapsed,
         toggleGroupCollapsed
-    };
+    }), [isGroupCollapsed, toggleGroupCollapsed]);
 }
 

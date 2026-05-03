@@ -1,5 +1,5 @@
 import type { AppView, EntityCollection, NavigationResult, RebasePlugin, NavigationStateController, UrlController, NavigationGroupMapping } from "@rebasepro/types";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 
 import { AuthController,  RebaseData, CollectionRegistryController, User } from "@rebasepro/types";
 import type { EntityCollectionsBuilder, AppViewsBuilder, EffectiveRoleController } from "@rebasepro/types";
@@ -111,7 +111,7 @@ export function useBuildNavigationStateController<EC extends EntityCollection, U
         refreshViews();
     }, [refreshCollections, refreshViews]);
 
-    return {
+    return useMemo(() => ({
         views,
         adminViews,
         topLevelNavigation,
@@ -119,5 +119,15 @@ export function useBuildNavigationStateController<EC extends EntityCollection, U
         navigationLoadingError: collectionsError ?? viewsError,
         refreshNavigation,
         plugins
-    };
+    }), [
+        views,
+        adminViews,
+        topLevelNavigation,
+        collectionsLoading,
+        viewsLoading,
+        collectionsError,
+        viewsError,
+        refreshNavigation,
+        plugins
+    ]);
 }

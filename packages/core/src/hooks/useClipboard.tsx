@@ -1,6 +1,6 @@
 // FORKED FROM https://github.com/fayeed/use-clipboard
 
-import { MutableRefObject, useCallback, useEffect, useRef, useState } from "react";
+import { MutableRefObject, useCallback, useEffect, useRef, useState, useMemo } from "react";
 
 export interface UseClipboardProps {
     /**
@@ -81,7 +81,7 @@ export const useClipboard = (
         if (copiedDuration) setTimeout(() => setIsCoppied(false), copiedDuration);
     }, [isCoppied]);
 
-    const isSupported = () => navigator.clipboard !== undefined;
+    const isSupported = useCallback(() => navigator.clipboard !== undefined, []);
 
     const handleError = useCallback((error: string) => {
         if (onError) onError(error);
@@ -104,16 +104,11 @@ export const useClipboard = (
             });
     }, [handleError, handleSuccess]);
 
-    const clearClipboard = () => {
+    const clearClipboard = useCallback(() => {
         if (isSupported()) {
             navigator.clipboard.writeText("");
         }
-    };
-
-    const copy = (text?: string) =>
-        action("copy", typeof text === "object" ? undefined : text);
-
-    const cut = () => action("cut");
+    }, [isSupported]);
 
     const action = useCallback(
         (operation = "copy", text?: string) => {
@@ -146,7 +141,12 @@ export const useClipboard = (
         [disableClipboardAPI, copyToClipboard, handleError]
     );
 
-    return {
+    const copy = useCallback((text?: string) =>
+        action("copy", typeof text === "object" ? undefined : text), [action]);
+
+    const cut = useCallback(() => action("cut"), [action]);
+
+    return useMemo(() => ({
         ref,
         isCoppied,
         clipboard,
@@ -154,5 +154,5 @@ export const useClipboard = (
         isSupported,
         copy,
         cut
-    };
+    }), [isCoppied, clipboard, clearClipboard, isSupported, copy, cut]);
 };

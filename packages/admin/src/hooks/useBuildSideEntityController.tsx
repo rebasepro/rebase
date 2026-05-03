@@ -1,6 +1,6 @@
 import type { EntityCollection } from "@rebasepro/types";
 import type { CustomizationController, EntitySidePanelProps, SideDialogPanelProps, SideDialogsController, SideEntityController, UrlController, NavigationStateController, Property } from "@rebasepro/types";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useMemo } from "react";
 import { AuthController, CollectionRegistryController } from "@rebasepro/types";
 import { useLocation } from "react-router-dom";
 import {
@@ -209,11 +209,11 @@ export const useBuildSideEntityController = (collectionRegistryController: Colle
 
     }, [urlController.buildUrlCollectionPath, urlController.resolveDatabasePathsFrom, sideDialogsController, smallLayout, authController.user, location.search]);
 
-    return {
+    return useMemo(() => ({
         close,
         open,
         replace
-    };
+    }), [close, open, replace]);
 };
 
 export function buildSidePanelsFromUrl(path: string, collections: EntityCollection[], newFlag: boolean): EntitySidePanelProps<any>[] {

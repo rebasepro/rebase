@@ -196,27 +196,7 @@ export const VirtualTable = React.memo<VirtualTableProps<any>>(
             setColumns(columnsProp);
         }, [columnsProp]);
 
-        const [_, setForceUpdate] = useState(false);
-        useEffect(() => {
-            // Create a ResizeObserver to detect size changes more aggressively
-            if (tableRef.current) {
-                const resizeObserver = new ResizeObserver(() => {
-                    // Force a re-render when size changes
-                    setForceUpdate(prev => !prev);
-                });
-
-                resizeObserver.observe(tableRef.current);
-
-                return () => {
-                    if (tableRef.current) {
-                        resizeObserver.unobserve(tableRef.current);
-                    }
-                    resizeObserver.disconnect();
-                };
-            }
-            return () => {
-            }
-        }, [tableRef]);
+    // Removed redundant ResizeObserver to prevent performance issues and UI flickering.
 
         const [measureRef, bounds] = useMeasure({
             debounce: 50,

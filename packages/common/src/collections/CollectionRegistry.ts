@@ -23,11 +23,13 @@ export class CollectionRegistry {
     private collectionsByTableName = new Map<string, EntityCollection>();
     private collectionsBySlug = new Map<string, EntityCollection>();
     private rootCollections: EntityCollection[] = [];
+    private cachedCollectionsList: EntityCollection[] | null = null;
 
     // Raw configuration layer (used by Collection Editor AST generator)
     private rawCollectionsByTableName = new Map<string, EntityCollection>();
     private rawCollectionsBySlug = new Map<string, EntityCollection>();
     private rawRootCollections: EntityCollection[] = [];
+    private cachedRawCollectionsList: EntityCollection[] | null = null;
 
     // Snapshot of raw input for idempotency check — compared BEFORE normalization
     // to avoid the issue where normalization creates new objects that always fail equality.
@@ -43,10 +45,12 @@ export class CollectionRegistry {
         this.collectionsByTableName.clear();
         this.collectionsBySlug.clear();
         this.rootCollections = [];
+        this.cachedCollectionsList = null;
 
         this.rawCollectionsByTableName.clear();
         this.rawCollectionsBySlug.clear();
         this.rawRootCollections = [];
+        this.cachedRawCollectionsList = null;
     }
 
     /**
@@ -299,11 +303,17 @@ export class CollectionRegistry {
     }
 
     getCollections(): EntityCollection[] {
-        return Array.from(this.collectionsByTableName.values());
+        if (!this.cachedCollectionsList) {
+            this.cachedCollectionsList = Array.from(this.collectionsByTableName.values());
+        }
+        return this.cachedCollectionsList;
     }
 
     getRawCollections(): EntityCollection[] {
-        return Array.from(this.rawCollectionsByTableName.values());
+        if (!this.cachedRawCollectionsList) {
+            this.cachedRawCollectionsList = Array.from(this.rawCollectionsByTableName.values());
+        }
+        return this.cachedRawCollectionsList;
     }
 
     /**

@@ -9,7 +9,7 @@ import { deepEqual as equal } from "fast-equals";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { getDefaultValuesFor, getLocalChangesBackup, isHidden, isReadOnly } from "@rebasepro/common";
 
-import { saveEntityWithCallbacks, useAuthController, useCustomizationController, useData, useRebaseContext, useSnackbarController, useTranslation, useSlot } from "@rebasepro/core";
+import { saveEntityWithCallbacks, useAuthController, useCustomizationController, useData, useSnackbarController, useTranslation, useSlot } from "@rebasepro/core";
 import { getFormFieldKeys } from "@rebasepro/core";
 import { Alert, CheckIcon, Chip, cls, EditIcon, NotesIcon, paperMixin, Tooltip, Typography } from "@rebasepro/ui";
 import { Formex, FormexController, getIn, setIn, useCreateFormex } from "@rebasepro/formex";
@@ -32,7 +32,7 @@ import { LocalChangesMenu } from "./components/LocalChangesMenu";
 import { useDebouncedCallback } from "@rebasepro/ui";
 import { getEntityTitlePropertyKey } from "../util/previews";
 import { getValueInPath, isObject, mergeDeep } from "@rebasepro/utils";
-import { useCollectionRegistryController, useSideEntityController } from "../index";
+import { useCollectionRegistryController, useSideEntityController, useCMSContext } from "../index";
 
 // extract touched values for nested touched trees and map to current values
 export function extractTouchedValues(values: any, touched: Record<string, boolean>): Record<string, any> {
@@ -196,7 +196,7 @@ export function EntityForm<M extends Record<string, unknown>>({
     const dataClient = useData();
     const snackbarController = useSnackbarController();
     const customizationController = useCustomizationController();
-    const context = useRebaseContext();
+    const context = useCMSContext();
     const analyticsController = useAnalyticsController();
 
     const [underlyingChanges] = useState<Partial<EntityValues<M>>>({});

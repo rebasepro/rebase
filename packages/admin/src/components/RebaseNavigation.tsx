@@ -13,6 +13,9 @@ import {
 import { CircularProgressCenter } from "@rebasepro/ui";
 import type { AppView, CollectionEditorOptions } from "@rebasepro/types";
 
+const EMPTY_PLUGINS: any[] = [];
+const EMPTY_COLLECTIONS: any[] = [];
+
 import { useBuildNavigationStateController } from "../hooks/navigation/useBuildNavigationStateController";
 import { useBuildUrlController } from "../hooks/navigation/useBuildUrlController";
 import { useBuildCollectionRegistryController } from "../hooks/navigation/useBuildCollectionRegistryController";
@@ -73,7 +76,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     }, [collectionEditorConfig]);
 
     // ── Combine CMS and Studio Configs ────────────────────────────────
-    const cmsCollections = registry.cmsConfig?.collections ?? [];
+    const cmsCollections = registry.cmsConfig?.collections ?? EMPTY_COLLECTIONS;
 
     // ── Build the navigation controllers ──────────────────────────────
     const collectionsBuilder = useMemo(() => Array.isArray(cmsCollections) ? () => [...cmsCollections] : cmsCollections, [cmsCollections]);
@@ -130,7 +133,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     }, [registry.studioConfig?.devViews, schemaView]);
 
     const navigationStateController = useBuildNavigationStateController({
-        plugins: registry.cmsConfig?.plugins ?? [],
+        plugins: registry.cmsConfig?.plugins ?? EMPTY_PLUGINS,
         collections: collectionsBuilder,
         views: devViews,
         authController: context.authController!,

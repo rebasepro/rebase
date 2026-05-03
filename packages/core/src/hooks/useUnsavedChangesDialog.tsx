@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { useBlocker } from "react-router-dom";
 import { UnsavedChangesDialogProps } from "../components/UnsavedChangesDialog";
 
@@ -50,13 +50,15 @@ export function useUnsavedChangesDialog(
         setManualDialogOpen(false);
     }, [blocker]);
 
-    return {
+    const triggerDialog = useCallback(() => setManualDialogOpen(true), []);
+
+    return useMemo(() => ({
         dialogProps: {
             open: manualDialogOpen || blocker.state === "blocked",
             handleOk,
             handleCancel,
             body: "There are unsaved changes in this collection"
         },
-        triggerDialog: () => setManualDialogOpen(true)
-    };
+        triggerDialog
+    }), [manualDialogOpen, blocker.state, handleOk, handleCancel, triggerDialog]);
 }

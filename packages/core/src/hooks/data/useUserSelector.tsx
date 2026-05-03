@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { User, UserManagementDelegate } from "@rebasepro/types";
 import { useInternalUserManagementController } from "../useInternalUserManagementController";
 
@@ -144,7 +144,7 @@ export function useUserSelector(
         return userManagement?.getUser(uid) ?? null;
     }, [userManagement]);
 
-    return {
+    return useMemo(() => ({
         items,
         isLoading,
         error,
@@ -152,5 +152,5 @@ export function useUserSelector(
         loadMore,
         hasMore,
         getUser
-    };
+    }), [items, isLoading, error, search, loadMore, hasMore, getUser]);
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { AuthClient, AuthController, User } from "@rebasepro/types";
 
 export function useAuthSubscription(authClient?: AuthClient): AuthController {
@@ -45,36 +45,43 @@ export function useAuthSubscription(authClient?: AuthClient): AuthController {
         return unsubscribe;
     }, [authClient]);
 
-    return {
+    const signOut = useCallback(async () => {
+        if (!authClient) return;
+        setAuthLoading(true);
+        try {
+            await authClient.signOut();
+        } finally {
+            setAuthLoading(false);
+        }
+    }, [authClient]);
+
+    const getAuthToken = useCallback(async () => {
+        if (!authClient) return "";
+        const session = authClient.getSession();
+        if (!session) return "";
+        if (session.expiresAt < Date.now()) {
+            try {
+                const refreshed = await authClient.refreshSession();
+                return refreshed.accessToken;
+            } catch (e) {
+                return "";
+            }
+        }
+        return session.accessToken;
+    }, [authClient]);
+
+    return useMemo(() => ({
         user,
         initialLoading: authClient ? initialLoading : false,
         authLoading,
-        signOut: async () => {
-            if (!authClient) return;
-            setAuthLoading(true);
-            try {
-                await authClient.signOut();
-            } finally {
-                setAuthLoading(false);
-            }
-        },
+        signOut,
         authError,
-        getAuthToken: async () => {
-            if (!authClient) return "";
-            const session = authClient.getSession();
-            if (!session) return "";
-            if (session.expiresAt < Date.now()) {
-                try {
-                    const refreshed = await authClient.refreshSession();
-                    return refreshed.accessToken;
-                } catch (e) {
-                    return "";
-                }
-            }
-            return session.accessToken;
-        },
+        getAuthToken,
         loginSkipped,
         extra,
         setExtra
-    } as AuthController;
+    } as AuthController), [
+        user, initialLoading, authLoading, signOut, authError, 
+        getAuthToken, loginSkipped, extra, setExtra, authClient
+    ]);
 }

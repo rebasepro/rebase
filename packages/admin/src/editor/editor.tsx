@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { EditorState } from "prosemirror-state";
 import { cls, defaultBorderMixin, Separator, useInjectStyles, TextareaAutosize } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/core";
@@ -201,7 +201,7 @@ export const RebaseEditor = ({
         {isMarkdownMode ? "Visual" : "Markdown"}
       </button>
 
-      <ProseMirrorContext.Provider value={{ state, view }}>
+      <ProseMirrorContext.Provider value={useMemo(() => ({ state, view }), [state, view])}>
 
         <div style={{ display: isMarkdownMode ? "none" : "block" }}>
           <div
