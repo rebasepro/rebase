@@ -244,16 +244,6 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         }
         const whereParams = Object.keys(whereMap).length > 0 ? whereMap : undefined;
         const orderByParams = sortByProperty ? `${String(sortByProperty)}:${currentSort}` : undefined;
-
-        // Eagerly include relations to avoid N+1 fetches in the table view.
-        // If the collection has any relation or reference properties, request
-        // all relations up-front so that RelationPreview/ReferencePreview
-        // components receive pre-fetched data instead of triggering individual
-        // API calls per cell.
-        const hasRelations = collection.properties && Object.values(collection.properties).some(
-            (p: any) => p.type === "relation" || p.type === "reference"
-        );
-        const includeParams = hasRelations ? ["*"] : undefined;
         
         let unsubscribe: (() => void) | undefined;
         
@@ -262,16 +252,14 @@ export function useDataTableController<M extends Record<string, any> = any, USER
                 where: whereParams,
                 limit: itemCount,
                 orderBy: orderByParams,
-                searchString,
-                include: includeParams
+                searchString
             }, ((res: FindResponse<M>) => onEntitiesUpdate(res.data)) as any, onError);
         } else {
             accessor.find({
                 where: whereParams,
                 limit: itemCount,
                 orderBy: orderByParams,
-                searchString,
-                include: includeParams
+                searchString
             })
                 .then(((res: FindResponse<M>) => onEntitiesUpdate(res.data)) as any)
                 .catch(onError);

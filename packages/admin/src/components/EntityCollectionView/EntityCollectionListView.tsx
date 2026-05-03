@@ -1,6 +1,9 @@
 import type { EntityCollection, Property } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CollectionSize, Entity, EntityTableController, SelectionController } from "@rebasepro/types";
+// @ts-ignore
+import { FixedSizeList as List, ListOnItemsRenderedProps } from "react-window";
+import useMeasure from "react-use-measure";
 import { getEntityImagePreviewPropertyKey } from "@rebasepro/common";
 import {
     Checkbox,
@@ -73,6 +76,21 @@ function getPreviewCount(size: CollectionSize): number {
         case "l": return 3;
         case "xl": return 4;
         default: return 2;
+    }
+}
+
+/**
+ * Fixed row height in pixels for react-window virtualisation.
+ * Must match the visual height produced by getRowClasses (padding + content).
+ */
+function getRowHeight(size: CollectionSize): number {
+    switch (size) {
+        case "xs": return 44;
+        case "s":  return 52;
+        case "m":  return 72;
+        case "l":  return 84;
+        case "xl": return 96;
+        default:   return 72;
     }
 }
 
@@ -232,8 +250,12 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
     const analyticsController = useAnalyticsController();
 
     const containerRef = useRef<HTMLDivElement>(null);
-    const loadMoreRef = useRef<HTMLDivElement>(null);
-    const hasRestoredScroll = useRef(false);
+    const listRef = useRef<List>(null);
+    const [measureRef, bounds] = useMeasure({
+        debounce: 50,
+        polyfill: ResizeObserver,
+        offsetSize: true
+    });
 
     const {
         data,
@@ -248,89 +270,48 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
 
     const isLoadingMore = useRef(false);
 
-    // Infinite scroll with Intersection Observer
+    // Infinite scroll via react-window onItemsRendered
+    const onItemsRendered = useCallback(({ visibleStopIndex }: ListOnItemsRenderedProps) => {
+        if (!paginationEnabled || noMoreToLoad || dataLoading || isLoadingMore.current) return;
+        // Trigger load when within 10 rows of the end
+        if (visibleStopIndex >= data.length - 10) {
+            isLoadingMore.current = true;
+            setItemCount?.((itemCount ?? pageSize) + pageSize);
+        }
+    }, [paginationEnabled, noMoreToLoad, dataLoading, data.length, itemCount, pageSize, setItemCount]);
+
+    // Reset the loading-more gate when new data arrives
     useEffect(() => {
-        if (!paginationEnabled || noMoreToLoad || dataLoading) return;
         if (!dataLoading) isLoadingMore.current = false;
+    }, [dataLoading]);
 
-        const observer = new IntersectionObserver(
-            (entries) => {
-                if (entries[0].isIntersecting && !dataLoading && !noMoreToLoad && !isLoadingMore.current) {
-                    isLoadingMore.current = true;
-                    setItemCount?.((itemCount ?? pageSize) + pageSize);
-                }
-            },
-            {
-                root: containerRef.current,
-                rootMargin: "400px",
-                threshold: 0
-            }
-        );
-
-        if (loadMoreRef.current) observer.observe(loadMoreRef.current);
-        return () => observer.disconnect();
-    }, [paginationEnabled, noMoreToLoad, dataLoading, itemCount, pageSize, setItemCount]);
-
-    // Scroll restoration — deferred to after layout paint so the container
-    // has enough scrollHeight for the scrollTop assignment to stick.
+    // Scroll restoration via react-window scrollTo
+    const hasRestoredScroll = useRef(false);
     useEffect(() => {
-        if (!containerRef.current || !initialScroll || hasRestoredScroll.current || data.length === 0) return;
-
-        let attempts = 0;
-        const maxAttempts = 5;
-
-        const tryRestore = () => {
-            const el = containerRef.current;
-            if (!el) return;
-
-            // If the container is tall enough to scroll to the target, apply it.
-            // Otherwise retry on the next frame (layout may still be pending).
-            if (el.scrollHeight >= initialScroll || attempts >= maxAttempts) {
-                el.scrollTop = initialScroll;
-                hasRestoredScroll.current = true;
-            } else {
-                attempts++;
-                requestAnimationFrame(tryRestore);
-            }
-        };
-
-        requestAnimationFrame(tryRestore);
+        if (!initialScroll || hasRestoredScroll.current || data.length === 0) return;
+        if (listRef.current) {
+            listRef.current.scrollTo(initialScroll);
+            hasRestoredScroll.current = true;
+        }
     }, [initialScroll, data.length]);
 
-    // Scroll tracking
+    // Scroll tracking via react-window onScroll
     const lastScrollOffset = useRef(0);
-    useEffect(() => {
-        const container = containerRef.current;
-        if (!container || !onScroll) return;
-
-        const handleScroll = () => {
-            const currentOffset = container.scrollTop;
-            const direction = currentOffset > lastScrollOffset.current ? "forward" : "backward";
-            lastScrollOffset.current = currentOffset;
-            onScroll({
-                scrollDirection: direction,
-                scrollOffset: currentOffset,
-                scrollUpdateWasRequested: false
-            });
-        };
-
-        container.addEventListener("scroll", handleScroll, { passive: true });
-        return () => container.removeEventListener("scroll", handleScroll);
+    const handleListScroll = useCallback(({ scrollDirection, scrollOffset, scrollUpdateWasRequested }: {
+        scrollDirection: "forward" | "backward";
+        scrollOffset: number;
+        scrollUpdateWasRequested: boolean;
+    }) => {
+        lastScrollOffset.current = scrollOffset;
+        onScroll?.({
+            scrollDirection,
+            scrollOffset,
+            scrollUpdateWasRequested
+        });
     }, [onScroll]);
 
-    // Responsive column count: measure container width
-    const [containerWidth, setContainerWidth] = useState(1200);
-    useEffect(() => {
-        const el = containerRef.current;
-        if (!el) return;
-        const ro = new ResizeObserver((entries) => {
-            for (const entry of entries) {
-                setContainerWidth(entry.contentRect.width);
-            }
-        });
-        ro.observe(el);
-        return () => ro.disconnect();
-    }, []);
+    // Responsive column count: derived from useMeasure bounds
+    const containerWidth = bounds.width || 1200;
 
     const resolvedCollection = collection;
 
@@ -457,6 +438,7 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
     }, [resolvedCollection, titlePropertyKey, statusPropertyKey, datePropertyKey, imagePropertyKey, previewKeys, size]);
 
     const showImage = size !== "xs";
+    const rowHeight = getRowHeight(size);
 
     // Responsive: determine visible columns based on container width.
     // The first extra column requires significantly more available space (600px)
@@ -514,10 +496,40 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
     // Empty state
     const isEmpty = !dataLoading && data.length === 0 && !dataLoadingError;
 
+    // Memoised row renderer for react-window
+    const Row = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
+        const entity = data[index];
+        if (!entity) return null;
+        return (
+            <div style={style}>
+                <ListRow
+                    entity={entity}
+                    collection={resolvedCollection}
+                    onClick={handleEntityClick}
+                    selected={isEntitySelected(entity)}
+                    highlighted={isEntityHighlighted(entity)}
+                    onSelectionChange={handleSelectionChange}
+                    selectionEnabled={selectionEnabled}
+                    columns={visibleColumns}
+                    slotKeys={slotKeys}
+                    rowClasses={rowClasses}
+                    showImage={showImage}
+                    size={size}
+                    isLast={index === data.length - 1}
+                    isActive={selectedEntityId !== undefined && entity.id === selectedEntityId}
+                />
+            </div>
+        );
+    }, [data, resolvedCollection, handleEntityClick, isEntitySelected, isEntityHighlighted, handleSelectionChange, selectionEnabled, visibleColumns, slotKeys, rowClasses, showImage, size, selectedEntityId]);
+
     return (
         <div
-            ref={containerRef}
-            className="flex-1 overflow-auto bg-white dark:bg-surface-950"
+            ref={(node) => {
+                // Merge refs: useMeasure + containerRef
+                measureRef(node);
+                (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+            }}
+            className="flex-1 overflow-hidden bg-white dark:bg-surface-950"
         >
             {/* Error state */}
             {dataLoadingError ? (
@@ -535,45 +547,34 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
                     )}
                 </div>
             ) : (
-            <div className="w-full overflow-hidden">
+                <>
+                    <List
+                        ref={listRef}
+                        height={bounds.height || 600}
+                        width={bounds.width || "100%"}
+                        itemCount={data.length}
+                        itemSize={rowHeight}
+                        overscanCount={8}
+                        onScroll={handleListScroll}
+                        onItemsRendered={onItemsRendered}
+                    >
+                        {Row}
+                    </List>
 
-
-                {/* Entity rows */}
-                {data.map((entity, index) => (
-                    <ListRow
-                        key={`${entity.path}_${entity.id}`}
-                        entity={entity}
-                        collection={resolvedCollection}
-                        onClick={handleEntityClick}
-                        selected={isEntitySelected(entity)}
-                        highlighted={isEntityHighlighted(entity)}
-                        onSelectionChange={handleSelectionChange}
-                        selectionEnabled={selectionEnabled}
-                        columns={visibleColumns}
-                        slotKeys={slotKeys}
-                        rowClasses={rowClasses}
-                        showImage={showImage}
-                        size={size}
-                        isLast={index === data.length - 1}
-                        isActive={selectedEntityId !== undefined && entity.id === selectedEntityId}
-                    />
-                ))}
-
-                {/* Load more trigger / Loading indicator */}
-                <div
-                    ref={loadMoreRef}
-                    className="flex items-center justify-center py-6"
-                >
+                    {/* Loading indicator (below the virtual list) */}
                     {dataLoading && (
-                        <CircularProgress size="small" />
+                        <div className="flex items-center justify-center py-4">
+                            <CircularProgress size="small" />
+                        </div>
                     )}
                     {!dataLoading && noMoreToLoad && data.length > 0 && (
-                        <Typography variant="caption" color="secondary">
-                            All {data.length} entries loaded
-                        </Typography>
+                        <div className="flex items-center justify-center py-2">
+                            <Typography variant="caption" color="secondary">
+                                All {data.length} entries loaded
+                            </Typography>
+                        </div>
                     )}
-                </div>
-            </div>
+                </>
             )}
         </div>
     );
