@@ -7,7 +7,7 @@ import { createPostgresDatabaseConnection } from "@rebasepro/server-postgresql";
 import { env } from "./env.js";
 import {
     authors, posts, tags, profiles, products, orders,
-    postsTags, ordersProducts
+    postsTags, customers, orderItems
 } from "./schema.generated.js";
 import fs from "fs";
 import path from "path";
@@ -367,36 +367,188 @@ async function runSeed() {
         }
         console.log(`  ✅ Created ${ptValues.length} post-tag associations`);
 
-        // ── Products ──────────────────────────────────────────────────
-        console.log("📦 Generating 30 products...");
-        const categories = ["electronics", "clothing", "home"] as const;
-        const productValues = [];
-        for (let i = 1; i <= 30; i++) {
-            const cat = pick([...categories]);
-            productValues.push({ id: i, name: `Premium ${cat} Item ${i}`, description: `High quality ${cat} product.`, price: (Math.random() * 200 + 10).toFixed(2), stock: Math.floor(Math.random() * 500).toString(), category: cat as any });
+        // ── Customers ──────────────────────────────────────────────────
+        console.log("👤 Generating 40 customers...");
+        const companies = ["Acme Corp", "Globex Inc", "Initech", "Umbrella LLC", "Stark Industries", "Wayne Enterprises", "Oscorp", "Cyberdyne Systems", null, null, null, null];
+        const streets = ["123 Main St", "456 Oak Ave", "789 Pine Rd", "321 Elm Blvd", "654 Maple Dr", "987 Cedar Ln", "111 Broadway", "222 Market St", "333 Park Ave", "444 Lake Rd"];
+        const cities = ["New York, NY 10001", "San Francisco, CA 94102", "Austin, TX 73301", "Chicago, IL 60601", "Seattle, WA 98101", "Miami, FL 33101", "Denver, CO 80201", "Portland, OR 97201", "Boston, MA 02101", "Nashville, TN 37201"];
+        const customerValues = [];
+        for (let i = 1; i <= 40; i++) {
+            const fn = pick(firstNames);
+            const ln = pick(lastNames);
+            const addr = `${pick(streets)}\n${pick(cities)}`;
+            customerValues.push({
+                first_name: fn,
+                last_name: ln,
+                email: `${fn.toLowerCase()}.${ln.toLowerCase()}${i}@example.com`,
+                phone: `+1-${String(Math.floor(Math.random() * 900) + 100)}-${String(Math.floor(Math.random() * 900) + 100)}-${String(Math.floor(Math.random() * 9000) + 1000)}`,
+                company: pick(companies),
+                shipping_address: addr,
+                billing_address: Math.random() > 0.3 ? addr : `${pick(streets)}\n${pick(cities)}`,
+                notes: Math.random() > 0.7 ? pick(["VIP customer", "Wholesale buyer", "Preferred shipping: FedEx", "Tax exempt", ""]) : null,
+                created_at: randomDate(365, 30),
+                updated_at: randomDate(30, 0),
+            });
         }
+        await db.insert(customers).values(customerValues);
+
+        // ── Products ──────────────────────────────────────────────────
+        console.log("📦 Generating 50 products...");
+        const productCatalog: { name: string; sku: string; cat: string; price: number; cost: number; weight: number; desc: string }[] = [
+            { name: "MacBook Pro 16\" M4", sku: "ELEC-MBP16-M4", cat: "electronics", price: 2499, cost: 1800, weight: 2100, desc: "Apple MacBook Pro 16-inch with M4 Pro chip, 18GB RAM, 512GB SSD" },
+            { name: "Sony WH-1000XM5 Headphones", sku: "ELEC-SONY-XM5", cat: "electronics", price: 349.99, cost: 210, weight: 250, desc: "Industry-leading noise cancellation with exceptional sound quality" },
+            { name: "Samsung 4K OLED Monitor 32\"", sku: "ELEC-SAM-32OLED", cat: "electronics", price: 1299, cost: 850, weight: 8500, desc: "32-inch 4K OLED monitor with 120Hz refresh rate, perfect for creative professionals" },
+            { name: "Logitech MX Master 3S", sku: "ELEC-LOG-MX3S", cat: "electronics", price: 99.99, cost: 45, weight: 141, desc: "Advanced wireless mouse with ultra-fast scrolling" },
+            { name: "Keychron Q1 Pro Keyboard", sku: "ELEC-KEY-Q1PRO", cat: "electronics", price: 199, cost: 95, weight: 1700, desc: "75% wireless mechanical keyboard with hot-swappable switches" },
+            { name: "iPad Air M2", sku: "ELEC-IPAD-AIRM2", cat: "electronics", price: 599, cost: 420, weight: 462, desc: "10.9-inch Liquid Retina display, M2 chip, 128GB" },
+            { name: "Anker 737 Power Bank", sku: "ELEC-ANK-737", cat: "electronics", price: 109.99, cost: 55, weight: 640, desc: "24,000mAh portable charger with 140W output" },
+            { name: "Premium Wool Overcoat", sku: "CLO-WOOL-OC001", cat: "clothing", price: 289, cost: 120, weight: 1800, desc: "Italian wool blend overcoat, tailored fit, charcoal grey" },
+            { name: "Merino V-Neck Sweater", sku: "CLO-MER-VN001", cat: "clothing", price: 89, cost: 32, weight: 350, desc: "100% Australian merino wool, available in 6 colors" },
+            { name: "Selvedge Denim Jeans", sku: "CLO-DEN-SEL001", cat: "clothing", price: 168, cost: 55, weight: 900, desc: "Japanese selvedge denim, slim fit, raw indigo" },
+            { name: "Organic Cotton T-Shirt Pack (3)", sku: "CLO-COT-TS003", cat: "clothing", price: 49.99, cost: 15, weight: 450, desc: "Pack of 3 organic cotton crew neck tees, classic fit" },
+            { name: "Leather Chelsea Boots", sku: "CLO-LTR-CB001", cat: "clothing", price: 245, cost: 98, weight: 1400, desc: "Full-grain leather Chelsea boots with Goodyear welt construction" },
+            { name: "Performance Running Jacket", sku: "CLO-RUN-JK001", cat: "clothing", price: 135, cost: 48, weight: 280, desc: "Lightweight, water-resistant running jacket with reflective details" },
+            { name: "Ceramic Plant Pot Set", sku: "HG-CER-PS003", cat: "home_garden", price: 59.99, cost: 22, weight: 3200, desc: "Set of 3 handcrafted ceramic pots with drainage holes, matte finish" },
+            { name: "Smart LED Grow Light", sku: "HG-LED-GL001", cat: "home_garden", price: 79.99, cost: 35, weight: 1200, desc: "Full-spectrum grow light with app control and timer" },
+            { name: "Bamboo Cutting Board Set", sku: "HG-BAM-CB003", cat: "home_garden", price: 44.99, cost: 16, weight: 2800, desc: "Set of 3 organic bamboo cutting boards, antimicrobial" },
+            { name: "Cast Iron Dutch Oven 6qt", sku: "HG-CI-DO006", cat: "home_garden", price: 149, cost: 65, weight: 5400, desc: "Enameled cast iron dutch oven, perfect for soups and stews" },
+            { name: "Linen Duvet Cover Set", sku: "HG-LIN-DC001", cat: "home_garden", price: 199, cost: 72, weight: 2100, desc: "100% French linen duvet cover and 2 pillowcases, stone-washed" },
+            { name: "Carbon Steel Road Bike", sku: "SPT-BIK-RD001", cat: "sports", price: 899, cost: 450, weight: 9500, desc: "Shimano 105 groupset, carbon fork, 700c wheels" },
+            { name: "Yoga Mat Premium 6mm", sku: "SPT-YOG-MT001", cat: "sports", price: 68, cost: 18, weight: 1800, desc: "Non-slip natural rubber yoga mat with alignment markings" },
+            { name: "Adjustable Dumbbell Set", sku: "SPT-DUM-AD001", cat: "sports", price: 349, cost: 165, weight: 24000, desc: "5-52.5 lb adjustable dumbbells, pair" },
+            { name: "Trail Running Shoes", sku: "SPT-TRL-RS001", cat: "sports", price: 159, cost: 62, weight: 620, desc: "Vibram outsole, waterproof Gore-Tex membrane, supportive midsole" },
+            { name: "Camping Tent 4-Person", sku: "SPT-TEN-4P001", cat: "sports", price: 279, cost: 120, weight: 4200, desc: "3-season dome tent with full rainfly and vestibule" },
+            { name: "TypeScript Design Patterns", sku: "BOK-TS-DP001", cat: "books", price: 49.99, cost: 12, weight: 650, desc: "Comprehensive guide to design patterns in TypeScript, 2025 edition" },
+            { name: "System Design Interview Vol. 2", sku: "BOK-SDI-V2001", cat: "books", price: 39.99, cost: 10, weight: 580, desc: "Step-by-step framework for system design interviews" },
+            { name: "The Art of PostgreSQL", sku: "BOK-PG-ART001", cat: "books", price: 59, cost: 15, weight: 720, desc: "Advanced PostgreSQL techniques for application developers" },
+            { name: "Organic Matcha Powder 100g", sku: "FB-MAT-100G", cat: "food_beverage", price: 34.99, cost: 14, weight: 120, desc: "Ceremonial grade organic matcha from Uji, Kyoto" },
+            { name: "Single Origin Coffee Beans 1kg", sku: "FB-COF-1KG", cat: "food_beverage", price: 28, cost: 11, weight: 1050, desc: "Ethiopian Yirgacheffe, light roast, specialty grade" },
+            { name: "Artisan Chocolate Box", sku: "FB-CHO-BOX12", cat: "food_beverage", price: 42, cost: 18, weight: 400, desc: "12-piece assorted single-origin chocolate truffles" },
+            { name: "Vitamin D3+K2 Supplement", sku: "HB-VIT-D3K2", cat: "health_beauty", price: 24.99, cost: 6, weight: 80, desc: "120 capsules, 5000 IU D3 + 200mcg K2-MK7" },
+            { name: "Organic Face Moisturizer", sku: "HB-FCE-MO001", cat: "health_beauty", price: 38, cost: 12, weight: 120, desc: "Lightweight daily moisturizer with hyaluronic acid and vitamin E" },
+            { name: "Electric Toothbrush Pro", sku: "HB-ETB-PRO01", cat: "health_beauty", price: 89.99, cost: 35, weight: 320, desc: "Sonic toothbrush with 5 modes, pressure sensor, and travel case" },
+            { name: "LEGO Architecture Set", sku: "TOY-LEG-ARC01", cat: "toys", price: 119.99, cost: 55, weight: 1200, desc: "Skyline Collection: New York City, 598 pieces" },
+            { name: "Strategy Board Game Deluxe", sku: "TOY-BGM-STR01", cat: "toys", price: 64.99, cost: 25, weight: 1800, desc: "Euro-style strategy game, 2-5 players, 60-120 min playtime" },
+            { name: "RC Drone with 4K Camera", sku: "TOY-DRN-4K01", cat: "toys", price: 299, cost: 130, weight: 950, desc: "Foldable drone with 4K gimbal camera, 30 min flight time" },
+        ];
+        // Add some duplicates with variations to get to 50
+        const extraProducts = [
+            { name: "USB-C Hub 7-in-1", sku: "ELEC-USB-HUB7", cat: "electronics", price: 49.99, cost: 18, weight: 120, desc: "HDMI, USB-A x3, SD, microSD, USB-C PD passthrough" },
+            { name: "Wireless Earbuds Pro", sku: "ELEC-WEB-PRO1", cat: "electronics", price: 179, cost: 65, weight: 58, desc: "Active noise cancellation, 30hr battery with case" },
+            { name: "Standing Desk Mat", sku: "HG-DSK-MAT01", cat: "home_garden", price: 79, cost: 28, weight: 2800, desc: "Anti-fatigue standing desk mat with massage points" },
+            { name: "Stainless Steel Water Bottle", sku: "SPT-WTR-SS001", cat: "sports", price: 34.99, cost: 9, weight: 350, desc: "32oz insulated, keeps cold 24hrs / hot 12hrs" },
+            { name: "Resistance Band Set", sku: "SPT-RBS-SET01", cat: "sports", price: 29.99, cost: 8, weight: 450, desc: "5 bands with handles, door anchor, and carry bag" },
+            { name: "Essential Oil Diffuser", sku: "HB-EOD-001", cat: "health_beauty", price: 45, cost: 15, weight: 380, desc: "Ultrasonic aromatherapy diffuser with color-changing LED" },
+            { name: "French Press Coffee Maker", sku: "FB-FP-34OZ", cat: "food_beverage", price: 36, cost: 12, weight: 850, desc: "Double-wall borosilicate glass, 34oz capacity" },
+            { name: "Wireless Charging Pad", sku: "ELEC-WCP-15W", cat: "electronics", price: 29.99, cost: 10, weight: 100, desc: "15W Qi wireless charger, compatible with all Qi devices" },
+            { name: "Hiking Backpack 40L", sku: "SPT-HBP-40L", cat: "sports", price: 129, cost: 48, weight: 1200, desc: "Waterproof 40L pack with rain cover, hip belt, hydration-ready" },
+            { name: "Puzzle 1000 Pieces - World Map", sku: "TOY-PUZ-WM01", cat: "toys", price: 24.99, cost: 7, weight: 650, desc: "Premium quality 1000-piece jigsaw puzzle, vintage world map" },
+            { name: "Mechanical Pencil Set", sku: "BOK-MPC-SET1", cat: "books", price: 18.99, cost: 5, weight: 120, desc: "0.5mm and 0.7mm mechanical pencils with lead refills and erasers" },
+            { name: "Smart Home Hub", sku: "ELEC-SHH-001", cat: "electronics", price: 129, cost: 55, weight: 340, desc: "Matter-compatible smart home hub with Thread and Zigbee" },
+            { name: "Cashmere Scarf", sku: "CLO-CSH-SC001", cat: "clothing", price: 145, cost: 52, weight: 180, desc: "100% Mongolian cashmere, oversized wrap scarf" },
+            { name: "Garden Tool Set", sku: "HG-GTL-SET5", cat: "home_garden", price: 54.99, cost: 20, weight: 2400, desc: "5-piece stainless steel garden tools with ergonomic handles" },
+            { name: "Protein Bar Box (12)", sku: "FB-PRB-BOX12", cat: "food_beverage", price: 32, cost: 14, weight: 720, desc: "12 high-protein bars, mixed flavors, 20g protein each" },
+        ];
+        const allProducts = [...productCatalog, ...extraProducts];
+        const productValues = allProducts.map((p, i) => ({
+            name: p.name,
+            sku: p.sku,
+            description: p.desc,
+            category: p.cat as any,
+            price: p.price.toFixed(2),
+            compare_at_price: Math.random() > 0.7 ? (p.price * (1.1 + Math.random() * 0.4)).toFixed(2) : null,
+            cost: p.cost.toFixed(2),
+            stock_quantity: String(Math.floor(Math.random() * 200) + 5),
+            low_stock_threshold: String(Math.floor(Math.random() * 15) + 5),
+            weight_grams: String(p.weight),
+            status: (pick(["active", "active", "active", "active", "draft", "archived"])) as any,
+            is_featured: Math.random() > 0.8,
+            created_at: randomDate(300, 30),
+            updated_at: randomDate(30, 0),
+        }));
         await db.insert(products).values(productValues);
 
-        // ── Orders ────────────────────────────────────────────────────
-        console.log("🛒 Generating 50 orders...");
-        const orderStatuses = ["pending", "shipped", "delivered", "cancelled"] as const;
+        // ── Orders + Order Items ──────────────────────────────────────
+        const NUM_ORDERS = 80;
+        console.log(`🛒 Generating ${NUM_ORDERS} orders with line items...`);
+        const orderStatuses = ["pending", "confirmed", "processing", "shipped", "delivered", "delivered", "delivered", "cancelled", "refunded"] as const;
+        const paymentStatuses = ["unpaid", "paid", "paid", "paid", "paid", "partially_refunded", "refunded"] as const;
+        const currencies = ["USD", "USD", "USD", "EUR", "GBP", "CAD"] as const;
+        const carriers = ["UPS", "FedEx", "USPS", "DHL"];
         const orderValues = [];
-        for (let i = 1; i <= 50; i++) {
-            orderValues.push({ id: i, customer_name: randomName(), status: pick([...orderStatuses]) as any });
+        const allOrderItems: { order_id: number; product_id: number; product_name: string; sku: string; quantity: string; unit_price: string; line_total: string }[] = [];
+
+        for (let i = 1; i <= NUM_ORDERS; i++) {
+            const status = pick([...orderStatuses]);
+            const isDelivered = status === "delivered";
+            const isShipped = status === "shipped" || isDelivered;
+            const isCancelled = status === "cancelled" || status === "refunded";
+            const payStatus = isCancelled ? (status === "refunded" ? "refunded" : "paid") : pick([...paymentStatuses]) as string;
+
+            // Pick 1-5 products for this order
+            const numItems = 1 + Math.floor(Math.random() * 4);
+            const orderProductIndices = new Set<number>();
+            while (orderProductIndices.size < numItems) {
+                orderProductIndices.add(Math.floor(Math.random() * allProducts.length));
+            }
+
+            let subtotal = 0;
+            for (const pIdx of orderProductIndices) {
+                const prod = allProducts[pIdx];
+                const qty = 1 + Math.floor(Math.random() * 3);
+                const lineTotal = prod.price * qty;
+                subtotal += lineTotal;
+                allOrderItems.push({
+                    order_id: i,
+                    product_id: pIdx + 1,
+                    product_name: prod.name,
+                    sku: prod.sku,
+                    quantity: String(qty),
+                    unit_price: prod.price.toFixed(2),
+                    line_total: lineTotal.toFixed(2),
+                });
+            }
+
+            const taxRate = 0.08 + Math.random() * 0.04;
+            const taxAmount = subtotal * taxRate;
+            const shippingCost = subtotal > 100 ? 0 : 9.99 + Math.random() * 10;
+            const discountAmount = Math.random() > 0.7 ? subtotal * (0.05 + Math.random() * 0.15) : 0;
+            const total = subtotal + taxAmount + shippingCost - discountAmount;
+
+            const orderDate = randomDate(180, 1);
+            const shippedDate = isShipped ? new Date(new Date(orderDate).getTime() + (1 + Math.random() * 3) * 86400000).toISOString() : null;
+            const deliveredDate = isDelivered && shippedDate ? new Date(new Date(shippedDate).getTime() + (2 + Math.random() * 5) * 86400000).toISOString() : null;
+            const custId = Math.floor(Math.random() * 40) + 1;
+
+            orderValues.push({
+                order_number: `ORD-${String(2025)}-${String(i).padStart(4, "0")}`,
+                customer_id: custId,
+                status: status as any,
+                payment_status: payStatus as any,
+                subtotal: subtotal.toFixed(2),
+                tax_amount: taxAmount.toFixed(2),
+                shipping_cost: shippingCost.toFixed(2),
+                discount_amount: discountAmount > 0 ? discountAmount.toFixed(2) : "0",
+                total: total.toFixed(2),
+                currency: pick([...currencies]) as any,
+                shipping_address: customerValues[(custId - 1)].shipping_address,
+                tracking_number: isShipped ? `${pick(carriers)}-${String(Math.floor(Math.random() * 9000000000) + 1000000000)}` : null,
+                notes: Math.random() > 0.8 ? pick(["Gift wrap requested", "Leave at front door", "Fragile items", "Rush order", ""]) : null,
+                order_date: orderDate,
+                shipped_date: shippedDate,
+                delivered_date: deliveredDate,
+                created_at: orderDate,
+                updated_at: randomDate(10, 0),
+            });
         }
-        await db.insert(orders).values(orderValues);
 
-        // ── Order-product associations ────────────────────────────────
-        const opValues: { order_id: number; product_id: number }[] = [];
-        for (let i = 1; i <= 50; i++) {
-            const n = 1 + Math.floor(Math.random() * 4);
-            const assigned = new Set<number>();
-            for (let j = 0; j < n; j++) assigned.add(Math.floor(Math.random() * 30) + 1);
-            for (const p of assigned) opValues.push({ order_id: i, product_id: p });
+        for (let i = 0; i < orderValues.length; i += BATCH) {
+            await db.insert(orders).values(orderValues.slice(i, i + BATCH));
         }
-        await db.insert(ordersProducts).values(opValues);
-
-
+        for (let i = 0; i < allOrderItems.length; i += BATCH) {
+            await db.insert(orderItems).values(allOrderItems.slice(i, i + BATCH));
+        }
+        console.log(`  ✅ ${NUM_ORDERS} orders, ${allOrderItems.length} line items`);
 
         // ── Summary ───────────────────────────────────────────────────
         const statusCounts: Record<string, number> = {};
@@ -404,7 +556,7 @@ async function runSeed() {
 
         console.log(`\n🎉 Database seeded successfully!`);
         console.log(`   ${NUM_AUTHORS} authors, ${NUM_TAGS} tags, ${POST_COUNT} posts`);
-        console.log(`   30 products, 50 orders`);
+        console.log(`   40 customers, ${allProducts.length} products, ${NUM_ORDERS} orders`);
         console.log(`   Post statuses: ${Object.entries(statusCounts).map(([k, v]) => `${k}=${v}`).join(", ")}`);
 
     } catch (e) {

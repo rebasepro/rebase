@@ -79,7 +79,8 @@ export class EntityPersistService {
                     const relation = findRelation(resolvedRelations, relationKey);
 
                     if (!relation) {
-                        throw new Error(`Relation '${relationKey}' not found in collection '${currentCollection.slug}'`);
+                        const available = Object.keys(resolvedRelations).join(', ') || '(none)';
+                        throw new Error(`Relation '${relationKey}' not found in collection '${currentCollection.slug}'. Available relations: [${available}]`);
                     }
 
                     if (i === segments.length - 1) {

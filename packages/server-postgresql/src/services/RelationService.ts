@@ -43,7 +43,8 @@ export class RelationService {
         const relation = findRelation(resolvedRelations, relationKey);
 
         if (!relation) {
-            throw new Error(`Relation '${relationKey}' not found in collection '${parentCollectionPath}'`);
+            const available = Object.keys(resolvedRelations).join(', ') || '(none)';
+            throw new Error(`Relation '${relationKey}' not found in collection '${parentCollectionPath}'. Available relations: [${available}]`);
         }
 
         return this.fetchEntitiesUsingJoins<M>(parentCollection, parentEntityId, relation, options);
@@ -218,7 +219,10 @@ export class RelationService {
         const parentCollection = getCollectionByPath(parentCollectionPath, this.registry);
         const resolvedRelations = resolveCollectionRelations(parentCollection);
         const relation = findRelation(resolvedRelations, relationKey);
-        if (!relation) throw new Error(`Relation '${relationKey}' not found in collection '${parentCollectionPath}'`);
+        if (!relation) {
+            const available = Object.keys(resolvedRelations).join(', ') || '(none)';
+            throw new Error(`Relation '${relationKey}' not found in collection '${parentCollectionPath}'. Available relations: [${available}]`);
+        }
 
         const targetCollection = relation.target();
         const targetTable = getTableForCollection(targetCollection, this.registry);

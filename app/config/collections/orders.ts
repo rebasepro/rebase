@@ -1,5 +1,6 @@
 import { PostgresCollection } from "@rebasepro/types";
-import productsCollection from "./products";
+import customersCollection from "./customers";
+import orderItemsCollection from "./order_items";
 
 const ordersCollection: PostgresCollection = {
     name: "Orders",
@@ -8,53 +9,197 @@ const ordersCollection: PostgresCollection = {
     table: "orders",
     icon: "ShoppingCart",
     history: true,
+    openEntityMode: "split",
+    enabledViews: ["table", "kanban"],
+    kanban: {
+        columnProperty: "status"
+    },
     properties: {
         id: {
             name: "ID",
             type: "number",
-            validation: {
-                required: true
-            }
+            isId: "increment"
         },
-        customer_name: {
-            name: "Customer Name",
+        order_number: {
+            name: "Order #",
             type: "string",
             validation: {
+                required: true,
+                unique: true
+            },
+            description: "Human-readable order identifier (e.g. ORD-2025-0042)"
+        },
+        customer: {
+            name: "Customer",
+            type: "relation",
+            relationName: "customer",
+            relation: {
+                relationName: "customer",
+                cardinality: "one",
+                direction: "owning",
+                target: () => customersCollection
+            },
+            validation: {
                 required: true
             }
-        },
-        order_date: {
-            name: "Order Date",
-            type: "date"
         },
         status: {
             name: "Status",
             type: "string",
+            validation: {
+                required: true
+            },
+            defaultValue: "pending",
             enum: [
                 { id: "pending", label: "Pending", color: "orange" },
-                { id: "shipped", label: "Shipped", color: "blue" },
+                { id: "confirmed", label: "Confirmed", color: "blue" },
+                { id: "processing", label: "Processing", color: "cyan" },
+                { id: "shipped", label: "Shipped", color: "purple" },
                 { id: "delivered", label: "Delivered", color: "green" },
-                { id: "cancelled", label: "Cancelled", color: "red" }
+                { id: "cancelled", label: "Cancelled", color: "red" },
+                { id: "refunded", label: "Refunded", color: "gray" }
             ]
         },
-        products: {
-            name: "Products",
-            type: "relation",
-            relationName: "products",
-            relation: {
-                relationName: "products",
-                cardinality: "many",
-                direction: "owning",
-                target: () => productsCollection
+        payment_status: {
+            name: "Payment",
+            type: "string",
+            validation: {
+                required: true
+            },
+            defaultValue: "unpaid",
+            enum: [
+                { id: "unpaid", label: "Unpaid", color: "red" },
+                { id: "paid", label: "Paid", color: "green" },
+                { id: "partially_refunded", label: "Partially Refunded", color: "orange" },
+                { id: "refunded", label: "Refunded", color: "gray" }
+            ]
+        },
+        subtotal: {
+            name: "Subtotal",
+            type: "number",
+            description: "Sum of all line items before tax and shipping"
+        },
+        tax_amount: {
+            name: "Tax",
+            type: "number",
+            description: "Tax amount"
+        },
+        shipping_cost: {
+            name: "Shipping",
+            type: "number",
+            description: "Shipping cost"
+        },
+        discount_amount: {
+            name: "Discount",
+            type: "number",
+            description: "Total discount applied"
+        },
+        total: {
+            name: "Total",
+            type: "number",
+            validation: {
+                required: true,
+                min: 0
+            },
+            description: "Final order total (subtotal + tax + shipping - discount)"
+        },
+        currency: {
+            name: "Currency",
+            type: "string",
+            defaultValue: "USD",
+            enum: [
+                { id: "USD", label: "USD ($)" },
+                { id: "EUR", label: "EUR (€)" },
+                { id: "GBP", label: "GBP (£)" },
+                { id: "CAD", label: "CAD (C$)" },
+                { id: "AUD", label: "AUD (A$)" }
+            ]
+        },
+        shipping_address: {
+            name: "Shipping Address",
+            type: "string",
+            multiline: true,
+            description: "Delivery address for this order"
+        },
+        tracking_number: {
+            name: "Tracking Number",
+            type: "string",
+            description: "Shipping carrier tracking number"
+        },
+        notes: {
+            name: "Internal Notes",
+            type: "string",
+            multiline: true,
+            description: "Internal notes (not visible to customer)"
+        },
+        order_date: {
+            name: "Order Date",
+            type: "date",
+            mode: "date_time",
+            validation: {
+                required: true
             }
+        },
+        shipped_date: {
+            name: "Shipped Date",
+            type: "date",
+            mode: "date_time",
+            clearable: true
+        },
+        delivered_date: {
+            name: "Delivered Date",
+            type: "date",
+            mode: "date_time",
+            clearable: true
+        },
+        created_at: {
+            name: "Created at",
+            type: "date",
+            autoValue: "on_create",
+            readOnly: true,
+            hideFromCollection: true
+        },
+        updated_at: {
+            name: "Updated at",
+            type: "date",
+            autoValue: "on_update",
+            readOnly: true,
+            hideFromCollection: true
         }
     },
+    propertiesOrder: [
+        "order_number",
+        "customer",
+        "status",
+        "payment_status",
+        "order_date",
+        "subtotal",
+        "tax_amount",
+        "shipping_cost",
+        "discount_amount",
+        "total",
+        "currency",
+        "shipping_address",
+        "tracking_number",
+        "shipped_date",
+        "delivered_date",
+        "notes",
+        "created_at",
+        "updated_at"
+    ],
     relations: [
         {
-            relationName: "products",
-            target: () => productsCollection,
-            cardinality: "many",
+            relationName: "customer",
+            target: () => customersCollection,
+            cardinality: "one",
             direction: "owning",
+        },
+        {
+            relationName: "order_items",
+            target: () => orderItemsCollection,
+            cardinality: "many",
+            direction: "inverse",
+            inverseRelationName: "order"
         }
     ]
 };
