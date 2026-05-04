@@ -2,7 +2,7 @@ import { eq, SQL } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { EntityCollection, Properties, Property, Relation, RelationProperty, isPostgresCollection } from "@rebasepro/types";
-import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
+import { getTableName, resolveCollectionRelations, findRelation, DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { DrizzleConditionBuilder } from "./utils/drizzle-conditions";
 import { getPrimaryKeys, buildCompositeId } from "./services/entity-helpers";
@@ -202,8 +202,25 @@ export function serializePropertyToServer(value: unknown, property: Property): u
             return value;
 
         case "array":
-            if (Array.isArray(value) && property.of) {
-                return value.map(item => serializePropertyToServer(item, property.of as Property));
+            if (Array.isArray(value)) {
+                if (property.of) {
+                    return value.map(item => serializePropertyToServer(item, property.of as Property));
+                } else if (property.oneOf) {
+                    const typeField = property.oneOf.typeField ?? DEFAULT_ONE_OF_TYPE;
+                    const valueField = property.oneOf.valueField ?? DEFAULT_ONE_OF_VALUE;
+                    return value.map((e) => {
+                        if (e === null) return null;
+                        if (typeof e !== "object") return e;
+                        const rec = e as Record<string, unknown>;
+                        const type = rec[typeField] as string;
+                        const childProperty = property.oneOf?.properties[type];
+                        if (!type || !childProperty) return e;
+                        return {
+                            [typeField]: type,
+                            [valueField]: serializePropertyToServer(rec[valueField], childProperty)
+                        };
+                    });
+                }
             }
             return value;
 
@@ -486,8 +503,25 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
             return value;
 
         case "array":
-            if (Array.isArray(value) && property.of) {
-                return value.map(item => parsePropertyFromServer(item, property.of as Property, collection));
+            if (Array.isArray(value)) {
+                if (property.of) {
+                    return value.map(item => parsePropertyFromServer(item, property.of as Property, collection));
+                } else if (property.oneOf) {
+                    const typeField = property.oneOf.typeField ?? DEFAULT_ONE_OF_TYPE;
+                    const valueField = property.oneOf.valueField ?? DEFAULT_ONE_OF_VALUE;
+                    return value.map((e) => {
+                        if (e === null) return null;
+                        if (typeof e !== "object") return e;
+                        const rec = e as Record<string, unknown>;
+                        const type = rec[typeField] as string;
+                        const childProperty = property.oneOf?.properties[type];
+                        if (!type || !childProperty) return e;
+                        return {
+                            [typeField]: type,
+                            [valueField]: parsePropertyFromServer(rec[valueField], childProperty, collection)
+                        };
+                    });
+                }
             }
             return value;
 

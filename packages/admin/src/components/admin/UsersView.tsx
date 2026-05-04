@@ -699,7 +699,12 @@ function UserDetailsForm({
     const dirty = isNewUser ||
         displayName !== (userProp?.displayName || "") ||
         email !== (userProp?.email || "") ||
-        JSON.stringify(selectedRoleIds.sort()) !== JSON.stringify((userProp?.roles || []).sort());
+        (() => {
+            const prev = userProp?.roles || [];
+            if (selectedRoleIds.length !== prev.length) return true;
+            const set = new Set(prev);
+            return selectedRoleIds.some(id => !set.has(id));
+        })();
 
     return (
         <Dialog open={open} onOpenChange={(open) => !open ? handleClose() : undefined} maxWidth="4xl">

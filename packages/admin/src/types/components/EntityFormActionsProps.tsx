@@ -7,7 +7,7 @@ export interface EntityFormActionsProps {
     path: string;
     collection: EntityCollection;
     entity?: Entity;
-    layout: "bottom" | "side";
+    layout: "bottom" | "side" | "responsive";
     savingError?: Error;
     formex: FormexController<any>;
     disabled: boolean;

@@ -280,7 +280,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
                                 collection={collection as EntityCollection<Record<string, unknown>>}
                                 entityId={renderedEntityId}
                                 parentCollectionIds={usedParentCollectionIds}
-                                layout="side_panel"
+                                layout="split"
                             />
                         </ErrorBoundary>
                     </div>
@@ -315,7 +315,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
                     collection={collection as EntityCollection<Record<string, unknown>>}
                     entityId={renderedEntityId!}
                     parentCollectionIds={usedParentCollectionIds}
-                    layout="side_panel"
+                    layout="split"
                 />
             </ErrorBoundary>
         </div>

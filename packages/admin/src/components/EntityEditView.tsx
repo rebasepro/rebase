@@ -67,7 +67,7 @@ export interface EntityEditViewProps<M extends Record<string, unknown> = Record<
     onValuesModified?: (modified: boolean, values: M) => void;
     onSaved?: (params: OnUpdateParams) => void;
     onTabChange?: (props: OnTabChangeParams<M>) => void;
-    layout?: "side_panel" | "full_screen";
+    layout?: "side_panel" | "full_screen" | "split";
     barActions?: (params: BarActionsParams) => any;
     formProps?: Partial<EntityFormProps<M>>,
 }
@@ -222,7 +222,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
         selectedSecondaryForm
     } = resolvedSelectedEntityView(customViews, customizationController, selectedTab, canEdit);
 
-    const actionsAtTheBottom = !largeLayout || layout === "side_panel" || selectedEntityView?.includeActions === "bottom";
+    const actionsAtTheBottom = layout === "side_panel" || selectedEntityView?.includeActions === "bottom";
 
     const mainViewVisible = selectedTab === MAIN_TAB_VALUE || Boolean(selectedSecondaryForm);
 
@@ -439,7 +439,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
 
     const shouldShowTopBar = Boolean(barActions) || hasAdditionalViews || layout === "side_panel";
 
-    const fullScreenButton = layout === "side_panel" && entityId ? (
+    const fullScreenButton = (layout === "side_panel" || layout === "split") && entityId ? (
         <Tooltip title={"Open full screen"}>
             <IconButton
                 size="small"
@@ -600,7 +600,7 @@ function OneToOneRelationForm({
     relation: Relation,
     value: EntityRelation,
     databaseId: string,
-    layout: "side_panel" | "full_screen",
+    layout: "side_panel" | "full_screen" | "split",
     status: EntityStatus,
     actionsAtTheBottom: boolean,
 }) {

@@ -37,39 +37,53 @@ export function EntityFormActions({
     const sideEntityController = context.sideEntityController;
     const { t } = useTranslation();
 
-    return layout === "bottom"
-        ? buildBottomActions({
-            path,
-            savingError,
-            entity,
-            collection,
-            context,
-            sideEntityController,
-            disabled,
-            status,
-            pluginActions,
-            openEntityMode,
-            navigateBack,
-            formContext,
-            formex,
-            t
-        })
-        : buildSideActions({
-            path,
-            savingError,
-            entity,
-            collection,
-            context,
-            sideEntityController,
-            disabled,
-            status,
-            pluginActions,
-            openEntityMode,
-            navigateBack,
-            formContext,
-            formex,
-            t
-        });
+    const bottomActionsProps = {
+        path,
+        savingError,
+        entity,
+        collection,
+        context,
+        sideEntityController,
+        disabled,
+        status,
+        pluginActions,
+        openEntityMode,
+        navigateBack,
+        formContext,
+        formex,
+        t,
+        className: layout === "responsive" ? "@6xl:hidden" : undefined
+    };
+
+    const sideActionsProps = {
+        path,
+        savingError,
+        entity,
+        collection,
+        context,
+        sideEntityController,
+        disabled,
+        status,
+        pluginActions,
+        openEntityMode,
+        navigateBack,
+        formContext,
+        formex,
+        t,
+        className: layout === "responsive" ? "hidden @6xl:flex" : undefined
+    };
+
+    const bottomActions = buildBottomActions(bottomActionsProps);
+    const sideActions = buildSideActions(sideActionsProps);
+
+    if (layout === "responsive") {
+        return <>
+            {bottomActions}
+            {sideActions}
+        </>;
+    }
+
+    return layout === "bottom" ? bottomActions : sideActions;
 }
 
 type ActionsViewProps<M extends Record<string, unknown>> = {
@@ -88,6 +102,7 @@ type ActionsViewProps<M extends Record<string, unknown>> = {
     formContext: FormContext,
     formex: FormexController<any>;
     t: (key: string) => string;
+    className?: string;
 };
 
 function buildBottomActions<M extends Record<string, unknown>>({
@@ -105,12 +120,13 @@ function buildBottomActions<M extends Record<string, unknown>>({
     navigateBack,
     formContext,
     formex,
-    t
+    t,
+    className
 }: ActionsViewProps<M>) {
 
     const hasErrors = Object.keys(formex.errors).length > 0 && formex.submitCount > 0;
 
-    return <DialogActions position={"absolute"}>
+    return <DialogActions position={"absolute"} className={className}>
         {savingError &&
             <div className="text-right">
                 <Typography color={"error"}>{savingError.message}</Typography>
@@ -172,13 +188,14 @@ function buildSideActions<M extends Record<string, unknown>>({
     status,
     pluginActions,
     formex,
-    t
+    t,
+    className
 }: ActionsViewProps<M>) {
 
     const hasErrors = Object.keys(formex.errors).length > 0 && formex.submitCount > 0;
 
     return <div
-        className={cls("overflow-auto h-full flex flex-col gap-2 w-80 2xl:w-96 px-4 py-16 sticky top-0 border-l", defaultBorderMixin)}>
+        className={cls("overflow-auto h-full flex flex-col gap-2 w-80 2xl:w-96 px-4 py-16 sticky top-0 border-l", defaultBorderMixin, className)}>
         <LoadingButton fullWidth={true}
             variant="filled"
             color="primary"

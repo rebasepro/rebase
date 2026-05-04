@@ -56,6 +56,13 @@ export function extractTouchedValues(values: any, touched: Record<string, boolea
  * (e.g. `{ address: {} }` when only `address.city` was touched but value is undefined)
  * from falsely triggering the unsaved local changes indicator.
  */
+/**
+ * Check if a value is semantically empty (null, undefined, or empty string).
+ */
+function isSemanticEmpty(v: any): boolean {
+    return v === null || v === undefined || v === "";
+}
+
 function removeEmptyContainers(obj: any): any {
     if (Array.isArray(obj)) {
         const cleaned = obj.map(removeEmptyContainers);
@@ -73,6 +80,12 @@ function removeEmptyContainers(obj: any): any {
                 continue;
             }
             result[key] = cleaned;
+        }
+        // After cleaning, check if all remaining values are semantically empty
+        // (null, undefined, or ""). This catches ghost objects like {type: "", value: null}
+        // created by oneOf block initialization that aren't meaningful changes.
+        if (Object.keys(result).length > 0 && Object.values(result).every(isSemanticEmpty)) {
+            return {};
         }
         return result;
     }
@@ -106,23 +119,13 @@ export function getChanges<T extends object>(source: Partial<T>, comparison: Par
             (changes as Record<string, unknown>)[key] = undefined;
         } else if (Array.isArray(sourceValue)) {
             const comparisonArray = Array.isArray(comparisonValue) ? comparisonValue : [];
-            if (sourceValue.length < comparisonArray.length) {
+            if (sourceValue.length !== comparisonArray.length) {
                 (changes as Record<string, unknown>)[key] = sourceValue;
                 continue;
             }
-            const changedArray = sourceValue.map((item, index) => {
-                const comparisonItem = comparisonArray[index];
-                if (equal(item, comparisonItem)) {
-                    return null;
-                }
-                if (isObject(item) && item && isObject(comparisonItem) && comparisonItem) {
-                    const nestedChanges = getChanges(item, comparisonItem);
-                    return Object.keys(nestedChanges).length > 0 ? nestedChanges : item;
-                }
-                return item;
-            });
-            if (changedArray.some(item => item !== null) || sourceValue.length > comparisonArray.length) {
-                (changes as Record<string, unknown>)[key] = changedArray;
+            const hasChanges = sourceValue.some((item, index) => !equal(item, comparisonArray[index]));
+            if (hasChanges) {
+                (changes as Record<string, unknown>)[key] = sourceValue;
             }
         } else if (isObject(sourceValue) && sourceValue && isObject(comparisonValue) && comparisonValue) {
             const nestedChanges = getChanges(sourceValue, comparisonValue);
@@ -724,7 +727,7 @@ export function EntityForm<M extends Record<string, unknown>>({
         collection={collection}
         path={path}
         entity={entity}
-        layout={forceActionsAtTheBottom ? "bottom" : "side"}
+        layout={forceActionsAtTheBottom ? "bottom" : "responsive"}
         savingError={savingError}
         formex={formex}
         disabled={actionsDisabled}
@@ -744,7 +747,7 @@ export function EntityForm<M extends Record<string, unknown>>({
                     values: baseInitialValues as M
                 })}
                 noValidate
-                className={cls("flex-1 flex flex-row w-full overflow-y-auto justify-center", className)}>
+                className={cls("@container flex-1 flex flex-row w-full overflow-y-auto justify-center", className)}>
                 <div
                     id={`form_${path}`}
                     className={cls("relative flex flex-row max-w-4xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-6xl w-full h-fit")}>

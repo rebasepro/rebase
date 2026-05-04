@@ -71,41 +71,52 @@ export function EntityEditViewFormActions({
 
     const formActions = showDefaultActions ? entityActions.filter(a => a.includeInForm === undefined || a.includeInForm) : [];
 
-    return layout === "bottom"
-        ? buildBottomActions({
-            savingError,
-            entity,
-            formActions,
-            collection,
-            context,
-            sideEntityController,
-            disabled,
-            status,
-            sideDialogContext,
-            pluginActions,
-            openEntityMode,
-            navigateBack,
-            formContext,
-            formex,
-            t
-        })
-        : buildSideActions({
-            savingError,
-            entity,
-            formActions,
-            collection,
-            context,
-            sideEntityController,
-            sideDialogContext,
-            disabled,
-            status,
-            pluginActions,
-            openEntityMode,
-            navigateBack,
-            formContext,
-            formex,
-            t
-        });
+    const bottomActions = buildBottomActions({
+        savingError,
+        entity,
+        formActions,
+        collection,
+        context,
+        sideEntityController,
+        disabled,
+        status,
+        sideDialogContext,
+        pluginActions,
+        openEntityMode,
+        navigateBack,
+        formContext,
+        formex,
+        t,
+        className: layout === "responsive" ? "@6xl:hidden" : undefined
+    });
+
+    const sideActions = buildSideActions({
+        savingError,
+        entity,
+        formActions,
+        collection,
+        context,
+        sideEntityController,
+        sideDialogContext,
+        disabled,
+        status,
+        pluginActions,
+        openEntityMode,
+        navigateBack,
+        formContext,
+        formex,
+        t,
+        className: layout === "responsive" ? "hidden @6xl:flex" : undefined
+    });
+
+    if (layout === "responsive") {
+        return <>
+            {bottomActions}
+            {sideActions}
+        </>;
+    }
+
+    return layout === "bottom" ? bottomActions : sideActions;
 }
 
 type ActionsViewProps<M extends Record<string, unknown>> = {
@@ -119,11 +130,12 @@ type ActionsViewProps<M extends Record<string, unknown>> = {
     status: "new" | "existing" | "copy",
     sideDialogContext: SideDialogController,
     pluginActions?: any[],
-    openEntityMode: "side_panel" | "full_screen";
+    openEntityMode: "side_panel" | "full_screen" | "split";
     navigateBack: () => void;
     formContext: FormContext,
     formex: FormexController<any>;
     t: (key: string, vars?: Record<string, string>) => string;
+    className?: string;
 };
 
 function buildBottomActions<M extends Record<string, unknown>>({
@@ -141,12 +153,14 @@ function buildBottomActions<M extends Record<string, unknown>>({
     navigateBack,
     formContext,
     formex,
-    t
+    t,
+    className
 }: ActionsViewProps<M>) {
 
     const hasErrors = Object.keys(formex.errors).length > 0 && formex.submitCount > 0;
     const canClose = openEntityMode === "side_panel";
     return <DialogActions
+        className={className}
         position={"absolute"}>
         {savingError &&
             <div className="text-right">
@@ -234,12 +248,13 @@ function buildSideActions<M extends Record<string, unknown>>({
     navigateBack,
     formContext,
     formex,
-    t
+    t,
+    className
 }: ActionsViewProps<M>) {
 
     const hasErrors = Object.keys(formex.errors).length > 0 && formex.submitCount > 0;
     return <div
-        className={cls("overflow-auto h-full flex flex-col gap-2 w-80 2xl:w-96 px-4 py-16 sticky top-0 border-l", defaultBorderMixin)}>
+        className={cls("overflow-auto h-full flex flex-col gap-2 w-80 2xl:w-96 px-4 py-16 sticky top-0 border-l", defaultBorderMixin, className)}>
         <LoadingButton fullWidth={true}
             variant="filled"
             color="primary"

@@ -176,7 +176,13 @@ function BlockEntry({
 
     useEffect(() => {
         if (!type) {
-            updateType(Object.keys(properties)[0]);
+            // Auto-fix empty blocks silently — set the default type WITHOUT
+            // marking as touched so the form doesn't become dirty on mount.
+            const defaultType = Object.keys(properties)[0];
+            const newSelectedProperty = defaultType ? properties[defaultType] : undefined;
+            setTypeInternal(defaultType);
+            formex.setFieldValue(typeFieldName, defaultType);
+            formex.setFieldValue(valueFieldName, newSelectedProperty ? getDefaultValueFor(newSelectedProperty) : null);
         }
     }, []);
 

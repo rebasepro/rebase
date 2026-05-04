@@ -546,7 +546,7 @@ function MemoizedList({
                             const isDragging = draggingColumnId === column.key;
                             const isDraggable = !column.frozen && !!onColumnsOrderChange;
 
-                            return (
+                            return onColumnsOrderChange ? (
                                 <SortableCellWrapper
                                     key={`cell_wrapper_${column.key}`}
                                     columnKey={column.key}
@@ -566,6 +566,30 @@ function MemoizedList({
                                         rowIndex={index}
                                         columnIndex={columnIndex} />
                                 </SortableCellWrapper>
+                            ) : (
+                                <div
+                                    key={`cell_wrapper_${column.key}`}
+                                    className={cls(
+                                        "flex-shrink-0",
+                                        column.frozen && "sticky left-0 z-10 bg-white dark:bg-surface-950"
+                                    )}
+                                    style={{
+                                        minWidth: column.width,
+                                        maxWidth: column.width,
+                                        width: column.width
+                                    }}
+                                >
+                                    <VirtualTableCell
+                                        dataKey={column.key}
+                                        // @ts-ignore
+                                        cellRenderer={cellRenderer}
+                                        column={column}
+                                        columns={columns}
+                                        rowData={rowData}
+                                        cellData={cellData}
+                                        rowIndex={index}
+                                        columnIndex={columnIndex} />
+                                </div>
                             );
                         })}
 

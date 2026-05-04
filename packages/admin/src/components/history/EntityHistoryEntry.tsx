@@ -19,15 +19,27 @@ import { HistoryEntryData } from "../../hooks";
 import { getValueInPath } from "@rebasepro/utils";
 
 /**
- * Shallow-deep equality: uses JSON.stringify for objects, strict equality for primitives.
+ * Recursive deep equality for primitives, arrays and plain objects.
  */
 function deepEqual(a: unknown, b: unknown): boolean {
     if (a === b) return true;
     if (a == null || b == null) return a === b;
-    if (typeof a === "object" && typeof b === "object") {
-        return JSON.stringify(a) === JSON.stringify(b);
+    if (typeof a !== typeof b) return false;
+    if (typeof a !== "object") return false;
+
+    if (Array.isArray(a)) {
+        if (!Array.isArray(b) || a.length !== (b as unknown[]).length) return false;
+        return a.every((item, i) => deepEqual(item, (b as unknown[])[i]));
     }
-    return false;
+
+    if (Array.isArray(b)) return false;
+
+    const aObj = a as Record<string, unknown>;
+    const bObj = b as Record<string, unknown>;
+    const aKeys = Object.keys(aObj);
+    const bKeys = Object.keys(bObj);
+    if (aKeys.length !== bKeys.length) return false;
+    return aKeys.every(key => key in bObj && deepEqual(aObj[key], bObj[key]));
 }
 
 export type EntityHistoryEntryProps = {

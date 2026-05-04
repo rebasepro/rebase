@@ -110,20 +110,20 @@ function defaultKeyGenerator(c: Parameters<MiddlewareHandler<HonoEnv>>[0]): stri
 
 /**
  * Pre-configured rate limiter for general auth endpoints (login, register).
- * 20 requests per 15 minutes per IP.
+ * 200 requests per 15 minutes per IP.
  */
 export const defaultAuthLimiter = createRateLimiter({
     windowMs: 15 * 60 * 1000,
-    limit: 20,
+    limit: 200,
     message: "Too many authentication attempts, please try again later."
 });
 
 /**
  * Pre-configured strict rate limiter for sensitive endpoints (password reset, verification).
- * 5 requests per 15 minutes per IP.
+ * 50 requests per 15 minutes per IP.
  */
 export const strictAuthLimiter = createRateLimiter({
     windowMs: 15 * 60 * 1000,
-    limit: 5,
+    limit: 50,
     message: "Too many requests to this sensitive endpoint, please try again later."
 });
