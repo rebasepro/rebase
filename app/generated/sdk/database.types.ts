@@ -89,27 +89,4 @@ export interface Database {
       name?: string;
     };
   };
-  privateNotes: {
-    Row: {
-      id?: string;
-      title: string;
-      content?: string;
-      userId?: string;
-      isLocked?: boolean;
-    };
-    Insert: {
-      id?: string;
-      title: string;
-      content?: string;
-      userId?: string;
-      isLocked?: boolean;
-    };
-    Update: {
-      id?: string;
-      title?: string;
-      content?: string;
-      userId?: string;
-      isLocked?: boolean;
-    };
-  };
 }

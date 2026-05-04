@@ -186,6 +186,10 @@ function EntityFullScreenRoute({
     const collectionRegistry = useCollectionRegistryController();
     const urlController = useUrlController();
     const navigate = useNavigate();
+    const location = useLocation();
+
+    // Preserve the current hash (e.g. #full) across tab/save navigations
+    const hash = location.hash;
 
     const navigationPath = urlController.urlPathToDataPath(pathname);
 
@@ -201,7 +205,24 @@ function EntityFullScreenRoute({
 
     const entityId = lastEntityEntry && "entityId" in lastEntityEntry ? lastEntityEntry.entityId : undefined;
 
-    const urlTab = getSelectedTabFromUrl(isNew, lastCustomView);
+    // Derive tab from navigation entries (works for registered custom views)
+    let urlTab = getSelectedTabFromUrl(isNew, lastCustomView);
+
+    // Fallback: internal tabs like __json or __rebase_history aren't registered as
+    // entity views, so the navigation parser ignores them. Check the raw pathname
+    // for a trailing segment after the entity ID to catch those cases.
+    if (!urlTab && entityId && !isNew) {
+        const entityIdStr = String(entityId);
+        const entityIdIdx = pathname.lastIndexOf(`/${entityIdStr}`);
+        if (entityIdIdx >= 0) {
+            const afterEntity = pathname.substring(entityIdIdx + 1 + entityIdStr.length);
+            const trailingSegment = afterEntity.startsWith("/") ? afterEntity.substring(1) : afterEntity;
+            if (trailingSegment.length > 0) {
+                urlTab = trailingSegment;
+            }
+        }
+    }
+
     const [selectedTab, setSelectedTab] = useState<string | undefined>(urlTab);
 
     const parentCollectionIds = collectionRegistry.getParentCollectionIds(navigationPath);
@@ -265,9 +286,9 @@ function EntityFullScreenRoute({
                 const newSelectedTab = params.selectedTab;
                 const newEntityId = params.entityId;
                 if (newSelectedTab) {
-                    navigate(`${basePath}/${newEntityId}/${newSelectedTab}`, { replace: true });
+                    navigate(`${basePath}/${newEntityId}/${newSelectedTab}${hash}`, { replace: true });
                 } else {
-                    navigate(`${basePath}/${newEntityId}`, { replace: true });
+                    navigate(`${basePath}/${newEntityId}${hash}`, { replace: true });
                 }
             }}
             onTabChange={(params) => {
@@ -277,9 +298,9 @@ function EntityFullScreenRoute({
                 }
                 const newSelectedTab = params.selectedTab;
                 if (newSelectedTab) {
-                    navigate(`${basePath}/${entityId}/${newSelectedTab}`, { replace: true });
+                    navigate(`${basePath}/${entityId}/${newSelectedTab}${hash}`, { replace: true });
                 } else {
-                    navigate(`${basePath}/${entityId}`, { replace: true });
+                    navigate(`${basePath}/${entityId}${hash}`, { replace: true });
                 }
             }}
             parentCollectionIds={parentCollectionIds}

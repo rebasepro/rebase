@@ -32,14 +32,14 @@ import postsCollection from "../config/collections/posts";
 import profilesCollection from "../config/collections/profiles";
 import productsCollection from "../config/collections/products";
 import ordersCollection from "../config/collections/orders";
-import privateNotesCollection from "../config/collections/private_notes";
+
 import tagsCollection from "../config/collections/tags";
 
 const DATABASE_URL = "postgresql://postgres:A%3FCl8L%5DpUHiO%3A%5COT@34.22.208.81:5432/firecms";
 
 const allCollections: EntityCollection[] = [
     authorsCollection, postsCollection, profilesCollection,
-    productsCollection, ordersCollection, privateNotesCollection, tagsCollection
+    productsCollection, ordersCollection, tagsCollection
 ];
 
 // ── SQL Tracing ──

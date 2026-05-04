@@ -7,7 +7,7 @@ import { createPostgresDatabaseConnection } from "@rebasepro/server-postgresql";
 import { env } from "./env.js";
 import {
     authors, posts, tags, profiles, products, orders,
-    postsTags, ordersProducts, privateNotes
+    postsTags, ordersProducts
 } from "./schema.generated.js";
 import fs from "fs";
 import path from "path";
@@ -145,33 +145,33 @@ const topics = [
     "CI/CD Pipelines with GitHub Actions",
     "Drizzle ORM: The TypeScript-First Database Toolkit",
     "Understanding Web Vitals and Core Performance Metrics",
-    "Go for Backend Services: Concurrency Made Simple",
-    "Building a Design System from Scratch",
-    "Edge Computing and the Future of Web Architecture",
-    "Svelte vs React: A Developer Experience Comparison",
-    "Data Modeling Best Practices for Relational Databases",
-    "Accessibility First: Building Inclusive Web Experiences",
+    "Astro and the Island Architecture: A New Way to Build",
+    "Building a Design System with Tailwind CSS",
+    "Hono: The Ultrafast Web Framework for the Edge",
+    "From Express to Hono: Migrating Your Node.js API",
+    "Data Modeling Best Practices for PostgreSQL",
+    "Tailwind CSS at Scale: Custom Plugins and Design Tokens",
     "Observability in Production: Logs, Metrics, and Traces",
-    "Vue 3 Composition API: Patterns and Anti-Patterns",
+    "Astro + React: Building Hybrid Static and Dynamic Sites",
     "Building CLI Tools with Node.js and Commander",
     "The Art of Code Review: Beyond Bug Finding",
-    "Angular Signals: A New Approach to Reactivity",
-    "Practical Event-Driven Architecture",
+    "PostgreSQL Full-Text Search vs Elasticsearch",
+    "Practical Event-Driven Architecture with Node.js",
     "TypeScript Generics: From Basics to Advanced",
-    "Kotlin Multiplatform: One Language, Every Platform",
+    "Building a Blog Engine with Astro and Tailwind CSS",
     "Zero-Trust Security Architecture for Modern Apps",
-    "Effective Debugging Strategies for Complex Systems",
+    "Effective Debugging Strategies for Node.js Applications",
     "Horizontal Scaling Strategies for PostgreSQL",
-    "State Management in 2025: What Actually Works",
-    "Building Progressive Web Apps That Feel Native",
-    "Terraform for Infrastructure as Code",
-    "Open Source Sustainability: Business Models That Work",
+    "State Management in React: What Actually Works in 2025",
+    "Building Progressive Web Apps with Astro",
+    "Hono Middleware Patterns: Auth, CORS, and Logging",
+    "Tailwind CSS vs Styled Components: A Practical Comparison",
     "TypeScript Monorepos with Turborepo and pnpm",
-    "Intro to Computer Vision with TensorFlow",
+    "Node.js Streams and Backpressure: A Deep Dive",
     "The Developer's Guide to Technical Writing",
-    "TypeScript Decorators and Metadata Reflection",
-    "Next.js App Router: Server Actions Deep Dive",
-    "Bun vs Node.js: Runtime Performance Compared",
+    "PostgreSQL JSON Columns: When and How to Use Them",
+    "React Server Components and Astro: Complementary Tools",
+    "Deploying Hono to Cloudflare Workers and Deno Deploy",
 ];
 
 const markdownIntros = [
@@ -202,6 +202,18 @@ const markdownSections = [
     `## Monitoring and Observability\n\n1. **Structured Logging** — JSON logs with trace IDs\n2. **Metrics** — request latency, error rates\n3. **Distributed Tracing** — follow requests across services\n4. **Alerting** — actionable alerts, not noise\n\nInvest in observability early.`,
 
     `## Conclusion\n\nThe technologies we've discussed represent the current state of the art, but they'll continue to evolve. The most important skill isn't mastering any particular tool — it's the ability to learn, adapt, and make pragmatic decisions.\n\nStay curious, keep building.`,
+
+    `## The React Mental Model\n\nReact's component model has fundamentally changed how we think about UI development. Instead of imperatively mutating the DOM, we describe *what* the UI should look like and let the framework figure out the rest.\n\n> "React is not a framework. It's a library for building composable user interfaces. It encourages the creation of reusable UI components which present data that changes over time." — React Documentation\n\nThis declarative approach scales remarkably well. A team of fifty engineers can work on the same codebase without stepping on each other's toes, because each component is a self-contained unit with clear inputs and outputs.\n\n\`\`\`tsx\nfunction PostCard({ title, excerpt, author }: PostCardProps) {\n  return (\n    <article className=\"rounded-lg border p-6 hover:shadow-md transition-shadow\">\n      <h3 className=\"text-lg font-semibold\">{title}</h3>\n      <p className=\"mt-2 text-gray-600\">{excerpt}</p>\n      <span className=\"mt-4 text-sm text-gray-400\">By {author}</span>\n    </article>\n  );\n}\n\`\`\`\n\nNotice how Tailwind CSS classes make the styling intent immediately obvious. No jumping between files, no naming debates.`,
+
+    `## Why PostgreSQL Keeps Winning\n\nIn a world of shiny new databases, PostgreSQL remains the reliable workhorse that powers everything from startups to Fortune 500 companies.\n\n> "PostgreSQL is the most advanced open-source relational database in the world. Full stop." — Bruce Momjian, PostgreSQL Core Team\n\nWhat makes Postgres special isn't any single feature — it's the *combination* of rock-solid reliability, extensibility, and a feature set that rivals commercial databases costing six figures.\n\n\`\`\`sql\n-- Full-text search, JSONB, CTEs, window functions — all built in\nSELECT title, ts_rank(search_vector, query) AS rank\nFROM posts, to_tsquery('english', 'react & typescript') AS query\nWHERE search_vector @@ query\nORDER BY rank DESC\nLIMIT 20;\n\`\`\`\n\nWith features like JSONB columns, row-level security, and logical replication, Postgres adapts to almost any workload without forcing you into a different database.`,
+
+    `## Tailwind CSS: Utility-First Done Right\n\nWhen Tailwind CSS first appeared, many developers dismissed it as "inline styles with extra steps." They were wrong.\n\n> "I've written CSS for over 20 years, and Tailwind CSS is the most productive way I've ever styled anything. Once you get past the initial learning curve, you'll never want to go back." — Adam Wathan, Creator of Tailwind CSS\n\nThe key insight is that utility classes aren't just about writing CSS faster — they're about **eliminating the decision fatigue** that comes with naming things and organizing stylesheets.\n\n\`\`\`html\n<div class=\"flex items-center gap-4 rounded-xl bg-white p-6 shadow-lg\n            ring-1 ring-black/5 dark:bg-gray-800\">\n  <img class=\"size-12 rounded-full\" src=\"/avatar.jpg\" alt=\"\" />\n  <div>\n    <p class=\"text-sm font-semibold text-gray-900 dark:text-white\">Sarah Chen</p>\n    <p class=\"text-sm text-gray-500\">Senior Engineer</p>\n  </div>\n</div>\n\`\`\`\n\nThe result is a design system that lives in your markup, is instantly readable by any team member, and produces tiny CSS bundles in production.`,
+
+    `## Astro's Content-First Philosophy\n\nAstro introduced a radical idea: what if your framework shipped **zero JavaScript by default**?\n\n> "The secret to a fast website isn't a faster framework — it's less JavaScript." — Fred K. Schott, Creator of Astro\n\nWith the island architecture, Astro lets you use React, Vue, Svelte, or any other UI framework — but only hydrates the interactive parts of the page. The static content ships as pure HTML.\n\n\`\`\`astro\n---\nimport PostList from '../components/PostList.tsx';\nimport Newsletter from '../components/Newsletter.tsx';\nconst posts = await fetch('/api/posts').then(r => r.json());\n---\n<html>\n  <body>\n    <h1>Our Blog</h1>\n    <!-- Static: zero JS -->\n    <PostList posts={posts} />\n    <!-- Interactive island: hydrated on visible -->\n    <Newsletter client:visible />\n  </body>\n</html>\n\`\`\`\n\nFor content-heavy sites like blogs, documentation, and marketing pages, this approach delivers performance numbers that are almost impossible to match with traditional SPAs.`,
+
+    `## Hono: Speed Without Compromise\n\nHono emerged as a game-changer in the Node.js ecosystem — a web framework built for the edge that doesn't sacrifice developer experience for performance.\n\n> "Hono is ultrafast, lightweight, and works on any JavaScript runtime. It's the web framework for the edges of the internet." — Yusuke Wada, Creator of Hono\n\nWhat sets Hono apart is its commitment to Web Standards. It uses the Fetch API, Request, and Response objects natively, meaning your code runs unchanged on Cloudflare Workers, Deno, Bun, and Node.js.\n\n\`\`\`typescript\nimport { Hono } from 'hono';\nimport { cors } from 'hono/cors';\nimport { jwt } from 'hono/jwt';\n\nconst app = new Hono();\n\napp.use('/api/*', cors());\napp.use('/api/*', jwt({ secret: process.env.JWT_SECRET! }));\n\napp.get('/api/posts', async (c) => {\n  const posts = await db.select().from(postsTable).limit(20);\n  return c.json({ data: posts });\n});\n\nexport default app;\n\`\`\`\n\nThe middleware ecosystem is rich, the TypeScript support is first-class, and the router is one of the fastest in any JavaScript runtime.`,
+
+    `## The Node.js Event Loop Explained\n\nEven experienced Node.js developers get tripped up by the event loop. Understanding it deeply is the difference between writing code that works and code that scales.\n\n> "Node.js is not a silver bullet. It's a tool that solves a specific class of problems extremely well — I/O-bound, event-driven applications." — Ryan Dahl, Creator of Node.js\n\nThe event loop processes callbacks in a specific order: timers, pending callbacks, idle, poll, check, and close callbacks. Each phase has a FIFO queue of callbacks to execute.\n\n\`\`\`typescript\n// This is NOT what you think it is\nsetTimeout(() => console.log('timeout'), 0);\nsetImmediate(() => console.log('immediate'));\nprocess.nextTick(() => console.log('nextTick'));\nPromise.resolve().then(() => console.log('promise'));\n\n// Output: nextTick → promise → timeout → immediate\n// (or timeout → immediate may swap depending on system load)\n\`\`\`\n\nWhen you understand the event loop, you understand why \`await\` matters, why CPU-bound work blocks everything, and why worker threads exist. It's foundational knowledge for any serious Node.js developer.`,
 ];
 
 const excerpts = [
@@ -266,7 +278,7 @@ async function runSeed() {
 
         // ── Clear existing data ───────────────────────────────────────
         console.log("🧹 Clearing existing data...");
-        await db.execute("TRUNCATE TABLE posts, authors, profiles, tags, private_notes, products, orders CASCADE;");
+        await db.execute("TRUNCATE TABLE posts, authors, profiles, tags, products, orders CASCADE;");
 
         // ── Authors ───────────────────────────────────────────────────
         console.log(`👤 Generating ${NUM_AUTHORS} authors & profiles...`);
@@ -309,14 +321,15 @@ async function runSeed() {
             const status = pick([...statuses]);
             const isPublished = status === "published";
 
-            // Build content blocks
+            // Build content blocks — never two text blocks in a row, always interleave with images
             const blocks: { type: string; value: string }[] = [{ type: "text", value: pick(markdownIntros) }];
-            const sections = pickN(markdownSections, 2 + Math.floor(Math.random() * 3));
+            const sections = pickN(markdownSections, 4 + Math.floor(Math.random() * 4));
             for (let s = 0; s < sections.length; s++) {
-                blocks.push({ type: "text", value: sections[s] });
-                if (Math.random() < 0.4 && s < sections.length - 1 && contentImagePaths.length > 0) {
+                // Insert an image between every text block
+                if (contentImagePaths.length > 0) {
                     blocks.push({ type: "image", value: pick(contentImagePaths) });
                 }
+                blocks.push({ type: "text", value: sections[s] });
             }
 
             postValues.push({
@@ -383,13 +396,7 @@ async function runSeed() {
         }
         await db.insert(ordersProducts).values(opValues);
 
-        // ── Private notes ─────────────────────────────────────────────
-        console.log("🔒 Generating 10 private notes...");
-        const noteValues = [];
-        for (let i = 1; i <= 10; i++) {
-            noteValues.push({ title: `Private Note ${i}`, content: `Confidential note ${i} content...`, user_id: `user-${(i % 3) + 1}`, is_locked: Math.random() > 0.7 });
-        }
-        await db.insert(privateNotes).values(noteValues);
+
 
         // ── Summary ───────────────────────────────────────────────────
         const statusCounts: Record<string, number> = {};
@@ -397,7 +404,7 @@ async function runSeed() {
 
         console.log(`\n🎉 Database seeded successfully!`);
         console.log(`   ${NUM_AUTHORS} authors, ${NUM_TAGS} tags, ${POST_COUNT} posts`);
-        console.log(`   30 products, 50 orders, 10 private notes`);
+        console.log(`   30 products, 50 orders`);
         console.log(`   Post statuses: ${Object.entries(statusCounts).map(([k, v]) => `${k}=${v}`).join(", ")}`);
 
     } catch (e) {

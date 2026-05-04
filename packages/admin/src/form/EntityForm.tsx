@@ -262,7 +262,14 @@ export function EntityForm<M extends Record<string, unknown>>({
         if (!localChangesDataRaw) {
             return undefined;
         }
-        return getChanges(localChangesDataRaw, initialValues);
+        const changes = getChanges(localChangesDataRaw, initialValues);
+        // Strip ghost empty containers (e.g. {content: {}}) left by intermediate
+        // path construction so they don't falsely trigger the unsaved-changes banner.
+        const cleaned = removeEmptyContainers(changes);
+        if (cleaned && typeof cleaned === "object" && Object.keys(cleaned).length === 0) {
+            return undefined;
+        }
+        return cleaned;
     }, [localChangesDataRaw, initialValues]);
 
     const hasLocalChanges = !localChangesCleared && localChangesData && Object.keys(localChangesData).length > 0;
@@ -289,6 +296,9 @@ export function EntityForm<M extends Record<string, unknown>>({
                 const touchedValues = removeEmptyContainers(extractTouchedValues(values, controller.touched));
                 if (touchedValues && Object.keys(touchedValues).length > 0) {
                     saveEntityToCache(key, touchedValues);
+                } else {
+                    // Clean up ghost cache entries that contain only empty containers
+                    removeEntityFromCache(key);
                 }
             }
         },

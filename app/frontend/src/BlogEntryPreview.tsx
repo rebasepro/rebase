@@ -26,22 +26,20 @@ export function BlogEntryPreview({ modifiedValues }: EntityCustomViewParams) {
     }, [storage, values?.hero_image]);
 
     return (
-        <div>
+        <div className="h-full overflow-y-auto">
 
-            {headerUrl && <img
-                alt={"Header"}
-                style={{
-                    width: "100%",
-                    maxHeight: "300px",
-                    objectFit: "cover"
-                }}
-                src={headerUrl}
-            />}
+            {headerUrl && <div className="px-6 pt-6">
+                <img
+                    alt={"Header"}
+                    className="w-full max-h-[400px] object-cover rounded-xl"
+                    src={headerUrl}
+                />
+            </div>}
 
             <Container className={"mb-16"}>
 
-                <Container maxWidth={"3xl"}>
-                    {values?.title && <Typography variant={"h3"} className="mt-16 mb-12 mx-12">
+                <Container maxWidth={"6xl"}>
+                    {values?.title && <Typography variant={"h3"} className="mt-10 mb-8 mx-6">
                         {values.title}
                     </Typography>}
                 </Container>
@@ -77,8 +75,8 @@ function Text({ markdownText }: {
     if (!markdownText)
         return <></>;
 
-    return <Container maxWidth={"3xl"}>
-        <div className="mt-12 mb-12 px-12">
+    return <Container maxWidth={"6xl"}>
+        <div className="mt-6 mb-6 px-6">
             <Markdown source={markdownText}/>
         </div>
     </Container>;
@@ -101,21 +99,17 @@ export function StorageImage({ storagePath }: {
         return <></>;
 
     return (
-        <div className="flex justify-center">
-            <div className="m-4 p-8">
+        <Container maxWidth={"6xl"}>
+            <div className="my-6 px-6">
                 {url
                     ? <img
                         alt={"Content"}
-                        style={{
-                            objectFit: "contain",
-                            width: "100%",
-                            height: "100%"
-                        }}
+                        className="w-full h-auto rounded-xl object-cover"
                         src={url}/>
-                    : <div className="w-[200px] h-[200px] bg-surface-200 dark:bg-surface-700 animate-pulse rounded"/>
+                    : <div className="w-full h-[240px] bg-surface-200 dark:bg-surface-700 animate-pulse rounded-xl"/>
                 }
             </div>
-        </div>
+        </Container>
     );
 }
 
@@ -126,7 +120,7 @@ function Quote({ quoteText }: {
     if (!quoteText)
         return <></>;
 
-    return <Container maxWidth={"5xl"} className={"border-l-2 border-l-red-950 dark:border-l-red-100 my-8 italic"}>
+    return <Container maxWidth={"6xl"} className={"border-l-2 border-l-red-950 dark:border-l-red-100 my-6 mx-6 px-6 italic"}>
         <Typography variant="h5">
             {quoteText}
         </Typography>

@@ -205,7 +205,7 @@ export const RebaseEditor = ({
 
 
   return (
-    <div className="relative min-h-[300px] w-full">
+    <div className="relative min-h-[200px] w-full">
       <button
         type="button"
         onClick={handleToggleMarkdown}
@@ -220,7 +220,7 @@ export const RebaseEditor = ({
         <div style={{ display: isMarkdownMode ? "none" : "block" }}>
           <div
             ref={editorRef}
-            className={cls("prose dark:prose-invert", proseClass, "prose-headings:font-title prose-headings:font-normal prose-strong:font-semibold prose-code:font-normal prose-blockquote:font-normal prose-a:font-normal font-default focus:outline-none max-w-full p-12")}
+            className={cls("relative prose dark:prose-invert", proseClass, "prose-headings:font-title prose-headings:font-normal prose-strong:font-semibold prose-code:font-normal prose-blockquote:font-normal prose-a:font-normal font-default focus:outline-none max-w-full p-12")}
           />
 
           {view && (
@@ -258,7 +258,7 @@ export const RebaseEditor = ({
             onChange={handleMarkdownChange}
             onBlur={handleMarkdownBlur}
             className={cls(
-              "w-full h-full min-h-[300px] p-12 bg-transparent resize-none font-mono focus:ring-0",
+              "w-full h-full min-h-[200px] p-12 bg-transparent resize-none font-mono focus:ring-0",
               proseClass
             )}
             style={{ 

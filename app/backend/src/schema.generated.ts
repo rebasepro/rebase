@@ -54,17 +54,7 @@ export const postsTags = pgTable("posts_tags", {
     pk: primaryKey({ columns: [table.post_id, table.tag_id] })
 }));
 
-export const privateNotes = pgTable("private_notes", {
-    id: uuid("id").primaryKey().defaultRandom(),
-    title: varchar("title").notNull(),
-    content: varchar("content"),
-    user_id: varchar("user_id"),
-    is_locked: boolean("is_locked")
-}, (table) => ([
-    pgPolicy("admin_bypass", { as: "permissive", for: "all", to: ["public"], using: sql`(true) AND (string_to_array(auth.roles(), ',') @> ARRAY['admin'])`, withCheck: sql`(true) AND (string_to_array(auth.roles(), ',') @> ARRAY['admin'])` }),
-    pgPolicy("owner_access", { as: "permissive", for: "all", to: ["public"], using: sql`${table.user_id} = auth.uid()`, withCheck: sql`${table.user_id} = auth.uid()` }),
-    pgPolicy("no_update_locked", { as: "restrictive", for: "update", to: ["public"], using: sql`${table.is_locked} = false`, withCheck: sql`${table.is_locked} = false` }),
-])).enableRLS();
+
 
 export const products = pgTable("products", {
     id: integer("id").primaryKey().notNull(),
@@ -149,7 +139,7 @@ export const tagsRelations = drizzleRelations(tags, ({ one, many }) => ({
     "posts": many(postsTags, { relationName: "posts" })
 }));
 
-export const tables = { authors, orders, ordersProducts, posts, postsTags, privateNotes, products, profiles, tags };
+export const tables = { authors, orders, ordersProducts, posts, postsTags, products, profiles, tags };
 export const enums = { ordersStatus, postsStatus, productsCategory };
 export const relations = { authorsRelations, ordersRelations, ordersProductsRelations, postsRelations, postsTagsRelations, profilesRelations, tagsRelations };
 

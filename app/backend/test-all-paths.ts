@@ -16,11 +16,11 @@ import postsCollection from "../config/collections/posts";
 import profilesCollection from "../config/collections/profiles";
 import productsCollection from "../config/collections/products";
 import ordersCollection from "../config/collections/orders";
-import privateNotesCollection from "../config/collections/private_notes";
+
 import tagsCollection from "../config/collections/tags";
 
 const DB = "postgresql://postgres:A%3FCl8L%5DpUHiO%3A%5COT@34.22.208.81:5432/firecms";
-const all: EntityCollection[] = [authorsCollection, postsCollection, profilesCollection, productsCollection, ordersCollection, privateNotesCollection, tagsCollection];
+const all: EntityCollection[] = [authorsCollection, postsCollection, profilesCollection, productsCollection, ordersCollection, tagsCollection];
 
 let sqlQ: string[] = [];
 let tracing = false;
@@ -144,25 +144,7 @@ async function main() {
         ok("6.4 author.path=authors", prv.author.path === "authors");
     }
 
-    // ─── 7. Private notes — UUID ID, no relations ───
-    console.log("\n── 7. Private notes: UUID IDs, no relations ──");
-    try {
-        trace();
-        const notes = await svc.fetchEntitiesWithConditions("private_notes", { limit: 5 });
-        const q7 = stop();
-        ok("7.1 got notes", notes.length > 0);
-        ok("7.2 single query", q7 === 1, `${q7}`);
-        if (notes.length > 0) {
-            const n = notes[0];
-            ok("7.3 id is UUID-like string", typeof n.id === "string" && n.id.length > 10);
-            ok("7.4 path=private_notes", n.path === "private_notes");
-            const nv = n.values as any;
-            ok("7.5 title string", typeof nv.title === "string");
-        }
-    } catch (e) {
-        stop();
-        console.log("  ⏭️  Skipped (table not in schema)");
-    }
+
 
     // ─── 8. Single entity fetch (fetchEntity) ───
     console.log("\n── 8. fetchEntity — single author by ID ──");

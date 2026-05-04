@@ -7,7 +7,7 @@ import { createAuthorsClient } from './authors.js';
 import { createProfilesClient } from './profiles.js';
 import { createPostsClient } from './posts.js';
 import { createTagsClient } from './tags.js';
-import { createPrivateNotesClient } from './private_notes.js';
+
 import { createTestEntitiesClient } from './test_entities.js';
 import { createAuth, createMemoryStorage } from './auth.js';
 import { createAdmin } from './admin.js';
@@ -35,7 +35,7 @@ import { createAdmin } from './admin.js';
  *   profiles: ReturnType<typeof createProfilesClient>,
  *   posts: ReturnType<typeof createPostsClient>,
  *   tags: ReturnType<typeof createTagsClient>,
- *   privateNotes: ReturnType<typeof createPrivateNotesClient>,
+
  *   testEntities: ReturnType<typeof createTestEntitiesClient>,
  *   setToken: (token: string) => void
  * }}
@@ -102,8 +102,7 @@ export function createRebaseClient(config) {
         posts: createPostsClient(transport),
         /** @type {ReturnType<typeof createTagsClient>} */
         tags: createTagsClient(transport),
-        /** @type {ReturnType<typeof createPrivateNotesClient>} */
-        privateNotes: createPrivateNotesClient(transport),
+
         /** @type {ReturnType<typeof createTestEntitiesClient>} */
         testEntities: createTestEntitiesClient(transport),
         /** Update the auth token at runtime */
@@ -116,7 +115,7 @@ export { createAuthorsClient } from './authors.js';
 export { createProfilesClient } from './profiles.js';
 export { createPostsClient } from './posts.js';
 export { createTagsClient } from './tags.js';
-export { createPrivateNotesClient } from './private_notes.js';
+
 export { createTestEntitiesClient } from './test_entities.js';
 
 // Re-export utilities
