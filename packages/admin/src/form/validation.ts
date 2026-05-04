@@ -164,18 +164,7 @@ function getZodStringSchema({
     }
 
     if (validation) {
-        if (validation.unique && customFieldValidator && name)
-            schema = schema.refine(
-                (value: any) =>
-                    customFieldValidator({
-                        name,
-                        property,
-                        parentProperty,
-                        value,
-                        entityId
-                    }),
-                { message: "This value already exists and should be unique" }
-            );
+
         if (validation.min || validation.min === 0) schema = schema.refine(
             (value: any) => value == null || value.length >= validation.min!,
             { message: `${property.name} must be min ${validation.min} characters long` }
@@ -251,17 +240,7 @@ function getZodNumberSchema({
     }
 
     if (validation) {
-        if (validation.unique && customFieldValidator && name)
-            schema = schema.refine(
-                (value: any) => customFieldValidator({
-                    name,
-                    property,
-                    parentProperty,
-                    value,
-                    entityId
-                }),
-                { message: "This value already exists and should be unique" }
-            );
+
         if (validation.min || validation.min === 0) schema = schema.refine(
             (value: any) => value == null || value >= validation.min!,
             { message: `${property.name} must be higher or equal to ${validation.min}` }
@@ -304,17 +283,7 @@ function getZodGeoPointSchema({
     let schema: ZodTypeAny = z.object({}).passthrough().nullable().optional();
     const validation = property.validation;
 
-    if (validation?.unique && customFieldValidator && name)
-        schema = schema.refine(
-            (value: any) => customFieldValidator({
-                name,
-                property,
-                parentProperty,
-                value,
-                entityId
-            }),
-            { message: "This value already exists and should be unique" }
-        );
+
     if (validation?.required) {
         schema = schema.refine(
             (value: any) => value !== undefined && value !== null,
@@ -348,17 +317,7 @@ function getZodDateSchema({
                 { message: validation?.requiredMessage ? validation.requiredMessage : "Required" }
             );
         }
-        if (validation.unique && customFieldValidator && name)
-            schema = schema.refine(
-                (value: any) => customFieldValidator({
-                    name,
-                    property,
-                    parentProperty,
-                    value,
-                    entityId
-                }),
-                { message: "This value already exists and should be unique" }
-            );
+
         if (validation.min) schema = schema.refine(
             (value: any) => value == null || value >= validation.min!,
             { message: `${property.name} must be after ${validation.min}` }
@@ -388,17 +347,7 @@ function getZodReferenceSchema({
                 { message: validation?.requiredMessage ? validation.requiredMessage : "Required" }
             );
         }
-        if (validation.unique && customFieldValidator && name)
-            schema = schema.refine(
-                (value: any) => customFieldValidator({
-                    name,
-                    property,
-                    parentProperty,
-                    value,
-                    entityId
-                }),
-                { message: "This value already exists and should be unique" }
-            );
+
     }
     return schema;
 }
@@ -428,17 +377,7 @@ function getZodRelationSchema({
                 { message: validation?.requiredMessage ? validation.requiredMessage : "Required" }
             );
         }
-        if (validation.unique && customFieldValidator && name)
-            schema = schema.refine(
-                (value: any) => customFieldValidator({
-                    name,
-                    property,
-                    parentProperty,
-                    value,
-                    entityId
-                }),
-                { message: "This value already exists and should be unique" }
-            );
+
     }
     return schema;
 }
@@ -460,17 +399,7 @@ function getZodBooleanSchema({
                 { message: validation?.requiredMessage ? validation.requiredMessage : "Required" }
             );
         }
-        if (validation.unique && customFieldValidator && name)
-            schema = schema.refine(
-                (value: any) => customFieldValidator({
-                    name,
-                    property,
-                    parentProperty,
-                    value,
-                    entityId
-                }),
-                { message: "This value already exists and should be unique" }
-            );
+
     }
     return schema;
 }

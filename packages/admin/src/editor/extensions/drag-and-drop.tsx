@@ -45,11 +45,14 @@ function nodeDOMAtCoords(coords: { x: number; y: number }, view: EditorView) {
     if (coords.y < editorRect.top || coords.y > editorRect.bottom) return undefined;
     if (coords.x < editorRect.left - 100 || coords.x > editorRect.right + 50) return undefined;
 
+    const blockSelector = 'li, p, pre, blockquote, h1, h2, h3, h4, h5, h6, img, [data-type="taskList"]';
+
     // 1. First probe exactly at the mouse coordinates
     let elem = document.elementFromPoint(coords.x, coords.y);
-    let block = elem?.closest('li, p:not(:first-child), pre, blockquote, h1, h2, h3, h4, h5, h6, img, [data-type="taskList"]');
-    if (block && view.dom.contains(block)) {
-        return block.closest('li') || block;
+    let block = elem?.closest(blockSelector);
+    if (block && view.dom.contains(block) && block.textContent?.trim()) {
+        const li = block.closest('li');
+        return (li && view.dom.contains(li)) ? li : block;
     }
 
     // 2. If mouse is in the left gutter, probe horizontally into the editor
@@ -57,11 +60,12 @@ function nodeDOMAtCoords(coords: { x: number; y: number }, view: EditorView) {
     if (coords.x > probeX) return undefined;
 
     let probeElem = document.elementFromPoint(probeX, coords.y);
-    let probeBlock = probeElem?.closest('li, p:not(:first-child), pre, blockquote, h1, h2, h3, h4, h5, h6, img, [data-type="taskList"]');
-    if (probeBlock) {
+    let probeBlock = probeElem?.closest(blockSelector);
+    if (probeBlock && probeBlock.textContent?.trim()) {
         // Ensure the found block is actually inside our editor
         if (view.dom.contains(probeBlock)) {
-            return probeBlock.closest('li') || probeBlock;
+            const li = probeBlock.closest('li');
+            return (li && view.dom.contains(li)) ? li : probeBlock;
         }
     }
 
@@ -146,12 +150,16 @@ export function dragHandlePlugin(options: DragHandleOptions = { dragHandleWidth:
     function hideDragHandle() {
         if (dragHandleElement) {
             dragHandleElement.classList.add("hide");
+            dragHandleElement.style.opacity = "0";
+            dragHandleElement.style.pointerEvents = "none";
         }
     }
 
     function showDragHandle() {
         if (dragHandleElement) {
             dragHandleElement.classList.remove("hide");
+            dragHandleElement.style.opacity = "1";
+            dragHandleElement.style.pointerEvents = "auto";
         }
     }
 

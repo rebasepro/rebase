@@ -43,7 +43,7 @@ const customKeymap = {
     "Mod-Alt-0": setBlockType(schema.nodes.paragraph),
 };
 
-export const corePlugins: Plugin[] = [
+export const getCorePlugins = (): Plugin[] => [
     history(),
     keymap(customKeymap),
     keymap(baseKeymap),

@@ -309,14 +309,14 @@ const cssStyles = `
 
 .ProseMirror img {
   transition: filter 0.1s ease-in-out;
-  &:hover {
-    cursor: pointer;
-    filter: brightness(90%);
-  }
-  &.ProseMirror-selectednode {
-    filter: brightness(90%);
-    box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000) !important;
-  }
+}
+.ProseMirror img:hover {
+  cursor: pointer;
+  filter: brightness(90%);
+}
+.ProseMirror img.ProseMirror-selectednode {
+  filter: brightness(90%);
+  box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000) !important;
 }
 
 ul[data-type="taskList"] li > label {
@@ -328,14 +328,12 @@ ul[data-type="taskList"] li > label {
     margin-right: 0.5rem;
   }
 }
-[data-theme="dark"] {
-  ul[data-type="taskList"] li > label input[type="checkbox"] {
+[data-theme="dark"] ul[data-type="taskList"] li > label input[type="checkbox"] {
     background-color: rgb(30 41 59);
     border: 2px solid #666;
-    &:hover { background-color: rgb(51 65 85); }
-    &:active { background-color: rgb(71 85 105); }
-  }
 }
+[data-theme="dark"] ul[data-type="taskList"] li > label input[type="checkbox"]:hover { background-color: rgb(51 65 85); }
+[data-theme="dark"] ul[data-type="taskList"] li > label input[type="checkbox"]:active { background-color: rgb(71 85 105); }
 ul[data-type="taskList"] li > label input[type="checkbox"] {
   -webkit-appearance: none;
   appearance: none;
@@ -351,9 +349,10 @@ ul[data-type="taskList"] li > label input[type="checkbox"] {
   margin-right: 0.3rem;
   display: grid;
   place-content: center;
-  &:hover { background-color: rgb(241 245 249); }
-  &:active { background-color: rgb(226 232 240); }
-  &::before {
+}
+ul[data-type="taskList"] li > label input[type="checkbox"]:hover { background-color: rgb(241 245 249); }
+ul[data-type="taskList"] li > label input[type="checkbox"]:active { background-color: rgb(226 232 240); }
+ul[data-type="taskList"] li > label input[type="checkbox"]::before {
     content: "";
     width: 0.65em;
     height: 0.65em;
@@ -362,9 +361,8 @@ ul[data-type="taskList"] li > label input[type="checkbox"] {
     box-shadow: inset 1em 1em;
     transform-origin: center;
     clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
-  }
-  &:checked::before { transform: scale(1); }
 }
+ul[data-type="taskList"] li > label input[type="checkbox"]:checked::before { transform: scale(1); }
 
 [data-theme="dark"] {
   ul[data-type="taskList"] li[data-checked="true"] > div > p {
@@ -403,27 +401,22 @@ ul[data-type="taskList"] li[data-checked="true"] > div > p {
   height: 1.5rem;
   z-index: 100;
   cursor: grab;
-  
-  /* Create a hover area around the handle itself that doesn't overlap text */
-  &::before {
-    content: '';
-    position: absolute;
-    top: -10px;
-    bottom: -10px;
-    left: -20px; 
-    right: 0px;
-    z-index: -1;
-  }
-  
-  &:hover { background-color: rgb(241 245 249); transition: background-color 0.2s; }
-  &:active { background-color: rgb(226 232 240); transition: background-color 0.2s; }
-  &.hide { opacity: 0; pointer-events: none; }
-  @media screen and (max-width: 600px) { display: none; pointer-events: none; }
 }
-[data-theme="dark"] .drag-handle {
-  &:hover { background-color: rgb(51 65 85); }
-  &:active { background-color: rgb(51 65 85); }
+.drag-handle::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  bottom: -10px;
+  left: -20px; 
+  right: 0px;
+  z-index: -1;
 }
+.drag-handle:hover { background-color: rgb(241 245 249); transition: background-color 0.2s; }
+.drag-handle:active { background-color: rgb(226 232 240); transition: background-color 0.2s; }
+.drag-handle.hide { opacity: 0; pointer-events: none; }
+@media screen and (max-width: 600px) { .drag-handle { display: none; pointer-events: none; } }
+[data-theme="dark"] .drag-handle:hover { background-color: rgb(51 65 85); }
+[data-theme="dark"] .drag-handle:active { background-color: rgb(51 65 85); }
 .prosemirror-dropcursor-block {
   background-color: var(--color-surface-accent-600);
 }
