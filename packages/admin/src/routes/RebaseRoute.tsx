@@ -69,6 +69,24 @@ export function RebaseRoute() {
     }, [navigationEntries.map(entry => entry.path).join(",")]);
 
     if (isNew) {
+        // For new entities, check if the collection uses split mode
+        const newEntityCollectionEntry = navigationEntries.find(e => e.type === "collection");
+        if (newEntityCollectionEntry) {
+            let newCollection: EntityCollection<any> | undefined;
+            newCollection = collectionRegistry.getCollection(newEntityCollectionEntry.id);
+            if (!newCollection)
+                newCollection = collectionRegistry.getCollection(newEntityCollectionEntry.slug);
+            if (newCollection && (newCollection.openEntityMode ?? "split") === "split") {
+                return <EntityCollectionView
+                    key={`collection_view_${newCollection.slug}`}
+                    {...newCollection}
+                    parentCollectionIds={[]}
+                    path={newCollection.slug}
+                    updateUrl={true}
+                    selectedEntityId={undefined}
+                    Actions={toArray(newCollection.Actions)} />;
+            }
+        }
         return <EntityFullScreenRoute
             pathname={pathname}
             navigationEntries={navigationEntries}
@@ -137,7 +155,7 @@ export function RebaseRoute() {
         collection = collectionRegistry.getCollection(firstCollectionEntry.id);
         if (!collection)
             collection = collectionRegistry.getCollection(firstCollectionEntry.slug);
-        if (collection && collection.openEntityMode === "split") {
+        if (collection && (collection.openEntityMode ?? "split") === "split") {
             return <EntityCollectionView
                 key={`collection_view_${collection.slug}`}
                 {...collection}
