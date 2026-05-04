@@ -38,6 +38,11 @@ export type SplitListViewProps<M extends Record<string, unknown> = Record<string
      */
     selectedEntityId?: string | number;
     /**
+     * When provided, the detail panel will open this tab (e.g. a subcollection slug).
+     * Used by the router to pass the subcollection tab from the URL.
+     */
+    selectedTab?: string;
+    /**
      * Toolbar to render above the content in the left panel.
      */
     toolbar?: React.ReactNode;
@@ -96,6 +101,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
     path,
     parentCollectionIds,
     selectedEntityId,
+    selectedTab,
     toolbar,
     children
 }: SplitListViewProps<M>) {
@@ -278,7 +284,17 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
                     collection={collection as EntityCollection<Record<string, unknown>>}
                     entityId={renderedEntityId}
                     parentCollectionIds={usedParentCollectionIds}
+                    selectedTab={selectedTab}
                     layout="split"
+                    onTabChange={(params) => {
+                        const newSelectedTab = params.selectedTab;
+                        const entityUrl = urlController.buildUrlCollectionPath(
+                            newSelectedTab
+                                ? `${path}/${renderedEntityId}/${newSelectedTab}`
+                                : `${path}/${renderedEntityId}`
+                        );
+                        navigate(entityUrl);
+                    }}
                 />
             </ErrorBoundary>
         </div>

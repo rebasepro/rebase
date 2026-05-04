@@ -125,20 +125,46 @@ export function RebaseRoute() {
     // Check if this is a simple entity route (collection + entity) for a split-layout collection.
     // If so, render the collection view with the entity shown in the split detail panel
     // instead of the full-screen editor. This keeps the master-detail UX with clean URLs.
+    //
+    // Also handles subcollection tabs: /c/customers/39/orders produces 3 entries
+    // (collection→entity→subcollection). We extract the subcollection slug as selectedTab.
     const lastEntityEntry = navigationEntries.find((entry) => entry.type === "entity");
     const firstCollectionEntry = navigationEntries[0];
     if (
         !isFullScreen &&
         !isCopy &&
-        navigationEntries.length === 2 &&
         firstCollectionEntry?.type === "collection" &&
-        lastEntityEntry?.type === "entity"
+        lastEntityEntry?.type === "entity" &&
+        (navigationEntries.length === 2 || navigationEntries.length === 3)
     ) {
         let collection: EntityCollection<any> | undefined;
         collection = collectionRegistry.getCollection(firstCollectionEntry.id);
         if (!collection)
             collection = collectionRegistry.getCollection(firstCollectionEntry.slug);
         if (collection && (collection.openEntityMode ?? "split") === "split") {
+            // Extract subcollection tab from the 3rd entry if present
+            let selectedTab: string | undefined;
+            if (navigationEntries.length === 3) {
+                const thirdEntry = navigationEntries[2];
+                if (thirdEntry.type === "collection") {
+                    selectedTab = thirdEntry.collection.slug;
+                } else if (thirdEntry.type === "custom_view") {
+                    selectedTab = thirdEntry.view.key;
+                }
+            }
+            // Fallback: check for unregistered tabs (e.g. __json, __rebase_history)
+            // that aren't parsed as navigation entries
+            if (!selectedTab && (navigationEntries.length === 2) && lastEntityEntry) {
+                const entityIdStr = String(lastEntityEntry.entityId);
+                const entityIdIdx = pathname.lastIndexOf(`/${entityIdStr}`);
+                if (entityIdIdx >= 0) {
+                    const afterEntity = pathname.substring(entityIdIdx + 1 + entityIdStr.length);
+                    const trailingSegment = afterEntity.startsWith("/") ? afterEntity.substring(1) : afterEntity;
+                    if (trailingSegment.length > 0) {
+                        selectedTab = trailingSegment;
+                    }
+                }
+            }
             return <EntityCollectionView
                 key={`collection_view_${collection.slug}`}
                 {...collection}
@@ -146,6 +172,7 @@ export function RebaseRoute() {
                 path={collection.slug}
                 updateUrl={true}
                 selectedEntityId={lastEntityEntry.entityId}
+                selectedTab={selectedTab}
                 Actions={toArray(collection.Actions)} />;
         }
     }

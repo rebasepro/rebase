@@ -15,6 +15,7 @@ import {
     resolveDefaultSelectedView,
 } from "@rebasepro/common";
 import { resolvedSelectedEntityView } from "../util/resolutions";
+import { getEntityTitlePropertyKey } from "../util/previews";
 import { CenteredView, CircularProgress, cls, CodeIcon, defaultBorderMixin, HistoryIcon, IconButton, OpenInFullIcon, Tab, Tabs, Tooltip, Typography, Skeleton } from "@rebasepro/ui";
 import {
     useCustomizationController,
@@ -437,7 +438,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
 
     const shouldShowTopBar = Boolean(barActions) || hasAdditionalViews || layout === "side_panel";
 
-    const fullScreenButton = (layout === "side_panel" || layout === "split") && entityId ? (
+    const fullScreenButton = !barActions && (layout === "side_panel" || layout === "split") && entityId ? (
         <Tooltip title={"Open full screen"}>
             <IconButton
                 size="small"
@@ -446,10 +447,38 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                     navigate(`${entityUrl}#full`);
                 }}
             >
-                <OpenInFullIcon size="small" />
+                <OpenInFullIcon size="smallest" />
             </IconButton>
         </Tooltip>
     ) : null;
+
+    // Compute contextual title for subcollection tabs, e.g. "Orders of James"
+    const subcollectionContextTitle = useMemo(() => {
+        if (selectedTab === MAIN_TAB_VALUE || selectedTab === JSON_TAB_VALUE || selectedTab === HISTORY_TAB_VALUE) {
+            return null;
+        }
+        // Check if the selected tab is a subcollection
+        const matchedSubcollection = subcollections.find(sc => sc.slug === selectedTab);
+        if (!matchedSubcollection) {
+            return null;
+        }
+        // Check if the selected tab is a custom view (not a subcollection)
+        const isCustomView = resolvedEntityViews.some(v => v.key === selectedTab);
+        if (isCustomView) {
+            return null;
+        }
+        // Resolve the parent entity's title
+        const titleKey = getEntityTitlePropertyKey(collection, customizationController.propertyConfigs);
+        const entityValues = usedEntity?.values;
+        if (!titleKey || !entityValues) {
+            return matchedSubcollection.name;
+        }
+        const titleValue = entityValues[titleKey as keyof M];
+        if (!titleValue || typeof titleValue !== "string") {
+            return matchedSubcollection.name;
+        }
+        return `${matchedSubcollection.name} of ${titleValue}`;
+    }, [selectedTab, subcollections, resolvedEntityViews, collection, customizationController.propertyConfigs, usedEntity?.values]);
 
     let result = <div className="relative flex flex-col h-full w-full bg-white dark:bg-surface-900">
 
@@ -457,6 +486,15 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
             className={cls("h-14 items-center flex overflow-hidden w-full h-14 border-b pl-2 pr-2 pt-1 flex bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
 
             {fullScreenButton}
+
+            {subcollectionContextTitle && (
+                <Typography
+                    variant="label"
+                    className="truncate ml-1 text-surface-600 dark:text-surface-400"
+                >
+                    {subcollectionContextTitle}
+                </Typography>
+            )}
 
             {barActions?.({
                 path,

@@ -111,6 +111,12 @@ export type EntityCollectionViewProps<M extends Record<string, unknown>> = {
      */
     selectedEntityId?: string | number;
 
+    /**
+     * When provided, the split view will open this tab (e.g. a subcollection slug)
+     * in the entity detail panel. Used by the router to pass the subcollection from the URL.
+     */
+    selectedTab?: string;
+
 } & EntityCollection<M>;
 
 /**
@@ -146,6 +152,7 @@ export const EntityCollectionView = React.memo(
         className,
         updateUrl,
         selectedEntityId: selectedEntityIdProp,
+        selectedTab: selectedTabProp,
         ...collectionProp
     }: EntityCollectionViewProps<M>
     ) {
@@ -980,6 +987,7 @@ export const EntityCollectionView = React.memo(
                         path={path}
                         parentCollectionIds={parentCollectionIds}
                         selectedEntityId={selectedEntityIdProp}
+                        selectedTab={selectedTabProp}
                         toolbar={toolbarNode}
                     >
                         {/* When detail panel is open, left panel is always the list
@@ -1072,7 +1080,8 @@ export const EntityCollectionView = React.memo(
             equal(a.exportable, b.exportable) &&
             equal(a.history, b.history) &&
             equal(a.forceFilter, b.forceFilter) &&
-            equal(a.selectedEntityId, b.selectedEntityId);
+            equal(a.selectedEntityId, b.selectedEntityId) &&
+            equal(a.selectedTab, b.selectedTab);
     }) as React.FunctionComponent<EntityCollectionViewProps<any>>
 
 function EntitiesCount({
