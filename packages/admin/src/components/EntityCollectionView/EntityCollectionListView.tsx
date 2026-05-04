@@ -667,11 +667,11 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                 "flex items-center gap-4 cursor-pointer group transition-colors duration-200 relative h-full",
                 rowClasses,
                 isActive
-                    ? "bg-surface-accent-100 dark:bg-surface-accent-950"
+                    ? "bg-surface-accent-100 dark:bg-surface-accent-950 hover:bg-surface-accent-200 dark:hover:bg-surface-accent-900"
                     : selected
-                        ? "bg-primary-50 dark:bg-primary-900/20"
+                        ? "bg-primary-50 dark:bg-primary-900/20 hover:bg-surface-50 dark:hover:bg-surface-800/40"
                         : highlighted
-                            ? "bg-surface-accent-50 dark:bg-surface-accent-950"
+                            ? "bg-surface-accent-50 dark:bg-surface-accent-950 hover:bg-surface-50 dark:hover:bg-surface-800/40"
                             : "bg-white dark:bg-surface-950 hover:bg-surface-50 dark:hover:bg-surface-800/40"
             )}
             onClick={handleClick}
