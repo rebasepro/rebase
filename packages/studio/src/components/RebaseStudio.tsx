@@ -8,6 +8,7 @@ import { RLSEditor } from "./RLSEditor/RLSEditor";
 import { StorageView } from "./StorageView/StorageView";
 import { CronJobsView } from "./CronJobs/CronJobsView";
 import { SchemaVisualizer } from "./SchemaVisualizer/SchemaVisualizer";
+import { BranchesView } from "./Branches/BranchesView";
 import { StudioHomePage } from "./StudioHomePage";
 
 /**
@@ -27,7 +28,7 @@ export function RebaseStudio({ tools, homePage }: RebaseStudioConfig) {
     
     const devViews: AppView[] = useMemo(() => {
         const views: AppView[] = [];
-        const activeTools = tools ?? ["sql", "js", "rls", "storage", "cron", "schema-visualizer"];
+        const activeTools = tools ?? ["sql", "js", "rls", "storage", "cron", "schema-visualizer", "branches"];
         
         if (activeTools.includes("sql")) {
             views.push({ slug: "sql", name: "SQL Console", group: "Database", icon: "terminal", description: "Execute SQL queries", view: <SQLEditor /> });
@@ -46,6 +47,9 @@ export function RebaseStudio({ tools, homePage }: RebaseStudioConfig) {
         }
         if (activeTools.includes("schema-visualizer")) {
             views.push({ slug: "schema-visualizer", name: "Schema Visualizer", group: "Database", icon: "account_tree", description: "Interactive database ERD", view: <SchemaVisualizer /> });
+        }
+        if (activeTools.includes("branches")) {
+            views.push({ slug: "branches", name: "Branches", group: "Database", icon: "fork_right", description: "Create and manage database branches", view: <BranchesView /> });
         }
         // Note: "schema" tool is auto-injected by RebaseShell when collectionEditor is enabled.
         // It is NOT registered here anymore.

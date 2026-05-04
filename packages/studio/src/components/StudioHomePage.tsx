@@ -33,6 +33,7 @@ const SECTIONS: StudioSection[] = [
             { path: "/js", name: "JS Console", description: "Run JavaScript with the Rebase SDK in a live sandbox", icon: "code" },
             { path: "/rls", name: "RLS Policies", description: "Configure Row Level Security for fine-grained data access", icon: "security" },
             { path: "/schema-visualizer", name: "Schema Visualizer", description: "Interactive ERD showing tables, columns, and relationships", icon: "account_tree" },
+            { path: "/branches", name: "Branches", description: "Create and manage isolated database copies for development", icon: "fork_right" },
         ],
     },
     {

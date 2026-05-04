@@ -107,12 +107,25 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
     const resolvedStorage = storageSourceProp ?? client?.storage;
 
     // Database admin — use explicit prop, or derive from client.ws / driver when available.
-    // Prefers the new `driver.admin` capability object, falls back to legacy per-method derivation.
+    // Merges SQL capabilities with admin capabilities (branching, etc.) into a single object.
     const resolvedDatabaseAdmin = useMemo(() => {
         if (databaseAdmin) return databaseAdmin;
 
         // 1. New path: DataDriver exposes `.admin` capability object
-        if (driverProp?.admin) return driverProp.admin;
+        // Merge it with SQL/schema methods from the driver itself.
+        if (driverProp?.admin) {
+            return {
+                ...(typeof driverProp.executeSql === "function" ? {
+                    executeSql: driverProp.executeSql.bind(driverProp),
+                    fetchAvailableDatabases: driverProp.fetchAvailableDatabases?.bind(driverProp),
+                    fetchAvailableRoles: driverProp.fetchAvailableRoles?.bind(driverProp),
+                    fetchCurrentDatabase: driverProp.fetchCurrentDatabase?.bind(driverProp),
+                    fetchUnmappedTables: driverProp.fetchUnmappedTables?.bind(driverProp),
+                    fetchTableMetadata: driverProp.fetchTableMetadata?.bind(driverProp),
+                } : {}),
+                ...driverProp.admin
+            };
+        }
 
         // 2. Auto-derive from the client's WebSocket connection (Rebase backend)
         const ws = (client as any)?.ws;
@@ -124,6 +137,12 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
                 fetchCurrentDatabase: ws.fetchCurrentDatabase?.bind(ws),
                 fetchUnmappedTables: ws.fetchUnmappedTables?.bind(ws),
                 fetchTableMetadata: ws.fetchTableMetadata?.bind(ws),
+                // Branch admin capabilities
+                ...(typeof ws.createBranch === "function" ? {
+                    createBranch: ws.createBranch.bind(ws),
+                    deleteBranch: ws.deleteBranch.bind(ws),
+                    listBranches: ws.listBranches.bind(ws),
+                } : {}),
             };
         }
 

@@ -9,7 +9,8 @@ import {
     WebSocketErrorPayload,
     CollectionUpdateMessage,
     EntityUpdateMessage,
-    TableMetadata
+    TableMetadata,
+    BranchInfo
 } from "@rebasepro/types";
 import { rebaseReviver } from "./reviver";
 
@@ -720,6 +721,29 @@ export class RebaseWebSocketClient {
         }) as { metadata?: TableMetadata };
         // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
         return response.metadata || ({ columns: [], foreignKeys: [], junctions: [], policies: [] } as TableMetadata);
+    }
+
+    async createBranch(name: string, options?: { source?: string }): Promise<BranchInfo> {
+        const response = await this.sendMessage({
+            type: "CREATE_BRANCH",
+            payload: { name, options }
+        }) as { branch: BranchInfo };
+        return response.branch;
+    }
+
+    async deleteBranch(name: string): Promise<void> {
+        await this.sendMessage({
+            type: "DELETE_BRANCH",
+            payload: { name }
+        });
+    }
+
+    async listBranches(): Promise<BranchInfo[]> {
+        const response = await this.sendMessage({
+            type: "LIST_BRANCHES",
+            payload: {}
+        }) as { branches?: BranchInfo[] };
+        return response.branches || [];
     }
 
     /**

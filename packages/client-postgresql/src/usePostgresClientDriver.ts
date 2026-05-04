@@ -10,7 +10,8 @@ import {
     ListenCollectionProps,
     ListenEntityProps,
     SaveEntityProps,
-    TableMetadata
+    TableMetadata,
+    BranchInfo
 } from "@rebasepro/types";
 import { RebaseWebSocketClient } from "@rebasepro/client";
 
@@ -118,6 +119,18 @@ export function usePostgresClientDriver(config: PostgresDataDriverConfig): Postg
 
         async fetchTableMetadata(tableName: string): Promise<TableMetadata> {
             return client.fetchTableMetadata(tableName);
+        },
+
+        admin: {
+            createBranch(name: string, options?: { source?: string }): Promise<BranchInfo> {
+                return client.createBranch(name, options);
+            },
+            deleteBranch(name: string): Promise<void> {
+                return client.deleteBranch(name);
+            },
+            listBranches(): Promise<BranchInfo[]> {
+                return client.listBranches();
+            }
         }
     } as PostgresDataDriver;
     }, [client]);

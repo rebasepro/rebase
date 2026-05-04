@@ -435,7 +435,7 @@ export const en: RebaseTranslations = {
     multiple_deleted: "Multiple deleted",
     some_entities_deleted: "Some of the entities have been deleted, but not all",
     error_deleting_entities: "Error deleting entities",
-    deleted: "deleted",
+    deleted: "Deleted",
 
     select_reference: "Select reference",
     select_references: "Select references",

@@ -1014,12 +1014,19 @@ export class EntityFetchService {
             }
 
             if (i === pathSegments.length - 1) {
-                return this.relationService.fetchRelatedEntities<M>(
+                const entities = await this.relationService.fetchRelatedEntities<M>(
                     currentCollection.slug,
                     currentEntityId,
                     relationKey,
                     options
                 );
+                // Remap entity paths to use the full subcollection path (e.g., "authors/19/posts")
+                // instead of just the target collection slug ("posts"). This ensures
+                // delete/update operations use the correct path for WebSocket notification matching.
+                for (const entity of entities) {
+                    entity.path = path;
+                }
+                return entities;
             }
 
             if (i + 1 < pathSegments.length) {

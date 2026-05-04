@@ -27,6 +27,7 @@
     "baseUrl": ".",
     "paths": {
       "@rebasepro/core": ["../core/src"],
+      "@rebasepro/client": ["../client/src"],
       "@rebasepro/types": [
         "../types/src"
       ]

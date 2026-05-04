@@ -1,0 +1,375 @@
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import {
+    Typography, cls, defaultBorderMixin, Button, Chip,
+    CircularProgress, IconButton, Paper,
+    ForkRightIcon, RefreshIcon, AddIcon,
+    DeleteOutlineIcon, ContentCopyIcon,
+    Dialog, DialogTitle, DialogContent, DialogActions,
+    TextField, Select, SelectItem, Alert,
+} from "@rebasepro/ui";
+import { useRebaseContext, useSnackbarController, ConfirmationDialog } from "@rebasepro/core";
+import { isBranchAdmin } from "@rebasepro/types";
+import type { BranchInfo } from "@rebasepro/types";
+
+function formatSize(bytes: number | undefined): string {
+    if (bytes === undefined || bytes === null) return "—";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+function formatRelative(date: Date | string | undefined): string {
+    if (!date) return "—";
+    const d = date instanceof Date ? date : new Date(date);
+    if (isNaN(d.getTime())) return "—";
+    const now = Date.now();
+    const diff = now - d.getTime();
+    if (diff < 60_000) return "just now";
+    if (diff < 3_600_000) { const m = Math.round(diff / 60_000); return `${m}m ago`; }
+    if (diff < 86_400_000) { const h = Math.round(diff / 3_600_000); return `${h}h ago`; }
+    if (diff < 604_800_000) { const d2 = Math.round(diff / 86_400_000); return `${d2}d ago`; }
+    return d.toLocaleDateString();
+}
+
+export function BranchesView() {
+    const { databaseAdmin } = useRebaseContext();
+    const snackbar = useSnackbarController();
+
+    const [branches, setBranches] = useState<BranchInfo[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
+
+    // Create dialog
+    const [createOpen, setCreateOpen] = useState(false);
+    const [newBranchName, setNewBranchName] = useState("");
+    const [sourceBranch, setSourceBranch] = useState<string | undefined>(undefined);
+    const [creating, setCreating] = useState(false);
+
+    // Delete confirm
+    const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+    const [deleting, setDeleting] = useState(false);
+
+    // Refs
+    const snackbarRef = useRef(snackbar);
+    snackbarRef.current = snackbar;
+
+    const branchAdmin = isBranchAdmin(databaseAdmin) ? databaseAdmin : undefined;
+
+    const loadBranches = useCallback(async () => {
+        if (!branchAdmin) {
+            setLoading(false);
+            return;
+        }
+        try {
+            const result = await branchAdmin.listBranches();
+            setBranches(result);
+        } catch (e: unknown) {
+            snackbarRef.current.open({
+                type: "error",
+                message: e instanceof Error ? e.message : String(e)
+            });
+        } finally {
+            setLoading(false);
+        }
+    }, [branchAdmin]);
+
+    useEffect(() => {
+        loadBranches();
+    }, [loadBranches]);
+
+    const handleCreate = async () => {
+        if (!branchAdmin || !newBranchName.trim()) return;
+        setCreating(true);
+        try {
+            await branchAdmin.createBranch(newBranchName.trim(), sourceBranch ? { source: sourceBranch } : undefined);
+            snackbarRef.current.open({
+                type: "success",
+                message: `Branch "${newBranchName.trim()}" created successfully`
+            });
+            setCreateOpen(false);
+            setNewBranchName("");
+            setSourceBranch(undefined);
+            await loadBranches();
+        } catch (e: unknown) {
+            snackbarRef.current.open({
+                type: "error",
+                message: e instanceof Error ? e.message : String(e)
+            });
+        } finally {
+            setCreating(false);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!branchAdmin || !deleteTarget) return;
+        setDeleting(true);
+        try {
+            await branchAdmin.deleteBranch(deleteTarget);
+            snackbarRef.current.open({
+                type: "success",
+                message: `Branch "${deleteTarget}" deleted`
+            });
+            if (selectedBranch === deleteTarget) setSelectedBranch(null);
+            setDeleteTarget(null);
+            await loadBranches();
+        } catch (e: unknown) {
+            snackbarRef.current.open({
+                type: "error",
+                message: e instanceof Error ? e.message : String(e)
+            });
+        } finally {
+            setDeleting(false);
+        }
+    };
+
+    // Not supported
+    if (!branchAdmin) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
+                <ForkRightIcon size="large" className="text-surface-300 dark:text-surface-600" />
+                <Typography variant="h6" color="secondary">Database Branching Not Available</Typography>
+                <Typography variant="body2" color="disabled" className="max-w-md">
+                    Branching requires a PostgreSQL backend with an admin connection configured.
+                    Set <code className="text-xs bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded font-mono">adminConnectionString</code> in your server configuration.
+                </Typography>
+            </div>
+        );
+    }
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-full">
+                <CircularProgress />
+            </div>
+        );
+    }
+
+    const selected = branches.find(b => b.name === selectedBranch);
+
+    return (
+        <div className="flex h-full w-full overflow-hidden bg-white dark:bg-surface-950">
+            {/* ── Branch List ── */}
+            <div className={cls("flex flex-col w-[340px] min-w-[280px] border-r h-full", defaultBorderMixin)}>
+                <div className={cls("flex items-center justify-between px-4 py-2.5 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
+                    <div className="flex items-center gap-2">
+                        <ForkRightIcon size="small" className="text-primary" />
+                        <Typography variant="subtitle2" className="font-semibold">Branches</Typography>
+                        <Chip size="smallest" className="bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300">{branches.length}</Chip>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <IconButton size="small" onClick={loadBranches} title="Refresh">
+                            <RefreshIcon size="small" />
+                        </IconButton>
+                        <IconButton size="small" onClick={() => setCreateOpen(true)} title="Create branch" className="text-primary">
+                            <AddIcon size="small" />
+                        </IconButton>
+                    </div>
+                </div>
+                <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                    {branches.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
+                            <ContentCopyIcon size="medium" className="text-surface-300 dark:text-surface-600" />
+                            <Typography variant="body2" color="disabled" className="text-[13px]">
+                                No branches yet. Create one to start working with an isolated database copy.
+                            </Typography>
+                            <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => setCreateOpen(true)}
+                                startIcon={<AddIcon size="smallest" />}
+                            >
+                                Create Branch
+                            </Button>
+                        </div>
+                    ) : (
+                        branches.map(branch => (
+                            <div
+                                key={branch.name}
+                                onClick={() => setSelectedBranch(branch.name)}
+                                className={cls(
+                                    "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all",
+                                    selectedBranch === branch.name
+                                        ? "bg-primary/10 dark:bg-primary/15 ring-1 ring-primary/30"
+                                        : "hover:bg-surface-100 dark:hover:bg-surface-800"
+                                )}
+                            >
+                                <div className="w-2 h-2 rounded-full shrink-0 bg-emerald-500" />
+                                <div className="flex-1 min-w-0">
+                                    <Typography variant="body2" className="truncate font-medium text-[13px]">{branch.name}</Typography>
+                                    <Typography variant="caption" color="secondary" className="truncate text-[11px]">
+                                        from {branch.parentDatabase} · {formatRelative(branch.createdAt)}
+                                    </Typography>
+                                </div>
+                                {branch.sizeBytes !== undefined && (
+                                    <Typography variant="caption" color="disabled" className="font-mono text-[10px] shrink-0">
+                                        {formatSize(branch.sizeBytes)}
+                                    </Typography>
+                                )}
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+
+            {/* ── Detail Panel ── */}
+            <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+                {!selected ? (
+                    <div className="flex flex-col items-center justify-center h-full gap-3">
+                        <ForkRightIcon size="large" className="text-surface-200 dark:text-surface-700" />
+                        <Typography variant="body2" color="disabled">
+                            {branches.length === 0 ? "Create a branch to get started" : "Select a branch to view details"}
+                        </Typography>
+                    </div>
+                ) : (
+                    <>
+                        {/* Header */}
+                        <div className={cls("flex items-center justify-between px-5 py-3 border-b bg-white dark:bg-surface-950 min-h-[56px]", defaultBorderMixin)}>
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                                <div className="min-w-0">
+                                    <Typography variant="subtitle1" className="font-semibold truncate">{selected.name}</Typography>
+                                    <Typography variant="caption" color="secondary" className="truncate">
+                                        Created from <span className="font-mono text-[11px]">{selected.parentDatabase}</span>
+                                    </Typography>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <Button
+                                    size="small"
+                                    color="error"
+                                    variant="outlined"
+                                    onClick={() => setDeleteTarget(selected.name)}
+                                    startIcon={<DeleteOutlineIcon size="smallest" />}
+                                >
+                                    Delete
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Info Cards */}
+                        <div className="px-5 py-4 bg-surface-50 dark:bg-surface-900/50">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <StatCard label="Branch Name" value={selected.name} mono />
+                                <StatCard label="Source Database" value={selected.parentDatabase} mono />
+                                <StatCard label="Created" value={formatRelative(selected.createdAt)} />
+                                <StatCard label="Size" value={formatSize(selected.sizeBytes)} />
+                            </div>
+                        </div>
+
+                        {/* Usage Info */}
+                        <div className="flex-1 overflow-y-auto px-5 py-4">
+                            <Alert color="info">
+                                <Typography variant="body2" className="text-[13px]">
+                                    <strong>How to use this branch:</strong> Switch your application's database connection to 
+                                    <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-100 dark:bg-surface-800 font-mono text-[12px]">{selected.name}</code>
+                                    to work with an isolated copy of your data. Changes made to this branch won't affect your main database.
+                                </Typography>
+                            </Alert>
+                            <div className="mt-4 p-4 rounded-lg border bg-surface-50 dark:bg-surface-900 border-surface-200 dark:border-surface-700">
+                                <Typography variant="caption" className="text-[10px] uppercase tracking-wider text-surface-400 mb-2 block font-medium">Connection Details</Typography>
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">Database:</Typography>
+                                        <Typography variant="body2" className="font-mono text-[12px]">{selected.name}</Typography>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">Branched from:</Typography>
+                                        <Typography variant="body2" className="font-mono text-[12px]">{selected.parentDatabase}</Typography>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">Created at:</Typography>
+                                        <Typography variant="body2" className="font-mono text-[12px]">
+                                            {selected.createdAt instanceof Date
+                                                ? selected.createdAt.toLocaleString()
+                                                : new Date(selected.createdAt).toLocaleString()}
+                                        </Typography>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                )}
+            </div>
+
+            {/* ── Create Dialog ── */}
+            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                <DialogTitle>Create New Branch</DialogTitle>
+                <DialogContent className="space-y-4 min-w-[400px]">
+                    <Typography variant="body2" color="secondary" className="text-[13px]">
+                        Create an isolated database copy. The branch will be a full clone of the source database at this point in time.
+                    </Typography>
+                    <div>
+                        <TextField
+                            label="Branch Name"
+                            value={newBranchName}
+                            onChange={(e) => setNewBranchName(e.target.value)}
+                            placeholder="e.g. feature-auth, staging, preview-pr-42"
+                            size="small"
+                            autoFocus
+                        />
+                    </div>
+                    {branches.length > 0 && (
+                        <div>
+                            <Select
+                                label="Source Database"
+                                value={sourceBranch ?? ""}
+                                onValueChange={(v) => setSourceBranch(v || undefined)}
+                                placeholder="Default (main database)"
+                                size="small"
+                                renderValue={(v) => v || "Default (main database)"}
+                            >
+                                <SelectItem value="">Default (main database)</SelectItem>
+                                {branches.map(b => (
+                                    <SelectItem key={b.name} value={b.name}>{b.name}</SelectItem>
+                                ))}
+                            </Select>
+                        </div>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button variant="text" onClick={() => setCreateOpen(false)} disabled={creating}>
+                        Cancel
+                    </Button>
+                    <Button
+                        color="primary"
+                        onClick={handleCreate}
+                        disabled={!newBranchName.trim() || creating}
+                        startIcon={creating ? <CircularProgress size="smallest" /> : <AddIcon size="smallest" />}
+                    >
+                        {creating ? "Creating..." : "Create Branch"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* ── Delete Confirm ── */}
+            <ConfirmationDialog
+                open={!!deleteTarget}
+                onAccept={handleDelete}
+                onCancel={() => setDeleteTarget(null)}
+                title="Delete Branch"
+                body={
+                    <Typography variant="body2">
+                        Are you sure you want to permanently delete the branch <strong>{deleteTarget}</strong>?
+                        This action cannot be undone and all data in this branch will be lost.
+                    </Typography>
+                }
+                loading={deleting}
+            />
+        </div>
+    );
+}
+
+function StatCard({ label, value, mono }: {
+    label: string; value: string; mono?: boolean;
+}) {
+    return (
+        <div className={cls("px-3 py-2 rounded-lg border bg-white dark:bg-surface-900", defaultBorderMixin)}>
+            <Typography variant="caption" color="secondary" className="text-[10px] uppercase tracking-wider font-medium">{label}</Typography>
+            <Typography variant="body2" className={cls(
+                "mt-0.5 font-semibold text-[13px] truncate",
+                mono && "font-mono"
+            )}>{value}</Typography>
+        </div>
+    );
+}
