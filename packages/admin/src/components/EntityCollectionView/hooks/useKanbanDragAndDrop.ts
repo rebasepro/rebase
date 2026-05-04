@@ -147,5 +147,6 @@ export function useKanbanDragAndDrop<M extends Record<string, unknown>>({
         }
     }, [collection, columnProperty, orderProperty, context, dataClient, calculateNewOrder, boardDataController, analyticsController, fullPath]);
 
-    return useMemo(() => ({ calculateNewOrder, handleItemsReorder }), [calculateNewOrder, handleItemsReorder]);
+    return useMemo(() => ({ calculateNewOrder,
+handleItemsReorder }), [calculateNewOrder, handleItemsReorder]);
 }

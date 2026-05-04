@@ -56,9 +56,10 @@ export function UsersView({ userManagement }: {
 
     React.useEffect(() => {
         breadcrumbs.set({
-            breadcrumbs: [{ title: t("users"), url: "/users" }]
+            breadcrumbs: [{ title: t("users"),
+url: "/users" }]
         });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
     }, []);
 
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -120,7 +121,8 @@ export function UsersView({ userManagement }: {
             setTotalUsers(result.total);
         } catch (error: unknown) {
             console.error("Failed to fetch users:", error);
-            snackbarController.open({ type: "error", message: error instanceof Error ? error.message : "Failed to load users" });
+            snackbarController.open({ type: "error",
+message: error instanceof Error ? error.message : "Failed to load users" });
         } finally {
             setTableLoading(false);
         }
@@ -213,10 +215,12 @@ export function UsersView({ userManagement }: {
         setBootstrapping(true);
         try {
             await bootstrapAdmin();
-            snackbarController.open({ type: "success", message: t("bootstrap_admin_success") });
+            snackbarController.open({ type: "success",
+message: t("bootstrap_admin_success") });
             window.location.reload();
         } catch (error: unknown) {
-            snackbarController.open({ type: "error", message: error instanceof Error ? error.message : t("failed_to_bootstrap_admin") });
+            snackbarController.open({ type: "error",
+message: error instanceof Error ? error.message : t("failed_to_bootstrap_admin") });
         } finally {
             setBootstrapping(false);
         }
@@ -243,12 +247,14 @@ export function UsersView({ userManagement }: {
         setDeleteInProgress(true);
         try {
             await deleteUser(userToDelete);
-            snackbarController.open({ type: "success", message: t("user_deleted_successfully") });
+            snackbarController.open({ type: "success",
+message: t("user_deleted_successfully") });
             setDeleteConfirmOpen(false);
             setUserToDelete(undefined);
             refreshCurrentPage();
         } catch (error: unknown) {
-            snackbarController.open({ type: "error", message: error instanceof Error ? error.message : t("error_deleting_user") });
+            snackbarController.open({ type: "error",
+message: error instanceof Error ? error.message : t("error_deleting_user") });
         } finally {
             setDeleteInProgress(false);
         }
@@ -262,16 +268,18 @@ export function UsersView({ userManagement }: {
             setResetConfirmOpen(false);
             setUserToReset(undefined);
             setCreationResult(result);
-            snackbarController.open({ type: "success", message: t("reset_password_success") });
+            snackbarController.open({ type: "success",
+message: t("reset_password_success") });
         } catch (error: unknown) {
-            snackbarController.open({ type: "error", message: error instanceof Error ? error.message : t("error_resetting_password") });
+            snackbarController.open({ type: "error",
+message: error instanceof Error ? error.message : t("error_resetting_password") });
         } finally {
             setResetInProgress(false);
         }
     };
 
     if (delegateLoading) {
-        return <CenteredView><CircularProgress /></CenteredView>;
+        return <CenteredView><CircularProgress/></CenteredView>;
     }
 
     return (
@@ -288,7 +296,7 @@ export function UsersView({ userManagement }: {
                         onClick={handleBootstrap}
                         disabled={bootstrapping}
                     >
-                        {bootstrapping ? <CircularProgress size="small" /> : t("add_logged_user_as_admin")}
+                        {bootstrapping ? <CircularProgress size="small"/> : t("add_logged_user_as_admin")}
                     </Button>
                 </div>
             )}
@@ -311,13 +319,13 @@ export function UsersView({ userManagement }: {
                         ))}
                     </Select>
                 )}
-                <SearchBar 
-                    placeholder={t("search_users")} 
-                    onTextSearch={(v) => handleSearch(v || "")} 
+                <SearchBar
+                    placeholder={t("search_users")}
+                    onTextSearch={(v) => handleSearch(v || "")}
                     size="small"
                     expandable
                 />
-                <Button startIcon={<AddIcon />} onClick={handleAddUser} disabled={!saveUser}>
+                <Button startIcon={<AddIcon/>} onClick={handleAddUser} disabled={!saveUser}>
                     {t("add_user")}
                 </Button>
             </div>
@@ -335,28 +343,34 @@ export function UsersView({ userManagement }: {
                     <TableBody>
                         {tableLoading ? (
                             [
-                                { email: "w-48", name: "w-32", roles: ["w-16", "w-20"] },
-                                { email: "w-32", name: "w-24", roles: ["w-24"] },
-                                { email: "w-40", name: "w-36", roles: ["w-16", "w-16"] },
+                                { email: "w-48",
+name: "w-32",
+roles: ["w-16", "w-20"] },
+                                { email: "w-32",
+name: "w-24",
+roles: ["w-24"] },
+                                { email: "w-40",
+name: "w-36",
+roles: ["w-16", "w-16"] }
                             ].map((row, i) => (
                                 <TableRow key={`skeleton-${i}`}>
-                                    <TableCell className="font-mono text-xs"><Skeleton className="h-3 w-40" /></TableCell>
-                                    <TableCell><Skeleton className={`h-4 ${row.email}`} /></TableCell>
-                                    <TableCell className="font-medium"><Skeleton className={`h-4 ${row.name}`} /></TableCell>
+                                    <TableCell className="font-mono text-xs"><Skeleton className="h-3 w-40"/></TableCell>
+                                    <TableCell><Skeleton className={`h-4 ${row.email}`}/></TableCell>
+                                    <TableCell className="font-medium"><Skeleton className={`h-4 ${row.name}`}/></TableCell>
                                     <TableCell>
                                         <div className="flex flex-wrap gap-2">
                                             {row.roles.map((w, j) => (
-                                                <Skeleton key={j} className={`h-6 ${w} rounded-full`} />
+                                                <Skeleton key={j} className={`h-6 ${w} rounded-full`}/>
                                             ))}
                                         </div>
                                     </TableCell>
                                     <TableCell className="whitespace-nowrap text-sm">
-                                        <Skeleton className="h-4 w-20" />
+                                        <Skeleton className="h-4 w-20"/>
                                     </TableCell>
                                     <TableCell className="text-right whitespace-nowrap">
                                         <div className="flex justify-end items-center gap-1">
-                                            <Skeleton className="h-7 w-7 rounded-md" />
-                                            <Skeleton className="h-7 w-7 rounded-md" />
+                                            <Skeleton className="h-7 w-7 rounded-md"/>
+                                            <Skeleton className="h-7 w-7 rounded-md"/>
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -371,7 +385,7 @@ export function UsersView({ userManagement }: {
                                     <div className="flex flex-wrap gap-2">
                                         {user.roles?.map((roleId: string) => {
                                             const role = roles?.find(r => r.id === roleId);
-                                            return role ? <RoleChip key={roleId} role={role} /> : <span key={roleId}>{roleId}</span>;
+                                            return role ? <RoleChip key={roleId} role={role}/> : <span key={roleId}>{roleId}</span>;
                                         })}
                                     </div>
                                 </TableCell>
@@ -389,7 +403,7 @@ export function UsersView({ userManagement }: {
                                                         setUserToReset(user);
                                                         setResetConfirmOpen(true);
                                                     }}>
-                                                    <LockResetIcon size="smallest" />
+                                                    <LockResetIcon size="smallest"/>
                                                 </IconButton>
                                             </Tooltip>
                                         )}
@@ -402,7 +416,7 @@ export function UsersView({ userManagement }: {
                                                         setUserToDelete(user);
                                                         setDeleteConfirmOpen(true);
                                                     }}>
-                                                    <DeleteIcon size="smallest" />
+                                                    <DeleteIcon size="smallest"/>
                                                 </IconButton>
                                             </Tooltip>
                                         )}
@@ -437,7 +451,7 @@ export function UsersView({ userManagement }: {
                             size="small"
                             disabled={page === 0}
                             onClick={() => handlePageChange(page - 1)}>
-                            <ChevronLeftIcon size="small" />
+                            <ChevronLeftIcon size="small"/>
                         </IconButton>
                         <Typography variant="body2" className="px-3 text-surface-accent-600 dark:text-surface-accent-300">
                             {page + 1} / {totalPages}
@@ -446,7 +460,7 @@ export function UsersView({ userManagement }: {
                             size="small"
                             disabled={page >= totalPages - 1}
                             onClick={() => handlePageChange(page + 1)}>
-                            <ChevronRightIcon size="small" />
+                            <ChevronRightIcon size="small"/>
                         </IconButton>
                     </div>
                 </div>
@@ -517,7 +531,8 @@ function CreationResultDialog({
         try {
             await navigator.clipboard.writeText(result.temporaryPassword);
             setCopied(true);
-            snackbarController.open({ type: "success", message: t("password_copied") ?? "Password copied to clipboard" });
+            snackbarController.open({ type: "success",
+message: t("password_copied") ?? "Password copied to clipboard" });
             setTimeout(() => setCopied(false), 3000);
         } catch {
             // Fallback for older browsers
@@ -538,7 +553,7 @@ function CreationResultDialog({
             <Dialog open={true} onOpenChange={(open) => !open ? onClose() : undefined} maxWidth="xl">
                 <DialogTitle variant="h5" gutterBottom={false}>
                     <div className="flex items-center gap-3">
-                        <EmailIcon />
+                        <EmailIcon/>
                         {t("invitation_sent_title") ?? "Invitation Sent"}
                     </div>
                 </DialogTitle>
@@ -596,7 +611,7 @@ function CreationResultDialog({
                                 </code>
                                 <Tooltip title={t("copy_password") ?? "Copy password"} asChild>
                                     <IconButton onClick={handleCopyPassword}>
-                                        {copied ? <CheckCircleIcon className="text-green-600" /> : <ContentCopyIcon />}
+                                        {copied ? <CheckCircleIcon className="text-green-600"/> : <ContentCopyIcon/>}
                                     </IconButton>
                                 </Tooltip>
                             </div>
@@ -690,7 +705,8 @@ function UserDetailsForm({
             }
             onSaved?.();
         } catch (error: unknown) {
-            snackbarController.open({ type: "error", message: error instanceof Error ? error.message : "Failed to save user" });
+            snackbarController.open({ type: "error",
+message: error instanceof Error ? error.message : "Failed to save user" });
         } finally {
             setIsSubmitting(false);
         }
@@ -709,7 +725,10 @@ function UserDetailsForm({
     return (
         <Dialog open={open} onOpenChange={(open) => !open ? handleClose() : undefined} maxWidth="4xl">
             <form onSubmit={handleSubmit} autoComplete="off" noValidate
-                style={{ display: "flex", flexDirection: "column", position: "relative", height: "100%" }}>
+                style={{ display: "flex",
+flexDirection: "column",
+position: "relative",
+height: "100%" }}>
 
                 <DialogTitle variant="h4" gutterBottom={false}>
                     {t("user")}
@@ -766,7 +785,7 @@ function UserDetailsForm({
                                 >
                                     {roles.map(role => (
                                         <MultiSelectItem key={role.id} value={role.id}>
-                                            <RoleChip role={role} />
+                                            <RoleChip role={role}/>
                                         </MultiSelectItem>
                                     ))}
                                 </MultiSelect>

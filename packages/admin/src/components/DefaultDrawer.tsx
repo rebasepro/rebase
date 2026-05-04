@@ -20,7 +20,7 @@ export function DefaultDrawer({
     logo,
     logoDestination,
     className,
-    style,
+    style
 }: {
     title?: React.ReactNode;
     logo?: string;
@@ -73,8 +73,12 @@ export function DefaultDrawer({
     // Collapsible groups state - using "drawer" namespace for independent state from home page
     const { isGroupCollapsed, toggleGroupCollapsed } = useCollapsedGroups(groupsToRender, "drawer");
 
-    const headerSlot = useSlot("navigation.header", { drawerOpen, drawerHovered, context });
-    const footerSlot = useSlot("navigation.footer", { drawerOpen, drawerHovered, context });
+    const headerSlot = useSlot("navigation.header", { drawerOpen,
+drawerHovered,
+context });
+    const footerSlot = useSlot("navigation.footer", { drawerOpen,
+drawerHovered,
+context });
 
     if (!navigationState.topLevelNavigation)
         return null;
@@ -125,7 +129,7 @@ export function DefaultDrawer({
                     style={{
                         maskImage: scrolled
                             ? "linear-gradient(to bottom, transparent 0, black 20px, black calc(100% - 20px), transparent 100%)"
-                            : "linear-gradient(to bottom, black 0, black calc(100% - 20px), transparent 100%)",
+                            : "linear-gradient(to bottom, black 0, black calc(100% - 20px), transparent 100%)"
                     }}>
 
                     {groupsToRender.map((group) => {
@@ -173,7 +177,7 @@ export function DrawerLogo({
     title,
     logoDestination,
     drawerOpen,
-    drawerHovered,
+    drawerHovered
 }: {
     logo?: string;
     title?: React.ReactNode;
@@ -193,8 +197,8 @@ export function DrawerLogo({
                 to={logoDestination || urlController.basePath}
             >
                 {logo
-                    ? <img src={logo} alt="Logo" className="w-[28px] h-[28px] object-contain" />
-                    : <RebaseLogo width="28px" height="28px" />
+                    ? <img src={logo} alt="Logo" className="w-[28px] h-[28px] object-contain"/>
+                    : <RebaseLogo width="28px" height="28px"/>
                 }
             </Link>
 
@@ -229,7 +233,7 @@ export function DrawerToggle({
     drawerOpen,
     drawerHovered,
     openDrawer,
-    closeDrawer,
+    closeDrawer
 }: {
     drawerOpen: boolean;
     drawerHovered: boolean;
@@ -267,8 +271,8 @@ export function DrawerToggle({
                 >
                     <div className="shrink-0 flex items-center justify-center w-[56px] h-[24px] text-surface-500 dark:text-surface-400">
                         {isExpanded
-                            ? <KeyboardDoubleArrowLeftIcon size="small" />
-                            : <KeyboardDoubleArrowRightIcon size="small" />
+                            ? <KeyboardDoubleArrowLeftIcon size="small"/>
+                            : <KeyboardDoubleArrowRightIcon size="small"/>
                         }
                     </div>
                     <div className={cls(
@@ -294,7 +298,7 @@ export function DrawerToggle({
  */
 function DrawerModeSwitch({
     drawerOpen,
-    drawerHovered,
+    drawerHovered
 }: {
     drawerOpen: boolean;
     drawerHovered: boolean;

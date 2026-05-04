@@ -1,7 +1,7 @@
 import { ArrayProperty, BooleanProperty, DateProperty, MapProperty, NumberProperty, Property, PropertyConfig, StringProperty } from "@rebasepro/types";
 import { mergeDeep } from "@rebasepro/utils";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- propertyData is a partial property shape built incrementally via mergeDeep
+
 export function updatePropertyFromWidget(propertyData: any,
     selectedWidgetId: string | undefined,
     propertyConfigs: Record<string, PropertyConfig>): Property {
@@ -203,7 +203,7 @@ export function updatePropertyFromWidget(propertyData: any,
             propertyData,
             {
                 type: "reference",
-                propertyConfig: "reference",
+                propertyConfig: "reference"
             } as Property
         );
     } else if (selectedWidgetId === "reference_as_string") {
@@ -211,7 +211,7 @@ export function updatePropertyFromWidget(propertyData: any,
             propertyData,
             {
                 type: "string",
-                propertyConfig: "reference_as_string",
+                propertyConfig: "reference_as_string"
             } as Property
         );
     } else if (selectedWidgetId === "multi_references") {
@@ -230,7 +230,7 @@ export function updatePropertyFromWidget(propertyData: any,
             propertyData,
             {
                 type: "boolean",
-                propertyConfig: "switch",
+                propertyConfig: "switch"
             } as BooleanProperty
         );
     } else if (selectedWidgetId === "date_time") {
@@ -256,7 +256,7 @@ export function updatePropertyFromWidget(propertyData: any,
             propertyData,
             {
                 type: "array",
-                propertyConfig: "repeat",
+                propertyConfig: "repeat"
             } as ArrayProperty
         );
     } else if (selectedWidgetId === "block") {

@@ -65,7 +65,7 @@ export function VirtualTableSelect(props: {
             key={`${enumKey}`}
             enumKey={String(enumKey)}
             enumValues={enumValues}
-            size={small ? "small" : "medium"} />;
+            size={small ? "small" : "medium"}/>;
     };
 
     // When the dropdown closes (including on escape), restore focus to the trigger
@@ -99,7 +99,7 @@ export function VirtualTableSelect(props: {
                         <EnumValuesChip
                             enumKey={enumConfig.id}
                             enumValues={enumValues}
-                            size={small ? "small" : "medium"} />
+                            size={small ? "small" : "medium"}/>
                     </MultiSelectItem>
                 ))}
             </MultiSelect>
@@ -124,7 +124,7 @@ export function VirtualTableSelect(props: {
                         <EnumValuesChip
                             enumKey={enumConfig.id}
                             enumValues={enumValues}
-                            size={small ? "small" : "medium"} />
+                            size={small ? "small" : "medium"}/>
                     </SelectItem>
                 ))}
             </Select>

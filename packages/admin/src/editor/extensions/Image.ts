@@ -35,12 +35,12 @@ export async function onFileRead(view: EditorView, readerEvent: ProgressEvent<Fi
         // Retrieve the LATEST state after the async upload
         let currentDecos = plugin.getState(view.state) as DecorationSet;
         const foundDecos = currentDecos.find(undefined, undefined, spec => spec.id === decoId);
-        
+
         if (foundDecos.length === 0) {
             console.warn("Image placeholder removed before upload completed.");
             return;
         }
-        
+
         // Get the mapped position of the decoration
         const currentPos = foundDecos[0].from;
 

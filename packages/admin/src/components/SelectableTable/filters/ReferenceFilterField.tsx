@@ -196,7 +196,7 @@ export function ReferenceFilterField({
                             if (internalValue !== null)
                                 updateFilter(operation, null);
                             else updateFilter(operation, undefined);
-                        }} />
+                        }}/>
                     {t("filter_for_null_values")}
                 </Label>}
 

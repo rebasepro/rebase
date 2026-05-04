@@ -5,14 +5,14 @@ import { isPropertyBuilder } from "@rebasepro/common";
  * Recursively extract all property paths from a Properties object.
  * For nested map properties, creates dot-notation paths like "address.city".
  * Skips PropertyBuilder functions (callbacks) as they cannot be statically analyzed.
- * 
+ *
  * @param properties - The properties object to extract paths from
  * @param prefix - Optional prefix for nested paths (used in recursion)
  * @returns Array of property path strings
  */
 export function getPropertyPaths(
     properties: Properties | undefined,
-    prefix: string = ""
+    prefix = ""
 ): string[] {
     if (!properties) return [];
 
@@ -60,7 +60,7 @@ export function getPropertyPaths(
 /**
  * Get property paths grouped by top-level property for UI display.
  * Skips PropertyBuilder functions.
- * 
+ *
  * @param properties - The properties object
  * @returns Object with top-level keys mapping to their nested paths
  */

@@ -77,7 +77,7 @@ export function TextFieldBinding<T extends string | number>({
         <LabelWithIcon
             icon={getIconForProperty(property, "small")}
             required={property.validation?.required || property.isId === true}
-            title={property.name ?? propertyKey} />
+            title={property.name ?? propertyKey}/>
     );
     return (<>
         <PropertyIdCopyTooltip propertyKey={propertyKey}>
@@ -106,7 +106,7 @@ export function TextFieldBinding<T extends string | number>({
                     {property.clearable && (
                         <div className="flex flex-row justify-center items-center absolute h-full right-0 top-0 mr-4">
                             <IconButton onClick={handleClearClick}>
-                                <CloseIcon />
+                                <CloseIcon/>
                             </IconButton>
                         </div>
                     )}
@@ -121,24 +121,24 @@ export function TextFieldBinding<T extends string | number>({
                     label={<LabelWithIcon
                         icon={getIconForProperty(property, "small")}
                         required={property.validation?.required || property.isId === true}
-                        title={property.name ?? propertyKey} />}
+                        title={property.name ?? propertyKey}/>}
                     type={inputType}
                     disabled={disabled}
                     endAdornment={
                         property.clearable && <IconButton
                             onClick={handleClearClick}>
-                            <CloseIcon />
+                            <CloseIcon/>
                         </IconButton>
                     }
                     error={showError ? !!error : undefined}
-                    inputClassName={error ? "text-red-500 dark:text-red-600" : ""} />
+                    inputClassName={error ? "text-red-500 dark:text-red-600" : ""}/>
             )}
         </PropertyIdCopyTooltip>
         <FieldHelperText includeDescription={includeDescription}
             showError={showError}
             error={error}
             disabled={disabled}
-            property={property} />
+            property={property}/>
 
         {url && <Collapse
             className="mt-1 ml-1"
@@ -146,7 +146,7 @@ export function TextFieldBinding<T extends string | number>({
             <PropertyPreview
                 value={value}
                 property={property}
-                size={size} />
+                size={size}/>
         </Collapse>}
 
     </>

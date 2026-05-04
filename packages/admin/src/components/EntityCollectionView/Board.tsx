@@ -29,7 +29,7 @@ export function Board<M extends Record<string, unknown>, COLUMN extends string>(
     columnLoadingState,
     onLoadMoreColumn,
     onAddItemToColumn,
-    AddColumnComponent,
+    AddColumnComponent
 }: BoardProps<M, COLUMN>) {
 
     const [activeItem, setActiveItem] = useState<BoardItem<M> | null>(null);
@@ -53,8 +53,8 @@ export function Board<M extends Record<string, unknown>, COLUMN extends string>(
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
-                distance: 5,
-            },
+                distance: 5
+            }
         })
     );
 
@@ -263,7 +263,7 @@ export function Board<M extends Record<string, unknown>, COLUMN extends string>(
         >
             <DragOverlay dropAnimation={{
                 duration: 300,
-                easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)",
+                easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)"
             }}>
                 {activeItem ? (
                     <ItemComponent
@@ -272,7 +272,7 @@ export function Board<M extends Record<string, unknown>, COLUMN extends string>(
                         index={-1}
                         style={{
                             boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
-                            opacity: 0.9,
+                            opacity: 0.9
                         }}
                     />
                 ) : activeColumn ? (

@@ -5,7 +5,7 @@ import {
     useTranslation
 } from "@rebasepro/core";
 import { PluginHomePageActionsProps } from "@rebasepro/types";
-import { ContentCopyIcon, DeleteIcon, IconButton, Menu, MenuItem, MoreVertIcon, SettingsIcon, } from "@rebasepro/ui";
+import { ContentCopyIcon, DeleteIcon, IconButton, Menu, MenuItem, MoreVertIcon, SettingsIcon } from "@rebasepro/ui";
 import { useCollectionEditorController } from "../useCollectionEditorController";
 import { useState } from "react";
 import { useCollectionsConfigController } from "../useCollectionsConfigController";
@@ -68,7 +68,7 @@ export function HomePageEditorCollectionAction({
             {permissions.deleteCollections &&
                 <Menu
                     trigger={<IconButton size={"small"}>
-                        <MoreVertIcon size={"small"} />
+                        <MoreVertIcon size={"small"}/>
                     </IconButton>}
                 >
                     {permissions.createCollections &&
@@ -79,7 +79,7 @@ export function HomePageEditorCollectionAction({
                                 event.stopPropagation();
                                 onDuplicateCollectionClicked();
                             }}>
-                            <ContentCopyIcon />
+                            <ContentCopyIcon/>
                             {t("studio_home_duplicate_collection")}
                         </MenuItem>
                     }
@@ -90,7 +90,7 @@ export function HomePageEditorCollectionAction({
                             event.stopPropagation();
                             setDeleteRequested(true);
                         }}>
-                        <DeleteIcon />
+                        <DeleteIcon/>
                         {t("studio_home_delete")}
                     </MenuItem>
 
@@ -104,7 +104,7 @@ export function HomePageEditorCollectionAction({
                     onClick={(event: React.MouseEvent) => {
                         onEditCollectionClicked();
                     }}>
-                    <SettingsIcon size={"small"} />
+                    <SettingsIcon size={"small"}/>
                 </IconButton>}
         </div>
 
@@ -113,7 +113,7 @@ export function HomePageEditorCollectionAction({
             onAccept={deleteCollection}
             onCancel={() => setDeleteRequested(false)}
             title={<>{t("studio_home_confirm_delete_title")}</>}
-            body={<>{t("studio_home_confirm_delete_no_data")}</>} />
+            body={<>{t("studio_home_confirm_delete_no_data")}</>}/>
     </>;
 
 }

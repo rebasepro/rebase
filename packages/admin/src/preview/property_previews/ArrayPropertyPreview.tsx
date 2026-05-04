@@ -58,7 +58,7 @@ export function ArrayPropertyPreview({
                                         propertyKey={propertyKey}
                                         value={value}
                                         property={of}
-                                        size={childSize} />
+                                        size={childSize}/>
                                 </ErrorBoundary>
                             </div>
                         </React.Fragment>

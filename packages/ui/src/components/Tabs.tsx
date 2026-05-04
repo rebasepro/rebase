@@ -94,14 +94,15 @@ export function Tabs({
                         "bg-surface-50 dark:bg-surface-900 border shadow-sm", defaultBorderMixin
                     )}
                 >
-                    <ChevronLeftIcon size="small" />
+                    <ChevronLeftIcon size="small"/>
                 </button>
             )}
             <div
                 ref={scrollContainerRef}
                 className="flex-1 overflow-x-auto no-scrollbar min-w-0"
                 onScroll={checkScroll}
-                style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+                style={{ scrollbarWidth: "none",
+msOverflowStyle: "none" }}
             >
                 <TabsPrimitive.List className={cls(
                     variant === "standard" && "inline-flex h-10 items-center justify-start rounded-md bg-surface-50 p-1 text-surface-600 dark:bg-surface-900 dark:text-surface-400 gap-2 border",
@@ -126,7 +127,7 @@ export function Tabs({
                         "bg-surface-50 dark:bg-surface-900 border shadow-sm", defaultBorderMixin
                     )}
                 >
-                    <ChevronRightIcon size="small" />
+                    <ChevronRightIcon size="small"/>
                 </button>
             )}
         </TabsPrimitive.Root>

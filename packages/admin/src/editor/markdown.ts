@@ -5,30 +5,41 @@ import {
     defaultMarkdownSerializer
 } from "prosemirror-markdown";
 import markdownIt from "markdown-it";
-// @ts-ignore
+// @ts-expect-error -- markdown-it-task-lists does not ship type declarations
 import markdownItTaskLists from "markdown-it-task-lists";
-// @ts-ignore
+// @ts-expect-error -- markdown-it-mark does not ship type declarations
 import markdownItMark from "markdown-it-mark";
-// @ts-ignore
+// @ts-expect-error -- markdown-it-ins does not ship type declarations
 import markdownItIns from "markdown-it-ins";
 
 import { schema } from "./schema";
+
+/**
+ * ProseMirror's MarkdownSerializerState exposes an `out` string property
+ * that accumulates the serialised output. The published typings do not
+ * include it, so we extend the type locally to avoid `as any` casts.
+ */
+interface MarkdownSerializerStateWithOutput {
+    out: string;
+}
 
 const parserTokens: any = {
     ...defaultMarkdownParser.tokens,
     em: { mark: "italic" },
     strong: { mark: "bold" },
-    html_inline: { ignore: true, noCloseToken: true },
-    html_block: { ignore: true, noCloseToken: true },
+    html_inline: { ignore: true,
+noCloseToken: true },
+    html_block: { ignore: true,
+noCloseToken: true },
     s: {
-        mark: "strike",
+        mark: "strike"
     },
     task_list: {
-        block: "task_list",
+        block: "task_list"
     },
     task_item: {
         block: "task_item",
-        getAttrs: (tok: any) => ({ checked: tok.attrGet("checked") === "true" }),
+        getAttrs: (tok: any) => ({ checked: tok.attrGet("checked") === "true" })
     },
     mark: {
         mark: "highlight"
@@ -81,7 +92,7 @@ md.core.ruler.after("inline", "tables-wrap-paragraphs", (state: any) => {
                 pOpen.block = true;
                 const pClose = new state.Token("paragraph_close", "p", -1);
                 pClose.block = true;
-                
+
                 state.tokens.splice(closeIndex, 0, pClose);
                 state.tokens.splice(i + 1, 0, pOpen);
             }
@@ -120,6 +131,8 @@ export const markdownSerializer = new MarkdownSerializer(
             state.closeBlock(node);
         },
         table(state, node) {
+            // Access the internal `.out` accumulator with a typed cast (see MarkdownSerializerStateWithOutput).
+            const stateInternal = state as unknown as MarkdownSerializerStateWithOutput;
             node.forEach((row, _, i) => {
                 row.forEach((cell, _, j) => {
                     if (j === 0) state.write("| ");
@@ -128,16 +141,16 @@ export const markdownSerializer = new MarkdownSerializer(
                     // Capture cell content by tracking state.out length.
                     // This avoids monkey-patching state.write which loses
                     // flushClose/delim handling and can produce "undefined" text.
-                    const startLen = (state as any).out.length;
+                    const startLen = stateInternal.out.length;
                     let first = true;
-                    cell.forEach((block: any) => {
-                        if (!first) (state as any).out += "<br>";
+                    cell.forEach((block) => {
+                        if (!first) stateInternal.out += "<br>";
                         state.renderInline(block);
                         first = false;
                     });
-                    const cellContent = (state as any).out.slice(startLen);
+                    const cellContent = stateInternal.out.slice(startLen);
                     // Remove the rendered content from state.out; we'll re-add it escaped
-                    (state as any).out = (state as any).out.slice(0, startLen);
+                    stateInternal.out = stateInternal.out.slice(0, startLen);
                     state.write(cellContent.replace(/\|/g, "\\|").replace(/\n/g, " "));
                     state.write(" |");
                 });
@@ -159,9 +172,18 @@ export const markdownSerializer = new MarkdownSerializer(
         ...defaultMarkdownSerializer.marks,
         bold: defaultMarkdownSerializer.marks.strong,
         italic: defaultMarkdownSerializer.marks.em,
-        strike: { open: "~~", close: "~~", mixable: true, expelEnclosingWhitespace: true },
-        highlight: { open: "==", close: "==", mixable: true, expelEnclosingWhitespace: true },
-        underline: { open: "++", close: "++", mixable: true, expelEnclosingWhitespace: true },
+        strike: { open: "~~",
+close: "~~",
+mixable: true,
+expelEnclosingWhitespace: true },
+        highlight: { open: "==",
+close: "==",
+mixable: true,
+expelEnclosingWhitespace: true },
+        underline: { open: "++",
+close: "++",
+mixable: true,
+expelEnclosingWhitespace: true },
         link: {
             ...defaultMarkdownSerializer.marks.link,
             close(state: any, mark, parent, index) {
@@ -173,7 +195,10 @@ export const markdownSerializer = new MarkdownSerializer(
             }
         },
         // textStyle (colored text from HTML) has no markdown equivalent — emit content as-is
-        textStyle: { open: "", close: "", mixable: true, expelEnclosingWhitespace: true },
+        textStyle: { open: "",
+close: "",
+mixable: true,
+expelEnclosingWhitespace: true }
     }
 );
 export const parser = markdownParser;

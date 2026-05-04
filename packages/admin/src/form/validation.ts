@@ -44,7 +44,6 @@ export function getEntitySchema<M extends Record<string, unknown>>(
 }
 
 
-
 export function mapPropertyToZod(propertyContext: PropertyContext<Property>): ZodTypeAny {
 
     const property = propertyContext.property;
@@ -85,7 +84,6 @@ export function mapPropertyToZod(propertyContext: PropertyContext<Property>): Zo
         { message: `Unsupported data type: ${dataType}` }
     );
 }
-
 
 
 export function getZodMapObjectSchema({
@@ -468,7 +466,7 @@ function getZodArraySchema({
                 });
                 arraySchema = z.array(ofSchema).nullable().optional();
             } catch (e: unknown) {
-                console.error(`Error creating validation schema for array of property:`, e);
+                console.error("Error creating validation schema for array of property:", e);
                 arraySchema = z.array(z.any().refine(
                     () => false,
                     { message: `Validation error: ${e instanceof Error ? e.message : "Unknown error"}` }

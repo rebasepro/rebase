@@ -277,7 +277,7 @@ export function EntityForm<M extends Record<string, unknown>>({
 
     const hasLocalChanges = !localChangesCleared && localChangesData && Object.keys(localChangesData).length > 0;
 
-    const formex: FormexController<M> = formexProp ?? useCreateFormex<M>({
+    const internalFormex = useCreateFormex<M>({
         initialValues: initialValues as M,
         initialDirty,
         debugId: `EntityForm:${path}/${entityIdProp}`,
@@ -312,6 +312,7 @@ export function EntityForm<M extends Record<string, unknown>>({
             return zodToFormErrors(result.error);
         }
     });
+    const formex: FormexController<M> = formexProp ?? internalFormex;
 
     useEffect(() => {
 
@@ -457,7 +458,7 @@ export function EntityForm<M extends Record<string, unknown>>({
 
     const lastSavedValues = useRef<EntityValues<M> | undefined>(entity?.values);
     const save = async (values: EntityValues<M>): Promise<Entity<M> | void> => {
-        let valuesToSave = status === "existing"
+        const valuesToSave = status === "existing"
             ? getChanges(values, entity?.values || {}) as EntityValues<M>
             : values;
 
@@ -488,7 +489,7 @@ export function EntityForm<M extends Record<string, unknown>>({
     const disabled = formex.isSubmitting || Boolean(disabledProp);
 
     const formContext: FormContext<M> = {
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- stable reference for form field value setter
+
         setFieldValue: useCallback((key: string, value: unknown) => formex.setFieldValue(key, value), []),
         values: formex.values,
         collection,
@@ -515,11 +516,11 @@ export function EntityForm<M extends Record<string, unknown>>({
         parentCollectionIds,
         path: path,
         status,
-        collection: collection as any,
+        collection: collection as EntityCollection,
         context,
-        formContext: formContext as any,
+        formContext: formContext as FormContext<Record<string, unknown>>,
         openEntityMode,
-        disabled: actionsDisabled,
+        disabled: actionsDisabled
     };
     const pluginFormActions = useSlot("form.actions", formActionProps);
     const pluginFormBefore = useSlot("form.before", formActionProps);
@@ -623,7 +624,7 @@ export function EntityForm<M extends Record<string, unknown>>({
                             <FormEntry propertyKey={key}
                                 widthPercentage={widthPercentage}
                                 key={`field_${key}`}>
-                                <PropertyFieldBinding {...cmsFormFieldProps} />
+                                <PropertyFieldBinding {...cmsFormFieldProps}/>
                             </FormEntry>
                         );
                     }
@@ -635,7 +636,7 @@ export function EntityForm<M extends Record<string, unknown>>({
                             throw new Error("When using additional fields you need to provide a Builder or a value");
                         }
                         const child = Builder
-                            ? <Builder entity={entity} context={context} />
+                            ? <Builder entity={entity} context={context}/>
                             : <div className={"w-full"}>
                                 {additionalField.value?.({
                                     entity,
@@ -647,9 +648,9 @@ export function EntityForm<M extends Record<string, unknown>>({
                             <div key={`additional_${key}`} className={"w-full"}>
                                 <LabelWithIconAndTooltip
                                     propertyKey={key}
-                                    icon={<NotesIcon size={"small"} />}
+                                    icon={<NotesIcon size={"small"}/>}
                                     title={additionalField.name}
-                                    className={"text-text-secondary dark:text-text-secondary-dark ml-3.5"} />
+                                    className={"text-text-secondary dark:text-text-secondary-dark ml-3.5"}/>
                                 <div
                                     className={cls(paperMixin, "w-full min-h-14 p-4 md:p-6 overflow-x-scroll no-scrollbar")}>
                                     <ErrorBoundary>
@@ -702,13 +703,13 @@ export function EntityForm<M extends Record<string, unknown>>({
             {formContext && <>
                 <div className="mt-12 flex flex-col gap-8" ref={formRef}>
                     {formFields()}
-                    <ErrorFocus containerRef={formRef} />
+                    <ErrorFocus containerRef={formRef}/>
                 </div>
             </>}
 
             {pluginFormAfter}
 
-            {forceActionsAtTheBottom && <div className="h-16" />}
+            {forceActionsAtTheBottom && <div className="h-16"/>}
         </>
     </ErrorBoundary>;
 
@@ -768,12 +769,12 @@ export function EntityForm<M extends Record<string, unknown>>({
                             {formex.dirty
                                 ? <Tooltip title={t("form_modified")}>
                                     <Chip size={"small"} className={"py-1"} colorScheme={"orangeDarker"}>
-                                        <EditIcon size={"smallest"} />
+                                        <EditIcon size={"smallest"}/>
                                     </Chip>
                                 </Tooltip>
                                 : <Tooltip title={t("form_in_sync")}>
                                     <Chip size={"small"} className={"py-1"}>
-                                        <CheckIcon size={"smallest"} />
+                                        <CheckIcon size={"smallest"}/>
                                     </Chip>
                                 </Tooltip>}
                         </div>
@@ -798,7 +799,7 @@ export function getInitialEntityValues<M extends Record<string, unknown>>(
     path: string,
     status: "new" | "existing" | "copy",
     entity: Entity<M> | undefined,
-    propertyConfigs?: Record<string, PropertyConfig>,
+    propertyConfigs?: Record<string, PropertyConfig>
 ): Partial<EntityValues<M>> {
     const properties = collection.properties;
     if ((status === "existing" || status === "copy") && entity) {
@@ -843,15 +844,12 @@ export function zodToFormErrors(zodError: z.ZodError): Record<string, any> {
 }
 
 
-
 function useOnAutoSave(autoSave: undefined | boolean, formex: FormexController<any>, lastSavedValues: any, save: (values: EntityValues<any>) => Promise<Entity<any> | void>) {
-    if (!autoSave) return;
     useEffect(() => {
-        if (autoSave) {
-            if (formex.values && !equal(formex.values, lastSavedValues.current)) {
-                save(formex.values);
-            }
+        if (!autoSave) return;
+        if (formex.values && !equal(formex.values, lastSavedValues.current)) {
+            save(formex.values);
         }
-    }, [formex.values]);
+    }, [autoSave, formex.values]);
 }
 

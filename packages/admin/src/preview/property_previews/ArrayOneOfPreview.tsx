@@ -14,7 +14,7 @@ export function ArrayOneOfPreview({
     propertyKey,
     value,
     property: property,
-    size,
+    size
     // entity
 }: PropertyPreviewProps<ArrayProperty>) {
 
@@ -58,7 +58,7 @@ export function ArrayOneOfPreview({
                                     // entity={entity}
                                     // @ts-ignore
                                     property={(property.resolvedProperties[index] ?? properties[value[typeField]]) as Property}
-                                    size={childSize} />}
+                                    size={childSize}/>}
                             </ErrorBoundary>
                         </div>
                     </React.Fragment>

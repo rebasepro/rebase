@@ -13,79 +13,79 @@ export interface BubbleColorMenuItem {
 const TEXT_COLORS: BubbleColorMenuItem[] = [
     {
         name: "Default",
-        color: "black",
+        color: "black"
     },
     {
         name: "Purple",
-        color: "#9333EA",
+        color: "#9333EA"
     },
     {
         name: "Red",
-        color: "#E00000",
+        color: "#E00000"
     },
     {
         name: "Yellow",
-        color: "#EAB308",
+        color: "#EAB308"
     },
     {
         name: "Blue",
-        color: "#2563EB",
+        color: "#2563EB"
     },
     {
         name: "Green",
-        color: "#008A00",
+        color: "#008A00"
     },
     {
         name: "Orange",
-        color: "#FFA500",
+        color: "#FFA500"
     },
     {
         name: "Pink",
-        color: "#BA4081",
+        color: "#BA4081"
     },
     {
         name: "Gray",
-        color: "#A8A29E",
-    },
+        color: "#A8A29E"
+    }
 ];
 
 const HIGHLIGHT_COLORS: BubbleColorMenuItem[] = [
     {
         name: "Default",
-        color: "inherit",
+        color: "inherit"
     },
     {
         name: "Purple",
-        color: "#9333EA",
+        color: "#9333EA"
     },
     {
         name: "Red",
-        color: "#E00000",
+        color: "#E00000"
     },
     {
         name: "Yellow",
-        color: "#EAB308",
+        color: "#EAB308"
     },
     {
         name: "Blue",
-        color: "#2563EB",
+        color: "#2563EB"
     },
     {
         name: "Green",
-        color: "#008A00",
+        color: "#008A00"
     },
     {
         name: "Orange",
-        color: "#FFA500",
+        color: "#FFA500"
     },
     {
         name: "Pink",
-        color: "#BA4081",
+        color: "#BA4081"
     },
     {
         name: "Gray",
-        color: "#A8A29E",
-    },
+        color: "#A8A29E"
+    }
 ];
 
 interface ColorSelectorProps {
@@ -119,12 +119,12 @@ export const ColorSelector = ({
                         className="rounded px-1"
                         style={{
                             color: activeColorItem?.color,
-                            backgroundColor: activeHighlightItem?.color,
+                            backgroundColor: activeHighlightItem?.color
                         }}
                     >
                         A
                     </span>
-                    <KeyboardArrowDownIcon size={"small"} />
+                    <KeyboardArrowDownIcon size={"small"}/>
                 </Button>}
             modal={true} open={open} onOpenChange={onOpenChange}>
 
@@ -189,7 +189,7 @@ export const ColorSelector = ({
                             <span>{name}</span>
                         </div>
                         {currentHighlightColor === color && (
-                            <CheckIcon className="h-4 w-4" />
+                            <CheckIcon className="h-4 w-4"/>
                         )}
                     </EditorBubbleItem>
                 ))}

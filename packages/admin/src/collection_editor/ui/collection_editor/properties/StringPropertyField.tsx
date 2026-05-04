@@ -41,10 +41,10 @@ export function StringPropertyField({
                             min={true}
                             trim={true}
                             uppercase={true}
-                            showErrors={showErrors} />}
+                            showErrors={showErrors}/>}
                     {widgetId === "user_select" &&
                         <StringPropertyValidation disabled={disabled}
-                            showErrors={showErrors} />}
+                            showErrors={showErrors}/>}
 
                     {widgetId === "multiline" &&
                         <StringPropertyValidation disabled={disabled}
@@ -54,19 +54,19 @@ export function StringPropertyField({
                             min={true}
                             trim={true}
                             uppercase={true}
-                            showErrors={showErrors} />}
+                            showErrors={showErrors}/>}
 
                     {widgetId === "email" &&
                         <StringPropertyValidation disabled={disabled}
                             max={true}
                             min={true}
                             trim={true}
-                            showErrors={showErrors} />}
+                            showErrors={showErrors}/>}
 
                 </ValidationPanel>
 
             </div>
-            
+
             <div className={"col-span-12"}>
                 <Select name={columnTypePath}
                     disabled={disabled || Boolean(isIdValue)}
@@ -138,7 +138,7 @@ export function StringPropertyField({
                         setFieldValue("defaultValue", e.target.value === "" ? undefined : e.target.value);
                     }}
                     label={"Default value"}
-                    value={getIn(values, "defaultValue") ?? ""} />
+                    value={getIn(values, "defaultValue") ?? ""}/>
 
             </div>
         </>

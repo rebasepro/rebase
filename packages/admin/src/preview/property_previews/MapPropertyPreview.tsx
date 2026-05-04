@@ -25,7 +25,7 @@ export function MapPropertyPreview({
 
     if (!mapProperty.properties || Object.keys(mapProperty.properties ?? {}).length === 0) {
         return (
-            <KeyValuePreview value={value} />
+            <KeyValuePreview value={value}/>
         );
     }
 
@@ -44,7 +44,7 @@ export function MapPropertyPreview({
                                 value={(value)[key]}
                                 property={mapProperty.properties![key]}
                                 // entity={entity}
-                                size={size} />
+                                size={size}/>
                         </ErrorBoundary>
                     </div>
                 ))}
@@ -81,7 +81,7 @@ export function MapPropertyPreview({
                                                 value={(value)[key]}
                                                 property={childProperty}
                                                 // entity={entity}
-                                                size={size} />}
+                                                size={size}/>}
                                     </ErrorBoundary>
                                 </div>
                             </div>
@@ -93,7 +93,7 @@ export function MapPropertyPreview({
                                         value={(value)[key]}
                                         property={childProperty}
                                         // entity={entity}
-                                        size={size} />
+                                        size={size}/>
                                 </div>
                             }
                         </div>
@@ -106,7 +106,7 @@ export function MapPropertyPreview({
 
 export function KeyValuePreview({ value }: { value: any }) {
     if (typeof value !== "object") return null;
-    if (!value) return <EmptyValue />;
+    if (!value) return <EmptyValue/>;
     return <div
         className="flex flex-col gap-1 w-full">
         {
@@ -136,7 +136,7 @@ export function KeyValuePreview({ value }: { value: any }) {
                     </div>
                     {typeof childValue === "object" &&
                         <div className={cls(defaultBorderMixin, "border-l pl-4")}>
-                            <KeyValuePreview value={childValue} />
+                            <KeyValuePreview value={childValue}/>
                         </div>
                     }
                 </div>

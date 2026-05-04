@@ -77,24 +77,26 @@ export function useProseMirror({ initialContent, editable = true, handleImageUpl
                     el.removeAttribute("face");
                 });
                 return div.innerHTML;
-            },
+            }
         });
 
         // Patch posAtCoords to allow dropping/interacting anywhere horizontally natively
         const originalPosAtCoords = editorView.posAtCoords.bind(editorView);
         editorView.posAtCoords = (coords: { left: number, top: number }) => {
-            let res = originalPosAtCoords(coords);
+            const res = originalPosAtCoords(coords);
             if (!res) {
                 const editorRect = editorView.dom.getBoundingClientRect();
                 // If it's literally anywhere to the left of the actual ProseMirror content block
                 if (coords.left <= editorRect.left) {
                     const probeX = editorRect.left + Math.min(60, editorRect.width / 4);
-                    return originalPosAtCoords({ left: probeX, top: coords.top });
+                    return originalPosAtCoords({ left: probeX,
+top: coords.top });
                 }
                 // Or if it's anywhere to the right
                 if (coords.left >= editorRect.right) {
                     const probeX = editorRect.right - Math.min(60, editorRect.width / 4);
-                    return originalPosAtCoords({ left: probeX, top: coords.top });
+                    return originalPosAtCoords({ left: probeX,
+top: coords.top });
                 }
             }
             return res;

@@ -66,9 +66,10 @@ export function getTableBindingForProperty(
         return {
             Component: ({ propertyKey, property, internalValue, updateValue, disabled, size, path }) => {
                 const referenceProperty = (property as StringProperty).reference as any;
-                const referenceValue = internalValue ? new EntityReference({ id: internalValue as string, path: referenceProperty.path as string }) : undefined;
+                const referenceValue = internalValue ? new EntityReference({ id: internalValue as string,
+path: referenceProperty.path as string }) : undefined;
                 return (
-                    <TableReferenceField 
+                    <TableReferenceField
                         name={propertyKey}
                         internalValue={referenceValue}
                         updateValue={(v) => updateValue(v ? (v as EntityReference).id : null)}
@@ -89,7 +90,7 @@ export function getTableBindingForProperty(
     } else if (isAStorageProperty) {
         return {
             Component: ({ validationError, error, disabled, selected, openPopup, property, entity, path, internalValue, size, updateValue, propertyKey }: any) => (
-                <TableStorageUpload 
+                <TableStorageUpload
                     error={validationError ?? error}
                     disabled={disabled}
                     focused={selected}
@@ -114,7 +115,7 @@ export function getTableBindingForProperty(
         if (numberProperty.enum) {
             return {
                 Component: ({ propertyKey, disabled, selected, size, error, validationError, internalValue, updateValue }: any) => (
-                    <VirtualTableSelect 
+                    <VirtualTableSelect
                         name={propertyKey}
                         multiple={false}
                         disabled={disabled}
@@ -149,7 +150,7 @@ export function getTableBindingForProperty(
         if (stringProperty.enum) {
             return {
                 Component: ({ propertyKey, disabled, selected, size, error, validationError, internalValue, updateValue }: any) => (
-                    <VirtualTableSelect 
+                    <VirtualTableSelect
                         name={propertyKey}
                         multiple={false}
                         focused={selected}
@@ -167,7 +168,7 @@ export function getTableBindingForProperty(
         } else if (stringProperty.userSelect) {
             return {
                 Component: ({ propertyKey, disabled, selected, size, error, validationError, internalValue, updateValue }: any) => (
-                    <VirtualTableUserSelect 
+                    <VirtualTableUserSelect
                         name={propertyKey}
                         multiple={false}
                         focused={selected}
@@ -184,7 +185,7 @@ export function getTableBindingForProperty(
             const multiline = Boolean(stringProperty.multiline) || Boolean(stringProperty.markdown);
             return {
                 Component: ({ error, validationError, disabled, selected, internalValue, updateValue }: any) => (
-                    <VirtualTableInput 
+                    <VirtualTableInput
                         error={validationError ?? error}
                         disabled={disabled}
                         multiline={multiline}
@@ -199,7 +200,7 @@ export function getTableBindingForProperty(
     } else if (property.type === "boolean") {
         return {
             Component: ({ error, validationError, disabled, selected, internalValue, updateValue }: any) => (
-                <VirtualTableSwitch 
+                <VirtualTableSwitch
                     error={validationError ?? error}
                     disabled={disabled}
                     focused={selected}
@@ -211,7 +212,7 @@ export function getTableBindingForProperty(
     } else if (property.type === "date") {
         return {
             Component: ({ propertyKey, error, validationError, disabled, selected, property, internalValue, updateValue }: any) => (
-                <VirtualTableDateField 
+                <VirtualTableDateField
                     name={propertyKey}
                     error={validationError ?? error}
                     disabled={disabled}
@@ -229,7 +230,7 @@ export function getTableBindingForProperty(
         if (typeof property.path === "string") {
             return {
                 Component: ({ propertyKey, internalValue, updateValue, disabled, size, property }: any) => (
-                    <TableReferenceField 
+                    <TableReferenceField
                         name={propertyKey}
                         internalValue={internalValue as EntityReference}
                         updateValue={updateValue}
@@ -252,7 +253,7 @@ export function getTableBindingForProperty(
             if (property.widget === "dialog") {
                 return {
                     Component: ({ propertyKey, internalValue, updateValue, disabled, size, property }: any) => (
-                        <TableRelationField 
+                        <TableRelationField
                             name={propertyKey}
                             internalValue={internalValue as EntityRelation}
                             updateValue={updateValue}
@@ -272,14 +273,14 @@ export function getTableBindingForProperty(
             } else {
                 return {
                     Component: ({ propertyKey, internalValue, updateValue, disabled, property }: any) => (
-                        <TableRelationSelectorField 
+                        <TableRelationSelectorField
                             name={propertyKey}
                             internalValue={internalValue as EntityRelation}
                             updateValue={updateValue}
                             disabled={disabled}
                             size={"small"}
                             relation={property.relation!}
-                            forceFilter={property.forceFilter} 
+                            forceFilter={property.forceFilter}
                         />
                     ),
                     allowScroll: false
@@ -290,14 +291,14 @@ export function getTableBindingForProperty(
         const arrayProperty = (property as ArrayProperty);
 
         if (!arrayProperty.of && !arrayProperty.oneOf) {
-            throw Error(`You need to specify an 'of' or 'oneOf' prop (or specify a custom field) in your array property`);
+            throw Error("You need to specify an 'of' or 'oneOf' prop (or specify a custom field) in your array property");
         } else if (arrayProperty.of && !Array.isArray(arrayProperty.of)) {
             const ofProp = arrayProperty.of as any;
             if (ofProp.type === "string" || ofProp.type === "number") {
                 if (selected && ofProp.enum) {
                     return {
                         Component: ({ propertyKey, disabled, selected, size, error, validationError, internalValue, updateValue }: any) => (
-                            <VirtualTableSelect 
+                            <VirtualTableSelect
                                 name={propertyKey}
                                 multiple={true}
                                 disabled={disabled}

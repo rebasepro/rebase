@@ -519,7 +519,7 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
                             size="small"
                             onClick={() => boardDataController.refreshAll()}
                         >
-                            <RefreshIcon size="small" />
+                            <RefreshIcon size="small"/>
                         </IconButton>
                     </Tooltip>
                     {indexUrl && (
@@ -600,7 +600,7 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
                         {t("cancel")}
                     </Button>
                     <Button onClick={handleBackfill} disabled={backfillLoading}>
-                        {backfillLoading ? <CircularProgress size="smallest" /> : t("initialize")}
+                        {backfillLoading ? <CircularProgress size="smallest"/> : t("initialize")}
                     </Button>
                 </DialogActions>
             </Dialog>

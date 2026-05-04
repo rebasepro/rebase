@@ -1,4 +1,4 @@
-import { ArrowForwardIcon, Card, cls, Markdown, Typography, } from "@rebasepro/ui";
+import { ArrowForwardIcon, Card, cls, Markdown, Typography } from "@rebasepro/ui";
 import React from "react"; // Import React
 
 export type NavigationCardProps = {
@@ -62,14 +62,14 @@ export const NavigationCard = React.memo(function NavigationCard({
                     {description && <Typography variant="caption"
                         color="secondary"
                         component="div">
-                        <Markdown source={description} size={"small"} />
+                        <Markdown source={description} size={"small"}/>
                     </Typography>}
                 </div>
 
                 {/* Arrow */}
                 <div className="self-end mt-1">
                     <div className={"transition-transform duration-200 group-hover:translate-x-0.5"}>
-                        <ArrowForwardIcon className="text-primary" size={"small"} />
+                        <ArrowForwardIcon className="text-primary" size={"small"}/>
                     </div>
                 </div>
 

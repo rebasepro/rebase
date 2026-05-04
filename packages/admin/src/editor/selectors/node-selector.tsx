@@ -40,64 +40,64 @@ const items: SelectorItem[] = [
         isActive: (state) =>
             isNodeActive(state, schema.nodes.paragraph) &&
             !isNodeActive(state, schema.nodes.bullet_list) &&
-            !isNodeActive(state, schema.nodes.ordered_list),
+            !isNodeActive(state, schema.nodes.ordered_list)
     },
     {
         name: "Heading 1",
         labelKey: "editor_heading_1",
         icon: LooksOneIcon,
         command: (state, dispatch) => setBlockType(schema.nodes.heading, { level: 1 })(state, dispatch),
-        isActive: (state) => isNodeActive(state, schema.nodes.heading, { level: 1 }),
+        isActive: (state) => isNodeActive(state, schema.nodes.heading, { level: 1 })
     },
     {
         name: "Heading 2",
         labelKey: "editor_heading_2",
         icon: LooksTwoIcon,
         command: (state, dispatch) => setBlockType(schema.nodes.heading, { level: 2 })(state, dispatch),
-        isActive: (state) => isNodeActive(state, schema.nodes.heading, { level: 2 }),
+        isActive: (state) => isNodeActive(state, schema.nodes.heading, { level: 2 })
     },
     {
         name: "Heading 3",
         labelKey: "editor_heading_3",
         icon: Looks3Icon,
         command: (state, dispatch) => setBlockType(schema.nodes.heading, { level: 3 })(state, dispatch),
-        isActive: (state) => isNodeActive(state, schema.nodes.heading, { level: 3 }),
+        isActive: (state) => isNodeActive(state, schema.nodes.heading, { level: 3 })
     },
     {
         name: "To-do List",
         labelKey: "editor_todo_list",
         icon: CheckBoxIcon,
         command: (state, dispatch) => wrapInList(schema.nodes.task_list)(state, dispatch),
-        isActive: (state) => isNodeActive(state, schema.nodes.task_item),
+        isActive: (state) => isNodeActive(state, schema.nodes.task_item)
     },
     {
         name: "Bullet List",
         labelKey: "editor_bullet_list",
         icon: FormatListBulletedIcon,
         command: (state, dispatch) => wrapInList(schema.nodes.bullet_list)(state, dispatch),
-        isActive: (state) => isNodeActive(state, schema.nodes.bullet_list),
+        isActive: (state) => isNodeActive(state, schema.nodes.bullet_list)
     },
     {
         name: "Numbered List",
         labelKey: "editor_numbered_list",
         icon: FormatListNumberedIcon,
         command: (state, dispatch) => wrapInList(schema.nodes.ordered_list)(state, dispatch),
-        isActive: (state) => isNodeActive(state, schema.nodes.ordered_list),
+        isActive: (state) => isNodeActive(state, schema.nodes.ordered_list)
     },
     {
         name: "Quote",
         labelKey: "editor_quote",
         icon: FormatQuoteIcon,
         command: (state, dispatch) => wrapIn(schema.nodes.blockquote)(state, dispatch),
-        isActive: (state) => isNodeActive(state, schema.nodes.blockquote),
+        isActive: (state) => isNodeActive(state, schema.nodes.blockquote)
     },
     {
         name: "Code",
         labelKey: "editor_code",
         icon: CodeIcon,
         command: (state, dispatch) => setBlockType(schema.nodes.code_block)(state, dispatch),
-        isActive: (state) => isNodeActive(state, schema.nodes.code_block),
-    },
+        isActive: (state) => isNodeActive(state, schema.nodes.code_block)
+    }
 ];
 
 interface NodeSelectorProps {
@@ -117,7 +117,7 @@ export const NodeSelector = ({
 
     const activeItem = items.filter((item) => item.isActive(state)).pop() ?? {
         name: "Multiple",
-        labelKey: "editor_multiple",
+        labelKey: "editor_multiple"
     };
 
     return (
@@ -130,7 +130,7 @@ export const NodeSelector = ({
                 className="gap-2 rounded-none"
                 color="text">
                 <span className="whitespace-nowrap text-sm">{t(activeItem.labelKey)}</span>
-                <KeyboardArrowDownIcon size={"small"} />
+                <KeyboardArrowDownIcon size={"small"}/>
             </Button>}
             modal={true}
             open={open}
@@ -146,10 +146,10 @@ export const NodeSelector = ({
                     className="flex cursor-pointer items-center justify-between rounded px-2 py-1 text-sm hover:bg-blue-50 hover:dark:bg-surface-700 text-surface-900 dark:text-white"
                 >
                     <div className="flex items-center space-x-2">
-                        <item.icon size="smallest" />
+                        <item.icon size="smallest"/>
                         <span>{t(item.labelKey)}</span>
                     </div>
-                    {activeItem.name === item.name && <CheckIcon size="smallest" />}
+                    {activeItem.name === item.name && <CheckIcon size="smallest"/>}
                 </EditorBubbleItem>
             ))}
         </Popover>

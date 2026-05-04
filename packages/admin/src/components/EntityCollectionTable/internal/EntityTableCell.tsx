@@ -101,7 +101,6 @@ export const EntityTableCell = React.memo<EntityTableCellProps>(
     }: EntityTableCellProps) {
 
 
-
         const [measureRef, bounds] = useMeasure();
         const ref = useRef<HTMLDivElement>(null);
 

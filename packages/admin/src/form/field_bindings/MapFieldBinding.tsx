@@ -87,7 +87,7 @@ export function MapFieldBinding({
                         <div key={`map-${propertyKey}-${index}`} className={"relative"}>
                             <ErrorBoundary>
                                 <PropertyFieldBinding
-                                    {...fieldBindingProps} />
+                                    {...fieldBindingProps}/>
                             </ErrorBoundary>
                         </div>
                     );
@@ -117,7 +117,7 @@ export function MapFieldBinding({
                     icon={getIconForProperty(property, "small")}
                     required={property.validation?.required}
                     title={property.name ?? propertyKey}
-                    className={"text-text-secondary dark:text-text-secondary-dark"} />}>
+                    className={"text-text-secondary dark:text-text-secondary-dark"}/>}>
                 {mapFormView}
             </ExpandablePanel>}
 
@@ -127,7 +127,7 @@ export function MapFieldBinding({
                 showError={showError ?? false}
                 error={error && !partOfArray ? error as any : undefined}
                 disabled={disabled}
-                property={property} />
+                property={property}/>
 
         </ErrorBoundary>
     );

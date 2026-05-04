@@ -84,10 +84,10 @@ export function RepeatFieldBinding({
             context,
             partOfArray: true,
             minimalistView: false,
-            autoFocus: internalId === lastAddedId,
+            autoFocus: internalId === lastAddedId
         };
         return <ErrorBoundary>
-            <PropertyFieldBinding {...fieldProps} index={index} />
+            <PropertyFieldBinding {...fieldProps} index={index}/>
         </ErrorBoundary>;
     };
 
@@ -112,7 +112,7 @@ export function RepeatFieldBinding({
             icon={getIconForProperty(property, "small")}
             required={property.validation?.required}
             title={property.name ?? propertyKey}
-            className={"h-8 flex grow text-text-secondary dark:text-text-secondary-dark"} />
+            className={"h-8 flex grow text-text-secondary dark:text-text-secondary-dark"}/>
         {Array.isArray(value) && <Typography variant={"caption"} className={"px-4"}>({value.length})</Typography>}
     </>);
 
@@ -132,7 +132,7 @@ export function RepeatFieldBinding({
                 showError={showError}
                 error={error as any}
                 disabled={disabled}
-                property={property} />
+                property={property}/>
 
         </>
     );

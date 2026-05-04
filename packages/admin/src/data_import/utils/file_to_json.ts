@@ -39,7 +39,7 @@ export function convertFileToJson(file: File): Promise<ConversionResult> {
                 const workbook = XLSX.read(data, {
                     type: "array",
                     codepage: 65001,
-                    cellDates: true,
+                    cellDates: true
                 });
                 const worksheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[worksheetName];

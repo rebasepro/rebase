@@ -34,7 +34,7 @@ export function RelationFilterField({
     relation,
     name: _name,
     hidden: _hidden,
-    setHidden: _setHidden,
+    setHidden: _setHidden
 }: RelationFilterFieldProps) {
 
     const manyRelation = relation.cardinality === "many";

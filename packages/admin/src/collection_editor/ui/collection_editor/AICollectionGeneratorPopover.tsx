@@ -159,8 +159,8 @@ export function AICollectionGeneratorPopover({
                 size={size}
                 disabled={loading || configController?.readOnly}
                 startIcon={loading
-                    ? <CircularProgress size="smallest" />
-                    : <AIIcon size="small" />
+                    ? <CircularProgress size="smallest"/>
+                    : <AIIcon size="small"/>
                 }
             >
                 AI Assist
@@ -174,8 +174,8 @@ export function AICollectionGeneratorPopover({
                 aria-label="AI Assist"
             >
                 {loading
-                    ? <CircularProgress size="smallest" />
-                    : <AIIcon size="small" />
+                    ? <CircularProgress size="smallest"/>
+                    : <AIIcon size="small"/>
                 }
             </IconButton>
         </Tooltip>
@@ -194,7 +194,7 @@ export function AICollectionGeneratorPopover({
         >
             <div className="p-4 flex flex-col gap-3 min-w-[360px] max-w-[480px]">
                 <div className="flex items-center gap-2">
-                    <AIIcon size="small" />
+                    <AIIcon size="small"/>
                     <Typography variant="subtitle2">
                         {existingCollection ? "Modify Collection with AI" : "Generate Collection with AI"}
                     </Typography>
@@ -242,7 +242,7 @@ export function AICollectionGeneratorPopover({
                         size="small"
                         onClick={handleGenerate}
                         disabled={!prompt.trim() || loading}
-                        startIcon={loading ? <CircularProgress size="smallest" /> : undefined}
+                        startIcon={loading ? <CircularProgress size="smallest"/> : undefined}
                     >
                         {loading ? "Generating..." : "Generate"}
                     </Button>

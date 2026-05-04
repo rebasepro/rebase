@@ -10,7 +10,7 @@ import {
     EntityCollectionTable,
     getFieldConfig,
     PropertyConfigBadge,
-    useSelectionController,
+    useSelectionController
 } from "../../components";
 import { useCollectionRegistryController } from "../../hooks";
 import {
@@ -26,7 +26,7 @@ import {
     SelectItem,
     Tooltip,
     Typography,
-    UploadIcon,
+    UploadIcon
 } from "@rebasepro/ui";
 import { buildEntityPropertiesFromData } from "@rebasepro/schema-inference";
 import { useImportConfig } from "../hooks";
@@ -107,7 +107,7 @@ export function ImportCollectionAction<M extends Record<string, unknown>, USER e
             <IconButton
                 size={"small"}
                 color={"primary"} onClick={handleClickOpen}>
-                <UploadIcon size={"small"} />
+                <UploadIcon size={"small"}/>
             </IconButton>
         </Tooltip>
 
@@ -123,7 +123,7 @@ export function ImportCollectionAction<M extends Record<string, unknown>, USER e
                 {step === "initial" && <>
                     <Typography variant={"body2"}>Upload a CSV, Excel or JSON file and map it to your existing
                         schema</Typography>
-                    <ImportFileUpload onDataAdded={onDataAdded} />
+                    <ImportFileUpload onDataAdded={onDataAdded}/>
                 </>}
 
                 {step === "mapping" && <>
@@ -133,7 +133,7 @@ export function ImportCollectionAction<M extends Record<string, unknown>, USER e
                             isIdColumn,
                             property,
                             propertyKey,
-                            importKey,
+                            importKey
                         }) => {
                             return <PropertyTreeSelect
                                 selectedPropertyKey={propertyKey ?? ""}
@@ -156,7 +156,8 @@ export function ImportCollectionAction<M extends Record<string, unknown>, USER e
                                             }
                                             return { [currentImportKey]: currentPropertyKey };
                                         })
-                                        .reduce((acc, curr) => ({ ...acc, ...curr }), {});
+                                        .reduce((acc, curr) => ({ ...acc,
+...curr }), {});
                                     importConfig.setHeadersMapping(newHeadersMapping as Record<string, string>);
 
                                     if (newPropertyKey === importConfig.idColumn) {
@@ -165,12 +166,12 @@ export function ImportCollectionAction<M extends Record<string, unknown>, USER e
 
                                 }}
                             />;
-                        }} />
+                        }}/>
                 </>}
 
                 {step === "preview" && <ImportDataPreview importConfig={importConfig}
                     properties={properties}
-                    propertiesOrder={propertiesOrder} />}
+                    propertiesOrder={propertiesOrder}/>}
 
                 {step === "import_data_saving" && importConfig &&
                     <ImportSaveInProgress importConfig={importConfig}
@@ -255,7 +256,7 @@ function PropertyTreeSelect({
         }
 
         return <PropertySelectEntry propertyKey={selectedPropertyKey}
-            property={selectedProperty as Property} />;
+            property={selectedProperty as Property}/>;
     }, [selectedProperty]);
 
     const onSelectValueChange = (value: string) => {
@@ -292,7 +293,7 @@ function PropertyTreeSelect({
                 disabled={property.type === "map"}>
                 <PropertySelectEntry propertyKey={propertyKey}
                     property={property}
-                    level={level} />
+                    level={level}/>
             </SelectItem>;
         })}
 
@@ -337,11 +338,11 @@ export function PropertySelectEntry({
         className="flex flex-row w-full text-start items-center h-full">
 
         {new Array(level).fill(0).map((_, index) =>
-            <div className={cls(defaultBorderMixin, "ml-8 border-l h-12")} key={index} />)}
+            <div className={cls(defaultBorderMixin, "ml-8 border-l h-12")} key={index}/>)}
 
         <div className={"m-4"}>
             <Tooltip title={widget?.name}>
-                <PropertyConfigBadge propertyConfig={widget} />
+                <PropertyConfigBadge propertyConfig={widget}/>
             </Tooltip>
         </div>
 
@@ -405,12 +406,12 @@ export function ImportDataPreview<M extends Record<string, unknown>>({
             noMoreToLoad: false
         }}
         enablePopupIcon={false}
-        endAdornment={<div className={"h-12"} />}
+        endAdornment={<div className={"h-12"}/>}
         filterable={false}
         sortable={false}
         openEntityMode={"full_screen"}
         selectionController={selectionController}
-        properties={properties} />
+        properties={properties}/>
 
 }
 

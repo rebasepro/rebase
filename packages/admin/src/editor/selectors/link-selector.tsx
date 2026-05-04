@@ -1,4 +1,4 @@
-import { useEffect, useRef, } from "react";
+import { useEffect, useRef } from "react";
 import { Button, CheckIcon, cls, DeleteIcon, focusedDisabled, Popover } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/core";
 import { useProseMirrorContext } from "../hooks/useProseMirrorContext";
@@ -78,7 +78,7 @@ export const LinkSelector = ({
                 className="gap-2 rounded-none"
                 color={"text"}>
                 <p className={cls("underline decoration-stone-400 underline-offset-4", {
-                    "text-blue-500": isActive,
+                    "text-blue-500": isActive
                 })}>
                     {t("editor_link")}
                 </p>
@@ -92,7 +92,7 @@ export const LinkSelector = ({
                     autoFocus={open}
                     placeholder={t("editor_paste_or_type_link")}
                     defaultValue={href}
-                    className={cls("text-surface-900 dark:text-white flex-grow bg-transparent p-1 text-sm outline-none", focusedDisabled)} />
+                    className={cls("text-surface-900 dark:text-white flex-grow bg-transparent p-1 text-sm outline-none", focusedDisabled)}/>
 
                 {href ? (
                     <Button
@@ -103,13 +103,13 @@ export const LinkSelector = ({
                         className="flex items-center"
                         onClick={handleRemoveLink}
                     >
-                        <DeleteIcon size="small" />
+                        <DeleteIcon size="small"/>
                     </Button>
                 ) : (
                     <Button size={"small"}
                         type="submit"
                         variant={"text"}>
-                        <CheckIcon size="small" />
+                        <CheckIcon size="small"/>
                     </Button>
                 )}
             </form>

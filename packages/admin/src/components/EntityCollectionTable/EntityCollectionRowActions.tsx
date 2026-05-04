@@ -151,7 +151,7 @@ export const EntityCollectionRowActions = function EntityCollectionRowActions({
                         <Menu
                             trigger={<IconButton
                                 size={iconSize}>
-                                <MoreVertIcon />
+                                <MoreVertIcon/>
                             </IconButton>}>
                             {collapsedActions.map((action, index) => (
                                 <MenuItem
@@ -199,7 +199,7 @@ export const EntityCollectionRowActions = function EntityCollectionRowActions({
                     <span className="min-w-0 truncate text-center">
                         {entity
                             ? entity.id
-                            : <Skeleton />
+                            : <Skeleton/>
                         }
                     </span>
                 </div>

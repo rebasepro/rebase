@@ -221,7 +221,7 @@ export function useTopLevelNavigation(
             allowDragAndDrop: plugins?.some((plugin: RebasePlugin) => plugin.hooks?.allowDragAndDrop) ?? false,
             navigationEntries,
             groups: uniqueGroups,
-            onNavigationEntriesUpdate: onNavigationEntriesOrderUpdate,
+            onNavigationEntriesUpdate: onNavigationEntriesOrderUpdate
         };
 
         // Cache the newly computed navigation result and return the cached reference

@@ -77,7 +77,7 @@ export function GeneralSettingsForm({
         }
     };
 
-    const collectionIcon = <IconForView collectionOrView={values} />;
+    const collectionIcon = <IconForView collectionOrView={values}/>;
     const isSubcollection = !!parentCollection;
     const showErrors = submitCount > 0;
 
@@ -92,7 +92,7 @@ export function GeneralSettingsForm({
                         </Typography>
                         <DefaultDatabaseField databaseId={values.databaseId}
                             disabled={configController?.readOnly}
-                            onDatabaseIdUpdate={updateDatabaseId} />
+                            onDatabaseIdUpdate={updateDatabaseId}/>
 
                         <Tooltip title={"Change icon"}
                             asChild={true}>
@@ -124,7 +124,7 @@ export function GeneralSettingsForm({
                                 label={"Name"}
                                 autoFocus={true}
                                 required
-                                error={showErrors && Boolean(errors.name)} />
+                                error={showErrors && Boolean(errors.name)}/>
                             <FieldCaption error={touched.name && Boolean(errors.name)}>
                                 {touched.name && Boolean(errors.name) ? errors.name : "Name of this collection, usually a plural name (e.g. Products)"}
                             </FieldCaption>
@@ -136,19 +136,19 @@ export function GeneralSettingsForm({
                                 as={DebouncedTextField}
                                 label={"Table name"}
                                 required
-                                error={showErrors && Boolean((errors as any).table)} />
+                                error={showErrors && Boolean((errors as any).table)}/>
 
                             <FieldCaption error={(touched as any).table && Boolean((errors as any).table)}>
                                 {(touched as any).table && Boolean((errors as any).table)
                                     ? (errors as any).table
                                     : isSubcollection ? "Relative path to the parent (no need to include the parent path)" : "PostgreSQL table name for this collection"}
                             </FieldCaption>
-                            
+
                             {(values as any).isTableMissing && (
                                 <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800/30 rounded-md text-sm font-medium flex gap-2">
-                                    <div className="mt-0.5"><WarningIcon size="smallest" /></div>
+                                    <div className="mt-0.5"><WarningIcon size="smallest"/></div>
                                     <span>
-                                        The table <b>"{(values as any).table}"</b> does not exist in the database schema. 
+                                        The table <b>"{(values as any).table}"</b> does not exist in the database schema.
                                         If you've recently created it, make sure to generate and run your database migrations.
                                     </span>
                                 </div>
@@ -166,7 +166,7 @@ export function GeneralSettingsForm({
                                     return handleChange(e);
                                 }}
                                 value={values.singularName ?? ""}
-                                label={"Singular name"} />
+                                label={"Singular name"}/>
                             <FieldCaption error={showErrors && Boolean(errors.singularName)}>
                                 {showErrors && Boolean(errors.singularName) ? errors.singularName : "Optionally define a singular name for your entities"}
                             </FieldCaption>
@@ -197,12 +197,11 @@ export function GeneralSettingsForm({
                                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setFieldValue("slug", e.target.value)}
                                 disabled={!isNewCollection}
                                 label={"Collection ID"}
-                                error={showErrors && Boolean(errors.slug)} />
+                                error={showErrors && Boolean(errors.slug)}/>
                             <FieldCaption error={touched.slug && Boolean(errors.slug)}>
                                 {touched.slug && Boolean(errors.slug) ? errors.slug : "This ID identifies this collection. Typically the same as the path."}
                             </FieldCaption>
                         </div>
-
 
 
                     </div>
@@ -219,7 +218,7 @@ export function GeneralSettingsForm({
                             <BooleanSwitchWithLabel
                                 position={"start"}
                                 allowIndeterminate={true}
-                                label={<span className="flex items-center gap-2"><HistoryIcon size={"smallest"} />{values.history === null || values.history === undefined ? "Document history revisions enabled if enabled globally" : (
+                                label={<span className="flex items-center gap-2"><HistoryIcon size={"smallest"}/>{values.history === null || values.history === undefined ? "Document history revisions enabled if enabled globally" : (
                                     values.history ? "Document history revisions ENABLED" : "Document history revisions NOT enabled"
                                 )}</span>}
                                 onValueChange={(v) => setFieldValue("history", v)}
@@ -235,7 +234,7 @@ export function GeneralSettingsForm({
                     </ExpandablePanel>}
                 </fieldset>
 
-                <div style={{ height: "52px" }} />
+                <div style={{ height: "52px" }}/>
 
                 <Dialog
                     open={iconDialogOpen}
@@ -248,7 +247,7 @@ export function GeneralSettingsForm({
                             onIconSelected={(icon: string) => {
                                 setIconDialogOpen(false);
                                 setFieldValue("icon", icon);
-                            }} />
+                            }}/>
                     </div>
                 </Dialog>
 

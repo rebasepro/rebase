@@ -23,7 +23,8 @@ export const ImageBubble = forwardRef<HTMLDivElement, ImageBubbleProps>(
         useEffect(() => {
             if (!view) return;
             const handleContextMenu = (e: MouseEvent) => {
-                const posInfo = view.posAtCoords({ left: e.clientX, top: e.clientY });
+                const posInfo = view.posAtCoords({ left: e.clientX,
+top: e.clientY });
                 if (posInfo && posInfo.inside >= 0) {
                     const node = view.state.doc.nodeAt(posInfo.inside);
                     if (node && node.type.name === "image") {
@@ -38,14 +39,14 @@ export const ImageBubble = forwardRef<HTMLDivElement, ImageBubbleProps>(
                 }
             };
             view.dom.addEventListener("contextmenu", handleContextMenu);
-            
+
             const handleMousedown = (e: MouseEvent) => {
                 if (menuRef.current && !menuRef.current.contains(e.target as Node) && e.button !== 2) {
                     setShow(false);
                 }
             };
             document.addEventListener("mousedown", handleMousedown);
-            
+
             return () => {
                 view.dom.removeEventListener("contextmenu", handleContextMenu);
                 document.removeEventListener("mousedown", handleMousedown);
@@ -73,7 +74,7 @@ export const ImageBubble = forwardRef<HTMLDivElement, ImageBubbleProps>(
                         top,
                         left,
                         right,
-                        bottom,
+                        bottom
                     };
                 }
             };
@@ -83,7 +84,9 @@ export const ImageBubble = forwardRef<HTMLDivElement, ImageBubbleProps>(
                 try {
                     start = view.coordsAtPos(state.selection.from);
                     end = view.coordsAtPos(state.selection.to);
-                } catch (e) {}
+                } catch (e) {
+                    // Ignore errors during fast remounts/updates
+                }
 
                 computePosition(virtualEl as VirtualElement, menuRef.current, {
                     placement: options?.placement || "bottom",
@@ -94,7 +97,7 @@ export const ImageBubble = forwardRef<HTMLDivElement, ImageBubbleProps>(
                         Object.assign(menuRef.current.style, {
                             left: `${x}px`,
                             top: `${y}px`,
-                            visibility: "visible",
+                            visibility: "visible"
                         });
                     }
                 });
@@ -123,7 +126,9 @@ export const ImageBubble = forwardRef<HTMLDivElement, ImageBubbleProps>(
         return (
             <div
                 ref={menuRef}
-                style={{ visibility: "hidden", position: "fixed", zIndex: 50 }}
+                style={{ visibility: "hidden",
+position: "fixed",
+zIndex: 50 }}
                 className={cls("flex flex-col gap-1.5 p-2 w-56 max-w-[90vw] rounded-lg border bg-white dark:bg-surface-900 shadow-lg", defaultBorderMixin, className)}
                 onMouseDown={(e) => {
                     // Prevent mousedown from stealing focus from inputs
@@ -156,3 +161,5 @@ export const ImageBubble = forwardRef<HTMLDivElement, ImageBubbleProps>(
         );
     }
 );
+
+ImageBubble.displayName = "ImageBubble";

@@ -85,7 +85,7 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
         }, []);
 
         const computedDrawerOpen: boolean = drawerOpen;
-        const computedDrawerHovered: boolean = Boolean(largeLayout && onHover);
+        const computedDrawerHovered = Boolean(largeLayout && onHover);
 
         const adminModeController = useAdminModeController();
         const isStudioDark = adminModeController.mode === "studio";
@@ -132,13 +132,13 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
                     <main
                         className="flex flex-col grow overflow-auto">
 
-                        {hasAppBar && <DrawerHeader />}
+                        {hasAppBar && <DrawerHeader/>}
 
                         <div
                             className={cls(defaultBorderMixin, "bg-surface-50 dark:bg-surface-900 grow overflow-auto m-0", {
                                 "lg:mt-4": !hasAppBar,
                                 "mt-1 lg:m-0 lg:mx-2 lg:mb-2 lg:rounded-lg lg:border lg:border-solid": padding,
-                                "border-t": hasAppBar && !padding,
+                                "border-t": hasAppBar && !padding
                             })}>
 
                             <ErrorBoundary>
@@ -190,7 +190,6 @@ function DrawerWrapper(props: {
     >
 
 
-
         <div className={"flex flex-col h-full"}>
             {props.children}
         </div>
@@ -208,7 +207,7 @@ function DrawerWrapper(props: {
                 onClick={() => props.setDrawerOpen(true)}
                 className="absolute sm:top-2 sm:left-4 top-1 left-2"
             >
-                <MenuIcon />
+                <MenuIcon/>
             </IconButton>
             <Sheet side={"left"}
                 transparent={true}

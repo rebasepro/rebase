@@ -28,7 +28,7 @@ export function UrlComponentPreview({
 }): React.ReactElement {
 
     if (!previewType) {
-        if (!url || !url.trim()) return <EmptyValue />;
+        if (!url || !url.trim()) return <EmptyValue/>;
         return (
             <a className="flex gap-4 break-words items-center font-medium text-primary visited:text-primary dark:visited:text-primary dark:text-primary"
                 href={url}
@@ -37,7 +37,7 @@ export function UrlComponentPreview({
                     e.preventDefault();
                 }}
                 target="_blank">
-                <OpenInNewIcon size={"small"} />
+                <OpenInNewIcon size={"small"}/>
                 {url}
             </a>
         );
@@ -46,7 +46,7 @@ export function UrlComponentPreview({
     if (previewType === "image") {
         return <ImagePreview url={url}
             size={size}
-            fill={fill} />;
+            fill={fill}/>;
     } else if (previewType === "audio") {
         return <audio controls
             className={"max-w-100%"}
@@ -55,7 +55,7 @@ export function UrlComponentPreview({
             <code>audio</code> element.
         </audio>;
     } else if (previewType === "video") {
-        return <VideoPreview size={size} src={url} interactive={interactive} />;
+        return <VideoPreview size={size} src={url} interactive={interactive}/>;
     } else {
         return (
             <Tooltip title={hint}>
@@ -69,7 +69,7 @@ export function UrlComponentPreview({
                         width: getThumbnailMeasure(size),
                         height: getThumbnailMeasure(size)
                     }}>
-                    <DescriptionIcon className="text-surface-700 dark:text-surface-300" />
+                    <DescriptionIcon className="text-surface-700 dark:text-surface-300"/>
                     {hint && <Typography
                         className="max-w-full truncate rtl text-left"
                         variant={"caption"}>{hint}</Typography>}
@@ -109,6 +109,6 @@ function VideoPreview({
         }}
         {...videoProps}
         className={cls("max-w-100% rounded-xs", { "pointer-events-none": !interactive })}>
-        <source src={src} />
+        <source src={src}/>
     </video>;
 }

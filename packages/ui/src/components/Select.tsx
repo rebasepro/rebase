@@ -162,7 +162,7 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                         padding ? {
                             "px-4": size === "large",
                             "px-3": size === "medium",
-                            "px-2": size === "small" || size === "smallest",
+                            "px-2": size === "small" || size === "smallest"
                         } : "",
                         "outline-hidden focus:outline-hidden",
                         "outline-none focus:outline-none",
@@ -214,14 +214,14 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                         <KeyboardArrowDownIcon size={size === "large" ? "medium" : "small"}
                             className={cls("transition", open ? "rotate-180" : "", {
                                 "px-2": size === "large",
-                                "px-1": size === "medium" || size === "small",
-                            })} />
+                                "px-1": size === "medium" || size === "small"
+                            })}/>
                     </SelectPrimitive.Icon>
                 </SelectPrimitive.Trigger>
 
                 {endAdornment && (
                     <div
-                        className={cls("h-full flex items-center absolute right-0 pr-12",)}
+                        className={cls("h-full flex items-center absolute right-0 pr-12")}
                         onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -282,7 +282,7 @@ export const SelectItem = React.memo(function SelectItem<T extends SelectValue =
         <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
         <div
             className="absolute left-1 data-[state=checked]:block hidden">
-            <CheckIcon size={16} />
+            <CheckIcon size={16}/>
         </div>
     </SelectPrimitive.Item>;
 });

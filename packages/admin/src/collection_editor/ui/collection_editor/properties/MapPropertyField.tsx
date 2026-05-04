@@ -77,7 +77,7 @@ export function MapPropertyField({ disabled, getData, allowDataInference, proper
                     <Typography variant={"subtitle2"}>Properties in this group</Typography>
                     <Button
                         onClick={() => setPropertyDialogOpen(true)}
-                        startIcon={<AddIcon />}
+                        startIcon={<AddIcon/>}
                     >
                         Add property to {values.name ?? "this group"}
                     </Button>
@@ -93,7 +93,7 @@ export function MapPropertyField({ disabled, getData, allowDataInference, proper
                             setSelectedPropertyNamespace(namespace);
                             setPropertyDialogOpen(true);
                         }}
-                        onPropertyMove={onPropertyMove} />
+                        onPropertyMove={onPropertyMove}/>
 
                     {empty &&
                         <Typography variant={"label"}

@@ -48,7 +48,7 @@ export function DisplaySettingsForm({
         if (!values.properties) return result;
 
         Object.entries(values.properties).forEach(([key, prop]) => {
-            if (prop && 'type' in prop && prop.type === 'number') {
+            if (prop && "type" in prop && prop.type === "number") {
                 result.push({
                     key,
                     label: (prop as Property).name || key,
@@ -60,7 +60,6 @@ export function DisplaySettingsForm({
     }, [values.properties]);
 
     const showErrors = submitCount > 0;
-
 
 
     return (
@@ -80,19 +79,17 @@ export function DisplaySettingsForm({
                         <LayoutModeSwitch
                             className={"col-span-12"}
                             value={values.openEntityMode ?? "side_panel"}
-                            onChange={(value) => setFieldValue("openEntityMode", value)} />
-
-
+                            onChange={(value) => setFieldValue("openEntityMode", value)}/>
 
 
                         {/* View Mode (Table/Cards/Kanban) */}
                         <ViewModeSwitch
                             className={"col-span-12"}
                             value={values.defaultViewMode ?? "table"}
-                            onChange={(value) => setFieldValue("defaultViewMode", value)} />
+                            onChange={(value) => setFieldValue("defaultViewMode", value)}/>
 
                         {/* Kanban Column Property */}
-                        <KanbanConfigSection className={"col-span-12"} forceExpanded={expandKanban} />
+                        <KanbanConfigSection className={"col-span-12"} forceExpanded={expandKanban}/>
 
                         {/* Order Property */}
                         <div className={"col-span-12 mt-4"}>
@@ -123,7 +120,7 @@ export function DisplaySettingsForm({
                                                 const fieldConfig = getFieldConfig(prop.property, customizationController.propertyConfigs);
                                                 return (
                                                     <div className="flex items-center gap-2">
-                                                        <PropertyConfigBadge propertyConfig={fieldConfig} />
+                                                        <PropertyConfigBadge propertyConfig={fieldConfig}/>
                                                         <span>{prop.label}</span>
                                                     </div>
                                                 );
@@ -136,7 +133,7 @@ export function DisplaySettingsForm({
                                                         setFieldValue("orderProperty", undefined);
                                                     }}
                                                 >
-                                                    <CloseIcon size="small" />
+                                                    <CloseIcon size="small"/>
                                                 </IconButton>
                                             ) : undefined}
                                         >
@@ -145,7 +142,7 @@ export function DisplaySettingsForm({
                                                 return (
                                                     <SelectItem key={prop.key} value={prop.key}>
                                                         <div className="flex items-center gap-3">
-                                                            <PropertyConfigBadge propertyConfig={fieldConfig} />
+                                                            <PropertyConfigBadge propertyConfig={fieldConfig}/>
                                                             <div>
                                                                 <div>{prop.label}</div>
                                                                 <Typography variant="caption" color="secondary">
@@ -269,10 +266,10 @@ export function DisplaySettingsForm({
                                         setFieldValue("sideDialogWidth", null);
                                     }}
                                     disabled={!values.sideDialogWidth}>
-                                    <CloseIcon size={"small"} />
+                                    <CloseIcon size={"small"}/>
                                 </IconButton>}
                                 value={values.sideDialogWidth ?? ""}
-                                label={"Side dialog width"} />
+                                label={"Side dialog width"}/>
                             <FieldCaption>
                                 Optionally define the width (in pixels) of entities side dialog. Default is 768px
                             </FieldCaption>
@@ -307,7 +304,7 @@ export function DisplaySettingsForm({
                     </div>
                 </fieldset>
 
-                <div style={{ height: "52px" }} />
+                <div style={{ height: "52px" }}/>
 
             </Container>
         </div>

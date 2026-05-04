@@ -177,7 +177,7 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
                 if (value && Array.isArray(value)) {
                     const [op, val] = value;
                     const postgrestOp = op === "==" ? "eq" : op === "!=" ? "neq" : op === ">" ? "gt" : op === ">=" ? "gte" : op === "<" ? "lt" : op === "<=" ? "lte" : op === "in" ? "in" : op === "not-in" ? "nin" : op === "array-contains" ? "cs" : op === "array-contains-any" ? "csa" : "eq";
-                    
+
                     let stringVal: string;
                     if (Array.isArray(val)) {
                         stringVal = `(${val.join(",")})`;
@@ -189,7 +189,7 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
             });
         }
         whereMap[currentColumnProperty] = `eq.${column}`;
-        
+
         const orderByParam = currentOrderProperty ? `${currentOrderProperty}:asc` : undefined;
 
         // Mark column as loading
@@ -317,14 +317,14 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
                 // Count query for column (for display in column header)
                 const accessor = currentDataClient.collection(currentResolvedPath);
                 if (accessor.count) {
-                    
+
                     const whereMap: Record<string, string> = {};
                     if (currentFilterValues) {
                         Object.entries(currentFilterValues).forEach(([key, value]) => {
                             if (value && Array.isArray(value)) {
                                 const [op, val] = value;
                                 const postgrestOp = op === "==" ? "eq" : op === "!=" ? "neq" : op === ">" ? "gt" : op === ">=" ? "gte" : op === "<" ? "lt" : op === "<=" ? "lte" : op === "in" ? "in" : op === "not-in" ? "nin" : op === "array-contains" ? "cs" : op === "array-contains-any" ? "csa" : "eq";
-                                
+
                                 let stringVal: string;
                                 if (Array.isArray(val)) {
                                     stringVal = `(${val.join(",")})`;
@@ -371,7 +371,7 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
                 }
             });
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+
     }, [subscriptionVersion, subscribeToColumn, pageSize]);
 
     // Track which subscription version last updated the counts
@@ -400,7 +400,7 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
                     try {
                         unsubscribersRef.current[column]();
                     } catch (e) {
-                        // Ignore cleanup errors  
+                        // Ignore cleanup errors
                     }
                     delete unsubscribersRef.current[column];
                 }

@@ -1,7 +1,7 @@
 import { useCollectionRegistryController } from "../_cms_internals";
 import { useAuthController, useTranslation } from "@rebasepro/core";
 import { EntityCollection, PluginFormActionProps } from "@rebasepro/types";
-import { IconButton, SettingsIcon, Tooltip, } from "@rebasepro/ui";
+import { IconButton, SettingsIcon, Tooltip } from "@rebasepro/ui";
 
 import { useCollectionEditorController } from "../useCollectionEditorController";
 
@@ -39,10 +39,10 @@ export function EditorEntityAction({
                     id: collection.slug,
                     path,
                     parentCollectionIds,
-                    parentCollection: parentCollection as EntityCollection,
+                    parentCollection: parentCollection as EntityCollection
                 })
                 : undefined}>
-            <SettingsIcon size={"small"} />
+            <SettingsIcon size={"small"}/>
         </IconButton>
     </Tooltip>;
 

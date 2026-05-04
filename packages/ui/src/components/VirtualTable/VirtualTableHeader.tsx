@@ -126,7 +126,7 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<any>>(
                     <>
 
                         {AdditionalHeaderWidget &&
-                            <AdditionalHeaderWidget onHover={onHover || openFilter} />}
+                            <AdditionalHeaderWidget onHover={onHover || openFilter}/>}
 
                         {column.sortable && (sort || hovered || openFilter) &&
                             <Badge color="secondary"
@@ -139,11 +139,11 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<any>>(
                                     }}
                                 >
                                     {!sort &&
-                                        <ArrowUpwardIcon />}
+                                        <ArrowUpwardIcon/>}
                                     {sort === "asc" &&
-                                        <ArrowUpwardIcon />}
+                                        <ArrowUpwardIcon/>}
                                     {sort === "desc" &&
-                                        <ArrowUpwardIcon className={"rotate-180"} />}
+                                        <ArrowUpwardIcon className={"rotate-180"}/>}
                                 </IconButton>
                             </Badge>
                         }
@@ -163,7 +163,7 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<any>>(
                                         className={onHover || openFilter ? "bg-white dark:bg-surface-950" : undefined}
                                         size={"small"}
                                         onClick={handleSettingsClick}>
-                                        <FilterListIcon size={"small"} />
+                                        <FilterListIcon size={"small"}/>
                                     </IconButton>}
                             >
                                 <FilterForm column={column}
@@ -172,7 +172,7 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<any>>(
                                     onFilterUpdate={update}
                                     createFilterField={createFilterField}
                                     hidden={hidden}
-                                    setHidden={setHidden} />
+                                    setHidden={setHidden}/>
 
                             </Popover>
 

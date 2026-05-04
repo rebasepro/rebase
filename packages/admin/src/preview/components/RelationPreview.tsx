@@ -30,10 +30,10 @@ export const RelationPreview = function RelationPreview(props: RelationPreviewPr
             onClick={props.onClick}
             size={props.size}>
             <ErrorView error={"Unexpected value. Click to edit"}
-                tooltip={JSON.stringify(relation)} />
+                tooltip={JSON.stringify(relation)}/>
         </EntityPreviewContainer>;
     }
-    return <RelationPreviewInternal {...props} />;
+    return <RelationPreviewInternal {...props}/>;
 };
 
 function RelationPreviewInternal({
@@ -54,10 +54,10 @@ function RelationPreviewInternal({
     const collection = collectionRegistryController.getCollection(relation.path);
     if (!collection) {
         if (customizationController.components?.missingReference) {
-            return <customizationController.components.missingReference path={relation.path} />;
+            return <customizationController.components.missingReference path={relation.path}/>;
         } else {
             return <EntityPreviewContainer size={size}>
-                <ErrorView error={`Collection not found: ${relation.path}`} />
+                <ErrorView error={`Collection not found: ${relation.path}`}/>
             </EntityPreviewContainer>;
         }
     }
@@ -71,7 +71,7 @@ function RelationPreviewInternal({
         includeEntityLink={includeEntityLink}
         includeId={includeId}
         onClick={onClick}
-        hover={hover} />
+        hover={hover}/>
 }
 
 function RelationPreviewExisting<M extends Record<string, unknown> = Record<string, unknown>>({
@@ -110,10 +110,10 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
     let body: React.ReactNode;
 
     if (!relation) {
-        body = <ErrorView error={"Relation not set"} />;
+        body = <ErrorView error={"Relation not set"}/>;
     } else if (usedEntity && !usedEntity.values) {
         body = <ErrorView error={"Relation does not exist"}
-            tooltip={relation.path} />;
+            tooltip={relation.path}/>;
     }
 
     if (body) {
@@ -131,7 +131,7 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
             <EntityPreviewContainer onClick={disabled ? undefined : onClick}
                 hover={disabled ? undefined : hover}
                 size={size}>
-                <Skeleton />
+                <Skeleton/>
             </EntityPreviewContainer>
         );
     }
@@ -141,7 +141,7 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
             <EntityPreviewContainer onClick={disabled ? undefined : onClick}
                 hover={disabled ? undefined : hover}
                 size={size}>
-                <ErrorView error={"Entity not found"} />
+                <ErrorView error={"Entity not found"}/>
             </EntityPreviewContainer>
         );
     }
@@ -153,7 +153,7 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
         onClick={onClick}
         includeEntityLink={includeEntityLink}
         includeId={false}
-        hover={hover} />;
+        hover={hover}/>;
 
 }
 

@@ -7,7 +7,7 @@ import {
     getNavigationEntriesFromPath,
     NavigationViewInternal,
     removeInitialAndTrailingSlashes,
-    resolveDefaultSelectedView,
+    resolveDefaultSelectedView
 } from "@rebasepro/common";
 import { resolvedSelectedEntityView } from "../util/resolutions";
 import { ADDITIONAL_TAB_WIDTH, CONTAINER_FULL_WIDTH, FORM_CONTAINER_WIDTH } from "@rebasepro/core";
@@ -69,7 +69,7 @@ function calculateCollectionDesiredWidth(collection: EntityCollection<any>): str
     return result;
 }
 
-function getNestedPropertiesDepth(property: Property, accumulator: number = 0): number {
+function getNestedPropertiesDepth(property: Property, accumulator = 0): number {
     if (property.type === "map" && property.properties) {
         const values = Object.values(property.properties).flatMap((childProperty) => getNestedPropertiesDepth(childProperty as Readonly<Property>, accumulator + 1));
         return Math.max(...values);
@@ -158,7 +158,8 @@ export const useBuildSideEntityController = (collectionRegistryController: Colle
                 const entityProps = sidePanelProps.additional as EntitySidePanelProps;
                 const newWidth = getEntityViewWidth(entityProps, smallLayout, customizationController);
                 if (sidePanelProps.width !== newWidth) {
-                    return { ...sidePanelProps, width: newWidth };
+                    return { ...sidePanelProps,
+width: newWidth };
                 }
             }
             return sidePanelProps;
@@ -299,7 +300,7 @@ const propsToSidePanel = (props: EntitySidePanelProps,
     const entityViewWidth = getEntityViewWidth(props, smallLayout, customizationController);
     return {
         key: `${props.path}/${props.entityId}`,
-        component: <EntitySidePanel {...resolvedPanelProps} />,
+        component: <EntitySidePanel {...resolvedPanelProps}/>,
         urlPath: urlPath,
         parentUrlPath: parentUrlPath,
         width: entityViewWidth,

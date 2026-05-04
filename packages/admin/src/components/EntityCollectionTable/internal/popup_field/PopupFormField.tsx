@@ -39,7 +39,7 @@ interface PopupFormFieldProps<M extends Record<string, unknown>> {
 
 export function PopupFormField<M extends Record<string, unknown>>(props: PopupFormFieldProps<M>) {
     if (!props.open) return null;
-    return <PopupFormFieldLoading {...props} />;
+    return <PopupFormFieldLoading {...props}/>;
 
 }
 
@@ -77,7 +77,7 @@ export function PopupFormFieldLoading<M extends Record<string, unknown>>({
         onClose,
         onCellValueChange,
         container
-    }} entity={entity} />;
+    }} entity={entity}/>;
 }
 
 export function PopupFormFieldInternal<M extends Record<string, unknown>>({
@@ -237,7 +237,7 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
                 data: entity,
                 setError: setSavingError,
                 onValueUpdated: () => {
-                },
+                }
             });
         }
         return Promise.resolve();
@@ -283,7 +283,7 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
         formex,
         status: "existing",
         openEntityMode: "side_panel",
-        disabled: false,
+        disabled: false
     };
 
     const property: Property | undefined = propertyKey && getPropertyInPath(collection?.properties ?? {} as Properties, propertyKey as string);
@@ -316,7 +316,7 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
                         className="cursor-auto"
                         style={{ cursor: "auto !important" }}>
                         {fieldProps &&
-                            <PropertyFieldBinding {...fieldProps} />}
+                            <PropertyFieldBinding {...fieldProps}/>}
                     </div>
                 </div>
 
@@ -372,7 +372,7 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
         <div
             key={`draggable_${propertyKey as string}_${entityId}_${open}`}
             style={{
-                boxShadow: "0 0 0 2px rgba(128,128,128,0.2)",
+                boxShadow: "0 0 0 2px rgba(128,128,128,0.2)"
             }}
             className={`inline-block fixed z-20 shadow-outline rounded-md bg-white dark:bg-surface-950 ${!open ? "invisible" : "visible"
                 } cursor-grab overflow-visible`}
@@ -398,7 +398,7 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
                             onClose();
                         }}>
                         <CloseIcon className="text-white"
-                            size={"small"} />
+                            size={"small"}/>
                     </IconButton>
                 </div>
             </div>

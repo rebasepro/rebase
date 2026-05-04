@@ -82,7 +82,7 @@ export function CollectionRLSTab() {
                         roles: parsedRoles,
                         cmd: (p.cmd || p.CMD || "ALL") as "SELECT" | "INSERT" | "UPDATE" | "DELETE" | "ALL",
                         qual: (p.qual || p.QUAL || null) as string | null,
-                        with_check: (p.with_check || p.WITH_CHECK || null) as string | null,
+                        with_check: (p.with_check || p.WITH_CHECK || null) as string | null
                     };
                 });
                 setDbPolicies(policies);
@@ -118,7 +118,6 @@ export function CollectionRLSTab() {
     };
 
 
-
     return (
         <div className={"overflow-auto my-auto"}>
             <Container maxWidth={"4xl"} className={"flex flex-col gap-4 p-8 m-auto"}>
@@ -137,11 +136,11 @@ export function CollectionRLSTab() {
                 ) : (
                     <div className="flex flex-col gap-3">
                         {rules.map((rule: SecurityRule) => (
-                            <Paper key={rule.name} 
+                            <Paper key={rule.name}
                                 className={"p-4 border border-transparent hover:border-surface-200 dark:hover:border-surface-800 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors bg-white dark:bg-surface-950 shadow-sm"}>
                                 <div className="flex flex-col gap-1.5 min-w-0">
                                     <div className="flex items-center gap-2">
-                                        <KeyIcon size="small" className="text-text-disabled dark:text-text-disabled-dark shrink-0" />
+                                        <KeyIcon size="small" className="text-text-disabled dark:text-text-disabled-dark shrink-0"/>
                                         <Typography variant="subtitle2" className="truncate">{rule.name}</Typography>
                                     </div>
                                     <div className="flex gap-2 text-xs pl-6 overflow-x-auto hide-scrollbar">
@@ -164,17 +163,17 @@ export function CollectionRLSTab() {
                                     <IconButton size="small" onClick={() => {
                                         setFieldValue("securityRules", rules.filter((r: SecurityRule) => r.name !== rule.name));
                                     }}>
-                                        <DeleteIcon size="small" className="text-text-secondary dark:text-text-secondary-dark hover:text-red-500 dark:hover:text-red-500 transition-colors" />
+                                        <DeleteIcon size="small" className="text-text-secondary dark:text-text-secondary-dark hover:text-red-500 dark:hover:text-red-500 transition-colors"/>
                                     </IconButton>
                                 </div>
                             </Paper>
                         ))}
                     </div>
                 )}
-                
+
                 {isLoadingDb && unmappedPolicies.length === 0 && (
                     <div className="flex justify-center mt-8">
-                        <CircularProgress size="small" />
+                        <CircularProgress size="small"/>
                     </div>
                 )}
 
@@ -186,11 +185,11 @@ export function CollectionRLSTab() {
                         </Typography>
                         <div className="flex flex-col gap-3">
                             {unmappedPolicies.map(dp => (
-                                <Paper key={dp.policyname} 
+                                <Paper key={dp.policyname}
                                     className={"p-4 border border-orange-200 dark:border-orange-900/50 bg-orange-50/50 dark:bg-orange-900/10 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors"}>
                                     <div className="flex flex-col gap-1.5 min-w-0">
                                         <div className="flex items-center gap-2">
-                                            <KeyIcon size="small" className="text-orange-500 shrink-0" />
+                                            <KeyIcon size="small" className="text-orange-500 shrink-0"/>
                                             <Typography variant="subtitle2" className="truncate">{dp.policyname}</Typography>
                                             <Tooltip title="This policy is live in the database but missing from your codebase schema.">
                                                 <div className="px-1.5 py-0.5 rounded text-[10px] uppercase bg-orange-500/10 text-orange-600 border border-orange-500/20 shrink-0">
@@ -280,7 +279,7 @@ function InlinePolicyEditor({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="flex flex-col gap-1.5">
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">Policy Name</Typography>
-                            <TextField value={name} onChange={(e: any) => setName(e.target.value)} placeholder="e.g. allow_read_all" />
+                            <TextField value={name} onChange={(e: any) => setName(e.target.value)} placeholder="e.g. allow_read_all"/>
                         </div>
                         <div className="flex flex-col gap-1.5">
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">Behavior</Typography>
@@ -309,13 +308,13 @@ function InlinePolicyEditor({
                     {command !== "INSERT" && (
                         <div className="flex flex-col gap-1.5">
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">USING expression</Typography>
-                            <TextField value={usingExpr} onChange={(e: any) => setUsingExpr(e.target.value)} placeholder="e.g. auth.uid() = user_id" />
+                            <TextField value={usingExpr} onChange={(e: any) => setUsingExpr(e.target.value)} placeholder="e.g. auth.uid() = user_id"/>
                         </div>
                     )}
                     {showCheck && (
                         <div className="flex flex-col gap-1.5">
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">WITH CHECK expression</Typography>
-                            <TextField value={checkExpr} onChange={(e: any) => setCheckExpr(e.target.value)} placeholder="e.g. auth.uid() = user_id" />
+                            <TextField value={checkExpr} onChange={(e: any) => setCheckExpr(e.target.value)} placeholder="e.g. auth.uid() = user_id"/>
                         </div>
                     )}
                 </Paper>
@@ -323,7 +322,12 @@ function InlinePolicyEditor({
             <DialogActions>
                 <Button size="small" variant="text" color="neutral" onClick={onCancel}>Cancel</Button>
                 <Button size="small" variant="filled" color="primary" disabled={!name}
-                    onClick={() => onSave({ policyname: name, permissive: behavior, cmd: command, roles, qual: usingExpr, with_check: showCheck ? checkExpr : null })}
+                    onClick={() => onSave({ policyname: name,
+permissive: behavior,
+cmd: command,
+roles,
+qual: usingExpr,
+with_check: showCheck ? checkExpr : null })}
                 >Save</Button>
             </DialogActions>
         </>

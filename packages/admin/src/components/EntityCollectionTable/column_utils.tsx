@@ -14,7 +14,7 @@ export function buildIdColumn(largeLayout?: boolean): VirtualTableColumn {
         resizable: false,
         frozen: largeLayout ?? false,
         headerAlign: "center",
-        align: "center",
+        align: "center"
     };
 }
 
@@ -55,7 +55,7 @@ export function propertiesToColumns<M extends Record<string, unknown>>({ propert
                     disabled
                 },
                 AdditionalHeaderWidget: AdditionalHeaderWidget
-                    ? ({ onHover }: { onHover: boolean }) => <AdditionalHeaderWidget property={property} propertyKey={key} onHover={onHover} />
+                    ? ({ onHover }: { onHover: boolean }) => <AdditionalHeaderWidget property={property} propertyKey={key} onHover={onHover}/>
                     : undefined
             } satisfies VirtualTableColumn;
         });

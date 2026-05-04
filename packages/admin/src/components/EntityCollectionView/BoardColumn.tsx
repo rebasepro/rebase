@@ -68,7 +68,7 @@ export const BoardColumn = memo(function BoardColumn<M extends Record<string, un
         listeners,
         isDragging: isColumnBeingDragged,
         transform,
-        transition,
+        transition
     } = useSortable({
         id,
         data: { type: "COLUMN" },
@@ -80,7 +80,7 @@ export const BoardColumn = memo(function BoardColumn<M extends Record<string, un
         ...style,
         transform: CSS.Transform.toString(transform),
         transition,
-        zIndex: isColumnBeingDragged ? 2 : 1,
+        zIndex: isColumnBeingDragged ? 2 : 1
     }), [style, transform, transition, isColumnBeingDragged]);
 
     // Only apply drag listeners if reordering is allowed
@@ -134,7 +134,7 @@ export const BoardColumn = memo(function BoardColumn<M extends Record<string, un
                         }}
                         className="opacity-60 hover:opacity-100"
                     >
-                        <AddIcon size="small" />
+                        <AddIcon size="small"/>
                     </IconButton>
                 )}
             </div>

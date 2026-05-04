@@ -55,7 +55,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
     }) as Property | null;
 
     if (property === null) {
-        content = <EmptyValue />;
+        content = <EmptyValue/>;
     } else if (property.Preview) {
         content = createElement(property.Preview,
             {
@@ -69,7 +69,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                 customProps: property.customProps
             });
     } else if (value === undefined || value === null) {
-        content = <EmptyValue />;
+        content = <EmptyValue/>;
     } else if (property.type === "string") {
         const stringProperty = property as StringProperty;
         if (typeof value === "string") {
@@ -80,22 +80,22 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                     storeUrl={property.storage?.storeUrl ?? false}
                     size={props.size}
                     fill={fill}
-                    storagePathOrDownloadUrl={filePath} />;
+                    storagePathOrDownloadUrl={filePath}/>;
             } else if (stringProperty.url) {
                 if (typeof stringProperty.url === "boolean")
                     content =
                         <UrlComponentPreview size={props.size}
                             url={value}
-                            fill={fill} />;
+                            fill={fill}/>;
                 else if (typeof stringProperty.url === "string")
                     content =
                         <UrlComponentPreview size={props.size}
                             url={value}
                             interactive={interactive}
                             fill={fill}
-                            previewType={stringProperty.url} />;
+                            previewType={stringProperty.url}/>;
             } else if (stringProperty.markdown) {
-                content = <Markdown source={value} size={"small"} />;
+                content = <Markdown source={value} size={"small"}/>;
             } else if (stringProperty.userSelect) {
                 content = <UserPreview
                     value={value}
@@ -111,16 +111,17 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                         includeId={stringProperty.reference.includeId}
                         includeEntityLink={stringProperty.reference.includeEntityLink}
                         size={props.size}
-                        reference={new EntityReference({ id: value, path: stringProperty.reference.path })}
+                        reference={new EntityReference({ id: value,
+path: stringProperty.reference.path })}
                     />;
                 } else {
-                    content = <EmptyValue />;
+                    content = <EmptyValue/>;
                 }
 
             } else {
                 content = <StringPropertyPreview {...props}
                     property={stringProperty}
-                    value={value} />;
+                    value={value}/>;
             }
         } else {
             content = buildWrongValueType(propertyKey, property.type, value);
@@ -136,46 +137,46 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                 if (Array.isArray(arrayProperty.of)) {
                     content = <ArrayPropertyPreview {...props}
                         value={value}
-                        property={arrayProperty} />;
+                        property={arrayProperty}/>;
                 } else if (arrayProperty.of.type === "reference") {
                     content = <ArrayOfReferencesPreview {...props}
                         value={value}
-                        property={property} />;
+                        property={property}/>;
                 } else if (arrayProperty.of.type === "relation") {
                     content = <ArrayOfRelationsPreview {...props}
                         value={value}
-                        property={property} />;
+                        property={property}/>;
                 } else if (arrayProperty.of.type === "string") {
                     if (arrayProperty.of.enum) {
                         content = <ArrayPropertyEnumPreview
                             {...props}
                             value={value}
-                            property={property} />;
+                            property={property}/>;
                     } else if (arrayProperty.of.storage) {
                         content = <ArrayOfStorageComponentsPreview
                             {...props}
                             value={value}
-                            property={property as ArrayProperty} />;
+                            property={property as ArrayProperty}/>;
                     } else {
                         content = <ArrayOfStringsPreview
                             {...props}
                             property={property as ArrayProperty}
-                            value={value as string[]} />;
+                            value={value as string[]}/>;
                     }
                 } else if (arrayProperty.of.type === "number" && arrayProperty.of.enum) {
                     content = <ArrayPropertyEnumPreview
                         {...props}
                         value={value as number[]}
-                        property={property as ArrayProperty} />;
+                        property={property as ArrayProperty}/>;
                 } else {
                     content = <ArrayPropertyPreview {...props}
                         value={value}
-                        property={property as ArrayProperty} />;
+                        property={property as ArrayProperty}/>;
                 }
             } else if (arrayProperty.oneOf) {
                 content = <ArrayOneOfPreview {...props}
                     value={value}
-                    property={property as ArrayProperty} />;
+                    property={property as ArrayProperty}/>;
             }
         } else {
             content = buildWrongValueType(propertyKey, property.type, value);
@@ -185,7 +186,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
             content =
                 <MapPropertyPreview {...props}
                     value={value as Record<string, any>}
-                    property={property as MapProperty} />;
+                    property={property as MapProperty}/>;
         } else {
             content = buildWrongValueType(propertyKey, property.type, value);
         }
@@ -213,12 +214,12 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                 content = buildWrongValueType(propertyKey, property.type, value);
             }
         } else {
-            content = <EmptyValue />;
+            content = <EmptyValue/>;
         }
 
     } else if (property.type === "relation") {
         if (!value) {
-            content = <EmptyValue />;
+            content = <EmptyValue/>;
         } else if (Array.isArray(value)) {
             // Many-cardinality relation: value is an array of EntityRelation (or plain objects)
             content = (
@@ -261,7 +262,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
 
     } else if (property.type === "boolean") {
         if (typeof value === "boolean") {
-            content = <BooleanPreview value={value} size={size} property={property} />;
+            content = <BooleanPreview value={value} size={size} property={property}/>;
         } else {
             content = buildWrongValueType(propertyKey, property.type, value);
         }
@@ -269,7 +270,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
         if (typeof value === "number") {
             content = <NumberPropertyPreview {...props}
                 value={value}
-                property={property as NumberProperty} />;
+                property={property as NumberProperty}/>;
         } else {
             content = buildWrongValueType(propertyKey, property.type, value);
         }
@@ -278,7 +279,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
     }
 
     return content === undefined || content === null || (Array.isArray(content) && content.length === 0)
-        ? <EmptyValue />
+        ? <EmptyValue/>
         : content;
 }, equal);
 
@@ -286,6 +287,6 @@ function buildWrongValueType(name: string | undefined, type: string, value: any)
     console.warn(`Unexpected value for property ${name}, of type ${type}`, value);
     return (
         <ErrorView title={"Unexpected value"}
-            error={`${JSON.stringify(value)}`} />
+            error={`${JSON.stringify(value)}`}/>
     );
 }

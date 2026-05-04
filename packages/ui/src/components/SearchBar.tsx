@@ -83,7 +83,7 @@ export function SearchBar({
                 className)}>
             <div
                 className={cls("absolute p-0 h-full pointer-events-none flex items-center justify-center top-0", iconPaddingClass)}>
-                {loading ? <CircularProgress size={"smallest"} /> : <SearchIcon className={"text-text-disabled dark:text-text-disabled-dark"} size={size === "small" ? "small" : "medium"} />}
+                {loading ? <CircularProgress size={"smallest"}/> : <SearchIcon className={"text-text-disabled dark:text-text-disabled-dark"} size={size === "small" ? "small" : "medium"}/>}
             </div>
             <input
                 value={searchText ?? ""}
@@ -116,9 +116,9 @@ export function SearchBar({
                     size={"small"}
                     aria-label="Clear search"
                     onClick={clearText}>
-                    <CloseIcon size={"smallest"} />
+                    <CloseIcon size={"smallest"}/>
                 </IconButton>
-                : <div style={{ width: 26 }} />
+                : <div style={{ width: 26 }}/>
             }
         </div>
     );

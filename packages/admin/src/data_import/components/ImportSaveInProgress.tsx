@@ -1,7 +1,7 @@
 import { useData } from "@rebasepro/core";
 import { Entity, EntityCollection } from "@rebasepro/types";
 import { RebaseData } from "@rebasepro/types";
-import { Button, CenteredView, CircularProgress, Typography, } from "@rebasepro/ui";
+import { Button, CenteredView, CircularProgress, Typography } from "@rebasepro/ui";
 import { useEffect, useRef, useState } from "react";
 import { ImportConfig } from "../types";
 
@@ -75,7 +75,7 @@ export function ImportSaveInProgress<C extends EntityCollection<any>>
 
     return (
         <div className={"flex flex-col gap-4 items-center"}>
-            <CircularProgress />
+            <CircularProgress/>
 
             <Typography variant={"h6"}>
                 Saving data

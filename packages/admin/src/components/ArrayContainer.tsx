@@ -67,7 +67,8 @@ const buildIdsMap = (value: any[]) =>
                     [getHashValue(v) ?? String(index) + index]: getRandomId()
                 };
             })
-            .reduce((a, b) => ({ ...a, ...b }), {})
+            .reduce((a, b) => ({ ...a,
+...b }), {})
         : {};
 
 type SortableItemProps = {
@@ -122,7 +123,8 @@ function SortableItem({
         transform: CSS.Transform.toString(transform),
         transition
     } : {};
-    const dragHandleProps = sortable ? { ...listeners, ...attributes } : {};
+    const dragHandleProps = sortable ? { ...listeners,
+...attributes } : {};
 
     return (
         <ArrayContainerItem
@@ -224,7 +226,7 @@ export function ArrayItemOptions({
     copy,
     canAddElements,
     sortable,
-    addInIndex,
+    addInIndex
 }: {
     dragHandleProps: any;
     direction?: "row" | "column";
@@ -285,11 +287,11 @@ export function ArrayItemOptions({
                         !sortable && showMenu && !disabled ? "cursor-pointer" : ""
                     )}
                 >
-                    <HandleIcon />
+                    <HandleIcon/>
                 </IconButton>
             </Tooltip>
             {showMenu && (
-                <Menu portalContainer={iconRef.current} open={menuOpen} trigger={<div tabIndex={-1} />}>
+                <Menu portalContainer={iconRef.current} open={menuOpen} trigger={<div tabIndex={-1}/>}>
                     <MenuItem
                         dense
                         onClick={(e: React.MouseEvent) => {
@@ -297,7 +299,7 @@ export function ArrayItemOptions({
                             remove(index);
                         }}
                     >
-                        <RemoveIcon size={"small"} />
+                        <RemoveIcon size={"small"}/>
                         {t("remove")}
                     </MenuItem>
                     <MenuItem
@@ -307,7 +309,7 @@ export function ArrayItemOptions({
                             copy(index);
                         }}
                     >
-                        <ContentCopyIcon size={"small"} />
+                        <ContentCopyIcon size={"small"}/>
                         {t("copy")}
                     </MenuItem>
                     {addInIndex && (
@@ -318,7 +320,7 @@ export function ArrayItemOptions({
                                 addInIndex(index);
                             }}
                         >
-                            <KeyboardArrowUpIcon size={"small"} />
+                            <KeyboardArrowUpIcon size={"small"}/>
                             {t("add_on_top")}
                         </MenuItem>
                     )}
@@ -330,7 +332,7 @@ export function ArrayItemOptions({
                                 addInIndex(index + 1);
                             }}
                         >
-                            <KeyboardArrowDownIcon size={"small"} />
+                            <KeyboardArrowDownIcon size={"small"}/>
                             {t("add_below")}
                         </MenuItem>
                     )}
@@ -374,8 +376,8 @@ export function ArrayContainer<T>({
 
     const pointerSensor = useSensor(PointerSensor, {
         activationConstraint: {
-            distance: 5,
-        },
+            distance: 5
+        }
     });
     const keyboardSensor = useSensor(KeyboardSensor, {});
     const sensors = useSensors(pointerSensor, keyboardSensor);
@@ -487,7 +489,7 @@ export function ArrayContainer<T>({
                                 variant={"text"}
                                 size={size === "small" ? "small" : "medium"}
                                 disabled={disabled || (value?.length ?? 0) >= max}
-                                startIcon={<AddIcon />}
+                                startIcon={<AddIcon/>}
                                 onClick={insertInEnd}
                             >
                                 {addLabel ?? "Add"}
@@ -528,7 +530,7 @@ export function ArrayContainer<T>({
                         variant={"text"}
                         size={size === "small" ? "small" : "medium"}
                         disabled={disabled || (value?.length ?? 0) >= max}
-                        startIcon={<AddIcon />}
+                        startIcon={<AddIcon/>}
                         onClick={insertInEnd}
                     >
                         {addLabel ?? "Add"}

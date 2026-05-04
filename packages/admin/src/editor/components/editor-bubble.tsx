@@ -63,7 +63,7 @@ export const EditorBubble = forwardRef<HTMLDivElement, EditorBubbleProps>(
                         top,
                         left,
                         right,
-                        bottom,
+                        bottom
                     };
                 }
             };
@@ -88,7 +88,7 @@ export const EditorBubble = forwardRef<HTMLDivElement, EditorBubbleProps>(
                         Object.assign(menuRef.current.style, {
                             left: `${x}px`,
                             top: `${y}px`,
-                            visibility: "visible",
+                            visibility: "visible"
                         });
                     }
                 });
@@ -102,7 +102,9 @@ export const EditorBubble = forwardRef<HTMLDivElement, EditorBubbleProps>(
             <div
                 ref={menuRef}
                 className={className}
-                style={{ position: "fixed", zIndex: 9999, visibility: "hidden" }}
+                style={{ position: "fixed",
+zIndex: 9999,
+visibility: "hidden" }}
                 onMouseDown={(e) => {
                     e.preventDefault(); // Don't lose focus inside ProseMirror
                 }}

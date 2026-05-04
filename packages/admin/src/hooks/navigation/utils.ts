@@ -28,7 +28,8 @@ export function computeNavigationGroups({
 
     // Deep clone the input groups upfront to avoid mutating the caller's data
     let result = navigationGroupMappings
-        ? navigationGroupMappings.map(g => ({ name: g.name, entries: [...g.entries] }))
+        ? navigationGroupMappings.map(g => ({ name: g.name,
+entries: [...g.entries] }))
         : navigationGroupMappings;
 
     // Merge plugin navigation entries
@@ -166,10 +167,10 @@ export function areCollectionsEqual(a: EntityCollection, b: EntityCollection, vi
         return false;
     }
     const restAWithoutFunctions = Object.fromEntries(
-        Object.entries(a).filter(([k, v]) => typeof v !== 'function' && k !== 'subcollections')
+        Object.entries(a).filter(([k, v]) => typeof v !== "function" && k !== "subcollections")
     );
     const restBWithoutFunctions = Object.fromEntries(
-        Object.entries(b).filter(([k, v]) => typeof v !== 'function' && k !== 'subcollections')
+        Object.entries(b).filter(([k, v]) => typeof v !== "function" && k !== "subcollections")
     );
     return equal(restAWithoutFunctions, restBWithoutFunctions);
 }

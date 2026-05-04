@@ -30,7 +30,8 @@ function pgTypeToRebaseProperty(column: TableColumnInfo): Property | null {
         return {
             type: "string",
             name: prettifiedName,
-            enum: enum_values.map((v: string) => ({ id: v, label: prettifyIdentifier(v) })),
+            enum: enum_values.map((v: string) => ({ id: v,
+label: prettifyIdentifier(v) })),
             validation: required ? { required: true } : undefined
         } as StringProperty;
     }
@@ -194,7 +195,7 @@ export function buildCollectionFromTableMetadata(
             // Remove undefined keys so we don't output "validation: undefined"
             const propRecord = property as unknown as Record<string, unknown>;
             Object.keys(propRecord).forEach(key => propRecord[key] === undefined && delete propRecord[key]);
-            
+
             properties[column.column_name] = property;
             propertiesOrder.push(column.column_name);
         }
@@ -203,7 +204,7 @@ export function buildCollectionFromTableMetadata(
     // Parse Outgoing Foreign Keys -> Many-to-One / One-to-One
     if (metadata.foreignKeys) {
         for (const fk of metadata.foreignKeys) {
-            const relName = fk.column_name.endsWith('_id') ? fk.column_name.substring(0, fk.column_name.length - 3) : fk.column_name;
+            const relName = fk.column_name.endsWith("_id") ? fk.column_name.substring(0, fk.column_name.length - 3) : fk.column_name;
             relations.push({
                 id: fk.column_name,
                 relationName: relName,
@@ -240,7 +241,7 @@ export function buildCollectionFromTableMetadata(
             // Attempt to map typical cmds to operations.
             // Postgres cmd: SELECT, INSERT, UPDATE, DELETE, ALL
             let operations: string[] = [];
-            switch(policy.cmd) {
+            switch (policy.cmd) {
                 case "ALL": operations = ["read", "create", "update", "delete"]; break;
                 case "SELECT": operations = ["read"]; break;
                 case "INSERT": operations = ["create"]; break;

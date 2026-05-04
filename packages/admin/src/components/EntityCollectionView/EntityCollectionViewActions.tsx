@@ -68,7 +68,7 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
             ? <Button
                 id={`add_entity_${path}`}
                 onClick={onNewClick}
-                startIcon={<AddIcon size={"small"} />}
+                startIcon={<AddIcon size={"small"}/>}
                 variant="filled"
                 color="primary">
                 Add {collection.singularName ?? collection.name}
@@ -80,7 +80,7 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
                 color={compact ? "neutral" : "primary"}
                 size={compact ? "small" : "medium"}
             >
-                <AddIcon size={"small"} />
+                <AddIcon size={"small"}/>
             </Button>);
 
     const multipleDeleteEnabled = canDelete(collection, path, null);
@@ -91,7 +91,7 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
             ? <Button
                 variant={"text"}
                 disabled={!(selectedEntities?.length) || !multipleDeleteEnabled}
-                startIcon={<DeleteIcon size={"small"} />}
+                startIcon={<DeleteIcon size={"small"}/>}
                 onClick={onMultipleDeleteClick}
                 color={"primary"}
                 className="lg:w-20"
@@ -103,7 +103,7 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
                 color={"primary"}
                 disabled={!(selectedEntities?.length) || !multipleDeleteEnabled}
                 onClick={onMultipleDeleteClick}>
-                <DeleteIcon size={"small"} />
+                <DeleteIcon size={"small"}/>
             </IconButton>;
         multipleDeleteButton =
             <Tooltip
@@ -126,7 +126,7 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
     const actions = toArray(collection.Actions)
         .map((Action, i) => (
             <ErrorBoundary key={`actions_${i}`}>
-                <Action {...actionProps} />
+                <Action {...actionProps}/>
             </ErrorBoundary>
         ));
 
@@ -140,14 +140,14 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
                 {pluginActions}
             </ErrorBoundary>
             <ErrorBoundary>
-                <ImportCollectionAction {...(actionProps as any)} />
+                <ImportCollectionAction {...(actionProps as any)}/>
             </ErrorBoundary>
             <ErrorBoundary>
-                <ExportCollectionAction {...(actionProps as any)} />
+                <ExportCollectionAction {...(actionProps as any)}/>
             </ErrorBoundary>
             {hasCollectionEditor && (
                 <ErrorBoundary>
-                    <EditorCollectionAction {...(actionProps as any)} />
+                    <EditorCollectionAction {...(actionProps as any)}/>
                 </ErrorBoundary>
             )}
         </>
@@ -165,7 +165,7 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
                     onOpenChange={setOverflowOpen}
                     trigger={
                         <IconButton size="small">
-                            <MoreVertIcon size="small" />
+                            <MoreVertIcon size="small"/>
                         </IconButton>
                     }>
                     <div className="flex flex-col gap-1 p-2 min-w-[200px]" onClick={() => setOverflowOpen(false)}>

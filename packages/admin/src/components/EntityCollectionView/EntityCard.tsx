@@ -124,7 +124,7 @@ export function EntityCard<M extends Record<string, unknown> = Record<string, un
                 <div className={cls(
                     "absolute inset-0 bg-black/0 group-hover:bg-black/10",
                     "transition-colors duration-200"
-                )} />
+                )}/>
 
                 {/* Selection checkbox */}
                 {selectionEnabled && (

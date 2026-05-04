@@ -30,4 +30,5 @@ export const supportedFieldsIds: PropertyConfigId[] = [
 export const supportedFields: Record<string, PropertyConfig> = Object.entries(DEFAULT_FIELD_CONFIGS)
     .filter(([id]) => supportedFieldsIds.includes(id as PropertyConfigId))
     .map(([id, config]) => ({ [id]: config }))
-    .reduce((a, b) => ({ ...a, ...b }), {});
+    .reduce((a, b) => ({ ...a,
+...b }), {});

@@ -7,7 +7,7 @@ import { RelationPreview } from "../../../preview";
 import { CollectionSize, Entity, EntityRelation, FilterValues, Relation } from "@rebasepro/types";
 
 import { getPreviewSizeFrom } from "../../../preview/util";
-import {  } from "@rebasepro/core";
+import { } from "@rebasepro/core";
 import { ErrorView } from "@rebasepro/core";
 import { cls, EditIcon } from "@rebasepro/ui";
 import { EntityPreviewContainer } from "../../EntityPreview";
@@ -51,7 +51,7 @@ export function TableRelationField(props: TableRelationFieldProps) {
         />;
     }
 
-    return <TableRelationFieldInternal {...props} collection={collection} />;
+    return <TableRelationFieldInternal {...props} collection={collection}/>;
 }
 
 export const TableRelationFieldInternal = React.memo(
@@ -124,7 +124,7 @@ export const TableRelationFieldInternal = React.memo(
                 return <EntityPreviewContainer
                     onClick={disabled ? undefined : handleOpen}
                     size={getPreviewSizeFrom(size)}>
-                    <ErrorView title="Value is not a relation." error={"Click to edit"} />
+                    <ErrorView title="Value is not a relation." error={"Click to edit"}/>
                 </EntityPreviewContainer>;
         };
 
@@ -148,11 +148,11 @@ export const TableRelationFieldInternal = React.memo(
                     }
                 </>;
             else
-                return <ErrorView error={"Data is not an array of relations"} />;
+                return <ErrorView error={"Data is not an array of relations"}/>;
         };
 
         if (!collection)
-            return <ErrorView error={"The specified collection does not exist"} />;
+            return <ErrorView error={"The specified collection does not exist"}/>;
 
         return (
             <div className="w-full group">
@@ -172,7 +172,7 @@ export const TableRelationFieldInternal = React.memo(
                         size={"medium"}>
                         <EditIcon
                             size={"small"}
-                            className={"ml-2 mr-1 text-surface-300 dark:text-surface-600"} />
+                            className={"ml-2 mr-1 text-surface-300 dark:text-surface-600"}/>
                         {title}
                     </EntityPreviewContainer>}
 

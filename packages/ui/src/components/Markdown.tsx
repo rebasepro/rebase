@@ -32,7 +32,7 @@ const proseWeightOverrides = [
     "prose-strong:font-semibold",
     "prose-code:font-normal",
     "prose-blockquote:font-normal",
-    "prose-a:font-normal",
+    "prose-a:font-normal"
 ].join(" ");
 
 const md = new MarkdownIt({ html: true });

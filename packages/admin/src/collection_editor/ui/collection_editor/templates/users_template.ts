@@ -38,5 +38,5 @@ export const usersCollectionTemplate = {
             type: "string",
             url: "image"
         }
-    },
+    }
 } as unknown as EntityCollection;

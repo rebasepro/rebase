@@ -1,5 +1,5 @@
 import type { AppView, AppViewsBuilder, EntityCollection, FirebaseCollection, RebasePlugin } from "@rebasepro/types";
-import { AuthController, DataDriver,  User, RebaseData } from "@rebasepro/types";
+import { AuthController, DataDriver, User, RebaseData } from "@rebasepro/types";
 import type { EntityCollectionsBuilder } from "@rebasepro/types";
 import { canReadCollection } from "@rebasepro/common";
 
@@ -7,7 +7,7 @@ export function filterOutNotAllowedCollections(resolvedCollections: EntityCollec
     return resolvedCollections
         .filter((c) => canReadCollection(c, authController))
         .map((c) => {
-            if (!('subcollections' in c) || !c.subcollections) return c;
+            if (!("subcollections" in c) || !c.subcollections) return c;
             return {
                 ...c,
                 subcollections: () => filterOutNotAllowedCollections((c as FirebaseCollection).subcollections?.() ?? [], authController)
@@ -18,7 +18,7 @@ export function filterOutNotAllowedCollections(resolvedCollections: EntityCollec
 export function applyPluginModifyCollection(resolvedCollections: EntityCollection[], modifyCollection: (collection: EntityCollection) => EntityCollection) {
     return resolvedCollections.map((collection: EntityCollection): EntityCollection => {
         const modifiedCollection = modifyCollection(collection);
-        if ('subcollections' in modifiedCollection && modifiedCollection.subcollections) {
+        if ("subcollections" in modifiedCollection && modifiedCollection.subcollections) {
             return {
                 ...modifiedCollection,
                 subcollections: () => applyPluginModifyCollection((modifiedCollection as FirebaseCollection).subcollections?.() ?? [], modifyCollection)

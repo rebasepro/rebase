@@ -89,7 +89,7 @@ export const MultiSelect = React.forwardRef<
             renderValues,
             open,
             onOpenChange,
-            portalContainer,
+            portalContainer
         },
         ref
     ) => {
@@ -222,15 +222,15 @@ export const MultiSelect = React.forwardRef<
                                     "min-h-[28px]": size === "smallest",
                                     "min-h-[32px]": size === "small",
                                     "min-h-[44px]": size === "medium",
-                                    "min-h-[64px]": size === "large",
+                                    "min-h-[64px]": size === "large"
                                 },
                                 {
                                     "py-1": size === "small" || size === "smallest",
-                                    "py-2": size === "medium" || size === "large",
+                                    "py-2": size === "medium" || size === "large"
                                 },
                                 {
                                     "px-2": size === "small" || size === "smallest",
-                                    "px-4": size === "medium" || size === "large",
+                                    "px-4": size === "medium" || size === "large"
                                 },
                                 "select-none rounded-md text-sm",
                                 "focus:ring-0 focus-visible:ring-0 outline-none focus:outline-none focus-visible:outline-none",
@@ -280,7 +280,7 @@ export const MultiSelect = React.forwardRef<
                                         />}
                                         <div className={cls("px-2 h-full flex items-center")}>
                                             <KeyboardArrowDownIcon size={size === "large" ? "medium" : "small"}
-                                                className={cls("transition", isPopoverOpen ? "rotate-180" : "")} />
+                                                className={cls("transition", isPopoverOpen ? "rotate-180" : "")}/>
                                         </div>
                                     </div>
                                 </div>
@@ -291,7 +291,7 @@ export const MultiSelect = React.forwardRef<
                                     </span>
                                     <div className={cls("px-2 h-full flex items-center")}>
                                         <KeyboardArrowDownIcon size={size === "large" ? "medium" : "small"}
-                                            className={cls("transition", isPopoverOpen ? "rotate-180" : "")} />
+                                            className={cls("transition", isPopoverOpen ? "rotate-180" : "")}/>
                                     </div>
                                 </div>
                             )}
@@ -319,7 +319,7 @@ export const MultiSelect = React.forwardRef<
                                         </div>
                                     )}
                                 </div>
-                                <Separator orientation={"horizontal"} className={"my-0"} />
+                                <Separator orientation={"horizontal"} className={"my-0"}/>
                                 <CommandPrimitive.List>
                                     <CommandPrimitive.Empty className={"px-4 py-2 text-sm text-text-secondary dark:text-text-secondary-dark"}>
                                         No results found.
@@ -340,7 +340,7 @@ export const MultiSelect = React.forwardRef<
                                                 )
                                             }
                                         >
-                                            <InnerCheckBox checked={selectedValues.length === allValues.length} />
+                                            <InnerCheckBox checked={selectedValues.length === allValues.length}/>
                                             <span className={"text-sm text-text-secondary dark:text-text-secondary-dark"}>(Select All)</span>
                                         </CommandPrimitive.Item>}
                                         {children}
@@ -398,7 +398,7 @@ export const MultiSelectItem = React.memo(function MultiSelectItem<T extends Mul
             className
         )}
     >
-        <InnerCheckBox checked={isSelected} />
+        <InnerCheckBox checked={isSelected}/>
         {children}
     </CommandPrimitive.Item>;
 });
@@ -407,7 +407,7 @@ const InnerCheckBox = React.memo(function InnerCheckBox({ checked }: { checked: 
     return <div className={cls(
         "p-2",
         "w-8 h-8",
-        "inline-flex items-center justify-center text-sm font-medium focus:outline-none transition-colors ease-in-out duration-150",
+        "inline-flex items-center justify-center text-sm font-medium focus:outline-none transition-colors ease-in-out duration-150"
     )}>
         <div
             className={cls(
@@ -417,7 +417,7 @@ const InnerCheckBox = React.memo(function InnerCheckBox({ checked }: { checked: 
                 (checked) ? "text-surface-accent-100 dark:text-surface-accent-900" : "",
                 (checked ? "border-transparent" : "border-surface-accent-800 dark:border-surface-accent-200")
             )}>
-            {checked && <CheckIcon size={16} className={"absolute"} />}
+            {checked && <CheckIcon size={16} className={"absolute"}/>}
         </div>
     </div>
 });

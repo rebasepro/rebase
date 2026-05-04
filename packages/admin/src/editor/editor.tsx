@@ -120,9 +120,11 @@ export const RebaseEditor = ({
 
   useInjectStyles("Editor", cssStyles);
 
-  const callbacksRef = useRef({ onMarkdownContentChange, onJsonContentChange });
+  const callbacksRef = useRef({ onMarkdownContentChange,
+onJsonContentChange });
   useEffect(() => {
-    callbacksRef.current = { onMarkdownContentChange, onJsonContentChange };
+    callbacksRef.current = { onMarkdownContentChange,
+onJsonContentChange };
   }, [onMarkdownContentChange, onJsonContentChange]);
 
   const flushChanges = (currentState: EditorState) => {
@@ -144,7 +146,7 @@ export const RebaseEditor = ({
   const { state, view, editorRef } = useProseMirror({
     initialContent: content,
     editable: !disabled,
-    handleImageUpload,
+    handleImageUpload
   });
 
   const doc = state?.doc;
@@ -189,7 +191,6 @@ export const RebaseEditor = ({
   }, [view]);
 
 
-
   useEffect(() => {
     if (view) {
       if (highlight) {
@@ -203,7 +204,6 @@ export const RebaseEditor = ({
   const proseClass = proseClasses[textSize];
 
 
-
   return (
     <div className="relative min-h-[200px] w-full">
       <button
@@ -215,7 +215,8 @@ export const RebaseEditor = ({
         {isMarkdownMode ? "Visual" : "Markdown"}
       </button>
 
-      <ProseMirrorContext.Provider value={useMemo(() => ({ state, view }), [state, view])}>
+      <ProseMirrorContext.Provider value={useMemo(() => ({ state,
+view }), [state, view])}>
 
         <div style={{ display: isMarkdownMode ? "none" : "block" }}>
           <div
@@ -228,28 +229,28 @@ export const RebaseEditor = ({
             <EditorBubble
               options={{
                 placement: "top",
-                offset: 6,
+                offset: 6
               }}
               className={cls("flex w-fit max-w-[90vw] h-10 overflow-hidden rounded border bg-white dark:bg-surface-900 shadow", defaultBorderMixin)}
             >
-              <NodeSelector portalContainer={editorRef.current} open={openNode} onOpenChange={setOpenNode} />
-              <Separator orientation="vertical" />
-              <LinkSelector open={openLink} onOpenChange={setOpenLink} />
-              <Separator orientation="vertical" />
-              <TextButtons />
+              <NodeSelector portalContainer={editorRef.current} open={openNode} onOpenChange={setOpenNode}/>
+              <Separator orientation="vertical"/>
+              <LinkSelector open={openLink} onOpenChange={setOpenLink}/>
+              <Separator orientation="vertical"/>
+              <TextButtons/>
             </EditorBubble>
 
             <ImageBubble
                options={{
                 placement: "bottom",
-                offset: 6,
+                offset: 6
               }}
             />
-            <TableBubble />
+            <TableBubble/>
           </>
         )}
 
-        <SlashCommandMenu upload={handleImageUpload} aiController={aiController} />
+        <SlashCommandMenu upload={handleImageUpload} aiController={aiController}/>
         </div>
 
         {isMarkdownMode && (
@@ -261,7 +262,7 @@ export const RebaseEditor = ({
               "w-full h-full min-h-[200px] p-12 bg-transparent resize-none font-mono focus:ring-0",
               proseClass
             )}
-            style={{ 
+            style={{
               tabSize: 4,
               outline: "none",
               border: "none",
@@ -274,7 +275,6 @@ export const RebaseEditor = ({
     </div>
   );
 };
-
 
 
 const cssStyles = `

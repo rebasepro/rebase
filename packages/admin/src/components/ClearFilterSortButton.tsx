@@ -38,7 +38,7 @@ export function ClearFilterSortButton({
                         tableController.setSortBy?.(undefined);
                     }}
                 >
-                    <FilterListOffIcon size="small" />
+                    <FilterListOffIcon size="small"/>
                 </Button>
             </Tooltip>
         );

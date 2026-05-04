@@ -9,7 +9,7 @@ const EMPTY_ARRAY: any[] = [];
 import { CollectionSize, Entity, EntityReference, EntityTableController, FilterValues, PartialEntityCollection, SaveEntityProps, ViewMode } from "@rebasepro/types";
 import {
     EntityCollectionRowActions,
-    EntityCollectionTable,
+    EntityCollectionTable
 } from "../EntityCollectionTable";
 import { CollectionTableToolbar } from "../EntityCollectionTable/internal/CollectionTableToolbar";
 import { getSubcollections } from "@rebasepro/common";
@@ -57,7 +57,7 @@ import { getSubcollectionColumnId } from "../EntityCollectionTable/internal/comm
 import {
     copyEntityAction,
     deleteEntityAction,
-    editEntityAction,
+    editEntityAction
 } from "../common/default_entity_actions";
 import { OnCellValueChange, OnColumnResizeParams, UniqueFieldValidator } from "@rebasepro/core";
 import { useColumnIds } from "@rebasepro/core";
@@ -604,7 +604,7 @@ export const EntityCollectionView = React.memo(
                     Builder: ({ entity }: { entity: Entity }) => (
                         <Button
                             className={"max-w-full truncate justify-start"}
-                            startIcon={<KeyboardTabIcon size={"small"} />}
+                            startIcon={<KeyboardTabIcon size={"small"}/>}
                             onClick={(event: React.MouseEvent) => {
                                 event.stopPropagation();
                                 navigateToEntity({
@@ -751,7 +751,7 @@ export const EntityCollectionView = React.memo(
             };
             return <>{headerActionContributions.map((s, i) => (
                 <ErrorBoundary key={`header_action_${propertyKey}_${i}`}>
-                    <s.Component {...headerSlotProps} {...(s.props ?? {})} />
+                    <s.Component {...headerSlotProps} {...(s.props ?? {})}/>
                 </ErrorBoundary>
             ))}</>;
         }, [headerActionContributions, path, parentCollectionIds]);
@@ -765,7 +765,7 @@ export const EntityCollectionView = React.memo(
                 );
             }
             : undefined;
-            
+
         const onColumnsOrderChange = useCallback((newColumns: VirtualTableColumn[]) => {
             // Extract property keys from the new column order
             // Filter to only include actual property columns (not frozen columns, not additional fields, etc.)
@@ -840,7 +840,7 @@ export const EntityCollectionView = React.memo(
                         onClick={onNewClick}
                         className="mt-4"
                     >
-                        <AddIcon />
+                        <AddIcon/>
                         {t("create_your_first_entry")}
                     </Button>
                 </div>
@@ -861,7 +861,7 @@ export const EntityCollectionView = React.memo(
                     selectionController={usedSelectionController}
                     collectionEntitiesCount={docsCount ?? undefined}
                     resolvedProperties={resolvedCollection.properties}
-                    compact={isCompact} />}
+                    compact={isCompact}/>}
                 actions={
                     <EntityCollectionViewActions
                         parentCollectionIds={parentCollectionIds ?? EMPTY_ARRAY}
@@ -880,7 +880,7 @@ export const EntityCollectionView = React.memo(
                     </EntityCollectionViewActions>
                 }
             />
-        );        const innerView = viewMode === "kanban" ? (
+        ); const innerView = viewMode === "kanban" ? (
             <EntityCollectionBoardView
                 key={`kanban-view-${path}-${selectedKanbanProperty}`}
                 collection={collection}
@@ -953,7 +953,7 @@ export const EntityCollectionView = React.memo(
                 additionalIDHeaderWidget={<EntityIdHeaderWidget
                     path={path}
                     idPath={path}
-                    collection={collection} />}
+                    collection={collection}/>}
                 openEntityMode={openEntityMode}
                 onColumnsOrderChange={onColumnsOrderChange}
             />
@@ -1045,7 +1045,7 @@ export const EntityCollectionView = React.memo(
                     customFieldValidator={uniqueFieldValidator}
                     path={path}
                     onCellValueChange={onValueChange}
-                    container={containerRef.current} />}
+                    container={containerRef.current}/>}
 
                 {deleteEntityClicked &&
                     <DeleteEntityDialog
@@ -1056,7 +1056,7 @@ export const EntityCollectionView = React.memo(
                         open={Boolean(deleteEntityClicked)}
                         onEntityDelete={internalOnEntityDelete}
                         onMultipleEntitiesDelete={internalOnMultipleEntitiesDelete}
-                        onClose={() => setDeleteEntityClicked(undefined)} />}
+                        onClose={() => setDeleteEntityClicked(undefined)}/>}
 
             </div>
         );
@@ -1110,7 +1110,7 @@ function EntitiesCount({
         const accessor = dataClient.collection(resolvedPath);
         if (accessor.count) {
             if (onCountChange) onCountChange(null);
-            
+
             // Convert filterValues to PostgREST where clause
             const whereMap: Record<string, string> = {};
             if (filter) {
@@ -1118,7 +1118,7 @@ function EntitiesCount({
                     if (value && Array.isArray(value)) {
                         const [op, val] = value;
                         const postgrestOp = op === "==" ? "eq" : op === "!=" ? "neq" : op === ">" ? "gt" : op === ">=" ? "gte" : op === "<" ? "lt" : op === "<=" ? "lte" : op === "in" ? "in" : op === "not-in" ? "nin" : op === "array-contains" ? "cs" : op === "array-contains-any" ? "csa" : "eq";
-                        
+
                         let stringVal: string;
                         if (Array.isArray(val)) {
                             stringVal = `(${val.join(",")})`;
@@ -1187,7 +1187,7 @@ function EntityIdHeaderWidget({
                 alignOffset={-117}
                 trigger={
                     <IconButton size={"small"}>
-                        <SearchIcon size={"small"} />
+                        <SearchIcon size={"small"}/>
                     </IconButton>
                 }>
                 <div
@@ -1220,16 +1220,17 @@ function EntityIdHeaderWidget({
                                     setSearchString(e.target.value);
                                 }}
                                 value={searchString}
-                                className={"rounded-lg bg-white dark:bg-surface-800 flex-grow bg-transparent outline-none p-2 " + focusedDisabled} />
+                                className={"rounded-lg bg-white dark:bg-surface-800 flex-grow bg-transparent outline-none p-2 " + focusedDisabled}/>
                             <Button variant={"text"}
                                 disabled={!(searchString.trim())}
                                 type={"submit"}
-                            ><KeyboardTabIcon /></Button>
+                            ><KeyboardTabIcon/></Button>
                         </div>
                     </form>
                     {recentIds && recentIds.length > 0 && <div className="flex flex-col gap-2 p-2">
                         {recentIds.map(id => (
-                            <ReferencePreview reference={new EntityReference({ id, path })}
+                            <ReferencePreview reference={new EntityReference({ id,
+path })}
                                 key={id}
                                 hover={true}
                                 onClick={() => {
@@ -1245,7 +1246,7 @@ function EntityIdHeaderWidget({
                                     })
                                 }}
                                 includeEntityLink={false}
-                                size={"small"} />
+                                size={"small"}/>
                         ))}
                     </div>}
                 </div>

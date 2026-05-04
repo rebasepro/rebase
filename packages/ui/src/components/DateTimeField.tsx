@@ -3,7 +3,7 @@
 import React, { useRef, useState } from "react";
 import { CalendarMonthIcon, CloseIcon, ErrorIcon } from "../icons";
 import { IconButton } from "./IconButton";
-import { fieldBackgroundDisabledMixin, fieldBackgroundHoverMixin, fieldBackgroundMixin, } from "../styles";
+import { fieldBackgroundDisabledMixin, fieldBackgroundHoverMixin, fieldBackgroundMixin } from "../styles";
 import { InputLabel } from "./InputLabel";
 import { Typography } from "./Typography";
 import { cls } from "../util";
@@ -45,7 +45,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
     style,
     inputClassName,
     invisible,
-    timezone,
+    timezone
 }) => {
     const inputRef = useRef<HTMLInputElement>(null);
     const [focused, setFocused] = useState(false);
@@ -80,7 +80,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
             hour: "2-digit",
             minute: "2-digit",
             hour12: false,
-            timeZone: timezone, // undefined = local timezone
+            timeZone: timezone // undefined = local timezone
         };
 
         const formatter = new Intl.DateTimeFormat("en-CA", options);
@@ -109,13 +109,21 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
         }
         // For named timezones, calculate the offset by comparing formatted times
         const utcFormatter = new Intl.DateTimeFormat("en-CA", {
-            year: "numeric", month: "2-digit", day: "2-digit",
-            hour: "2-digit", minute: "2-digit", hour12: false,
+            year: "numeric",
+month: "2-digit",
+day: "2-digit",
+            hour: "2-digit",
+minute: "2-digit",
+hour12: false,
             timeZone: "UTC"
         });
         const tzFormatter = new Intl.DateTimeFormat("en-CA", {
-            year: "numeric", month: "2-digit", day: "2-digit",
-            hour: "2-digit", minute: "2-digit", hour12: false,
+            year: "numeric",
+month: "2-digit",
+day: "2-digit",
+            hour: "2-digit",
+minute: "2-digit",
+hour12: false,
             timeZone: tz
         });
 
@@ -222,7 +230,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
                         "min-h-[28px]": size === "smallest",
                         "min-h-[32px]": size === "small",
                         "min-h-[44px]": size === "medium",
-                        "min-h-[64px]": size === "large",
+                        "min-h-[64px]": size === "large"
                     },
                     className
                 )}
@@ -267,7 +275,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
                             "min-h-[28px]": size === "smallest",
                             "min-h-[32px]": size === "small",
                             "min-h-[44px]": size === "medium",
-                            "min-h-[64px]": size === "large",
+                            "min-h-[64px]": size === "large"
                         },
                         label ? "pt-8 pb-2" : "py-2",
                         inputClassName,
@@ -282,20 +290,20 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
                     }}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-surface-accent-500!"
                 >
-                    <CalendarMonthIcon color={"disabled"} />
+                    <CalendarMonthIcon color={"disabled"}/>
                 </IconButton>
                 {clearable && value && (
                     <IconButton
                         onClick={handleClear}
                         className="absolute right-14 top-1/2 transform -translate-y-1/2 text-surface-accent-400 "
                     >
-                        <CloseIcon />
+                        <CloseIcon/>
                     </IconButton>
                 )}
             </div>
             {invalidValue && (
                 <div className="flex items-center m-2">
-                    <ErrorIcon size={"small"} color={"error"} />
+                    <ErrorIcon size={"small"} color={"error"}/>
                     <div className="pl-2">
                         <Typography variant={"body2"}>
                             Invalid date value for this field

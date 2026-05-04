@@ -42,7 +42,7 @@ export function CollectionViewHeaderAction({
                     });
                 }}
                 size={"small"}>
-                <SettingsIcon size={"small"} />
+                <SettingsIcon size={"small"}/>
             </IconButton>
         </Tooltip>
     )

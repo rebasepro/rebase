@@ -26,36 +26,36 @@ export const TextButtons = () => {
             labelKey: "editor_bold",
             isActive: (s: EditorState) => isMarkActive(s, schema.marks.bold),
             command: (s: EditorState, dispatch: (tr: Transaction) => void) => toggleMark(schema.marks.bold)(s, dispatch),
-            icon: FormatBoldIcon,
+            icon: FormatBoldIcon
         },
         {
             name: "italic",
             labelKey: "editor_italic",
             isActive: (s: EditorState) => isMarkActive(s, schema.marks.italic),
             command: (s: EditorState, dispatch: (tr: Transaction) => void) => toggleMark(schema.marks.italic)(s, dispatch),
-            icon: FormatItalicIcon,
+            icon: FormatItalicIcon
         },
         {
             name: "underline",
             labelKey: "editor_underline",
             isActive: (s: EditorState) => isMarkActive(s, schema.marks.underline),
             command: (s: EditorState, dispatch: (tr: Transaction) => void) => toggleMark(schema.marks.underline)(s, dispatch),
-            icon: FormatUnderlinedIcon,
+            icon: FormatUnderlinedIcon
         },
         {
             name: "strike",
             labelKey: "editor_strikethrough",
             isActive: (s: EditorState) => isMarkActive(s, schema.marks.strike),
             command: (s: EditorState, dispatch: (tr: Transaction) => void) => toggleMark(schema.marks.strike)(s, dispatch),
-            icon: FormatStrikethroughIcon,
+            icon: FormatStrikethroughIcon
         },
         {
             name: "code",
             labelKey: "editor_code",
             isActive: (s: EditorState) => isMarkActive(s, schema.marks.code),
             command: (s: EditorState, dispatch: (tr: Transaction) => void) => toggleMark(schema.marks.code)(s, dispatch),
-            icon: CodeIcon,
-        },
+            icon: CodeIcon
+        }
     ];
 
     return (
@@ -75,7 +75,7 @@ export const TextButtons = () => {
                         <item.icon
                             className={cls({
                                 "text-inherit": !item.isActive(state),
-                                "text-blue-500": item.isActive(state),
+                                "text-blue-500": item.isActive(state)
                             })}
                         />
                     </Button>

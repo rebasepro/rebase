@@ -4,13 +4,13 @@ import { useCallback, useState } from "react";
 export function PropertyIdCopyTooltip({
     propertyKey,
     className,
-    children,
+    children
 }: {
     propertyKey: string,
     className?: string,
     children: any
 }) {
-    return <Tooltip title={<PropertyIdCopyTooltipContent propertyKey={propertyKey} />}
+    return <Tooltip title={<PropertyIdCopyTooltipContent propertyKey={propertyKey}/>}
         delayDuration={800}
         side={"top"}
         align={"start"}

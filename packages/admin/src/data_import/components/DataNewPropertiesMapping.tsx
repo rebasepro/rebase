@@ -45,9 +45,9 @@ export function DataNewPropertiesMapping({
 
             <IdSelectField idColumn={idColumn}
                 headersMapping={headersMapping}
-                onChange={(value) => importConfig.setIdColumn(value ?? undefined)} />
+                onChange={(value) => importConfig.setIdColumn(value ?? undefined)}/>
 
-            <div className={"h-4"} />
+            <div className={"h-4"}/>
 
             <Table style={{
                 tableLayout: "fixed"
@@ -84,7 +84,7 @@ export function DataNewPropertiesMapping({
                                     >{origintype}</Typography>}
                                 </TableCell>
                                 <TableCell>
-                                    <ChevronRightIcon />
+                                    <ChevronRightIcon/>
                                 </TableCell>
                                 <TableCell className={importKey === idColumn ? "text-center" : undefined}
                                     style={{ width: "75%" }}>
@@ -134,7 +134,7 @@ export function DataNewPropertiesMapping({
                                         <Typography variant={"body2"}>{key}</Typography>
                                     </TableCell>
                                     <TableCell>
-                                        <ChevronRightIcon />
+                                        <ChevronRightIcon/>
                                     </TableCell>
                                     <TableCell className={key === idColumn ? "text-center" : undefined}
                                         style={{ width: "75%" }}>
@@ -143,7 +143,7 @@ export function DataNewPropertiesMapping({
                                             onValueChange={(value) => {
                                                 const newValues = setIn(importConfig.defaultValues, key, value);
                                                 importConfig.setDefaultValues(newValues);
-                                            }} />
+                                            }}/>
                                     </TableCell>
                                 </TableRow>;
                             }
@@ -208,13 +208,13 @@ function DefaultValuesField({
         return <TextField size={"medium"}
             placeholder={"Default value"}
             value={defaultValue ?? ""}
-            onChange={(event) => onValueChange(event.target.value)} />;
+            onChange={(event) => onValueChange(event.target.value)}/>;
     } else if (property.type === "number") {
         return <TextField size={"medium"}
             type={"number"}
             value={defaultValue ?? ""}
             placeholder={"Default value"}
-            onChange={(event) => onValueChange(event.target.value)} />;
+            onChange={(event) => onValueChange(event.target.value)}/>;
     } else if (property.type === "boolean") {
         return <BooleanSwitchWithLabel
             value={defaultValue ?? null}

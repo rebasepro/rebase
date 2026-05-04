@@ -145,7 +145,7 @@ export function StringNumberFilterField({
                     }}
                     endAdornment={internalValue !== undefined && internalValue != null && <IconButton
                         onClick={(e) => updateFilter(operation, undefined)}>
-                        <CloseIcon />
+                        <CloseIcon/>
                     </IconButton>}
                 />}
 
@@ -162,7 +162,7 @@ export function StringNumberFilterField({
                         }}
                         endAdornment={internalValue && <IconButton
                             onClick={(e) => updateFilter(operation, undefined)}>
-                            <CloseIcon />
+                            <CloseIcon/>
                         </IconButton>}
                         renderValue={(enumKey) => {
                             if (enumKey === null)
@@ -174,7 +174,7 @@ export function StringNumberFilterField({
                                 key={`select_value_${name}_${enumKey}`}
                                 enumKey={enumKey}
                                 enumValues={enumValues}
-                                size={"small"} />;
+                                size={"small"}/>;
                         }}>
                         {enumValues.map((enumConfig) => (
                             <SelectItem key={`select_item_${name}_${enumConfig.id}`}
@@ -182,7 +182,7 @@ export function StringNumberFilterField({
                                 <EnumValuesChip
                                     enumKey={String(enumConfig.id)}
                                     enumValues={enumValues}
-                                    size={"small"} />
+                                    size={"small"}/>
                             </SelectItem>
                         ))}
                     </Select>
@@ -201,7 +201,7 @@ export function StringNumberFilterField({
                         endAdornment={internalValue && <IconButton
                             className="absolute right-2 top-3"
                             onClick={(e) => updateFilter(operation, undefined)}>
-                            <CloseIcon />
+                            <CloseIcon/>
                         </IconButton>}
                     >
                         {enumValues.map((enumConfig) => (
@@ -210,7 +210,7 @@ export function StringNumberFilterField({
                                 <EnumValuesChip
                                     enumKey={String(enumConfig.id)}
                                     enumValues={enumValues}
-                                    size={"small"} />
+                                    size={"small"}/>
                             </MultiSelectItem>
                         ))}
                     </MultiSelect>

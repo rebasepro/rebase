@@ -78,7 +78,7 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
                 onClick={handleBackClick}
                 className="mr-1"
             >
-                <ArrowBackIcon size="small" />
+                <ArrowBackIcon size="small"/>
             </IconButton>
         </Tooltip>
     );
@@ -96,7 +96,7 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
                         variant="text"
                         size="small"
                         onClick={() => setFiltersDialogOpen(true)}
-                        startIcon={<FilterListIcon size="small" />}
+                        startIcon={<FilterListIcon size="small"/>}
                         className={cls(activeFilterCount > 0 && "text-primary")}
                     >
                         {t("filters")}{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
@@ -107,7 +107,7 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
                         onClick={() => setFiltersDialogOpen(true)}
                         className={cls(activeFilterCount > 0 && "text-primary")}
                     >
-                        <FilterListIcon size="small" />
+                        <FilterListIcon size="small"/>
                     </IconButton>
                 )}
             </Badge>
@@ -120,7 +120,7 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
         <ClearFilterSortButton
             key={"clear_filter"}
             tableController={tableController}
-            enabled={!collection.forceFilter} />
+            enabled={!collection.forceFilter}/>
     ];
 
     const pluginActionsStart = useSlot("collection.actions.start", actionProps);

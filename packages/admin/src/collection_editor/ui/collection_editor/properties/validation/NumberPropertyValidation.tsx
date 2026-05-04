@@ -25,7 +25,7 @@ export function NumberPropertyValidation({ disabled }: {
     return (
 
         <div className={"grid grid-cols-12 gap-2"}>
-            <GeneralPropertyValidation disabled={disabled} />
+            <GeneralPropertyValidation disabled={disabled}/>
 
 
             <div className={"col-span-6"}>
@@ -35,7 +35,7 @@ export function NumberPropertyValidation({ disabled }: {
                     type="number"
                     size="small"
                     disabled={disabled}
-                    onChange={handleChange} />
+                    onChange={handleChange}/>
             </div>
 
             <div className={"col-span-6"}>
@@ -46,7 +46,7 @@ export function NumberPropertyValidation({ disabled }: {
                     size="small"
 
                     disabled={disabled}
-                    onChange={handleChange} />
+                    onChange={handleChange}/>
             </div>
 
 
@@ -59,7 +59,7 @@ export function NumberPropertyValidation({ disabled }: {
                     size="small"
 
                     disabled={disabled}
-                    onChange={handleChange} />
+                    onChange={handleChange}/>
             </div>
 
             <div className={"col-span-6"}>
@@ -71,7 +71,7 @@ export function NumberPropertyValidation({ disabled }: {
                     size="small"
 
                     disabled={disabled}
-                    onChange={handleChange} />
+                    onChange={handleChange}/>
             </div>
 
             <div className={"col-span-4"}>
@@ -82,7 +82,7 @@ export function NumberPropertyValidation({ disabled }: {
                             label={"Positive value"}
                             disabled={disabled}
                             form={form}
-                            field={field} />
+                            field={field}/>
                     }}
                 </Field>
             </div>
@@ -94,7 +94,7 @@ export function NumberPropertyValidation({ disabled }: {
                             label={"Negative value"}
                             disabled={disabled}
                             form={form}
-                            field={field} />
+                            field={field}/>
                     }}
                 </Field>
             </div>
@@ -106,7 +106,7 @@ export function NumberPropertyValidation({ disabled }: {
                             label={"Integer value"}
                             disabled={disabled}
                             form={form}
-                            field={field} />
+                            field={field}/>
                     }}
                 </Field>
             </div>

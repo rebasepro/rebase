@@ -189,7 +189,7 @@ export const UserSelector = React.forwardRef<
 
         useInjectStyles("UserSelector", " [cmdk-group] { max-height: 40vh; overflow-y: auto; } ");
 
-        const resolvedPlaceholder = placeholder || <EmptyValue className={"ml-2"} />;
+        const resolvedPlaceholder = placeholder || <EmptyValue className={"ml-2"}/>;
         const portalContainer = (typeof document !== "undefined" ? document.body : undefined);
 
         return (
@@ -221,7 +221,7 @@ export const UserSelector = React.forwardRef<
                             <div className="flex justify-between items-center w-full">
                                 {resolvedUser ? (
                                     <div className="flex flex-row items-center gap-1 truncate flex-1 min-w-0 mr-2">
-                                        <UserDisplay user={resolvedUser} />
+                                        <UserDisplay user={resolvedUser}/>
                                     </div>
                                 ) : (
                                     <span className="text-sm text-text-secondary dark:text-text-secondary-dark">
@@ -234,7 +234,7 @@ export const UserSelector = React.forwardRef<
                                         <IconButton
                                             size="small"
                                             onClick={handleClear}>
-                                            <CloseIcon size={"small"} />
+                                            <CloseIcon size={"small"}/>
                                         </IconButton>
                                     )}
                                     <KeyboardArrowDownIcon
@@ -266,7 +266,7 @@ export const UserSelector = React.forwardRef<
                                     <div className="relative flex-1">
                                         <SearchIcon
                                             className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary dark:text-text-secondary-dark"
-                                            size="small" />
+                                            size="small"/>
                                         <CommandPrimitive.Input
                                             ref={searchInputRef}
                                             className={cls(
@@ -280,11 +280,11 @@ export const UserSelector = React.forwardRef<
                                     </div>
                                     {isLoading && (
                                         <div className="flex items-center justify-center px-3">
-                                            <CircularProgress size="smallest" />
+                                            <CircularProgress size="smallest"/>
                                         </div>
                                     )}
                                 </div>
-                                <Separator orientation="horizontal" className="my-0" />
+                                <Separator orientation="horizontal" className="my-0"/>
                                 <CommandPrimitive.List
                                     ref={scrollContainerRef}
                                     style={{
@@ -294,7 +294,7 @@ export const UserSelector = React.forwardRef<
                                 >
                                     {isLoading && availableItems.length === 0 && (
                                         <div className="flex items-center justify-center py-6">
-                                            <CircularProgress size="small" />
+                                            <CircularProgress size="small"/>
                                             <span
                                                 className="ml-2 text-sm text-text-secondary dark:text-text-secondary-dark">{loadingText}</span>
                                         </div>
@@ -323,17 +323,17 @@ export const UserSelector = React.forwardRef<
                                                         "aria-selected:outline-hidden aria-selected:ring-2 aria-selected:ring-primary/75 aria-selected:ring-offset-2 aria-selected:bg-surface-accent-100 dark:aria-selected:bg-surface-accent-900"
                                                     )}
                                                 >
-                                                    <UserDisplay user={item.user} />
+                                                    <UserDisplay user={item.user}/>
                                                 </CommandPrimitive.Item>
                                             );
                                         })}
                                         {availableItems.length > 0 && hasMore && (
                                             <div ref={sentinelCallbackRef} className="h-1 w-full"
-                                                style={{ visibility: "hidden" }} />
+                                                style={{ visibility: "hidden" }}/>
                                         )}
                                         {isLoading && availableItems.length > 0 && (
                                             <div className="flex items-center justify-center py-4">
-                                                <CircularProgress size="smallest" />
+                                                <CircularProgress size="smallest"/>
                                                 <span
                                                     className="ml-2 text-xs text-text-secondary dark:text-text-secondary-dark">Loading...</span>
                                             </div>

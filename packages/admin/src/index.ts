@@ -50,12 +50,12 @@ export {
     RebaseLayout,
     RebaseRouteDefs,
     SideDialogs,
-    useApp,
+    useApp
 } from "./components";
 export type {
     EntityViewProps,
     EntitySelectionProps,
-    SelectableTableProps,
+    SelectableTableProps
 } from "./components";
 
 export * from "./hooks";
@@ -84,7 +84,7 @@ export {
     getDefaultPropertiesOrder,
     // Preview utilities (moved from @rebasepro/core — property-aware logic belongs in CMS)
     getEntityPreviewKeys,
-    getEntityTitlePropertyKey,
+    getEntityTitlePropertyKey
 } from "./util";
 
 // Data import/export — merged from former standalone packages

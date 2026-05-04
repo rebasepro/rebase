@@ -40,7 +40,7 @@ export function useCollectionInlineEditor<M extends Record<string, unknown>>({
         propertyKey,
         onValueUpdated,
         setError,
-        data: entity,
+        data: entity
     }) => {
 
         const updatedValues = setIn({}, propertyKey, value);

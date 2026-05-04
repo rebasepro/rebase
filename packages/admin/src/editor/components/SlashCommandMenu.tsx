@@ -35,9 +35,9 @@ interface SuggestionItem {
     icon: ReactNode;
     searchTerms?: string[];
     command: (
-        view: EditorView, 
-        range: { from: number; to: number }, 
-        upload: UploadFn, 
+        view: EditorView,
+        range: { from: number; to: number },
+        upload: UploadFn,
         aiController?: EditorAIController,
         setSubView?: (viewId: string | null) => void
     ) => void;
@@ -48,7 +48,7 @@ const suggestionItems: SuggestionItem[] = [
         title: "Text",
         description: "Just start typing with plain text.",
         searchTerms: ["p", "paragraph"],
-        icon: <TextFieldsIcon size={18} />,
+        icon: <TextFieldsIcon size={18}/>,
         command: (view, range) => {
             view.dispatch(view.state.tr.deleteRange(range.from, range.to));
             setBlockType(schema.nodes.paragraph)(view.state, view.dispatch);
@@ -58,7 +58,7 @@ const suggestionItems: SuggestionItem[] = [
         title: "To-do List",
         description: "Track tasks with a to-do list.",
         searchTerms: ["todo", "task", "list", "check", "checkbox"],
-        icon: <CheckBoxIcon size={18} />,
+        icon: <CheckBoxIcon size={18}/>,
         command: (view, range) => {
             view.dispatch(view.state.tr.deleteRange(range.from, range.to));
             wrapInList(schema.nodes.task_list)(view.state, view.dispatch);
@@ -68,7 +68,7 @@ const suggestionItems: SuggestionItem[] = [
         title: "Heading 1",
         description: "Big section heading.",
         searchTerms: ["title", "big", "large"],
-        icon: <LooksOneIcon size={18} />,
+        icon: <LooksOneIcon size={18}/>,
         command: (view, range) => {
             view.dispatch(view.state.tr.deleteRange(range.from, range.to));
             setBlockType(schema.nodes.heading, { level: 1 })(view.state, view.dispatch);
@@ -78,7 +78,7 @@ const suggestionItems: SuggestionItem[] = [
         title: "Heading 2",
         description: "Medium section heading.",
         searchTerms: ["subtitle", "medium"],
-        icon: <LooksTwoIcon size={18} />,
+        icon: <LooksTwoIcon size={18}/>,
         command: (view, range) => {
             view.dispatch(view.state.tr.deleteRange(range.from, range.to));
             setBlockType(schema.nodes.heading, { level: 2 })(view.state, view.dispatch);
@@ -88,7 +88,7 @@ const suggestionItems: SuggestionItem[] = [
         title: "Heading 3",
         description: "Small section heading.",
         searchTerms: ["subtitle", "small"],
-        icon: <Looks3Icon size={18} />,
+        icon: <Looks3Icon size={18}/>,
         command: (view, range) => {
             view.dispatch(view.state.tr.deleteRange(range.from, range.to));
             setBlockType(schema.nodes.heading, { level: 3 })(view.state, view.dispatch);
@@ -98,7 +98,7 @@ const suggestionItems: SuggestionItem[] = [
         title: "Bullet List",
         description: "Create a simple bullet list.",
         searchTerms: ["unordered", "point"],
-        icon: <FormatListBulletedIcon size={18} />,
+        icon: <FormatListBulletedIcon size={18}/>,
         command: (view, range) => {
             view.dispatch(view.state.tr.deleteRange(range.from, range.to));
             wrapInList(schema.nodes.bullet_list)(view.state, view.dispatch);
@@ -108,7 +108,7 @@ const suggestionItems: SuggestionItem[] = [
         title: "Numbered List",
         description: "Create a list with numbering.",
         searchTerms: ["ordered"],
-        icon: <FormatListNumberedIcon size={18} />,
+        icon: <FormatListNumberedIcon size={18}/>,
         command: (view, range) => {
             view.dispatch(view.state.tr.deleteRange(range.from, range.to));
             wrapInList(schema.nodes.ordered_list)(view.state, view.dispatch);
@@ -118,7 +118,7 @@ const suggestionItems: SuggestionItem[] = [
         title: "Quote",
         description: "Capture a quote.",
         searchTerms: ["blockquote"],
-        icon: <FormatQuoteIcon size={18} />,
+        icon: <FormatQuoteIcon size={18}/>,
         command: (view, range) => {
             view.dispatch(view.state.tr.deleteRange(range.from, range.to));
             wrapIn(schema.nodes.blockquote)(view.state, view.dispatch);
@@ -128,7 +128,7 @@ const suggestionItems: SuggestionItem[] = [
         title: "Code",
         description: "Capture a code snippet.",
         searchTerms: ["codeblock"],
-        icon: <CodeIcon size={18} />,
+        icon: <CodeIcon size={18}/>,
         command: (view, range) => {
             view.dispatch(view.state.tr.deleteRange(range.from, range.to));
             setBlockType(schema.nodes.code_block)(view.state, view.dispatch);
@@ -138,7 +138,7 @@ const suggestionItems: SuggestionItem[] = [
         title: "Image",
         description: "Upload an image from your computer.",
         searchTerms: ["photo", "picture", "media", "upload", "file"],
-        icon: <ImageIcon size={18} />,
+        icon: <ImageIcon size={18}/>,
         command: (view, range, upload) => {
             view.dispatch(view.state.tr.deleteRange(range.from, range.to));
 
@@ -171,7 +171,7 @@ const suggestionItems: SuggestionItem[] = [
         title: "Table",
         description: "Insert a custom grid table.",
         searchTerms: ["table", "grid", "row", "col"],
-        icon: <TableChartIcon size={18} />,
+        icon: <TableChartIcon size={18}/>,
         command: (view, range, upload, aiController, setSubView) => {
             if (setSubView) setSubView("table-grid");
         }
@@ -182,7 +182,7 @@ const autocompleteSuggestionItem: SuggestionItem = {
     title: "Autocomplete",
     description: "Add text based on the context.",
     searchTerms: ["ai"],
-    icon: <AutoFixHighIcon size={18} />,
+    icon: <AutoFixHighIcon size={18}/>,
     command: async (view, range, upload, aiController) => {
         if (!aiController) throw Error("No AiController");
 
@@ -207,7 +207,7 @@ const autocompleteSuggestionItem: SuggestionItem = {
         try {
             // The AI controller might stream literal "\n" characters depending on its JSON decoding layer.
             // We need to un-escape these back to genuine newlines so MarkdownIt block-parsing works.
-            const unescapedResult = result.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
+            const unescapedResult = result.replace(/\\n/g, "\n").replace(/\\t/g, "\t");
 
             const isHTML = /<\/?[a-z][\s\S]*>/i.test(unescapedResult);
             let parsedDoc;
@@ -238,7 +238,8 @@ export const SlashCommandMenu = ({ upload, aiController }: { upload: UploadFn, a
     const menuRef = useRef<HTMLDivElement>(null);
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [subView, setSubView] = useState<string | null>(null);
-    const [tableGridCoords, setTableGridCoords] = useState({ r: 0, c: 0 });
+    const [tableGridCoords, setTableGridCoords] = useState({ r: 0,
+c: 0 });
 
     const pluginState = state ? SlashCommandPluginKey.getState(state) : null;
     const isActive = pluginState?.active;
@@ -279,7 +280,7 @@ export const SlashCommandMenu = ({ upload, aiController }: { upload: UploadFn, a
                     top: start.top,
                     left: start.left,
                     right: start.left,
-                    bottom: start.bottom,
+                    bottom: start.bottom
                 };
             }
         };
@@ -295,7 +296,7 @@ export const SlashCommandMenu = ({ upload, aiController }: { upload: UploadFn, a
                     Object.assign(menuRef.current.style, {
                         left: `${x}px`,
                         top: `${y}px`,
-                        visibility: "visible",
+                        visibility: "visible"
                     });
                 }
             });
@@ -311,19 +312,24 @@ export const SlashCommandMenu = ({ upload, aiController }: { upload: UploadFn, a
                 if (e.key === "Escape") {
                     e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
                     setSubView(null);
-                    setTableGridCoords({ r: 0, c: 0 });
+                    setTableGridCoords({ r: 0,
+c: 0 });
                 } else if (e.key === "ArrowUp") {
                     e.preventDefault(); e.stopPropagation();
-                    setTableGridCoords(prev => ({ r: Math.max(0, prev.r - 1), c: prev.c }));
+                    setTableGridCoords(prev => ({ r: Math.max(0, prev.r - 1),
+c: prev.c }));
                 } else if (e.key === "ArrowDown") {
                     e.preventDefault(); e.stopPropagation();
-                    setTableGridCoords(prev => ({ r: Math.min(4, prev.r + 1), c: prev.c }));
+                    setTableGridCoords(prev => ({ r: Math.min(4, prev.r + 1),
+c: prev.c }));
                 } else if (e.key === "ArrowLeft") {
                     e.preventDefault(); e.stopPropagation();
-                    setTableGridCoords(prev => ({ r: prev.r, c: Math.max(0, prev.c - 1) }));
+                    setTableGridCoords(prev => ({ r: prev.r,
+c: Math.max(0, prev.c - 1) }));
                 } else if (e.key === "ArrowRight") {
                     e.preventDefault(); e.stopPropagation();
-                    setTableGridCoords(prev => ({ r: prev.r, c: Math.min(4, prev.c + 1) }));
+                    setTableGridCoords(prev => ({ r: prev.r,
+c: Math.min(4, prev.c + 1) }));
                 } else if (e.key === "Enter") {
                     e.preventDefault(); e.stopPropagation();
                     if (range) {
@@ -339,7 +345,8 @@ export const SlashCommandMenu = ({ upload, aiController }: { upload: UploadFn, a
                         view.dispatch(tr);
                         view.focus();
                         setSubView(null);
-                        setTableGridCoords({ r: 0, c: 0 });
+                        setTableGridCoords({ r: 0,
+c: 0 });
                     }
                 }
                 return;
@@ -368,7 +375,8 @@ export const SlashCommandMenu = ({ upload, aiController }: { upload: UploadFn, a
                 e.stopPropagation();
                 e.stopImmediatePropagation();
                 // Close menu gracefully and keep it dismissed
-                view.dispatch(view.state.tr.setMeta(SlashCommandPluginKey, { active: false, dismissed: true }));
+                view.dispatch(view.state.tr.setMeta(SlashCommandPluginKey, { active: false,
+dismissed: true }));
             }
         };
 
@@ -386,7 +394,8 @@ export const SlashCommandMenu = ({ upload, aiController }: { upload: UploadFn, a
 
     useEffect(() => {
         if (!subView) {
-            setTableGridCoords({ r: 0, c: 0 });
+            setTableGridCoords({ r: 0,
+c: 0 });
         }
     }, [subView]);
 
@@ -397,13 +406,16 @@ export const SlashCommandMenu = ({ upload, aiController }: { upload: UploadFn, a
             <div
                 ref={menuRef}
                 onMouseDown={(e) => e.preventDefault()}
-                style={{ position: "fixed", zIndex: 9999, visibility: "hidden" }}
+                style={{ position: "fixed",
+zIndex: 9999,
+visibility: "hidden" }}
                 className={cls("text-surface-900 dark:text-white rounded-md border bg-white dark:bg-surface-900 p-2 shadow transition-none", defaultBorderMixin)}
             >
                 <TableGridPicker
                     hoveredRow={tableGridCoords.r}
                     hoveredCol={tableGridCoords.c}
-                    onHover={(r, c) => setTableGridCoords({ r, c })}
+                    onHover={(r, c) => setTableGridCoords({ r,
+c })}
                     onSelect={(rows, cols) => {
                         const tableNode = createTableNode(view.state.schema, rows, cols);
                         const tr = view.state.tr.replaceWith(range.from, range.to, tableNode);
@@ -426,7 +438,9 @@ export const SlashCommandMenu = ({ upload, aiController }: { upload: UploadFn, a
     return (
         <div
             ref={menuRef}
-            style={{ position: "fixed", zIndex: 9999, visibility: "hidden" }}
+            style={{ position: "fixed",
+zIndex: 9999,
+visibility: "hidden" }}
             className={cls("text-surface-900 dark:text-white max-h-[280px] w-72 overflow-y-auto rounded-md border bg-white dark:bg-surface-900 px-1 py-2 shadow transition-none", defaultBorderMixin)}
         >
             {filteredItems.map((item, index) => (
@@ -476,16 +490,16 @@ const createTableNode = (schema: import("prosemirror-model").Schema, rowsCount: 
     return schema.nodes.table.create(null, Fragment.from(rows));
 };
 
-const TableGridPicker = ({ 
-    hoveredRow, 
-    hoveredCol, 
-    onHover, 
-    onSelect 
-}: { 
-    hoveredRow: number; 
-    hoveredCol: number; 
+const TableGridPicker = ({
+    hoveredRow,
+    hoveredCol,
+    onHover,
+    onSelect
+}: {
+    hoveredRow: number;
+    hoveredCol: number;
     onHover: (r: number, c: number) => void;
-    onSelect: (r: number, c: number) => void; 
+    onSelect: (r: number, c: number) => void;
 }) => {
     return (
         <div className="flex flex-col gap-1 items-center justify-center p-1 w-fit">
@@ -500,8 +514,8 @@ const TableGridPicker = ({
                                 key={c}
                                 className={cls(
                                     "w-5 h-5 border rounded-sm cursor-pointer transition-colors duration-75",
-                                    r <= hoveredRow && c <= hoveredCol 
-                                        ? "bg-blue-100 border-blue-400 dark:bg-blue-900 dark:border-blue-500" 
+                                    r <= hoveredRow && c <= hoveredCol
+                                        ? "bg-blue-100 border-blue-400 dark:bg-blue-900 dark:border-blue-500"
                                         : "bg-white dark:bg-surface-800 border-gray-200 dark:border-gray-700 hover:border-blue-300"
                                 )}
                                 onMouseEnter={() => onHover(r, c)}

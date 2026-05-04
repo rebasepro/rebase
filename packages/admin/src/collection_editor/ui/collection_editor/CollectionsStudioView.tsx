@@ -10,7 +10,7 @@ import {
     Typography,
     IconButton,
     AddIcon,
-    Button,
+    Button
 } from "@rebasepro/ui";
 ;
 import { CollectionsConfigController } from "../../types/config_controller";
@@ -67,7 +67,7 @@ export function CollectionsStudioView({ configController }: CollectionsStudioVie
                                 onClick={() => navigate(urlController.buildAppUrlPath("schema/new"))}
                                 className={activeCollectionId === "new" ? "text-primary dark:text-primary-dark" : "text-text-secondary dark:text-text-secondary-dark"}
                             >
-                                <AddIcon size="small" />
+                                <AddIcon size="small"/>
                             </IconButton>
                         </div>
 
@@ -97,7 +97,7 @@ export function CollectionsStudioView({ configController }: CollectionsStudioVie
                                             isSelected
                                                 ? "text-primary dark:text-primary-light"
                                                 : "text-text-secondary dark:text-text-secondary-dark"
-                                        )} />
+                                        )}/>
                                         <span className="truncate flex-1">
                                             {collection.name || collection.slug}
                                         </span>
@@ -124,7 +124,7 @@ export function CollectionsStudioView({ configController }: CollectionsStudioVie
                                 <Button
                                     onClick={() => navigate(urlController.buildAppUrlPath("schema/new"))}
                                 >
-                                    <AddIcon />
+                                    <AddIcon/>
                                     Add new collection
                                 </Button>
                             </div>

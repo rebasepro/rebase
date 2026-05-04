@@ -10,7 +10,7 @@ import {
     useRebaseClient,
     StudioBridgeRegistryProvider,
     useBridgeRegistration,
-    CustomizationControllerContext,
+    CustomizationControllerContext
 } from "@rebasepro/core";
 import { CircularProgressCenter } from "@rebasepro/ui";
 import type { AppView, CollectionEditorOptions, EntityCustomView, EntityAction } from "@rebasepro/types";
@@ -121,10 +121,10 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
             icon: "view_list",
             nestedRoutes: true,
             view: (
-                <Suspense fallback={<CircularProgressCenter />}>
-                    <CollectionsStudioView configController={internalConfigController} />
+                <Suspense fallback={<CircularProgressCenter/>}>
+                    <CollectionsStudioView configController={internalConfigController}/>
                 </Suspense>
-            ),
+            )
         };
     }, [collectionEditorEnabled, registry.studioConfig, internalConfigController]);
 
@@ -217,7 +217,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
 function BridgeAutoRegistrar({
     collectionRegistryController,
     urlController,
-    navigationStateController,
+    navigationStateController
 }: {
     collectionRegistryController: any;
     urlController: any;

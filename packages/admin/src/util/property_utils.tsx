@@ -49,7 +49,7 @@ export function isRelationProperty(property: Property) {
 export function getIconForWidget(widget: PropertyConfig | undefined,
     size: "smallest" | "small" | "medium" | "large" | number) {
     const Icon = widget?.Icon ?? CircleIcon;
-    return <Icon size={size} />;
+    return <Icon size={size}/>;
 }
 
 /**
@@ -99,7 +99,7 @@ export function getIconForProperty(
     fields: Record<string, PropertyConfig> = {}
 ): React.ReactNode {
     if (isPropertyBuilder(property)) {
-        return <FunctionsIcon size={size} />;
+        return <FunctionsIcon size={size}/>;
     }
 
     // Try to look up a custom PropertyConfig icon first
@@ -111,7 +111,7 @@ export function getIconForProperty(
 
     // Fall back to a type-based default icon
     const Icon = getDefaultIconForProperty(property);
-    return <Icon size={size} />;
+    return <Icon size={size}/>;
 }
 
 /**

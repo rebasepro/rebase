@@ -19,7 +19,7 @@ export function NewCollectionButton() {
                 redirect: true,
                 sourceClick: "new_collection_button"
             })}>
-            <AddIcon />
+            <AddIcon/>
             {t("studio_new_collection")}
         </Button>
     </div>

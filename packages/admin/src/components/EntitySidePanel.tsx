@@ -26,14 +26,14 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
         allowFullScreen = true,
         path,
         entityId,
-        formProps,
+        formProps
     } = props;
 
     const {
         blocked,
         setBlocked,
         setBlockedNavigationMessage,
-        close,
+        close
     } = useSideDialogContext();
 
     const navigate = useNavigate();
@@ -63,7 +63,7 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
                 entityId: params.entityId,
                 selectedTab: params.selectedTab,
                 updateUrl: true,
-                collection: params.collection,
+                collection: params.collection
             });
         }
 
@@ -91,7 +91,7 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
     }, [collection?.name, setBlocked, setBlockedNavigationMessage]);
 
     if (!props || !collection) {
-        return <div className={"w-full"} />;
+        return <div className={"w-full"}/>;
     }
 
     return (
@@ -112,7 +112,7 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
                                 className="self-center"
                                 size={"small"}
                                 onClick={onClose}>
-                                <CloseIcon size={"small"} />
+                                <CloseIcon size={"small"}/>
                             </IconButton>
                             {allowFullScreen && <IconButton
                                 className="self-center"
@@ -134,20 +134,20 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
                                         navigate(fullScreenUrl + "#new", { state: null });
                                     }
                                 }}>
-                                <OpenInFullIcon size={"smallest"} />
+                                <OpenInFullIcon size={"smallest"}/>
                             </IconButton>}
                         </div>}
                     onTabChange={({
                         entityId,
                         selectedTab,
-                        collection,
+                        collection
                     }) => {
                         sideEntityController.replace({
                             path: path,
                             entityId,
                             selectedTab,
                             updateUrl: true,
-                            collection,
+                            collection
                         });
                     }}
                     formProps={formProps}

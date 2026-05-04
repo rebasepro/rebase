@@ -65,7 +65,7 @@ export function BasicExportAction({
                 size={"small"}
                 color={"primary"} onClick={handleClickOpen}>
                 <DownloadIcon
-                    size={"small"} />
+                    size={"small"}/>
             </IconButton>
         </Tooltip>
 
@@ -86,7 +86,7 @@ export function BasicExportAction({
                             <input id="radio-csv" type="radio" value="csv" name="exportType"
                                 checked={exportType === "csv"}
                                 onChange={() => setExportType("csv")}
-                                className={cls("w-4 bg-surface-100 border-surface-300 dark:bg-surface-700 dark:border-surface-600")} />
+                                className={cls("w-4 bg-surface-100 border-surface-300 dark:bg-surface-700 dark:border-surface-600")}/>
                             <label htmlFor="radio-csv"
                                 className="p-2 text-sm font-medium text-surface-900 dark:text-surface-accent-300">CSV</label>
                         </div>
@@ -94,7 +94,7 @@ export function BasicExportAction({
                             <input id="radio-json" type="radio" value="json" name="exportType"
                                 checked={exportType === "json"}
                                 onChange={() => setExportType("json")}
-                                className={cls("w-4 bg-surface-100 border-surface-300 dark:bg-surface-700 dark:border-surface-600")} />
+                                className={cls("w-4 bg-surface-100 border-surface-300 dark:bg-surface-700 dark:border-surface-600")}/>
                             <label htmlFor="radio-json"
                                 className="p-2 text-sm font-medium text-surface-900 dark:text-surface-accent-300">JSON</label>
                         </div>
@@ -105,7 +105,7 @@ export function BasicExportAction({
                             <input id="radio-timestamp" type="radio" value="timestamp" name="dateExportType"
                                 checked={dateExportType === "timestamp"}
                                 onChange={() => setDateExportType("timestamp")}
-                                className={cls("w-4 bg-surface-100 border-surface-300 dark:bg-surface-700 dark:border-surface-600")} />
+                                className={cls("w-4 bg-surface-100 border-surface-300 dark:bg-surface-700 dark:border-surface-600")}/>
                             <label htmlFor="radio-timestamp"
                                 className="p-2 text-sm font-medium text-surface-900 dark:text-surface-accent-300">Dates
                                 as
@@ -115,7 +115,7 @@ export function BasicExportAction({
                             <input id="radio-string" type="radio" value="string" name="dateExportType"
                                 checked={dateExportType === "string"}
                                 onChange={() => setDateExportType("string")}
-                                className={cls("w-4 bg-surface-100 border-surface-300 dark:bg-surface-700 dark:border-surface-600")} />
+                                className={cls("w-4 bg-surface-100 border-surface-300 dark:bg-surface-700 dark:border-surface-600")}/>
                             <label htmlFor="radio-string"
                                 className="p-2 text-sm font-medium text-surface-900 dark:text-surface-accent-300">Dates
                                 as
@@ -129,7 +129,7 @@ export function BasicExportAction({
                     disabled={exportType !== "csv"}
                     value={flattenArrays}
                     onValueChange={setFlattenArrays}
-                    label={"Flatten arrays"} />
+                    label={"Flatten arrays"}/>
 
             </DialogContent>
 

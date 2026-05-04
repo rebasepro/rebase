@@ -104,3 +104,5 @@ export const Checkbox = React.memo(({
         </CheckboxPrimitive.Root>
     );
 });
+
+Checkbox.displayName = "Checkbox";

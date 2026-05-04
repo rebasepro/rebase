@@ -40,7 +40,7 @@ const customKeymap = {
     "Mod-Alt-2": setBlockType(schema.nodes.heading, { level: 2 }),
     "Mod-Alt-3": setBlockType(schema.nodes.heading, { level: 3 }),
 
-    "Mod-Alt-0": setBlockType(schema.nodes.paragraph),
+    "Mod-Alt-0": setBlockType(schema.nodes.paragraph)
 };
 
 export const getCorePlugins = (): Plugin[] => [

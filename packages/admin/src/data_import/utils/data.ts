@@ -30,7 +30,8 @@ export function convertDataToEntity(authController: AuthController,
                 [mappedKey]: processedValue
             });
         })
-        .reduce((acc, curr) => ({ ...acc, ...curr }), {});
+        .reduce((acc, curr) => ({ ...acc,
+...curr }), {});
 
     const values = mergeDeep(defaultValues ?? {}, unflattenObject(mappedKeysObject));
     let id = idColumn ? data[idColumn] : undefined;
@@ -133,7 +134,9 @@ export function processValueMapping(authController: AuthController, value: any, 
             databaseId = targetCollection?.databaseId;
         }
 
-        return new EntityReference({ id: entityId, path, databaseId });
+        return new EntityReference({ id: entityId,
+path,
+databaseId });
 
     } else if (from === to) {
         return value;

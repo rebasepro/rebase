@@ -7,7 +7,7 @@ import { navigateToEntity } from "../../util/navigation_utils";
 import { resolveDefaultSelectedView } from "@rebasepro/common";
 
 export const editEntityAction: EntityAction = {
-    icon: <EditIcon size={"small"} />,
+    icon: <EditIcon size={"small"}/>,
     key: "edit",
     name: "Edit",
     collapsed: false,
@@ -47,7 +47,7 @@ export const editEntityAction: EntityAction = {
             collection ? collection.defaultSelectedView : undefined,
             {
                 status: "existing",
-                entityId: entity.id,
+                entityId: entity.id
             }
         );
         navigateToEntity({
@@ -66,7 +66,7 @@ export const editEntityAction: EntityAction = {
 }
 
 export const copyEntityAction: EntityAction = {
-    icon: <FileCopyIcon size={"small"} />,
+    icon: <FileCopyIcon size={"small"}/>,
     name: "Copy",
     key: "copy",
     isEnabled: ({ entity }) => Boolean(entity),
@@ -109,7 +109,7 @@ export const copyEntityAction: EntityAction = {
 }
 
 export const deleteEntityAction: EntityAction = {
-    icon: <DeleteIcon size={"small"} />,
+    icon: <DeleteIcon size={"small"}/>,
     name: "Delete",
     key: "delete",
     isEnabled: ({ entity }) => Boolean(entity),
@@ -147,7 +147,7 @@ export const deleteEntityAction: EntityAction = {
                         onCollectionChange?.();
                         navigateBack?.();
                     }}
-                    onClose={closeDialog} />;
+                    onClose={closeDialog}/>;
             }
         })
         return Promise.resolve(undefined);

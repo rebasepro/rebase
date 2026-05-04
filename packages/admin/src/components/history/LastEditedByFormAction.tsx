@@ -11,7 +11,7 @@ export function LastEditedByFormAction({
     entityId,
     path,
     status,
-    collection,
+    collection
 }: PluginFormActionProps) {
     if (status === "new" || status === "copy" || !entityId) return null;
     if (!collection.history) return null;

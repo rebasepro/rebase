@@ -29,7 +29,7 @@ export function ArrayEnumPreview({
                         <EnumValuesChip
                             enumKey={enumKey}
                             enumValues={enumValues}
-                            size={size !== "medium" ? "small" : "medium"} />
+                            size={size !== "medium" ? "small" : "medium"}/>
                     </ErrorBoundary>
                 );
             }

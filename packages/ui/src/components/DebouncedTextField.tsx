@@ -29,5 +29,5 @@ export function DebouncedTextField<T extends string | number>(props: TextFieldPr
 
     return <TextField {...props}
         onChange={internalOnChange}
-        value={internalValue} />
+        value={internalValue}/>
 }

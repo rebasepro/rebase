@@ -26,7 +26,7 @@ export function NumberPropertyField({ disabled }: {
             <div className={"col-span-12"}>
 
                 <ValidationPanel>
-                    <NumberPropertyValidation disabled={disabled} />
+                    <NumberPropertyValidation disabled={disabled}/>
                 </ValidationPanel>
 
             </div>
@@ -107,7 +107,7 @@ export function NumberPropertyField({ disabled }: {
                         setFieldValue("defaultValue", e.target.value === "" ? undefined : parseFloat(e.target.value));
                     }}
                     label={"Default value"}
-                    value={getIn(values, "defaultValue") ?? ""} />
+                    value={getIn(values, "defaultValue") ?? ""}/>
 
             </div>
         </>

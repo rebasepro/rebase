@@ -270,7 +270,7 @@ export const TextareaAutosize = React.forwardRef(function TextareaAutosize(
                     // Need a large enough difference to allow scrolling.
                     // This prevents infinite rendering loop.
                     overflow: state.overflow ? "hidden" : undefined,
-                    ...style,
+                    ...style
                 }}
                 onScroll={onScroll}
                 {...other}
@@ -284,7 +284,7 @@ export const TextareaAutosize = React.forwardRef(function TextareaAutosize(
                 style={{
                     padding: 0,
                     ...styles.shadow,
-                    ...style,
+                    ...style
                 }}
             />
         </React.Fragment>
@@ -352,13 +352,13 @@ function useForkRef<Instance>(
                 setRef(ref, instance);
             });
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+
     }, refs);
 }
 
 function setRef<T>(
     ref: React.MutableRefObject<T | null> | ((instance: T | null) => void) | null | undefined,
-    value: T | null,
+    value: T | null
 ): void {
     if (typeof ref === "function") {
         ref(value);

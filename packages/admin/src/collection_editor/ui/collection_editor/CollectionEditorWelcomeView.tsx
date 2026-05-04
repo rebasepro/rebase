@@ -3,7 +3,7 @@ import { AIIcon } from "@rebasepro/core";
 import React, { useState } from "react";
 ;
 import { EntityCollection } from "@rebasepro/types";
-import { Button, Card, Chip, cls, CodeIcon, Container, Icon, Tooltip, Typography, } from "@rebasepro/ui";
+import { Button, Card, Chip, cls, CodeIcon, Container, Icon, Tooltip, Typography } from "@rebasepro/ui";
 import { CollectionJsonImportDialog } from "./CollectionJsonImportDialog";
 
 import { productsCollectionTemplate } from "./templates/products_template";
@@ -97,7 +97,7 @@ export function CollectionEditorWelcomeView({
                                     }
                                 }}
                                 size="small">
-                                <Icon iconKey={"table"} size={"smallest"} />
+                                <Icon iconKey={"table"} size={"smallest"}/>
                                 {importingTable === tableName ? "Loading..." : tableName}
                             </Chip>
                         ))}
@@ -153,7 +153,7 @@ export function CollectionEditorWelcomeView({
                                     <Button
                                         variant="filled"
                                         color="neutral"
-                                        startIcon={<AIIcon size="small" />}
+                                        startIcon={<AIIcon size="small"/>}
                                     >
                                         Generate with AI
                                     </Button>
@@ -173,7 +173,7 @@ export function CollectionEditorWelcomeView({
                             variant="filled"
                             color="neutral"
                             onClick={() => setJsonImportOpen(true)}
-                            startIcon={<CodeIcon size="small" />}
+                            startIcon={<CodeIcon size="small"/>}
                         >
                             Paste JSON Configuration
                         </Button>
@@ -189,7 +189,6 @@ export function CollectionEditorWelcomeView({
                     </div>
 
 
-
                 </div>
 
 
@@ -201,7 +200,7 @@ export function CollectionEditorWelcomeView({
                         ● Create a collection from a file (csv, json, xls, xslx...)
                     </Typography>
 
-                    <ImportFileUpload onDataAdded={(data, propertiesOrder) => onContinue(data, propertiesOrder)} />
+                    <ImportFileUpload onDataAdded={(data, propertiesOrder) => onContinue(data, propertiesOrder)}/>
 
                 </div>}
 
@@ -215,36 +214,35 @@ export function CollectionEditorWelcomeView({
                         <TemplateButton title={"Products"}
                             subtitle={"A collection of products with images, prices and stock"}
                             icon={<Icon size={"small"}
-                                iconKey={productsCollectionTemplate.icon! as string} />}
+                                iconKey={productsCollectionTemplate.icon! as string}/>}
                             onClick={() => {
                                 setValues(productsCollectionTemplate);
                                 onContinue();
-                            }} />
+                            }}/>
                         <TemplateButton title={"Users"}
                             subtitle={"A collection of users with emails, names and roles"}
-                            icon={<Icon size={"small"} iconKey={usersCollectionTemplate.icon! as string} />}
+                            icon={<Icon size={"small"} iconKey={usersCollectionTemplate.icon! as string}/>}
                             onClick={() => {
                                 setValues(usersCollectionTemplate);
                                 onContinue();
-                            }} />
+                            }}/>
                         <TemplateButton title={"Blog posts"}
                             subtitle={"A collection of blog posts with images, authors and complex content"}
-                            icon={<Icon size={"small"} iconKey={blogCollectionTemplate.icon! as string} />}
+                            icon={<Icon size={"small"} iconKey={blogCollectionTemplate.icon! as string}/>}
                             onClick={() => {
                                 setValues(blogCollectionTemplate);
                                 onContinue();
-                            }} />
+                            }}/>
                         <TemplateButton title={"Pages"}
                             subtitle={"A collection of pages with images, authors and complex content"}
-                            icon={<Icon size={"small"} iconKey={pagesCollectionTemplate.icon! as string} />}
+                            icon={<Icon size={"small"} iconKey={pagesCollectionTemplate.icon! as string}/>}
                             onClick={() => {
                                 setValues(pagesCollectionTemplate);
                                 onContinue();
-                            }} />
+                            }}/>
                     </div>
 
                 </div>
-
 
 
             </Container>

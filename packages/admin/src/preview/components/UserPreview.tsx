@@ -17,7 +17,7 @@ export function UserPreview({ value }: PropertyPreviewProps<StringProperty>) {
     const getUser = useInternalUserManagementController<User>()?.getUser;
 
     if (!value) {
-        return <EmptyValue />;
+        return <EmptyValue/>;
     }
 
     const user = getUser?.(value);
@@ -25,5 +25,5 @@ export function UserPreview({ value }: PropertyPreviewProps<StringProperty>) {
         return <Typography variant={"caption"} color={"secondary"}>User not found: {value}</Typography>;
     }
 
-    return <UserDisplay user={user} />;
+    return <UserDisplay user={user}/>;
 }

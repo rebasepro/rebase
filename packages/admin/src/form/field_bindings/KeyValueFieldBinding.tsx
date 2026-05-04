@@ -63,14 +63,14 @@ export function KeyValueFieldBinding({
         setValue={setValue}
         disabled={disabled}
         initialValue={initialValues}
-        fieldName={property.name ?? propertyKey} />;
+        fieldName={property.name ?? propertyKey}/>;
 
     const title = <LabelWithIconAndTooltip
         propertyKey={propertyKey}
         icon={getIconForProperty(property, "small")}
         required={property.validation?.required}
         title={property.name ?? propertyKey}
-        className={"text-text-secondary dark:text-text-secondary-dark"} />;
+        className={"text-text-secondary dark:text-text-secondary-dark"}/>;
 
     return (
         <>
@@ -85,7 +85,7 @@ export function KeyValueFieldBinding({
                 showError={showError}
                 error={error}
                 disabled={disabled}
-                property={property} />
+                property={property}/>
 
         </>
     );
@@ -209,7 +209,7 @@ function MapEditView<T extends Record<string, any>>({
                     entryValue={entryValue}
                     type={type}
                     disabled={disabled}
-                    updatetype={updatetype} />;
+                    updatetype={updatetype}/>;
             }
             )}
 
@@ -217,7 +217,7 @@ function MapEditView<T extends Record<string, any>>({
             size={"small"}
             className="w-full"
             disabled={disabled}
-            startIcon={<AddIcon />}
+            startIcon={<AddIcon/>}
             onClick={(e) => {
                 e.preventDefault();
                 setValue({
@@ -297,7 +297,7 @@ function MapKeyValueRow<T extends Record<string, any>>({
                             [fieldKey]: event.target.value
                         });
                     }
-                }} />;
+                }}/>;
         } else if (type === "date") {
             return <DateTimeField value={entryValue}
                 size={"medium"}
@@ -308,7 +308,7 @@ function MapKeyValueRow<T extends Record<string, any>>({
                         ...value,
                         [fieldKey]: date
                     });
-                }} />;
+                }}/>;
         } else if (type === "boolean") {
             return <BooleanSwitchWithLabel value={entryValue}
                 size={"medium"}
@@ -319,7 +319,7 @@ function MapKeyValueRow<T extends Record<string, any>>({
                         ...value,
                         [fieldKey]: newValue
                     });
-                }} />;
+                }}/>;
         } else if (type === "array") {
             return <div
                 className={cls(defaultBorderMixin, "ml-2 pl-2 border-l border-solid")}>
@@ -354,7 +354,7 @@ function MapKeyValueRow<T extends Record<string, any>>({
                                 });
                             }}
                         />
-                    }} />
+                    }}/>
             </div>;
         } else if (type === "map") {
             return <div
@@ -366,7 +366,7 @@ function MapKeyValueRow<T extends Record<string, any>>({
                             ...value,
                             [fieldKey]: updatedValue
                         });
-                    }} />
+                    }}/>
             </div>;
         } else {
             return <Typography
@@ -392,7 +392,7 @@ function MapKeyValueRow<T extends Record<string, any>>({
                     size={"medium"}
                     onChange={(event) => {
                         onFieldKeyChange(event.target.value);
-                    }} />
+                    }}/>
             </div>
 
             <div className="grow">
@@ -401,7 +401,7 @@ function MapKeyValueRow<T extends Record<string, any>>({
             <div className={"flex flex-col"}>
                 <Menu
                     trigger={<IconButton size={"smallest"}>
-                        <ArrowDropDownIcon size={"small"} />
+                        <ArrowDropDownIcon size={"small"}/>
                     </IconButton>}
                 >
                     <MenuItem dense
@@ -421,7 +421,7 @@ function MapKeyValueRow<T extends Record<string, any>>({
                 <IconButton aria-label="delete"
                     size={"smallest"}
                     onClick={onDeleteClick}>
-                    <RemoveIcon size={"smallest"} />
+                    <RemoveIcon size={"smallest"}/>
                 </IconButton>
             </div>
         </Typography>
@@ -471,21 +471,21 @@ function ArrayKeyValueRow<T>({
                     } else {
                         setValue(event.target.value as T);
                     }
-                }} />;
+                }}/>;
         } else if (type === "date") {
             return <DateTimeField value={entryValue}
                 size={"medium"}
                 locale={locale}
                 onChange={(date) => {
                     setValue(date as T);
-                }} />;
+                }}/>;
         } else if (type === "boolean") {
             return <BooleanSwitchWithLabel value={entryValue}
                 size={"small"}
                 position={"start"}
                 onValueChange={(v) => {
                     setValue(v as T);
-                }} />;
+                }}/>;
         } else if (type === "array") {
             return <Typography variant={"caption"}>
                 Arrays of arrays are not supported.
@@ -495,7 +495,7 @@ function ArrayKeyValueRow<T>({
                 <MapEditView value={entryValue}
                     setValue={(updatedValue) => {
                         setValue(updatedValue);
-                    }} />
+                    }}/>
             </div>;
         } else {
             return <Typography
@@ -517,7 +517,7 @@ function ArrayKeyValueRow<T>({
             <Menu
                 trigger={<IconButton size={"small"}
                     className="h-7 w-7">
-                    <ArrowDropDownIcon />
+                    <ArrowDropDownIcon/>
                 </IconButton>}>
                 <MenuItem dense
                     onClick={() => doUpdatetype("string")}>string</MenuItem>

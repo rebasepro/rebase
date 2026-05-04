@@ -210,7 +210,8 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
     }, [unselect]);
 
     const onFilterUpdate = useCallback((updatedFilterValues?: FilterValues<any>) => {
-        setFilterValues?.({ ...updatedFilterValues, ...forceFilter } as FilterValues<any>);
+        setFilterValues?.({ ...updatedFilterValues,
+...forceFilter } as FilterValues<any>);
     }, [forceFilter]);
 
     const contextValue = useMemo(() => ({
@@ -298,14 +299,14 @@ function createFilterField({
             includeId={baseProperty.includeId}
             previewProperties={baseProperty?.previewProperties}
             hidden={hidden}
-            setHidden={setHidden} />;
+            setHidden={setHidden}/>;
     } else if (baseProperty.type === "relation" && baseProperty.relation) {
         return <RelationFilterField value={filterValue}
             setValue={setFilterValue}
             name={id as string}
             relation={baseProperty.relation}
             hidden={hidden}
-            setHidden={setHidden} />;
+            setHidden={setHidden}/>;
     } else if (baseProperty.type === "number" || baseProperty.type === "string") {
         const name = baseProperty.name;
         const enumValues = baseProperty.enum ? enumToObjectEntries(baseProperty.enum) : undefined;
@@ -315,13 +316,13 @@ function createFilterField({
             type={baseProperty.type}
             isArray={isArray}
             enumValues={enumValues}
-            title={name} />;
+            title={name}/>;
     } else if (baseProperty.type === "boolean") {
         const name = baseProperty.name;
         return <BooleanFilterField value={filterValue}
             setValue={setFilterValue}
             name={id as string}
-            title={name} />;
+            title={name}/>;
 
     } else if (baseProperty.type === "date") {
         const title = baseProperty.name;
@@ -330,7 +331,7 @@ function createFilterField({
             name={id as string}
             mode={baseProperty.mode}
             isArray={isArray}
-            title={title} />;
+            title={title}/>;
     }
 
     return (

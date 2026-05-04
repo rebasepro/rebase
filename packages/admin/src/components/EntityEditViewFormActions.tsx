@@ -200,7 +200,7 @@ function buildBottomActions<M extends Record<string, unknown>>({
 
         {hasErrors ?
             <ErrorTooltip title={"This form has errors"}>
-                <ErrorIcon className="ml-4" color="error" size={"smallest"} />
+                <ErrorIcon className="ml-4" color="error" size={"smallest"}/>
             </ErrorTooltip> : null}
         <Button variant="text"
             color="primary"
@@ -260,7 +260,7 @@ function buildSideActions<M extends Record<string, unknown>>({
             variant="filled"
             color="primary"
             type="submit"
-            startIcon={hasErrors ? <ErrorIcon /> : undefined}
+            startIcon={hasErrors ? <ErrorIcon/> : undefined}
             disabled={disabled || formex.isSubmitting}
             onClick={() => {
                 sideDialogContext.setPendingClose?.(false);
@@ -291,7 +291,7 @@ function buildSideActions<M extends Record<string, unknown>>({
                 } satisfies EntityActionClickProps<any>;
                 const isEnabled = !action.isEnabled || action.isEnabled(props);
                 return (
-                    <EntityActionButton key={action.key} action={action} enabled={isEnabled} props={props} />
+                    <EntityActionButton key={action.key} action={action} enabled={isEnabled} props={props}/>
                 );
             })}
         </div>}
@@ -354,7 +354,7 @@ function EntityActionButton({
                     });
                 }
             }}>
-            {loading ? <CircularProgress size={"smallest"} /> : action.icon}
+            {loading ? <CircularProgress size={"smallest"}/> : action.icon}
         </IconButton>
     </Tooltip>;
 }

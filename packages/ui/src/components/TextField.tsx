@@ -6,7 +6,7 @@ import {
     fieldBackgroundHoverMixin,
     fieldBackgroundInvisibleMixin,
     fieldBackgroundMixin,
-    focusedInvisibleMixin,
+    focusedInvisibleMixin
 } from "../styles";
 import { InputLabel } from "./InputLabel";
 import { cls } from "../util";
@@ -156,7 +156,7 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
                         "min-h-[28px]": size === "smallest",
                         "min-h-[32px]": size === "small",
                         "min-h-[44px]": size === "medium",
-                        "min-h-[64px]": size === "large",
+                        "min-h-[64px]": size === "large"
                     },
                     label
                         ? size === "large"
@@ -194,7 +194,7 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
                         "min-h-[28px]": size === "smallest",
                         "min-h-[32px]": size === "small",
                         "min-h-[44px]": size === "medium",
-                        "min-h-[64px]": size === "large",
+                        "min-h-[64px]": size === "large"
                     },
                     className
                 )}
@@ -229,7 +229,7 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
                             {
                                 "mr-4": size === "large",
                                 "mr-3": size === "medium",
-                                "mr-2": size === "small" || size === "smallest",
+                                "mr-2": size === "small" || size === "smallest"
                             }
                         )}
                     >

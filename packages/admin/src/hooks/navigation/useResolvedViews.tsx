@@ -97,11 +97,11 @@ export function useResolvedViews<USER extends User>(
 
     // Memoize JSX elements for injected admin views to ensure stable references.
     const usersViewElement = useMemo(() =>
-        userManagement ? <UsersView userManagement={userManagement as unknown as UserManagementDelegate<User>} /> : null,
+        userManagement ? <UsersView userManagement={userManagement as unknown as UserManagementDelegate<User>}/> : null,
         [userManagement]
     );
     const rolesViewElement = useMemo(() =>
-        userManagement?.roles ? <RolesView userManagement={userManagement as unknown as UserManagementDelegate<User>} /> : null,
+        userManagement?.roles ? <RolesView userManagement={userManagement as unknown as UserManagementDelegate<User>}/> : null,
         [userManagement]
     );
 

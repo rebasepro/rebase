@@ -83,7 +83,7 @@ export function MarkdownPropertyField({
                         min={true}
                         trim={true}
                         uppercase={true}
-                        showErrors={showErrors} />
+                        showErrors={showErrors}/>
 
                 </ValidationPanel>
 
@@ -93,7 +93,7 @@ export function MarkdownPropertyField({
                 <ExpandablePanel
                     title={
                         <div className="flex flex-row text-surface-500">
-                            <SettingsIcon />
+                            <SettingsIcon/>
                             <Typography variant={"subtitle2"}
                                 className="ml-4">
                                 Paste behavior
@@ -131,7 +131,7 @@ export function MarkdownPropertyField({
                 <ExpandablePanel
                     title={
                         <div className="flex flex-row text-surface-500">
-                            <CloudUploadIcon />
+                            <CloudUploadIcon/>
                             <Typography variant={"subtitle2"}
                                 className="ml-4">
                                 File upload config
@@ -207,7 +207,7 @@ export function MarkdownPropertyField({
                         setFieldValue("defaultValue", e.target.value === "" ? undefined : e.target.value);
                     }}
                     label={"Default value"}
-                    value={getIn(values, "defaultValue") ?? ""} />
+                    value={getIn(values, "defaultValue") ?? ""}/>
 
             </div>
         </>

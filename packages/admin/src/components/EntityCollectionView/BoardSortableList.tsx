@@ -24,10 +24,10 @@ export function BoardSortableList<M extends Record<string, unknown>>({
     isDragOverColumn,
     loading = false,
     hasMore = false,
-    onLoadMore,
+    onLoadMore
 }: BoardSortableListProps<M>) {
     const {
-        setNodeRef,
+        setNodeRef
     } = useDroppable({
         id: columnId,
         data: { type: "ITEM-LIST" }
@@ -114,7 +114,7 @@ export function BoardSortableList<M extends Record<string, unknown>>({
                     {/* Infinite scroll sentinel - inside scrollable container */}
                     {(loading || hasMore) && (
                         <div ref={sentinelRef} className="flex items-center justify-center py-2 min-h-6">
-                            {loading && <CircularProgress size="smallest" />}
+                            {loading && <CircularProgress size="smallest"/>}
                         </div>
                     )}
                 </>
@@ -135,7 +135,7 @@ const SortableItem = memo(function SortableItem<M extends Record<string, unknown
     item,
     index,
     columnId,
-    ItemComponent,
+    ItemComponent
 }: SortableItemProps<M>) {
     const {
         setNodeRef,
@@ -143,7 +143,7 @@ const SortableItem = memo(function SortableItem<M extends Record<string, unknown
         listeners,
         isDragging: isItemBeingDragged,
         transform,
-        transition,
+        transition
     } = useSortable({
         id: item.id,
         data: {
@@ -157,7 +157,7 @@ const SortableItem = memo(function SortableItem<M extends Record<string, unknown
         transform: CSS.Transform.toString(transform),
         transition,
         zIndex: isItemBeingDragged ? 2 : 1,
-        opacity: isItemBeingDragged ? 0 : 1,
+        opacity: isItemBeingDragged ? 0 : 1
     }), [transform, transition, isItemBeingDragged]);
 
     return (

@@ -138,7 +138,7 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
             ? <EntityView
                 entity={entity}
                 collection={collection}
-                path={path} />
+                path={path}/>
             : <></>;
     }
 
@@ -161,7 +161,7 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
             </DialogContent>
             <DialogActions>
 
-                {loading && <CircularProgress size={"smallest"} />}
+                {loading && <CircularProgress size={"smallest"}/>}
 
                 <Button onClick={handleCancel}
                     disabled={loading}

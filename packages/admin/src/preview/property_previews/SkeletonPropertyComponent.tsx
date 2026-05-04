@@ -96,7 +96,7 @@ function renderMap<T extends Record<string, any>>(property: MapProperty, size: P
                         {property.properties && property.properties[key] &&
                             <SkeletonPropertyComponent
                                 property={property.properties[key]}
-                                size={"medium"} />}
+                                size={"medium"}/>}
                     </div>
                 ))}
             </div>
@@ -123,7 +123,7 @@ function renderMap<T extends Record<string, any>>(property: MapProperty, size: P
                                     {property.properties && property.properties[key] &&
                                         <SkeletonPropertyComponent
                                             property={property.properties[key]}
-                                            size={"medium"} />}
+                                            size={"medium"}/>}
                                 </th>
                             </tr>
                         );
@@ -155,7 +155,7 @@ function renderArrayOfMaps(properties: Properties, size: PreviewSize, previewPro
                                         >
                                             <SkeletonPropertyComponent
                                                 property={(properties)[key]}
-                                                size={"medium"} />
+                                                size={"medium"}/>
                                         </th>
                                     )
                                 )}
@@ -205,7 +205,7 @@ function renderGenericArrayCell(
                     <>
                         <SkeletonPropertyComponent key={`i_${index}`}
                             property={property}
-                            size={"medium"} />
+                            size={"medium"}/>
                     </>
                 )}
         </div>
@@ -215,7 +215,7 @@ function renderGenericArrayCell(
 function renderUrlAudioComponent() {
     return (
         <Skeleton width={300}
-            height={100} />
+            height={100}/>
     );
 }
 
@@ -223,7 +223,7 @@ export function renderSkeletonImageThumbnail(size: PreviewSize) {
     const imageSize = size === "small" ? 40 : size === "medium" ? 100 : 200;
     return (
         <Skeleton width={imageSize}
-            height={imageSize} />
+            height={imageSize}/>
     );
 }
 
@@ -231,12 +231,12 @@ function renderUrlVideo(size: PreviewSize) {
 
     return (
         <Skeleton width={size !== "large" ? 300 : 500}
-            height={size !== "large" ? 200 : 250} />
+            height={size !== "large" ? 200 : 250}/>
     );
 }
 
 function renderReference() {
-    return <Skeleton width={200} height={100} />;
+    return <Skeleton width={200} height={100}/>;
 }
 
 function renderUrlComponent(property: StringProperty, size: PreviewSize = "large") {
@@ -264,14 +264,14 @@ function renderUrlFile(size: PreviewSize) {
 }
 
 export function renderSkeletonText(index?: number, width = 120) {
-    return <Skeleton width={width} key={`skeleton_${index}`} />;
+    return <Skeleton width={width} key={`skeleton_${index}`}/>;
 }
 
 export function renderSkeletonCaptionText(index?: number) {
     return <Skeleton
-        height={20} />;
+        height={20}/>;
 }
 
 export function renderSkeletonIcon() {
-    return <Skeleton width={24} height={24} />;
+    return <Skeleton width={24} height={24}/>;
 }

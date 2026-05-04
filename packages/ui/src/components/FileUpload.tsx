@@ -78,7 +78,7 @@ export function FileUpload({
                 "cursor-pointer": !disabled,
                 [fieldBackgroundHoverMixin]: !isDragActive,
                 "transition-colors duration-200 ease-[cubic-bezier(0,0,0.2,1)] border-red-500": isDragReject,
-                "transition-colors duration-200 ease-[cubic-bezier(0,0,0.2,1)] border-green-500": isDragAccept,
+                "transition-colors duration-200 ease-[cubic-bezier(0,0,0.2,1)] border-green-500": isDragAccept
             })}>
 
         <Typography variant={"caption"} color={"secondary"} className={"absolute top-2 left-3.5 cursor-inherit"}>
@@ -86,7 +86,7 @@ export function FileUpload({
         </Typography>
 
         <input
-            {...getInputProps()} />
+            {...getInputProps()}/>
 
         {children}
 

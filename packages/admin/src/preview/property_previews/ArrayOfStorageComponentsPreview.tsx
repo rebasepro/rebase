@@ -41,7 +41,7 @@ export function ArrayOfStorageComponentsPreview({
                             propertyKey={propertyKey}
                             value={v}
                             property={property.of as Property}
-                            size={childSize} />
+                            size={childSize}/>
                     </ErrorBoundary>
                 )}
         </div>

@@ -150,7 +150,7 @@ export const PropertyCollectionView = ({
                         <PropertyPreview propertyKey={baseKey}
                             value={data}
                             property={property}
-                            size={size} />
+                            size={size}/>
                     </div>
                 </div>
             );
@@ -230,7 +230,7 @@ export const PropertyCollectionView = ({
                         <PropertyPreview propertyKey={baseKey}
                             value={data}
                             property={property}
-                            size={size} />
+                            size={size}/>
                     </div>
                 </div>
             );
@@ -296,7 +296,7 @@ export const PropertyCollectionView = ({
                     <PropertyPreview propertyKey={baseKey}
                         value={data}
                         property={property}
-                        size={size} />
+                        size={size}/>
                 </div>
             </div>
         );

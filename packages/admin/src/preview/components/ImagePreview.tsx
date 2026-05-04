@@ -39,7 +39,7 @@ export function ImagePreview({
         if (hasError) {
             return (
                 <div className="w-full h-full flex items-center justify-center bg-surface-100 dark:bg-surface-800 rounded-md">
-                    <BrokenImageIcon className="text-surface-400 dark:text-surface-500" />
+                    <BrokenImageIcon className="text-surface-400 dark:text-surface-500"/>
                 </div>
             );
         }
@@ -57,8 +57,10 @@ export function ImagePreview({
         if (hasError) {
             return (
                 <div className="flex items-center justify-center bg-surface-100 dark:bg-surface-800 rounded-md"
-                     style={{ width: imageSize, height: imageSize, maxHeight: "100%" }}>
-                    <BrokenImageIcon className="text-surface-400 dark:text-surface-500" />
+                     style={{ width: imageSize,
+height: imageSize,
+maxHeight: "100%" }}>
+                    <BrokenImageIcon className="text-surface-400 dark:text-surface-500"/>
                 </div>
             );
         }
@@ -73,7 +75,7 @@ export function ImagePreview({
                     width: imageSize,
                     height: imageSize,
                     maxHeight: "100%"
-                }} />
+                }}/>
         );
     }
 
@@ -94,13 +96,13 @@ export function ImagePreview({
 
             {hasError ? (
                 <div className="w-full h-full flex items-center justify-center bg-surface-100 dark:bg-surface-800 rounded-md">
-                    <BrokenImageIcon className="text-surface-400 dark:text-surface-500" />
+                    <BrokenImageIcon className="text-surface-400 dark:text-surface-500"/>
                 </div>
             ) : (
                 <img src={url}
                     className={"rounded-md"}
                     style={imageStyle}
-                    onError={handleError} />
+                    onError={handleError}/>
             )}
 
             <div className={"flex flex-row gap-2 absolute bottom-[-4px] right-[-4px] invisible group-hover:visible"}>
@@ -116,7 +118,7 @@ export function ImagePreview({
                             return navigator.clipboard.writeText(url);
                         }}>
                         <ContentCopyIcon className={"text-surface-700 dark:text-surface-300"}
-                            size={"smallest"} />
+                            size={"smallest"}/>
                     </IconButton>
                 </Tooltip>}
 
@@ -132,7 +134,7 @@ export function ImagePreview({
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}
                     >
                         <OpenInNewIcon className={"text-surface-700 dark:text-surface-300"}
-                            size={"smallest"} />
+                            size={"smallest"}/>
                     </IconButton>
                 </Tooltip>
             </div>

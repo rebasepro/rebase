@@ -43,9 +43,10 @@ export function RolesView({ userManagement }: { userManagement: UserManagementDe
 
     React.useEffect(() => {
         breadcrumbs.set({
-            breadcrumbs: [{ title: t("roles"), url: "/roles" }]
+            breadcrumbs: [{ title: t("roles"),
+url: "/roles" }]
         });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
     }, []);
 
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -74,11 +75,13 @@ export function RolesView({ userManagement }: { userManagement: UserManagementDe
         setDeleteInProgress(true);
         try {
             await deleteRole(roleToDelete);
-            snackbarController.open({ type: "success", message: t("role_deleted_successfully") });
+            snackbarController.open({ type: "success",
+message: t("role_deleted_successfully") });
             setDeleteConfirmOpen(false);
             setRoleToDelete(undefined);
         } catch (error: unknown) {
-            snackbarController.open({ type: "error", message: error instanceof Error ? error.message : t("error_deleting_role") });
+            snackbarController.open({ type: "error",
+message: error instanceof Error ? error.message : t("error_deleting_role") });
         } finally {
             setDeleteInProgress(false);
         }
@@ -87,15 +90,21 @@ export function RolesView({ userManagement }: { userManagement: UserManagementDe
     const createDefaultRoles = () => {
         if (!saveRole) return;
         const defaultRoles: Role[] = [
-            { id: "admin", name: "Admin", isAdmin: true },
-            { id: "editor", name: "Editor", isAdmin: false },
-            { id: "viewer", name: "Viewer", isAdmin: false }
+            { id: "admin",
+name: "Admin",
+isAdmin: true },
+            { id: "editor",
+name: "Editor",
+isAdmin: false },
+            { id: "viewer",
+name: "Viewer",
+isAdmin: false }
         ];
         defaultRoles.forEach(role => saveRole(role));
     };
 
     if (loading) {
-        return <CenteredView><CircularProgress /></CenteredView>;
+        return <CenteredView><CircularProgress/></CenteredView>;
     }
 
     return (
@@ -104,7 +113,7 @@ export function RolesView({ userManagement }: { userManagement: UserManagementDe
                 <Typography gutterBottom variant="h4" className="grow mb-0" component="h4">
                     {t("roles")}
                 </Typography>
-                <Button startIcon={<AddIcon />} onClick={handleAddRole} disabled={!saveRole}>
+                <Button startIcon={<AddIcon/>} onClick={handleAddRole} disabled={!saveRole}>
                     {t("add_role")}
                 </Button>
             </div>
@@ -122,10 +131,10 @@ export function RolesView({ userManagement }: { userManagement: UserManagementDe
                             return (
                                 <TableRow key={role.id} onClick={() => saveRole && handleEditRole(role)}>
                                     <TableCell>
-                                        <RoleChip role={role} />
+                                        <RoleChip role={role}/>
                                     </TableCell>
                                     <TableCell className="items-center">
-                                        <Checkbox checked={role.isAdmin ?? false} disabled />
+                                        <Checkbox checked={role.isAdmin ?? false} disabled/>
                                     </TableCell>
                                     <TableCell className="text-right whitespace-nowrap">
                                         <div className="flex justify-end items-center gap-1">
@@ -138,7 +147,7 @@ export function RolesView({ userManagement }: { userManagement: UserManagementDe
                                                             setRoleToDelete(role);
                                                             setDeleteConfirmOpen(true);
                                                         }}>
-                                                        <DeleteIcon size="smallest" />
+                                                        <DeleteIcon size="smallest"/>
                                                     </IconButton>
                                                 </Tooltip>
                                             )}
@@ -241,7 +250,8 @@ function RoleDetailsForm({
             });
             handleClose();
         } catch (error: unknown) {
-            snackbarController.open({ type: "error", message: error instanceof Error ? error.message : "Failed to save role" });
+            snackbarController.open({ type: "error",
+message: error instanceof Error ? error.message : "Failed to save role" });
         } finally {
             setIsSubmitting(false);
         }
@@ -250,7 +260,10 @@ function RoleDetailsForm({
     return (
         <Dialog open={open} onOpenChange={(open) => !open ? handleClose() : undefined} maxWidth="4xl">
             <form onSubmit={handleSubmit} autoComplete="off" noValidate
-                style={{ display: "flex", flexDirection: "column", position: "relative", height: "100%" }}>
+                style={{ display: "flex",
+flexDirection: "column",
+position: "relative",
+height: "100%" }}>
 
                 <DialogTitle variant="h4" gutterBottom={false}>
                     {t("role")}
@@ -298,7 +311,7 @@ function RoleDetailsForm({
                         </div>
 
                         <div className="col-span-12">
-                            <CollectionPermissionsMatrix roleId={roleId} isAdmin={isAdmin} />
+                            <CollectionPermissionsMatrix roleId={roleId} isAdmin={isAdmin}/>
                         </div>
                     </div>
                 </DialogContent>
@@ -325,10 +338,14 @@ function RoleDetailsForm({
 // CollectionPermissionsMatrix
 // ============================================
 const CRUD_OPS = [
-    { op: "select" as const, label: "read" },
-    { op: "insert" as const, label: "create" },
-    { op: "update" as const, label: "edit" },
-    { op: "delete" as const, label: "delete" },
+    { op: "select" as const,
+label: "read" },
+    { op: "insert" as const,
+label: "create" },
+    { op: "update" as const,
+label: "edit" },
+    { op: "delete" as const,
+label: "delete" }
 ];
 
 function hasRoleAccess(
@@ -409,7 +426,7 @@ function CollectionPermissionsMatrix({ roleId, isAdmin }: { roleId: string; isAd
                                     </TableCell>
                                     {CRUD_OPS.map(({ op }) => (
                                         <TableCell key={op} align="center" className="w-20">
-                                            <PermCell granted={isAdmin || hasRoleAccess(rules, roleId, op)} />
+                                            <PermCell granted={isAdmin || hasRoleAccess(rules, roleId, op)}/>
                                         </TableCell>
                                     ))}
                                 </TableRow>

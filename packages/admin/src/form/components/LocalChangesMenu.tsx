@@ -91,9 +91,9 @@ export function LocalChangesMenu<M extends Record<string, unknown>>({
                         }
                         onClick={handleOpenMenu}
                     >
-                        <WarningIcon size={"smallest"} className={"mr-1 text-yellow-600 dark:text-yellow-400"} />
+                        <WarningIcon size={"smallest"} className={"mr-1 text-yellow-600 dark:text-yellow-400"}/>
                         {t("unsaved_local_changes")}
-                        <KeyboardArrowDownIcon size={"smallest"} />
+                        <KeyboardArrowDownIcon size={"smallest"}/>
                     </Button>
                 }
                 open={open}
@@ -102,9 +102,9 @@ export function LocalChangesMenu<M extends Record<string, unknown>>({
                 <div className={"max-w-xs px-4 py-4 text-sm text-gray-700 dark:text-gray-300"}>
                     {t("unsaved_local_changes_description")}
                 </div>
-                <MenuItem dense onClick={handlePreview}><VisibilityIcon size={"small"} />{t("preview_changes")}</MenuItem>
-                <MenuItem dense onClick={handleApply}><CheckIcon size={"small"} />{t("apply_changes")}</MenuItem>
-                <MenuItem dense onClick={handleDiscard}><CancelIcon size={"small"} />{t("discard_local_changes")}</MenuItem>
+                <MenuItem dense onClick={handlePreview}><VisibilityIcon size={"small"}/>{t("preview_changes")}</MenuItem>
+                <MenuItem dense onClick={handleApply}><CheckIcon size={"small"}/>{t("apply_changes")}</MenuItem>
+                <MenuItem dense onClick={handleDiscard}><CancelIcon size={"small"}/>{t("discard_local_changes")}</MenuItem>
             </Menu>
 
             <Dialog
@@ -123,7 +123,7 @@ export function LocalChangesMenu<M extends Record<string, unknown>>({
                     }}>
                         <div className="p-4">
                             <PropertyCollectionView data={cachedData}
-                                properties={properties as Properties} />
+                                properties={properties as Properties}/>
                         </div>
                     </div>
                 </DialogContent>

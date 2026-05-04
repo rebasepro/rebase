@@ -8,7 +8,6 @@ import type { AuthController } from "@rebasepro/types";
 import { ChipColorScheme, CHIP_COLORS } from "@rebasepro/ui";
 
 
-
 // ── Slot types ────────────────────────────────────────────────────────
 
 /**
@@ -165,7 +164,12 @@ export function resolveCollectionSlotKeys(
     });
     const subtitleKey = sortedPreviewKeys.length > 0 ? sortedPreviewKeys[0] : undefined;
 
-    return { titleKey, imageKey, subtitleKey, relationKeys, statusKey, dateKey };
+    return { titleKey,
+imageKey,
+subtitleKey,
+relationKeys,
+statusKey,
+dateKey };
 }
 
 // ── Image unwrapping helper ───────────────────────────────────────────
@@ -269,7 +273,9 @@ export function resolveEntitySlots(
     if (titleKey) {
         const prop = collection.properties[titleKey] as Property | undefined;
         const val = getValueInPath(entity.values, titleKey);
-        if (prop) title = { property: prop, propertyKey: titleKey, value: val };
+        if (prop) title = { property: prop,
+propertyKey: titleKey,
+value: val };
     }
 
     // Subtitle
@@ -278,7 +284,9 @@ export function resolveEntitySlots(
         const prop = collection.properties[subtitleKey] as Property | undefined;
         const val = getValueInPath(entity.values, subtitleKey);
         if (prop && val !== undefined && val !== null && val !== "") {
-            subtitle = { property: prop, propertyKey: subtitleKey, value: val };
+            subtitle = { property: prop,
+propertyKey: subtitleKey,
+value: val };
         }
     }
 
@@ -307,7 +315,8 @@ export function resolveEntitySlots(
                     const displayName = resolveRelationDisplayName(rel as EntityRelation, prop);
                     const id = (rel as EntityRelation).id ?? i;
                     if (displayName) {
-                        items.push({ displayName, id });
+                        items.push({ displayName,
+id });
                     }
                 }
             }
@@ -319,7 +328,8 @@ export function resolveEntitySlots(
                 const displayName = resolveRelationDisplayName(relation, prop);
                 totalCount = 1;
                 if (displayName) {
-                    items.push({ displayName, id: relation.id });
+                    items.push({ displayName,
+id: relation.id });
                 }
             }
         }
@@ -345,7 +355,9 @@ export function resolveEntitySlots(
         const prop = collection.properties[statusKey] as Property | undefined;
         const val = getValueInPath(entity.values, statusKey);
         if (prop && val !== undefined && val !== null) {
-            status = { property: prop, propertyKey: statusKey, value: val };
+            status = { property: prop,
+propertyKey: statusKey,
+value: val };
         }
     }
 

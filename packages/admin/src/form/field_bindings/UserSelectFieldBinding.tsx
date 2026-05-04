@@ -59,7 +59,7 @@ export function UserSelectFieldBinding({
                 showError={showError}
                 error={error}
                 disabled={disabled}
-                property={property} />
+                property={property}/>
 
         </>
     );

@@ -7,7 +7,7 @@ export function EntityCustomViewsSelectDialog({
     onClose
 }: { open: boolean, onClose: (selectedViewKey?: string) => void }) {
     const {
-        entityViews,
+        entityViews
     } = useCustomizationController();
 
     return <Dialog

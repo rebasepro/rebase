@@ -10,7 +10,7 @@ import {
     addRowBefore,
     addRowAfter,
     deleteRow,
-    deleteTable,
+    deleteTable
 } from "prosemirror-tables";
 import { EditorState } from "prosemirror-state";
 
@@ -50,7 +50,7 @@ export const TableBubble = forwardRef<HTMLDivElement, TableBubbleProps>(
             if (!show || !view || !state || !menuRef.current) return;
 
             const { from, to } = state.selection;
-            
+
             // Safety measure: if view.docView is destroyed, coordsAtPos might crash
             if (view.isDestroyed) return;
 
@@ -72,9 +72,9 @@ export const TableBubble = forwardRef<HTMLDivElement, TableBubbleProps>(
                         top,
                         bottom,
                         left,
-                        right,
+                        right
                     } as DOMRect;
-                },
+                }
             };
 
             const cleanup = autoUpdate(virtualEl as VirtualElement, menuRef.current, () => {
@@ -95,7 +95,7 @@ export const TableBubble = forwardRef<HTMLDivElement, TableBubbleProps>(
                         Object.assign(menuRef.current.style, {
                             left: `${x}px`,
                             top: `${y}px`,
-                            visibility: "visible",
+                            visibility: "visible"
                         });
                     }
                 });
@@ -113,7 +113,9 @@ export const TableBubble = forwardRef<HTMLDivElement, TableBubbleProps>(
         return (
             <div
                 ref={menuRef}
-                style={{ visibility: "hidden", position: "fixed", zIndex: 50 }}
+                style={{ visibility: "hidden",
+position: "fixed",
+zIndex: 50 }}
                 className={cls("flex flex-row gap-1 p-1 rounded-lg border bg-white dark:bg-surface-900 shadow-lg", defaultBorderMixin, className)}
                 onMouseDown={(e) => {
                     // Prevent mousedown from stealing focus from the editor
@@ -137,7 +139,7 @@ export const TableBubble = forwardRef<HTMLDivElement, TableBubbleProps>(
                         </IconButton>
                     </Tooltip>
                 </div>
-                
+
                 <div className="flex gap-1 border-r pr-1 mr-1 dark:border-gray-700">
                     <Tooltip title={t("add_column_before")}>
                         <IconButton size="small" onClick={() => executeCommand(addColumnBefore)}>
@@ -165,3 +167,5 @@ export const TableBubble = forwardRef<HTMLDivElement, TableBubbleProps>(
         );
     }
 );
+
+TableBubble.displayName = "TableBubble";

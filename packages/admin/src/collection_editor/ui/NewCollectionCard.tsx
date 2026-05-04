@@ -20,7 +20,7 @@ export function NewCollectionCard({
     const { t } = useTranslation();
     const canCreateCollections = collectionEditorController.configPermissions
         ? collectionEditorController.configPermissions({
-            user: authController.user,
+            user: authController.user
         }).createCollections
         : true;
 
@@ -37,7 +37,7 @@ export function NewCollectionCard({
 
             <div
                 className="flex items-center justify-center h-full w-full grow flex-col">
-                <AddIcon color="primary" />
+                <AddIcon color="primary"/>
                 <Typography color="primary"
                     variant={"caption"}
                     className={"font-medium"}>{t("studio_new_collection_add").toUpperCase()}</Typography>

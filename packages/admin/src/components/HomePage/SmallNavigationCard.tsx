@@ -1,4 +1,4 @@
-import { ArrowForwardIcon, cardClickableMixin, cardMixin, cls, Typography, } from "@rebasepro/ui";
+import { ArrowForwardIcon, cardClickableMixin, cardMixin, cls, Typography } from "@rebasepro/ui";
 
 import { Link } from "react-router-dom";
 
@@ -11,7 +11,7 @@ export type SmallNavigationCardProps = {
 export function SmallNavigationCard({
     name,
     url,
-    icon,
+    icon
 }: SmallNavigationCardProps) {
 
     return (
@@ -36,7 +36,7 @@ export function SmallNavigationCard({
                 </div>
 
                 <div className={"p-2"}>
-                    <ArrowForwardIcon color="primary" size={"small"} />
+                    <ArrowForwardIcon color="primary" size={"small"}/>
                 </div>
             </Link>
 

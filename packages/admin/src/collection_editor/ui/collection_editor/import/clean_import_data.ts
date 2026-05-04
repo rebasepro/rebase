@@ -16,7 +16,8 @@ export function cleanPropertiesFromImport(properties: Properties, parentSlug = "
         if (property.type === "map" && property.properties) {
             const slugifiedResult = cleanPropertiesFromImport(property.properties as Properties, fullSlug);
             return {
-                headersMapping: { ...acc.headersMapping, [key]: fullSlug },
+                headersMapping: { ...acc.headersMapping,
+[key]: fullSlug },
                 properties: {
                     ...acc.properties,
                     [slug]: {
@@ -33,13 +34,15 @@ export function cleanPropertiesFromImport(properties: Properties, parentSlug = "
             [slug]: property
         } as Properties;
 
-        const headersMapping = { ...acc.headersMapping, [key]: fullSlug } as Record<string, string>;
+        const headersMapping = { ...acc.headersMapping,
+[key]: fullSlug } as Record<string, string>;
 
         return {
             headersMapping,
-            properties: updatedProperties,
+            properties: updatedProperties
         }
-    }, { headersMapping: {}, properties: {} });
+    }, { headersMapping: {},
+properties: {} });
 
     const firstKey = Object.keys(result.headersMapping)?.[0];
     let idColumn: string | undefined;

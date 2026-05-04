@@ -31,7 +31,7 @@ export class ReactNodeView implements NodeView {
         view: EditorView,
         getPos: () => number | undefined,
         Component: ReactNodeViewComponent,
-        as: string = "div",
+        as = "div",
         className?: string,
         contentDOMElement?: HTMLElement
     ) {

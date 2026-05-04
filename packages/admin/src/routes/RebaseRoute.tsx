@@ -85,7 +85,7 @@ export function RebaseRoute() {
             collection = collectionRegistry.getCollection(navigationEntries[0].slug);
         if (!collection) {
             if (!collectionRegistry.initialised) {
-                return <CircularProgressCenter />;
+                return <CircularProgressCenter/>;
             }
             return null;
         }
@@ -95,7 +95,7 @@ export function RebaseRoute() {
             parentCollectionIds={[]}
             path={collection.slug}
             updateUrl={true}
-            Actions={toArray(collection.Actions)} />
+            Actions={toArray(collection.Actions)}/>
     }
 
     if (isSidePanel) {
@@ -108,7 +108,7 @@ export function RebaseRoute() {
                 collection = collectionRegistry.getCollection(firstEntry.slug);
             if (!collection) {
                 if (!collectionRegistry.initialised) {
-                    return <CircularProgressCenter />;
+                    return <CircularProgressCenter/>;
                 }
                 return null;
             }
@@ -118,7 +118,7 @@ export function RebaseRoute() {
                 parentCollectionIds={[]}
                 path={collection.slug}
                 updateUrl={true}
-                Actions={toArray(collection.Actions)} />;
+                Actions={toArray(collection.Actions)}/>;
         }
     }
 
@@ -173,7 +173,7 @@ export function RebaseRoute() {
                 updateUrl={true}
                 selectedEntityId={lastEntityEntry.entityId}
                 selectedTab={selectedTab}
-                Actions={toArray(collection.Actions)} />;
+                Actions={toArray(collection.Actions)}/>;
         }
     }
 
@@ -283,16 +283,16 @@ function EntityFullScreenRoute({
 
     if (isNew && !lastCollectionEntry) {
         if (!collectionRegistry.initialised) {
-            return <CircularProgressCenter />;
+            return <CircularProgressCenter/>;
         }
         throw new Error("INTERNAL: No collection found in the navigation");
     }
 
     if (!isNew && !lastEntityEntry) {
         if (!collectionRegistry.initialised) {
-            return <CircularProgressCenter />;
+            return <CircularProgressCenter/>;
         }
-        return <NotFoundPage />;
+        return <NotFoundPage/>;
     }
 
     const collection = isNew
@@ -338,7 +338,7 @@ function EntityFullScreenRoute({
             open={blocker?.state === "blocked"}
             handleOk={() => blocker?.proceed?.()}
             handleCancel={() => blocker?.reset?.()}
-            body={"You have unsaved changes in this entity."} />
+            body={"You have unsaved changes in this entity."}/>
 
     </>;
 }

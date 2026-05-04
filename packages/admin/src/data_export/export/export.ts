@@ -66,7 +66,8 @@ export function getEntityCSVExportableData(data: Entity<any>[],
 
     if (additionalData) {
         additionalData.forEach((additional, index) => {
-            mergedData[index] = { ...mergedData[index], ...additional };
+            mergedData[index] = { ...mergedData[index],
+...additional };
         });
     }
 
@@ -88,7 +89,8 @@ export function getEntityJsonExportableData(data: Entity<any>[],
 
     if (additionalData) {
         additionalData.forEach((additional, index) => {
-            mergedData[index] = { ...mergedData[index], ...additional };
+            mergedData[index] = { ...mergedData[index],
+...additional };
         });
     }
 
@@ -201,8 +203,10 @@ function processValuesForExport<M extends Record<string, unknown>>
             if (updatedValue === undefined) return {};
             return ({ [key]: updatedValue });
         })
-        .reduce((a, b) => ({ ...a, ...b }), {}) as Record<keyof M, any>;
-    return { ...inputValues, ...updatedValues };
+        .reduce((a, b) => ({ ...a,
+...b }), {}) as Record<keyof M, any>;
+    return { ...inputValues,
+...updatedValues };
 }
 
 function entryToCSVRow(entry: any[]) {

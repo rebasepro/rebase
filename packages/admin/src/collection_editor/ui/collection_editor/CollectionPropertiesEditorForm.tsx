@@ -19,7 +19,7 @@ import {
     FindInPageIcon,
     IconButton,
     Tooltip,
-    Typography,
+    Typography
 } from "@rebasepro/ui";
 
 import { getFullId, idToPropertiesPath, namespaceToPropertiesOrderPath } from "./util";
@@ -57,7 +57,7 @@ export function CollectionPropertiesEditorForm({
     getUser,
     getData,
     doCollectionInference,
-    propertyConfigs,
+    propertyConfigs
 
 }: CollectionEditorFormProps) {
 
@@ -422,7 +422,7 @@ export function CollectionPropertiesEditorForm({
                             placeholder={"Collection name"}
                             size={"small"}
                             required
-                            error={Boolean(errors?.name)} />
+                            error={Boolean(errors?.name)}/>
 
                         {owner &&
                             <Typography variant={"body2"}
@@ -452,7 +452,7 @@ export function CollectionPropertiesEditorForm({
                                 variant={"filled"}
                                 disabled={inferringProperties}
                                 onClick={inferPropertiesFromData}>
-                                {inferringProperties ? <CircularProgress size={"small"} /> : <FindInPageIcon />}
+                                {inferringProperties ? <CircularProgress size={"small"}/> : <FindInPageIcon/>}
                             </IconButton>
                         </Tooltip>}
                         <Tooltip title={"Add new property"}
@@ -460,7 +460,7 @@ export function CollectionPropertiesEditorForm({
                             <Button
                                 disabled={configController?.readOnly}
                                 onClick={() => setNewPropertyDialogOpen(true)}>
-                                <AddIcon />
+                                <AddIcon/>
                             </Button>
                         </Tooltip>
                     </div>
@@ -478,7 +478,7 @@ export function CollectionPropertiesEditorForm({
                         onPropertyMove={onPropertyMove}
                         onPropertyRemove={(isNewCollection || (inferredPropertyKeys && inferredPropertyKeys.length > 0)) && !configController?.readOnly ? deleteProperty : undefined}
 
-                        errors={errors} />
+                        errors={errors}/>
                 </ErrorBoundary>
 
                 <Button className={"mt-4 xl:mt-8 w-full"}
@@ -486,7 +486,7 @@ export function CollectionPropertiesEditorForm({
                     color="neutral"
                     disabled={configController?.readOnly}
                     onClick={() => setNewPropertyDialogOpen(true)}
-                    startIcon={<AddIcon />}>
+                    startIcon={<AddIcon/>}>
                     Add new property
                 </Button>
             </div>
@@ -516,7 +516,7 @@ export function CollectionPropertiesEditorForm({
                                 initialErrors={initialErrors}
                                 getData={getData}
                                 propertyConfigs={propertyConfigs}
-        
+
                             />}
 
                         {!selectedProperty &&
@@ -530,7 +530,7 @@ export function CollectionPropertiesEditorForm({
                                     disabled={configController?.readOnly}
                                     onClick={() => setNewPropertyDialogOpen(true)}
                                 >
-                                    <AddIcon />
+                                    <AddIcon/>
                                     Add new property
                                 </Button>
                             </div>}
@@ -566,7 +566,7 @@ export function CollectionPropertiesEditorForm({
                 onOkClicked={asDialog
                     ? closePropertyDialog
                     : undefined
-                } />}
+                }/>}
 
         </div>);
 
@@ -587,13 +587,13 @@ export function CollectionPropertiesEditorForm({
             getData={getData}
             allowDataInference={!isNewCollection}
             propertyConfigs={propertyConfigs}
-            existingPropertyKeys={values.propertiesOrder as string[]} />
+            existingPropertyKeys={values.propertiesOrder as string[]}/>
 
         <ErrorBoundary>
             <GetCodeDialog
                 collection={values}
                 open={codeDialogOpen}
-                onOpenChange={setCodeDialogOpen} />
+                onOpenChange={setCodeDialogOpen}/>
         </ErrorBoundary>
     </>
     );

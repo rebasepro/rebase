@@ -51,6 +51,8 @@ app/frontend/debug_trace**
 /scratch.*
 /test-*.js
 /test_*.js
+/test-*.ts
+/test_*.ts
 /fix-*.js
 /fix_*.js
 /fix-*.cjs
@@ -59,6 +61,7 @@ app/frontend/debug_trace**
 /fix-*.ts
 /migration-*.ts
 /patch_*.js
+*.diff
 /refactor-*.mjs
 /eslint-errors*.json
 /graph.json
@@ -69,3 +72,5 @@ app/frontend/debug_trace**
 !/CONTRIBUTING.md
 !/PUBLISHING.md
 !/LICENSE
+tsc_output.txt
+yarn.lock

@@ -2,7 +2,7 @@ import React, { createContext, forwardRef, RefObject, useCallback, useEffect, us
 
 import { deepEqual as equal } from "fast-equals"
 
-// @ts-ignore
+// @ts-expect-error -- react-window does not ship type declarations and @types/react-window is not installed
 import { FixedSizeList as List } from "react-window";
 import useMeasure from "react-use-measure";
 
@@ -32,7 +32,7 @@ import {
 } from "@dnd-kit/core";
 import { arrayMove, horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- React contexts cannot be generic; the Provider value is always structurally correct
+
 const VirtualListContext = createContext<VirtualTableContextProps<Record<string, unknown>>>(null! as VirtualTableContextProps<Record<string, unknown>>);
 VirtualListContext.displayName = "VirtualListContext";
 
@@ -70,8 +70,10 @@ const innerElementType = forwardRef<HTMLDivElement, InnerElementProps>(({
                                     minHeight: "100%",
                                     position: "relative"
                                 }}>
-                                <div style={{ position: "sticky", top: 0, zIndex: 10 }}>
-                                    <VirtualTableHeaderRow {...virtualTableProps} />
+                                <div style={{ position: "sticky",
+top: 0,
+zIndex: 10 }}>
+                                    <VirtualTableHeaderRow {...virtualTableProps}/>
                                 </div>
                                 {!customView && children}
                             </div>
@@ -133,7 +135,7 @@ export const VirtualTable = React.memo<VirtualTableProps<any>>(
         endAdornment,
         AddColumnComponent,
         initialScroll = 0,
-        onColumnsOrderChange,
+        onColumnsOrderChange
     }: VirtualTableProps<T>) {
 
         const sortByProperty: string | undefined = sortBy ? sortBy[0] : undefined;
@@ -152,8 +154,8 @@ export const VirtualTable = React.memo<VirtualTableProps<any>>(
         const sensors = useSensors(
             useSensor(PointerSensor, {
                 activationConstraint: {
-                    distance: 5,
-                },
+                    distance: 5
+                }
             })
         );
 
@@ -323,12 +325,12 @@ export const VirtualTable = React.memo<VirtualTableProps<any>>(
                     {"Error"}
                 </Typography>
 
-                {error?.message && <SafeLinkRenderer text={error.message} />}
+                {error?.message && <SafeLinkRenderer text={error.message}/>}
 
             </CenteredView>
             : (empty
                 ? (loading
-                    ? <CircularProgressCenter />
+                    ? <CircularProgressCenter/>
                     : <div
                         className="flex flex-col overflow-auto items-center justify-center p-8 h-full">
                         {emptyComponent}
@@ -387,7 +389,7 @@ export const VirtualTable = React.memo<VirtualTableProps<any>>(
                         itemCount={(data?.length ?? 0) + (endAdornment ? 1 : 0)}
                         onScroll={draggingColumnId ? undefined : onScroll}
                         includeAddColumn={Boolean(AddColumnComponent)}
-                        itemSize={rowHeight} />
+                        itemSize={rowHeight}/>
 
                 </VirtualListContext.Provider>
             </div>
@@ -438,7 +440,7 @@ const SortableCellWrapper = ({
         listeners,
         setNodeRef,
         transform,
-        transition,
+        transition
     } = useSortable({
         id: columnKey,
         disabled: !isDraggable || frozen
@@ -454,7 +456,7 @@ const SortableCellWrapper = ({
         transition: isDragging ? undefined : transition,
         minWidth: width,
         maxWidth: width,
-        width: width,
+        width: width
     };
 
     return (
@@ -557,14 +559,14 @@ function MemoizedList({
                                 >
                                     <VirtualTableCell
                                         dataKey={column.key}
-                                        // @ts-ignore
+                                        // @ts-expect-error -- React.memo<VirtualTableProps<any>> erases the generic T, so cellRenderer's parameter type widens to `any` losing structural compatibility with VirtualTableCell<T>. The types are structurally correct at runtime.
                                         cellRenderer={cellRenderer}
                                         column={column}
                                         columns={columns}
                                         rowData={rowData}
                                         cellData={cellData}
                                         rowIndex={index}
-                                        columnIndex={columnIndex} />
+                                        columnIndex={columnIndex}/>
                                 </SortableCellWrapper>
                             ) : (
                                 <div
@@ -581,19 +583,19 @@ function MemoizedList({
                                 >
                                     <VirtualTableCell
                                         dataKey={column.key}
-                                        // @ts-ignore
+                                        // @ts-expect-error -- React.memo<VirtualTableProps<any>> erases the generic T, so cellRenderer's parameter type widens to `any` losing structural compatibility with VirtualTableCell<T>. The types are structurally correct at runtime.
                                         cellRenderer={cellRenderer}
                                         column={column}
                                         columns={columns}
                                         rowData={rowData}
                                         cellData={cellData}
                                         rowIndex={index}
-                                        columnIndex={columnIndex} />
+                                        columnIndex={columnIndex}/>
                                 </div>
                             );
                         })}
 
-                        {includeAddColumn && <div className={"w-20"} />}
+                        {includeAddColumn && <div className={"w-20"}/>}
 
                     </VirtualTableRow>
                 );
@@ -618,12 +620,22 @@ const SafeLinkRenderer: React.FC<{
     text: string;
 }> = ({ text }) => {
     const urlRegex = /https?:\/\/[^\s]+/g;
-    const htmlContent = text.replace(urlRegex, (url) => {
-        // For each URL found, replace it with an HTML <a> tag
-        return `<a href="${url}" class="underline" target="_blank">Link</a><br/>`;
-    });
+    const urls = text.match(urlRegex) || [];
+    const parts = text.split(urlRegex);
 
     return (
-        <div className={"break-all"} dangerouslySetInnerHTML={{ __html: htmlContent }} />
+        <div className={"break-all"}>
+            {parts.map((part, i) => (
+                <React.Fragment key={i}>
+                    {part}
+                    {urls[i] && (
+                        <>
+                            <a href={urls[i]} className="underline" target="_blank" rel="noopener noreferrer">Link</a>
+                            <br/>
+                        </>
+                    )}
+                </React.Fragment>
+            ))}
+        </div>
     );
 };

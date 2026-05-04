@@ -23,7 +23,7 @@ export function StorageUploadProgress({
     metadata,
     onFileUploadComplete,
     imageSize,
-    simple,
+    simple
 }: StorageUploadItemProps) {
 
     const storageSource = useStorageSource();
@@ -42,7 +42,7 @@ export function StorageUploadProgress({
         setError(undefined);
         setLoading(true);
 
-        const key = storagePath && fileName ? `${storagePath}/${fileName}` : fileName || storagePath || 'unnamed';
+        const key = storagePath && fileName ? `${storagePath}/${fileName}` : fileName || storagePath || "unnamed";
         storageSource.putObject({
             file,
             key,
@@ -82,7 +82,7 @@ export function StorageUploadProgress({
     if (simple) {
         return <div className={`w-${imageSize} h-${imageSize}`}>
 
-            {loading && <Skeleton className={`w-${imageSize} h-${imageSize}`} />}
+            {loading && <Skeleton className={`w-${imageSize} h-${imageSize}`}/>}
 
         </div>
     }
@@ -93,10 +93,10 @@ export function StorageUploadProgress({
             `min-w-[${imageSize}px] min-h-[${imageSize}px]`)}>
 
             {loading &&
-                <Skeleton className="w-full h-full" />}
+                <Skeleton className="w-full h-full"/>}
 
             {error && <ErrorView title={"Error uploading file"}
-                error={error} />}
+                error={error}/>}
 
         </div>
 

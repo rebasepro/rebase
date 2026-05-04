@@ -1,8 +1,8 @@
-import type { EntityCollection } from "@rebasepro/types";
+import type { EntityCollection, EntityCustomViewParams } from "@rebasepro/types";
 import type { FormContext } from "../types/fields";
 import type { PluginFormActionProps } from "@rebasepro/types";
 import React, { useEffect, useMemo, useState } from "react";
-import { Entity, EntityRelation, EntityStatus, EntityValues, Relation, User } from "@rebasepro/types";
+import { Entity, EntityStatus } from "@rebasepro/types";
 import { PluginProviderStack } from "@rebasepro/core";
 
 import { EntityCollectionView, EntityView } from "../components";
@@ -12,7 +12,7 @@ import { ErrorView } from "@rebasepro/core";
 import {
     getSubcollections,
     removeInitialAndTrailingSlashes,
-    resolveDefaultSelectedView,
+    resolveDefaultSelectedView
 } from "@rebasepro/common";
 import { resolvedSelectedEntityView } from "../util/resolutions";
 import { getEntityTitlePropertyKey } from "../util/previews";
@@ -85,7 +85,7 @@ export function EntityEditView<M extends Record<string, unknown>>({
     const {
         entity,
         dataLoading,
-        // eslint-disable-next-line no-unused-vars
+
         dataLoadingError
     } = useEntityFetch<M>({
         path: props.path,
@@ -114,7 +114,7 @@ export function EntityEditView<M extends Record<string, unknown>>({
 
     if (!dataLoading && dataLoadingError) {
         return <CenteredView>
-            <ErrorView error={dataLoadingError} />
+            <ErrorView error={dataLoadingError}/>
         </CenteredView>
     }
 
@@ -200,14 +200,15 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
             status,
             entityId
         }
-    ), []);
+    ), [collection, status, entityId]);
 
     const [selectedTab, setSelectedTab] = useState<string>(selectedTabProp ?? defaultSelectedView ?? MAIN_TAB_VALUE);
     useEffect(() => {
-        if ((selectedTabProp ?? defaultSelectedView ?? MAIN_TAB_VALUE) !== selectedTab) {
-            setSelectedTab(selectedTabProp ?? defaultSelectedView ?? MAIN_TAB_VALUE);
+        const target = selectedTabProp ?? defaultSelectedView ?? MAIN_TAB_VALUE;
+        if (target !== selectedTab) {
+            setSelectedTab(target);
         }
-    }, [selectedTabProp]);
+    }, [selectedTabProp, defaultSelectedView]);
 
     const subcollections = getSubcollections(collection).filter(c => !c.hideFromNavigation);
     const subcollectionsCount = subcollections?.length ?? 0;
@@ -291,7 +292,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
         role="tabpanel">
         <ErrorBoundary>
             <EntityJsonPreview
-                values={formContext?.values ?? entity?.values ?? {}} />
+                values={formContext?.values ?? entity?.values ?? {}}/>
         </ErrorBoundary>
     </div>;
 
@@ -304,7 +305,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
             <EntityHistoryView
                 collection={collection}
                 entity={usedEntity}
-                formContext={formContext as any}
+                formContext={formContext as FormContext<Record<string, unknown>>}
                 modifiedValues={formContext?.values ?? usedEntity?.values}
             />
         </ErrorBoundary>
@@ -321,7 +322,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                 key={`subcol_${subcollectionId}`}
                 role="tabpanel">
 
-                {globalLoading && <CircularProgressCenter />}
+                {globalLoading && <CircularProgressCenter/>}
 
                 {!globalLoading &&
                     (usedEntity && newFullPath
@@ -330,7 +331,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                             parentCollectionIds={[...parentCollectionIds, collection.slug]}
                             updateUrl={false}
                             {...subcollection}
-                            openEntityMode={layout} />
+                            openEntityMode={layout}/>
                         : <div className="flex items-center justify-center w-full h-full p-3">
                             <Typography variant={"label"}>
                                 You need to save your entity before
@@ -366,8 +367,8 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                 className={"px-8 h-full overflow-auto"}
                 entity={entity}
                 path={path}
-                collection={collection} />
-            <div className="h-16" />
+                collection={collection}/>
+            <div className="h-16"/>
         </div>
     </div> : null;
 
@@ -405,7 +406,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
             onSaved?.(res);
             formProps?.onSaved?.(res);
         }}
-        Builder={selectedSecondaryForm?.Builder as any}
+        Builder={selectedSecondaryForm?.Builder as React.ComponentType<EntityCustomViewParams<M>> | undefined}
     />;
 
     const subcollectionTabs = subcollections && subcollections.map((subcollection) =>
@@ -447,7 +448,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                     navigate(`${entityUrl}#full`);
                 }}
             >
-                <OpenInFullIcon size="smallest" />
+                <OpenInFullIcon size="smallest"/>
             </IconButton>
         </Tooltip>
     ) : null;
@@ -517,14 +518,14 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                         disabled={!hasAdditionalViews}
                         value={JSON_TAB_VALUE}
                         className={"text-sm"}>
-                        <CodeIcon size={"small"} />
+                        <CodeIcon size={"small"}/>
                     </Tab>}
 
                     {includeHistoryView && <Tab
                         disabled={!hasAdditionalViews}
                         value={HISTORY_TAB_VALUE}
                         className={"text-sm"}>
-                        <HistoryIcon size={"small"} />
+                        <HistoryIcon size={"small"}/>
                     </Tab>}
 
                     <Tab
@@ -544,7 +545,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
         </div>}
 
         {globalLoading
-            ? <EntityFormSkeleton collection={collection} />
+            ? <EntityFormSkeleton collection={collection}/>
             : <>
                 {entityReadOnlyView}
                 {entityView}
@@ -586,35 +587,35 @@ function EntityFormSkeleton({ collection }: { collection: EntityCollection<any> 
         <div className="flex-1 flex flex-row w-full overflow-y-auto justify-center">
             <div className="relative flex flex-row max-w-4xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-6xl w-full h-fit">
                 <div className="flex flex-col w-full pt-12 pb-16 px-4 sm:px-8 md:px-10">
-                    
+
                     <div className="flex flex-row gap-4 self-end sticky top-4 z-10">
-                        <Skeleton height={24} className="w-8 rounded-full" />
+                        <Skeleton height={24} className="w-8 rounded-full"/>
                     </div>
 
                     <div className="w-full flex flex-col items-start my-4 lg:my-6">
                         <div className={`py-1 my-4 w-2/3 ${collection.hideIdFromForm ? "mb-6" : ""}`}>
-                            <Skeleton height={28} className="w-full rounded-md" />
+                            <Skeleton height={28} className="w-full rounded-md"/>
                         </div>
-                        <Skeleton height={32} className="w-full rounded-md" />
+                        <Skeleton height={32} className="w-full rounded-md"/>
                     </div>
 
                     <div className="mt-12 flex flex-col gap-8">
                         <div className="flex flex-wrap gap-x-4 w-full space-y-8">
-                            
+
                             <div className="relative w-full">
-                                <Skeleton height={60} className="w-full rounded-md" />
+                                <Skeleton height={60} className="w-full rounded-md"/>
                             </div>
-                            
+
                             <div className="relative w-full">
-                                <Skeleton height={60} className="w-full rounded-md" />
+                                <Skeleton height={60} className="w-full rounded-md"/>
                             </div>
-                            
+
                             <div className="relative w-full">
-                                <Skeleton height={60} className="w-full rounded-md" />
+                                <Skeleton height={60} className="w-full rounded-md"/>
                             </div>
-                            
+
                             <div className="relative w-full">
-                                <Skeleton height={60} className="w-full rounded-md" />
+                                <Skeleton height={60} className="w-full rounded-md"/>
                             </div>
 
                         </div>
@@ -625,74 +626,3 @@ function EntityFormSkeleton({ collection }: { collection: EntityCollection<any> 
     );
 }
 
-function OneToOneRelationForm({
-    relation,
-    value,
-    databaseId,
-    layout,
-    status,
-    actionsAtTheBottom
-}: {
-    relation: Relation,
-    value: EntityRelation,
-    databaseId: string,
-    layout: "side_panel" | "full_screen" | "split",
-    status: EntityStatus,
-    actionsAtTheBottom: boolean,
-}) {
-    if (!relation)
-        return null;
-
-    const collection = relation.target();
-    const path = collection.slug;
-
-    const entityId = value.id;
-
-    const {
-        entity,
-        dataLoading,
-        dataLoadingError
-    } = useEntityFetch({
-        path: path,
-        entityId: entityId,
-        collection: collection,
-        databaseId: databaseId,
-        useCache: false
-    });
-
-    return <EntityForm
-        collection={collection}
-        path={path}
-        entityId={entityId}
-        // onValuesModified={onValuesModified}
-        entity={entity}
-        // initialDirtyValues={cachedDirtyValues}
-        openEntityMode={layout}
-        forceActionsAtTheBottom={actionsAtTheBottom}
-        initialStatus={status}
-        // className={cls((!mainViewVisible || !canEdit) && !selectedSecondaryForm ? "hidden" : "", formProps?.className)}
-        EntityFormActionsComponent={EntityEditViewFormActions}
-    // disabled={!canEdit}
-    // onEntityChange={(entity) => {
-    //     setUsedEntity(entity);
-    //     formProps?.onEntityChange?.(entity);
-    // }}
-    // onStatusChange={(status) => {
-    //     setStatus(status);
-    //     formProps?.onStatusChange?.(status);
-    // }}
-    // onFormContextReady={(formContext) => {
-    //     setFormContext(formContext);
-    //     formProps?.onFormContextReady?.(formContext);
-    // }}
-    // onSaved={(params) => {
-    //     const res = {
-    //         ...params,
-    //         selectedTab: MAIN_TAB_VALUE === selectedTab ? undefined : selectedTab
-    //     };
-    //     onSaved?.(res);
-    //     formProps?.onSaved?.(res);
-    // }}
-    // Builder={selectedSecondaryForm?.Builder}
-    />
-}

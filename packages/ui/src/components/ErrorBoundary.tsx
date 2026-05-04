@@ -11,12 +11,11 @@ export class ErrorBoundary extends React.Component<PropsWithChildren<Record<stri
         this.state = { error: null };
     }
 
-    // eslint-disable-next-line n/handle-callback-err
     static getDerivedStateFromError(error: Error) {
         return { error };
     }
 
-    componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    componentDidCatch(error: Error, _errorInfo: ErrorInfo) {
         console.error(error);
         // logErrorToMyService(error, errorInfo);
     }
@@ -26,7 +25,7 @@ export class ErrorBoundary extends React.Component<PropsWithChildren<Record<stri
             return (
                 <div className="flex flex-col m-2">
                     <div className="flex items-center m-2">
-                        <ErrorIcon color={"error"} size={"small"} />
+                        <ErrorIcon color={"error"} size={"small"}/>
                         <div className="ml-4">Error</div>
                     </div>
                     <Typography variant={"caption"}>

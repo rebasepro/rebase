@@ -34,7 +34,7 @@ export function useEntitySelectionDialog<M extends Record<string, unknown>>(refe
                 component:
                     <EntitySelectionTable
                         collection={usedCollection}
-                        {...referenceDialogProps as EntitySelectionProps<M>} />,
+                        {...referenceDialogProps as EntitySelectionProps<M>}/>,
                 width: "90vw",
                 onClose: () => {
                     referenceDialogProps.onClose?.();

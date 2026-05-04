@@ -85,7 +85,8 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
                             context: context as unknown as RebaseContext
                         })
                     };
-                }))).reduce((a, b) => ({ ...a, ...b }), {});
+                }))).reduce((a, b) => ({ ...a,
+...b }), {});
             }))
             : [];
 
@@ -101,7 +102,8 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
                                 context: context as unknown as RebaseContext
                             })
                         };
-                    }))).reduce((a, b) => ({ ...a, ...b }), {});
+                    }))).reduce((a, b) => ({ ...a,
+...b }), {});
             }))
             : [];
         return [...resolvedExportColumnsValues, ...resolvedColumnsValues];
@@ -129,7 +131,8 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
                         const defaultValues = getDefaultValuesFor(collection.properties);
                         return {
                             ...entity,
-                            values: { ...defaultValues, ...entity.values }
+                            values: { ...defaultValues,
+...entity.values }
                         };
                     })
                     : data;
@@ -169,7 +172,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
                 size={"small"}
                 color={"primary"}
                 onClick={handleClickOpen}>
-                <DownloadIcon size={"small"} />
+                <DownloadIcon size={"small"}/>
             </IconButton>
         </Tooltip>
 
@@ -198,7 +201,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
                             <input id="radio-csv" type="radio" value="csv" name="exportType"
                                 checked={exportType === "csv"}
                                 onChange={() => setExportType("csv")}
-                                className={cls("w-4 bg-surface-100 border-surface-300 dark:bg-surface-700 dark:border-surface-600")} />
+                                className={cls("w-4 bg-surface-100 border-surface-300 dark:bg-surface-700 dark:border-surface-600")}/>
                             <label htmlFor="radio-csv"
                                 className="p-2 text-sm font-medium text-surface-900 dark:text-surface-300">CSV</label>
                         </div>
@@ -206,7 +209,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
                             <input id="radio-json" type="radio" value="json" name="exportType"
                                 checked={exportType === "json"}
                                 onChange={() => setExportType("json")}
-                                className={cls("w-4 bg-surface-100 border-surface-300 dark:bg-surface-700 dark:border-surface-600")} />
+                                className={cls("w-4 bg-surface-100 border-surface-300 dark:bg-surface-700 dark:border-surface-600")}/>
                             <label htmlFor="radio-json"
                                 className="p-2 text-sm font-medium text-surface-900 dark:text-surface-300">JSON</label>
                         </div>
@@ -217,7 +220,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
                             <input id="radio-timestamp" type="radio" value="timestamp" name="dateExportType"
                                 checked={dateExportType === "timestamp"}
                                 onChange={() => setDateExportType("timestamp")}
-                                className={cls("w-4 bg-surface-100 border-surface-300 dark:bg-surface-700 dark:border-surface-600")} />
+                                className={cls("w-4 bg-surface-100 border-surface-300 dark:bg-surface-700 dark:border-surface-600")}/>
                             <label htmlFor="radio-timestamp"
                                 className="p-2 text-sm font-medium text-surface-900 dark:text-surface-300">Dates
                                 as
@@ -227,7 +230,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
                             <input id="radio-string" type="radio" value="string" name="dateExportType"
                                 checked={dateExportType === "string"}
                                 onChange={() => setDateExportType("string")}
-                                className={cls("w-4 bg-surface-100 border-surface-300 dark:bg-surface-700 dark:border-surface-600")} />
+                                className={cls("w-4 bg-surface-100 border-surface-300 dark:bg-surface-700 dark:border-surface-600")}/>
                             <label htmlFor="radio-string"
                                 className="p-2 text-sm font-medium text-surface-900 dark:text-surface-300">Dates
                                 as
@@ -241,13 +244,13 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
                     disabled={exportType !== "csv"}
                     value={flattenArrays}
                     onValueChange={setFlattenArrays}
-                    label={"Flatten arrays"} />
+                    label={"Flatten arrays"}/>
 
                 <BooleanSwitchWithLabel
                     size={"small"}
                     value={includeUndefinedValues}
                     onValueChange={setIncludeUndefinedValues}
-                    label={"Include undefined values"} />
+                    label={"Include undefined values"}/>
 
                 {!canExport && notAllowedView}
 
@@ -255,7 +258,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
 
             <DialogActions>
 
-                {dataLoading && <CircularProgress size={"smallest"} />}
+                {dataLoading && <CircularProgress size={"smallest"}/>}
 
                 <Button onClick={handleClose}
                     variant={"text"}>

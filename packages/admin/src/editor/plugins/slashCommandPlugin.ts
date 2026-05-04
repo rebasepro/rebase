@@ -21,7 +21,7 @@ export function slashCommandPlugin() {
                 if (meta !== undefined) {
                     return meta;
                 }
-                
+
                 const { selection } = newState;
                 if (!(selection instanceof TextSelection) || !selection.empty) {
                     return { active: false };
@@ -47,15 +47,19 @@ export function slashCommandPlugin() {
 
                 // If the user previously dismissed this slash command, keep it dismissed
                 if (value.dismissed) {
-                    return { active: false, dismissed: true };
+                    return { active: false,
+dismissed: true };
                 }
 
                 // match[1] is the slash, match[2] is the query
                 const query = match[2];
                 const from = $anchor.pos - query.length - 1;
                 const to = $anchor.pos;
-                return { active: true, range: { from, to }, query };
-            },
+                return { active: true,
+range: { from,
+to },
+query };
+            }
         }
     });
 }

@@ -68,7 +68,7 @@ export function SideDialogs() {
                     panel={panel}
                     panelIndex={index}
                     offsetPosition={sidePanels.length - index - 1}
-                    isTopPanel={index === sidePanels.length - 1} />)
+                    isTopPanel={index === sidePanels.length - 1}/>)
         }
     </>;
 }
@@ -174,7 +174,7 @@ function SideDialogView({
                         className={"transform max-w-[100vw] lg:max-w-[95vw] flex flex-col h-full transition-all duration-250 ease-in-out bg-white dark:bg-surface-900 "}
                         style={{
                             width: panel.width,
-                            transform: `translateX(-${offsetPosition * 200}px)`,
+                            transform: `translateX(-${offsetPosition * 200}px)`
                         }}
                     >
                         <ErrorBoundary>
@@ -182,7 +182,7 @@ function SideDialogView({
                         </ErrorBoundary>
                     </div>}
 
-                {!panel && <div style={{ width }} />}
+                {!panel && <div style={{ width }}/>}
 
             </Sheet>
 
@@ -200,7 +200,7 @@ function SideDialogView({
                         handleDrawerCloseCancel();
                     }
                 }}
-                body={blockedNavigationMessage || "There are unsaved changes"} />
+                body={blockedNavigationMessage || "There are unsaved changes"}/>
 
         </SideDialogContext.Provider>
 

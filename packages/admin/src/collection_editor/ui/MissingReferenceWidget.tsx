@@ -13,12 +13,13 @@ export function MissingReferenceWidget({ path: pathProp }: {
     const collectionEditor = useCollectionEditorController();
     const { t } = useTranslation();
     return <div className={"p-1 flex flex-col items-center"}>
-        <ErrorView error={t("studio_missing_reference_error", { path })} />
+        <ErrorView error={t("studio_missing_reference_error", { path })}/>
         <Button className={"mx-2"}
             size={"small"}
             onClick={() => {
                 collectionEditor.createCollection({
-                    initialValues: { path, name: prettifyIdentifier(path) },
+                    initialValues: { path,
+name: prettifyIdentifier(path) },
                     parentCollectionIds,
                     redirect: false,
                     sourceClick: "missing_reference"

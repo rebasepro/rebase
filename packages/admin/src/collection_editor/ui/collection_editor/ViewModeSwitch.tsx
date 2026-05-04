@@ -21,17 +21,17 @@ export function ViewModeSwitch({
                     {
                         value: "table",
                         label: "Table",
-                        icon: <ListIcon />
+                        icon: <ListIcon/>
                     },
                     {
                         value: "cards",
                         label: "Cards",
-                        icon: <AppsIcon />
+                        icon: <AppsIcon/>
                     },
                     {
                         value: "kanban",
                         label: "Kanban",
-                        icon: <ViewKanbanIcon />
+                        icon: <ViewKanbanIcon/>
                     }
                 ]}
             />

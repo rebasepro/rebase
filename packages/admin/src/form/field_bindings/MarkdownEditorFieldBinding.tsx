@@ -57,7 +57,7 @@ export function MarkdownEditorFieldBinding({
     disabled: disabledProp,
     isSubmitting,
     context,
-    customProps,
+    customProps
 }: FieldProps<StringProperty, MarkdownEditorFieldProps>) {
 
     const authController = useAuthController();
@@ -79,7 +79,7 @@ export function MarkdownEditorFieldBinding({
     // future serialization that matches this canonical form is NOT a real change.
     const canonicalInitialValue = useMemo(
         () => canonicalizeMarkdown(value),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+
         [] // intentionally only on mount
     );
     // Track it in a ref so the callback always has the latest
@@ -152,10 +152,10 @@ export function MarkdownEditorFieldBinding({
         handleImageUpload={async (file: File) => {
             const storagePath = storagePathBuilder(file);
             const fileName = await fileNameBuilder(file);
-            const key = `${storagePath}/${fileName}`.replace(/^\/+/, '').replace(/\/+/g, '/');
+            const key = `${storagePath}/${fileName}`.replace(/^\/+/, "").replace(/\/+/g, "/");
             const result = await storageSource.putObject({
                 file,
-                key,
+                key
             });
             const downloadConfig = await storageSource.getSignedUrl(result.key);
             const url = downloadConfig.url;
@@ -178,7 +178,7 @@ export function MarkdownEditorFieldBinding({
                     icon={getIconForProperty(property, "small")}
                     required={property.validation?.required}
                     title={property.name ?? propertyKey}
-                    className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5"} />
+                    className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5"}/>
                 <div className="flex-grow"/>
                 {property.clearable && !disabled && (
                     <IconButton
@@ -200,7 +200,7 @@ export function MarkdownEditorFieldBinding({
             <FieldHelperText includeDescription={includeDescription}
                 showError={showError}
                 error={error}
-                property={property} />
+                property={property}/>
         </>
 
     );

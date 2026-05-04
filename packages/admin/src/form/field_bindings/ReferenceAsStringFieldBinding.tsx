@@ -24,10 +24,10 @@ import { useCollectionRegistryController } from "../../index";
  */
 export function ReferenceAsStringFieldBinding(props: FieldProps<StringProperty>) {
     if (typeof props.property.reference?.path !== "string") {
-        return <ReadOnlyFieldBinding {...props as FieldProps<Property>} />;
+        return <ReadOnlyFieldBinding {...props as FieldProps<Property>}/>;
     }
 
-    return <ReferenceAsStringFieldBindingInternal {...props} />;
+    return <ReferenceAsStringFieldBindingInternal {...props}/>;
 }
 
 function ReferenceAsStringFieldBindingInternal({
@@ -61,7 +61,8 @@ function ReferenceAsStringFieldBindingInternal({
 
     const referenceValue: EntityReference | undefined = useMemo(() => {
         if (value && path) {
-            return new EntityReference({ id: value, path });
+            return new EntityReference({ id: value,
+path });
         }
         return undefined;
     }, [value, path]);
@@ -96,10 +97,10 @@ function ReferenceAsStringFieldBindingInternal({
                 icon={getIconForProperty(property, "small")}
                 required={property.validation?.required}
                 title={property.name ?? propertyKey}
-                className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5"} />}
+                className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5"}/>}
 
             {!collection && <ErrorView
-                error={"The specified collection does not exist. Check console"} />}
+                error={"The specified collection does not exist. Check console"}/>}
 
             {collection && <>
 
@@ -123,7 +124,7 @@ function ReferenceAsStringFieldBindingInternal({
                         onClick={onEntryClick}
                         size={"medium"}>
                         <IconForView collectionOrView={collection}
-                            className={"text-surface-300 dark:text-surface-600"} />
+                            className={"text-surface-300 dark:text-surface-600"}/>
                         {`Edit ${property.name}`.toUpperCase()}
                     </EntityPreviewContainer>
                 </div>}
@@ -133,7 +134,7 @@ function ReferenceAsStringFieldBindingInternal({
                 showError={showError}
                 error={error}
                 disabled={disabled}
-                property={property} />
+                property={property}/>
 
         </>
     );

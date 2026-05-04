@@ -81,7 +81,7 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
         autoFocus,
         index,
         size,
-        onPropertyChange,
+        onPropertyChange
     }: PropertyFieldBindingProps<M>): ReactElement<PropertyFieldBindingProps<M>> {
 
     const authController = useAuthController();
@@ -169,7 +169,7 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
                 return <FieldInternal
                     Component={Component as ComponentType<FieldProps>}
                     componentProps={componentProps}
-                    formexFieldProps={fieldProps} />;
+                    formexFieldProps={fieldProps}/>;
             }}
         </Field>
     );
@@ -214,7 +214,7 @@ function FieldInternal<CustomProps, M extends Record<string, any>>
     const error = getIn(formexFieldProps.form.errors, propertyKey) as string | string[] | undefined;
     const touched = getIn(formexFieldProps.form.touched, propertyKey) as boolean | undefined;
 
-    const showError: boolean = Boolean(error &&
+    const showError = Boolean(error &&
         (formexFieldProps.form.submitCount > 0 || property.validation?.unique) &&
         (!Array.isArray(error) || !!error.filter((e: any) => !!e).length));
 
@@ -266,7 +266,7 @@ function FieldInternal<CustomProps, M extends Record<string, any>>
     return (
         <ErrorBoundary>
 
-            <UsedComponent {...cmsFieldProps} />
+            <UsedComponent {...cmsFieldProps}/>
 
             {underlyingValueHasChanged && !isSubmitting &&
                 <Typography variant={"caption"} className={"ml-3.5"}>
@@ -326,7 +326,7 @@ function useWrappedComponent<T, M extends Record<string, any> = any>(
                         Field: Component as any,
                         plugin,
                         path,
-                        collection: collection as any,
+                        collection: collection as any
                     };
                     const enabled = plugin.fieldBuilder.enabled?.(params);
                     if (enabled === undefined || enabled)

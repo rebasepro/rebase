@@ -24,7 +24,7 @@ export function Skeleton({
                              height,
                              className
                          }: SkeletonProps) {
-    
+
     useInjectStyles("Skeleton", styles);
 
     return <span
@@ -39,8 +39,8 @@ export function Skeleton({
             "max-w-full max-h-full",
             className)
     }>
-        <span 
-            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 dark:via-white/5 to-transparent" 
+        <span
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 dark:via-white/5 to-transparent"
             style={{ animation: "shimmer 1s infinite" }}
         />
     </span>;

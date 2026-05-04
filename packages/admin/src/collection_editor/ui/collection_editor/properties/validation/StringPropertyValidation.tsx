@@ -3,7 +3,7 @@ import React from "react";
 
 import { Field, FormexFieldProps, getIn, useFormex } from "@rebasepro/formex";
 ;
-import { DebouncedTextField, } from "@rebasepro/ui";
+import { DebouncedTextField } from "@rebasepro/ui";
 import { GeneralPropertyValidation } from "./GeneralPropertyValidation";
 import { SwitchControl } from "../../SwitchControl";
 import { serializeRegExp } from "@rebasepro/utils";
@@ -51,7 +51,7 @@ export function StringPropertyValidation({
     return (
         <div className={"grid grid-cols-12 gap-2"}>
 
-            <GeneralPropertyValidation disabled={disabled} />
+            <GeneralPropertyValidation disabled={disabled}/>
 
             <div className={"grid grid-cols-12 gap-2 col-span-12"}>
 
@@ -63,7 +63,7 @@ export function StringPropertyValidation({
                                 label={"Lowercase"}
                                 disabled={disabled}
                                 form={form}
-                                field={field} />
+                                field={field}/>
                         }}
                     </Field>
                 </div>}
@@ -76,7 +76,7 @@ export function StringPropertyValidation({
                                 label={"Uppercase"}
                                 disabled={disabled}
                                 form={form}
-                                field={field} />
+                                field={field}/>
                         }}
                     </Field>
                 </div>}
@@ -89,7 +89,7 @@ export function StringPropertyValidation({
                                 label={"Trim"}
                                 disabled={disabled}
                                 form={form}
-                                field={field} />
+                                field={field}/>
                         }}
                     </Field>
                 </div>}
@@ -106,7 +106,7 @@ export function StringPropertyValidation({
                         size="small"
 
                         disabled={disabled}
-                        onChange={handleChange} />
+                        onChange={handleChange}/>
                 </div>}
 
                 {min && <div className={"col-span-4"}>
@@ -117,7 +117,7 @@ export function StringPropertyValidation({
                         size="small"
 
                         disabled={disabled}
-                        onChange={handleChange} />
+                        onChange={handleChange}/>
                 </div>}
 
                 {max && <div className={"col-span-4"}>
@@ -128,7 +128,7 @@ export function StringPropertyValidation({
                         size="small"
 
                         disabled={disabled}
-                        onChange={handleChange} />
+                        onChange={handleChange}/>
                 </div>}
 
             </div>
@@ -140,7 +140,7 @@ export function StringPropertyValidation({
                     size="small"
                     disabled={disabled}
                     value={matchesStringValue}
-                    error={Boolean(matchesError)} />
+                    error={Boolean(matchesError)}/>
                 <FieldCaption error={Boolean(matchesError)}>
                     {matchesError ? "Not a valid regexp" : "e.g. /^\\d+$/ for digits only"}
                 </FieldCaption>

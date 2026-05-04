@@ -2,7 +2,7 @@ import React from "react";
 import { Outlet } from "react-router-dom";
 import {
     useAdminModeController,
-    useRebaseRegistry,
+    useRebaseRegistry
 } from "@rebasepro/core";
 
 import { Scaffold } from "./app/Scaffold";
@@ -48,12 +48,12 @@ export function RebaseLayout(props: RebaseLayoutProps) {
         appBar,
         drawer,
         autoOpenDrawer = false,
-        devViews = [],
+        devViews = []
     } = props;
 
     const adminModeController = useAdminModeController();
 
-    const ActiveAppBar = appBar ?? <AppBar />;
+    const ActiveAppBar = appBar ?? <AppBar/>;
     const ActiveDrawer = drawer ?? (
         <Drawer
             title={title}
@@ -63,11 +63,11 @@ export function RebaseLayout(props: RebaseLayoutProps) {
 
     return (
         <Scaffold autoOpenDrawer={autoOpenDrawer}>
-            <AdminModeSyncer devViews={devViews} />
+            <AdminModeSyncer devViews={devViews}/>
             {ActiveAppBar}
             {ActiveDrawer}
-            <Outlet />
-            <SideDialogs />
+            <Outlet/>
+            <SideDialogs/>
         </Scaffold>
     );
 }

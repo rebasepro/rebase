@@ -90,7 +90,7 @@ export function CollectionJsonImportDialog({
             maxWidth="2xl"
         >
             <DialogTitle className="flex items-center gap-2">
-                <CodeIcon size="small" />
+                <CodeIcon size="small"/>
                 Import Collection from JSON
             </DialogTitle>
             <DialogContent className="flex flex-col gap-4">

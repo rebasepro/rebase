@@ -1,6 +1,6 @@
 export {
     EntityForm,
-    zodToFormErrors,
+    zodToFormErrors
 } from "./EntityForm";
 // EntityFormProps is exported from @rebasepro/types
 

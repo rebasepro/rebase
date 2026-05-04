@@ -54,14 +54,14 @@ export function EntityView<M extends Record<string, unknown>>(
                                     target="_blank">
                                     <IconButton>
                                         <OpenInNewIcon
-                                            size={"small"} />
+                                            size={"small"}/>
                                     </IconButton>
                                 </a>}
                         </div>
                     </div>
                 </div>
 
-                <PropertyCollectionView data={entity.values} properties={properties} size={"medium"} />
+                <PropertyCollectionView data={entity.values} properties={properties} size={"medium"}/>
 
             </div>
         </div>

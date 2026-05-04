@@ -146,9 +146,9 @@ export function CollectionEditorDialog(props: CollectionEditorDialogProps) {
             <AIModifiedPathsProvider>
                 {open && <CollectionEditor {...props}
                     handleCancel={handleCancel}
-                    setFormDirty={setFormDirty} />}
+                    setFormDirty={setFormDirty}/>}
 
-                <UnsavedChangesDialog {...dialogProps} />
+                <UnsavedChangesDialog {...dialogProps}/>
             </AIModifiedPathsProvider>
         </Dialog>
     );
@@ -176,7 +176,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
     const authController = useAuthController();
 
     const {
-        topLevelNavigation,
+        topLevelNavigation
     } = navigationState;
     const {
         collections
@@ -196,7 +196,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
         try {
             if (collectionRegistry.initialised) {
                 if (props.editedCollectionId) {
-                    // We must use getRawCollection so the editor schema fields 
+                    // We must use getRawCollection so the editor schema fields
                     // aren't polluted with dynamically injected runtime `relations`.
                     // The path lookup relies on generating a fake child path to resolve through the registry
                     const collectionPath = [...(props.parentCollectionIds ?? []), props.editedCollectionId]
@@ -247,11 +247,11 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
             };
 
     if (!initialLoadingCompleted) {
-        return <CircularProgressCenter />;
+        return <CircularProgressCenter/>;
     }
 
     if (!props.isNewCollection && (!collectionRegistry.initialised || !initialLoadingCompleted)) {
-        return <CircularProgressCenter />;
+        return <CircularProgressCenter/>;
     }
 
     return <CollectionEditorInternal
@@ -263,7 +263,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
         collection={collection}
         setCollection={setCollection}
         groups={groups}
-        propertyConfigs={propertyConfigs} />
+        propertyConfigs={propertyConfigs}/>
 
 }
 
@@ -508,7 +508,8 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
             }
         }
         if (currentView === "properties") {
-            errors = { ...errors, ...propertyErrorsRef.current };
+            errors = { ...errors,
+...propertyErrorsRef.current };
         }
         if (currentView === "general") {
             const pathError = validatePath((col as any).table || col.slug, isNewCollection, existingPaths, col.slug);
@@ -545,7 +546,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     const pathError = validatePath(usedPath, isNewCollection, existingPaths, values.slug);
 
     const parentPaths = !pathError && parentCollectionIds ? collectionRegistry.convertIdsToPaths(parentCollectionIds) : undefined;
-    
+
     const updatedFullPath = parentPaths && parentPaths.length > 0
         ? [...parentPaths, usedPath].join("/fake_id/")
         : (path?.includes("/") ? path.split("/").slice(0, -1).join("/") + "/" + usedPath : usedPath);
@@ -594,7 +595,6 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
         // setFieldValue("propertiesOrder", Object.values(importConfig.headersMapping));
         setNextMode();
     };
-
 
 
     const [deleteRequested, setDeleteRequested] = useState(false);
@@ -688,12 +688,12 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                     <div className="flex-grow flex flex-col min-h-0 overflow-y-auto no-scrollbar relative w-full h-full">
 
                         {currentView === "loading" &&
-                            <CircularProgressCenter />}
+                            <CircularProgressCenter/>}
 
                         {currentView === "extra_view" &&
                             usedPath &&
                             extraView?.View &&
-                            <extraView.View path={usedPath} />}
+                            <extraView.View path={usedPath}/>}
 
                         {currentView === "welcome" &&
                             <CollectionEditorWelcomeView
@@ -721,16 +721,16 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                                             message: "Error importing table: " + (e instanceof Error ? e.message : "Unknown error")
                                         });
                                     }
-                                } : undefined} />}
+                                } : undefined}/>}
 
                         {currentView === "import_data_mapping" && importConfig &&
                             <CollectionEditorImportMapping importConfig={importConfig}
-                                propertyConfigs={propertyConfigs} />}
+                                propertyConfigs={propertyConfigs}/>}
 
                         {currentView === "import_data_preview" && importConfig &&
                             <CollectionEditorImportDataPreview importConfig={importConfig}
                                 properties={values.properties as Properties}
-                                propertiesOrder={values.propertiesOrder as string[]} />}
+                                propertiesOrder={values.propertiesOrder as string[]}/>}
 
                         {currentView === "import_data_saving" && importConfig &&
                             <ImportSaveInProgress importConfig={importConfig}
@@ -751,19 +751,19 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                                 existingPaths={existingPaths}
                                 existingIds={existingIds}
                                 parentCollection={parentCollection}
-                                isNewCollection={isNewCollection} />
+                                isNewCollection={isNewCollection}/>
                         }
 
                         {currentView === "display" &&
-                            <DisplaySettingsForm expandKanban={expandKanban} />
+                            <DisplaySettingsForm expandKanban={expandKanban}/>
                         }
 
                         {currentView === "relations" && getDataSourceCapabilities(values.driver).supportsRelations &&
-                            <CollectionRelationsTab />
+                            <CollectionRelationsTab/>
                         }
 
                         {currentView === "rls" && getDataSourceCapabilities(values.driver).supportsRLS &&
-                            <CollectionRLSTab />
+                            <CollectionRLSTab/>
                         }
 
                         {currentView === "properties" &&
@@ -789,13 +789,13 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                                         color={"primary"}
                                         onClick={() => setCurrentView("extra_view")}>
                                         {extraView.icon}
-                                    </IconButton>} />
+                                    </IconButton>}/>
                         }
 
                     </div>
                     {(!fullScreen || isNewCollection || !!error) && (
                         <div className="shrink-0 w-full p-4 sm:px-6 sm:py-4 border-t border-surface-200 dark:border-surface-800 flex items-center justify-between gap-4 bg-white dark:bg-surface-900">
-                            {error && <ErrorView error={error} />}
+                            {error && <ErrorView error={error}/>}
 
                             {isNewCollection && includeTemplates && currentView === "import_data_mapping" &&
                                 <Button variant={"text"}
@@ -827,7 +827,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                                 type="button"
                                 color={"neutral"}
                                 onClick={() => setCurrentView("general")}>
-                                <ArrowBackIcon />
+                                <ArrowBackIcon/>
                                 Back
                             </Button>}
 
@@ -874,7 +874,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                                     loading={isSubmitting}
                                     disabled={isSubmitting || (currentView === "general" && !validValues)}
                                     startIcon={currentView === "properties"
-                                        ? <CheckIcon />
+                                        ? <CheckIcon/>
                                         : undefined}
                                 >
                                     {currentView === "general" && "Next"}
@@ -905,7 +905,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
             title={<>Delete the stored config?</>}
             body={<> This will <b>not
                 delete any data</b>, only
-                the stored config, and reset to the code state.</>} />
+                the stored config, and reset to the code state.</>}/>
 
     </div>
 

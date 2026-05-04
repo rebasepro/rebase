@@ -189,7 +189,9 @@ export const RelationSelector = React.forwardRef<
                 const resolved = relationsArray.map(rel => {
                     const r = rel as EntityRelation;
                     if (r.data) return toRelationItem(r.data, r);
-                    return { id: r.id, label: String(r.id), relation: r } as RelationItem;
+                    return { id: r.id,
+label: String(r.id),
+relation: r } as RelationItem;
                 });
                 setSelectedItems(resolved);
                 hasResolvedItemsRef.current = true;
@@ -222,7 +224,9 @@ export const RelationSelector = React.forwardRef<
                         console.warn("RelationSelector: could not fetch entity for relation", rel, e);
                     }
                     const relation = isPrimitive ? new EntityRelation(relId as string | number, path) : rel as EntityRelation;
-                    return { id: relId, label: String(relId), relation } as RelationItem;
+                    return { id: relId,
+label: String(relId),
+relation } as RelationItem;
                 })
             ).then(resolved => {
                 if (active) {
@@ -363,7 +367,7 @@ export const RelationSelector = React.forwardRef<
             setIsPopoverOpen(false);
         }, []);
 
-        const resolvedPlaceholder = placeholder || emptyPlaceholder || <EmptyValue className={"ml-2"} />;
+        const resolvedPlaceholder = placeholder || emptyPlaceholder || <EmptyValue className={"ml-2"}/>;
 
         // Use Sheet portal container if available, otherwise document.body
         const portalContainer = (typeof document !== "undefined" ? document.body : undefined);
@@ -397,7 +401,7 @@ export const RelationSelector = React.forwardRef<
                             <div className="flex justify-between items-center w-full">
                                 {isLoadingSelectedItems ? (
                                     <div className="flex items-center gap-2">
-                                        <CircularProgress size="smallest" />
+                                        <CircularProgress size="smallest"/>
                                         <span className="text-sm text-text-secondary dark:text-text-secondary-dark">{loadingText}</span>
                                     </div>
                                 ) : selectedItems.length > 0 ? (
@@ -431,7 +435,7 @@ export const RelationSelector = React.forwardRef<
                                                     {item.data ? (
                                                         <EntityPreviewData size={"smallest"} entity={item.data}
                                                             includeEntityLink={false}
-                                                            includeId={false} />
+                                                            includeId={false}/>
                                                     ) : (
                                                         <span className="text-sm truncate">{item.label}</span>
                                                     )}
@@ -473,7 +477,7 @@ export const RelationSelector = React.forwardRef<
                                                         updateUrl: true
                                                     });
                                                 }}>
-                                                <KeyboardTabIcon size={"small"} />
+                                                <KeyboardTabIcon size={"small"}/>
                                             </IconButton>
                                         </Tooltip>
                                     )}
@@ -509,7 +513,7 @@ export const RelationSelector = React.forwardRef<
                                     <div className="relative flex-1">
                                         <SearchIcon
                                             className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary dark:text-text-secondary-dark"
-                                            size="small" />
+                                            size="small"/>
                                         <CommandPrimitive.Input
                                             ref={searchInputRef}
                                             className={cls(
@@ -523,7 +527,7 @@ export const RelationSelector = React.forwardRef<
                                     </div>
                                     {isLoading && (
                                         <div className="flex items-center justify-center px-3">
-                                            <CircularProgress size="smallest" />
+                                            <CircularProgress size="smallest"/>
                                         </div>
                                     )}
                                     {selectedItems.length > 0 && (
@@ -535,7 +539,7 @@ export const RelationSelector = React.forwardRef<
                                         </div>
                                     )}
                                 </div>
-                                <Separator orientation="horizontal" className="my-0" />
+                                <Separator orientation="horizontal" className="my-0"/>
                                 <CommandPrimitive.List
                                     ref={scrollContainerRef}
                                     style={{
@@ -545,7 +549,7 @@ export const RelationSelector = React.forwardRef<
                                 >
                                     {isLoading && availableItems.length === 0 && (
                                         <div className="flex items-center justify-center py-6">
-                                            <CircularProgress size="small" />
+                                            <CircularProgress size="small"/>
                                             <span
                                                 className="ml-2 text-sm text-text-secondary dark:text-text-secondary-dark">{loadingText}</span>
                                         </div>
@@ -574,7 +578,7 @@ export const RelationSelector = React.forwardRef<
                                                         "aria-selected:outline-hidden aria-selected:ring-2 aria-selected:ring-primary/75 aria-selected:ring-offset-2 aria-selected:bg-surface-accent-100 dark:aria-selected:bg-surface-accent-900"
                                                     )}
                                                 >
-                                                    {multiple && (<InnerCheckBox checked={isSelected} />)}
+                                                    {multiple && (<InnerCheckBox checked={isSelected}/>)}
                                                     {item.data ? (
                                                         <div
                                                             className="flex flex-row items-center gap-2 min-w-0 w-full">
@@ -600,11 +604,11 @@ export const RelationSelector = React.forwardRef<
                                         })}
                                         {availableItems.length > 0 && hasMore && (
                                             <div ref={sentinelCallbackRef} className="h-1 w-full"
-                                                style={{ visibility: "hidden" }} />
+                                                style={{ visibility: "hidden" }}/>
                                         )}
                                         {isLoading && availableItems.length > 0 && (
                                             <div className="flex items-center justify-center py-4">
-                                                <CircularProgress size="smallest" />
+                                                <CircularProgress size="smallest"/>
                                                 <span
                                                     className="ml-2 text-xs text-text-secondary dark:text-text-secondary-dark">Loading...</span>
                                             </div>
@@ -633,7 +637,7 @@ function InnerCheckBox({ checked }: { checked: boolean }) {
                     checked ? "bg-primary text-surface-accent-100 dark:text-surface-accent-900 border-transparent" : "bg-white dark:bg-surface-accent-900 border-surface-accent-800 dark:border-surface-accent-200"
                 )}
             >
-                {checked && <CheckIcon size={16} className="absolute" />}
+                {checked && <CheckIcon size={16} className="absolute"/>}
             </div>
         </div>
     );

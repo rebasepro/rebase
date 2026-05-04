@@ -19,7 +19,7 @@ import {
     TableCell,
     TableRow,
     Tooltip,
-    Typography,
+    Typography
 } from "@rebasepro/ui";
 import { CollectionEditorDialog } from "./CollectionEditorDialog";
 import { CollectionsConfigController } from "../../types/config_controller";
@@ -56,7 +56,7 @@ export function SubcollectionsEditTab({
 
     const {
         values,
-        setFieldValue,
+        setFieldValue
     } = useFormex<EntityCollection>();
 
     const [subcollections, setSubcollections] = React.useState<EntityCollection[]>(getSubcollections(collection) ?? []);
@@ -101,7 +101,7 @@ export function SubcollectionsEditTab({
                                                             setSubcollectionToDelete(subcollection.slug);
                                                         }}
                                                         color="inherit">
-                                                        <DeleteIcon size={"small"} />
+                                                        <DeleteIcon size={"small"}/>
                                                     </IconButton>
                                                 </Tooltip>
                                             </TableCell>
@@ -118,7 +118,7 @@ export function SubcollectionsEditTab({
                                 }}
                                 variant="filled"
                                 color="neutral"
-                                startIcon={<AddIcon />}>
+                                startIcon={<AddIcon/>}>
                                 Add subcollection
                             </Button>
 
@@ -155,7 +155,7 @@ export function SubcollectionsEditTab({
                                                                 setViewToDelete(view.key);
                                                             }}
                                                             color="inherit">
-                                                            <DeleteIcon size={"small"} />
+                                                            <DeleteIcon size={"small"}/>
                                                         </IconButton>
                                                     </Tooltip>
                                                 </TableCell>
@@ -184,7 +184,7 @@ export function SubcollectionsEditTab({
                                     }}
                                     variant="filled"
                                     color="neutral"
-                                    startIcon={<AddIcon />}>
+                                    startIcon={<AddIcon/>}>
                                     Add custom entity view
                                 </Button>
                             </div>
@@ -213,7 +213,7 @@ export function SubcollectionsEditTab({
                     title={<>Delete this subcollection?</>}
                     body={<> This will <b>not
                         delete any data</b>, only
-                        the collection in the CMS</>} />}
+                        the collection in the CMS</>}/>}
             {viewToDelete &&
                 <ConfirmationDialog open={Boolean(viewToDelete)}
                     onAccept={() => {
@@ -224,7 +224,7 @@ export function SubcollectionsEditTab({
                     title={<>Remove this view?</>}
                     body={<>This will <b>not
                         delete any data</b>, only
-                        the view in the CMS</>} />}
+                        the view in the CMS</>}/>}
 
             <CollectionEditorDialog
                 open={Boolean(currentDialog)}
@@ -240,7 +240,7 @@ export function SubcollectionsEditTab({
                         setSubcollections([...subcollections, updatedCollection]);
                     }
                     setCurrentDialog(undefined);
-                }} />
+                }}/>
 
             <EntityCustomViewsSelectDialog
                 open={addEntityViewDialogOpen}
@@ -249,7 +249,7 @@ export function SubcollectionsEditTab({
                         setFieldValue("entityViews", [...(values.entityViews ?? []), selectedViewKey]);
                     }
                     setAddEntityViewDialogOpen(false);
-                }} />
+                }}/>
         </>
     );
 }

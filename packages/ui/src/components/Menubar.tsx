@@ -24,7 +24,7 @@ export function Menubar({
 }
 
 export function MenubarMenu({
-                                children,
+                                children
                             }: { children: React.ReactNode }) {
     return (
         <MenubarPrimitive.Menu>
@@ -54,7 +54,7 @@ export function MenubarTrigger({
 
 export function MenubarPortal({
                                   children,
-                                  portalContainer,
+                                  portalContainer
                               }: {
     children: React.ReactNode;
     portalContainer?: HTMLElement | null;

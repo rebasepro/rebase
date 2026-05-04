@@ -75,7 +75,7 @@ export function StorageThumbnailInternal({
             interactive={interactive}
             size={size}
             fill={fill}
-            hint={storagePathOrDownloadUrl} />
+            hint={storagePathOrDownloadUrl}/>
         : renderSkeletonImageThumbnail(size);
 }
 

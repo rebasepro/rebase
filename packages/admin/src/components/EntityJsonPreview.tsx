@@ -55,7 +55,7 @@ export function EntityJsonPreview({ values }: { values: object }) {
           {tokens.map((line, i) => (
               <div key={i} {...getLineProps({ line })} className="text-wrap">
                   {line.map((token, key) => (
-                      <span key={key} {...getTokenProps({ token })} className="word-break" />
+                      <span key={key} {...getTokenProps({ token })} className="word-break"/>
                   ))}
               </div>
           ))}

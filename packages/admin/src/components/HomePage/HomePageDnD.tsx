@@ -93,7 +93,7 @@ export function SortableNavigationCard({
 
     return (
         <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-            <NavigationCardBinding {...entry} onClick={onClick} />
+            <NavigationCardBinding {...entry} onClick={onClick}/>
         </div>
     );
 }

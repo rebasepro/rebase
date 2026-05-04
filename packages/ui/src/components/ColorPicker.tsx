@@ -38,7 +38,7 @@ function getColorDisplayName(colorKey: ChipColorKey): string {
 /**
  * A color picker component that displays a grid of predefined CHIP_COLORS.
  * Used for selecting colors for enum values, tags, and other chip-based UI elements.
- * 
+ *
  * @group Form components
  */
 export function ColorPicker({
@@ -71,7 +71,7 @@ export function ColorPicker({
                         "rounded-full border-2 border-dashed border-surface-accent-400 dark:border-surface-accent-600",
                         "flex items-center justify-center"
                     )}>
-                        {!value && <CheckIcon size={checkSize} />}
+                        {!value && <CheckIcon size={checkSize}/>}
                     </div>
                     <span className="text-surface-accent-700 dark:text-surface-accent-300">
                         Auto (based on ID)
@@ -105,7 +105,7 @@ export function ColorPicker({
                                     isSelected && "ring-2 ring-primary ring-offset-1"
                                 )}
                                 style={{
-                                    backgroundColor: colorScheme.color,
+                                    backgroundColor: colorScheme.color
                                 }}
                                 aria-label={displayName}
                                 aria-pressed={isSelected}

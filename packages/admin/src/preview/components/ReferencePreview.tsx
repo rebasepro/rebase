@@ -32,11 +32,11 @@ export const ReferencePreview = function ReferencePreview(props: ReferencePrevie
             onClick={props.onClick}
             size={props.size ?? "medium"}>
             <ErrorView error={"Unexpected value. Click to edit"}
-                tooltip={JSON.stringify(reference)} />
+                tooltip={JSON.stringify(reference)}/>
         </EntityPreviewContainer>;
     }
     return <ErrorBoundary>
-        <ReferencePreviewInternal {...props} />
+        <ReferencePreviewInternal {...props}/>
     </ErrorBoundary>;
 };
 
@@ -58,13 +58,13 @@ function ReferencePreviewInternal({
     const collection = collectionRegistryController.getCollection(reference.path);
     if (!collection) {
         if (customizationController.components?.missingReference) {
-            return <customizationController.components.missingReference path={reference.path} />;
+            return <customizationController.components.missingReference path={reference.path}/>;
         } else {
             return <EntityPreviewContainer
                 onClick={onClick}
                 size={size ?? "medium"}>
                 <ErrorView error={"Unexpected reference value. Click to edit"}
-                    tooltip={reference.pathWithId} />
+                    tooltip={reference.pathWithId}/>
             </EntityPreviewContainer>;
         }
     }
@@ -78,7 +78,7 @@ function ReferencePreviewInternal({
         includeEntityLink={includeEntityLink}
         includeId={includeId}
         onClick={onClick}
-        hover={hover} />
+        hover={hover}/>
 }
 
 function ReferencePreviewExisting<M extends Record<string, unknown> = Record<string, unknown>>({
@@ -115,10 +115,10 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
     let body: React.ReactNode;
 
     if (!reference) {
-        body = <ErrorView error={"Reference not set"} />;
+        body = <ErrorView error={"Reference not set"}/>;
     } else if (usedEntity && !usedEntity.values) {
         body = <ErrorView error={"Reference does not exist"}
-            tooltip={reference.path} />;
+            tooltip={reference.path}/>;
     }
     if (body) {
 
@@ -136,7 +136,7 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
             <EntityPreviewContainer onClick={disabled ? undefined : onClick}
                 hover={disabled ? undefined : hover}
                 size={size}>
-                <Skeleton />
+                <Skeleton/>
             </EntityPreviewContainer>
         );
     }
@@ -146,7 +146,7 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
             <EntityPreviewContainer onClick={disabled ? undefined : onClick}
                 hover={disabled ? undefined : hover}
                 size={size}>
-                <ErrorView error={"Entity not found"} />
+                <ErrorView error={"Entity not found"}/>
             </EntityPreviewContainer>
         );
     }
@@ -159,7 +159,7 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
         onClick={onClick}
         includeEntityLink={includeEntityLink}
         includeId={includeId}
-        hover={hover} />;
+        hover={hover}/>;
 
 }
 

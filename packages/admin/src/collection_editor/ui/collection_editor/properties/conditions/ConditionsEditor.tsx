@@ -24,10 +24,18 @@ import { getPropertyPaths } from "./property_paths";
  * Condition types that can be configured
  */
 const CONDITION_TYPES = [
-    { id: "disabled", label: "Disabled", description: "Disable this field when condition is true" },
-    { id: "hidden", label: "Hidden", description: "Hide this field when condition is true" },
-    { id: "required", label: "Required", description: "Make this field required when condition is true" },
-    { id: "readOnly", label: "Read Only", description: "Make this field read-only when condition is true" }
+    { id: "disabled",
+label: "Disabled",
+description: "Disable this field when condition is true" },
+    { id: "hidden",
+label: "Hidden",
+description: "Hide this field when condition is true" },
+    { id: "required",
+label: "Required",
+description: "Make this field required when condition is true" },
+    { id: "readOnly",
+label: "Read Only",
+description: "Make this field read-only when condition is true" }
 ] as const;
 
 type ConditionType = typeof CONDITION_TYPES[number]["id"];
@@ -36,27 +44,72 @@ type ConditionType = typeof CONDITION_TYPES[number]["id"];
  * Operators for building conditions with their applicable data types
  */
 const OPERATORS = [
-    { id: "==", label: "equals", valueType: "any", applicableTo: ["string", "number", "boolean", "date"] },
-    { id: "!=", label: "not equals", valueType: "any", applicableTo: ["string", "number", "boolean", "date"] },
-    { id: ">", label: "greater than", valueType: "number", applicableTo: ["number", "date"] },
-    { id: "<", label: "less than", valueType: "number", applicableTo: ["number", "date"] },
-    { id: ">=", label: "greater or equal", valueType: "number", applicableTo: ["number", "date"] },
-    { id: "<=", label: "less or equal", valueType: "number", applicableTo: ["number", "date"] },
-    { id: "in", label: "contains", valueType: "any", applicableTo: ["array"] },
-    { id: "!in", label: "not contains", valueType: "any", applicableTo: ["array"] },
-    { id: "!!", label: "has a value", valueType: "none", applicableTo: ["string", "number", "boolean", "array", "map", "date"] },
-    { id: "!", label: "is empty", valueType: "none", applicableTo: ["string", "number", "boolean", "array", "map", "date"] },
-    { id: "isPast", label: "is in the past", valueType: "none", applicableTo: ["date"] },
-    { id: "isFuture", label: "is in the future", valueType: "none", applicableTo: ["date"] }
+    { id: "==",
+label: "equals",
+valueType: "any",
+applicableTo: ["string", "number", "boolean", "date"] },
+    { id: "!=",
+label: "not equals",
+valueType: "any",
+applicableTo: ["string", "number", "boolean", "date"] },
+    { id: ">",
+label: "greater than",
+valueType: "number",
+applicableTo: ["number", "date"] },
+    { id: "<",
+label: "less than",
+valueType: "number",
+applicableTo: ["number", "date"] },
+    { id: ">=",
+label: "greater or equal",
+valueType: "number",
+applicableTo: ["number", "date"] },
+    { id: "<=",
+label: "less or equal",
+valueType: "number",
+applicableTo: ["number", "date"] },
+    { id: "in",
+label: "contains",
+valueType: "any",
+applicableTo: ["array"] },
+    { id: "!in",
+label: "not contains",
+valueType: "any",
+applicableTo: ["array"] },
+    { id: "!!",
+label: "has a value",
+valueType: "none",
+applicableTo: ["string", "number", "boolean", "array", "map", "date"] },
+    { id: "!",
+label: "is empty",
+valueType: "none",
+applicableTo: ["string", "number", "boolean", "array", "map", "date"] },
+    { id: "isPast",
+label: "is in the past",
+valueType: "none",
+applicableTo: ["date"] },
+    { id: "isFuture",
+label: "is in the future",
+valueType: "none",
+applicableTo: ["date"] }
 ] as const;
 
 type OperatorId = typeof OPERATORS[number]["id"];
 
 // Context fields with their types
 const CONTEXT_FIELDS = [
-    { id: "isNew", label: "Is New Entity", dataType: "boolean", color: "#9c27b0" },
-    { id: "entityId", label: "Entity ID", dataType: "string", color: "#2196f3" },
-    { id: "user.roles", label: "User Roles", dataType: "array", color: "#ff9800" }
+    { id: "isNew",
+label: "Is New Entity",
+dataType: "boolean",
+color: "#9c27b0" },
+    { id: "entityId",
+label: "Entity ID",
+dataType: "string",
+color: "#2196f3" },
+    { id: "user.roles",
+label: "User Roles",
+dataType: "array",
+color: "#ff9800" }
 ] as const;
 
 interface SimpleRule {
@@ -73,7 +126,7 @@ type LogicOperator = "and" | "or";
 interface ConditionGroup {
     logic: LogicOperator;
     rules: SimpleRule[];
-    groups?: ConditionGroup[];  // Nested groups for complex logic
+    groups?: ConditionGroup[]; // Nested groups for complex logic
 }
 
 /**
@@ -332,7 +385,10 @@ function ConditionRow({
                         ? rule.operator
                         : newApplicableOps[0]?.id ?? "==";
                     // Reset value when changing field
-                    onRuleChange({ ...rule, field: value, operator: newOperator as OperatorId, value: "" });
+                    onRuleChange({ ...rule,
+field: value,
+operator: newOperator as OperatorId,
+value: "" });
                 }}
                 disabled={disabled}
                 size="small"
@@ -396,7 +452,8 @@ function ConditionRow({
             {/* Operator - filtered by field type */}
             <Select
                 value={rule.operator}
-                onValueChange={(value) => onRuleChange({ ...rule, operator: value as OperatorId })}
+                onValueChange={(value) => onRuleChange({ ...rule,
+operator: value as OperatorId })}
                 disabled={disabled}
                 size="small"
                 inputClassName="min-w-[120px]">
@@ -411,7 +468,8 @@ function ConditionRow({
             {showValueField && (
                 <ConditionValueInput
                     value={rule.value}
-                    onChange={(newValue) => onRuleChange({ ...rule, value: newValue })}
+                    onChange={(newValue) => onRuleChange({ ...rule,
+value: newValue })}
                     dataType={fieldDataType}
                     enumValues={enumValues}
                     disabled={disabled}
@@ -422,7 +480,7 @@ function ConditionRow({
             {/* Remove button */}
             {showRemoveButton && (
                 <IconButton onClick={onRemove} disabled={disabled} size="small" variant="ghost">
-                    <DeleteIcon size="smallest" />
+                    <DeleteIcon size="smallest"/>
                 </IconButton>
             )}
         </div>
@@ -443,13 +501,15 @@ function ConditionGroupRow({
     showErrors
 }: ConditionGroupRowProps) {
     const handleLogicChange = (logic: LogicOperator) => {
-        onGroupChange({ ...group, logic });
+        onGroupChange({ ...group,
+logic });
     };
 
     const handleRuleChange = (index: number, rule: SimpleRule) => {
         const newRules = [...group.rules];
         newRules[index] = rule;
-        onGroupChange({ ...group, rules: newRules });
+        onGroupChange({ ...group,
+rules: newRules });
     };
 
     const handleRemoveRule = (index: number) => {
@@ -457,7 +517,8 @@ function ConditionGroupRow({
         if (newRules.length === 0) {
             onRemove();
         } else {
-            onGroupChange({ ...group, rules: newRules });
+            onGroupChange({ ...group,
+rules: newRules });
         }
     };
 
@@ -467,7 +528,8 @@ function ConditionGroupRow({
             operator: "==",
             value: ""
         };
-        onGroupChange({ ...group, rules: [...group.rules, defaultRule] });
+        onGroupChange({ ...group,
+rules: [...group.rules, defaultRule] });
     };
 
     return (
@@ -490,7 +552,7 @@ function ConditionGroupRow({
                     )}
                 </div>
                 <IconButton onClick={onRemove} disabled={disabled} size="small" variant="ghost">
-                    <DeleteIcon size="smallest" />
+                    <DeleteIcon size="smallest"/>
                 </IconButton>
             </div>
 
@@ -602,14 +664,18 @@ function jsonLogicToSimpleRule(jsonLogic: Record<string, any>): SimpleRule | nul
                         const value = Array.isArray(right)
                             ? right.join(", ")
                             : String(right ?? "");
-                        return { field, operator: "!in", value };
+                        return { field,
+operator: "!in",
+value };
                     }
                 }
             }
             // Otherwise it's a simple negation (is falsy)
             if (args?.var) {
                 const field = args.var.replace(/^values\./, "");
-                return { field, operator: "!", value: "" };
+                return { field,
+operator: "!",
+value: "" };
             }
         }
 
@@ -617,7 +683,9 @@ function jsonLogicToSimpleRule(jsonLogic: Record<string, any>): SimpleRule | nul
             const varObj = args;
             if (varObj?.var) {
                 const field = varObj.var.replace(/^values\./, "");
-                return { field, operator, value: "" };
+                return { field,
+operator,
+value: "" };
             }
         }
 
@@ -626,7 +694,9 @@ function jsonLogicToSimpleRule(jsonLogic: Record<string, any>): SimpleRule | nul
             const varObj = args;
             if (varObj?.var) {
                 const field = varObj.var.replace(/^values\./, "");
-                return { field, operator, value: "" };
+                return { field,
+operator,
+value: "" };
             }
         }
 
@@ -637,7 +707,9 @@ function jsonLogicToSimpleRule(jsonLogic: Record<string, any>): SimpleRule | nul
                 const value = Array.isArray(right)
                     ? right.join(", ")
                     : String(right ?? "");
-                return { field, operator, value };
+                return { field,
+operator,
+value };
             }
         }
     } catch {
@@ -755,9 +827,10 @@ export function ConditionsEditor({ disabled, collectionProperties }: ConditionsE
         if (jsonLogic) {
             console.log(`[ConditionsEditor] Parsing ${type.id}:`, jsonLogic);
             const group = jsonLogicToGroup(jsonLogic as Record<string, any>);
-            console.log(`[ConditionsEditor] Parsed group:`, group);
+            console.log("[ConditionsEditor] Parsed group:", group);
             if (group) {
-                activeConditions.push({ type: type.id, group });
+                activeConditions.push({ type: type.id,
+group });
             }
         }
     }

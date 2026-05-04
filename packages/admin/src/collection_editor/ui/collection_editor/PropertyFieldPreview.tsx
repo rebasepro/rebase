@@ -8,9 +8,8 @@ import {
     DoNotDisturbOnIcon,
     FunctionsIcon,
     Paper,
-    Typography,
+    Typography
 } from "@rebasepro/ui";
-
 
 
 export function PropertyFieldPreview({
@@ -44,12 +43,12 @@ export function PropertyFieldPreview({
         <Paper
             className={cls(
                 "w-full flex flex-row gap-3 items-center px-3 py-2 rounded-lg transition-all duration-200 border border-transparent bg-transparent",
-                selected 
-                    ? "bg-primary/5 dark:bg-primary/10 ring-1 ring-inset ring-primary" 
+                selected
+                    ? "bg-primary/5 dark:bg-primary/10 ring-1 ring-inset ring-primary"
                     : "hover:bg-surface-50 dark:hover:bg-surface-800"
             )}
         >
-            <PropertyConfigBadge propertyConfig={propertyConfig} size="small" />
+            <PropertyConfigBadge propertyConfig={propertyConfig} size="small"/>
 
             <div className="flex-1 flex flex-col min-w-0 pr-8">
                 {includeName &&
@@ -110,18 +109,18 @@ export function NonEditablePropertyPreview({
         <Paper
             className={cls(
                 "w-full flex flex-row gap-3 items-center px-3 py-2 rounded-lg transition-all duration-200 border border-transparent bg-transparent",
-                selected 
-                    ? "bg-primary/5 dark:bg-primary/10 ring-1 ring-inset ring-primary" 
+                selected
+                    ? "bg-primary/5 dark:bg-primary/10 ring-1 ring-inset ring-primary"
                     : "hover:bg-surface-50 dark:hover:bg-surface-800"
             )}
         >
             <div className={"relative shrink-0"}>
-                {propertyConfig && <PropertyConfigBadge propertyConfig={propertyConfig} size="small" />}
+                {propertyConfig && <PropertyConfigBadge propertyConfig={propertyConfig} size="small"/>}
                 {!propertyConfig && <div
                     className={"h-8 w-8 flex items-center justify-center rounded-full shadow-2xs text-white bg-surface-500"}>
-                    <FunctionsIcon color={"inherit"} size={"small"} />
+                    <FunctionsIcon color={"inherit"} size={"small"}/>
                 </div>}
-                <DoNotDisturbOnIcon color={"disabled"} size={"small"} className={"absolute -right-2 -top-2 bg-surface-50 dark:bg-surface-900 rounded-full"} />
+                <DoNotDisturbOnIcon color={"disabled"} size={"small"} className={"absolute -right-2 -top-2 bg-surface-50 dark:bg-surface-900 rounded-full"}/>
             </div>
 
             <div className="flex-1 flex flex-col min-w-0 pr-8">

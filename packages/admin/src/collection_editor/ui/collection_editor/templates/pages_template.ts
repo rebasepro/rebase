@@ -41,7 +41,7 @@ export const pagesCollectionTemplate = {
                     name: "Background Image",
                     storage: {
                         storagePath: "page_hero/images",
-                        acceptedFiles: ["image/*"],
+                        acceptedFiles: ["image/*"]
                     }
                 },
                 call_to_action: {
@@ -117,7 +117,7 @@ export const pagesCollectionTemplate = {
                                 }
                             }
                         }
-                    },
+                    }
                 }
             }
         },

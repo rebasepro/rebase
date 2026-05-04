@@ -88,11 +88,11 @@ function getRowHeight(size: CollectionSize): number {
     // +1 accounts for the 1px bottom border on each row wrapper
     switch (size) {
         case "xs": return 45;
-        case "s":  return 53;
-        case "m":  return 73;
-        case "l":  return 85;
+        case "s": return 53;
+        case "m": return 73;
+        case "l": return 85;
         case "xl": return 97;
-        default:   return 73;
+        default: return 73;
     }
 }
 
@@ -217,13 +217,16 @@ function formatDateValue(value: unknown): string | null {
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
     if (diffDays === 0) {
-        return date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+        return date.toLocaleTimeString(undefined, { hour: "2-digit",
+minute: "2-digit" });
     } else if (diffDays === 1) {
         return "Yesterday";
     } else if (diffDays < 7) {
         return `${diffDays}d ago`;
     } else {
-        return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: diffDays > 365 ? "numeric" : undefined });
+        return date.toLocaleDateString(undefined, { month: "short",
+day: "numeric",
+year: diffDays > 365 ? "numeric" : undefined });
     }
 }
 
@@ -326,7 +329,6 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
     const { titleKey: titlePropertyKey, imageKey: imagePropertyKey, subtitleKey, statusKey: statusPropertyKey, dateKey: datePropertyKey } = slotKeys;
 
 
-
     const previewKeys = useMemo(
         () => getEntityPreviewKeys(authController, resolvedCollection, customizationController.propertyConfigs, undefined, 10)
             .filter(key => key !== titlePropertyKey && key !== imagePropertyKey && key !== statusPropertyKey && key !== datePropertyKey),
@@ -336,7 +338,7 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
 
     const columns = useMemo(() => {
         const cols: ListColumnDef[] = [];
-        
+
         const getIdealColumnWidth = (prop: Property) => {
             if (prop.type === "string" && "enum" in prop) return "flex-shrink-0 w-32";
             if (prop.type === "date" || prop.type === "number" || prop.type === "boolean") return "flex-shrink-0 w-28";
@@ -349,7 +351,7 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
             resolvedCollection.listProperties.forEach((key, index) => {
                 const prop = resolvedCollection.properties[key] as Property;
                 if (!prop) return;
-                
+
                 cols.push({
                     key,
                     label: prop.name || key,
@@ -492,7 +494,6 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
     }, [highlightedEntities]);
 
 
-
     const rowClasses = getRowClasses(size);
 
     // Initial loading state (no data yet)
@@ -550,7 +551,7 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
                     </Typography>
                 </div>
             ) : isInitialLoading ? (
-                <CircularProgressCenter />
+                <CircularProgressCenter/>
             ) : isEmpty ? (
                 <div className="h-full flex items-center justify-center p-8">
                     {emptyComponent ?? (
@@ -577,7 +578,7 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
                     {/* Loading indicator (below the virtual list) */}
                     {dataLoading && (
                         <div className="flex items-center justify-center py-4">
-                            <CircularProgress size="small" />
+                            <CircularProgress size="small"/>
                         </div>
                     )}
                     {!dataLoading && noMoreToLoad && data.length > 0 && (
@@ -678,7 +679,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
         >
             {/* Selection indicator line */}
             {selected && !isActive && (
-                <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary-500 rounded-r-full" />
+                <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary-500 rounded-r-full"/>
             )}
 
             {/* Selection Checkbox */}
@@ -700,7 +701,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                 <div className="flex-shrink-0">
                     {slots.image ? (
                         <div className={cls("w-10 h-10 rounded-lg border relative overflow-hidden bg-surface-100 dark:bg-surface-800", defaultBorderMixin)}>
-                            <PropertyPreview propertyKey={slots.image.propertyKey} value={slots.image.value} property={slots.image.property} size="small" fill={true} />
+                            <PropertyPreview propertyKey={slots.image.propertyKey} value={slots.image.value} property={slots.image.property} size="small" fill={true}/>
                         </div>
                     ) : (
                         <div className={cls("w-10 h-10 rounded-lg bg-surface-100 dark:bg-surface-800 flex items-center justify-center border", defaultBorderMixin)}>
@@ -780,7 +781,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                             return (
                                 <div key={col.key} className={cls(col.width, "flex", col.align === "center" ? "justify-center" : col.align === "right" ? "justify-end" : "justify-start")}>
                                     {value ? (
-                                        <PropertyPreview propertyKey={col.key} value={value} property={col.property} size="small" />
+                                        <PropertyPreview propertyKey={col.key} value={value} property={col.property} size="small"/>
                                     ) : <span className="text-surface-400">—</span>}
                                 </div>
                             );
@@ -813,7 +814,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                             <div key={col.key} className={cls(col.width, "truncate", col.align === "center" ? "text-center" : col.align === "right" ? "text-right" : "text-left")}>
                                 <Typography component="div" variant="body2" className="text-surface-600 dark:text-surface-300 truncate">
                                     {value !== undefined ? (
-                                        <PropertyPreview propertyKey={col.key} value={value} property={col.property} size="small" />
+                                        <PropertyPreview propertyKey={col.key} value={value} property={col.property} size="small"/>
                                     ) : "—"}
                                 </Typography>
                             </div>

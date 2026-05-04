@@ -14,7 +14,7 @@ export function VirtualTableNumberInput(props: {
         align,
         value,
         updateValue,
-        focused,
+        focused
     } = props;
     const propStringValue = (value && typeof value === "number") ? value.toString() : "";
     const [internalValue, setInternalValue] = useState<string | null>(propStringValue);

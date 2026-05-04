@@ -64,7 +64,7 @@ export function RepeatPropertyField({
                                 includeName={false}
                                 includeEditButton={true}
                                 selected={false}
-                                hasError={false} />}
+                                hasError={false}/>}
 
                             {!disabled && !ofProperty && <Button variant={"text"}
                                 color={ofPropertyError ? "error" : "primary"}
@@ -97,7 +97,7 @@ export function RepeatPropertyField({
             <div className={"col-span-12"}>
 
                 <ValidationPanel>
-                    <ArrayPropertyValidation disabled={disabled} />
+                    <ArrayPropertyValidation disabled={disabled}/>
                 </ValidationPanel>
 
             </div>

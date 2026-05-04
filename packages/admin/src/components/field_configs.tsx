@@ -135,7 +135,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
             type: "array",
             of: {
                 type: "string",
-                enum: [],
+                enum: []
             },
             Field: MultiSelectFieldBinding
         }
@@ -183,7 +183,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
             type: "array",
             of: {
                 type: "number",
-                enum: [],
+                enum: []
             },
             Field: MultiSelectFieldBinding
         }
@@ -250,7 +250,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         property: {
             type: "array",
             of: {
-                type: "reference",
+                type: "reference"
             },
             Field: ArrayOfReferencesFieldBinding
         }
@@ -311,7 +311,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         property: {
             type: "array",
             of: {
-                type: "string",
+                type: "string"
             },
             Field: RepeatFieldBinding
         }
@@ -336,7 +336,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         property: {
             type: "array",
             oneOf: {
-                properties: {},
+                properties: {}
             },
             Field: BlockFieldBinding
         }

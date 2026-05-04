@@ -22,7 +22,7 @@ export function NumberPropertyPreview({
         return <EnumValuesChip
             enumKey={enumKey}
             enumValues={enumValues}
-            size={size !== "medium" ? "small" : "medium"} />;
+            size={size !== "medium" ? "small" : "medium"}/>;
     } else {
         return <span className={size === "small" ? "text-sm" : ""}>{value}</span>;
     }

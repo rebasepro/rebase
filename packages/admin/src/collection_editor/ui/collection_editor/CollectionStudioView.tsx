@@ -5,7 +5,7 @@ import { useState, useMemo, useEffect } from "react";
 import {
     Typography,
     Button,
-    AddIcon,
+    AddIcon
 } from "@rebasepro/ui";
 import { useSnackbarController } from "@rebasepro/core";
 import { CollectionEditorDialogProps } from "./CollectionEditorDialog";
@@ -77,12 +77,12 @@ export function CollectionStudioView({ collectionId, ...props }: CollectionStudi
                         <Button
                             onClick={() => navigate(urlController.buildAppUrlPath("schema/new"))}
                         >
-                            <AddIcon />
+                            <AddIcon/>
                             Add new collection
                         </Button>
                     </div>
                 )}
-                
+
                 <UnsavedChangesDialog
                     {...dialogProps}
                     handleOk={() => {

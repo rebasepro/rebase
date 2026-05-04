@@ -78,7 +78,8 @@ export function RelationPropertyField({
     const updateRelationConfig = useCallback(
         (patch: Record<string, unknown>) => {
             const current = (values._relationConfig as Record<string, unknown>) ?? {};
-            setFieldValue("_relationConfig" as keyof (RelationProperty & { _relationConfig?: unknown }), { ...current, ...patch });
+            setFieldValue("_relationConfig" as keyof (RelationProperty & { _relationConfig?: unknown }), { ...current,
+...patch });
         },
         [values, setFieldValue]
     );
@@ -89,7 +90,8 @@ export function RelationPropertyField({
             const currentThrough = (current.through as Record<string, unknown>) ?? {};
             setFieldValue("_relationConfig" as keyof (RelationProperty & { _relationConfig?: unknown }), {
                 ...current,
-                through: { ...currentThrough, ...patch }
+                through: { ...currentThrough,
+...patch }
             });
         },
         [values, setFieldValue]

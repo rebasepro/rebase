@@ -4,7 +4,7 @@ import { CollectionSize, Entity, FilterValues } from "@rebasepro/types";
 
 import {
     EntityCollectionRowActions,
-    EntityCollectionTable,
+    EntityCollectionTable
 } from "../EntityCollectionTable";
 import {
     useAuthController,
@@ -100,7 +100,7 @@ export function EntitySelectionTable<M extends Record<string, unknown>>(
         selectedEntityIds: selectedEntityIdsProp,
         description,
         forceFilter,
-        maxSelection,
+        maxSelection
     }: EntitySelectionProps<M>) {
 
     const sideDialogContext = useSideDialogContext();
@@ -244,7 +244,7 @@ export function EntitySelectionTable<M extends Record<string, unknown>>(
 
     if (!collection) {
         return <ErrorView
-            error={"Could not find collection with id " + collection} />
+            error={"Could not find collection with id " + collection}/>
     }
 
     const displayedColumnIds = useColumnIds(collection, false);
@@ -254,7 +254,7 @@ export function EntitySelectionTable<M extends Record<string, unknown>>(
         collection,
         entitiesDisplayedFirst,
         forceFilter,
-        updateUrl: false,
+        updateUrl: false
     });
 
 
@@ -276,7 +276,7 @@ export function EntitySelectionTable<M extends Record<string, unknown>>(
                             <IconForView
                                 size={"small"}
                                 collectionOrView={collection}
-                                className={"text-surface-300 dark:text-surface-600"} />
+                                className={"text-surface-300 dark:text-surface-600"}/>
                             {collection.singularName
                                 ? `Select ${collection.singularName}`
                                 : `Select from ${collection.name}`}
@@ -290,7 +290,7 @@ export function EntitySelectionTable<M extends Record<string, unknown>>(
                             collection={collection}
                             path={path}
                             onNewClick={onNewClick}
-                            onClear={onClear} />
+                            onClear={onClear}/>
                         }
                     />}
             </div>
@@ -338,12 +338,12 @@ function EntitySelectionDialogActions({
         onClick && (largeLayout
             ? <Button
                 onClick={onClick}
-                startIcon={<AddIcon />}>
+                startIcon={<AddIcon/>}>
                 Add {collection.singularName ?? collection.name}
             </Button>
             : <Button
                 onClick={onClick}>
-                <AddIcon />
+                <AddIcon/>
             </Button>);
 
     return (

@@ -52,7 +52,7 @@ export function TableStorageUpload(props: {
         entity,
         path,
         previewSize,
-        updateValue,
+        updateValue
     } = props;
 
     const storageSource = useStorageSource();
@@ -96,7 +96,7 @@ export function TableStorageUpload(props: {
             multipleFilesSupported={multipleFilesSupported}
             onFilesAdded={onFilesAdded}
             onFileUploadComplete={onFileUploadComplete}
-            previewSize={previewSize} />
+            previewSize={previewSize}/>
 
     );
 }
@@ -138,7 +138,7 @@ function StorageUpload({
     storage,
     onFilesAdded,
     onFileUploadComplete,
-    storagePathBuilder,
+    storagePathBuilder
 }: StorageUploadProps) {
 
     const previewSize = previewSizeInput;
@@ -170,7 +170,8 @@ function StorageUpload({
         isDragAccept,
         isDragReject
     } = useDropzone({
-        accept: storage.acceptedFiles ? storage.acceptedFiles.map(e => ({ [e]: [] })).reduce((a, b) => ({ ...a, ...b }), {}) : undefined,
+        accept: storage.acceptedFiles ? storage.acceptedFiles.map(e => ({ [e]: [] })).reduce((a, b) => ({ ...a,
+...b }), {}) : undefined,
         disabled,
         maxSize: storage.maxSize,
         noClick: true,
@@ -221,7 +222,7 @@ function StorageUpload({
             )}
         >
 
-            <input autoFocus={autoFocus} {...getInputProps()} />
+            <input autoFocus={autoFocus} {...getInputProps()}/>
 
             {internalValue.map((entry, index) => {
                 let child;
@@ -233,7 +234,7 @@ function StorageUpload({
                             property={renderProperty}
                             value={entry.storagePathOrDownloadUrl}
                             entity={entity}
-                            size={previewSize} />
+                            size={previewSize}/>
                     );
                 } else if (entry.file) {
                     child = (
@@ -273,7 +274,7 @@ function StorageUpload({
                     color={"inherit"}
                     size={"small"}
                     onClick={open}>
-                    <EditIcon size={"small"} className={"text-surface-500"} />
+                    <EditIcon size={"small"} className={"text-surface-500"}/>
                 </IconButton>
             </EntityTableCellActions>
 
@@ -310,7 +311,7 @@ export function TableStorageItemPreview({
                         value={value}
                         property={property}
                         // entity={entity}
-                        size={size} />
+                        size={size}/>
                 </ErrorBoundary>
             }
 

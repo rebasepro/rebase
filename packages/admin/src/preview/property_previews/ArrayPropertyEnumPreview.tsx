@@ -31,5 +31,5 @@ export function ArrayPropertyEnumPreview({
     return <ArrayEnumPreview name={propertyKey}
         value={value}
         enumValues={enumValues}
-        size={size} />;
+        size={size}/>;
 }

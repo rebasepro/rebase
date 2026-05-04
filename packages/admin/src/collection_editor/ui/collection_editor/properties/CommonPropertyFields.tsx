@@ -63,7 +63,7 @@ export const CommonPropertyFields = React.forwardRef<HTMLDivElement, CommonPrope
                         placeholder={"Field name"}
                         required
                         disabled={disabled}
-                        error={Boolean(nameError)} />
+                        error={Boolean(nameError)}/>
 
                     <FieldCaption error={Boolean(nameError)}>
                         {nameError}
@@ -87,7 +87,7 @@ export const CommonPropertyFields = React.forwardRef<HTMLDivElement, CommonPrope
                         disabled={disabledId || disabled}
                         required
                         size="small"
-                        error={Boolean(idError)} />
+                        error={Boolean(idError)}/>
                     <FieldCaption error={Boolean(idError)}>
                         {idError}
                     </FieldCaption>
@@ -98,7 +98,7 @@ export const CommonPropertyFields = React.forwardRef<HTMLDivElement, CommonPrope
                         as={DebouncedTextField}
                         label={"Description"}
                         disabled={disabled}
-                        error={Boolean(descriptionError)} />
+                        error={Boolean(descriptionError)}/>
                     <FieldCaption error={Boolean(descriptionError)}>
                         {descriptionError}
                     </FieldCaption>

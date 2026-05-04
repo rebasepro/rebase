@@ -14,7 +14,12 @@ export function RebaseCMS({ collections, homePage, entityViews, entityActions, p
     const dispatch = useRebaseRegistryDispatch();
 
     useLayoutEffect(() => {
-        dispatch.registerCMS({ collections, homePage, entityViews, entityActions, plugins, collectionEditor });
+        dispatch.registerCMS({ collections,
+homePage,
+entityViews,
+entityActions,
+plugins,
+collectionEditor });
         return () => dispatch.unregisterCMS();
     }, [dispatch, collections, homePage, entityViews, entityActions, plugins, collectionEditor]);
 

@@ -77,7 +77,7 @@ export function MultiSelectFieldBinding({
                     setValue((value ?? []).filter((v: any) => v !== enumKey));
                 }}
             >
-                <CloseIcon size="smallest" />
+                <CloseIcon size="smallest"/>
             </button>}
         </EnumValuesChip>;
     }, [enumValues, setValue, value]);
@@ -95,7 +95,7 @@ export function MultiSelectFieldBinding({
                     icon={getIconForProperty(property, "small")}
                     required={property.validation?.required}
                     title={property.name ?? propertyKey}
-                    className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5"} />}
+                    className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5"}/>}
                 onValueChange={(updatedValue: string[]) => {
                     let newValue;
                     if (of && (of as Property)?.type === "number") {
@@ -115,7 +115,7 @@ export function MultiSelectFieldBinding({
                 showError={showError}
                 error={error}
                 disabled={disabled}
-                property={property} />
+                property={property}/>
 
         </>
     );

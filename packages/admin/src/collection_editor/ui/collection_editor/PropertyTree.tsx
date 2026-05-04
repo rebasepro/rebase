@@ -82,11 +82,11 @@ export const PropertyTree = React.memo(
         const sensors = useSensors(
             useSensor(PointerSensor, {
                 activationConstraint: {
-                    distance: 5,
+                    distance: 5
                 }
             }),
             useSensor(KeyboardSensor, {
-                coordinateGetter: sortableKeyboardCoordinates,
+                coordinateGetter: sortableKeyboardCoordinates
             })
         );
 
@@ -221,7 +221,7 @@ export function PropertyTreeEntry({
         transform: CSS.Translate.toString(transform),
         transition,
         zIndex: isDragging ? 10 : undefined,
-        position: "relative" as const,
+        position: "relative" as const
     };
 
     const isPropertyInferred = inferredPropertyKeys?.includes(namespace ? `${namespace}.${propertyKey}` : propertyKey);
@@ -268,7 +268,7 @@ export function PropertyTreeEntry({
                         left: "24px",
                         top: "40px",
                         bottom: "16px"
-                    }} />}
+                    }}/>}
 
                 <div>
                     {!isPropertyBuilder(property) && !additionalField && editable
@@ -277,19 +277,19 @@ export function PropertyTreeEntry({
                             onClick={onPropertyClick ? () => onPropertyClick(propertyKey, namespace) : undefined}
                             includeName={true}
                             selected={selected}
-                            hasError={hasError} />
+                            hasError={hasError}/>
                         : <NonEditablePropertyPreview name={propertyKey}
                             property={property}
                             onClick={onPropertyClick ? () => onPropertyClick(propertyKey, namespace) : undefined}
-                            selected={selected} />}
+                            selected={selected}/>}
                 </div>
 
                 <div className="absolute top-1/2 -translate-y-1/2 right-3 flex flex-row items-center gap-1">
-                    {isAIModified && <AIModifiedIndicator />}
+                    {isAIModified && <AIModifiedIndicator/>}
                     {isPropertyInferred && <>
                         <Tooltip title={"Inferred property"} asChild={true}>
                             <IconButton size="smallest" disabled>
-                                <FindInPageIcon size="smallest" />
+                                <FindInPageIcon size="smallest"/>
                             </IconButton>
                         </Tooltip>
                         {onPropertyRemove && <Tooltip title={"Remove inferred property"}
@@ -300,7 +300,7 @@ export function PropertyTreeEntry({
                                     e.stopPropagation();
                                     onPropertyRemove(propertyKey, namespace);
                                 }}>
-                                <DeleteIcon size={"smallest"} />
+                                <DeleteIcon size={"smallest"}/>
                             </IconButton>
                         </Tooltip>}
                     </>}
@@ -310,7 +310,7 @@ export function PropertyTreeEntry({
                             <IconButton
                                 size="smallest"
                             >
-                                <MoreVertIcon size={"smallest"} />
+                                <MoreVertIcon size={"smallest"}/>
                             </IconButton>
                         }
                     >
@@ -325,7 +325,7 @@ export function PropertyTreeEntry({
                                 }
                             }}
                         >
-                            <VerticalAlignTopIcon size="smallest" />
+                            <VerticalAlignTopIcon size="smallest"/>
                             Move to top
                         </MenuItem>
                         <MenuItem
@@ -339,14 +339,14 @@ export function PropertyTreeEntry({
                                 }
                             }}
                         >
-                            <VerticalAlignBottomIcon size="smallest" />
+                            <VerticalAlignBottomIcon size="smallest"/>
                             Move to bottom
                         </MenuItem>
                         <MenuItem
                             dense
                             onClick={() => onPropertyRemove?.(propertyKey, namespace)}
                         >
-                            <DeleteIcon size="smallest" />
+                            <DeleteIcon size="smallest"/>
                             Delete
                         </MenuItem>
                     </Menu>

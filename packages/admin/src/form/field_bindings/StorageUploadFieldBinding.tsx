@@ -57,7 +57,7 @@ export function StorageUploadFieldBinding({
     property,
     includeDescription,
     context,
-    isSubmitting,
+    isSubmitting
 }: FieldProps<StringProperty | ArrayProperty>) {
 
     const authController = useAuthController();
@@ -101,7 +101,7 @@ export function StorageUploadFieldBinding({
                     icon={getIconForProperty(property, "small")}
                     required={property.validation?.required}
                     title={property.name ?? propertyKey}
-                    className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5"} />}
+                    className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5"}/>}
 
             <StorageUpload
                 value={internalValue}
@@ -115,13 +115,13 @@ export function StorageUploadFieldBinding({
                 onFileUploadComplete={onFileUploadComplete}
                 storagePathBuilder={storagePathBuilder}
                 storage={storage}
-                multipleFilesSupported={multipleFilesSupported} />
+                multipleFilesSupported={multipleFilesSupported}/>
 
             <FieldHelperText includeDescription={includeDescription}
                 showError={showError}
                 error={error}
                 disabled={disabled}
-                property={property} />
+                property={property}/>
 
         </>
     );
@@ -148,7 +148,7 @@ function SortableStorageItem({
     storagePathBuilder,
     onFileUploadComplete,
     onClear,
-    disabled,
+    disabled
 }: SortableStorageItemProps) {
 
     const {
@@ -188,7 +188,7 @@ function SortableStorageItem({
                 disabled={disabled}
                 value={entry.storagePathOrDownloadUrl}
                 onRemove={() => onClear(entry.storagePathOrDownloadUrl!)}
-                size={entry.size as PreviewSize} />
+                size={entry.size as PreviewSize}/>
         );
     } else if (entry.file) {
         child = (
@@ -312,7 +312,7 @@ function FileDropComponent({
             >
                 <input
                     autoFocus={autoFocus}
-                    {...getInputProps()} />
+                    {...getInputProps()}/>
 
                 {internalValue.map((entry) => (
                     <SortableStorageItem
@@ -372,7 +372,7 @@ export function StorageUpload({
     onFilesAdded,
     autoFocus,
     storage,
-    storagePathBuilder,
+    storagePathBuilder
 }: StorageUploadProps) {
 
     if (multipleFilesSupported) {
@@ -408,11 +408,11 @@ export function StorageUpload({
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
-                distance: 5, // Start dragging after 5px movement
-            },
+                distance: 5 // Start dragging after 5px movement
+            }
         }),
         useSensor(KeyboardSensor, {
-            coordinateGetter: sortableKeyboardCoordinates,
+            coordinateGetter: sortableKeyboardCoordinates
         })
     );
 
@@ -482,12 +482,12 @@ export function StorageUpload({
                 onDragEnd={handleDragEnd}
             >
                 <SortableContext items={value.map(v => v.id)} strategy={horizontalListSortingStrategy}>
-                    <FileDropComponent {...fileDropProps} />
+                    <FileDropComponent {...fileDropProps}/>
                 </SortableContext>
             </DndContext>
         );
     } else {
         // For single file, no D&D context is needed
-        return <FileDropComponent {...fileDropProps} isDndItemDragging={false} />;
+        return <FileDropComponent {...fileDropProps} isDndItemDragging={false}/>;
     }
 }

@@ -70,7 +70,7 @@ export function SelectFieldBinding({
                     property.clearable && !disabled && <IconButton
                         size="small"
                         onClick={handleClearClick}>
-                        <CloseIcon size={"small"} />
+                        <CloseIcon size={"small"}/>
                     </IconButton>
                 }
                 onValueChange={(updatedValue: string) => {
@@ -83,7 +83,7 @@ export function SelectFieldBinding({
                     return <EnumValuesChip
                         enumKey={enumKey}
                         enumValues={enumValues}
-                        size={size} />;
+                        size={size}/>;
                 }}
             >
                 {enumValues && enumValues.map((option) => {
@@ -93,7 +93,7 @@ export function SelectFieldBinding({
                         <EnumValuesChip
                             enumKey={String(option.id)}
                             enumValues={enumValues}
-                            size={size} />
+                            size={size}/>
                     </SelectItem>
                 })}
             </Select>
@@ -102,7 +102,7 @@ export function SelectFieldBinding({
                 showError={showError}
                 error={error}
                 disabled={disabled}
-                property={property} />
+                property={property}/>
 
         </>
     );

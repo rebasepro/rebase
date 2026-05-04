@@ -64,7 +64,8 @@ export function useEntityHistory(params: {
             if (token) headers["Authorization"] = `Bearer ${token}`;
 
             const url = `${apiConfig.apiUrl}/api/data/${slug}/${entityId}/history?limit=${pageSize}&offset=${currentOffset}`;
-            const response = await fetch(url, { headers, signal });
+            const response = await fetch(url, { headers,
+signal });
 
             // Check if the request was aborted or the entity changed while in-flight
             if (signal?.aborted) return;
@@ -140,7 +141,8 @@ export function useEntityHistory(params: {
         if (token) headers["Authorization"] = `Bearer ${token}`;
 
         const url = `${apiConfig.apiUrl}/api/data/${slug}/${entityId}/history/${historyId}/revert`;
-        const response = await fetch(url, { method: "POST", headers });
+        const response = await fetch(url, { method: "POST",
+headers });
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ error: { message: response.statusText } }));

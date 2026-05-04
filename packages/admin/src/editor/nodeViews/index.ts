@@ -6,7 +6,7 @@ import { ImageComponent } from "./ImageComponent";
 
 function createReactNodeView(
     Component: ReactNodeViewComponent,
-    as: string = "div",
+    as = "div",
     className?: string,
     createContentDOM?: () => HTMLElement
 ) {

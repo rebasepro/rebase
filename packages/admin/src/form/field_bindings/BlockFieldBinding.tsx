@@ -73,7 +73,7 @@ export function BlockFieldBinding({
             autoFocus={internalId === lastAddedId}
             context={context}
             storeProps={storeProps}
-            storedProps={storedProps} />;
+            storedProps={storedProps}/>;
     };
 
     const title = (
@@ -82,7 +82,7 @@ export function BlockFieldBinding({
             icon={getIconForProperty(property, "small")}
             required={property.validation?.required}
             title={property.name ?? propertyKey}
-            className={"text-text-secondary dark:text-text-secondary-dark"} />
+            className={"text-text-secondary dark:text-text-secondary-dark"}/>
     );
 
     const firstOneOfKey = Object.keys(property.oneOf.properties)[0];
@@ -98,7 +98,7 @@ export function BlockFieldBinding({
         newDefaultEntry={{
             [property.oneOf!.typeField ?? DEFAULT_ONE_OF_TYPE]: firstOneOfKey,
             [property.oneOf!.valueField ?? DEFAULT_ONE_OF_VALUE]: getDefaultValueFor(property.oneOf.properties[firstOneOfKey])
-        }} />;
+        }}/>;
     return (
 
         <>
@@ -117,7 +117,7 @@ export function BlockFieldBinding({
                 showError={showError}
                 error={error}
                 disabled={disabled}
-                property={property} />
+                property={property}/>
 
         </>
     );
@@ -214,7 +214,7 @@ function BlockEntry({
             partOfArray: false,
             partOfBlock: true,
             minimalistView: true,
-            onPropertyChange: storeProps,
+            onPropertyChange: storeProps
         }
         : undefined;
 
@@ -248,7 +248,7 @@ function BlockEntry({
                                     <EnumValuesChip
                                         enumKey={enumKey}
                                         enumValues={enumValuesConfigs}
-                                        size={"small"} />
+                                        size={"small"}/>
                                 }
                                 onValueChange={(value) => {
                                     updateType(value);
@@ -260,7 +260,7 @@ function BlockEntry({
                                         <EnumValuesChip
                                             enumKey={enumConfig.id}
                                             enumValues={enumValuesConfigs}
-                                            size={"small"} />
+                                            size={"small"}/>
                                     </SelectItem>)
                                 )}
                             </Select>
@@ -272,7 +272,7 @@ function BlockEntry({
 
             {fieldProps && (
                 // It is important to use this key to force a re-render of the field on type change
-                <PropertyFieldBinding key={`form_control_${name}_${typeInternal}`} {...fieldProps} />
+                <PropertyFieldBinding key={`form_control_${name}_${typeInternal}`} {...fieldProps}/>
             )}
 
         </div>

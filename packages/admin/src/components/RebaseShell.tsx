@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import {
-    useRebaseRegistry,
+    useRebaseRegistry
 } from "@rebasepro/core";
 
 import { RebaseAuthGate } from "./RebaseAuthGate";

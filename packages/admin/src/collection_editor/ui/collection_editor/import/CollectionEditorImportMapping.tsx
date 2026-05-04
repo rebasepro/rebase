@@ -121,7 +121,7 @@ export function CollectionEditorImportMapping({
         // we try to infer the rest of the properties of a property, from the type and the data
         const propertyData = importConfig.importData.map((d) => getIn(d, importKey));
         const inferredNewProperty = {
-            ...buildPropertyFromData(propertyData, property, getInferenceType),
+            ...buildPropertyFromData(propertyData, property, getInferenceType)
         };
 
         if (propertyPath) {
@@ -161,7 +161,7 @@ export function CollectionEditorImportMapping({
                                 if (!propertyKey || !property) return;
                                 setSelectedProperty({
                                     ...property,
-                                    id: propertyKey,
+                                    id: propertyKey
                                 });
                             }}
                             propertyTypeView={<PropertySelect property={property}
@@ -171,9 +171,9 @@ export function CollectionEditorImportMapping({
                                     importKey
                                 })}
                                 propertyKey={propertyKey}
-                                propertyConfigs={propertyConfigs} />}
+                                propertyConfigs={propertyConfigs}/>}
                         />;
-                    }} />
+                    }}/>
             </Container>
 
             <PropertyFormDialog
@@ -193,9 +193,9 @@ export function CollectionEditorImportMapping({
                 }}
                 autoOpenTypeSelect={false}
                 existingProperty={false}
-                propertyConfigs={propertyConfigs} />
+                propertyConfigs={propertyConfigs}/>
 
-            <div style={{ height: "52px" }} />
+            <div style={{ height: "52px" }}/>
         </div>
     );
 
@@ -240,7 +240,7 @@ function PropertySelect({
             position={"item-aligned"}
             renderValue={(value) => {
                 if (!widget) return null;
-                return <PropertyConfigBadge propertyConfig={widget} />
+                return <PropertyConfigBadge propertyConfig={widget}/>
             }}
             onValueChange={(newSelectedWidgetId) => {
                 const newProperty = updatePropertyFromWidget(property, newSelectedWidgetId, propertyConfigs)
@@ -258,7 +258,7 @@ function PropertySelect({
                     value={key}
                     optionDisabled={false}
                     propertyConfig={widget}
-                    existing={false} />;
+                    existing={false}/>;
             })
             }
         </Select>
@@ -281,7 +281,7 @@ export function ImportPropertySelectItem({ value, optionDisabled, propertyConfig
                 "flex flex-row items-center text-base min-h-[48px]",
                 optionDisabled ? "w-full" : "")}>
             <div className={"mr-8"}>
-                <PropertyConfigBadge propertyConfig={propertyConfig} />
+                <PropertyConfigBadge propertyConfig={propertyConfig}/>
             </div>
             <div>
                 <div>{propertyConfig.name}</div>

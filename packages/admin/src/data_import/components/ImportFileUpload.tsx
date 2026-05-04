@@ -15,12 +15,12 @@ export function ImportFileUpload({ onDataAdded }: {
             "application/xls": [".xls", ".xlsx"],
             "application/x-xls": [".xls", ".xlsx"],
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xls", ".xlsx"],
-            "application/json": [".json"],
+            "application/json": [".json"]
         }}
         preventDropOnDocument={true}
         size={"small"}
         maxFiles={1}
-        uploadDescription={<><UploadIcon />Drag and drop a file here or click to upload</>}
+        uploadDescription={<><UploadIcon/>Drag and drop a file here or click to upload</>}
         onFilesAdded={(files: File[]) => {
             if (files.length > 0) {
                 convertFileToJson(files[0])
@@ -38,5 +38,5 @@ export function ImportFileUpload({ onDataAdded }: {
                         });
                     });
             }
-        }} />
+        }}/>
 }

@@ -3,7 +3,6 @@ import { EntityCollection, Properties } from "@rebasepro/types";
 import { getSubcollections } from "@rebasepro/common";
 
 
-
 import React, { useMemo } from "react";
 export function useLocalCollectionsConfigController(
     clientOrUrl: any,
@@ -21,7 +20,7 @@ export function useLocalCollectionsConfigController(
         try {
             let token = options?.getAuthToken ? await options.getAuthToken() : null;
             let baseUrl = typeof clientOrUrl === "string" ? clientOrUrl : "http://localhost:3001";
-            
+
             if (typeof clientOrUrl === "object" && clientOrUrl !== null) {
                 baseUrl = clientOrUrl.baseUrl || baseUrl;
                 if (!token && clientOrUrl.resolveToken) {
@@ -34,7 +33,7 @@ export function useLocalCollectionsConfigController(
                 headers["Authorization"] = `Bearer ${token}`;
             }
 
-            const response = await fetch(`${baseUrl.replace(/\/$/, '')}/api/schema-editor${endpoint}`, {
+            const response = await fetch(`${baseUrl.replace(/\/$/, "")}/api/schema-editor${endpoint}`, {
                 method: "POST",
                 headers,
                 body: JSON.stringify(payload)
@@ -75,37 +74,45 @@ export function useLocalCollectionsConfigController(
         },
 
         saveCollection: async ({ id, collectionData }: SaveCollectionParams) => {
-            await request("/collection/save", { collectionId: id, collectionData });
+            await request("/collection/save", { collectionId: id,
+collectionData });
         },
         updateCollection: async ({ id, collectionData }: UpdateCollectionParams) => {
-            await request("/collection/save", { collectionId: id, collectionData });
+            await request("/collection/save", { collectionId: id,
+collectionData });
         },
         deleteCollection: async ({ id }: DeleteCollectionParams) => {
             await request("/collection/delete", { collectionId: id });
         },
 
         saveProperty: async ({ path, propertyKey, property, newPropertiesOrder }: SavePropertyParams) => {
-            await request("/property/save", { collectionId: path, propertyKey, propertyConfig: property });
+            await request("/property/save", { collectionId: path,
+propertyKey,
+propertyConfig: property });
             if (newPropertiesOrder) {
-                await request("/collection/save", { collectionId: path, collectionData: { propertiesOrder: newPropertiesOrder } });
+                await request("/collection/save", { collectionId: path,
+collectionData: { propertiesOrder: newPropertiesOrder } });
             }
         },
         deleteProperty: async ({ path, propertyKey, newPropertiesOrder }: DeletePropertyParams) => {
-            await request("/property/delete", { collectionId: path, propertyKey });
+            await request("/property/delete", { collectionId: path,
+propertyKey });
             if (newPropertiesOrder) {
-                await request("/collection/save", { collectionId: path, collectionData: { propertiesOrder: newPropertiesOrder } });
+                await request("/collection/save", { collectionId: path,
+collectionData: { propertiesOrder: newPropertiesOrder } });
             }
         },
 
         updatePropertiesOrder: async ({ collection, fullPath, newPropertiesOrder }: UpdatePropertiesOrderParams) => {
             const collectionId = (collection as EntityCollection & { id?: string }).id || fullPath.split("/").pop();
-            await request("/collection/save", { collectionId, collectionData: { propertiesOrder: newPropertiesOrder } });
+            await request("/collection/save", { collectionId,
+collectionData: { propertiesOrder: newPropertiesOrder } });
         },
         updateKanbanColumnsOrder: async () => {
             // Kanban order mapping logic can be added later if needed natively.
         },
 
         navigationEntries: [],
-        saveNavigationEntries: async () => { },
+        saveNavigationEntries: async () => { }
     }), [clientOrUrl, parsedCollections, options?.readOnly, options?.getAuthToken]);
 }

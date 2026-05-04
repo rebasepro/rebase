@@ -47,7 +47,7 @@ export const SwitchFieldBinding = function SwitchFieldBinding({
                     label={<LabelWithIcon
                         icon={getIconForProperty(property, "small")}
                         required={property.validation?.required}
-                        title={property.name ?? propertyKey} />}
+                        title={property.name ?? propertyKey}/>}
                     disabled={disabled}
                     autoFocus={autoFocus}
                     size={size}
@@ -58,7 +58,7 @@ export const SwitchFieldBinding = function SwitchFieldBinding({
                 showError={showError}
                 error={error}
                 disabled={disabled}
-                property={property} />
+                property={property}/>
         </>
 
     );

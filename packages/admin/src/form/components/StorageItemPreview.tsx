@@ -51,7 +51,7 @@ export function StorageItemPreview({
                                 event.stopPropagation();
                                 onRemove(value);
                             }}>
-                            <RemoveIcon size={"small"} />
+                            <RemoveIcon size={"small"}/>
                         </IconButton>
                     </Tooltip>
                 </div>
@@ -63,7 +63,7 @@ export function StorageItemPreview({
                         value={value}
                         property={property}
                         interactive={false}
-                        size={size} />
+                        size={size}/>
                 </ErrorBoundary>
             }
 
@@ -71,7 +71,7 @@ export function StorageItemPreview({
                 <div
                     onClick={(e) => e.stopPropagation()}
                     className="flex flex-col items-center justify-center w-full h-full">
-                    <DescriptionIcon className="text-surface-700 dark:text-surface-300" />
+                    <DescriptionIcon className="text-surface-700 dark:text-surface-300"/>
                 </div>
             }
 

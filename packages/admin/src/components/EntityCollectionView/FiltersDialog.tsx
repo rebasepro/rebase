@@ -82,7 +82,8 @@ export function FiltersDialog({
 
     const handleApply = useCallback(() => {
         const hasFilters = Object.keys(localFilters).length > 0;
-        setFilterValues(hasFilters ? { ...localFilters, ...forceFilter } : (forceFilter || undefined));
+        setFilterValues(hasFilters ? { ...localFilters,
+...forceFilter } : (forceFilter || undefined));
         onOpenChange(false);
     }, [localFilters, setFilterValues, forceFilter, onOpenChange]);
 
@@ -230,7 +231,7 @@ export function FiltersDialog({
                 >
                     {t("clear_all")}
                 </Button>
-                <div className="flex-grow" />
+                <div className="flex-grow"/>
                 <Button
                     variant="text"
                     onClick={() => onOpenChange(false)}

@@ -6,7 +6,7 @@ import {
     UserSettingsView,
     UIReferenceView,
     NotFoundPage,
-    useInternalUserManagementController,
+    useInternalUserManagementController
 } from "@rebasepro/core";
 import { CircularProgressCenter } from "@rebasepro/ui";
 
@@ -26,11 +26,12 @@ function SettingsView() {
     const breadcrumbs = useBreadcrumbsController();
     useEffect(() => {
         breadcrumbs.set({
-            breadcrumbs: [{ title: t("project_settings"), url: "/settings" }]
+            breadcrumbs: [{ title: t("project_settings"),
+url: "/settings" }]
         });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
     }, []);
-    return <UserSettingsView />;
+    return <UserSettingsView/>;
 }
 
 export interface RebaseRouteDefsProps {
@@ -67,7 +68,7 @@ export function RebaseRouteDefs({ children, layout }: RebaseRouteDefsProps) {
     const userManagement = useInternalUserManagementController();
     const navigationStateController = useNavigationStateController();
 
-    const cmsHomePage = registry.cmsConfig?.homePage ?? <ContentHomePage />;
+    const cmsHomePage = registry.cmsConfig?.homePage ?? <ContentHomePage/>;
     const studioHomePage = registry.studioConfig?.homePage;
 
     const combinedViews = useMemo(() => [
@@ -78,29 +79,29 @@ export function RebaseRouteDefs({ children, layout }: RebaseRouteDefsProps) {
     const routeContents = (
         <>
             {/* Core CMS Routes */}
-            <Route path={"/"} element={cmsHomePage} />
+            <Route path={"/"} element={cmsHomePage}/>
             {registry.studioConfig && (
-                <Route path={"/s"} element={studioHomePage} />
+                <Route path={"/s"} element={studioHomePage}/>
             )}
 
-            <Route path={"/c/*"} element={<RebaseRoute />} />
-            <Route path={"/settings"} element={<SettingsView />} />
-            {userManagement && <Route path={"/roles"} element={<RolesView userManagement={userManagement} />} />}
-            {userManagement && <Route path={"/users"} element={<UsersView userManagement={userManagement} />} />}
+            <Route path={"/c/*"} element={<RebaseRoute/>}/>
+            <Route path={"/settings"} element={<SettingsView/>}/>
+            {userManagement && <Route path={"/roles"} element={<RolesView userManagement={userManagement}/>}/>}
+            {userManagement && <Route path={"/users"} element={<UsersView userManagement={userManagement}/>}/>}
 
             {/* Hidden debug route */}
-            <Route path={"/debug/ui"} element={<UIReferenceView />} />
+            <Route path={"/debug/ui"} element={<UIReferenceView/>}/>
 
             {/* Custom Registered Views */}
             {combinedViews.map(view => {
                 const slugs = Array.isArray(view.slug) ? view.slug : [view.slug];
                 return slugs.flatMap(slug => {
                     const routes = [
-                        <Route key={slug} path={slug} element={<CustomViewRoute view={view} />} />
+                        <Route key={slug} path={slug} element={<CustomViewRoute view={view}/>}/>
                     ];
                     if (view.nestedRoutes) {
                         routes.push(
-                            <Route key={slug + "/*"} path={slug + "/*"} element={<CustomViewRoute view={view} />} />
+                            <Route key={slug + "/*"} path={slug + "/*"} element={<CustomViewRoute view={view}/>}/>
                         );
                     }
                     return routes;
@@ -110,7 +111,7 @@ export function RebaseRouteDefs({ children, layout }: RebaseRouteDefsProps) {
             {/* User Provided Custom Routes */}
             {children}
 
-            <Route path={"*"} element={navigationStateController.loading ? <CircularProgressCenter /> : <NotFoundPage />} />
+            <Route path={"*"} element={navigationStateController.loading ? <CircularProgressCenter/> : <NotFoundPage/>}/>
         </>
     );
 
@@ -122,7 +123,7 @@ export function RebaseRouteDefs({ children, layout }: RebaseRouteDefsProps) {
                     : <Route element={<>{routeContents}</>}>{routeContents}</Route>
                 }
             </RebaseRoutes>
-            <CollectionEditorDialogs />
+            <CollectionEditorDialogs/>
         </>
     );
 }

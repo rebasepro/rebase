@@ -70,7 +70,7 @@ export const DefaultAppBar = function DefaultAppBar({
     className,
     style,
     user: userProp,
-    logo: logoProp,
+    logo: logoProp
 }: DefaultAppBarProps) {
 
     const {
@@ -110,7 +110,7 @@ export const DefaultAppBar = function DefaultAppBar({
         </Avatar>;
     } else if (user === undefined || authController.initialLoading) {
         avatarComponent = <div className={"p-1 flex justify-center"}>
-            <Skeleton className={"w-10 h-10 rounded-full"} />
+            <Skeleton className={"w-10 h-10 rounded-full"}/>
         </div>;
     } else {
         avatarComponent = null;
@@ -129,7 +129,7 @@ export const DefaultAppBar = function DefaultAppBar({
                     "pl-[19rem]": drawerOpen && largeLayout,
                     "pl-24": hasDrawer && !(drawerOpen && largeLayout),
                     "z-10": largeLayout,
-                    "duration-100": drawerOpen && largeLayout,
+                    "duration-100": drawerOpen && largeLayout
                 },
                 className)}>
 
@@ -143,8 +143,8 @@ export const DefaultAppBar = function DefaultAppBar({
                         {!hasDrawer && (logo
                             ? <img src={logo}
                                 alt="Logo"
-                                className={cls("w-[32px] h-[32px] object-contain")} />
-                            : <RebaseLogo width={"32px"} height={"32px"} />)}
+                                className={cls("w-[32px] h-[32px] object-contain")}/>
+                            : <RebaseLogo width={"32px"} height={"32px"}/>)}
 
                         {typeof title === "string"
                             ? <Typography variant="subtitle1"
@@ -155,7 +155,6 @@ export const DefaultAppBar = function DefaultAppBar({
                     </div>
                 </Link>
             </div>}
-
 
 
             <div className="mr-8 hidden lg:block">
@@ -184,7 +183,7 @@ export const DefaultAppBar = function DefaultAppBar({
                                                 {breadcrumb.count}
                                             </span>
                                         ) : (
-                                            <Skeleton className="w-8 h-4 rounded-md" />
+                                            <Skeleton className="w-8 h-4 rounded-md"/>
                                         )
                                     )}
                                 </div>
@@ -199,8 +198,7 @@ export const DefaultAppBar = function DefaultAppBar({
 
             {startAdornment}
 
-            <div className={"grow"} />
-
+            <div className={"grow"}/>
 
 
             {endAdornment &&
@@ -209,9 +207,7 @@ export const DefaultAppBar = function DefaultAppBar({
                 </ErrorBoundary>}
 
 
-
-
-            <LanguageToggle />
+            <LanguageToggle/>
 
             {includeModeToggle &&
                 <Menu
@@ -220,13 +216,13 @@ export const DefaultAppBar = function DefaultAppBar({
                         aria-label="Toggle theme"
 >
                         {mode === "dark"
-                            ? <DarkModeIcon />
-                            : <LightModeIcon />}
+                            ? <DarkModeIcon/>
+                            : <LightModeIcon/>}
                     </IconButton>}>
-                    <MenuItem onClick={() => setMode("dark")}><DarkModeIcon size={"smallest"} /> {t("dark_mode")}</MenuItem>
-                    <MenuItem onClick={() => setMode("light")}><LightModeIcon size={"smallest"} /> {t("light_mode")} </MenuItem>
+                    <MenuItem onClick={() => setMode("dark")}><DarkModeIcon size={"smallest"}/> {t("dark_mode")}</MenuItem>
+                    <MenuItem onClick={() => setMode("light")}><LightModeIcon size={"smallest"}/> {t("light_mode")} </MenuItem>
                     <MenuItem onClick={() => setMode("system")}> <BrightnessMediumIcon
-                        size={"smallest"} />{t("system_mode")}</MenuItem>
+                        size={"smallest"}/>{t("system_mode")}</MenuItem>
                 </Menu>}
 
             <Menu trigger={<div aria-label="User menu" role="button">{avatarComponent}</div>}>
@@ -243,7 +239,7 @@ export const DefaultAppBar = function DefaultAppBar({
 
                 {!dropDownActions && <>
                     <MenuItem onClick={() => navigate("/settings")}>
-                        <SettingsIcon />
+                        <SettingsIcon/>
                         {t("project_settings")}
                     </MenuItem>
                     <MenuItem onClick={async () => {
@@ -251,7 +247,7 @@ export const DefaultAppBar = function DefaultAppBar({
                         // replace current route with home
                         navigate("/");
                     }}>
-                        <LogoutIcon />
+                        <LogoutIcon/>
                         {t("log_out")}
                     </MenuItem>
                 </>}

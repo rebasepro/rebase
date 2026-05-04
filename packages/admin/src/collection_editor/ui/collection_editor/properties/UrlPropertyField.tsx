@@ -68,7 +68,7 @@ export function UrlPropertyField({
                         max={true}
                         min={true}
                         trim={true}
-                        showErrors={showErrors} />
+                        showErrors={showErrors}/>
 
                 </ValidationPanel>
 
@@ -82,7 +82,7 @@ export function UrlPropertyField({
                         setFieldValue("defaultValue", e.target.value === "" ? undefined : e.target.value);
                     }}
                     label={"Default value"}
-                    value={getIn(values, "defaultValue") ?? ""} />
+                    value={getIn(values, "defaultValue") ?? ""}/>
 
             </div>
         </>

@@ -6,10 +6,12 @@ interface WindowSize {
 }
 
 export function useWindowSize(): WindowSize {
-    const [size, setSize] = useState<WindowSize>({ width: 0, height: 0 });
+    const [size, setSize] = useState<WindowSize>({ width: 0,
+height: 0 });
     useLayoutEffect(() => {
         function updateSize() {
-            setSize({ width: window.innerWidth, height: window.innerHeight });
+            setSize({ width: window.innerWidth,
+height: window.innerHeight });
         }
 
         window.addEventListener("resize", updateSize);

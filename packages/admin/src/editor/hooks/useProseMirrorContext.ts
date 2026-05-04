@@ -9,7 +9,7 @@ export interface ProseMirrorContextType {
 
 export const ProseMirrorContext = createContext<ProseMirrorContextType>({
     state: null,
-    view: null,
+    view: null
 });
 
 export const useProseMirrorContext = () => useContext(ProseMirrorContext);

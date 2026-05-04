@@ -166,7 +166,7 @@ function buildBottomActions<M extends Record<string, unknown>>({
             color="primary"
             type="submit"
             disabled={disabled || formex.isSubmitting}
-            startIcon={hasErrors ? <ErrorIcon /> : undefined}>
+            startIcon={hasErrors ? <ErrorIcon/> : undefined}>
             {status === "existing" && t("save")}
             {status === "copy" && t("create_copy")}
             {status === "new" && t("create")}
@@ -200,7 +200,7 @@ function buildSideActions<M extends Record<string, unknown>>({
             variant="filled"
             color="primary"
             type="submit"
-            startIcon={hasErrors ? <ErrorIcon /> : undefined}
+            startIcon={hasErrors ? <ErrorIcon/> : undefined}
             disabled={disabled || formex.isSubmitting}>
             {status === "existing" && t("save")}
             {status === "copy" && t("create_copy")}

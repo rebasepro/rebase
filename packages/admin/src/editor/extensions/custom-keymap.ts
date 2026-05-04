@@ -20,6 +20,6 @@ export const customKeymapPlugin = () => {
         return true;
       }
       return false;
-    },
+    }
   });
 };

@@ -13,7 +13,7 @@ export function ConditionsPanel({
             innerClassName="p-4"
             title={
                 <div className="flex flex-row text-surface-500 text-text-secondary dark:text-text-secondary-dark">
-                    <SettingsIcon />
+                    <SettingsIcon/>
                     <Typography variant={"subtitle2"}
                         className="ml-4">
                         Conditions

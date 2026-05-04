@@ -10,7 +10,7 @@ export function AppBar({
     className?: string,
     style?: React.CSSProperties
 } & DefaultAppBarProps) {
-    const usedChildren = children ?? <DefaultAppBar {...props} />;
+    const usedChildren = children ?? <DefaultAppBar {...props}/>;
     return <>{usedChildren}</>;
 }
 

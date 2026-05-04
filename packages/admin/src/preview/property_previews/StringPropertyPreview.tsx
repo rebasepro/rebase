@@ -23,7 +23,7 @@ export function StringPropertyPreview({
         return <EnumValuesChip
             enumKey={enumKey}
             enumValues={property.enum}
-            size={size} />;
+            size={size}/>;
     } else if (property.previewAsTag) {
         const colorScheme = getColorSchemeForSeed(propertyKey ?? "");
         return (
@@ -38,7 +38,7 @@ export function StringPropertyPreview({
         return (
             <UrlComponentPreview size={size}
                 url={value}
-                previewType={typeof property.url === "string" ? property.url as PreviewType : undefined} />
+                previewType={typeof property.url === "string" ? property.url as PreviewType : undefined}/>
         );
     } else {
         if (!value) return <></>;
@@ -48,7 +48,7 @@ export function StringPropertyPreview({
                 {lines.map((str: any, index: number) =>
                     <React.Fragment key={`string_preview_${index}`}>
                         <span>{str}</span>
-                        {index !== lines.length - 1 && <br />}
+                        {index !== lines.length - 1 && <br/>}
                     </React.Fragment>)}
             </div>
             : (size === "small"

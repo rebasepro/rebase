@@ -1,7 +1,7 @@
 import type { AppView, EntityCollection, NavigationResult, RebasePlugin, NavigationStateController, UrlController, NavigationGroupMapping } from "@rebasepro/types";
 import { useCallback, useMemo } from "react";
 
-import { AuthController,  RebaseData, CollectionRegistryController, User } from "@rebasepro/types";
+import { AuthController, RebaseData, CollectionRegistryController, User } from "@rebasepro/types";
 import type { EntityCollectionsBuilder, AppViewsBuilder, EffectiveRoleController } from "@rebasepro/types";
 import { CollectionRegistry } from "@rebasepro/common";
 

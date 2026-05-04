@@ -38,7 +38,7 @@ export function NavigationCardBinding({
 }) {
 
     const userConfigurationPersistence = useUserConfigurationPersistence();
-    const collectionIcon = <IconForView collectionOrView={collection ?? view} />;
+    const collectionIcon = <IconForView collectionOrView={collection ?? view}/>;
 
     const navigate = useNavigate();
     const context = useRebaseContext();
@@ -65,7 +65,7 @@ export function NavigationCardBinding({
                 }}>
                 <StarIcon
                     size={"small"}
-                    className={favourite ? "text-secondary" : "text-surface-400 dark:text-surface-500"} />
+                    className={favourite ? "text-secondary" : "text-surface-400 dark:text-surface-500"}/>
             </IconButton>
         ]
         : [];
@@ -80,7 +80,7 @@ export function NavigationCardBinding({
         actionsArray.unshift(
             <Tooltip key="warning" title={`Table mapped to "${collection?.slug || collection?.name}" is missing in the database. Run migrations.`}>
                 <div>
-                    <WarningIcon size="small" className="text-red-600 dark:text-red-400" />
+                    <WarningIcon size="small" className="text-red-600 dark:text-red-400"/>
                 </div>
             </Tooltip>
         );

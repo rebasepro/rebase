@@ -82,7 +82,7 @@ export function EnumPropertyField({
                         ? () => getData()
                             .then(res => res.map(entry => getIn(entry, fullPropertyPath)).filter(Boolean))
                         : undefined}
-                    onValuesChanged={onValuesChanged} />
+                    onValuesChanged={onValuesChanged}/>
             </div>
 
             <div className={"col-span-12"}>
@@ -90,9 +90,9 @@ export function EnumPropertyField({
                 <ValidationPanel>
                     {!multiselect &&
                         <StringPropertyValidation disabled={disabled}
-                            showErrors={showErrors} />}
+                            showErrors={showErrors}/>}
                     {multiselect &&
-                        <ArrayPropertyValidation disabled={disabled} />}
+                        <ArrayPropertyValidation disabled={disabled}/>}
                 </ValidationPanel>
 
             </div>

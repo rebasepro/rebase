@@ -45,7 +45,7 @@ export function PropertyAddColumnComponent({
                         existingEntities: tableController.data
                     });
                 }}>
-                <AddIcon color={"inherit"} />
+                <AddIcon color={"inherit"}/>
             </div>
         </Tooltip>
     )

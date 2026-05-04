@@ -114,7 +114,7 @@ export function DrawerNavigationGroup({
                 {entries.map((entry) => (
                     <DrawerNavigationItem
                         key={entry.id}
-                        icon={<IconForView collectionOrView={entry.collection ?? entry.view} size={18} />}
+                        icon={<IconForView collectionOrView={entry.collection ?? entry.view} size={18}/>}
                         tooltipsOpen={!collapsed && tooltipsOpen}
                         adminMenuOpen={adminMenuOpen}
                         drawerOpen={drawerOpen}

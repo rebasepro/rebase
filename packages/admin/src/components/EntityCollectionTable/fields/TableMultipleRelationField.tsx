@@ -8,7 +8,7 @@ import { getRelationFrom, normalizeToEntityRelation } from "@rebasepro/common";
 
 import { RelationPreview } from "../../../preview";
 import { CollectionSize, Entity, EntityRelation, FilterValues, Relation } from "@rebasepro/types";
-import {  } from "@rebasepro/core";
+import { } from "@rebasepro/core";
 import { ErrorView } from "@rebasepro/core";
 import { EntityPreviewContainer } from "../../EntityPreview";
 
@@ -28,7 +28,7 @@ type TableMultipleRelationFieldProps = {
 
 export function TableMultipleRelationField(props: TableMultipleRelationFieldProps) {
     const collection = props.relation.target();
-    return <TableMultipleRelationFieldInternal {...props} collection={collection} />;
+    return <TableMultipleRelationFieldInternal {...props} collection={collection}/>;
 }
 
 export const TableMultipleRelationFieldInternal = React.memo(
@@ -79,7 +79,7 @@ export const TableMultipleRelationFieldInternal = React.memo(
                 return <>
                     {internalValue.map((item, index) => {
                         const relationItem = normalizeToEntityRelation(item);
-                        
+
                         if (!relationItem) return null;
 
                         return (
@@ -100,11 +100,11 @@ export const TableMultipleRelationFieldInternal = React.memo(
                     }
                 </>;
             else
-                return <ErrorView error={"Data is not an array of relations"} />;
+                return <ErrorView error={"Data is not an array of relations"}/>;
         };
 
         if (!collection)
-            return <ErrorView error={"The specified collection does not exist"} />;
+            return <ErrorView error={"The specified collection does not exist"}/>;
 
         return (
             <div className="w-full group">
@@ -121,7 +121,7 @@ export const TableMultipleRelationFieldInternal = React.memo(
                         size={"medium"}>
                         <EditIcon
                             size={"small"}
-                            className={"ml-2 mr-1 text-surface-300 dark:text-surface-600"} />
+                            className={"ml-2 mr-1 text-surface-300 dark:text-surface-600"}/>
                         {title}
                     </EntityPreviewContainer>}
 

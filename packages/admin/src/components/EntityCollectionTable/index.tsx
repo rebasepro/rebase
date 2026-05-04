@@ -3,7 +3,7 @@ export {
 } from "./EntityCollectionTable";
 
 export type {
-    EntityCollectionTableProps,
+    EntityCollectionTableProps
 } from "./EntityCollectionTableProps";
 
 export * from "./PropertyTableCell";

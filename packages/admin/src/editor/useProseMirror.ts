@@ -50,7 +50,7 @@ export function useProseMirror(options: UseProseMirrorOptions) {
         const state = EditorState.create({
             doc,
             schema,
-            plugins: options.plugins || [],
+            plugins: options.plugins || []
         });
 
         const view = new EditorView(mountRef.current, {
@@ -76,11 +76,8 @@ export function useProseMirror(options: UseProseMirrorOptions) {
                         options.onHtmlContentChange(div.innerHTML);
                     }
                 }
-            },
+            }
         });
-
-
-
 
 
         viewRef.current = view;
@@ -122,5 +119,7 @@ export function useProseMirror(options: UseProseMirrorOptions) {
         }
     }, [options.editable, editorState]);
 
-    return { mountRef, view: viewRef.current, editorState };
+    return { mountRef,
+view: viewRef.current,
+editorState };
 }

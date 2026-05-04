@@ -3,9 +3,9 @@ import { useCustomizationController } from "@rebasepro/core";
 import { Property } from "@rebasepro/types";
 import {
     getFieldConfig,
-    PropertyConfigBadge,
+    PropertyConfigBadge
 } from "../../components";
-import { EditIcon, ErrorBoundary, IconButton, TextField, } from "@rebasepro/ui";
+import { EditIcon, ErrorBoundary, IconButton, TextField } from "@rebasepro/ui";
 
 export function ImportNewPropertyFieldPreview({
     propertyKey,
@@ -31,7 +31,7 @@ export function ImportNewPropertyFieldPreview({
             className="flex flex-row w-full items-center">
 
             <div className={"mx-4"}>
-                {propertyTypeView ?? <PropertyConfigBadge propertyConfig={widget ?? undefined} />}
+                {propertyTypeView ?? <PropertyConfigBadge propertyConfig={widget ?? undefined}/>}
             </div>
 
             <div className="w-full flex flex-col grow">
@@ -45,10 +45,10 @@ export function ImportNewPropertyFieldPreview({
                             onChange={(e) => {
                                 if (onPropertyNameChanged && propertyKey)
                                     onPropertyNameChanged(propertyKey, e.target.value);
-                            }} />}
+                            }}/>}
 
                     <IconButton onClick={onEditClick} size={"small"}>
-                        <EditIcon size={"small"} />
+                        <EditIcon size={"small"}/>
                     </IconButton>
                 </div>
 

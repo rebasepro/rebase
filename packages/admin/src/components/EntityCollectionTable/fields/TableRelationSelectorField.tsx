@@ -26,7 +26,7 @@ export function TableRelationSelectorField({
     updateValue,
     relation,
     forceFilter,
-    size = "medium",
+    size = "medium"
 }: RelationSelectorFieldProps) {
 
     return (

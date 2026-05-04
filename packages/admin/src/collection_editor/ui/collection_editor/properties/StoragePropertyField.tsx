@@ -89,7 +89,7 @@ export function StoragePropertyField({
                 <ExpandablePanel
                     title={
                         <div className="flex flex-row text-surface-500 text-text-secondary dark:text-text-secondary-dark">
-                            <CloudUploadIcon />
+                            <CloudUploadIcon/>
                             <Typography variant={"subtitle2"}
                                 className="ml-4">
                                 File upload config
@@ -180,7 +180,7 @@ export function StoragePropertyField({
                                         label={"Include bucket URL (s3://...) in saved value"}
                                         disabled={existing || disabled}
                                         form={form}
-                                        field={field} />;
+                                        field={field}/>;
                                 }}
                             </Field>
 
@@ -200,7 +200,7 @@ export function StoragePropertyField({
                                         label={"Save URL instead of storage path"}
                                         disabled={existing || disabled}
                                         form={form}
-                                        field={field} />;
+                                        field={field}/>;
                                 }}
                             </Field>
 
@@ -353,10 +353,10 @@ export function StoragePropertyField({
 
                 <ValidationPanel>
                     {!multiple && <div className={"grid grid-cols-12 gap-2"}>
-                        <GeneralPropertyValidation disabled={disabled} />
+                        <GeneralPropertyValidation disabled={disabled}/>
                     </div>}
                     {multiple && <div className={"col-span-12"}>
-                        <ArrayPropertyValidation disabled={disabled} />
+                        <ArrayPropertyValidation disabled={disabled}/>
                     </div>}
                 </ValidationPanel>
 

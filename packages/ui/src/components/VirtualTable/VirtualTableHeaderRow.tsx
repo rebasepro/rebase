@@ -45,7 +45,7 @@ const SortableColumnHeader = ({
         listeners,
         setNodeRef,
         transform,
-        transition,
+        transition
     } = useSortable({
         id: column.key,
         disabled: !isDraggable || column.frozen
@@ -58,7 +58,7 @@ const SortableColumnHeader = ({
         transition: isDragging ? undefined : transition,
         minWidth: column.width,
         maxWidth: column.width,
-        width: column.width,
+        width: column.width
     };
 
     // Combine our press handlers with dnd-kit listeners
@@ -69,7 +69,7 @@ const SortableColumnHeader = ({
             listeners?.onPointerDown?.(e);
         },
         onPointerUp: () => setIsPressing(false),
-        onPointerCancel: () => setIsPressing(false),
+        onPointerCancel: () => setIsPressing(false)
     } : {};
 
     // Reset pressing state when drag ends
@@ -103,7 +103,7 @@ const SortableColumnHeader = ({
                 createFilterField={createFilterField}
                 AdditionalHeaderWidget={column.AdditionalHeaderWidget}
                 isDragging={isDragging || isPressing}
-                isDraggable={isDraggable} />
+                isDraggable={isDraggable}/>
         </div>
     );
 };
@@ -241,7 +241,7 @@ export const VirtualTableHeaderRow = ({
                     );
                 })}
 
-                {AddColumnComponent && <AddColumnComponent />}
+                {AddColumnComponent && <AddColumnComponent/>}
 
             </div>
         </>

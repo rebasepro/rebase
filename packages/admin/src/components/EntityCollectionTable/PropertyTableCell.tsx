@@ -45,7 +45,6 @@ export interface PropertyTableCellProps<T> {
 }
 
 
-
 export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
     function PropertyTableCell<T, M extends Record<string, any>>({
         propertyKey,
@@ -130,7 +129,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
                                 propertyKey,
                                 setError,
                                 onValueUpdated,
-                                data: entity,
+                                data: entity
                             });
                         } catch (e: unknown) {
                             console.error("onValueChange error", e);
@@ -244,7 +243,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
 
         if (!customField && (!customPreview || selected)) {
             const tableBinding = getTableBindingForProperty(property, selected);
-            
+
             if (tableBinding) {
                 const Component = tableBinding.Component;
                 innerComponent = <Component
@@ -262,7 +261,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
                     path={path}
                     openPopup={setPopupCell ? openPopup : undefined}
                 />;
-                
+
                 allowScroll = tableBinding.allowScroll ?? false;
                 includeActions = tableBinding.includeActions ?? true;
                 showExpandIcon = tableBinding.showExpandIcon ?? false;
@@ -315,7 +314,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
                     disabled={disabled}
                     showExpandIcon={showExpandIcon}
                     selected={selected}
-                    openPopup={!disabled ? openPopup : undefined} />}
+                    openPopup={!disabled ? openPopup : undefined}/>}
             >
 
                 {innerComponent}

@@ -5,7 +5,7 @@ import {
     smartQuotes,
     emDash,
     ellipsis,
-    InputRule,
+    InputRule
 } from "prosemirror-inputrules";
 import { schema } from "../schema";
 import { MarkType } from "prosemirror-model";
@@ -78,5 +78,5 @@ export const markdownInputRules = inputRules({
         emRule,
         codeRule,
         strikeRule
-    ],
+    ]
 });

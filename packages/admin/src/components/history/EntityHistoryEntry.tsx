@@ -79,9 +79,9 @@ function PreviousValueView({
                     propertyKey={propertyKey as string}
                     value={previousValueInPath as never}
                     property={childProperty as Property}
-                    size={"small"} />
+                    size={"small"}/>
             </div>}>
-            <KeyboardBackspaceIcon size={"smallest"} color={"disabled"} className={"mb-1"} />
+            <KeyboardBackspaceIcon size={"smallest"} color={"disabled"} className={"mb-1"}/>
         </Tooltip>
     }
 }
@@ -120,7 +120,7 @@ export function EntityHistoryEntry({
                 {entry.action}
             </Chip>
             {!userDisplay && updatedBy && <Chip size={"small"}>{updatedBy}</Chip>}
-            {userDisplay && <UserChip user={userDisplay} />}
+            {userDisplay && <UserChip user={userDisplay}/>}
         </div>
         <div
             className={cls(
@@ -148,7 +148,7 @@ export function EntityHistoryEntry({
                             propertyKey={key}
                             value={valueInPath as never}
                             property={childProperty as Property}
-                            size={"small"} />
+                            size={"small"}/>
                         : <Typography variant={"body2"}>
                             {typeof valueInPath === "string" ? valueInPath : JSON.stringify(valueInPath)}
                         </Typography>;
@@ -165,7 +165,7 @@ export function EntityHistoryEntry({
                                 {previousValueInPath !== undefined && !deepEqual(previousValueInPath, valueInPath) &&
                                     <PreviousValueView previousValueInPath={previousValueInPath}
                                         childProperty={childProperty as Property}
-                                        propertyKey={key} />
+                                        propertyKey={key}/>
                                 }
                                 {element}
                             </div>

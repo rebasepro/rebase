@@ -103,7 +103,7 @@ export const PropertyForm = React.memo(
             allowDataInference,
             getController,
             getData,
-            propertyConfigs,
+            propertyConfigs
         } = props;
 
         const initialValue: PropertyWithId = {
@@ -136,7 +136,8 @@ export const PropertyForm = React.memo(
         const formexController = useCreateFormex<PropertyWithId>({
             debugId: "PROPERTY_FORM",
             initialValues: property
-                ? { id: propertyKey, ...property } as PropertyWithId
+                ? { id: propertyKey,
+...property } as PropertyWithId
                 : initialValue,
             initialErrors,
             validateOnChange: true,
@@ -219,7 +220,7 @@ export const PropertyForm = React.memo(
                 getData={getData}
                 allowDataInference={allowDataInference}
                 propertyConfigs={propertyConfigs}
-                {...formexController} />
+                {...formexController}/>
         </Formex>;
     }, (a, b) =>
     a.getData === b.getData &&
@@ -388,15 +389,15 @@ function PropertyEditFormFields({
         childComponent =
             <StringPropertyField widgetId={selectedFieldConfigId}
                 disabled={disabled}
-                showErrors={showErrors} />;
+                showErrors={showErrors}/>;
     } else if (selectedFieldConfigId === "url") {
         childComponent =
             <UrlPropertyField disabled={disabled}
-                showErrors={showErrors} />;
+                showErrors={showErrors}/>;
     } else if (selectedFieldConfigId === "markdown") {
         childComponent =
             <MarkdownPropertyField disabled={disabled}
-                showErrors={showErrors} />;
+                showErrors={showErrors}/>;
     } else if (selectedFieldConfigId === "select" ||
         selectedFieldConfigId === "number_select") {
         childComponent = <EnumPropertyField
@@ -406,7 +407,7 @@ function PropertyEditFormFields({
             disabled={disabled}
             getData={getData}
             propertyNamespace={propertyNamespace}
-            showErrors={showErrors} />;
+            showErrors={showErrors}/>;
     } else if (selectedFieldConfigId === "multi_select" ||
         selectedFieldConfigId === "multi_number_select") {
         childComponent = <EnumPropertyField
@@ -416,50 +417,50 @@ function PropertyEditFormFields({
             allowDataInference={allowDataInference}
             getData={getData}
             propertyNamespace={propertyNamespace}
-            showErrors={showErrors} />;
+            showErrors={showErrors}/>;
     } else if (selectedFieldConfigId === "file_upload") {
         childComponent =
             <StoragePropertyField existing={existing}
                 multiple={false}
-                disabled={disabled} />;
+                disabled={disabled}/>;
     } else if (selectedFieldConfigId === "multi_file_upload") {
         childComponent =
             <StoragePropertyField existing={existing}
                 multiple={true}
-                disabled={disabled} />;
+                disabled={disabled}/>;
     } else if (selectedFieldConfigId === "switch") {
-        childComponent = <BooleanPropertyField disabled={disabled} />;
+        childComponent = <BooleanPropertyField disabled={disabled}/>;
     } else if (selectedFieldConfigId === "number_input") {
-        childComponent = <NumberPropertyField disabled={disabled} />;
+        childComponent = <NumberPropertyField disabled={disabled}/>;
     } else if (selectedFieldConfigId === "group") {
         childComponent =
             <MapPropertyField disabled={disabled} getData={getData} allowDataInference={allowDataInference}
-                propertyConfigs={propertyConfigs} />;
+                propertyConfigs={propertyConfigs}/>;
     } else if (selectedFieldConfigId === "block") {
         childComponent =
             <BlockPropertyField disabled={disabled} getData={getData} allowDataInference={allowDataInference}
-                propertyConfigs={propertyConfigs} />;
+                propertyConfigs={propertyConfigs}/>;
     } else if (selectedFieldConfigId === "reference") {
         childComponent =
             <ReferencePropertyField showErrors={showErrors}
                 existing={existing}
                 multiple={false}
-                disabled={disabled} />;
+                disabled={disabled}/>;
     } else if (selectedFieldConfigId === "reference_as_string") {
         childComponent =
             <ReferencePropertyField showErrors={showErrors}
                 existing={existing}
                 asString={true}
                 multiple={false}
-                disabled={disabled} />;
+                disabled={disabled}/>;
     } else if (selectedFieldConfigId === "date_time") {
-        childComponent = <DateTimePropertyField disabled={disabled} />;
+        childComponent = <DateTimePropertyField disabled={disabled}/>;
     } else if (selectedFieldConfigId === "multi_references") {
         childComponent =
             <ReferencePropertyField showErrors={showErrors}
                 existing={existing}
                 multiple={true}
-                disabled={disabled} />;
+                disabled={disabled}/>;
     } else if (selectedFieldConfigId === "repeat") {
         childComponent =
             <RepeatPropertyField showErrors={showErrors}
@@ -467,15 +468,15 @@ function PropertyEditFormFields({
                 getData={getData}
                 allowDataInference={allowDataInference}
                 disabled={disabled}
-                propertyConfigs={propertyConfigs} />;
+                propertyConfigs={propertyConfigs}/>;
     } else if (selectedFieldConfigId === "key_value") {
         childComponent =
-            <KeyValuePropertyField disabled={disabled} />;
+            <KeyValuePropertyField disabled={disabled}/>;
     } else if (selectedFieldConfigId === "relation") {
         childComponent =
             <RelationPropertyField
                 showErrors={showErrors}
-                disabled={disabled} />;
+                disabled={disabled}/>;
     } else {
         childComponent = null;
     }
@@ -507,7 +508,7 @@ function PropertyEditFormFields({
                         showError={Boolean(selectedWidgetError)}
                         existing={existing}
                         propertyConfigs={propertyConfigs}
-                        inArray={inArray} />
+                        inArray={inArray}/>
 
                     {!!selectedWidgetError &&
                         <Typography variant="caption"
@@ -525,7 +526,7 @@ function PropertyEditFormFields({
                         className="m-4"
                         disabled={disabled}
                         onClick={() => setDeleteDialogOpen(true)}>
-                        <DeleteIcon />
+                        <DeleteIcon/>
                     </IconButton>}
             </div>
 
@@ -536,12 +537,12 @@ function PropertyEditFormFields({
                         isNewProperty={!existing}
                         disabled={disabled}
                         autoUpdateId={autoUpdateId}
-                        ref={nameFieldRef} />}
+                        ref={nameFieldRef}/>}
 
                 {childComponent}
 
                 <div className={"col-span-12"}>
-                    <AdvancedPropertyValidation disabled={disabled} />
+                    <AdvancedPropertyValidation disabled={disabled}/>
                 </div>
             </div>
 
@@ -554,7 +555,7 @@ function PropertyEditFormFields({
                         <div> This will <b>not delete any
                             data</b>, only modify the
                             collection.</div>
-                    } />}
+                    }/>}
 
         </>
     );
@@ -675,14 +676,14 @@ function WidgetSelectView({
             className={cls(
                 "select-none rounded-md text-sm py-2 px-1 transition-colors duration-200",
                 !disabled && "hover:bg-surface-50 dark:hover:bg-surface-800 cursor-pointer",
-                "relative flex items-center mb-2",
+                "relative flex items-center mb-2"
             )}>
             {!value && <em>Select a property widget</em>}
             {value && computedFieldConfig && <div
                 className={cls(
                     "flex items-center")}>
                 <div className={"mr-4"}>
-                    <PropertyConfigBadge propertyConfig={computedFieldConfig} />
+                    <PropertyConfigBadge propertyConfig={computedFieldConfig}/>
                 </div>
                 <div className={"flex flex-col items-start text-left"}>
                     <div className="font-semibold text-text-primary dark:text-text-primary-dark tracking-tight">{computedFieldConfig.name}</div>
@@ -716,7 +717,7 @@ function WidgetSelectView({
                                                 onOpenChange(false, true);
                                             }}
                                             propertyConfig={propertyConfig}
-                                            existing={existing} />;
+                                            existing={existing}/>;
                                     }
                                     return null;
                                 })}
@@ -762,16 +763,16 @@ export function WidgetSelectViewItem({
         className={"flex flex-row items-center px-4 py-2 m-1"}>
         <div
             className={cls(
-                "flex flex-row items-center text-base min-h-[48px]",
+                "flex flex-row items-center text-base min-h-[48px]"
             )}>
             <div className={"mr-8"}>
-                <PropertyConfigBadge propertyConfig={propertyConfig} disabled={shouldWarnChangingtype} />
+                <PropertyConfigBadge propertyConfig={propertyConfig} disabled={shouldWarnChangingtype}/>
             </div>
             <div>
                 <div className={"flex flex-row gap-2 items-center"}>
                     {shouldWarnChangingtype && <Tooltip
                         title={"This widget uses a different data type than the initially selected widget. This can cause errors with existing data."}>
-                        <WarningIcon size="smallest" className={"w-4"} />
+                        <WarningIcon size="smallest" className={"w-4"}/>
                     </Tooltip>}
                     <Typography
                         variant={"label"}

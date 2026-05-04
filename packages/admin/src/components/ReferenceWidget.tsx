@@ -121,7 +121,7 @@ export function ReferenceWidget<M extends Record<string, unknown>>({
                     previewProperties={previewProperties}
                     size={size}
                     includeId={includeId}
-                    includeEntityLink={includeEntityLink} />
+                    includeEntityLink={includeEntityLink}/>
             })}
         </div>
     } else if (value?.isEntityReference && value?.isEntityReference()) {
@@ -132,7 +132,7 @@ export function ReferenceWidget<M extends Record<string, unknown>>({
             previewProperties={previewProperties}
             size={size}
             includeId={includeId}
-            includeEntityLink={includeEntityLink} />
+            includeEntityLink={includeEntityLink}/>
 
     }
     return <div className={cls("text-sm font-medium",

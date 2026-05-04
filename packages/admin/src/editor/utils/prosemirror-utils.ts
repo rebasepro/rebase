@@ -49,9 +49,9 @@ export function setMark(type: MarkType, attrs?: Record<string, unknown>) {
             if ($cursor) {
                 dispatch(state.tr.addStoredMark(type.create(attrs)));
             } else {
-                let tr = state.tr;
+                const tr = state.tr;
                 for (let i = 0; i < ranges.length; i++) {
-                    let { $from, $to } = ranges[i];
+                    const { $from, $to } = ranges[i];
                     tr.addMark($from.pos, $to.pos, type.create(attrs));
                 }
                 dispatch(tr.scrollIntoView());
@@ -67,17 +67,17 @@ export function unsetMark(type: MarkType) {
         const { empty, $cursor, ranges } = selection;
         if ((empty && !$cursor) || !type) return false;
         if (dispatch) {
-            let tr = state.tr;
+            const tr = state.tr;
             if ($cursor) {
                 const parent = $cursor.parent;
                 let markStart = -1;
                 let markEnd = -1;
                 let currentMarkStart = -1;
-                
+
                 parent.forEach((child: ProseMirrorNode, offset: number) => {
                     const childStart = $cursor.start() + offset;
                     const childEnd = childStart + child.nodeSize;
-                    
+
                     if (type.isInSet(child.marks)) {
                         if (currentMarkStart === -1) currentMarkStart = childStart;
                         if ($cursor.pos >= childStart && $cursor.pos <= childEnd) {
@@ -90,11 +90,11 @@ export function unsetMark(type: MarkType) {
                         }
                     }
                 });
-                
+
                 if (markStart !== -1 && markEnd === -1) {
                     markEnd = $cursor.end();
                 }
-                
+
                 if (markStart !== -1 && markEnd !== -1) {
                     tr.removeMark(markStart, markEnd, type);
                 }
@@ -102,7 +102,7 @@ export function unsetMark(type: MarkType) {
                 dispatch(tr.scrollIntoView());
             } else {
                 for (let i = 0; i < ranges.length; i++) {
-                    let { $from, $to } = ranges[i];
+                    const { $from, $to } = ranges[i];
                     tr.removeMark($from.pos, $to.pos, type);
                 }
                 dispatch(tr.scrollIntoView());

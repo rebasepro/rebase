@@ -317,7 +317,7 @@ export function ContentHomePage({
                     {additionalPluginActions}
                 </div>
 
-                <FavouritesView hidden={performingSearch} />
+                <FavouritesView hidden={performingSearch}/>
 
                 {additionalChildrenStart}
                 {additionalPluginChildrenStart}
@@ -357,7 +357,7 @@ export function ContentHomePage({
                             // Render home.cards contributions inline (no hook call inside loop)
                             const additionalCards = homeCardContributions.map((s, i) => (
                                 <ErrorBoundary key={`home_cards_${groupKey}_${i}`}>
-                                    <s.Component {...homeCardsProps} {...(s.props ?? {})} />
+                                    <s.Component {...homeCardsProps} {...(s.props ?? {})}/>
                                 </ErrorBoundary>
                             ));
 

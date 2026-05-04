@@ -35,7 +35,7 @@ export function ArrayOfStringsPreview({
                             <StringPropertyPreview propertyKey={propertyKey}
                                 property={stringProperty}
                                 value={v}
-                                size={size} />
+                                size={size}/>
                         </ErrorBoundary>
                     </div>
                 )}

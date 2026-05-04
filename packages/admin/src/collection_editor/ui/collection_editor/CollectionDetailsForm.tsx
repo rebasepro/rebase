@@ -76,7 +76,7 @@ export function CollectionDetailsForm({
         if (!values.properties) return result;
 
         Object.entries(values.properties).forEach(([key, prop]) => {
-            if (prop && 'type' in prop && prop.type === 'number') {
+            if (prop && "type" in prop && prop.type === "number") {
                 result.push({
                     key,
                     label: (prop as Property).name || key,
@@ -111,7 +111,7 @@ export function CollectionDetailsForm({
 
     };
 
-    const collectionIcon = <IconForView collectionOrView={values} />;
+    const collectionIcon = <IconForView collectionOrView={values}/>;
 
     const groupOptions = groups?.filter((group) => !reservedGroups?.includes(group));
 
@@ -124,7 +124,6 @@ export function CollectionDetailsForm({
     });
 
     const isSubcollection = !!parentCollection;
-
 
 
     const showErrors = submitCount > 0;
@@ -140,7 +139,7 @@ export function CollectionDetailsForm({
                             {isNewCollection ? "New collection" : `${values?.name} collection`}
                         </Typography>
                         <DefaultDatabaseField databaseId={values.databaseId}
-                            onDatabaseIdUpdate={updateDatabaseId} />
+                            onDatabaseIdUpdate={updateDatabaseId}/>
 
                         <Tooltip title={"Change icon"}
                             asChild={true}>
@@ -168,7 +167,7 @@ export function CollectionDetailsForm({
                             label={"Name"}
                             autoFocus={true}
                             required
-                            error={showErrors && Boolean(errors.name)} />
+                            error={showErrors && Boolean(errors.name)}/>
                         <FieldCaption error={touched.name && Boolean(errors.name)}>
                             {touched.name && Boolean(errors.name) ? errors.name : "Name of this collection, usually a plural name (e.g. Products)"}
                         </FieldCaption>
@@ -179,7 +178,7 @@ export function CollectionDetailsForm({
                             as={DebouncedTextField}
                             label={"Path"}
                             required
-                            error={showErrors && Boolean(errors.slug)} />
+                            error={showErrors && Boolean(errors.slug)}/>
 
                         <FieldCaption error={touched.slug && Boolean(errors.slug)}>
                             {touched.slug && Boolean(errors.slug)
@@ -227,14 +226,14 @@ export function CollectionDetailsForm({
                     <LayoutModeSwitch
                         className={"col-span-12"}
                         value={values.openEntityMode ?? "side_panel"}
-                        onChange={(value) => setFieldValue("openEntityMode", value)} />
+                        onChange={(value) => setFieldValue("openEntityMode", value)}/>
 
                     <ViewModeSwitch
                         className={"col-span-12"}
                         value={values.defaultViewMode ?? "table"}
-                        onChange={(value) => setFieldValue("defaultViewMode", value)} />
+                        onChange={(value) => setFieldValue("defaultViewMode", value)}/>
 
-                    <KanbanConfigSection className={"col-span-12"} forceExpanded={expandKanban} />
+                    <KanbanConfigSection className={"col-span-12"} forceExpanded={expandKanban}/>
 
                     <div className={"col-span-12 mt-4"}>
                         {(() => {
@@ -265,7 +264,7 @@ export function CollectionDetailsForm({
                                             const fieldConfig = getFieldConfig(prop.property, customizationController.propertyConfigs);
                                             return (
                                                 <div className="flex items-center gap-2">
-                                                    <PropertyConfigBadge propertyConfig={fieldConfig} />
+                                                    <PropertyConfigBadge propertyConfig={fieldConfig}/>
                                                     <span>{prop.label}</span>
                                                 </div>
                                             );
@@ -278,7 +277,7 @@ export function CollectionDetailsForm({
                                                     setFieldValue("orderProperty", undefined);
                                                 }}
                                             >
-                                                <CloseIcon size="small" />
+                                                <CloseIcon size="small"/>
                                             </IconButton>
                                         ) : undefined}
                                     >
@@ -287,7 +286,7 @@ export function CollectionDetailsForm({
                                             return (
                                                 <SelectItem key={prop.key} value={prop.key}>
                                                     <div className="flex items-center gap-3">
-                                                        <PropertyConfigBadge propertyConfig={fieldConfig} />
+                                                        <PropertyConfigBadge propertyConfig={fieldConfig}/>
                                                         <div>
                                                             <div>{prop.label}</div>
                                                             <Typography variant="caption" color="secondary">
@@ -376,7 +375,7 @@ export function CollectionDetailsForm({
                         <BooleanSwitchWithLabel
                             position={"start"}
                             allowIndeterminate={true}
-                            label={<span className="flex items-center gap-2"><HistoryIcon size={"smallest"} />{values.history === null || values.history === undefined ? "Document history revisions enabled if enabled globally" : (
+                            label={<span className="flex items-center gap-2"><HistoryIcon size={"smallest"}/>{values.history === null || values.history === undefined ? "Document history revisions enabled if enabled globally" : (
                                 values.history ? "Document history revisions ENABLED" : "Document history revisions NOT enabled"
                             )}</span>}
                             onValueChange={(v) => setFieldValue("history", v)}
@@ -396,7 +395,7 @@ export function CollectionDetailsForm({
 
                 </div>
 
-                <div style={{ height: "52px" }} />
+                <div style={{ height: "52px" }}/>
 
                 <Dialog
                     open={iconDialogOpen}
@@ -409,7 +408,7 @@ export function CollectionDetailsForm({
                             onIconSelected={(icon: string) => {
                                 setIconDialogOpen(false);
                                 setFieldValue("icon", icon);
-                            }} />
+                            }}/>
                     </div>
 
                 </Dialog>

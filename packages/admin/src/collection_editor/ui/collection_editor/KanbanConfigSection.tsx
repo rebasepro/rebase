@@ -34,7 +34,7 @@ export function KanbanConfigSection({
         if (!values.properties) return result;
 
         Object.entries(values.properties).forEach(([key, prop]) => {
-            if (prop && 'type' in prop && prop.type === 'string' && prop.enum) {
+            if (prop && "type" in prop && prop.type === "string" && prop.enum) {
                 result.push({
                     key,
                     label: (prop as Property).name || key,
@@ -55,7 +55,8 @@ export function KanbanConfigSection({
     React.useEffect(() => {
         if (forceExpanded && panelRef.current) {
             setTimeout(() => {
-                panelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                panelRef.current?.scrollIntoView({ behavior: "smooth",
+block: "center" });
             }, 100);
         }
     }, [forceExpanded]);
@@ -98,7 +99,7 @@ export function KanbanConfigSection({
                     const fieldConfig = getFieldConfig(prop.property, customizationController.propertyConfigs);
                     return (
                         <div className="flex items-center gap-2">
-                            <PropertyConfigBadge propertyConfig={fieldConfig} />
+                            <PropertyConfigBadge propertyConfig={fieldConfig}/>
                             <span>{prop.label}</span>
                         </div>
                     );
@@ -111,7 +112,7 @@ export function KanbanConfigSection({
                             setFieldValue("kanban", undefined);
                         }}
                     >
-                        <CloseIcon size="small" />
+                        <CloseIcon size="small"/>
                     </IconButton>
                 ) : undefined}
             >
@@ -120,7 +121,7 @@ export function KanbanConfigSection({
                     return (
                         <SelectItem key={prop.key} value={prop.key}>
                             <div className="flex items-center gap-3">
-                                <PropertyConfigBadge propertyConfig={fieldConfig} />
+                                <PropertyConfigBadge propertyConfig={fieldConfig}/>
                                 <div>
                                     <div>{prop.label}</div>
                                     <Typography variant="caption" color="secondary">
@@ -158,9 +159,12 @@ export function KanbanConfigSection({
                             type: "string",
                             name: dialogPropertyName,
                             enum: [
-                                { id: "todo", label: "To Do" },
-                                { id: "in_progress", label: "In Progress" },
-                                { id: "done", label: "Done" }
+                                { id: "todo",
+label: "To Do" },
+                                { id: "in_progress",
+label: "In Progress" },
+                                { id: "done",
+label: "Done" }
                             ]
                         } as Property}
                         propertyKey={dialogPropertyKey}

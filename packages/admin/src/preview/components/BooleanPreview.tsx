@@ -18,7 +18,7 @@ export function BooleanPreview({
         <Checkbox checked={value}
             padding={false}
             size={size}
-            color={"secondary"} />
+            color={"secondary"}/>
         {property.name && <span
             className={cls("text-text-secondary dark:text-text-secondary-dark", size === "small" ? "text-sm" : "")}>{property.name}</span>}
     </div>;

@@ -19,7 +19,7 @@ function normalizeError(error: unknown): string | undefined {
         if ("message" in error) {
             return String((error as { message: unknown }).message);
         }
-        
+
         // Extract all string values from the object (e.g., nested validation errors)
         const messages: string[] = [];
         const extractMessages = (obj: any) => {

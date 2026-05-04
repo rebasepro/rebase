@@ -79,7 +79,7 @@ export function CollectionTableToolbar({
                     compact ? "w-0 opacity-0" : "w-[22px] opacity-100"
                 )}>
                     {loading &&
-                        <CircularProgress size={"smallest"} />}
+                        <CircularProgress size={"smallest"}/>}
                 </div>}
 
                 {/* Search bar — hidden in compact */}
@@ -93,7 +93,7 @@ export function CollectionTableToolbar({
                             size={"small"}
                             placeholder={t("search")}
                             onTextSearch={onTextSearch}
-                            expandable={true} />}
+                            expandable={true}/>}
                 </div>
 
                 {/* Secondary actions — visible normally, collapsed to popover in compact */}
@@ -115,7 +115,7 @@ export function CollectionTableToolbar({
                             onOpenChange={setOverflowOpen}
                             trigger={
                                 <IconButton size="small">
-                                    <MoreVertIcon size="small" />
+                                    <MoreVertIcon size="small"/>
                                 </IconButton>
                             }>
                             <div className="flex flex-col gap-1 p-2 min-w-[200px]">

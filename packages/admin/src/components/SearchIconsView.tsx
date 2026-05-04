@@ -69,7 +69,7 @@ export function SearchIconsView({
                                 onClick={onIconSelected ? () => onIconSelected(icon) : undefined}
                                 className="box-content m-1"
                             >
-                                <Icon iconKey={icon} size={24} />
+                                <Icon iconKey={icon} size={24}/>
                             </IconButton>
                         </Tooltip>
                     );

@@ -88,7 +88,8 @@ export function resolveNavigationFrom<M extends Record<string, unknown>, USER ex
                 return data.collection(entry.slug).findById(entry.entityId)
                     .then((entity) => {
                         if (!entity) return undefined;
-                        return { ...entry, entity };
+                        return { ...entry,
+entity };
                     });
             } else if (entry.type === "custom_view") {
                 return Promise.resolve(entry);
@@ -139,7 +140,8 @@ export function useResolvedNavigationFrom<M extends Record<string, unknown>>(
         if (navigationStateController && collectionRegistryController) {
             setDataLoading(true);
             setDataLoadingError(undefined);
-            resolveNavigationFrom<M, User>({ path, context })
+            resolveNavigationFrom<M, User>({ path,
+context })
                 .then(setData)
                 .catch((e) => setDataLoadingError(e))
                 .finally(() => setDataLoading(false));
@@ -151,6 +153,8 @@ export function useResolvedNavigationFrom<M extends Record<string, unknown>>(
         if (!navigationStateController) {
             return { dataLoading: true };
         }
-        return { data, dataLoading, dataLoadingError };
+        return { data,
+dataLoading,
+dataLoadingError };
     }, [navigationStateController, data, dataLoading, dataLoadingError]);
 }

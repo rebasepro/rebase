@@ -25,8 +25,12 @@ import { getPropertyPaths } from "./property_paths";
  * - "exclude" → conditions.excludedEnumValues (JSON Logic returning excluded IDs)
  */
 const ENUM_CONDITION_TYPES = [
-    { id: "allowedEnumValues", label: "Filter Options", description: "Only show selected enum values when condition is true" },
-    { id: "excludedEnumValues", label: "Exclude Options", description: "Hide selected enum values when condition is true" }
+    { id: "allowedEnumValues",
+label: "Filter Options",
+description: "Only show selected enum values when condition is true" },
+    { id: "excludedEnumValues",
+label: "Exclude Options",
+description: "Hide selected enum values when condition is true" }
 ] as const;
 
 type EnumConditionType = typeof ENUM_CONDITION_TYPES[number]["id"];
@@ -35,20 +39,39 @@ type EnumConditionType = typeof ENUM_CONDITION_TYPES[number]["id"];
  * Operators for conditions
  */
 const OPERATORS = [
-    { id: "==", label: "equals", valueType: "any" },
-    { id: "!=", label: "not equals", valueType: "any" },
-    { id: "in", label: "contains", valueType: "array" },
-    { id: "!!", label: "has a value", valueType: "none" },
-    { id: "!", label: "is empty", valueType: "none" }
+    { id: "==",
+label: "equals",
+valueType: "any" },
+    { id: "!=",
+label: "not equals",
+valueType: "any" },
+    { id: "in",
+label: "contains",
+valueType: "array" },
+    { id: "!!",
+label: "has a value",
+valueType: "none" },
+    { id: "!",
+label: "is empty",
+valueType: "none" }
 ] as const;
 
 type OperatorId = typeof OPERATORS[number]["id"];
 
 // Context fields
 const CONTEXT_FIELDS = [
-    { id: "isNew", label: "Is New Entity", dataType: "boolean", color: "#9c27b0" },
-    { id: "entityId", label: "Entity ID", dataType: "string", color: "#2196f3" },
-    { id: "user.roles", label: "User Roles", dataType: "array", color: "#ff9800" }
+    { id: "isNew",
+label: "Is New Entity",
+dataType: "boolean",
+color: "#9c27b0" },
+    { id: "entityId",
+label: "Entity ID",
+dataType: "string",
+color: "#2196f3" },
+    { id: "user.roles",
+label: "User Roles",
+dataType: "array",
+color: "#ff9800" }
 ] as const;
 
 interface EnumConditionConfig {
@@ -156,7 +179,7 @@ function arrayToObject(arr: string[]): Record<string, string> {
  * Build JSON Logic rule: { "if": [ condition, thenValue, elseValue ] }
  * When condition is true, return the selected enum IDs.
  * When false, return all enum IDs or empty (depending on type).
- * 
+ *
  * IMPORTANT: We store arrays as objects with numeric keys to avoid
  * Firestore's "Nested arrays are not supported" error.
  */
@@ -208,7 +231,7 @@ function buildEnumFilterRule(
             "if": [
                 condition,
                 arrayToObject(config.selectedEnumIds), // When true: only these
-                arrayToObject(allEnumIds)               // When false: all
+                arrayToObject(allEnumIds) // When false: all
             ]
         };
     } else {
@@ -217,7 +240,7 @@ function buildEnumFilterRule(
             "if": [
                 condition,
                 arrayToObject(config.selectedEnumIds), // When true: exclude these
-                {}                                      // When false: exclude nothing
+                {} // When false: exclude nothing
             ]
         };
     }
@@ -346,7 +369,7 @@ function EnumConditionRow({
                     disabled={disabled}
                     size="small"
                     variant="ghost">
-                    <DeleteIcon size="smallest" />
+                    <DeleteIcon size="smallest"/>
                 </IconButton>
             </div>
 
@@ -355,7 +378,9 @@ function EnumConditionRow({
                 {/* Field selector */}
                 <Select
                     value={config.field}
-                    onValueChange={(value) => onConfigChange({ ...config, field: value, value: "" })}
+                    onValueChange={(value) => onConfigChange({ ...config,
+field: value,
+value: "" })}
                     disabled={disabled}
                     size="small"
                     inputClassName="min-w-[140px]"
@@ -392,7 +417,8 @@ function EnumConditionRow({
                 {/* Operator */}
                 <Select
                     value={config.operator}
-                    onValueChange={(value) => onConfigChange({ ...config, operator: value as OperatorId })}
+                    onValueChange={(value) => onConfigChange({ ...config,
+operator: value as OperatorId })}
                     disabled={disabled}
                     size="small"
                     inputClassName="min-w-[100px]">
@@ -409,13 +435,15 @@ function EnumConditionRow({
                             size="small"
                             position="start"
                             disabled={disabled}
-                            onValueChange={(v) => onConfigChange({ ...config, value: v ? "true" : "false" })}
+                            onValueChange={(v) => onConfigChange({ ...config,
+value: v ? "true" : "false" })}
                         />
                     ) : fieldEnumValues.length > 0 ? (
                         // Show Select for enum fields
                         <Select
                             value={config.value}
-                            onValueChange={(value) => onConfigChange({ ...config, value })}
+                            onValueChange={(value) => onConfigChange({ ...config,
+value })}
                             disabled={disabled}
                             size="small"
                             placeholder="Select value..."
@@ -429,7 +457,8 @@ function EnumConditionRow({
                     ) : (
                         <DebouncedTextField
                             value={config.value}
-                            onChange={(e) => onConfigChange({ ...config, value: e.target.value })}
+                            onChange={(e) => onConfigChange({ ...config,
+value: e.target.value })}
                             disabled={disabled}
                             size="small"
                             placeholder="Value"
@@ -446,7 +475,8 @@ function EnumConditionRow({
                 </Typography>
                 <MultiSelect
                     value={config.selectedEnumIds}
-                    onValueChange={(values) => onConfigChange({ ...config, selectedEnumIds: values })}
+                    onValueChange={(values) => onConfigChange({ ...config,
+selectedEnumIds: values })}
                     disabled={disabled}
                     size="small"
                     placeholder="Select values..."
@@ -506,7 +536,8 @@ export function EnumConditionsEditor({ disabled, collectionProperties }: EnumCon
         if (rule) {
             const config = parseEnumFilterRule(rule);
             if (config) {
-                activeConditions.push({ type: type.id, config });
+                activeConditions.push({ type: type.id,
+config });
             }
         }
     }

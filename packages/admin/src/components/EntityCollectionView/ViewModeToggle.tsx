@@ -82,10 +82,10 @@ export function ViewModeToggle({
 
     // Get icon for current view mode
     const getViewModeIcon = () => {
-        if (viewMode === "kanban") return <ViewKanbanIcon size="small" />;
-        if (viewMode === "cards") return <AppsIcon size="small" />;
-        if (viewMode === "table") return <ListIcon size="small" />;
-        return <FormatListBulletedIcon size="small" />;
+        if (viewMode === "kanban") return <ViewKanbanIcon size="small"/>;
+        if (viewMode === "cards") return <AppsIcon size="small"/>;
+        if (viewMode === "table") return <ListIcon size="small"/>;
+        return <FormatListBulletedIcon size="small"/>;
     };
 
     const getViewModeName = () => {
@@ -107,22 +107,22 @@ export function ViewModeToggle({
             {
                 value: "list",
                 label: t("list"),
-                icon: <FormatListBulletedIcon size="small" />
+                icon: <FormatListBulletedIcon size="small"/>
             },
             {
                 value: "table",
                 label: t("spreadsheet"),
-                icon: <ListIcon size="small" />
+                icon: <ListIcon size="small"/>
             },
             {
                 value: "cards",
                 label: t("cards"),
-                icon: <AppsIcon size="small" />
+                icon: <AppsIcon size="small"/>
             },
             {
                 value: "kanban",
                 label: t("board"),
-                icon: <ViewKanbanIcon size="small" />
+                icon: <ViewKanbanIcon size="small"/>
             }
         ];
 
@@ -176,7 +176,7 @@ export function ViewModeToggle({
                     {showSizeSelector && (
                         <div className="flex flex-row items-center justify-between gap-2">
                             <div className="flex items-center gap-2 text-sm text-surface-600 dark:text-surface-300">
-                                <ViewColumnIcon size="small" />
+                                <ViewColumnIcon size="small"/>
                                 <span>{t("size_label")}</span>
                             </div>
                             <Select
@@ -199,7 +199,7 @@ export function ViewModeToggle({
                     {showKanbanPropertySelector && (
                         <div className="flex flex-row items-center justify-between gap-2">
                             <div className="flex items-center gap-2 text-sm text-surface-600 dark:text-surface-300">
-                                <ViewKanbanIcon size="small" />
+                                <ViewKanbanIcon size="small"/>
                                 <span>{t("group_by")}</span>
                             </div>
                             <Select

@@ -213,7 +213,7 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
                     </Typography>
                 </div>
             ) : isInitialLoading ? (
-                <CircularProgressCenter />
+                <CircularProgressCenter/>
             ) : isEmpty ? (
                 <div className="h-full flex items-center justify-center p-8">
                     {emptyComponent ?? (
@@ -251,7 +251,7 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
                             className="flex items-center justify-center py-8"
                         >
                             {dataLoading && (
-                                <CircularProgress size="small" />
+                                <CircularProgress size="small"/>
                             )}
                             {!dataLoading && noMoreToLoad && data.length > 0 && (
                                 <Typography variant="caption" color="secondary">

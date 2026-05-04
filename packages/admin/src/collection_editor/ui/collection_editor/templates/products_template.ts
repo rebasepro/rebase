@@ -34,7 +34,7 @@ export const productsCollectionTemplate = {
             name: "Image",
             storage: {
                 storagePath: "images",
-                acceptedFiles: ["image/*"],
+                acceptedFiles: ["image/*"]
             },
             description: "Upload field for images"
         },

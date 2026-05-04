@@ -58,7 +58,7 @@ export function ArrayCustomShapedFieldBinding({
             icon={getIconForProperty(property, "small")}
             required={property.validation?.required}
             title={property.name ?? propertyKey}
-            className={"h-8 grow text-text-secondary dark:text-text-secondary-dark"} />
+            className={"h-8 grow text-text-secondary dark:text-text-secondary-dark"}/>
         {Array.isArray(value) && <Typography variant={"caption"} className={"px-4"}>({value.length})</Typography>}
     </>);
 
@@ -79,7 +79,7 @@ export function ArrayCustomShapedFieldBinding({
             customProps
         } as FieldProps<any>;
         return <div key={`custom_shaped_array_${index}`} className="pb-4">
-            <PropertyFieldBinding {...fieldProps} />
+            <PropertyFieldBinding {...fieldProps}/>
         </div>;
     });
 
@@ -100,7 +100,7 @@ export function ArrayCustomShapedFieldBinding({
                 showError={showError}
                 error={error}
                 disabled={disabled}
-                property={property} />
+                property={property}/>
 
         </>
     );

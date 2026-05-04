@@ -91,7 +91,7 @@ export function EnumForm({
             shouldUpdateId={updateIds}
             disabled={disabled}
             allowDataInference={allowDataInference}
-            getData={getData} />
+            getData={getData}/>
     </Formex>
 
 }
@@ -116,7 +116,7 @@ function EnumFormFields({
     enumValuesPath,
     shouldUpdateId,
     allowDataInference,
-    getData,
+    getData
 }: EnumFormFieldsProps) {
 
     const {
@@ -144,7 +144,7 @@ function EnumFormFields({
             shouldUpdateId={shouldUpdateId || justAdded}
             onDialogOpen={() => setEditDialogIndex(index)}
             inferredEntry={inferredValues.has(values.enum[index]?.id as string)}
-            key={`${internalId}`} />;
+            key={`${internalId}`}/>;
     };
 
     const inferValues = async () => {
@@ -181,7 +181,7 @@ function EnumFormFields({
     return (
         <div className={"col-span-12"}>
             <div className="ml-3.5 flex flex-row items-center">
-                <ListIcon />
+                <ListIcon/>
                 <Typography variant={"subtitle2"}
                     className="ml-2 grow">
                     Values
@@ -192,7 +192,7 @@ function EnumFormFields({
                         variant={"text"}
                         size={"small"}
                         onClick={inferValues}>
-                        {inferring ? <CircularProgress size={"smallest"} /> : <AutorenewIcon />}
+                        {inferring ? <CircularProgress size={"smallest"}/> : <AutorenewIcon/>}
                         Infer values from data
                     </Button>}
             </div>
@@ -211,12 +211,12 @@ function EnumFormFields({
                     newDefaultEntry={{
                         id: "",
                         label: ""
-                    }} />
+                    }}/>
 
                 <EnumEntryDialog index={editDialogIndex}
                     open={editDialogIndex !== undefined}
                     enumValuesPath={enumValuesPath}
-                    onClose={() => setEditDialogIndex(undefined)} />
+                    onClose={() => setEditDialogIndex(undefined)}/>
             </Paper>
         </div>
     );
@@ -279,8 +279,8 @@ const EnumEntry = React.memo(
                         size="small"
                         autoFocus={autoFocus}
                         autoComplete="off"
-                        endAdornment={inferredEntry && <AutorenewIcon size={"small"} />}
-                        error={Boolean(entryError?.label)} />
+                        endAdornment={inferredEntry && <AutorenewIcon size={"small"}/>}
+                        error={Boolean(entryError?.label)}/>
 
                     {!disabled &&
                         <Badge color={"error"} invisible={!entryError?.id}>
@@ -289,7 +289,7 @@ const EnumEntry = React.memo(
                                 aria-label="edit"
                                 className={"m-1"}
                                 onClick={() => onDialogOpen()}>
-                                <SettingsIcon size={"small"} />
+                                <SettingsIcon size={"small"}/>
                             </IconButton>
                         </Badge>}
 
@@ -330,7 +330,7 @@ function EnumEntryDialog({
 }) {
 
     const {
-        errors,
+        errors
     } = useFormex<EnumValues>();
 
     const idError = index !== undefined ? getIn(errors, `${enumValuesPath}[${index}].id`) : undefined;
@@ -350,7 +350,7 @@ function EnumEntryDialog({
                         label={"ID"}
                         size="small"
                         autoComplete="off"
-                        error={Boolean(idError)} />
+                        error={Boolean(idError)}/>
 
                     <FieldCaption error={Boolean(idError)}>
                         {idError ?? "Value saved in the data source"}

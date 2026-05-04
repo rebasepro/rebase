@@ -49,14 +49,14 @@ export function SideEntityProvider({ children }: { children: React.ReactNode }) 
         urlController,
         navigationStateController,
         sideDialogsController,
-        authController,
+        authController
     );
 
     return (
         <BreadcrumbsProvider>
             <SideDialogsControllerContext.Provider value={sideDialogsController}>
                 <SideEntityControllerContext.Provider value={sideEntityController}>
-                    <BridgeAutoRegistrar sideEntityController={sideEntityController} />
+                    <BridgeAutoRegistrar sideEntityController={sideEntityController}/>
                     {children}
                 </SideEntityControllerContext.Provider>
             </SideDialogsControllerContext.Provider>

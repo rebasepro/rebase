@@ -48,7 +48,7 @@ export function GetCodeDialog({
                         {tokens.map((line, i) => (
                             <div key={i} {...getLineProps({ line })}>
                                 {line.map((token, key) => (
-                                    <span key={key} {...getTokenProps({ token })} />
+                                    <span key={key} {...getTokenProps({ token })}/>
                                 ))}
                             </div>
                         ))}
@@ -70,7 +70,7 @@ export function GetCodeDialog({
                     })
                     return navigator.clipboard.writeText(code);
                 }}>
-                <ContentCopyIcon size={"small"} />
+                <ContentCopyIcon size={"small"}/>
                 Copy to clipboard
             </Button>
             <Button onClick={() => onOpenChange(false)}>Close</Button>
@@ -135,7 +135,7 @@ function collectionToCode(collection: EntityCollection): object {
             .reduce((a, b) => ({
                 ...a,
                 ...b
-            }), {}),
+            }), {})
         // subcollections: (collection.subcollections ?? []).map(collectionToCode)
     }
 

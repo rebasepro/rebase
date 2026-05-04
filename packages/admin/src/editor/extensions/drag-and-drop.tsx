@@ -48,10 +48,10 @@ function nodeDOMAtCoords(coords: { x: number; y: number }, view: EditorView) {
     const blockSelector = 'li, p, pre, blockquote, h1, h2, h3, h4, h5, h6, img, [data-type="taskList"]';
 
     // 1. First probe exactly at the mouse coordinates
-    let elem = document.elementFromPoint(coords.x, coords.y);
-    let block = elem?.closest(blockSelector);
+    const elem = document.elementFromPoint(coords.x, coords.y);
+    const block = elem?.closest(blockSelector);
     if (block && view.dom.contains(block) && block.textContent?.trim()) {
-        const li = block.closest('li');
+        const li = block.closest("li");
         return (li && view.dom.contains(li)) ? li : block;
     }
 
@@ -59,12 +59,12 @@ function nodeDOMAtCoords(coords: { x: number; y: number }, view: EditorView) {
     const probeX = editorRect.left + Math.min(60, editorRect.width / 4);
     if (coords.x > probeX) return undefined;
 
-    let probeElem = document.elementFromPoint(probeX, coords.y);
-    let probeBlock = probeElem?.closest(blockSelector);
+    const probeElem = document.elementFromPoint(probeX, coords.y);
+    const probeBlock = probeElem?.closest(blockSelector);
     if (probeBlock && probeBlock.textContent?.trim()) {
         // Ensure the found block is actually inside our editor
         if (view.dom.contains(probeBlock)) {
-            const li = probeBlock.closest('li');
+            const li = probeBlock.closest("li");
             return (li && view.dom.contains(li)) ? li : probeBlock;
         }
     }
@@ -276,7 +276,8 @@ export function globalDragDropPlugin() {
             const observer = new MutationObserver(() => {
                 if (dropCursorElement) updateDropCursorColor(dropCursorElement);
             });
-            observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+            observer.observe(document.documentElement, { attributes: true,
+attributeFilter: ["data-theme"] });
 
             const removeCursor = () => {
                 if (dropCursorElement && dropCursorElement.parentNode) {
@@ -285,10 +286,11 @@ export function globalDragDropPlugin() {
             };
 
             const getBlockInsertionPoint = (event: DragEvent, clampedX: number) => {
-                const pos = editorView.posAtCoords({ left: clampedX, top: event.clientY });
+                const pos = editorView.posAtCoords({ left: clampedX,
+top: event.clientY });
                 if (!pos) return null;
 
-                let $pos = editorView.state.doc.resolve(pos.pos);
+                const $pos = editorView.state.doc.resolve(pos.pos);
 
                 let blockDepth = 0;
                 for (let i = $pos.depth; i > 0; i--) {
@@ -331,7 +333,7 @@ export function globalDragDropPlugin() {
                 const editorRect = editorView.dom.getBoundingClientRect();
                 const clampedX = Math.max(editorRect.left + 10, Math.min(event.clientX, editorRect.right - 10));
 
-                let target = getBlockInsertionPoint(event, clampedX);
+                const target = getBlockInsertionPoint(event, clampedX);
                 if (target === null) {
                     removeCursor();
                     return;
@@ -354,13 +356,19 @@ export function globalDragDropPlugin() {
                                 top = (top + afterDOM.getBoundingClientRect().top) / 2;
                             }
                         }
-                        rect = { left: nodeRect.left, right: nodeRect.right, top: top - 1, bottom: top + 1 };
+                        rect = { left: nodeRect.left,
+right: nodeRect.right,
+top: top - 1,
+bottom: top + 1 };
                     }
                 }
 
                 if (!rect) {
                     const coords = editorView.coordsAtPos(target);
-                    rect = { left: editorRect.left + 50, right: editorRect.right - 50, top: coords.top - 1, bottom: coords.top + 1 };
+                    rect = { left: editorRect.left + 50,
+right: editorRect.right - 50,
+top: coords.top - 1,
+bottom: coords.top + 1 };
                 }
 
                 const parent = editorView.dom.offsetParent as HTMLElement;
@@ -396,7 +404,7 @@ export function globalDragDropPlugin() {
                 const editorRect = editorView.dom.getBoundingClientRect();
                 const clampedX = Math.max(editorRect.left + 10, Math.min(event.clientX, editorRect.right - 10));
 
-                let targetPos = getBlockInsertionPoint(event, clampedX);
+                const targetPos = getBlockInsertionPoint(event, clampedX);
                 if (targetPos === null) return;
 
                 const dragging = (editorView as EditorViewWithDrag).dragging;
@@ -414,7 +422,7 @@ export function globalDragDropPlugin() {
                     const mappedTarget = tr.mapping.map(targetPos);
                     const beforeInsert = tr.doc;
 
-                    let { node, slice } = dragging;
+                    const { node, slice } = dragging;
 
                     if (node && node.node) {
                         let nodeToInsert: import("prosemirror-model").Node | import("prosemirror-model").Fragment = node.node;

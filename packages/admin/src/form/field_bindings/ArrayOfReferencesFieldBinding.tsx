@@ -113,13 +113,13 @@ export function ArrayOfReferencesFieldBinding({
             icon={getIconForProperty(property, "small")}
             required={property.validation?.required}
             title={property.name ?? propertyKey}
-            className={"h-8 flex grow text-text-secondary dark:text-text-secondary-dark"} />
+            className={"h-8 flex grow text-text-secondary dark:text-text-secondary-dark"}/>
         {Array.isArray(value) && <Typography variant={"caption"} className={"px-4"}>({value.length})</Typography>}
     </>);
 
     const body = <>
         {!collection && <ErrorView
-            error={"The specified collection does not exist. Check console"} />}
+            error={"The specified collection does not exist. Check console"}/>}
 
         {collection && <div className={"group"}>
 
@@ -138,7 +138,7 @@ export function ArrayOfReferencesFieldBinding({
                 variant="text"
                 disabled={isSubmitting}
                 onClick={onEntryClick}>
-                <EditIcon size={"small"} />
+                <EditIcon size={"small"}/>
                 {t("edit")} {property.name}
             </Button>
         </div>}
@@ -162,7 +162,7 @@ export function ArrayOfReferencesFieldBinding({
                 showError={showError}
                 error={error}
                 disabled={disabled}
-                property={property} />
+                property={property}/>
 
         </>
     );

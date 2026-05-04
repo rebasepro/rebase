@@ -20,12 +20,12 @@ export function LayoutModeSwitch({
                     {
                         value: "side_panel",
                         label: "Side panel",
-                        icon: <VerticalSplitIcon />
+                        icon: <VerticalSplitIcon/>
                     },
                     {
                         value: "full_screen",
                         label: "Full screen",
-                        icon: <SquareIcon />
+                        icon: <SquareIcon/>
                     }
                 ]}
             />

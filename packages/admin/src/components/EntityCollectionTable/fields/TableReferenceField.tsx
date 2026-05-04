@@ -37,12 +37,12 @@ export function TableReferenceField(props: TableReferenceFieldProps) {
     const collection = collectionRegistryController.getCollection(path);
     if (!collection) {
         if (customizationController.components?.missingReference) {
-            return <customizationController.components.missingReference path={path} />;
+            return <customizationController.components.missingReference path={path}/>;
         } else {
-            return <ErrorView error={`Collection not found: ${path}`} />;
+            return <ErrorView error={`Collection not found: ${path}`}/>;
         }
     }
-    return <TableReferenceFieldInternal {...props} collection={collection} />;
+    return <TableReferenceFieldInternal {...props} collection={collection}/>;
 }
 
 export const TableReferenceFieldInternal = React.memo(
@@ -114,7 +114,7 @@ export const TableReferenceFieldInternal = React.memo(
                 return <EntityPreviewContainer
                     onClick={disabled ? undefined : handleOpen}
                     size={getPreviewSizeFrom(size)}>
-                    <ErrorView title="Value is not a reference." error={"Click to edit"} />
+                    <ErrorView title="Value is not a reference." error={"Click to edit"}/>
                 </EntityPreviewContainer>;
         };
 
@@ -139,11 +139,11 @@ export const TableReferenceFieldInternal = React.memo(
                     }
                 </>;
             else
-                return <ErrorView error={"Data is not an array of references"} />;
+                return <ErrorView error={"Data is not an array of references"}/>;
         };
 
         if (!collection)
-            return <ErrorView error={"The specified collection does not exist"} />;
+            return <ErrorView error={"The specified collection does not exist"}/>;
 
         return (
             <div className="w-full group">
@@ -163,7 +163,7 @@ export const TableReferenceFieldInternal = React.memo(
                         size={"medium"}>
                         <EditIcon
                             size={"small"}
-                            className={"ml-2 mr-1 text-surface-300 dark:text-surface-600"} />
+                            className={"ml-2 mr-1 text-surface-300 dark:text-surface-600"}/>
                         {title}
                     </EntityPreviewContainer>}
 

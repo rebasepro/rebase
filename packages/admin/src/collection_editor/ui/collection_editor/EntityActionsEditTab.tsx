@@ -19,7 +19,7 @@ import {
     TableCell,
     TableRow,
     Tooltip,
-    Typography,
+    Typography
 } from "@rebasepro/ui";
 import { useFormex } from "@rebasepro/formex";
 import { EntityActionsSelectDialog } from "./EntityActionsSelectDialog";
@@ -79,7 +79,7 @@ export function EntityActionsEditTab({
                                                         setActionToDelete(action.key);
                                                     }}
                                                     color="inherit">
-                                                    <DeleteIcon size={"small"} />
+                                                    <DeleteIcon size={"small"}/>
                                                 </IconButton>
                                             </Tooltip>
                                         </TableCell>
@@ -108,7 +108,7 @@ export function EntityActionsEditTab({
                             }}
                             variant="filled"
                             color="neutral"
-                            startIcon={<AddIcon />}>
+                            startIcon={<AddIcon/>}>
                             Add custom entity action
                         </Button>
                     </div>
@@ -130,7 +130,7 @@ export function EntityActionsEditTab({
                     <Container maxWidth={"2xl"} className={"flex flex-col gap-4 p-8 m-auto"}>
                         {content}
                     </Container>
-                    <div style={{ height: "52px" }} />
+                    <div style={{ height: "52px" }}/>
                 </div>
             )}
 
@@ -144,7 +144,7 @@ export function EntityActionsEditTab({
                     title={<>Remove this action?</>}
                     body={<>This will <b>not
                         delete any data</b>, only
-                        the action in the CMS</>} />}
+                        the action in the CMS</>}/>}
 
             <EntityActionsSelectDialog
                 open={addEntityActionDialogOpen}
@@ -158,7 +158,7 @@ export function EntityActionsEditTab({
                         setFieldValue("entityActions", value);
                     }
                     setAddEntityActionDialogOpen(false);
-                }} />
+                }}/>
         </>
     );
 }

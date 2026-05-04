@@ -79,7 +79,7 @@ export function EntityPreviewData({
     if (!collection) {
         return (
             <>
-                <ErrorView error={`Collection not found: ${entity.path}`} />
+                <ErrorView error={`Collection not found: ${entity.path}`}/>
             </>
         );
     }
@@ -111,11 +111,11 @@ export function EntityPreviewData({
                 {usedImageProperty && usedImageValue ? <PropertyPreview property={usedImageProperty}
                     propertyKey={imagePropertyKey as string}
                     size={"small"}
-                    value={usedImageValue as never} /> : null}
+                    value={usedImageValue as never}/> : null}
                 {(!usedImageProperty || !usedImageValue) ? <IconForView collectionOrView={collection}
                     color={"primary"}
                     size={size}
-                    className={"m-auto p-1"} /> : null}
+                    className={"m-auto p-1"}/> : null}
             </div>
 
             <div
@@ -130,7 +130,7 @@ export function EntityPreviewData({
                                 {entity.id}
                             </Typography>
                         </div>
-                        : <Skeleton />)}
+                        : <Skeleton/>)}
 
                 {titleProperty && (
                     <div
@@ -141,10 +141,10 @@ export function EntityPreviewData({
                                     propertyKey={titleProperty as string}
                                     value={getValueInPath(entity.values, titleProperty) as never}
                                     property={collection.properties[titleProperty as string] as Property}
-                                    size={"medium"} />
+                                    size={"medium"}/>
                                 : <SkeletonPropertyComponent
                                     property={collection.properties[titleProperty as string] as Property}
-                                    size={"medium"} />
+                                    size={"medium"}/>
                         }
                     </div>
                 )}
@@ -163,10 +163,10 @@ export function EntityPreviewData({
                                         propertyKey={key as string}
                                         value={valueInPath as never}
                                         property={childProperty as Property}
-                                        size={"small"} />
+                                        size={"small"}/>
                                     : <SkeletonPropertyComponent
                                         property={childProperty as Property}
-                                        size={"small"} />
+                                        size={"small"}/>
                             }
                         </div>
                     );
@@ -196,7 +196,7 @@ export function EntityPreviewData({
                                     updateUrl: true
                                 });
                             }}>
-                            <KeyboardTabIcon size={"small"} />
+                            <KeyboardTabIcon size={"small"}/>
                         </IconButton>
                     </Tooltip>
                 </div>}
@@ -257,7 +257,7 @@ export function EntityPreviewWithId({
             <EntityPreviewContainer
                 hover={props.hover}
                 size={props.size}>
-                <Skeleton />
+                <Skeleton/>
             </EntityPreviewContainer>
         );
     }
@@ -276,7 +276,7 @@ export function EntityPreviewWithId({
 
     return <EntityPreviewData
         {...props}
-        entity={entity} />;
+        entity={entity}/>;
 }
 
 /**

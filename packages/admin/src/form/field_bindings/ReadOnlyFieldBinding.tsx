@@ -41,7 +41,7 @@ export function ReadOnlyFieldBinding({
                 icon={getIconForProperty(property, "small")}
                 required={property.validation?.required}
                 title={property.name ?? propertyKey}
-                className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5"} />
+                className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5"}/>
             }
 
             <div
@@ -51,7 +51,7 @@ export function ReadOnlyFieldBinding({
                     <PropertyPreview propertyKey={propertyKey}
                         value={value}
                         property={property}
-                        size={"medium"} />
+                        size={"medium"}/>
                 </ErrorBoundary>
 
             </div>
@@ -59,7 +59,7 @@ export function ReadOnlyFieldBinding({
             <FieldHelperText includeDescription={includeDescription}
                 showError={showError}
                 error={error}
-                property={property} />
+                property={property}/>
 
         </>
     );

@@ -54,7 +54,7 @@ export function NavigationGroup({
                     }}
                     className={cls("ml-2 ", isHovered ? "opacity-100" : "opacity-0", "transition-opacity duration-100")}
                 >
-                    <EditIcon size="smallest" />
+                    <EditIcon size="smallest"/>
                 </IconButton>
             )}
         </div>

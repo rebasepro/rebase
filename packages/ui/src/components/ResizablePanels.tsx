@@ -13,7 +13,7 @@ export type ResizablePanelsProps = {
     panelSizePercent: number;
     onPanelSizeChange: (sizePercent: number) => void;
     minPanelSizePx?: number;
-    orientation?: 'horizontal' | 'vertical';
+    orientation?: "horizontal" | "vertical";
     animateLayout?: boolean;
     className?: string;
     stacked?: boolean;
@@ -27,7 +27,7 @@ export function ResizablePanels({
     panelSizePercent,
     onPanelSizeChange,
     minPanelSizePx = 200,
-    orientation = 'horizontal',
+    orientation = "horizontal",
     animateLayout = true,
     className,
     stacked = false
@@ -42,7 +42,7 @@ export function ResizablePanels({
     const startSizeRef = useRef(0);
 
     const [isResizing, setIsResizing] = useState(false);
-    const isHorizontal = orientation === 'horizontal';
+    const isHorizontal = orientation === "horizontal";
 
     const handleResizeStart = useCallback((e: React.MouseEvent) => {
         if (!showFirstPanel || !showSecondPanel) return;
@@ -58,8 +58,8 @@ export function ResizablePanels({
             startSizeRef.current = isHorizontal ? rect.width : rect.height;
         }
 
-        document.body.style.cursor = isHorizontal ? 'col-resize' : 'row-resize';
-        document.body.style.userSelect = 'none';
+        document.body.style.cursor = isHorizontal ? "col-resize" : "row-resize";
+        document.body.style.userSelect = "none";
     }, [isHorizontal, showFirstPanel, showSecondPanel]);
 
     useEffect(() => {
@@ -145,7 +145,7 @@ export function ResizablePanels({
                     minWidth: isHorizontal && showFirstPanel && showSecondPanel ? `${minPanelSizePx}px` : undefined,
                     minHeight: !isHorizontal && showFirstPanel && showSecondPanel ? `${minPanelSizePx}px` : undefined,
                     maxWidth: showSecondPanel ? undefined : "100%",
-                    maxHeight: showSecondPanel ? undefined : "100%",
+                    maxHeight: showSecondPanel ? undefined : "100%"
                 }}
             >
                 {firstPanel}
@@ -169,7 +169,7 @@ export function ResizablePanels({
                         <div className={cls(
                             "bg-primary/60 dark:bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200",
                             isHorizontal ? "w-1 h-8" : "h-1 w-8"
-                        )} />
+                        )}/>
                     </div>
                 </div>
             )}

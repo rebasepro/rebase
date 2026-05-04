@@ -65,6 +65,6 @@ export function resolvedSelectedEntityView<M extends Record<string, unknown>>(
     return {
         resolvedEntityViews,
         selectedEntityView,
-        selectedSecondaryForm,
+        selectedSecondaryForm
     };
 }

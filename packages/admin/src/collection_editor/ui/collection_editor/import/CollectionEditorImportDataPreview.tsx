@@ -39,7 +39,7 @@ export function CollectionEditorImportDataPreview({
 
     const selectionController = useSelectionController();
     if (loading)
-        return <CircularProgressCenter />
+        return <CircularProgressCenter/>
 
     return <EntityCollectionTable
         title={<div>
@@ -51,7 +51,7 @@ export function CollectionEditorImportDataPreview({
             dataLoading: false,
             noMoreToLoad: false
         }}
-        endAdornment={<div className={"h-12"} />}
+        endAdornment={<div className={"h-12"}/>}
         filterable={false}
         sortable={false}
         selectionController={selectionController}
@@ -61,6 +61,6 @@ export function CollectionEditorImportDataPreview({
         }))}
         openEntityMode={"side_panel"}
         properties={properties}
-        enablePopupIcon={false} />
+        enablePopupIcon={false}/>
 
 }

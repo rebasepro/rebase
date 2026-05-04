@@ -49,7 +49,7 @@ export function AddKanbanColumnAction({
     // Get current enum values
     const currentEnumValues = useMemo(() => {
         const property = getPropertyInPath(collection.properties, columnProperty);
-        if (!property || !('type' in property) || property.type !== "string") {
+        if (!property || !("type" in property) || property.type !== "string") {
             return [];
         }
         const stringProperty = property as StringProperty;
@@ -70,13 +70,13 @@ export function AddKanbanColumnAction({
             let isCodeDefinedProperty = false;
 
             // Property not in persisted config - use base collection
-            if (!property || typeof property === 'function') {
+            if (!property || typeof property === "function") {
                 property = collection.properties?.[columnProperty];
                 isCodeDefinedProperty = true;
             }
 
             // Type guard: property must be an object with type === "string"
-            if (!property || typeof property === 'function' || !('type' in property) || property.type !== "string") {
+            if (!property || typeof property === "function" || !("type" in property) || property.type !== "string") {
                 console.error("Column property not found or not a string. Property:", property);
                 setSaving(false);
                 return;
@@ -150,7 +150,7 @@ export function AddKanbanColumnAction({
                 onClick={() => setDialogOpen(true)}
             >
                 <IconButton className="opacity-60 hover:opacity-100">
-                    <AddIcon />
+                    <AddIcon/>
                 </IconButton>
                 <Typography variant="caption" color="secondary" className="mt-2">
                     {t("studio_add_kanban_column")}

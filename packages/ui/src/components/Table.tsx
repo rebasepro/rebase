@@ -160,3 +160,9 @@ function getParentName(element: HTMLElement | null): string | undefined {
     }
     return undefined;
 }
+
+Table.displayName = "Table";
+TableBody.displayName = "TableBody";
+TableHeader.displayName = "TableHeader";
+TableRow.displayName = "TableRow";
+TableCell.displayName = "TableCell";

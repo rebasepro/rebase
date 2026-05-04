@@ -84,7 +84,7 @@ export const blogCollectionTemplate = {
             enum: {
                 published: {
                     id: "published",
-                    label: "Published",
+                    label: "Published"
                 },
                 draft: "Draft"
             },

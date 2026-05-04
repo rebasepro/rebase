@@ -114,7 +114,8 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
         return (additionalFields
             ? additionalFields
                 .map((aC) => ({ [aC.key]: aC as AdditionalFieldDelegate<M, any> }))
-                .reduce((a, b) => ({ ...a, ...b }), {})
+                .reduce((a, b) => ({ ...a,
+...b }), {})
             : {}) as Record<string, AdditionalFieldDelegate<M, USER>>;
     }, [additionalFields]);
 
@@ -173,7 +174,7 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
                         sortableAttributes={sortableAttributes}
                         isDragging={isDragging}
                         isDraggable={isDraggable}
-                        frozen={frozen} />
+                        frozen={frozen}/>
                     : renderSkeletonText()
                 }
             </ErrorBoundary>);
@@ -198,7 +199,8 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
         const value = additionalField.dependencies
             ? Object.entries(entity.values)
                 .filter(([key, value]) => additionalField.dependencies!.includes(key as Extract<keyof M, string>))
-                .reduce((a, b) => ({ ...a, ...b }), {})
+                .reduce((a, b) => ({ ...a,
+...b }), {})
             : entity;
 
         const Builder = additionalField.Builder;
@@ -207,7 +209,7 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
         }
 
         const child: React.ReactNode = Builder
-            ? <Builder entity={entity} context={context} />
+            ? <Builder entity={entity} context={context}/>
             : <>
                 {additionalField.value?.({
                     entity,
@@ -315,7 +317,7 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
                         sortableStyle={props.sortableStyle}
                         sortableAttributes={props.sortableAttributes}
                         isDragging={props.isDragging}
-                        isDraggable={props.isDraggable} />;
+                        isDraggable={props.isDraggable}/>;
             } else if (additionalFieldsMap[columnKey]) {
                 return additionalCellRenderer(props);
             } else if (props.columnIndex < columns.length + 1) {
@@ -339,7 +341,7 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
                 isDragging={props.isDragging}
                 isDraggable={props.isDraggable}
                 frozen={props.frozen}>
-                <ErrorView error={e instanceof Error ? e : new Error(String(e))} />
+                <ErrorView error={e instanceof Error ? e : new Error(String(e))}/>
             </EntityTableCell>;
         }
     }, [tableRowActionsBuilder, additionalCellRenderer, propertyCellRenderer, size]);
@@ -356,7 +358,7 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
                 actionsStart={actionsStart}
                 actions={actions}
                 viewModeToggle={viewModeToggle}
-                loading={tableController.dataLoading} />}
+                loading={tableController.dataLoading}/>}
 
             <SelectableTable columns={columns}
                 size={size}
@@ -374,7 +376,7 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
                 emptyComponent={emptyComponent}
                 endAdornment={endAdornment}
                 AddColumnComponent={AddColumnComponent}
-                onColumnsOrderChange={onColumnsOrderChange} />
+                onColumnsOrderChange={onColumnsOrderChange}/>
 
         </div>
     );

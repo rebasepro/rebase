@@ -6,7 +6,7 @@ import {
     useTranslation
 } from "@rebasepro/core";
 import { EntityCollection, CollectionActionsProps } from "@rebasepro/types";
-import { Button, SaveIcon, Tooltip, UndoIcon, } from "@rebasepro/ui";
+import { Button, SaveIcon, Tooltip, UndoIcon } from "@rebasepro/ui";
 
 import { useCollectionEditorController } from "../useCollectionEditorController";
 import { useCollectionsConfigController } from "../useCollectionsConfigController";
@@ -57,7 +57,7 @@ export function EditorCollectionActionStart({
                                 message: t("studio_editor_collection_start_saved")
                             });
                         })}>
-                    <SaveIcon />
+                    <SaveIcon/>
                 </Button>
             </Tooltip>
 
@@ -73,7 +73,7 @@ export function EditorCollectionActionStart({
                         if (collection?.sort)
                             tableController.setSortBy?.(collection?.sort);
                     }}>
-                    <UndoIcon />
+                    <UndoIcon/>
                 </Button>
             </Tooltip>}
         </>;

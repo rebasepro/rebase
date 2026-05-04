@@ -4,7 +4,7 @@ import React from "react";
 import { Field, getIn, useFormex } from "@rebasepro/formex";
 ;
 import { NumberProperty, StringProperty } from "@rebasepro/types";
-import { CircularProgress, Select, SelectGroup, SelectItem, Typography, } from "@rebasepro/ui";
+import { CircularProgress, Select, SelectGroup, SelectItem, Typography } from "@rebasepro/ui";
 
 export function ReferencePropertyField({
     existing,
@@ -23,14 +23,14 @@ export function ReferencePropertyField({
     const {
         values,
         errors,
-        setFieldValue,
+        setFieldValue
     } = useFormex<StringProperty | NumberProperty>();
 
     const collectionRegistry = useCollectionRegistryController();
 
     if (!collectionRegistry.initialised)
         return <div className={"col-span-12"}>
-            <CircularProgress />
+            <CircularProgress/>
         </div>;
 
     const pathPath = asString ? "reference.slug" : (multiple ? "of.slug" : "path");
@@ -48,7 +48,7 @@ export function ReferencePropertyField({
                     value={pathValue}
                     error={pathError}
                     setFieldValue={setFieldValue}
-                    as={CollectionsSelect} />
+                    as={CollectionsSelect}/>
 
             </div>
 
@@ -75,7 +75,7 @@ export function CollectionsSelect({
 
     if (!collectionRegistry.initialised)
         return <div className={"col-span-12"}>
-            <CircularProgress />
+            <CircularProgress/>
         </div>;
 
     const collections = collectionRegistry.collections ?? [];
@@ -102,7 +102,7 @@ export function CollectionsSelect({
                     if (!selectedCollection) return null;
                     return (
                         <div className="flex flex-row">
-                            <IconForView collectionOrView={selectedCollection} />
+                            <IconForView collectionOrView={selectedCollection}/>
                             <Typography
                                 variant={"subtitle2"}
                                 className="ml-4">
@@ -122,7 +122,7 @@ export function CollectionsSelect({
                                         key={`${collection.slug}-${group}`}
                                         value={collection.slug}>
                                         <div className="flex flex-row">
-                                            <IconForView collectionOrView={collection} />
+                                            <IconForView collectionOrView={collection}/>
                                             <Typography
                                                 variant={"subtitle2"}
                                                 className="ml-4">
@@ -142,7 +142,7 @@ export function CollectionsSelect({
                             return <SelectItem key={collection.slug}
                                 value={collection.slug}>
                                 <div className="flex flex-row">
-                                    <IconForView collectionOrView={collection} />
+                                    <IconForView collectionOrView={collection}/>
                                     <Typography
                                         variant={"subtitle2"}
                                         className="ml-4">

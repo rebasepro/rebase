@@ -6,7 +6,7 @@ import { cls } from "../util";
 export function Paper({
                           children,
                           style,
-                          className,
+                          className
                       }: {
     children: React.ReactNode;
     style?: React.CSSProperties;

@@ -1,7 +1,7 @@
 import React from "react";
 import {
     useRebaseRegistry,
-    useAuthController,
+    useAuthController
 } from "@rebasepro/core";
 import { CircularProgressCenter } from "@rebasepro/ui";
 import { LoginView } from "@rebasepro/core";
@@ -28,12 +28,12 @@ export function RebaseAuthGate({ children }: { children: React.ReactNode }) {
     const authController = useAuthController();
 
     if (authController?.initialLoading) {
-        return <CircularProgressCenter size={"large"} />;
+        return <CircularProgressCenter size={"large"}/>;
     }
 
     if (!authController?.user) {
         const ActiveLoginView = registry.authConfig?.loginView ?? (
-            <LoginView authController={authController as any} />
+            <LoginView authController={authController as any}/>
         );
         return <>{ActiveLoginView}</>;
     }
