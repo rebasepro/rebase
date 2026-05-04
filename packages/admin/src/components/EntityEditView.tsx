@@ -15,7 +15,7 @@ import {
     resolveDefaultSelectedView,
 } from "@rebasepro/common";
 import { resolvedSelectedEntityView } from "../util/resolutions";
-import { CenteredView, CircularProgress, cls, CodeIcon, defaultBorderMixin, IconButton, OpenInFullIcon, Tab, Tabs, Tooltip, Typography, Skeleton } from "@rebasepro/ui";
+import { CenteredView, CircularProgress, cls, CodeIcon, defaultBorderMixin, HistoryIcon, IconButton, OpenInFullIcon, Tab, Tabs, Tooltip, Typography, Skeleton } from "@rebasepro/ui";
 import {
     useCustomizationController,
     useEntityFetch,
@@ -28,6 +28,7 @@ import { EntityForm } from "../form";
 import type { EntityFormProps, OnUpdateParams } from "../types/components/EntityFormProps";
 import { EntityEditViewFormActions } from "./EntityEditViewFormActions";
 import { EntityJsonPreview } from "../components/EntityJsonPreview";
+import { EntityHistoryView } from "../components/history";
 import { createFormexStub, getEntityFromCache } from "@rebasepro/core";
 import { usePermissions } from "@rebasepro/core";
 import { useUrlController } from "../index";
@@ -35,6 +36,7 @@ import { useNavigate } from "react-router-dom";
 
 export const MAIN_TAB_VALUE = "__main_##Q$SC^#S6";
 export const JSON_TAB_VALUE = "__json";
+export const HISTORY_TAB_VALUE = "__rebase_history";
 
 export type BarActionsParams = {
     values: object,
@@ -211,7 +213,8 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
     const customViews = collection.entityViews ?? [];
     const customViewsCount = customViews?.length ?? 0;
     const includeJsonView = collection.includeJsonView === undefined ? true : collection.includeJsonView;
-    const hasAdditionalViews = customViewsCount > 0 || subcollectionsCount > 0 || includeJsonView;
+    const includeHistoryView = Boolean(collection.history);
+    const hasAdditionalViews = customViewsCount > 0 || subcollectionsCount > 0 || includeJsonView || includeHistoryView;
 
     const {
         resolvedEntityViews,
@@ -290,6 +293,23 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                 values={formContext?.values ?? entity?.values ?? {}} />
         </ErrorBoundary>
     </div>;
+
+    const historyView = includeHistoryView ? <div
+        className={cls("relative flex-1 h-full overflow-auto w-full",
+            { "hidden": selectedTab !== HISTORY_TAB_VALUE })}
+        key={"history_view"}
+        role="tabpanel">
+        <ErrorBoundary>
+            <EntityHistoryView
+                collection={collection}
+                entity={usedEntity}
+                path={path}
+                parentCollectionIds={parentCollectionIds}
+                formContext={formContext as any}
+                modifiedValues={formContext?.values ?? usedEntity?.values}
+            />
+        </ErrorBoundary>
+    </div> : null;
 
     const subCollectionsViews = subcollections && subcollections.map((subcollection) => {
         const subcollectionId = subcollection.slug;
@@ -464,7 +484,12 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                         <CodeIcon size={"small"} />
                     </Tab>}
 
-                    {customViewTabsStart}
+                    {includeHistoryView && <Tab
+                        disabled={!hasAdditionalViews}
+                        value={HISTORY_TAB_VALUE}
+                        className={"text-sm"}>
+                        <HistoryIcon size={"small"} />
+                    </Tab>}
 
                     <Tab
                         disabled={!hasAdditionalViews}
@@ -472,6 +497,8 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                         className={"text-sm min-w-[90px]"}>
                         {collection.singularName ?? collection.name}
                     </Tab>
+
+                    {customViewTabsStart}
 
                     {customViewTabsEnd}
 
@@ -488,6 +515,8 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
             </>}
 
         {jsonView}
+
+        {historyView}
 
         {customViewsView}
 

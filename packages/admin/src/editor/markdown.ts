@@ -95,6 +95,11 @@ export const markdownParser = new MarkdownParser(schema, md, parserTokens);
 export const markdownSerializer = new MarkdownSerializer(
     {
         ...defaultMarkdownSerializer.nodes,
+        // Use "-" as bullet character to match markdown-it output and prevent
+        // serialization round-trip from changing "- " to "* " and dirtying the form.
+        bullet_list(state, node) {
+            state.renderList(node, "  ", () => "- ");
+        },
         // Add custom serialization for task lists
         task_list(state, node) {
             state.renderList(node, "  ", () => "- ");
@@ -117,20 +122,23 @@ export const markdownSerializer = new MarkdownSerializer(
         table(state, node) {
             node.forEach((row, _, i) => {
                 row.forEach((cell, _, j) => {
-                    state.write(j === 0 ? "| " : " ");
-                    let cellContent = "";
-                    const oldWrite = state.write.bind(state);
-                    state.write = (s: string) => { cellContent += s; };
-                    
+                    if (j === 0) state.write("| ");
+                    else state.write(" ");
+
+                    // Capture cell content by tracking state.out length.
+                    // This avoids monkey-patching state.write which loses
+                    // flushClose/delim handling and can produce "undefined" text.
+                    const startLen = state.out.length;
                     let first = true;
                     cell.forEach((block: any) => {
-                        if (!first) cellContent += "<br>";
+                        if (!first) state.out += "<br>";
                         state.renderInline(block);
                         first = false;
                     });
-                    
-                    state.write = oldWrite;
-                    state.write(cellContent.replace(/\|/g, "\\|"));
+                    const cellContent = state.out.slice(startLen);
+                    // Remove the rendered content from state.out; we'll re-add it escaped
+                    state.out = state.out.slice(0, startLen);
+                    state.write(cellContent.replace(/\|/g, "\\|").replace(/\n/g, " "));
                     state.write(" |");
                 });
                 state.write("\n");

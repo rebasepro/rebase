@@ -52,7 +52,8 @@ export function resolvedSelectedEntityView<M extends Record<string, unknown>>(
     const resolvedEntityViews = customViews
         ? customViews
               .map((e) => resolveEntityView(e, (customizationController as unknown as { entityViews?: EntityCustomView[] }).entityViews))
-              .filter(Boolean) as EntityCustomView[]
+              .filter(Boolean)
+              .filter((e) => (e as EntityCustomView).key !== "__rebase_history") as EntityCustomView[]
         : [];
 
     const selectedEntityView = resolvedEntityViews.find((e) => e.key === selectedTab);

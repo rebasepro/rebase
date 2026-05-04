@@ -148,16 +148,23 @@ export const RebaseEditor = ({
   });
 
   const doc = state?.doc;
-  const isInitialDocRef = useRef(true);
+  // Use a time-based settling window instead of a single-skip flag.
+  // The trailingNodePlugin fires appendTransaction on mount (adding a trailing
+  // paragraph), which creates a second doc change after the initial parse.
+  // A single-skip flag misses that second change. Instead, we skip ALL doc
+  // changes within the first 500ms after the view is created.
+  const mountTimeRef = useRef(Date.now());
+  const hasUserEditedRef = useRef(false);
   useEffect(() => {
     if (!state) return;
-    // Skip the first flush — it's the initial content being parsed, not a user edit.
-    // The markdown roundtrip (parse → serialize) may produce slightly different output
-    // (e.g. trailing newlines from trailingNodePlugin), which would falsely dirty the form.
-    if (isInitialDocRef.current) {
-      isInitialDocRef.current = false;
+    // Skip all doc changes during the initial settling window (500ms).
+    // This covers both the initial parse AND the trailingNodePlugin's
+    // appendTransaction that adds a trailing paragraph.
+    const elapsed = Date.now() - mountTimeRef.current;
+    if (elapsed < 500 && !hasUserEditedRef.current) {
       return;
     }
+    hasUserEditedRef.current = true;
     const timeout = setTimeout(() => {
       flushChanges(state);
     }, 250);
@@ -168,6 +175,13 @@ export const RebaseEditor = ({
     if (!view) return;
     const dom = view.dom;
     const handleBlur = () => {
+      // Don't flush during the initial settling window — the editor
+      // hasn't been interacted with yet, and the serialized output
+      // may differ from the input due to parse→serialize normalization.
+      if (!hasUserEditedRef.current) {
+        const elapsed = Date.now() - mountTimeRef.current;
+        if (elapsed < 500) return;
+      }
       flushChanges(view.state);
     };
     dom.addEventListener("blur", handleBlur);
@@ -206,7 +220,7 @@ export const RebaseEditor = ({
         <div style={{ display: isMarkdownMode ? "none" : "block" }}>
           <div
             ref={editorRef}
-            className={cls("prose dark:prose-invert", proseClass, "prose-headings:font-title font-default focus:outline-none max-w-full p-12")}
+            className={cls("prose dark:prose-invert", proseClass, "prose-headings:font-title prose-headings:font-normal prose-strong:font-semibold prose-code:font-normal prose-blockquote:font-normal prose-a:font-normal font-default focus:outline-none max-w-full p-12")}
           />
 
           {view && (

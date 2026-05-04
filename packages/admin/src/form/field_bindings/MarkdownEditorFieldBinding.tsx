@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
 import { useAuthController, useStorageSource } from "@rebasepro/core";
 import { getIconForProperty } from "../../util/property_utils";
@@ -8,10 +8,41 @@ import { cls, fieldBackgroundDisabledMixin, fieldBackgroundHoverMixin, fieldBack
 import { RebaseEditor, RebaseEditorProps } from "../../editor";
 import { resolveStorageFilenameString, resolveStoragePathString } from "@rebasepro/common";
 import { randomString } from "@rebasepro/utils";
+import { parser, serializer } from "../../editor/markdown";
 
 interface MarkdownEditorFieldProps {
     highlight?: { from: number, to: number };
     editorProps?: Partial<RebaseEditorProps>
+}
+
+/**
+ * Normalize markdown for comparison purposes: collapse whitespace,
+ * normalize line endings, trim lines. This is NOT for display.
+ */
+function normalizeMarkdown(md: string | null | undefined): string {
+    if (!md) return "";
+    return md
+        .replace(/\r\n/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .replace(/[ \t]+$/gm, "")
+        .trim();
+}
+
+/**
+ * Compute the canonical form of a markdown string by doing a full
+ * parse → serialize roundtrip through ProseMirror. This gives us
+ * the exact output the editor will produce for a given input,
+ * so we can compare against it to avoid false dirty states.
+ */
+function canonicalizeMarkdown(md: string | null | undefined): string {
+    if (!md) return "";
+    try {
+        const doc = parser.parse(md);
+        if (!doc) return normalizeMarkdown(md);
+        return normalizeMarkdown(serializer.serialize(doc));
+    } catch {
+        return normalizeMarkdown(md);
+    }
 }
 
 export function MarkdownEditorFieldBinding({
@@ -43,12 +74,28 @@ export function MarkdownEditorFieldBinding({
     const [fieldVersion, setFieldVersion] = useState(0);
     const internalValue = useRef<string | null>(value);
 
+    // Compute the canonical (round-tripped) form of the initial value ONCE.
+    // This is what ProseMirror will produce after parse → serialize, so any
+    // future serialization that matches this canonical form is NOT a real change.
+    const canonicalInitialValue = useMemo(
+        () => canonicalizeMarkdown(value),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [] // intentionally only on mount
+    );
+    // Track it in a ref so the callback always has the latest
+    const canonicalRef = useRef(canonicalInitialValue);
+
     const onContentChange = useCallback((content: string) => {
-        // Guard against markdown roundtrip normalization producing slightly different output
-        // (e.g., trailing newlines added by trailingNodePlugin, whitespace normalization).
-        const normalizedContent = content?.trimEnd() ?? "";
-        const normalizedValue = (value ?? "").trimEnd();
-        if (normalizedContent === normalizedValue) {
+        const normalizedContent = normalizeMarkdown(content);
+
+        // Compare against the canonical roundtripped form of the initial value.
+        // This eliminates ALL false positives from parse→serialize normalization
+        // differences (trailing nodes, bullet chars, whitespace, etc.).
+        if (normalizedContent === canonicalRef.current) {
+            return;
+        }
+        // Also compare against the current form value to avoid redundant updates
+        if (normalizedContent === normalizeMarkdown(value)) {
             return;
         }
         internalValue.current = content;

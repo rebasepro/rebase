@@ -270,6 +270,7 @@ export function EntityForm<M extends Record<string, unknown>>({
     const formex: FormexController<M> = formexProp ?? useCreateFormex<M>({
         initialValues: initialValues as M,
         initialDirty,
+        debugId: `EntityForm:${path}/${entityIdProp}`,
         initialTouched: initialDirtyValues ?
             flattenKeys(initialDirtyValues!)
                 .reduce((previousValue, currentValue) => ({

@@ -1,43 +1,7 @@
-import type { AppView, AppViewsBuilder, EntityCollection, EntityCustomView, FirebaseCollection, RebasePlugin } from "@rebasepro/types";
+import type { AppView, AppViewsBuilder, EntityCollection, FirebaseCollection, RebasePlugin } from "@rebasepro/types";
 import { AuthController, DataDriver,  User, RebaseData } from "@rebasepro/types";
 import type { EntityCollectionsBuilder } from "@rebasepro/types";
 import { canReadCollection } from "@rebasepro/common";
-
-/**
- * Auto-inject the "History" tab into any collection that has `history: true`.
- * Skips if the collection already has an entity view named "History".
- */
-function injectHistoryViews(collections: EntityCollection[]): EntityCollection[] {
-    return collections.map((collection) => {
-        let modified = collection;
-
-        if (collection.history) {
-            const existing = (collection.entityViews ?? []) as (string | EntityCustomView)[];
-            const alreadyHasHistory = existing.some(
-                v => (typeof v === "string" && v === "__rebase_history") ||
-                     (typeof v === "object" && v.name === "History")
-            );
-
-            if (!alreadyHasHistory) {
-                modified = {
-                    ...collection,
-                    entityViews: [...existing, "__rebase_history"]
-                };
-            }
-        }
-
-        // Recurse into subcollections
-        if ('subcollections' in modified && modified.subcollections) {
-            const originalSubcollections = modified.subcollections;
-            return {
-                ...modified,
-                subcollections: () => injectHistoryViews(originalSubcollections() ?? [])
-            } as FirebaseCollection;
-        }
-
-        return modified;
-    });
-}
 
 export function filterOutNotAllowedCollections(resolvedCollections: EntityCollection[], authController: AuthController<User>): EntityCollection[] {
     return resolvedCollections
@@ -92,9 +56,6 @@ export async function resolveCollections<U extends User, EC extends EntityCollec
             }
         }
     }
-
-    // Auto-inject history views for collections with history: true
-    resolvedCollections = injectHistoryViews(resolvedCollections);
 
     resolvedCollections = filterOutNotAllowedCollections(resolvedCollections, authController);
     return resolvedCollections;

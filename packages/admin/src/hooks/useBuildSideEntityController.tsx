@@ -12,7 +12,7 @@ import {
 import { resolvedSelectedEntityView } from "../util/resolutions";
 import { ADDITIONAL_TAB_WIDTH, CONTAINER_FULL_WIDTH, FORM_CONTAINER_WIDTH } from "@rebasepro/core";
 import { useCustomizationController, useLargeLayout } from "@rebasepro/core";
-import { JSON_TAB_VALUE } from "../components/EntityEditView";
+import { JSON_TAB_VALUE, HISTORY_TAB_VALUE } from "../components/EntityEditView";
 import React from "react";
 import { EntitySidePanel } from "../components/EntitySidePanel";
 
@@ -26,7 +26,7 @@ export function getEntityViewWidth(props: EntitySidePanelProps<any>, small: bool
         selectedSecondaryForm
     } = resolvedSelectedEntityView(props.collection?.entityViews, customizationController, props.selectedTab);
 
-    const shouldUseSmallLayout = !props.selectedTab || props.selectedTab === JSON_TAB_VALUE || props.selectedTab === "__rebase_history" || Boolean(selectedSecondaryForm);
+    const shouldUseSmallLayout = !props.selectedTab || props.selectedTab === JSON_TAB_VALUE || props.selectedTab === HISTORY_TAB_VALUE || Boolean(selectedSecondaryForm);
 
     let resolvedWidth: string | undefined;
     if (props.width) {

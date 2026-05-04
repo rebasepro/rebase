@@ -13,12 +13,27 @@ export interface MarkdownProps {
 }
 
 const proseClasses = {
-    small: "prose-sm typography-body2",
+    small: "prose prose-sm typography-body2",
     medium: "prose typography-body1",
-    large: "prose-lg",
-    xl: "prose-xl",
-    "2xl": "prose-2xl"
+    large: "prose prose-lg",
+    xl: "prose prose-xl",
+    "2xl": "prose prose-2xl"
 };
+
+/**
+ * Tailwind typography-plugin weight overrides.
+ * The plugin defaults to very heavy weights (h1: 800, h2: 700, h3/h4: 600,
+ * strong: 600, code: 600) which clash with the Rebase design-system that uses
+ * font-light (300) / font-normal (400) for headings.
+ * We reset them here so rendered markdown matches the rest of the UI.
+ */
+const proseWeightOverrides = [
+    "prose-headings:font-normal",
+    "prose-strong:font-semibold",
+    "prose-code:font-normal",
+    "prose-blockquote:font-normal",
+    "prose-a:font-normal",
+].join(" ");
 
 const md = new MarkdownIt({ html: true });
 /**
@@ -34,7 +49,7 @@ export const Markdown = React.memo<MarkdownProps>(function Markdown({
         }, [source]);
 
         return <div
-            className={cls(proseClasses[size], "dark:prose-invert prose-headings:font-title", className)}
+            className={cls(proseClasses[size], "dark:prose-invert prose-headings:font-title", proseWeightOverrides, className)}
             dangerouslySetInnerHTML={{ __html: html }}
         />;
     }

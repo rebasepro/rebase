@@ -1,233 +1,134 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import type { EntityCustomViewParams } from "@rebasepro/types";
+import { useStorageSource } from "@rebasepro/core";
+import { Container, Markdown, Typography } from "@rebasepro/ui";
 
 /**
- * Custom entity view that renders a real-time blog post preview.
- * Uses `modifiedValues` to show live updates as the user types in the form.
+ * This is a sample view used to render the content of a blog entry.
+ * It is bound to the data that is modified in the form.
  *
- * Inspired by the original FireCMS demo blog preview.
+ * Adapted from the original FireCMS example_pro BlogEntryPreview.
+ * Uses useStorageSource().getSignedUrl() to resolve storage keys to
+ * download URLs — the same pattern end-users should follow in their
+ * own custom views and SDK integrations.
  */
-export function BlogEntryPreview({
-    entity,
-    modifiedValues,
-}: EntityCustomViewParams) {
-    const values = { ...entity?.values, ...modifiedValues } as Record<string, any>;
+export function BlogEntryPreview({ modifiedValues }: EntityCustomViewParams) {
 
-    const title = values.title ?? "Untitled Blog Post";
-    const heroImage = values.hero_image;
-    const excerpt = values.excerpt;
-    const content = values.content as Array<{ type: string; value: string }> | undefined;
-    const status = values.status;
-    const publishDate = values.publish_date;
+    const storage = useStorageSource();
+    const values = modifiedValues as Record<string, any> | undefined;
+
+    const [headerUrl, setHeaderUrl] = useState<string | undefined>();
+    useEffect(() => {
+        if (values?.hero_image) {
+            storage.getSignedUrl(values.hero_image)
+                .then((res) => setHeaderUrl(res.url ?? undefined));
+        }
+    }, [storage, values?.hero_image]);
 
     return (
-        <div style={styles.container}>
-            <div style={styles.article}>
-                {/* Status badge */}
-                {status && (
-                    <div style={styles.statusRow}>
-                        <span style={{
-                            ...styles.statusBadge,
-                            backgroundColor: statusColors[status] ?? "#888",
-                        }}>
-                            {status.replace("_", " ").toUpperCase()}
-                        </span>
-                        {publishDate && (
-                            <span style={styles.date}>
-                                {new Date(publishDate).toLocaleDateString("en-US", {
-                                    year: "numeric",
-                                    month: "long",
-                                    day: "numeric",
-                                })}
-                            </span>
-                        )}
-                    </div>
-                )}
+        <div>
 
-                {/* Hero image */}
-                {heroImage && (
-                    <div style={styles.heroContainer}>
-                        <img
-                            src={heroImage}
-                            alt={title}
-                            style={styles.heroImage}
-                        />
-                    </div>
-                )}
+            {headerUrl && <img
+                alt={"Header"}
+                style={{
+                    width: "100%",
+                    maxHeight: "300px",
+                    objectFit: "cover"
+                }}
+                src={headerUrl}
+            />}
 
-                {/* Title */}
-                <h1 style={styles.title}>{title}</h1>
+            <Container className={"mb-16"}>
 
-                {/* Excerpt */}
-                {excerpt && (
-                    <p style={styles.excerpt}>{excerpt}</p>
-                )}
+                <Container maxWidth={"3xl"}>
+                    {values?.title && <Typography variant={"h3"} className="mt-16 mb-12 mx-12">
+                        {values.title}
+                    </Typography>}
+                </Container>
 
-                {/* Divider */}
-                <hr style={styles.divider} />
+                {values?.content && values.content
+                    .filter((e: any) => !!e)
+                    .map(
+                        (entry: any, index: number) => {
+                            if (entry.type === "text")
+                                return <Text key={`preview_text_${index}`}
+                                             markdownText={entry.value}/>;
+                            if (entry.type === "quote")
+                                return <Quote key={`preview_text_${index}`}
+                                              quoteText={entry.value}/>;
+                            if (entry.type === "image")
+                                return <StorageImage key={`preview_image_${index}`}
+                                                     storagePath={entry.value}/>;
+                            return null;
+                        }
+                    )}
 
-                {/* Content blocks */}
-                {content && content.length > 0 ? (
-                    <div style={styles.contentBlocks}>
-                        {content.map((block, index) => (
-                            <div key={index} style={styles.block}>
-                                {block.type === "text" && block.value && (
-                                    <div
-                                        style={styles.textBlock}
-                                        dangerouslySetInnerHTML={{
-                                            __html: simpleMarkdownToHtml(block.value),
-                                        }}
-                                    />
-                                )}
-                                {block.type === "image" && block.value && (
-                                    <div style={styles.imageBlock}>
-                                        <img
-                                            src={block.value}
-                                            alt={`Content image ${index + 1}`}
-                                            style={styles.contentImage}
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <p style={styles.emptyContent}>
-                        Start adding content blocks in the form to see a live preview here.
-                    </p>
-                )}
+            </Container>
+
+        </div>
+    );
+
+}
+
+function Text({ markdownText }: {
+    markdownText: string
+}) {
+
+    if (!markdownText)
+        return <></>;
+
+    return <Container maxWidth={"3xl"}>
+        <div className="mt-12 mb-12 px-12">
+            <Markdown source={markdownText}/>
+        </div>
+    </Container>;
+}
+
+export function StorageImage({ storagePath }: {
+    storagePath: string
+}) {
+
+    const storage = useStorageSource();
+    const [url, setUrl] = useState<string | undefined>();
+    useEffect(() => {
+        if (storagePath) {
+            storage.getSignedUrl(storagePath)
+                .then((res) => setUrl(res.url ?? undefined));
+        }
+    }, [storage, storagePath]);
+
+    if (!storagePath)
+        return <></>;
+
+    return (
+        <div className="flex justify-center">
+            <div className="m-4 p-8">
+                {url
+                    ? <img
+                        alt={"Content"}
+                        style={{
+                            objectFit: "contain",
+                            width: "100%",
+                            height: "100%"
+                        }}
+                        src={url}/>
+                    : <div className="w-[200px] h-[200px] bg-surface-200 dark:bg-surface-700 animate-pulse rounded"/>
+                }
             </div>
         </div>
     );
 }
 
-// ── Simple markdown → HTML converter ──────────────────────────────────
-// Converts basic markdown syntax to HTML for the preview.
-// Not a full parser — just enough for headings, bold, italic, links, and paragraphs.
-function simpleMarkdownToHtml(md: string): string {
-    let html = md
-        // Headings
-        .replace(/^### (.+)$/gm, "<h3>$1</h3>")
-        .replace(/^## (.+)$/gm, "<h2>$1</h2>")
-        .replace(/^# (.+)$/gm, "<h1>$1</h1>")
-        // Bold
-        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-        // Italic
-        .replace(/\*(.+?)\*/g, "<em>$1</em>")
-        // Inline code
-        .replace(/`(.+?)`/g, "<code style='background:#f0f0f0;padding:2px 6px;border-radius:3px;font-size:0.9em'>$1</code>")
-        // Links
-        .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:#4f46e5">$1</a>')
-        // Line breaks → paragraphs
-        .replace(/\n\n/g, "</p><p>")
-        .replace(/\n/g, "<br/>");
+function Quote({ quoteText }: {
+    quoteText: string
+}) {
 
-    return `<p>${html}</p>`;
+    if (!quoteText)
+        return <></>;
+
+    return <Container maxWidth={"5xl"} className={"border-l-2 border-l-red-950 dark:border-l-red-100 my-8 italic"}>
+        <Typography variant="h5">
+            {quoteText}
+        </Typography>
+    </Container>;
 }
-
-// ── Status colors ─────────────────────────────────────────────────────
-const statusColors: Record<string, string> = {
-    draft: "#6b7280",
-    needs_review: "#f59e0b",
-    published: "#10b981",
-    archived: "#ef4444",
-};
-
-// ── Styles ────────────────────────────────────────────────────────────
-const styles: Record<string, React.CSSProperties> = {
-    container: {
-        width: "100%",
-        height: "100%",
-        overflowY: "auto",
-        backgroundColor: "#fafafa",
-        display: "flex",
-        justifyContent: "center",
-        padding: "32px 16px",
-    },
-    article: {
-        maxWidth: 720,
-        width: "100%",
-        backgroundColor: "#fff",
-        borderRadius: 12,
-        padding: "40px 48px",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)",
-    },
-    statusRow: {
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        marginBottom: 20,
-    },
-    statusBadge: {
-        color: "#fff",
-        fontSize: 11,
-        fontWeight: 700,
-        letterSpacing: "0.05em",
-        padding: "3px 10px",
-        borderRadius: 4,
-        textTransform: "uppercase" as const,
-    },
-    date: {
-        color: "#9ca3af",
-        fontSize: 13,
-    },
-    heroContainer: {
-        width: "100%",
-        borderRadius: 8,
-        overflow: "hidden",
-        marginBottom: 28,
-    },
-    heroImage: {
-        width: "100%",
-        height: "auto",
-        display: "block",
-        objectFit: "cover" as const,
-        maxHeight: 360,
-    },
-    title: {
-        fontSize: 32,
-        fontWeight: 800,
-        lineHeight: 1.2,
-        margin: "0 0 16px 0",
-        color: "#111827",
-    },
-    excerpt: {
-        fontSize: 18,
-        lineHeight: 1.6,
-        color: "#6b7280",
-        margin: "0 0 24px 0",
-        fontStyle: "italic",
-    },
-    divider: {
-        border: "none",
-        borderTop: "1px solid #e5e7eb",
-        margin: "24px 0",
-    },
-    contentBlocks: {
-        display: "flex",
-        flexDirection: "column" as const,
-        gap: 24,
-    },
-    block: {},
-    textBlock: {
-        fontSize: 16,
-        lineHeight: 1.75,
-        color: "#374151",
-    },
-    imageBlock: {
-        borderRadius: 8,
-        overflow: "hidden",
-    },
-    contentImage: {
-        width: "100%",
-        height: "auto",
-        display: "block",
-    },
-    emptyContent: {
-        color: "#9ca3af",
-        fontStyle: "italic",
-        textAlign: "center" as const,
-        padding: "40px 0",
-        fontSize: 15,
-    },
-};
