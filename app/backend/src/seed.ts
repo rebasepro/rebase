@@ -111,7 +111,7 @@ const heroImageUrls = [
 
 const contentImageUrls = [
     "https://images.unsplash.com/photo-1587620962725-abab7fe55159?w=800&q=80",
-    "https://images.unsplash.com/photo-1607799279861-4dd421887fc8?w=800&q=80",
+    "https://images.unsplash.com/photo-1536104968055-4d61aa56f46a?w=800&q=80",
     "https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=800&q=80",
     "https://images.unsplash.com/photo-1580894894513-541e068a3e2b?w=800&q=80",
     "https://images.unsplash.com/photo-1484417894907-623942c8ee29?w=800&q=80",

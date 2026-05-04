@@ -1,12 +1,36 @@
-import { EntityCollection, Property } from "@rebasepro/types";
+import { EntityCollection, Property, StringProperty, NumberProperty, ArrayProperty, MapProperty, Relation } from "@rebasepro/types";
 
-export function generateOpenApiSpec(collections: EntityCollection[], basePath: string = "/api"): Record<string, unknown> {
-    const spec = {
-        openapi: "3.0.0",
+/**
+ * OpenAPI 3.0.3 specification generator.
+ *
+ * Produces a spec that exactly mirrors the REST API consumed by the
+ * Rebase SDK client (`@rebasepro/client`).
+ *
+ * Routes are mounted at `{basePath}/data/{slug}` by `initializeRebaseBackend`.
+ */
+
+export interface OpenApiGeneratorOptions {
+    /** Base path for the API (e.g. "/api"). Defaults to "/api". */
+    basePath?: string;
+    /** Whether auth is enabled on data routes. Defaults to true. */
+    requireAuth?: boolean;
+}
+
+export function generateOpenApiSpec(
+    collections: EntityCollection[],
+    options: OpenApiGeneratorOptions = {}
+): Record<string, unknown> {
+    const basePath = options.basePath ?? "/api";
+    const requireAuth = options.requireAuth ?? true;
+
+    const spec: Record<string, unknown> = {
+        openapi: "3.0.3",
         info: {
-            title: "Rebase Auto-Generated API",
+            title: "Rebase API",
             version: "1.0.0",
-            description: "Automatically generated REST API from Rebase collections"
+            description:
+                "Auto-generated REST API from Rebase collection definitions. " +
+                "This is the same API consumed by the `@rebasepro/client` SDK."
         },
         servers: [
             {
@@ -16,39 +40,130 @@ export function generateOpenApiSpec(collections: EntityCollection[], basePath: s
         ],
         paths: {} as Record<string, unknown>,
         components: {
-            schemas: {} as Record<string, unknown>
-        }
+            schemas: {
+                ErrorResponse: {
+                    type: "object",
+                    properties: {
+                        error: {
+                            type: "object",
+                            required: ["message", "code"],
+                            properties: {
+                                message: { type: "string" },
+                                code: { type: "string" },
+                                details: {}
+                            }
+                        }
+                    }
+                },
+                PaginationMeta: {
+                    type: "object",
+                    properties: {
+                        total: { type: "integer", description: "Total number of matching records" },
+                        limit: { type: "integer", description: "Page size used for this query" },
+                        offset: { type: "integer", description: "Number of records skipped" },
+                        hasMore: { type: "boolean", description: "Whether more records exist beyond this page" }
+                    }
+                }
+            } as Record<string, unknown>,
+            securitySchemes: {} as Record<string, unknown>
+        },
+        tags: [] as Array<{ name: string; description?: string }>
     };
 
-    (collections || []).forEach(collection => {
-        const schemaName = collection.singularName || collection.name;
-        spec.components.schemas[schemaName] = {
-            type: "object",
-            properties: {
-                id: { type: "string" },
-                ...Object.entries(collection.properties).reduce((props, [key, property]) => {
-                    if (property.type !== "relation") {
-                        props[key] = convertPropertyToOpenApiType(property);
-                    }
-                    return props;
-                }, {} as Record<string, unknown>)
+    // ── Security Schemes ─────────────────────────────────────────────────
+    if (requireAuth) {
+        (spec.components as Record<string, unknown>).securitySchemes = {
+            bearerAuth: {
+                type: "http",
+                scheme: "bearer",
+                bearerFormat: "JWT",
+                description:
+                    "JWT access token obtained from `POST /auth/login` or `POST /auth/register`. " +
+                    "Can also be a static service key for server-to-server authentication."
+            },
+            queryToken: {
+                type: "apiKey",
+                in: "query",
+                name: "token",
+                description: "Alternative: pass the JWT or service key as a `token` query parameter."
             }
         };
+        (spec as Record<string, unknown>).security = [
+            { bearerAuth: [] },
+            { queryToken: [] }
+        ];
+    }
 
-        const collectionPath = `/${collection.slug}`;
+    const paths = spec.paths as Record<string, unknown>;
+    const schemas = (spec.components as Record<string, unknown>).schemas as Record<string, unknown>;
+    const tags = spec.tags as Array<{ name: string; description?: string }>;
 
-        spec.paths[collectionPath] = {
+    // ── Collection routes ────────────────────────────────────────────────
+    for (const collection of (collections || [])) {
+        const schemaName = toPascalCase(collection.singularName || collection.name);
+        const slug = collection.slug;
+
+        tags.push({
+            name: collection.name,
+            description: collection.description || `CRUD operations for ${collection.name}`
+        });
+
+        // Build component schema for this collection
+        schemas[schemaName] = buildCollectionSchema(collection);
+
+        // Build an "input" schema (no read-only/auto fields like autoValue dates)
+        schemas[`${schemaName}Input`] = buildCollectionInputSchema(collection);
+
+        const dataPath = `/data/${slug}`;
+
+        // ── GET /data/{slug} — List entities ──────────────────────────
+        paths[dataPath] = {
             get: {
+                tags: [collection.name],
                 summary: `List ${collection.name}`,
+                operationId: `list${schemaName}`,
                 parameters: [
-                    { name: "limit", in: "query", schema: { type: "integer", default: 20 } },
-                    { name: "offset", in: "query", schema: { type: "integer", default: 0 } },
-                    { name: "where", in: "query", schema: { type: "string" } },
-                    { name: "orderBy", in: "query", schema: { type: "string" } }
+                    { name: "limit", in: "query", schema: { type: "integer", default: 20, maximum: 100 }, description: "Maximum number of records to return" },
+                    { name: "offset", in: "query", schema: { type: "integer", default: 0 }, description: "Number of records to skip" },
+                    { name: "page", in: "query", schema: { type: "integer", minimum: 1 }, description: "Page number (alternative to offset). Calculates offset as (page-1)*limit" },
+                    {
+                        name: "orderBy",
+                        in: "query",
+                        schema: { type: "string" },
+                        description: "Sort field and direction. Accepts `field:asc` or `field:desc`, or a JSON array `[{\"field\":\"name\",\"direction\":\"asc\"}]`",
+                        example: "created_at:desc"
+                    },
+                    {
+                        name: "where",
+                        in: "query",
+                        schema: { type: "string" },
+                        description: "JSON object filter. Example: `{\"status\":[\"==\",\"active\"]}`"
+                    },
+                    {
+                        name: "include",
+                        in: "query",
+                        schema: { type: "string" },
+                        description: "Comma-separated list of relations to include (eager-load). Use `*` for all relations.",
+                        example: "author,tags"
+                    },
+                    {
+                        name: "fields",
+                        in: "query",
+                        schema: { type: "string" },
+                        description: "Comma-separated list of fields to return (field selection)",
+                        example: "id,name,created_at"
+                    },
+                    {
+                        name: "searchString",
+                        in: "query",
+                        schema: { type: "string" },
+                        description: "Full-text search query"
+                    },
+                    ...buildFilterParameters(collection)
                 ],
                 responses: {
                     200: {
-                        description: "Success",
+                        description: "Paginated list of entities",
                         content: {
                             "application/json": {
                                 schema: {
@@ -57,104 +172,496 @@ export function generateOpenApiSpec(collections: EntityCollection[], basePath: s
                                         data: {
                                             type: "array",
                                             items: { $ref: `#/components/schemas/${schemaName}` }
-                                        }
+                                        },
+                                        meta: { $ref: "#/components/schemas/PaginationMeta" }
                                     }
                                 }
                             }
                         }
-                    }
+                    },
+                    ...errorResponses(requireAuth)
                 }
             },
             post: {
-                summary: `Create ${schemaName}`,
+                tags: [collection.name],
+                summary: `Create ${collection.singularName || collection.name}`,
+                operationId: `create${schemaName}`,
                 requestBody: {
+                    required: true,
                     content: {
                         "application/json": {
-                            schema: { $ref: `#/components/schemas/${schemaName}` }
+                            schema: { $ref: `#/components/schemas/${schemaName}Input` }
                         }
                     }
                 },
                 responses: {
                     201: {
-                        description: "Created",
+                        description: "Created entity",
                         content: {
                             "application/json": {
                                 schema: { $ref: `#/components/schemas/${schemaName}` }
                             }
                         }
-                    }
+                    },
+                    ...errorResponses(requireAuth)
                 }
             }
         };
 
-        spec.paths[`${collectionPath}/{id}`] = {
+        // ── GET/PUT/DELETE /data/{slug}/{id} ──────────────────────────
+        const entityPath = `/data/${slug}/{id}`;
+        paths[entityPath] = {
             get: {
-                summary: `Get ${schemaName} by ID`,
+                tags: [collection.name],
+                summary: `Get ${collection.singularName || collection.name} by ID`,
+                operationId: `get${schemaName}ById`,
                 parameters: [
-                    { name: "id", in: "path", required: true, schema: { type: "string" } }
+                    { name: "id", in: "path", required: true, schema: { type: "string" }, description: "Entity ID" },
+                    {
+                        name: "include",
+                        in: "query",
+                        schema: { type: "string" },
+                        description: "Comma-separated list of relations to include",
+                        example: "author,tags"
+                    }
                 ],
                 responses: {
                     200: {
-                        description: "Success",
+                        description: "Entity found",
                         content: {
                             "application/json": {
                                 schema: { $ref: `#/components/schemas/${schemaName}` }
                             }
                         }
-                    }
+                    },
+                    404: { description: "Entity not found", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
+                    ...errorResponses(requireAuth)
                 }
             },
             put: {
-                summary: `Update ${schemaName}`,
+                tags: [collection.name],
+                summary: `Update ${collection.singularName || collection.name}`,
+                operationId: `update${schemaName}`,
                 parameters: [
-                    { name: "id", in: "path", required: true, schema: { type: "string" } }
+                    { name: "id", in: "path", required: true, schema: { type: "string" }, description: "Entity ID" }
                 ],
                 requestBody: {
+                    required: true,
                     content: {
                         "application/json": {
-                            schema: { $ref: `#/components/schemas/${schemaName}` }
+                            schema: { $ref: `#/components/schemas/${schemaName}Input` }
                         }
                     }
                 },
                 responses: {
                     200: {
-                        description: "Updated",
+                        description: "Updated entity",
                         content: {
                             "application/json": {
                                 schema: { $ref: `#/components/schemas/${schemaName}` }
                             }
                         }
-                    }
+                    },
+                    404: { description: "Entity not found", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
+                    ...errorResponses(requireAuth)
                 }
             },
             delete: {
-                summary: `Delete ${schemaName}`,
+                tags: [collection.name],
+                summary: `Delete ${collection.singularName || collection.name}`,
+                operationId: `delete${schemaName}`,
                 parameters: [
-                    { name: "id", in: "path", required: true, schema: { type: "string" } }
+                    { name: "id", in: "path", required: true, schema: { type: "string" }, description: "Entity ID" }
                 ],
                 responses: {
-                    204: { description: "Deleted" }
+                    204: { description: "Deleted successfully" },
+                    404: { description: "Entity not found", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
+                    ...errorResponses(requireAuth)
                 }
             }
         };
-    });
+
+        // ── Subcollection routes ──────────────────────────────────────
+        const relations = (collection as EntityCollection & { relations?: Relation[] }).relations;
+        if (relations && relations.length > 0) {
+            for (const relation of relations) {
+                const relationName = relation.relationName;
+                if (!relationName) continue;
+
+                let targetName: string;
+                try {
+                    const targetCollection = relation.target();
+                    targetName = targetCollection.singularName || targetCollection.name;
+                } catch {
+                    targetName = relationName;
+                }
+                const targetSchema = toPascalCase(targetName);
+
+                const subPath = `/data/${slug}/{parentId}/${relationName}`;
+
+                // Only add if the schema exists (target collection is also registered)
+                paths[subPath] = {
+                    get: {
+                        tags: [collection.name],
+                        summary: `List ${relationName} for a ${collection.singularName || collection.name}`,
+                        operationId: `list${schemaName}${toPascalCase(relationName)}`,
+                        parameters: [
+                            { name: "parentId", in: "path", required: true, schema: { type: "string" }, description: `${collection.singularName || collection.name} ID` },
+                            { name: "limit", in: "query", schema: { type: "integer", default: 20 } },
+                            { name: "offset", in: "query", schema: { type: "integer", default: 0 } },
+                            { name: "orderBy", in: "query", schema: { type: "string" } },
+                            { name: "searchString", in: "query", schema: { type: "string" } }
+                        ],
+                        responses: {
+                            200: {
+                                description: `List of related ${relationName}`,
+                                content: {
+                                    "application/json": {
+                                        schema: {
+                                            type: "object",
+                                            properties: {
+                                                data: {
+                                                    type: "array",
+                                                    items: schemas[targetSchema]
+                                                        ? { $ref: `#/components/schemas/${targetSchema}` }
+                                                        : { type: "object" }
+                                                },
+                                                meta: { $ref: "#/components/schemas/PaginationMeta" }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            ...errorResponses(requireAuth)
+                        }
+                    }
+                };
+            }
+        }
+    }
 
     return spec;
 }
 
-function convertPropertyToOpenApiType(property: Property): Record<string, unknown> {
-    switch (property.type) {
-        case "string":
-            return { type: "string" };
-        case "number":
-            return { type: "number" };
-        case "boolean":
-            return { type: "boolean" };
-        case "date":
-            return { type: "string", format: "date-time" };
-        case "array":
-            return { type: "array", items: { type: "string" } };
-        default:
-            return { type: "string" };
+// ── Helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Build the component schema for a collection (output / read shape).
+ * All fields are included (including relation foreign keys).
+ */
+function buildCollectionSchema(collection: EntityCollection): Record<string, unknown> {
+    const properties: Record<string, unknown> = {
+        id: { type: "string", description: "Unique identifier" }
+    };
+    const required: string[] = ["id"];
+
+    for (const [key, property] of Object.entries(collection.properties)) {
+        // Skip relation properties — they are virtual and not part of the REST payload
+        if (property.type === "relation") continue;
+
+        properties[key] = convertPropertyToSchema(property);
+
+        if (property.validation?.required) {
+            required.push(key);
+        }
     }
+
+    return {
+        type: "object",
+        required: required.length > 0 ? required : undefined,
+        properties
+    };
+}
+
+/**
+ * Build an input schema (for POST/PUT) — excludes auto-generated fields.
+ */
+function buildCollectionInputSchema(collection: EntityCollection): Record<string, unknown> {
+    const properties: Record<string, unknown> = {};
+    const required: string[] = [];
+
+    for (const [key, property] of Object.entries(collection.properties)) {
+        if (property.type === "relation") continue;
+
+        // Skip auto-value date fields from the input schema
+        if (property.type === "date" && property.autoValue) continue;
+
+        // Skip auto-generated ID fields
+        if ("isId" in property && property.isId && property.isId !== "manual" && property.isId !== true) continue;
+
+        properties[key] = convertPropertyToSchema(property);
+
+        if (property.validation?.required) {
+            required.push(key);
+        }
+    }
+
+    // Allow explicit ID for create (optional)
+    properties["id"] = {
+        type: "string",
+        description: "Optional: client-assigned ID. If omitted, the server generates one."
+    };
+
+    return {
+        type: "object",
+        required: required.length > 0 ? required : undefined,
+        properties
+    };
+}
+
+/**
+ * Convert a Rebase Property to an OpenAPI 3.0 schema object.
+ */
+function convertPropertyToSchema(property: Property): Record<string, unknown> {
+    const base: Record<string, unknown> = {};
+
+    if (property.name) {
+        base.description = property.name;
+    }
+
+    switch (property.type) {
+        case "string": {
+            const sp = property as StringProperty;
+            base.type = "string";
+
+            if (sp.enum) {
+                const enumValues = resolveEnumValues(sp.enum);
+                if (enumValues.length > 0) {
+                    base.enum = enumValues;
+                }
+            }
+
+            if (sp.validation) {
+                if (sp.validation.min !== undefined) base.minLength = sp.validation.min;
+                if (sp.validation.max !== undefined) base.maxLength = sp.validation.max;
+                if (sp.validation.length !== undefined) {
+                    base.minLength = sp.validation.length;
+                    base.maxLength = sp.validation.length;
+                }
+                if (sp.validation.matches !== undefined) {
+                    base.pattern = String(sp.validation.matches);
+                }
+            }
+
+            if (sp.email) base.format = "email";
+            if (sp.url) base.format = "uri";
+            if (sp.storage) base.format = "uri";
+            if (sp.markdown) base.description = (base.description || "") + " (Markdown)";
+
+            return base;
+        }
+
+        case "number": {
+            const np = property as NumberProperty;
+            const isInteger = np.validation?.integer || np.columnType === "integer" || np.columnType === "serial" || np.columnType === "bigserial" || np.columnType === "bigint";
+            base.type = isInteger ? "integer" : "number";
+
+            if (np.enum) {
+                const enumValues = resolveEnumValues(np.enum);
+                if (enumValues.length > 0) {
+                    base.enum = enumValues;
+                }
+            }
+
+            if (np.validation) {
+                if (np.validation.min !== undefined) base.minimum = np.validation.min;
+                if (np.validation.max !== undefined) base.maximum = np.validation.max;
+                if (np.validation.moreThan !== undefined) {
+                    base.minimum = np.validation.moreThan;
+                    base.exclusiveMinimum = true;
+                }
+                if (np.validation.lessThan !== undefined) {
+                    base.maximum = np.validation.lessThan;
+                    base.exclusiveMaximum = true;
+                }
+            }
+
+            return base;
+        }
+
+        case "boolean":
+            base.type = "boolean";
+            return base;
+
+        case "date": {
+            base.type = "string";
+            if (property.mode === "date") {
+                base.format = "date";
+            } else {
+                base.format = "date-time";
+            }
+            if (property.autoValue) {
+                base.readOnly = true;
+                base.description = (base.description || "") +
+                    (property.autoValue === "on_create" ? " (Auto-set on creation)" : " (Auto-updated)");
+            }
+            return base;
+        }
+
+        case "geopoint":
+            base.type = "object";
+            base.properties = {
+                latitude: { type: "number" },
+                longitude: { type: "number" }
+            };
+            base.required = ["latitude", "longitude"];
+            return base;
+
+        case "reference":
+            base.type = "string";
+            base.description = (base.description || "") + " (Reference ID)";
+            return base;
+
+        case "array": {
+            const ap = property as ArrayProperty;
+            base.type = "array";
+
+            if (ap.oneOf) {
+                // Discriminated union (e.g., content blocks)
+                const typeField = ap.oneOf.typeField || "type";
+                const valueField = ap.oneOf.valueField || "value";
+                const variants: Record<string, unknown>[] = [];
+
+                for (const [variantKey, variantProp] of Object.entries(ap.oneOf.properties)) {
+                    variants.push({
+                        type: "object",
+                        properties: {
+                            [typeField]: { type: "string", enum: [variantKey] },
+                            [valueField]: convertPropertyToSchema(variantProp)
+                        },
+                        required: [typeField, valueField]
+                    });
+                }
+
+                base.items = { oneOf: variants };
+            } else if (ap.of) {
+                if (Array.isArray(ap.of)) {
+                    base.items = { oneOf: ap.of.map(p => convertPropertyToSchema(p)) };
+                } else {
+                    base.items = convertPropertyToSchema(ap.of);
+                }
+            } else {
+                base.items = {};
+            }
+
+            if (ap.validation) {
+                if (ap.validation.min !== undefined) base.minItems = ap.validation.min;
+                if (ap.validation.max !== undefined) base.maxItems = ap.validation.max;
+            }
+
+            return base;
+        }
+
+        case "map": {
+            const mp = property as MapProperty;
+            base.type = "object";
+
+            if (mp.properties) {
+                const props: Record<string, unknown> = {};
+                const req: string[] = [];
+
+                for (const [key, subProp] of Object.entries(mp.properties)) {
+                    props[key] = convertPropertyToSchema(subProp);
+                    if (subProp.validation?.required) {
+                        req.push(key);
+                    }
+                }
+
+                base.properties = props;
+                if (req.length > 0) base.required = req;
+            } else if (mp.keyValue) {
+                base.additionalProperties = true;
+            }
+
+            return base;
+        }
+
+        default:
+            base.type = "string";
+            return base;
+    }
+}
+
+/**
+ * Resolve EnumValues (array or record) into a flat array of enum values.
+ */
+function resolveEnumValues(enumDef: Record<string | number, unknown> | Array<{ id: string | number }>): Array<string | number> {
+    if (Array.isArray(enumDef)) {
+        return enumDef.map(e => (typeof e === "object" && e !== null && "id" in e) ? e.id : e as string | number);
+    }
+    return Object.keys(enumDef).map(k => {
+        // Preserve numeric keys as numbers
+        const num = Number(k);
+        return isNaN(num) ? k : num;
+    });
+}
+
+/**
+ * Build PostgREST-style filter parameters for a collection.
+ * These are additional query parameters like `?status=eq.active&price=gte.100`.
+ */
+function buildFilterParameters(collection: EntityCollection): Array<Record<string, unknown>> {
+    const params: Array<Record<string, unknown>> = [];
+
+    for (const [key, property] of Object.entries(collection.properties)) {
+        if (property.type === "relation" || property.type === "map" || property.type === "array" || property.type === "geopoint") {
+            continue;
+        }
+
+        params.push({
+            name: key,
+            in: "query",
+            required: false,
+            schema: { type: "string" },
+            description:
+                `Filter by \`${key}\`. Supports PostgREST operators: ` +
+                "`eq.value`, `neq.value`, `gt.value`, `gte.value`, `lt.value`, `lte.value`, " +
+                "`in.(a,b,c)`, `nin.(a,b,c)`, `cs.value` (array-contains), `csa.(a,b)` (array-contains-any). " +
+                "Plain values imply equality.",
+            example: property.type === "string" ? "eq.active" : property.type === "number" ? "gte.100" : undefined
+        });
+    }
+
+    return params;
+}
+
+/**
+ * Standard error responses included on every endpoint.
+ */
+function errorResponses(requireAuth: boolean): Record<string, unknown> {
+    const responses: Record<string, unknown> = {
+        400: {
+            description: "Bad request",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        },
+        500: {
+            description: "Internal server error",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        }
+    };
+
+    if (requireAuth) {
+        responses[401] = {
+            description: "Authentication required or invalid token",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        };
+        responses[403] = {
+            description: "Insufficient permissions",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        };
+    }
+
+    return responses;
+}
+
+/**
+ * Convert a string to PascalCase for schema names.
+ */
+function toPascalCase(str: string): string {
+    return str
+        .replace(/[^a-zA-Z0-9]+/g, " ")
+        .split(" ")
+        .filter(Boolean)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join("");
 }

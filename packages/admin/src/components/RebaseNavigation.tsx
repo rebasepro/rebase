@@ -3,15 +3,17 @@ import {
     useRebaseRegistry,
     useRebaseContext,
     useAuthController,
+    useCustomizationController,
     useAdminModeController,
     useBuildLocalConfigurationPersistence,
     useInternalUserManagementController,
     useRebaseClient,
     StudioBridgeRegistryProvider,
     useBridgeRegistration,
+    CustomizationControllerContext,
 } from "@rebasepro/core";
 import { CircularProgressCenter } from "@rebasepro/ui";
-import type { AppView, CollectionEditorOptions } from "@rebasepro/types";
+import type { AppView, CollectionEditorOptions, EntityCustomView, EntityAction } from "@rebasepro/types";
 
 const EMPTY_PLUGINS: any[] = [];
 const EMPTY_COLLECTIONS: any[] = [];
@@ -144,8 +146,35 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         userManagement: userManagement as any
     });
 
+    // ── Merge CMS-registered entityViews/entityActions into the customization controller ──
+    // The <Rebase> component builds the customizationController from its own props,
+    // but entity views passed to <RebaseCMS> are stored in the registry and not
+    // automatically merged. We re-provide an enriched controller here so that
+    // downstream consumers (EntityEditView, side panels, etc.) can resolve
+    // string-keyed entity views like "blog_preview".
+    const parentCustomizationController = useCustomizationController();
+    const enrichedCustomizationController = useMemo(() => {
+        const cmsEntityViews = (registry.cmsConfig?.entityViews ?? []) as EntityCustomView[];
+        const cmsEntityActions = (registry.cmsConfig?.entityActions ?? []) as EntityAction[];
+        if (cmsEntityViews.length === 0 && cmsEntityActions.length === 0) {
+            return parentCustomizationController;
+        }
+        return {
+            ...parentCustomizationController,
+            entityViews: [
+                ...parentCustomizationController.entityViews,
+                ...cmsEntityViews.filter(v => !parentCustomizationController.entityViews.some(ev => ev.key === v.key))
+            ],
+            entityActions: [
+                ...parentCustomizationController.entityActions,
+                ...cmsEntityActions.filter(a => !parentCustomizationController.entityActions.some(ea => ea.key === a.key))
+            ]
+        };
+    }, [parentCustomizationController, registry.cmsConfig?.entityViews, registry.cmsConfig?.entityActions]);
+
     // ── Inner content with all context providers ──────────────────────
     const navigationContent = (
+        <CustomizationControllerContext.Provider value={enrichedCustomizationController}>
         <StudioBridgeRegistryProvider>
             <CollectionRegistryContext.Provider value={collectionRegistryController}>
                 <UrlContext.Provider value={urlController}>
@@ -162,6 +191,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
                 </UrlContext.Provider>
             </CollectionRegistryContext.Provider>
         </StudioBridgeRegistryProvider>
+        </CustomizationControllerContext.Provider>
     );
 
     // ── Wrap with ConfigControllerProvider when collection editor is enabled ──

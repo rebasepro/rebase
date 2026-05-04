@@ -42,6 +42,7 @@ export const BooleanSwitchWithLabel = function BooleanSwitchWithLabel({
 
     const ref = React.useRef<HTMLDivElement | null>(null);
     const refInput = React.useRef<HTMLButtonElement | null>(null);
+    const switchLabelId = React.useId();
     const [_, setFocused] = React.useState(autoFocus)
     const onFocus = () => setFocused(true);
     const onBlur = () => setFocused(false);
@@ -59,6 +60,10 @@ export const BooleanSwitchWithLabel = function BooleanSwitchWithLabel({
             ref={ref}
             onFocus={onFocus}
             onBlur={onBlur}
+            role="switch"
+            aria-checked={props.allowIndeterminate && (value === null || value === undefined) ? "mixed" : !!value}
+            aria-disabled={disabled || undefined}
+            aria-labelledby={label ? switchLabelId : undefined}
             tabIndex={-1}
             className={cls(
                 !invisible && fieldBackgroundMixin,
@@ -100,7 +105,7 @@ export const BooleanSwitchWithLabel = function BooleanSwitchWithLabel({
                 {...props}
             />
 
-            <div className={cls(
+            <div id={switchLabelId} className={cls(
                 "grow",
                 position === "end" ? "mr-4" : "ml-4",
                 size === "small" || size === "smallest" ? "text-sm" : "text-base"

@@ -13,6 +13,7 @@ export interface CheckboxProps {
     padding?: boolean;
     size?: "smallest" | "small" | "medium" | "large";
     color?: "primary" | "secondary";
+    "aria-label"?: string;
 }
 
 const sizeClasses = {
@@ -48,7 +49,8 @@ export const Checkbox = React.memo(({
                              disabled,
                              size = "medium",
                              onCheckedChange,
-                             color = "primary"
+                             color = "primary",
+                             "aria-label": ariaLabel
                          }: CheckboxProps) => {
 
     const isChecked = indeterminate ? false : checked;
@@ -65,6 +67,8 @@ export const Checkbox = React.memo(({
             id={id}
             checked={indeterminate || isChecked}
             disabled={disabled}
+            aria-label={ariaLabel}
+            aria-checked={indeterminate ? "mixed" : isChecked}
             onCheckedChange={disabled ? undefined : onCheckedChange}>
 
             <div className={cls(

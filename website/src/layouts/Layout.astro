@@ -223,6 +223,58 @@ const breadcrumbSchema = breadcrumbs && breadcrumbs.length > 0 ? {
         background: radial-gradient(ellipse at center, rgba(0, 112, 244, 0.1) 0%, transparent 70%);
     }
 
+    /* Animated hero background orbs */
+    @keyframes float-orb {
+        0%, 100% { transform: translate(0, 0) scale(1); }
+        33% { transform: translate(30px, -25px) scale(1.05); }
+        66% { transform: translate(-20px, 15px) scale(0.95); }
+    }
+
+    @keyframes float-orb-reverse {
+        0%, 100% { transform: translate(0, 0) scale(1); }
+        33% { transform: translate(-25px, 20px) scale(0.97); }
+        66% { transform: translate(15px, -30px) scale(1.03); }
+    }
+
+    .hero-orb {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(100px);
+        pointer-events: none;
+        will-change: transform;
+        z-index: -1;
+    }
+
+    .hero-orb-1 {
+        width: 700px;
+        height: 700px;
+        background: radial-gradient(circle, rgba(0, 112, 244, 0.35), transparent 70%);
+        top: -250px;
+        left: 15%;
+        animation: float-orb 22s ease-in-out infinite;
+    }
+
+    .hero-orb-2 {
+        width: 500px;
+        height: 500px;
+        background: radial-gradient(circle, rgba(99, 102, 241, 0.25), transparent 70%);
+        bottom: -150px;
+        right: 10%;
+        animation: float-orb-reverse 18s ease-in-out infinite;
+        animation-delay: -5s;
+    }
+
+    .hero-orb-3 {
+        width: 350px;
+        height: 350px;
+        background: radial-gradient(circle, rgba(0, 200, 244, 0.15), transparent 70%);
+        top: 30%;
+        left: 50%;
+        transform: translateX(-50%);
+        animation: float-orb 25s ease-in-out infinite;
+        animation-delay: -10s;
+    }
+
     :focus-visible {
         outline: none;
         box-shadow: 0 0 0 2px transparent, 0 0 0 4px rgba(0, 112, 244, 0.75), 0 0 0 6px transparent;

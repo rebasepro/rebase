@@ -121,6 +121,7 @@ export const DefaultAppBar = function DefaultAppBar({
     return (
         <div
             style={style}
+            role="banner"
             className={cls("w-full h-16 transition-all ease-in duration-75 absolute top-0 max-w-full overflow-x-auto no-scrollbar",
                 "flex flex-row gap-2 px-4 items-center",
                 isStudioDark ? "dark:bg-surface-950" : "",
@@ -158,6 +159,7 @@ export const DefaultAppBar = function DefaultAppBar({
 
 
             <div className="mr-8 hidden lg:block">
+                <nav aria-label="Breadcrumb">
                 <div className={"flex flex-row gap-2 items-center"}>
                     {breadcrumbs.breadcrumbs.map((breadcrumb, index) => {
                         return <React.Fragment key={breadcrumb.url + "_" + index}>
@@ -190,6 +192,7 @@ export const DefaultAppBar = function DefaultAppBar({
                         </React.Fragment>;
                     })}
                 </div>
+                </nav>
             </div>
             {startAdornment}
 
@@ -214,7 +217,7 @@ export const DefaultAppBar = function DefaultAppBar({
                 <Menu
                     trigger={<IconButton
                         color="inherit"
-                        aria-label="Open drawer"
+                        aria-label="Toggle theme"
 >
                         {mode === "dark"
                             ? <DarkModeIcon />
@@ -226,7 +229,7 @@ export const DefaultAppBar = function DefaultAppBar({
                         size={"smallest"} />{t("system_mode")}</MenuItem>
                 </Menu>}
 
-            <Menu trigger={avatarComponent}>
+            <Menu trigger={<div aria-label="User menu" role="button">{avatarComponent}</div>}>
                 {user && <div className={"px-4 py-2 mb-2"}>
                     {user.displayName && <Typography variant={"body1"} color={"secondary"}>
                         {user.displayName}

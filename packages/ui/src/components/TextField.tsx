@@ -1,5 +1,5 @@
 "use client";
-import React, { ForwardedRef, forwardRef, useEffect, useRef } from "react";
+import React, { ForwardedRef, forwardRef, useEffect, useId, useRef } from "react";
 
 import {
     fieldBackgroundDisabledMixin,
@@ -83,6 +83,9 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
     ) => {
 
         const inputRef = inputRefProp ?? useRef(null);
+        const autoId = useId();
+        const inputId = inputProps.id ?? autoId;
+        const labelId = `${inputId}-label`;
 
         const [focused, setFocused] = React.useState(false);
         const hasValue = value !== undefined && value !== null && value !== "";
@@ -113,6 +116,10 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
             <textarea
                 {...(inputProps as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
                 ref={inputRef}
+                id={inputId}
+                aria-labelledby={label ? labelId : undefined}
+                aria-invalid={error || undefined}
+                aria-disabled={disabled || undefined}
                 placeholder={focused || hasValue || !label ? placeholder : undefined}
                 autoFocus={autoFocus}
                 rows={typeof minRows === "string" ? parseInt(minRows) : (minRows ?? 3)}
@@ -133,6 +140,10 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
             <input
                 {...inputProps}
                 ref={inputRef}
+                id={inputId}
+                aria-labelledby={label ? labelId : undefined}
+                aria-invalid={error || undefined}
+                aria-disabled={disabled || undefined}
                 disabled={disabled}
                 style={inputStyle}
                 className={cls(
@@ -191,6 +202,8 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
             >
                 {label && (
                     <InputLabel
+                        id={labelId}
+                        htmlFor={inputId}
                         className={cls(
                             "pointer-events-none absolute",
                             size === "large" ? "top-1" : "top-[-1px]",

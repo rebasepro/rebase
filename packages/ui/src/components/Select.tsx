@@ -155,6 +155,8 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                     id={id}
                     asChild={false}
                     type="button"
+                    aria-label={label || renderValue || "Select an option"}
+                    aria-invalid={error || undefined}
                     className={cls(
                         "h-full",
                         padding ? {

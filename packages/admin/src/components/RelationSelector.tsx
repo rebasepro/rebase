@@ -457,6 +457,7 @@ export const RelationSelector = React.forwardRef<
                                     {!multiple && selectedItems.length === 1 && selectedItems[0]?.data && (
                                         <Tooltip title={`Open ${selectedItems[0].label}`}>
                                             <IconButton
+                                                component={"div"}
                                                 size={"small"}
                                                 color={"inherit"}
                                                 className="opacity-60 hover:opacity-100"

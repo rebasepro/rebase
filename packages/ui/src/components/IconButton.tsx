@@ -11,7 +11,8 @@ export type IconButtonProps<C extends React.ElementType> =
     disabled?: boolean;
     toggled?: boolean;
     component?: C;
-    onClick?: React.MouseEventHandler<any>
+    onClick?: React.MouseEventHandler<any>;
+    "aria-label"?: string;
 }
 
 const buttonClasses = "hover:bg-surface-accent-200 hover:bg-opacity-75 hover:bg-surface-accent-200/75 dark:hover:bg-surface-accent-800 hover:scale-105 transition-transform";
@@ -42,10 +43,14 @@ const IconButtonInner = <C extends React.ElementType = "button">({
 
     const bgClasses = variant === "ghost" ? "bg-transparent" : "bg-surface-accent-200 bg-opacity-50 bg-surface-accent-200/50 dark:bg-surface-950 dark:bg-opacity-50 dark:bg-surface-950/50";
     const Component: React.ElementType<any> = component || "button";
+    const isNativeButton = Component === "button";
     return (
         <Component
-            type="button"
+            type={isNativeButton ? "button" : undefined}
+            role={isNativeButton ? undefined : "button"}
             ref={ref}
+            aria-disabled={disabled || undefined}
+            tabIndex={disabled ? -1 : undefined}
             {...props}
             className={cls(
                 disabled ? "opacity-50 pointer-events-none" : "cursor-pointer",

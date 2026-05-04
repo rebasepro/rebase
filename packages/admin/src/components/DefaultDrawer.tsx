@@ -99,7 +99,7 @@ export function DefaultDrawer({
 
     return (
         <>
-            <div className={cls("flex flex-col h-full relative grow w-full", isStudioDark ? "dark:bg-surface-950" : "", className)} style={style}>
+            <div role="navigation" aria-label="Main navigation" className={cls("flex flex-col h-full relative grow w-full", isStudioDark ? "dark:bg-surface-950" : "", className)} style={style}>
 
                 <DrawerLogo
                     logo={resolvedLogo}
@@ -259,6 +259,10 @@ export function DrawerToggle({
                         "transition-colors duration-150",
                         "py-2"
                     )}
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={isExpanded}
+                    aria-label={isExpanded ? t("collapse") : t("expand")}
                     onClick={() => isExpanded ? closeDrawer() : openDrawer()}
                 >
                     <div className="shrink-0 flex items-center justify-center w-[56px] h-[24px] text-surface-500 dark:text-surface-400">
@@ -307,12 +311,13 @@ function DrawerModeSwitch({
                 showSwitch ? "opacity-100 h-7 mt-2 mb-0" : "opacity-0 pointer-events-none h-7 mt-2 mb-0"
             )}
         >
-            <div className="flex bg-surface-100 dark:bg-surface-800 rounded-lg p-0.5 border border-surface-200 dark:border-surface-700">
+            <div role="group" aria-label="Content mode" className="flex bg-surface-100 dark:bg-surface-800 rounded-lg p-0.5 border border-surface-200 dark:border-surface-700">
                 <button
                     onClick={() => {
                         adminModeController.setMode("content");
                         navigate(urlController.basePath ?? "/");
                     }}
+                    aria-pressed={adminModeController.mode === "content"}
                     className={cls(
                         "flex-1 px-3 py-0.5 text-xs font-semibold rounded-md transition-all text-center",
                         adminModeController.mode === "content"
@@ -327,6 +332,7 @@ function DrawerModeSwitch({
                         adminModeController.setMode("studio");
                         navigate(urlController.basePath === "/" ? "/s" : `${urlController.basePath ?? ""}/s`);
                     }}
+                    aria-pressed={adminModeController.mode === "studio"}
                     className={cls(
                         "flex-1 px-3 py-0.5 text-xs font-semibold rounded-md transition-all text-center",
                         adminModeController.mode === "studio"

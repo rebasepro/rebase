@@ -85,6 +85,7 @@ export function Tabs({
                 <button
                     type="button"
                     disabled={!showLeftScroll}
+                    aria-label="Scroll tabs left"
                     onClick={() => scroll("left")}
                     className={cls(
                         "absolute left-0 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center rounded-md transition-all h-8 w-6",
@@ -116,6 +117,7 @@ export function Tabs({
                 <button
                     type="button"
                     disabled={!showRightScroll}
+                    aria-label="Scroll tabs right"
                     onClick={() => scroll("right")}
                     className={cls(
                         "absolute right-0 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center rounded-md transition-all h-8 w-6",

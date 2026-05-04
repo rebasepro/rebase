@@ -91,6 +91,7 @@ function getSimplifiedProperty(property: Property, path: string, value?: any): R
             }
 
             return value.map((v, i) => {
+                if (v == null) return {};
                 const typeKey = property.oneOf!.typeField ?? "type";
                 const oneOfType = v[typeKey];
                 const valueKey = property.oneOf!.valueField ?? "value";

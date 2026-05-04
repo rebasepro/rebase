@@ -26,6 +26,9 @@ export const BooleanSwitch = React.forwardRef(function BooleanSwitch({
                                                                      }: BooleanSwitchProps, ref: React.Ref<HTMLButtonElement>) {
         return <button
             type="button"
+            role="switch"
+            aria-checked={allowIndeterminate && (value === null || value === undefined) ? "mixed" : !!value}
+            aria-disabled={disabled || undefined}
             ref={ref}
             tabIndex={disabled ? -1 : undefined}
             onClick={disabled

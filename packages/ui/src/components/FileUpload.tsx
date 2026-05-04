@@ -64,6 +64,9 @@ export function FileUpload({
     );
     return <div
         {...getRootProps()}
+        role="button"
+        aria-label={title || uploadDescription || "Upload file"}
+        aria-disabled={disabled || undefined}
         className={cls(
             fieldBackgroundMixin,
             "flex gap-2",

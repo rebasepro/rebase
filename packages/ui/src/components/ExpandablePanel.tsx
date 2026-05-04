@@ -106,6 +106,7 @@ export function ExpandablePanel({
                         )}
                         role="button"
                         tabIndex={0}
+                        aria-expanded={open}
                     >
                         {title}
                         <KeyboardArrowDownIcon className={cls("transition", open ? "rotate-180" : "")}/>

@@ -22,10 +22,10 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
         <!-- Hero -->
         <section class="relative isolate overflow-hidden bg-linear-to-br from-surface-900 to-black pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-48 lg:pb-32">
             <!-- Background gradient top shape -->
-            <div class="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80"
-                 aria-hidden="true">
-                <div class="blob-shape relative left-[calc(50%-11rem)] aspect-1155/678 w-144.5 -translate-x-2/3 rotate-30 bg-linear-to-tr from-primary to-[#0d172e] opacity-25 sm:left-[calc(50%-30rem)] sm:w-288.75"></div>
-            </div>
+            <!-- Animated background orbs -->
+            <div class="hero-orb hero-orb-1" aria-hidden="true"></div>
+            <div class="hero-orb hero-orb-2" aria-hidden="true"></div>
+            <div class="hero-orb hero-orb-3" aria-hidden="true"></div>
 
             <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
                 <!-- EU badge -->
@@ -45,61 +45,6 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
                     Admin panel, APIs, and typed SDK — generated from a <b class="text-white font-medium">single TypeScript schema</b>.
                 </p>
                 
-                <!-- Feature badges -->
-                <div class="mb-8 flex flex-wrap items-center justify-center gap-3 sm:gap-5 text-sm sm:text-base animate-on-scroll fade-in">
-                    <span class="inline-flex items-center gap-2.5 rounded-full bg-surface-800/60 px-5 py-2 ring-1 ring-white/10 text-surface-200">
-                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 border border-primary/30">
-                            <svg class="h-5 w-5 text-primary" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                <rect x="3" y="3" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.4"/>
-                                <rect x="9" y="3" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.4"/>
-                                <rect x="3" y="9" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.4"/>
-                                <rect x="9" y="9" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.4"/>
-                            </svg>
-                        </span>
-                        Admin Panel
-                    </span>
-                    <span class="inline-flex items-center gap-2.5 rounded-full bg-surface-800/60 px-5 py-2 ring-1 ring-white/10 text-surface-200">
-                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 border border-primary/30">
-                            <svg class="h-5 w-5 text-primary" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                <circle cx="8" cy="4" r="1.5" stroke="currentColor" stroke-width="1.4"/>
-                                <circle cx="4" cy="11" r="1.5" stroke="currentColor" stroke-width="1.4"/>
-                                <circle cx="12" cy="11" r="1.5" stroke="currentColor" stroke-width="1.4"/>
-                                <path d="M7 5.5l-2.5 4M9 5.5l2.5 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-                            </svg>
-                        </span>
-                        REST & GraphQL
-                    </span>
-                    <span class="inline-flex items-center gap-2.5 rounded-full bg-surface-800/60 px-5 py-2 ring-1 ring-white/10 text-surface-200">
-                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 border border-primary/30">
-                            <svg class="h-5 w-5 text-primary" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                <polyline points="5 5 2 8 5 11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-                                <polyline points="11 5 14 8 11 11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-                                <line x1="10" y1="3" x2="6" y2="13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-                            </svg>
-                        </span>
-                        Typed SDK
-                    </span>
-                    <span class="inline-flex items-center gap-2.5 rounded-full bg-surface-800/60 px-5 py-2 ring-1 ring-white/10 text-surface-200">
-                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 border border-primary/30">
-                            <svg class="h-5 w-5 text-primary" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                <rect x="4" y="7" width="8" height="6" rx="1" stroke="currentColor" stroke-width="1.4"/>
-                                <path d="M5.5 7v-2a2.5 2.5 0 015 0v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-                                <circle cx="8" cy="10" r="1" fill="currentColor"/>
-                            </svg>
-                        </span>
-                        Built-in Auth
-                    </span>
-                    <span class="inline-flex items-center gap-2.5 rounded-full bg-surface-800/60 px-5 py-2 ring-1 ring-white/10 text-surface-200">
-                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 border border-primary/30">
-                            <svg class="h-5 w-5 text-primary" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                <path d="M11 5H3.5a1.5 1.5 0 000 3h7A2.5 2.5 0 0110.5 13H4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-                                <path d="M6 11l-2 2 2 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-                                <path d="M10 3l2 2-2 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </span>
-                        Real-time
-                    </span>
-                </div>
 
                 <!-- CTAs -->
                 <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-x-4 animate-on-scroll fade-in-up">
@@ -139,9 +84,7 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
                     </a>
                 </div>
                 
-                <p class="mt-4 text-xs sm:text-sm text-surface-500 animate-on-scroll fade-in-up">
-                    Open-source · Postgres-native · No vendor lock-in
-                </p>
+
             </div>
         </section>
 
@@ -327,7 +270,7 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
         </section>
 
         <!-- Social proof -->
-        <section class="bg-black py-12 sm:py-16 border-t border-surface-800/40">
+        <section class="bg-black py-12 sm:py-16">
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
                 <p class="text-center text-sm text-surface-500 mb-8 animate-on-scroll fade-in">Trusted by developers and teams at</p>
                 <ClientLogos />
@@ -335,7 +278,7 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
         </section>
 
         <!-- How it works -->
-        <section class="relative py-24 sm:py-32 overflow-hidden bg-black border-t border-surface-800/40">
+        <section class="relative py-24 sm:py-32 overflow-hidden bg-black">
             <div class="mx-auto max-w-7xl px-6 lg:px-12">
                 <div class="max-w-3xl mx-auto text-center mb-12 sm:mb-16 animate-on-scroll fade-in-up">
                     <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase">Zero to production</h2>
@@ -515,7 +458,7 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
         <ScrollSyncShowcase/>
 
         <!-- Built With Rebase: SustenTalent Use Case -->
-        <section class="relative isolate bg-black py-32 sm:py-48 overflow-hidden border-t border-surface-800/40">
+        <section class="relative isolate bg-black py-32 sm:py-48 overflow-hidden">
             <div class="mx-auto max-w-7xl px-4">
                 <div class="mx-auto max-w-3xl lg:text-center animate-on-scroll fade-in-up">
                     <p class="text-base font-semibold leading-7 text-primary">Solve Real Business Problems</p>
@@ -732,7 +675,7 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
         </section>
 
         <!-- Two big punches — sell feelings, link to depth -->
-        <section class="relative isolate bg-black py-24 sm:py-32 overflow-hidden border-t border-surface-800/40">
+        <section class="relative isolate bg-black py-24 sm:py-32 overflow-hidden">
             <SectionBackgroundAccents blob={{ position: "bottom", size: "md" }}/>
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -865,7 +808,7 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
 
 
         <!-- Power features with videos -->
-        <section class="relative isolate bg-black py-24 sm:py-32 overflow-hidden border-t border-surface-800/40">
+        <section class="relative isolate bg-black py-24 sm:py-32 overflow-hidden">
             <SectionBackgroundAccents blob={{ position: "bottom", size: "lg" }}/>
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
                 <div class="mx-auto max-w-2xl text-center mb-16 animate-on-scroll fade-in-up">
@@ -873,9 +816,9 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
                     <p class="mt-4 text-surface-400 text-lg">Every feature included. Every view updates in real time.</p>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
                     <!-- Kanban board views -->
-                    <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up">
+                    <div class="lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up">
                         <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
                         <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
                             <!-- Window controls -->
@@ -1019,12 +962,9 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
                             <p class="text-surface-400 text-sm leading-relaxed">CSV, JSON, or Excel — automatic field mapping in, one-click export out.</p>
                         </div>
                     </div>
-                </div>
 
-                <!-- Bottom row: product-level feature demos -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
                     <!-- Instant REST & GraphQL -->
-                    <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up">
+                    <div class="lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up">
                         <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
                         <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
                             <!-- Window controls -->
@@ -1168,7 +1108,7 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
         <RoadmapSection />
 
         <!-- FAQ -->
-        <section class="bg-black py-24 sm:py-32 border-t border-surface-800/40">
+        <section class="bg-black py-24 sm:py-32">
             <div class="mx-auto max-w-7xl px-6">
                 <div class="mx-auto max-w-3xl text-center animate-on-scroll fade-in-up">
                     <h2 class="text-3xl sm:text-4xl font-medium text-white">Frequently asked questions</h2>

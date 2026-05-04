@@ -71,6 +71,8 @@ export function SearchBar({
 
     return (
         <div
+            role="search"
+            aria-label="Search"
             onClick={onClick}
             className={cls("relative transition-all",
                 heightClass,
@@ -88,6 +90,7 @@ export function SearchBar({
                 ref={inputRef}
                 onClick={onClick}
                 placeholder={placeholder}
+                aria-label={placeholder}
                 readOnly={!onTextSearch}
                 onChange={onTextSearch
                     ? (event) => {
@@ -111,6 +114,7 @@ export function SearchBar({
                 ? <IconButton
                     className={`${size === "small" ? "mr-0 top-0" : "mr-1 top-0"} absolute right-0 z-10`}
                     size={"small"}
+                    aria-label="Clear search"
                     onClick={clearText}>
                     <CloseIcon size={"smallest"} />
                 </IconButton>

@@ -187,7 +187,10 @@ export class RebaseApiServer {
 
         // OpenAPI endpoint
         this.router.get(`${basePath}/docs`, (c) => {
-            const openApiSpec = generateOpenApiSpec(this.config.collections || [], this.config.basePath);
+            const openApiSpec = generateOpenApiSpec(this.config.collections || [], {
+                basePath: this.config.basePath,
+                requireAuth: this.config.requireAuth ?? true
+            });
             return c.json(openApiSpec);
         });
 

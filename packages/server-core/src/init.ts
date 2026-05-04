@@ -506,6 +506,40 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         config.app.route(`${basePath}/data`, dataRouter);
     }
 
+    // ── OpenAPI / Swagger ─────────────────────────────────────────────────
+    if (config.enableSwagger !== false && activeCollections.length > 0) {
+        const { generateOpenApiSpec } = await import("./api/openapi-generator");
+
+        config.app.get(`${basePath}/docs`, (c) => {
+            const spec = generateOpenApiSpec(activeCollections, {
+                basePath,
+                requireAuth: config.auth?.requireAuth !== false
+            });
+            return c.json(spec);
+        });
+
+        if (process.env.NODE_ENV !== "production") {
+            config.app.get(`${basePath}/swagger`, (c) => {
+                return c.html(`<!DOCTYPE html>
+<html>
+<head>
+    <title>Rebase API Documentation</title>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css"/>
+    <style>body{margin:0;padding:0;}</style>
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>SwaggerUIBundle({ url: '${basePath}/docs', dom_id: '#swagger-ui' });</script>
+</body>
+</html>`);
+            });
+            logger.info("Swagger UI available", { path: `${basePath}/swagger` });
+        }
+    }
+
     // ─── Server-side singleton ────────────────────────────────────────────
     // Build the admin-level RebaseClient and expose it as the `rebase` singleton.
     // This client bypasses the network and uses Hono's internal request handler.
