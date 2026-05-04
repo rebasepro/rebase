@@ -150,7 +150,7 @@ export function ViewModeToggle({
              onMouseLeave={handleMouseLeave}>
             <Popover
                 open={open}
-                onOpenChange={onOpenChange}
+                onOpenChange={(v) => { if (v) onOpenChange?.(true); }}
                 modal={false}
                 sideOffset={0}
                 onMouseEnter={handleMouseEnter}

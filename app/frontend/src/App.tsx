@@ -9,6 +9,7 @@ import { useDataEnhancementPlugin } from "@rebasepro/plugin-data-enhancement";
 import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
 import { collections } from "virtual:rebase-collections";
+import { BlogEntryPreview } from "./BlogEntryPreview";
 
 // Configuration from environment
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
@@ -37,6 +38,15 @@ export function App() {
 
     const plugins = React.useMemo(() => [dataEnhancementPlugin], [dataEnhancementPlugin]);
 
+    const entityViews = React.useMemo(() => [
+        {
+            key: "blog_preview",
+            name: "Preview",
+            Builder: BlogEntryPreview,
+            position: "start" as const
+        }
+    ], []);
+
     return (
         <Rebase
             client={rebaseClient}
@@ -48,6 +58,7 @@ export function App() {
             <RebaseCMS
                 collections={collections}
                 collectionEditor={collectionEditor}
+                entityViews={entityViews}
             />
             <RebaseStudio />
             <RebaseShell title="Rebase" />

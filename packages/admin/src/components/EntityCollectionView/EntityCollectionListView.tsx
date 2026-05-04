@@ -85,13 +85,14 @@ function getPreviewCount(size: CollectionSize): number {
  * Must match the visual height produced by getRowClasses (padding + content).
  */
 function getRowHeight(size: CollectionSize): number {
+    // +1 accounts for the 1px bottom border on each row wrapper
     switch (size) {
-        case "xs": return 44;
-        case "s":  return 52;
-        case "m":  return 72;
-        case "l":  return 84;
-        case "xl": return 96;
-        default:   return 72;
+        case "xs": return 45;
+        case "s":  return 53;
+        case "m":  return 73;
+        case "l":  return 85;
+        case "xl": return 97;
+        default:   return 73;
     }
 }
 
@@ -100,12 +101,12 @@ function getRowHeight(size: CollectionSize): number {
  */
 function getRowClasses(size: CollectionSize): string {
     switch (size) {
-        case "xs": return "py-2 px-5 min-h-[40px]";
-        case "s": return "py-2.5 px-5 min-h-[48px]";
-        case "m": return "py-3 px-5 min-h-[64px]";
-        case "l": return "py-4 px-5 min-h-[76px]";
-        case "xl": return "py-5 px-5 min-h-[88px]";
-        default: return "py-3 px-5 min-h-[64px]";
+        case "xs": return "py-2 px-5";
+        case "s": return "py-2.5 px-5";
+        case "m": return "py-3 px-5";
+        case "l": return "py-4 px-5";
+        case "xl": return "py-5 px-5";
+        default: return "py-3 px-5";
     }
 }
 
@@ -503,8 +504,15 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
     const Row = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
         const entity = data[index];
         if (!entity) return null;
+        const isLast = index === data.length - 1;
         return (
-            <div style={style}>
+            <div
+                style={style}
+                className={cls(
+                    !isLast && "border-b",
+                    !isLast && defaultBorderMixin
+                )}
+            >
                 <ListRow
                     entity={entity}
                     collection={resolvedCollection}
@@ -518,7 +526,7 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
                     rowClasses={rowClasses}
                     showImage={showImage}
                     size={size}
-                    isLast={index === data.length - 1}
+                    isLast={isLast}
                     isActive={selectedEntityId !== undefined && entity.id === selectedEntityId}
                 />
             </div>
@@ -532,7 +540,7 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
                 measureRef(node);
                 (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
             }}
-            className="flex-1 overflow-hidden bg-white dark:bg-surface-950"
+            className="flex-1 overflow-hidden"
         >
             {/* Error state */}
             {dataLoadingError ? (
@@ -656,17 +664,15 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     return (
         <div
             className={cls(
-                "flex items-center gap-4 cursor-pointer group transition-all duration-200 relative",
+                "flex items-center gap-4 cursor-pointer group transition-colors duration-200 relative h-full",
                 rowClasses,
-                !isLast && "border-b",
-                !isLast && defaultBorderMixin,
                 isActive
-                    ? "bg-surface-accent-50 dark:bg-surface-accent-950"
+                    ? "bg-surface-accent-100 dark:bg-surface-accent-950"
                     : selected
-                        ? "bg-primary-50/60 dark:bg-primary-900/20"
+                        ? "bg-primary-50 dark:bg-primary-900/20"
                         : highlighted
                             ? "bg-surface-accent-50 dark:bg-surface-accent-950"
-                            : "hover:bg-surface-50/80 dark:hover:bg-surface-800/40"
+                            : "bg-white dark:bg-surface-950 hover:bg-surface-50 dark:hover:bg-surface-800/40"
             )}
             onClick={handleClick}
         >
@@ -709,7 +715,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
             )}
 
             {/* PRIMARY slot → Title + subtitle + byline */}
-            <div className={cls("min-w-[180px]", useColumnMode ? "flex-1" : "flex-1 max-w-xl")}>
+            <div className={cls("min-w-[180px] overflow-hidden", useColumnMode ? "flex-1" : "flex-1")}>
                 <div className="truncate">
                     {slots.title?.value !== undefined ? (
                         <Typography component="div" variant="body2" className="font-semibold text-surface-900 dark:text-surface-50 truncate transition-colors group-hover:text-primary-600 dark:group-hover:text-primary-400">
@@ -816,7 +822,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                 </>
             ) : (
                 /* ── SLOT MODE (editorial scanner layout) ── */
-                <>
+                <div className="flex items-center gap-4 flex-shrink-0 ml-auto">
                     {/* STATUS slot */}
                     {slots.status && (
                         <div className="flex-shrink-0">
@@ -831,13 +837,13 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
 
                     {/* DATE slot */}
                     {slots.date && (
-                        <div className="flex-shrink-0 text-right min-w-[80px]">
+                        <div className="flex-shrink-0 text-right w-[80px]">
                             <Typography variant="caption" className="whitespace-nowrap text-surface-400 dark:text-surface-500 font-medium">
                                 {slots.date.formatted ?? "—"}
                             </Typography>
                         </div>
                     )}
-                </>
+                </div>
             )}
         </div>
     );

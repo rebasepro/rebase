@@ -14,14 +14,18 @@ import {
     fieldBackgroundInvisibleMixin,
     fieldBackgroundMixin,
     focusedDisabled,
+    IconButton,
     KeyboardArrowDownIcon,
+    KeyboardTabIcon,
     SearchIcon,
     Separator,
+    Tooltip,
     useInjectStyles
 } from "@rebasepro/ui";
 import { Entity, EntityRelation, FilterValues, Relation } from "@rebasepro/types";
 import { EntityPreviewData } from "./EntityPreview";
 import { useData, useRelationSelector } from "@rebasepro/core";
+import { useSideEntityController } from "../hooks/useSideEntityController";
 import { normalizeToEntityRelation } from "@rebasepro/common";
 import { EmptyValue } from "../preview";
 
@@ -85,6 +89,7 @@ export const RelationSelector = React.forwardRef<
 
         const collection = relation.target();
         const dataClient = useData();
+        const sideEntityController = useSideEntityController();
         const multiple = relation.cardinality === "many";
 
         const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -448,7 +453,29 @@ export const RelationSelector = React.forwardRef<
                                         </span>
                                     )}
 
-                                <div className="flex-shrink-0">
+                                <div className="flex items-center flex-shrink-0">
+                                    {!multiple && selectedItems.length === 1 && selectedItems[0]?.data && (
+                                        <Tooltip title={`Open ${selectedItems[0].label}`}>
+                                            <IconButton
+                                                size={"small"}
+                                                color={"inherit"}
+                                                className="opacity-60 hover:opacity-100"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    e.preventDefault();
+                                                    const entity = selectedItems[0].data!;
+                                                    setIsPopoverOpen(false);
+                                                    sideEntityController.open({
+                                                        entityId: entity.id,
+                                                        path: entity.path,
+                                                        collection,
+                                                        updateUrl: true
+                                                    });
+                                                }}>
+                                                <KeyboardTabIcon size={"small"} />
+                                            </IconButton>
+                                        </Tooltip>
+                                    )}
                                     <KeyboardArrowDownIcon
                                         size={size === "medium" ? "medium" : "small"}
                                         className={cls("transition", isPopoverOpen ? "rotate-180" : "")}

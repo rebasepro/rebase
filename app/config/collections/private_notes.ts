@@ -41,7 +41,7 @@ const privateNotesCollection: EntityCollection = {
     },
     properties: {
         id: {
-            name: "ID2",
+            name: "ID",
             type: "string",
             isId: "uuid"
         },
@@ -69,7 +69,10 @@ const privateNotesCollection: EntityCollection = {
             type: "boolean",
             description: "When true, RLS restrictive policy prevents updates"
         }
-    }
+    },
+    entityViews: [
+        "__rebase_history"
+    ]
 };
 
 export default privateNotesCollection;

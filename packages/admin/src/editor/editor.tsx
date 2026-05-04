@@ -206,7 +206,7 @@ export const RebaseEditor = ({
         <div style={{ display: isMarkdownMode ? "none" : "block" }}>
           <div
             ref={editorRef}
-            className={cls(proseClass, "prose-headings:font-title font-default focus:outline-none max-w-full p-12")}
+            className={cls("prose dark:prose-invert", proseClass, "prose-headings:font-title font-default focus:outline-none max-w-full p-12")}
           />
 
           {view && (

@@ -1,22 +1,24 @@
 import { PostgresCollection } from "@rebasepro/types";
 import authorsCollection from "./authors";
-import profilesCollection from "./profiles";
 import tagsCollection from "./tags";
 
 const postsCollection: PostgresCollection = {
-    name: "Posts",
-    singularName: "Post",
+    name: "Blog posts",
+    singularName: "Blog post",
     slug: "posts",
     table: "posts",
     icon: "Article",
     history: true,
+    defaultViewMode: "cards",
+    enabledViews: ["table", "cards", "kanban"],
+    kanban: {
+        columnProperty: "status"
+    },
     properties: {
         id: {
             name: "ID",
             type: "number",
-            validation: {
-                required: true
-            }
+            isId: "increment"
         },
         title: {
             name: "Title",
@@ -25,14 +27,62 @@ const postsCollection: PostgresCollection = {
                 required: true
             }
         },
+        slug: {
+            name: "Slug",
+            type: "string",
+            validation: {
+                required: true,
+                unique: true
+            },
+            description: "URL-friendly identifier for this blog post"
+        },
+        hero_image: {
+            name: "Hero Image",
+            type: "string",
+            storage: {
+                storagePath: "blog_images/"
+            },
+            description: "Header image displayed at the top of the blog post"
+        },
+        excerpt: {
+            name: "Excerpt",
+            type: "string",
+            multiline: true,
+            description: "Short summary displayed in previews and cards",
+            validation: {
+                max: 300
+            }
+        },
         content: {
             name: "Content",
-            type: "string",
-            multiline: true
+            type: "array",
+            description: "Blog content as dynamic blocks of text and images",
+            oneOf: {
+                typeField: "type",
+                valueField: "value",
+                properties: {
+                    text: {
+                        name: "Text",
+                        type: "string",
+                        markdown: true
+                    },
+                    image: {
+                        name: "Image",
+                        type: "string",
+                        storage: {
+                            storagePath: "blog_content/"
+                        }
+                    }
+                }
+            }
         },
         status: {
             name: "Status",
             type: "string",
+            validation: {
+                required: true
+            },
+            defaultValue: "draft",
             enum: [
                 {
                     id: "draft",
@@ -40,8 +90,8 @@ const postsCollection: PostgresCollection = {
                     color: "gray"
                 },
                 {
-                    id: "review",
-                    label: "In Review",
+                    id: "needs_review",
+                    label: "Needs Review",
                     color: "orange"
                 },
                 {
@@ -56,6 +106,27 @@ const postsCollection: PostgresCollection = {
                 }
             ]
         },
+        publish_date: {
+            name: "Publish date",
+            type: "date",
+            mode: "date_time",
+            clearable: true,
+            description: "When this post was or will be published"
+        },
+        created_at: {
+            name: "Created at",
+            type: "date",
+            autoValue: "on_create",
+            readOnly: true,
+            hideFromCollection: true
+        },
+        updated_at: {
+            name: "Updated at",
+            type: "date",
+            autoValue: "on_update",
+            readOnly: true,
+            hideFromCollection: true
+        },
         author: {
             name: "Author",
             type: "relation",
@@ -65,33 +136,6 @@ const postsCollection: PostgresCollection = {
                 cardinality: "one",
                 direction: "owning",
                 target: () => authorsCollection
-            }
-        },
-        profile: {
-            name: "Profile",
-            type: "relation",
-            relationName: "author_profile",
-            relation: {
-                relationName: "author_profile",
-                cardinality: "one",
-                direction: "inverse",
-                joinPath: [
-                    {
-                        table: "authors",
-                        on: {
-                            from: "posts.author_id",
-                            to: "authors.id"
-                        }
-                    },
-                    {
-                        table: "profiles",
-                        on: {
-                            from: "authors.id",
-                            to: "profiles.author_id"
-                        }
-                    }
-                ],
-                target: () => profilesCollection
             }
         },
         tags: {
@@ -106,6 +150,19 @@ const postsCollection: PostgresCollection = {
             }
         }
     },
+    propertiesOrder: [
+        "title",
+        "slug",
+        "hero_image",
+        "excerpt",
+        "status",
+        "publish_date",
+        "author",
+        "tags",
+        "content",
+        "created_at",
+        "updated_at"
+    ],
     relations: [
         {
             relationName: "author",
@@ -118,29 +175,11 @@ const postsCollection: PostgresCollection = {
             target: () => tagsCollection,
             cardinality: "many",
             direction: "owning",
-        },
-        {
-            relationName: "author_profile",
-            target: () => profilesCollection,
-            cardinality: "one",
-            direction: "inverse",
-            joinPath: [
-                {
-                    table: "authors",
-                    on: {
-                        from: "posts.author_id",
-                        to: "authors.id"
-                    }
-                },
-                {
-                    table: "profiles",
-                    on: {
-                        from: "authors.id",
-                        to: "profiles.author_id"
-                    }
-                }
-            ]
         }
+    ],
+    entityViews: [
+        "blog_preview",
+        "__rebase_history"
     ]
 };
 

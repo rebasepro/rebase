@@ -252,7 +252,7 @@ export const EntityCollectionView = React.memo(
         // Sync URL with current view on init (if view came from saved config)
         useEffect(() => {
             const urlView = getViewFromUrl();
-            if (!urlView && viewMode !== "list") {
+            if (!urlView && viewMode !== defaultViewMode) {
                 // View came from saved config but URL doesn't have it - update URL without push
                 const url = new URL(window.location.href);
                 url.searchParams.set("__view", viewMode);
@@ -266,13 +266,13 @@ export const EntityCollectionView = React.memo(
 
             // Update URL with __view param
             const url = new URL(window.location.href);
-            if (newMode === "list") {
+            if (newMode === defaultViewMode) {
                 url.searchParams.delete("__view");
             } else {
                 url.searchParams.set("__view", newMode);
             }
             window.history.pushState({}, "", url.toString());
-        }, []);
+        }, [defaultViewMode]);
 
         // Listen for browser back/forward
         useEffect(() => {

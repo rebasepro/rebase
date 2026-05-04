@@ -193,78 +193,75 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
         return highlightedEntities?.some(e => e.id === entity.id && e.path === entity.path) ?? false;
     }, [highlightedEntities]);
 
-    // Show initial loading state
-    if (dataLoading && data.length === 0 && !dataLoadingError) {
-        return <CircularProgressCenter />;
-    }
-
-    // Show empty state
-    if (!dataLoading && data.length === 0 && !dataLoadingError) {
-        return (
-            <div className="h-full flex items-center justify-center p-8">
-                {emptyComponent ?? (
-                    <Typography variant="label" color="secondary">
-                        No entries found
-                    </Typography>
-                )}
-            </div>
-        );
-    }
-
-    // Show error state
-    if (dataLoadingError) {
-        return (
-            <div className="h-full flex items-center justify-center p-8">
-                <Typography className="text-red-500">
-                    Error loading data: {dataLoadingError.message}
-                </Typography>
-            </div>
-        );
-    }
-
     const gridColumnsClass = getGridColumnsClass(size);
+
+    // Initial loading state (no data yet)
+    const isInitialLoading = dataLoading && data.length === 0 && !dataLoadingError;
+    // Empty state
+    const isEmpty = !dataLoading && data.length === 0 && !dataLoadingError;
 
     return (
         <div
             ref={containerRef}
             className="flex-1 overflow-auto p-4"
         >
-            {/* Card Grid with max-width container */}
-            <div className="max-w-7xl mx-auto">
-                <div className={cls(
-                    "grid gap-4",
-                    gridColumnsClass
-                )}>
-                    {data.map((entity) => (
-                        <EntityCard
-                            key={`${entity.path}_${entity.id}`}
-                            entity={entity}
-                            collection={collection}
-                            onClick={handleEntityClick}
-                            selected={isEntitySelected(entity)}
-                            highlighted={isEntityHighlighted(entity)}
-                            onSelectionChange={handleSelectionChange}
-                            selectionEnabled={selectionEnabled}
-                            size={size}
-                        />
-                    ))}
+            {/* Error state */}
+            {dataLoadingError ? (
+                <div className="h-full flex items-center justify-center p-8">
+                    <Typography className="text-red-500">
+                        Error loading data: {dataLoadingError.message}
+                    </Typography>
                 </div>
-
-                {/* Load more trigger / Loading indicator */}
-                <div
-                    ref={loadMoreRef}
-                    className="flex items-center justify-center py-8"
-                >
-                    {dataLoading && (
-                        <CircularProgress size="small" />
-                    )}
-                    {!dataLoading && noMoreToLoad && data.length > 0 && (
-                        <Typography variant="caption" color="secondary">
-                            All {data.length} entries loaded
+            ) : isInitialLoading ? (
+                <CircularProgressCenter />
+            ) : isEmpty ? (
+                <div className="h-full flex items-center justify-center p-8">
+                    {emptyComponent ?? (
+                        <Typography variant="label" color="secondary">
+                            No entries found
                         </Typography>
                     )}
                 </div>
-            </div>
+            ) : (
+                <>
+                    {/* Card Grid with max-width container */}
+                    <div className="max-w-7xl mx-auto">
+                        <div className={cls(
+                            "grid gap-4",
+                            gridColumnsClass
+                        )}>
+                            {data.map((entity) => (
+                                <EntityCard
+                                    key={`${entity.path}_${entity.id}`}
+                                    entity={entity}
+                                    collection={collection}
+                                    onClick={handleEntityClick}
+                                    selected={isEntitySelected(entity)}
+                                    highlighted={isEntityHighlighted(entity)}
+                                    onSelectionChange={handleSelectionChange}
+                                    selectionEnabled={selectionEnabled}
+                                    size={size}
+                                />
+                            ))}
+                        </div>
+
+                        {/* Load more trigger / Loading indicator */}
+                        <div
+                            ref={loadMoreRef}
+                            className="flex items-center justify-center py-8"
+                        >
+                            {dataLoading && (
+                                <CircularProgress size="small" />
+                            )}
+                            {!dataLoading && noMoreToLoad && data.length > 0 && (
+                                <Typography variant="caption" color="secondary">
+                                    All {data.length} entries loaded
+                                </Typography>
+                            )}
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 }

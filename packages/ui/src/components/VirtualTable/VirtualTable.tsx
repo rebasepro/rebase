@@ -19,7 +19,7 @@ import { VirtualTableContextProps } from "./types";
 import { VirtualTableHeaderRow } from "./VirtualTableHeaderRow";
 import { VirtualTableRow } from "./VirtualTableRow";
 import { VirtualTableCell } from "./VirtualTableCell";
-import { AssignmentIcon, CenteredView, cls, Typography } from "../../index";
+import { CenteredView, cls, Typography } from "../../index";
 import { useDebounceCallback } from "../../hooks/useDebounceCallback";
 import {
     closestCenter,
@@ -330,8 +330,7 @@ export const VirtualTable = React.memo<VirtualTableProps<any>>(
                 ? (loading
                     ? <CircularProgressCenter />
                     : <div
-                        className="flex flex-col overflow-auto items-center justify-center p-2 gap-2 h-full">
-                        <AssignmentIcon />
+                        className="flex flex-col overflow-auto items-center justify-center p-8 h-full">
                         {emptyComponent}
                     </div>)
                 : undefined);

@@ -4,7 +4,7 @@ import { primaryKey, pgTable, integer, varchar, text, char, boolean, timestamp, 
 import { relations as drizzleRelations, sql } from 'drizzle-orm';
 
 export const ordersStatus = pgEnum("orders_status", ['pending', 'shipped', 'delivered', 'cancelled']);
-export const postsStatus = pgEnum("posts_status", ['draft', 'review', 'published', 'archived']);
+export const postsStatus = pgEnum("posts_status", ['draft', 'needs_review', 'published', 'archived']);
 export const productsCategory = pgEnum("products_category", ['electronics', 'clothing', 'home']);
 
 export const authors = pgTable("authors", {
@@ -18,6 +18,7 @@ export const authors = pgTable("authors", {
 export const orders = pgTable("orders", {
     id: integer("id").primaryKey().notNull(),
     customer_name: varchar("customer_name").notNull(),
+    order_date: timestamp("order_date", { withTimezone: true, mode: 'string' }),
     status: ordersStatus("status")
 }, (table) => ([
     pgPolicy("test_policy", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
@@ -31,10 +32,16 @@ export const ordersProducts = pgTable("orders_products", {
 }));
 
 export const posts = pgTable("posts", {
-    id: integer("id").primaryKey().notNull(),
+    id: integer("id").generatedByDefaultAsIdentity().primaryKey(),
     title: varchar("title").notNull(),
-    content: varchar("content"),
-    status: postsStatus("status"),
+    slug: varchar("slug").unique().notNull(),
+    hero_image: varchar("hero_image"),
+    excerpt: varchar("excerpt"),
+    content: jsonb("content"),
+    status: postsStatus("status").notNull(),
+    publish_date: timestamp("publish_date", { withTimezone: true, mode: 'string' }),
+    created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }),
+    updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
     author_id: integer("author_id").references(() => authors.id, { onDelete: "set null" })
 }, (table) => ([
     pgPolicy("test_policy", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),

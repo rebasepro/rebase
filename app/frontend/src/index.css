@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import "@rebasepro/ui/index.css" layer(base);
+@plugin "@tailwindcss/typography";
 
 @source "../../../packages/**/src/**/*.{js,ts,jsx,tsx}";
 @custom-variant dark (&:where(.dark, .dark *));
