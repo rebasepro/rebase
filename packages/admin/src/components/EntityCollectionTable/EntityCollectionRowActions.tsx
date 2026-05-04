@@ -59,7 +59,7 @@ export const EntityCollectionRowActions = function EntityCollectionRowActions({
         selectionController?: SelectionController;
         highlightEntity?: (entity: Entity<any>) => void;
         unhighlightEntity?: (entity: Entity<any>) => void;
-        openEntityMode: "side_panel" | "full_screen";
+        openEntityMode: "side_panel" | "full_screen" | "split";
         // Sortable props for dnd-kit integration
         sortableNodeRef?: (node: HTMLElement | null) => void;
         sortableStyle?: React.CSSProperties;

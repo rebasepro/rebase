@@ -11,45 +11,15 @@ import {
     EntityUpdateMessage,
     TableMetadata
 } from "@rebasepro/types";
-
-/**
- * Recursively walk a value tree and rehydrate serialized types.
- * Currently handles `{ __type: "date", value: "<ISO>" }` → `Date`.
- */
-function rehydrateServerValues(val: unknown): unknown {
-    if (val === null || val === undefined) return val;
-    if (typeof val !== "object") return val;
-    if (val instanceof Date || val instanceof RegExp) return val;
-
-    if (Array.isArray(val)) {
-        return val.map(rehydrateServerValues);
-    }
-
-    const obj = val as Record<string, unknown>;
-
-    // Serialized date from the PostgreSQL data transformer
-    if (obj.__type === "date" && typeof obj.value === "string") {
-        const d = new Date(obj.value);
-        return isNaN(d.getTime()) ? null : d;
-    }
-
-    // Recurse into plain objects (but skip relation markers etc.)
-    const result: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(obj)) {
-        result[k] = rehydrateServerValues(v);
-    }
-    return result;
-}
+import { rebaseReviver } from "./reviver";
 
 /**
  * Rehydrate all serialised types inside an Entity's `values`.
+ * (Now obsolete as JSON.parse with rebaseReviver handles this globally,
+ * kept as pass-through for API compatibility)
  */
 function rehydrateEntity<M extends Record<string, unknown>>(entity: Entity<M>): Entity<M> {
-    if (!entity || !entity.values) return entity;
-    return {
-        ...entity,
-        values: rehydrateServerValues(entity.values) as M
-    };
+    return entity;
 }
 
 /**
@@ -278,7 +248,7 @@ export class RebaseWebSocketClient {
 
             this.ws!.onmessage = (event) => {
                 try {
-                    const message = JSON.parse(event.data);
+                    const message = JSON.parse(event.data, rebaseReviver);
                     this.handleWebSocketMessage(message);
                 } catch (error) {
                     console.error("Error parsing WebSocket message:", error);

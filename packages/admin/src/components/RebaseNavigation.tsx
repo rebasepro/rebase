@@ -162,12 +162,12 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         return {
             ...parentCustomizationController,
             entityViews: [
-                ...parentCustomizationController.entityViews,
-                ...cmsEntityViews.filter(v => !parentCustomizationController.entityViews.some(ev => ev.key === v.key))
+                ...(parentCustomizationController.entityViews ?? []),
+                ...cmsEntityViews.filter(v => !(parentCustomizationController.entityViews ?? []).some(ev => ev.key === v.key))
             ],
             entityActions: [
-                ...parentCustomizationController.entityActions,
-                ...cmsEntityActions.filter(a => !parentCustomizationController.entityActions.some(ea => ea.key === a.key))
+                ...(parentCustomizationController.entityActions ?? []),
+                ...cmsEntityActions.filter(a => !(parentCustomizationController.entityActions ?? []).some(ea => ea.key === a.key))
             ]
         };
     }, [parentCustomizationController, registry.cmsConfig?.entityViews, registry.cmsConfig?.entityActions]);

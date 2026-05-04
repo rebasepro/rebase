@@ -20,11 +20,11 @@ import { useEntityHistory } from "../../index";
  * Entity history tab view. Shows a paginated list of entity revisions
  * fetched from the backend API. Supports infinite scroll and revert.
  */
-export function EntityHistoryView({
+export function EntityHistoryView<M extends Record<string, unknown>>({
     entity,
     collection,
     formContext
-}: EntityCustomViewParams) {
+}: EntityCustomViewParams<M>) {
 
     const snackbarController = useSnackbarController();
     const authController = useAuthController();

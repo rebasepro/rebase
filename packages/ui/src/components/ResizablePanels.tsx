@@ -16,6 +16,7 @@ export type ResizablePanelsProps = {
     orientation?: 'horizontal' | 'vertical';
     animateLayout?: boolean;
     className?: string;
+    stacked?: boolean;
 };
 
 export function ResizablePanels({
@@ -28,7 +29,8 @@ export function ResizablePanels({
     minPanelSizePx = 200,
     orientation = 'horizontal',
     animateLayout = true,
-    className
+    className,
+    stacked = false
 }: ResizablePanelsProps) {
 
     const containerRef = useRef<HTMLDivElement>(null);
@@ -125,7 +127,7 @@ export function ResizablePanels({
             ref={containerRef}
             className={cls(
                 "relative w-full h-full flex overflow-hidden",
-                isHorizontal ? "flex-row" : "flex-col",
+                !stacked && (isHorizontal ? "flex-row" : "flex-col"),
                 className
             )}
         >
@@ -133,11 +135,12 @@ export function ResizablePanels({
             <div
                 ref={firstPanelRef}
                 className={cls(
-                    "relative flex-shrink-0 flex flex-col overflow-hidden",
-                    !isResizing && animateLayout && "transition-[flex-basis] duration-150 ease-out",
+                    stacked ? "absolute inset-0" : "relative flex-shrink-0",
+                    "flex flex-col overflow-hidden",
+                    !stacked && !isResizing && animateLayout && "transition-[flex-basis] duration-150 ease-out",
                     !showFirstPanel && "hidden"
                 )}
-                style={{
+                style={stacked ? undefined : {
                     flexBasis: appliedBasis,
                     minWidth: isHorizontal && showFirstPanel && showSecondPanel ? `${minPanelSizePx}px` : undefined,
                     minHeight: !isHorizontal && showFirstPanel && showSecondPanel ? `${minPanelSizePx}px` : undefined,
@@ -149,7 +152,7 @@ export function ResizablePanels({
             </div>
 
             {/* Divider */}
-            {showFirstPanel && showSecondPanel && (
+            {!stacked && showFirstPanel && showSecondPanel && (
                 <div
                     className={cls(
                         "relative z-10 flex flex-shrink-0 items-center justify-center",
@@ -174,7 +177,8 @@ export function ResizablePanels({
             {/* Second Panel */}
             <div
                 className={cls(
-                    "flex-grow relative flex flex-col overflow-hidden min-w-0 min-h-0",
+                    stacked ? "absolute inset-0" : "flex-grow relative min-w-0 min-h-0",
+                    "flex flex-col overflow-hidden",
                     !showSecondPanel && "hidden"
                 )}
             >

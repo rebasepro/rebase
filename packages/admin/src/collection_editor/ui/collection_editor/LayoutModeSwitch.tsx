@@ -5,8 +5,8 @@ export function LayoutModeSwitch({
     onChange,
     className
 }: {
-    value: "side_panel" | "full_screen";
-    onChange: (value: "side_panel" | "full_screen") => void;
+    value: "side_panel" | "full_screen" | "split";
+    onChange: (value: "side_panel" | "full_screen" | "split") => void;
     className?: string;
 }) {
 

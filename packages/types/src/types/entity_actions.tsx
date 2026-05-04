@@ -86,7 +86,7 @@ export type EntityActionClickProps<M extends Record<string, unknown>, USER exten
     /**
      * If the action is rendered in the form, is it open in a side panel or full screen?
      */
-    openEntityMode: "side_panel" | "full_screen";
+    openEntityMode: "side_panel" | "full_screen" | "split";
 
     /**
      * Optional selection controller, present if the action is being called from a collection view

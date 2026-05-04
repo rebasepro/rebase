@@ -1,4 +1,5 @@
 import { FindParams as TypesFindParams, FindResponse as TypesFindResponse, WhereFieldValue } from "@rebasepro/types";
+import { rebaseReviver } from "./reviver";
 
 export interface RebaseClientConfig {
     baseUrl: string;
@@ -162,7 +163,15 @@ export function createTransport(config: RebaseClientConfig): Transport {
 
         if (res.status === 204) return undefined as unknown as T;
 
-        const body = await res.json().catch(() => ({}));
+        const text = await res.text().catch(() => "");
+        let body: any = {};
+        if (text) {
+            try {
+                body = JSON.parse(text, rebaseReviver);
+            } catch (e) {
+                // If not valid JSON, fallback
+            }
+        }
 
         if (res.status === 401 && onUnauthorizedHandler) {
             const retried = await onUnauthorizedHandler();
@@ -179,7 +188,13 @@ export function createTransport(config: RebaseClientConfig): Transport {
                 const retryHeaders = getHeaders(retryToken, init) as Record<string, string>;
                 const retryRes = await fetchFn(url, { ...init, headers: retryHeaders });
                 if (retryRes.status === 204) return undefined as unknown as T;
-                const retryBody = await retryRes.json().catch(() => ({}));
+                const retryText = await retryRes.text().catch(() => "");
+                let retryBody: any = {};
+                if (retryText) {
+                    try {
+                        retryBody = JSON.parse(retryText, rebaseReviver);
+                    } catch (e) {}
+                }
                 if (!retryRes.ok) {
                     throw new RebaseApiError(
                         retryRes.status,

@@ -244,67 +244,30 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
 
     const isDetailVisible = animationPhase !== "idle";
 
-    // On small screens: show entity form when selected, otherwise show the list
-    if (!largeLayout) {
-        return (
-            <div className="relative flex-grow flex flex-col min-w-0 h-full w-full overflow-hidden">
-                {/* List — slides left and fades when detail is open */}
-                <div
-                    className={cls(
-                        "absolute inset-0 transition-all ease-out",
-                        isDetailVisible
-                            ? "opacity-0 -translate-x-1/3 pointer-events-none"
-                            : "opacity-100 translate-x-0"
-                    )}
-                    style={{ transitionDuration: `${TRANSITION_DURATION}ms` }}
-                >
-                    {toolbar}
-                    {children}
-                </div>
-
-                {/* Detail — slides in from right */}
-                {renderedEntityId !== undefined && (
-                    <div
-                        className={cls(
-                            "absolute inset-0 transition-all ease-out",
-                            animationPhase === "entered"
-                                ? "opacity-100 translate-x-0"
-                                : "opacity-0 translate-x-1/3"
-                        )}
-                        style={{ transitionDuration: `${TRANSITION_DURATION}ms` }}
-                    >
-                        <ErrorBoundary>
-                            <EntityEditView
-                                key={String(renderedEntityId)}
-                                path={path}
-                                collection={collection as EntityCollection<Record<string, unknown>>}
-                                entityId={renderedEntityId}
-                                parentCollectionIds={usedParentCollectionIds}
-                                layout="split"
-                            />
-                        </ErrorBoundary>
-                    </div>
-                )}
-            </div>
-        );
-    }
-
-    // ── Large layout: animated split using ResizablePanels ──
+    // ── Unified Layout: animated split using ResizablePanels ──
 
     const listPanel = (
-        <div className="flex flex-col h-full overflow-hidden min-w-0">
+        <div
+            className={cls(
+                "flex flex-col h-full overflow-hidden min-w-0 transition-all ease-out w-full",
+                (!largeLayout && isDetailVisible)
+                    ? "opacity-0 -translate-x-1/3 pointer-events-none"
+                    : "opacity-100 translate-x-0"
+            )}
+            style={{ transitionDuration: `${TRANSITION_DURATION}ms` }}
+        >
             {toolbar}
             {children}
         </div>
     );
 
-    const detailPanel = isDetailVisible && renderedEntityId !== undefined ? (
+    const detailPanel = renderedEntityId !== undefined ? (
         <div
             className={cls(
-                "flex-1 flex flex-col min-w-0 h-full transition-all ease-out",
+                "flex-1 flex flex-col min-w-0 h-full transition-all ease-out w-full",
                 animationPhase === "entered"
                     ? "opacity-100 translate-x-0"
-                    : "opacity-0 translate-x-8"
+                    : (largeLayout ? "opacity-0 translate-x-8" : "opacity-0 translate-x-1/3")
             )}
             style={{ transitionDuration: `${TRANSITION_DURATION}ms` }}
         >
@@ -313,7 +276,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
                     key={String(renderedEntityId)}
                     path={path}
                     collection={collection as EntityCollection<Record<string, unknown>>}
-                    entityId={renderedEntityId!}
+                    entityId={renderedEntityId}
                     parentCollectionIds={usedParentCollectionIds}
                     layout="split"
                 />
@@ -323,6 +286,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
 
     return (
         <ResizablePanels
+            stacked={!largeLayout}
             firstPanel={listPanel}
             secondPanel={detailPanel}
             showSecondPanel={isDetailVisible}

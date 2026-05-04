@@ -183,7 +183,7 @@ export function navigateToEntity({
 }:
 
     {
-        openEntityMode: "side_panel" | "full_screen";
+        openEntityMode: "side_panel" | "full_screen" | "split";
         collection?: EntityCollection;
         entityId?: string | number;
         selectedTab?: string;

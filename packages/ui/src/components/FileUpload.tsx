@@ -65,7 +65,7 @@ export function FileUpload({
     return <div
         {...getRootProps()}
         role="button"
-        aria-label={title || uploadDescription || "Upload file"}
+        aria-label={typeof title === "string" ? title : (typeof uploadDescription === "string" ? uploadDescription : "Upload file")}
         aria-disabled={disabled || undefined}
         className={cls(
             fieldBackgroundMixin,

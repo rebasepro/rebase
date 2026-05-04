@@ -71,6 +71,7 @@ export function EntityEditViewFormActions({
 
     const formActions = showDefaultActions ? entityActions.filter(a => a.includeInForm === undefined || a.includeInForm) : [];
 
+    // HMR reload trigger
     const bottomActions = buildBottomActions({
         savingError,
         entity,

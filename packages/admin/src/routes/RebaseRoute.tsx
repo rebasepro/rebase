@@ -137,7 +137,7 @@ export function RebaseRoute() {
         collection = collectionRegistry.getCollection(firstCollectionEntry.id);
         if (!collection)
             collection = collectionRegistry.getCollection(firstCollectionEntry.slug);
-        if (collection && (collection.detailLayout ?? "split") === "split") {
+        if (collection && collection.openEntityMode === "split") {
             return <EntityCollectionView
                 key={`collection_view_${collection.slug}`}
                 {...collection}

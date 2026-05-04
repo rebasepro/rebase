@@ -155,7 +155,7 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                     id={id}
                     asChild={false}
                     type="button"
-                    aria-label={label || renderValue || "Select an option"}
+                    aria-label={typeof label === "string" ? label : (typeof renderValue === "string" ? renderValue : "Select an option")}
                     aria-invalid={error || undefined}
                     className={cls(
                         "h-full",

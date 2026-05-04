@@ -51,7 +51,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
     const [focused, setFocused] = useState(false);
     const [internalValue, setInternalValue] = useState<string>("");
     const [isTyping, setIsTyping] = useState(false);
-    const invalidValue = value !== undefined && value !== null && !(value instanceof Date);
+    const invalidValue = value !== undefined && value !== null && (!(value instanceof Date) || isNaN(value.getTime()));
 
     useInjectStyles("DateTimeField", inputStyles);
 
@@ -67,7 +67,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
         dateValue: Date | null,
         mode: "date" | "date_time"
     ) => {
-        if (!dateValue) {
+        if (!dateValue || !(dateValue instanceof Date) || isNaN(dateValue.getTime())) {
             return "";
         }
         const pad = (n: number) => n.toString().padStart(2, "0");

@@ -303,8 +303,6 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
             <EntityHistoryView
                 collection={collection}
                 entity={usedEntity}
-                path={path}
-                parentCollectionIds={parentCollectionIds}
                 formContext={formContext as any}
                 modifiedValues={formContext?.values ?? usedEntity?.values}
             />

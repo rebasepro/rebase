@@ -74,7 +74,7 @@ import { mergeDeep } from "@rebasepro/utils";
 import { useCollectionRegistryController, useUrlController, useSideEntityController, useCMSContext } from "../../index";
 import { useBreadcrumbsController } from "../../index";
 
-const DEFAULT_ENTITY_OPEN_MODE: "side_panel" | "full_screen" = "full_screen";
+const DEFAULT_ENTITY_OPEN_MODE: "side_panel" | "full_screen" | "split" = "full_screen";
 
 /**
  * @group Components
@@ -628,7 +628,7 @@ export const EntityCollectionView = React.memo(
 
         const largeLayout = useLargeLayout();
 
-        const isSplitLayout = (collection.detailLayout ?? "split") === "split";
+        const isSplitLayout = collection.openEntityMode === "split";
         const isCompact = isSplitLayout && selectedEntityIdProp !== undefined;
         const activeSelectionEnabled = !isCompact && selectionEnabled;
 

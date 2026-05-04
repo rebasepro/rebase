@@ -30,7 +30,7 @@ export function DatePreview({
     const customizationController = useCustomizationController();
     const dateUtilsLocale = customizationController?.locale ? (locales as Record<string, locales.Locale>)[customizationController.locale] : undefined;
 
-    if (!date) {
+    if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
         return <></>;
     }
 

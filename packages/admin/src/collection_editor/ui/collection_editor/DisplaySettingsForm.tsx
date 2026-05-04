@@ -82,39 +82,8 @@ export function DisplaySettingsForm({
                             value={values.openEntityMode ?? "side_panel"}
                             onChange={(value) => setFieldValue("openEntityMode", value)} />
 
-                        {/* Detail Layout (Navigate vs Split) */}
-                        <div className={"col-span-12"}>
-                            <Select
-                                name="detailLayout"
-                                fullWidth={true}
-                                label="Detail layout (list view)"
-                                position={"item-aligned"}
-                                value={values.detailLayout ?? "split"}
-                                onValueChange={(v) => setFieldValue("detailLayout", v === "split" ? undefined : v)}
-                                renderValue={(value: string) => value === "split" ? "Split view (default)" : "Navigate"}
-                            >
-                                <SelectItem value="navigate">
-                                    <div>
-                                        <div>Navigate</div>
-                                        <Typography variant="caption" color="secondary">
-                                            Opens entities in a side panel or full screen
-                                        </Typography>
-                                    </div>
-                                </SelectItem>
-                                <SelectItem value="split">
-                                    <div>
-                                        <div>Split view (default)</div>
-                                        <Typography variant="caption" color="secondary">
-                                            Shows list and entity side-by-side with a resizable divider
-                                        </Typography>
-                                    </div>
-                                </SelectItem>
-                            </Select>
-                            <FieldCaption>
-                                Controls how entities are displayed in list view. Split view shows the entity
-                                inline next to the list, while Navigate opens a separate panel.
-                            </FieldCaption>
-                        </div>
+
+
 
                         {/* View Mode (Table/Cards/Kanban) */}
                         <ViewModeSwitch

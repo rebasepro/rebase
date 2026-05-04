@@ -146,7 +146,7 @@ export type EntityCollectionTableProps<M extends Record<string, unknown>,
 
         enablePopupIcon: boolean;
 
-        openEntityMode?: "side_panel" | "full_screen";
+        openEntityMode?: "side_panel" | "full_screen" | "split";
 
         /**
          * Callback when columns are reordered via drag-and-drop

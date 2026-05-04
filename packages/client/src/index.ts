@@ -11,6 +11,7 @@ export * from "./cron";
 export * from "./collection";
 export * from "./websocket";
 export * from "./storage";
+export * from "./reviver";
 
 export interface CreateRebaseClientOptions extends RebaseClientConfig {
     auth?: CreateAuthOptions;

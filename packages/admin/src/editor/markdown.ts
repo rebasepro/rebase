@@ -128,16 +128,16 @@ export const markdownSerializer = new MarkdownSerializer(
                     // Capture cell content by tracking state.out length.
                     // This avoids monkey-patching state.write which loses
                     // flushClose/delim handling and can produce "undefined" text.
-                    const startLen = state.out.length;
+                    const startLen = (state as any).out.length;
                     let first = true;
                     cell.forEach((block: any) => {
-                        if (!first) state.out += "<br>";
+                        if (!first) (state as any).out += "<br>";
                         state.renderInline(block);
                         first = false;
                     });
-                    const cellContent = state.out.slice(startLen);
+                    const cellContent = (state as any).out.slice(startLen);
                     // Remove the rendered content from state.out; we'll re-add it escaped
-                    state.out = state.out.slice(0, startLen);
+                    (state as any).out = (state as any).out.slice(0, startLen);
                     state.write(cellContent.replace(/\|/g, "\\|").replace(/\n/g, " "));
                     state.write(" |");
                 });
