@@ -7,7 +7,7 @@ import { createPostgresDatabaseConnection } from "@rebasepro/server-postgresql";
 import { env } from "./env.js";
 import {
     authors, posts, tags, profiles, products, orders,
-    postsTags, customers, orderItems
+    postsTags, customers, orderItems, tickets
 } from "./schema.generated.js";
 import fs from "fs";
 import path from "path";
@@ -278,7 +278,7 @@ async function runSeed() {
 
         // ── Clear existing data ───────────────────────────────────────
         console.log("🧹 Clearing existing data...");
-        await db.execute("TRUNCATE TABLE posts, authors, profiles, tags, products, orders CASCADE;");
+        await db.execute("TRUNCATE TABLE posts, authors, profiles, tags, products, orders, order_items, customers, tickets, posts_tags RESTART IDENTITY CASCADE;");
 
         // ── Authors ───────────────────────────────────────────────────
         console.log(`👤 Generating ${NUM_AUTHORS} authors & profiles...`);
@@ -833,6 +833,7 @@ desc: "12 high-protein bars, mixed flavors, 20g protein each" }
             const custId = Math.floor(Math.random() * 40) + 1;
 
             orderValues.push({
+                id: i,
                 order_number: `ORD-${String(2025)}-${String(i).padStart(4, "0")}`,
                 customer_id: custId,
                 status: status as any,
@@ -862,14 +863,109 @@ desc: "12 high-protein bars, mixed flavors, 20g protein each" }
         }
         console.log(`  ✅ ${NUM_ORDERS} orders, ${allOrderItems.length} line items`);
 
+        // ── Tickets ───────────────────────────────────────────────────
+        const NUM_TICKETS = 60;
+        console.log(`🎫 Generating ${NUM_TICKETS} support tickets...`);
+
+        const ticketSubjects: { subject: string; description: string; category: string; priority: string }[] = [
+            // Bug reports
+            { subject: "App crashes when uploading large files", description: "When I try to upload a file larger than 50MB through the web interface, the page freezes and eventually shows a white screen. I've tried Chrome and Firefox with the same result. The upload progress bar gets to about 80% before it fails. Console shows a memory allocation error.", category: "bug", priority: "high" },
+            { subject: "Search results not updating after editing product", description: "After editing a product's name or description, the search index doesn't seem to update. When I search for the new name, the old version still shows up. I have to wait several hours before the changes are reflected in search results. This is causing confusion for our team.", category: "bug", priority: "medium" },
+            { subject: "Dashboard charts showing incorrect date range", description: "The revenue chart on the main dashboard is showing data from the wrong month. When I select 'Last 30 days', it appears to show data from 60 days ago. This started happening after the timezone update last week.", category: "bug", priority: "high" },
+            { subject: "Email notifications arriving with broken formatting", description: "Order confirmation emails are being sent with broken HTML. The header image is missing and the product table is not rendering correctly. Customers are complaining that they can't read their order details. Attached a screenshot from a customer.", category: "bug", priority: "urgent" },
+            { subject: "Mobile app login loop on Android 14", description: "After updating to Android 14, the app gets stuck in a login loop. I enter my credentials, it shows the loading spinner, then redirects back to the login screen. Clearing cache and data doesn't help. Works fine on iOS and older Android versions.", category: "bug", priority: "high" },
+            { subject: "CSV export includes deleted records", description: "When exporting customer data to CSV, the export includes records that were previously deleted. This is a data integrity concern. We need the export to only include active records.", category: "bug", priority: "medium" },
+            { subject: "Pagination breaks on filtered product list", description: "When filtering products by category and then navigating to page 2, the filter resets and shows all products. Have to re-apply the filter on every page. This makes it very tedious to review products in a specific category.", category: "bug", priority: "low" },
+            { subject: "Webhook delivery failing with 502 errors", description: "Our order webhook endpoint has been returning 502 errors intermittently since yesterday. About 30% of webhook deliveries are failing. The receiving server is healthy — we've verified with direct requests. Looks like it might be a timeout issue on your end.", category: "bug", priority: "urgent" },
+            { subject: "Date picker showing wrong timezone in order form", description: "The date picker in the order creation form shows UTC instead of our local timezone (EST). When I select today's date, the order gets created with yesterday's date. This is causing issues with our fulfillment schedule.", category: "bug", priority: "medium" },
+            { subject: "Bulk edit not saving changes to more than 10 items", description: "When I select more than 10 products and try to bulk update the category, only the first 10 get updated. No error message is shown — it just silently ignores the rest. Tested multiple times with different selections.", category: "bug", priority: "medium" },
+
+            // Feature requests
+            { subject: "Add support for recurring orders", description: "Several of our B2B customers place the same order every month. It would save us a lot of time if we could set up recurring/subscription orders with automatic billing. Ideally with options for weekly, monthly, and quarterly frequencies.", category: "feature_request", priority: "medium" },
+            { subject: "Custom fields on customer profiles", description: "We need the ability to add custom fields to customer profiles. For example, we'd like to track their industry, company size, and preferred communication channel. Currently we're using the notes field as a workaround, but it's not searchable.", category: "feature_request", priority: "low" },
+            { subject: "Inventory alerts and low stock notifications", description: "It would be extremely helpful to get email or Slack notifications when a product's stock drops below the low stock threshold. Right now we have to manually check the inventory report every day. This has caused us to miss reorder windows twice.", category: "feature_request", priority: "high" },
+            { subject: "Multi-currency support for international orders", description: "We're expanding to Europe and need support for EUR and GBP alongside USD. Ideally the system would handle exchange rates automatically and display prices in the customer's local currency. We currently have to use a spreadsheet to track conversions.", category: "feature_request", priority: "medium" },
+            { subject: "API endpoint for bulk product creation", description: "We're onboarding a new supplier with 500+ products. Creating them one by one through the API is very slow. A bulk creation endpoint that accepts an array of products would save us hours. Happy to provide a spec for what we'd need.", category: "feature_request", priority: "low" },
+            { subject: "Dark mode for the admin dashboard", description: "Our team works late hours and the bright white interface causes eye strain. A dark mode option would be really appreciated. Even a basic dark color scheme toggle would be a huge quality of life improvement for us.", category: "feature_request", priority: "low" },
+            { subject: "Integration with QuickBooks for accounting sync", description: "We currently export orders manually and import them into QuickBooks. A direct integration would save our accounting team about 5 hours per week. We'd need order totals, tax amounts, and customer info to sync automatically.", category: "feature_request", priority: "medium" },
+            { subject: "Drag-and-drop reordering for product categories", description: "The product category order in the storefront should be customizable. Currently they're sorted alphabetically but we want to feature seasonal categories at the top. A drag-and-drop interface in the admin would be perfect.", category: "feature_request", priority: "low" },
+
+            // Questions
+            { subject: "How to set up shipping zones?", description: "I'm trying to configure different shipping rates for domestic vs international orders. I found the shipping settings page but I'm not sure how zones work. Can you walk me through setting up a zone for US domestic with flat rate and international with weight-based pricing?", category: "question", priority: "medium" },
+            { subject: "What are the API rate limits?", description: "We're building an integration that will sync inventory levels every 5 minutes. Before we go live, we need to understand the API rate limits. How many requests per minute can we make? Is there a burst allowance? Do different endpoints have different limits?", category: "question", priority: "low" },
+            { subject: "Can I restore a deleted product?", description: "I accidentally deleted a product (SKU: ELEC-MBP16-M4) that had 30 associated orders. Is there any way to restore it? I still need the order history to remain linked. If not, what's the best way to re-create it without losing order associations?", category: "question", priority: "high" },
+            { subject: "How to configure tax rates by state?", description: "We need to charge different tax rates depending on the shipping state. I see there's a tax settings section but I'm unsure how to set up nexus-based tax rules. Do you support automatic tax calculation or do I need to enter each state manually?", category: "question", priority: "medium" },
+            { subject: "What happens to data during plan upgrade?", description: "We're considering upgrading from the Basic to Professional plan. Will there be any downtime? Will all our existing data, customizations, and API keys be preserved? We have about 5,000 products and 12,000 orders in the system.", category: "question", priority: "low" },
+            { subject: "How to export order data for accounting?", description: "Our accountant is asking for a monthly export of all orders with line items, tax amounts, and refunds. I can see the export button on the orders page but it only exports the summary. How can I get a detailed export including line items?", category: "question", priority: "medium" },
+
+            // Billing issues
+            { subject: "Charged twice for last month's subscription", description: "I noticed two charges of $99 on my credit card statement for November — one on Nov 1 and another on Nov 3. I should only have been charged once. Please refund the duplicate charge. My account email is sarah.johnson@acme.com.", category: "billing", priority: "high" },
+            { subject: "Need to update payment method", description: "My credit card on file is expiring at the end of this month. I tried updating it in the billing settings but got an error: 'Payment method could not be verified.' I've tried two different cards with the same result.", category: "billing", priority: "medium" },
+            { subject: "Request for annual billing discount", description: "We've been on the monthly Professional plan ($99/mo) for 8 months now. Is there a discount available if we switch to annual billing? Also, would the switch happen immediately or at the next billing cycle?", category: "billing", priority: "low" },
+            { subject: "Invoice not reflecting applied promo code", description: "I applied promo code SAVE20 during signup last week but my first invoice doesn't show any discount. The confirmation email said the 20% discount would be applied for the first 3 months. Can you verify and adjust the invoice?", category: "billing", priority: "medium" },
+            { subject: "Need W-9 form for our records", description: "Our accounting department requires a W-9 form from all vendors for tax purposes. Can you provide one? Also, could you confirm your legal entity name and EIN for our records? We need this before we can process the next payment.", category: "billing", priority: "low" },
+            { subject: "Unexpected overage charges on API usage", description: "Our latest invoice includes $47 in API overage charges. We weren't aware there was a limit on API calls in our plan. Can you break down which days the overages occurred? We need to understand our usage pattern to avoid this in the future.", category: "billing", priority: "high" },
+
+            // Account issues
+            { subject: "Can't access admin panel after password reset", description: "I reset my password yesterday and now I can't log into the admin panel. The regular storefront login works fine with the new password, but the admin panel keeps saying 'Invalid credentials.' I've tried clearing cookies and using incognito mode.", category: "account", priority: "high" },
+            { subject: "Need to transfer account ownership", description: "Our company's founder (john@startup.io) is leaving and we need to transfer account ownership to our new CTO (maria@startup.io). What's the process for this? We need to ensure all integrations and API keys remain active during the transfer.", category: "account", priority: "medium" },
+            { subject: "Two-factor authentication locked me out", description: "I got a new phone and didn't transfer my authenticator app before wiping the old one. Now I can't access my account because of 2FA. I have my backup codes but they're saying 'Code already used.' Need help regaining access urgently.", category: "account", priority: "urgent" },
+            { subject: "Remove former employee's access", description: "We need to immediately revoke access for james.wilson@ourcompany.com. He left the company today and still has admin-level access to our dashboard. Can this be done on your end while I figure out the user management settings?", category: "account", priority: "urgent" },
+            { subject: "SSO configuration not working with Okta", description: "We're trying to set up SSO with our Okta instance. I've followed the documentation to configure the SAML connection but getting 'Assertion validation failed' errors. I've double-checked the entity ID and ACS URL. Our Okta admin says the SAML response looks correct on their end.", category: "account", priority: "high" },
+            { subject: "Team member can't see certain product categories", description: "I added a new team member with the 'Product Manager' role but they can't see the 'Electronics' or 'Sports' categories. Other categories are visible. We haven't set up any category-level permissions, so I'm not sure why these specific ones are hidden.", category: "account", priority: "medium" },
+
+            // Other / general
+            { subject: "Slow page load times on product listing", description: "The product listing page takes 8-12 seconds to load when we have the full catalog displayed. It used to load in under 2 seconds. This started about two weeks ago. We haven't added significantly more products — we're at about 500 total.", category: "other", priority: "high" },
+            { subject: "Documentation unclear on webhook payload format", description: "The webhook documentation doesn't clearly specify the JSON payload format for order.updated events. It shows the order.created format but mentions that 'updated events may differ.' Can you provide a sample payload for order.updated?", category: "other", priority: "low" },
+            { subject: "Requesting data export for GDPR compliance", description: "A customer (email: jane.doe@example.com) has requested a full data export under GDPR Article 15. We need to provide all personal data we have on file within 30 days. Can you help us generate a comprehensive export including order history, support interactions, and any tracking data?", category: "other", priority: "high" },
+            { subject: "Scheduled maintenance window request", description: "We have a major sale event on Black Friday. Can you confirm there won't be any scheduled maintenance between November 28-30? Also, do you have any recommendations for scaling our setup to handle 10x normal traffic during this period?", category: "other", priority: "medium" },
+            { subject: "Partnership inquiry for marketplace integration", description: "We're a marketplace platform with 2,000+ sellers and interested in integrating your system as a backend for our sellers' inventory management. Would you be open to a partnership discussion? We'd need multi-tenant support and a reseller pricing model.", category: "other", priority: "low" },
+            { subject: "Training session request for new team members", description: "We've just hired 5 new customer service reps who need to learn the admin interface. Do you offer any onboarding training sessions? We'd prefer a live 1-hour walkthrough covering order management, customer profiles, and the reporting dashboard.", category: "other", priority: "low" },
+        ];
+
+        const agentNames = ["Alex Rivera", "Sam Chen", "Jordan Park", "Morgan Lee", "Casey Brooks", null, null];
+        const ticketStatuses = ["open", "open", "in_progress", "in_progress", "waiting", "resolved", "resolved", "closed", "closed"] as const;
+
+        const ticketValues = [];
+        for (let i = 0; i < NUM_TICKETS; i++) {
+            const template = ticketSubjects[i % ticketSubjects.length];
+            const round = Math.floor(i / ticketSubjects.length);
+            const status = pick([...ticketStatuses]);
+            const createdAt = randomDate(90, 1);
+            const hasCustomer = Math.random() > 0.15; // 85% have a customer linked
+
+            ticketValues.push({
+                ticket_number: `TK-${String(2025)}-${String(i + 1).padStart(4, "0")}`,
+                subject: round === 0 ? template.subject : `${template.subject} (follow-up)`,
+                description: template.description,
+                status: status as any,
+                priority: template.priority as any,
+                category: template.category as any,
+                customer_id: hasCustomer ? Math.floor(Math.random() * 40) + 1 : null,
+                assigned_to: status === "open" && Math.random() > 0.5 ? null : pick(agentNames),
+                created_at: createdAt,
+                updated_at: status === "open" ? createdAt : randomDate(14, 0)
+            });
+        }
+
+        for (let i = 0; i < ticketValues.length; i += BATCH) {
+            await db.insert(tickets).values(ticketValues.slice(i, i + BATCH));
+        }
+        console.log(`  ✅ ${NUM_TICKETS} support tickets`);
+
         // ── Summary ───────────────────────────────────────────────────
         const statusCounts: Record<string, number> = {};
         postValues.forEach(p => { statusCounts[p.status] = (statusCounts[p.status] || 0) + 1; });
 
+        const ticketStatusCounts: Record<string, number> = {};
+        ticketValues.forEach(t => { ticketStatusCounts[t.status] = (ticketStatusCounts[t.status] || 0) + 1; });
+
         console.log("\n🎉 Database seeded successfully!");
         console.log(`   ${NUM_AUTHORS} authors, ${NUM_TAGS} tags, ${POST_COUNT} posts`);
         console.log(`   40 customers, ${allProducts.length} products, ${NUM_ORDERS} orders`);
+        console.log(`   ${NUM_TICKETS} tickets`);
         console.log(`   Post statuses: ${Object.entries(statusCounts).map(([k, v]) => `${k}=${v}`).join(", ")}`);
+        console.log(`   Ticket statuses: ${Object.entries(ticketStatusCounts).map(([k, v]) => `${k}=${v}`).join(", ")}`);
 
     } catch (e) {
         console.error("❌ Error seeding database:", e);

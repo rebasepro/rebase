@@ -312,7 +312,7 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
 
     /**
      * Default view mode for displaying this collection.
-     * - "table": Display entities in a spreadsheet-like table (default)
+     * - "table": Display entities in a table with inline editing (default)
      * - "cards": Display entities as a grid of cards with thumbnails
      * - "kanban": Display entities in a Kanban board grouped by a property
      * Defaults to "table".
@@ -487,7 +487,7 @@ export interface KanbanConfig<M extends Record<string, unknown> = Record<string,
 /**
  * View mode for displaying a collection.
  * - "list": Simple, clean list view — the classic CMS default
- * - "table": Spreadsheet-style table with inline editing
+ * - "table": Table with inline editing
  * - "cards": Grid of visual cards with thumbnails
  * - "kanban": Board view grouped by a property
  * @group Collections

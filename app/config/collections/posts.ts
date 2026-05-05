@@ -8,6 +8,7 @@ const postsCollection: PostgresCollection = {
     slug: "posts",
     table: "posts",
     icon: "Article",
+    group: "Content",
     history: true,
     openEntityMode: "split",
     defaultViewMode: "cards",

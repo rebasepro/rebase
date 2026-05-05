@@ -6,6 +6,7 @@ import customersCollection from "./customers";
 import productsCollection from "./products";
 import ordersCollection from "./orders";
 import orderItemsCollection from "./order_items";
+import ticketsCollection from "./tickets";
 
 export const collections = [
     authorsCollection,
@@ -15,5 +16,6 @@ export const collections = [
     customersCollection,
     productsCollection,
     ordersCollection,
-    orderItemsCollection
+    orderItemsCollection,
+    ticketsCollection
 ];

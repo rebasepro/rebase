@@ -445,7 +445,7 @@ export interface RebaseTranslations {
     no_filterable_properties: string;
     apply_filters: string;
     list: string;
-    spreadsheet: string;
+    table_view_mode: string;
     cards: string;
     board: string;
     initialize_kanban_order_desc: string;

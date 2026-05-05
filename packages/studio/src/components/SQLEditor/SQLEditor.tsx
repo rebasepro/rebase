@@ -103,29 +103,58 @@ const FixedEditorOverlay = ({
     onCancel: () => void 
 }) => {
     const [rect, setRect] = useState<DOMRect | null>(null);
+    const [windowSize, setWindowSize] = useState({ width: 1000, height: 1000 });
     const anchorRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (anchorRef.current && anchorRef.current.parentElement) {
             setRect(anchorRef.current.parentElement.getBoundingClientRect());
         }
+        if (typeof window !== "undefined") {
+            setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+            const handleResize = () => setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+            window.addEventListener('resize', handleResize);
+            return () => window.removeEventListener('resize', handleResize);
+        }
     }, []);
+
+    if (!rect) {
+        return <div ref={anchorRef} className="w-full h-full min-h-[20px]" />;
+    }
+
+    let top = rect.top - 2;
+    let left = rect.left - 2;
+    const minWidth = Math.max(rect.width + 4, 250);
+    const minHeight = rect.height + 4;
+
+    if (left + minWidth > windowSize.width) {
+        left = Math.max(10, windowSize.width - minWidth - 10);
+    }
+    
+    // Calculate a max height that doesn't overflow the bottom
+    const maxAvailableHeight = Math.max(50, windowSize.height - top - 10);
+    const resolvedMaxHeight = Math.min(300, maxAvailableHeight);
+
+    // If even the min height overflows, adjust top
+    if (top + minHeight > windowSize.height) {
+        top = Math.max(10, windowSize.height - minHeight - 10);
+    }
 
     return (
         <div ref={anchorRef} className="w-full h-full min-h-[20px]">
-            {rect && createPortal(
+            {createPortal(
                 <div 
                     className="fixed z-[9999] bg-surface-50 dark:bg-surface-900 border-2 border-primary dark:border-primary-dark shadow-xl flex flex-col"
                     style={{ 
-                        top: rect.top - 2, 
-                        left: rect.left - 2, 
-                        minWidth: Math.max(rect.width + 4, 250), 
-                        minHeight: rect.height + 4, 
-                        maxWidth: 400 
+                        top, 
+                        left, 
+                        minWidth, 
+                        minHeight, 
+                        maxWidth: Math.min(400, windowSize.width - left - 10)
                     }}
                 >
                     <textarea
-                        className="w-full h-full bg-transparent outline-none border-none ring-0 font-mono text-[13px] px-4 py-1.5 resize-none overflow-y-auto"
+                        className="w-full h-full bg-transparent outline-none border-none ring-0 font-mono text-[13px] text-text-primary dark:text-text-primary-dark px-4 py-1.5 resize-none overflow-y-auto"
                         defaultValue={displayValue}
                         autoFocus
                         style={{ minHeight: '32px' }}
@@ -134,11 +163,11 @@ const FixedEditorOverlay = ({
                             e.target.value = "";
                             e.target.value = val;
                             e.target.style.height = 'auto';
-                            e.target.style.height = `${Math.min(e.target.scrollHeight, 300)}px`;
+                            e.target.style.height = `${Math.min(e.target.scrollHeight, resolvedMaxHeight)}px`;
                         }}
                         onChange={(e) => {
                             e.target.style.height = 'auto';
-                            e.target.style.height = `${Math.min(e.target.scrollHeight, 300)}px`;
+                            e.target.style.height = `${Math.min(e.target.scrollHeight, resolvedMaxHeight)}px`;
                         }}
                         onBlur={(e) => {
                             onSave(e.target.value || null);

@@ -147,7 +147,7 @@ ws.send(JSON.stringify({
 
 ### React Integration
 
-In Rebase Studio, realtime is built into the data views. The spreadsheet, card, and kanban views automatically refresh when data changes.
+In Rebase Studio, realtime is built into the data views. The table, card, and kanban views automatically refresh when data changes.
 
 ## Message Types
 

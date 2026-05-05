@@ -414,7 +414,7 @@ export const es: RebaseTranslations = {
     no_filterable_properties: "No hay propiedades filtrables disponibles",
     apply_filters: "Aplicar filtros",
     list: "Lista",
-    spreadsheet: "Hoja de cálculo",
+    table_view_mode: "Tabla",
     cards: "Tarjetas",
     board: "Tablero",
     initialize_kanban_order_desc: "Esto asignará valores secuenciales para todos los elementos sin ordenación. Los elementos mantendrán su orden actual en cada columna.",

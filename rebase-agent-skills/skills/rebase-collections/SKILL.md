@@ -14,7 +14,7 @@ Rebase collections are the core building blocks of your data model. They define 
 A collection is defined as a TypeScript object implementing the `EntityCollection` interface. Each collection maps to a database table (via the `table` property) and generates:
 - Full CRUD REST endpoints at `/api/data/{slug}`
 - Optional GraphQL queries and mutations
-- Admin panel views (spreadsheet, forms, cards, kanban)
+- Admin panel views (table, forms, cards, kanban)
 
 ### Properties
 

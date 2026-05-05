@@ -7,6 +7,7 @@ const customersCollection: PostgresCollection = {
     slug: "customers",
     table: "customers",
     icon: "People",
+    group: "E-Commerce",
     history: true,
     openEntityMode: "split",
     properties: {

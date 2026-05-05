@@ -3,21 +3,38 @@ import type { Node, Edge } from "@xyflow/react";
 
 // ─── Layout Constants ─────────────────────────────────────────────────
 export const NODE_WIDTH = 280;
-const NODE_HEADER_HEIGHT = 52; // header area
+/** Header with a single line of text (junction tables or tableName === collectionName). */
+export const HEADER_HEIGHT_SINGLE = 33;
+/** Header with two lines (name + subtitle when collectionName !== tableName). */
+export const HEADER_HEIGHT_DOUBLE = 47;
 const ROW_HEIGHT = 28; // height per column row
+
+/**
+ * Compute the correct header height for a table node.
+ */
+export const getHeaderHeight = (opts: {
+    isJunction: boolean;
+    collectionName: string;
+    tableName: string;
+}): number => {
+    if (opts.isJunction) return HEADER_HEIGHT_SINGLE;
+    return opts.collectionName !== opts.tableName
+        ? HEADER_HEIGHT_DOUBLE
+        : HEADER_HEIGHT_SINGLE;
+};
 
 /**
  * Estimate the pixel height of a table node based on column count.
  */
-export const estimateNodeHeight = (columnCount: number): number =>
-    NODE_HEADER_HEIGHT + Math.max(columnCount, 1) * ROW_HEIGHT + 4; // +4 for bottom padding
+export const estimateNodeHeight = (columnCount: number, headerHeight: number = HEADER_HEIGHT_DOUBLE): number =>
+    headerHeight + Math.max(columnCount, 1) * ROW_HEIGHT + 4; // +4 for bottom padding
 
 /**
  * Get the vertical center Y of a specific column row (0-indexed)
  * relative to the top of the node.
  */
-export const getColumnRowY = (rowIndex: number): number =>
-    NODE_HEADER_HEIGHT + rowIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
+export const getColumnRowY = (rowIndex: number, headerHeight: number = HEADER_HEIGHT_DOUBLE): number =>
+    headerHeight + rowIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
 
 // ─── Auto-Layout via Dagre ────────────────────────────────────────────
 
@@ -46,8 +63,14 @@ export const getLayoutedElements = (
     const nodeHeights = new Map<string, number>();
 
     nodes.forEach((node) => {
-        const columnCount = (node.data as { columns?: unknown[] }).columns?.length ?? 3;
-        const h = estimateNodeHeight(columnCount);
+        const data = node.data as { columns?: unknown[]; isJunction?: boolean; collectionName?: string; tableName?: string };
+        const columnCount = data.columns?.length ?? 3;
+        const headerH = getHeaderHeight({
+            isJunction: Boolean(data.isJunction),
+            collectionName: data.collectionName ?? "",
+            tableName: data.tableName ?? ""
+        });
+        const h = estimateNodeHeight(columnCount, headerH);
         nodeHeights.set(node.id, h);
         g.setNode(node.id, {
             width: NODE_WIDTH,

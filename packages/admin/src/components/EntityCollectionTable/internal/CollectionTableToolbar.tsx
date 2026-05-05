@@ -84,8 +84,8 @@ export function CollectionTableToolbar({
 
                 {/* Search bar — hidden in compact */}
                 <div className={cls(
-                    "transition-all duration-300 ease-out overflow-hidden",
-                    compact ? "max-w-0 opacity-0" : "max-w-[300px] opacity-100"
+                    "transition-all duration-300 ease-out",
+                    compact ? "max-w-0 opacity-0 overflow-hidden" : "max-w-[300px] opacity-100"
                 )}>
                     {onTextSearch &&
                         <SearchBar

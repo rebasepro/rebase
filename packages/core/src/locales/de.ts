@@ -406,7 +406,7 @@ export const de: RebaseTranslations = {
     no_filterable_properties: "Keine filterbaren Eigenschaften verfügbar",
     apply_filters: "Filter anwenden",
     list: "Liste",
-    spreadsheet: "Tabelle",
+    table_view_mode: "Tabelle",
     cards: "Karten",
     board: "Board",
     initialize_kanban_order_desc: "Dadurch werden allen Elementen, die keine haben, fortlaufende Auftragswerte zugewiesen. Die Elemente behalten ihre aktuelle Reihenfolge innerhalb jeder Spalte bei.",

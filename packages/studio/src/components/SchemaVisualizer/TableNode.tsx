@@ -4,7 +4,7 @@ import type { NodeProps } from "@xyflow/react";
 import { Typography, Chip, Tooltip, cls } from "@rebasepro/ui";
 import { IconForView } from "@rebasepro/core";
 import type { TableNodeData, ColumnInfo } from "./useSchemaGraph";
-import { getColumnRowY } from "./schema-visualizer.utils";
+import { getColumnRowY, getHeaderHeight } from "./schema-visualizer.utils";
 
 /**
  * Custom React Flow node that renders a database table as a card.
@@ -27,10 +27,15 @@ const TableNodeInner = ({ data, selected }: NodeProps) => {
     const handles = useMemo(() => {
         const result: { id: string; type: "source" | "target"; position: Position; top: number }[] = [];
         const cols = columns as ColumnInfo[];
-        const midY = cols.length > 0 ? getColumnRowY(Math.floor(cols.length / 2)) : 30;
+        const headerH = getHeaderHeight({
+            isJunction: Boolean(isJunction),
+            collectionName: collectionName as string,
+            tableName: tableName as string
+        });
+        const midY = cols.length > 0 ? getColumnRowY(Math.floor(cols.length / 2), headerH) : 30;
 
         cols.forEach((col, idx) => {
-            const y = getColumnRowY(idx);
+            const y = getColumnRowY(idx, headerH);
 
             if (col.isForeignKey && !col.isPrimaryKey) {
                 // FK: source handles on both sides
@@ -83,7 +88,7 @@ position: Position.Left,
 top: midY });
 
         return result;
-    }, [columns]);
+    }, [columns, isJunction, collectionName, tableName]);
 
     return (
         <div

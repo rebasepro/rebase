@@ -6,6 +6,7 @@ const productsCollection: EntityCollection = {
     slug: "products",
     table: "products",
     icon: "Inventory",
+    group: "E-Commerce",
     history: true,
     openEntityMode: "split",
     defaultViewMode: "cards",

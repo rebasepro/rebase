@@ -9,6 +9,9 @@ export const ordersCurrency = pgEnum("orders_currency", ["USD", "EUR", "GBP", "C
 export const postsStatus = pgEnum("posts_status", ["draft", "needs_review", "published", "archived"]);
 export const productsCategory = pgEnum("products_category", ["electronics", "clothing", "home_garden", "sports", "books", "food_beverage", "health_beauty", "toys"]);
 export const productsStatus = pgEnum("products_status", ["draft", "active", "archived"]);
+export const ticketsStatus = pgEnum("tickets_status", ["open", "in_progress", "waiting", "resolved", "closed"]);
+export const ticketsPriority = pgEnum("tickets_priority", ["low", "medium", "high", "urgent"]);
+export const ticketsCategory = pgEnum("tickets_category", ["bug", "feature_request", "question", "billing", "account", "other"]);
 
 export const authors = pgTable("authors", {
     id: integer("id").generatedByDefaultAsIdentity().primaryKey(),
@@ -159,6 +162,28 @@ export const tags = pgTable("tags", {
     name: varchar("name").notNull()
 }).enableRLS();
 
+export const tickets = pgTable("tickets", {
+    id: integer("id").generatedByDefaultAsIdentity().primaryKey(),
+    ticket_number: varchar("ticket_number").unique().notNull(),
+    subject: varchar("subject").notNull(),
+    description: varchar("description"),
+    status: ticketsStatus("status").notNull(),
+    priority: ticketsPriority("priority").notNull(),
+    category: ticketsCategory("category"),
+    customer_id: integer("customer_id").references(() => customers.id, { onDelete: "set null" }),
+    assigned_to: varchar("assigned_to"),
+    created_at: timestamp("created_at", { withTimezone: true,
+mode: "string" }),
+    updated_at: timestamp("updated_at", { withTimezone: true,
+mode: "string" })
+}, (table) => ([
+    pgPolicy("test_policy", { as: "permissive",
+for: "all",
+to: ["public"],
+using: sql`true`,
+withCheck: sql`true` })
+])).enableRLS();
+
 export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({
     "profile": one(profiles, {
         fields: [authors.id],
@@ -169,7 +194,8 @@ export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({
 }));
 
 export const customersRelations = drizzleRelations(customers, ({ one, many }) => ({
-    "orders": many(orders, { relationName: "orders_customer_id" })
+    "orders": many(orders, { relationName: "orders_customer_id" }),
+    "tickets": many(tickets, { relationName: "tickets_customer_id" })
 }));
 
 export const orderItemsRelations = drizzleRelations(orderItems, ({ one, many }) => ({
@@ -228,6 +254,14 @@ export const tagsRelations = drizzleRelations(tags, ({ one, many }) => ({
     "posts": many(postsTags, { relationName: "posts" })
 }));
 
+export const ticketsRelations = drizzleRelations(tickets, ({ one, many }) => ({
+    "customer": one(customers, {
+        fields: [tickets.customer_id],
+        references: [customers.id],
+        relationName: "tickets_customer_id"
+    })
+}));
+
 export const tables = { authors,
 customers,
 orderItems,
@@ -236,13 +270,17 @@ posts,
 postsTags,
 products,
 profiles,
-tags };
+tags,
+tickets };
 export const enums = { ordersStatus,
 ordersPayment_status,
 ordersCurrency,
 postsStatus,
 productsCategory,
-productsStatus };
+productsStatus,
+ticketsStatus,
+ticketsPriority,
+ticketsCategory };
 export const relations = { authorsRelations,
 customersRelations,
 orderItemsRelations,
@@ -250,5 +288,6 @@ ordersRelations,
 postsRelations,
 postsTagsRelations,
 profilesRelations,
-tagsRelations };
+tagsRelations,
+ticketsRelations };
 

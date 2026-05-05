@@ -5,12 +5,12 @@ description: Guide for using and customizing the Rebase Studio admin panel. Use 
 
 # Rebase Studio
 
-Rebase Studio is the visual admin panel that provides a complete CMS experience — spreadsheet views, form editing, visual schema editor, user management, and more.
+Rebase Studio is the visual admin panel that provides a complete CMS experience — table views, form editing, visual schema editor, user management, and more.
 
 ## Overview
 
 The Studio is built on `@rebasepro/core` and provides:
-- **Spreadsheet-style collection views** with inline editing
+- **Table collection views** with inline editing
 - **Visual schema editor** for non-developers
 - **Form views** with 20+ field types
 - **Card grid** and **Kanban board** view modes

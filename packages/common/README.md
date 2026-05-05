@@ -69,9 +69,9 @@ Rebase has been meticulously crafted to make it incredibly easy for developers
 to build a CMS/admin tool while offering an excellent data editing experience
 and a user-friendly interface for marketers and content managers.
 
-### 🏓 Exceptional Spreadsheet View
+### 🏓 Exceptional Table View
 
-We've developed a highly efficient windowed **spreadsheet view** for
+We've developed a highly efficient windowed **table view** for
 collections, allowing inline editing for most common fields, as well as popup
 views for other cases and your custom field implementations.
 

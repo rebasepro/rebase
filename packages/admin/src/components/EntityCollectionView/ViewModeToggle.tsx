@@ -91,7 +91,7 @@ export function ViewModeToggle({
     const getViewModeName = () => {
         if (viewMode === "kanban") return t("board");
         if (viewMode === "cards") return t("cards");
-        if (viewMode === "table") return t("spreadsheet");
+        if (viewMode === "table") return t("table_view_mode");
         return t("list");
     };
 
@@ -111,7 +111,7 @@ export function ViewModeToggle({
             },
             {
                 value: "table",
-                label: t("spreadsheet"),
+                label: t("table_view_mode"),
                 icon: <ListIcon size="small"/>
             },
             {

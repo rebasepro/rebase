@@ -178,7 +178,9 @@ image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=80&h=80&fit=
 
 import {
   Filter, Pencil, MoreVertical, Image as ImageIcon, User, ChevronDown,
-  Tag, Home, Languages, Moon, ChevronsRight, List, Kanban, Folder
+  Tag, Home, Languages, Moon, ChevronsRight, List, Kanban, Folder,
+  Search, Settings, Trash2, Plus, X, Maximize2, Code, Check, Copy,
+  LayoutGrid, TextCursorInput, Link, LayoutList
 } from "lucide-react";
 
 /* ─── Material icon helper ─── */
@@ -193,7 +195,7 @@ function MI({
   className?: string;
   filled?: boolean;
 }) {
-  const IconComponent = {
+  const IconComponent: Record<string, React.ComponentType<{ size?: number }>> = {
     "filter_list": Filter,
     "edit": Pencil,
     "more_vert": MoreVertical,
@@ -207,14 +209,29 @@ function MI({
     "expand_more": ChevronDown,
     "keyboard_double_arrow_right": ChevronsRight,
     "list": List,
+    "format_list_bulleted": LayoutList,
     "view_kanban": Kanban,
     "folder": Folder,
-    "sell": Tag
-  }[children] || Folder;
+    "sell": Tag,
+    "search": Search,
+    "settings": Settings,
+    "delete": Trash2,
+    "add": Plus,
+    "close": X,
+    "open_in_full": Maximize2,
+    "code": Code,
+    "check": Check,
+    "content_copy": Copy,
+    "apps": LayoutGrid,
+    "short_text": TextCursorInput,
+    "add_link": Link
+  };
+
+  const Comp = IconComponent[children] || Folder;
 
   return (
     <span className={`inline-flex items-center justify-center select-none ${className}`}>
-      <IconComponent size={size}/>
+      <Comp size={size}/>
     </span>
   );
 }
@@ -473,6 +490,9 @@ export function EntityViewDemo() {
   const [highlightedFormField, setHighlightedFormField] = useState<string | null>(null);
   // Active collection (for switching between list/kanban)
   const [activeCollection, setActiveCollection] = useState<"posts" | "tags">("posts");
+  // Current view mode
+  type DemoViewMode = "list" | "table" | "cards" | "kanban";
+  const [viewMode, setViewMode] = useState<DemoViewMode>("table");
   // Kanban drag animation state
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0,
@@ -543,8 +563,9 @@ y });
 
     const loop = async () => {
       while (isMounted) {
-        // ── Phase 1: Browse rows, then inline-edit status in table ──
+        // ── Phase 1: TABLE view — Browse rows, inline-edit ──
         setActiveCollection("posts");
+        setViewMode("table");
         setHoveredRow(43);
         await wait(350); if (!guard()) return;
         setHoveredRow(42);
@@ -552,19 +573,18 @@ y });
         setHoveredRow(40);
         await wait(300); if (!guard()) return;
 
-        // Inline edit: change entity 40 status from Draft → In Review directly in table
+        // Inline edit: change entity 40 status from Draft → In Review
         setTableOverrides((prev) => ({ ...prev,
 40: { status: "In Review" } }));
         flashCell(40, "status");
         await wait(700); if (!guard()) return;
 
-        // Move on
         setHoveredRow(39);
         await wait(300); if (!guard()) return;
         setHoveredRow(42);
         await wait(300); if (!guard()) return;
 
-        // ── Phase 2: Open entity 42 ──
+        // Open entity 42
         openEntity(42);
         setHoveredRow(null);
         await wait(700); if (!guard()) return;
@@ -587,29 +607,58 @@ status: "In Review" }));
         closePanel();
         await wait(400); if (!guard()) return;
 
-        // ── Phase 3: Hover to entity 39, open it ──
-        setHoveredRow(42);
-        await wait(200); if (!guard()) return;
-        setHoveredRow(40);
-        await wait(200); if (!guard()) return;
+        // ── Phase 2: CARDS view — browse cards ──
+        setViewMode("cards");
+        await wait(600); if (!guard()) return;
+        setHoveredRow(43);
+        await wait(400); if (!guard()) return;
+        setHoveredRow(41);
+        await wait(400); if (!guard()) return;
         setHoveredRow(39);
-        await wait(300); if (!guard()) return;
+        await wait(400); if (!guard()) return;
 
+        // Open an entity from cards view
         openEntity(39);
         setHoveredRow(null);
         await wait(600); if (!guard()) return;
 
-        // Browse briefly
+        // Close
+        closePanel();
         await wait(400); if (!guard()) return;
+
+        // Browse more
+        setHoveredRow(37);
+        await wait(300); if (!guard()) return;
+        setHoveredRow(36);
+        await wait(300); if (!guard()) return;
+        setHoveredRow(null);
+        await wait(300); if (!guard()) return;
+
+        // ── Phase 3: LIST view — quick browse ──
+        setViewMode("list");
+        await wait(500); if (!guard()) return;
+        setHoveredRow(43);
+        await wait(250); if (!guard()) return;
+        setHoveredRow(42);
+        await wait(250); if (!guard()) return;
+        setHoveredRow(40);
+        await wait(250); if (!guard()) return;
+        setHoveredRow(39);
+        await wait(300); if (!guard()) return;
+
+        // Open entity 39
+        openEntity(39);
+        setHoveredRow(null);
+        await wait(500); if (!guard()) return;
 
         // Close
         closePanel();
-        await wait(350); if (!guard()) return;
+        await wait(400); if (!guard()) return;
 
-        // ── Phase 4: Switch to TAGS collection → Kanban mode ──
+        // ── Phase 4: KANBAN view — drag and drop ──
+        setViewMode("kanban");
         setHoveredRow(null);
         setTableOverrides({});
-        setActiveCollection("tags");
         await wait(800); if (!guard()) return;
 
         // Hover over cards briefly
@@ -662,8 +711,8 @@ y: 0 });
         setDragSourceColumn(null);
         await wait(800); if (!guard()) return;
 
-        // ── Phase 5: Switch back to POSTS ──
-        setActiveCollection("posts");
+        // ── Phase 5: Back to TABLE — quick edit cycle ──
+        setViewMode("table");
         await wait(400); if (!guard()) return;
 
         // Quick browse
@@ -883,10 +932,27 @@ width: "100%" }}
           <div className="min-h-[48px] overflow-x-auto px-2 md:px-4 bg-surface-50 dark:bg-surface-900 border-b border-surface-200/40 dark:border-surface-700/40 flex flex-row justify-between items-center w-full shrink-0">
             {/* Left side */}
             <div className="flex items-center gap-1 mr-4">
-              <button className="flex items-center gap-1.5 px-2 py-1 rounded-md text-sm bg-surface-100 dark:bg-surface-800 hover:bg-surface-200 dark:hover:bg-surface-700 text-surface-900 dark:text-white">
-                <MI size={18}>{activeCollection === "posts" ? "list" : "view_kanban"}</MI>
-                <span className="ml-1 text-sm">{activeCollection === "posts" ? "List" : "Board"}</span>
-              </button>
+              {/* View Mode Toggle — matches production ViewModeToggle */}
+              <div className="flex items-center bg-surface-100 dark:bg-surface-800 rounded-md p-0.5 gap-0.5">
+                {([
+                  { mode: "list" as const, icon: "format_list_bulleted", label: "List" },
+                  { mode: "table" as const, icon: "list", label: "Table" },
+                  { mode: "cards" as const, icon: "apps", label: "Cards" },
+                  { mode: "kanban" as const, icon: "view_kanban", label: "Board" }
+                ] as const).map(({ mode, icon, label }) => (
+                  <button
+                    key={mode}
+                    className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                      viewMode === mode
+                        ? "bg-white dark:bg-surface-900 shadow-sm text-primary"
+                        : "text-surface-500 hover:text-surface-700 dark:hover:text-surface-300"
+                    }`}
+                  >
+                    <MI size={14}>{icon}</MI>
+                    {viewMode === mode && <span className="text-xs">{label}</span>}
+                  </button>
+                ))}
+              </div>
               <button className="p-1.5 rounded-full text-surface-500 hover:bg-surface-200/50 dark:hover:bg-surface-800">
                 <MI size={18}>filter_list</MI>
               </button>
@@ -911,8 +977,8 @@ width: "100%" }}
           </div>
 
           {/* ── Content Area ── */}
-          {activeCollection === "posts" ? (
-            /* ── Table (List view for Posts) ── */
+          {(viewMode === "table" || viewMode === "list") ? (
+            /* ── Table / List view ── */
             <div className="h-full w-full flex flex-col bg-white dark:bg-surface-950 overflow-auto">
               {/* Table header */}
               <div
@@ -946,6 +1012,56 @@ width: "100%" }}
                       onLeave={() => setHoveredRow(null)}
                       onClick={() => openEntity(entity.id)}
                     />
+                  );
+                })}
+              </div>
+            </div>
+          ) : viewMode === "cards" ? (
+            /* ── Cards Grid View ── */
+            <div className="h-full w-full overflow-auto bg-white dark:bg-surface-950 p-3 md:p-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {MOCK_ENTITIES.map((entity) => {
+                  const merged = { ...entity, ...tableOverrides[entity.id] } as Entity;
+                  const statusColor = STATUS_COLORS[merged.status] || STATUS_COLORS.Draft;
+                  const isHovered = hoveredRow === entity.id;
+                  return (
+                    <div
+                      key={entity.id}
+                      className={`rounded-lg border overflow-hidden cursor-pointer transition-all duration-200 ${
+                        isHovered
+                          ? "border-primary/50 shadow-md scale-[1.02]"
+                          : "border-surface-200 dark:border-surface-700/50 hover:shadow-sm"
+                      } bg-white dark:bg-surface-900`}
+                      onMouseEnter={() => setHoveredRow(entity.id)}
+                      onMouseLeave={() => setHoveredRow(null)}
+                      onClick={() => openEntity(entity.id)}
+                    >
+                      {/* Card thumbnail */}
+                      <div className="w-full h-28 bg-surface-100 dark:bg-surface-800 overflow-hidden">
+                        {merged.image ? (
+                          <img src={merged.image} alt={merged.title} className="w-full h-full object-cover" loading="lazy"/>
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <MI size={28} className="text-surface-300 dark:text-surface-600">image</MI>
+                          </div>
+                        )}
+                      </div>
+                      {/* Card body */}
+                      <div className="p-2.5">
+                        <div className="line-clamp-2 text-sm font-medium text-surface-900 dark:text-white leading-tight mb-1.5">
+                          {merged.title}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span
+                            className="rounded-lg inline-flex items-center px-2 py-0.5 text-[10px] font-normal"
+                            style={{ backgroundColor: statusColor.bg, color: statusColor.text }}
+                          >
+                            {merged.status}
+                          </span>
+                          <span className="text-[10px] font-mono text-surface-400">#{entity.id}</span>
+                        </div>
+                      </div>
+                    </div>
                   );
                 })}
               </div>

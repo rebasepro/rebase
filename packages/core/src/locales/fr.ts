@@ -406,7 +406,7 @@ export const fr: RebaseTranslations = {
     no_filterable_properties: "Aucune propriété filtrable disponible",
     apply_filters: "Appliquer les filtres",
     list: "Liste",
-    spreadsheet: "Tableur",
+    table_view_mode: "Tableau",
     cards: "Cartes",
     board: "Tableau",
     initialize_kanban_order_desc: "Ceci attribuera des valeurs d'ordre séquentiel à tous les éléments qui n'en ont pas. Les articles conserveront leur ordre actuel dans chaque colonne.",

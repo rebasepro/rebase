@@ -8,6 +8,7 @@ const authorsCollection: EntityCollection = {
     slug: "authors",
     table: "authors",
     icon: "Person",
+    group: "Content",
     history: true,
     properties: {
         id: {
