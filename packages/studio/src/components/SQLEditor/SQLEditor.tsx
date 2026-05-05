@@ -1,6 +1,7 @@
 import { IconForView } from "@rebasepro/core";
 import { useStudioCollectionRegistry, useStudioSideEntityController } from "@rebasepro/core";
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import {
     Button,
     Paper,
@@ -91,6 +92,73 @@ const QueryLoadingView = () => {
 
 const STORAGE_KEY_TABS = "rebase_sql_tabs";
 const STORAGE_KEY_ACTIVE_TAB = "rebase_sql_active_tab";
+
+const FixedEditorOverlay = ({ 
+    displayValue, 
+    onSave, 
+    onCancel 
+}: { 
+    displayValue: string, 
+    onSave: (val: string | null) => void, 
+    onCancel: () => void 
+}) => {
+    const [rect, setRect] = useState<DOMRect | null>(null);
+    const anchorRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (anchorRef.current && anchorRef.current.parentElement) {
+            setRect(anchorRef.current.parentElement.getBoundingClientRect());
+        }
+    }, []);
+
+    return (
+        <div ref={anchorRef} className="w-full h-full min-h-[20px]">
+            {rect && createPortal(
+                <div 
+                    className="fixed z-[9999] bg-surface-50 dark:bg-surface-900 border-2 border-primary dark:border-primary-dark shadow-xl flex flex-col"
+                    style={{ 
+                        top: rect.top - 2, 
+                        left: rect.left - 2, 
+                        minWidth: Math.max(rect.width + 4, 250), 
+                        minHeight: rect.height + 4, 
+                        maxWidth: 400 
+                    }}
+                >
+                    <textarea
+                        className="w-full h-full bg-transparent outline-none border-none ring-0 font-mono text-[13px] px-4 py-1.5 resize-none overflow-y-auto"
+                        defaultValue={displayValue}
+                        autoFocus
+                        style={{ minHeight: '32px' }}
+                        onFocus={(e) => {
+                            const val = e.target.value;
+                            e.target.value = "";
+                            e.target.value = val;
+                            e.target.style.height = 'auto';
+                            e.target.style.height = `${Math.min(e.target.scrollHeight, 300)}px`;
+                        }}
+                        onChange={(e) => {
+                            e.target.style.height = 'auto';
+                            e.target.style.height = `${Math.min(e.target.scrollHeight, 300)}px`;
+                        }}
+                        onBlur={(e) => {
+                            onSave(e.target.value || null);
+                            onCancel();
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                onSave((e.currentTarget as HTMLTextAreaElement).value || null);
+                                onCancel();
+                            }
+                            if (e.key === "Escape") onCancel();
+                        }}
+                    />
+                </div>,
+                document.body
+            )}
+        </div>
+    );
+};
 
 export const SQLEditor = () => {
     const { databaseAdmin } = useRebaseContext();
@@ -1017,40 +1085,11 @@ id: String(ra.entityId) })}
 
                             if (isEditing) {
                                 return (
-                                    <div 
-                                        className="absolute top-[-2px] left-[-2px] z-20 bg-surface-50 dark:bg-surface-900 border-2 border-primary dark:border-primary-dark shadow-xl flex flex-col"
-                                        style={{ minWidth: 'max(100% + 4px, 250px)', minHeight: 'calc(100% + 4px)', maxWidth: '400px' }}
-                                    >
-                                        <textarea
-                                            className="w-full h-full bg-transparent outline-none border-none ring-0 font-mono text-[13px] px-4 py-1.5 resize-none overflow-y-auto"
-                                            defaultValue={displayValue}
-                                            autoFocus
-                                            style={{ minHeight: '32px' }}
-                                            onFocus={(e) => {
-                                                const val = e.target.value;
-                                                e.target.value = "";
-                                                e.target.value = val;
-                                                e.target.style.height = 'auto';
-                                                e.target.style.height = `${Math.min(e.target.scrollHeight, 300)}px`;
-                                            }}
-                                            onChange={(e) => {
-                                                e.target.style.height = 'auto';
-                                                e.target.style.height = `${Math.min(e.target.scrollHeight, 300)}px`;
-                                            }}
-                                            onBlur={(e) => {
-                                                handleCellSave(e.target.value || null, rowData, column.key, rowIndex);
-                                                setEditingCell(null);
-                                            }}
-                                            onKeyDown={(e) => {
-                                                if (e.key === "Enter" && !e.shiftKey) {
-                                                    e.preventDefault();
-                                                    handleCellSave((e.currentTarget as HTMLTextAreaElement).value || null, rowData, column.key, rowIndex);
-                                                    setEditingCell(null);
-                                                }
-                                                if (e.key === "Escape") setEditingCell(null);
-                                            }}
-                                        />
-                                    </div>
+                                    <FixedEditorOverlay
+                                        displayValue={displayValue}
+                                        onSave={(val) => handleCellSave(val, rowData, column.key, rowIndex)}
+                                        onCancel={() => setEditingCell(null)}
+                                    />
                                 );
                             }
 

@@ -14,6 +14,7 @@ import type { Node, Edge, NodeChange, EdgeChange } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
     Typography,
+    TextField,
     cls,
     defaultBorderMixin,
     CircularProgress,
@@ -229,17 +230,12 @@ duration: 400 }
 
                     {/* Search */}
                     <div className="px-2 py-1.5 border-b border-surface-200/40 dark:border-surface-700/40">
-                        <input
-                            type="text"
+                        <TextField
+                            size="smallest"
                             placeholder="Filter tables…"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className={cls(
-                                "w-full px-2.5 py-1.5 text-xs rounded-md transition-colors",
-                                "bg-surface-50 dark:bg-surface-800 border border-surface-200/50 dark:border-surface-700/50",
-                                "text-text-primary dark:text-text-primary-dark placeholder:text-text-disabled",
-                                "focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
-                            )}
+                            inputClassName="text-xs"
                         />
                     </div>
 
