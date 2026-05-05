@@ -1,3 +1,4 @@
+
 import type { ArrayProperty, Property, StringProperty } from "@rebasepro/types";
 import Compressor from "compressorjs";
 import { deepEqual as equal } from "fast-equals";

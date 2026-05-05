@@ -1,42 +1,10 @@
+
 import { IconForView } from "@rebasepro/core";
 import { useStudioCollectionRegistry, useStudioSideEntityController } from "@rebasepro/core";
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
-import {
-    Button,
-    Paper,
-    Typography,
-    CircularProgress,
-    cls,
-    IconButton,
-    InputLabel,
-    Dialog,
-    DialogContent,
-    DialogActions,
-    DialogTitle,
-    TextField,
-    Tooltip,
-    Alert,
-    Tabs,
-    Tab,
-    defaultBorderMixin,
-    Select,
-    SelectItem,
-    Menu,
-    MenuItem,
-    ResizablePanels,
-    Chip,
-    CloseIcon,
-    AddIcon,
-    StorageIcon,
-    TerminalIcon,
-    EditIcon,
-    MoreVertIcon,
-    NotesIcon,
-    PlayArrowIcon,
-    VirtualTable,
-    VirtualTableColumn
-} from "@rebasepro/ui";
+import { Button, Paper, Typography, CircularProgress, cls, IconButton, InputLabel, Dialog, DialogContent, DialogActions, DialogTitle, TextField, Tooltip, Alert, Tabs, Tab, defaultBorderMixin, Select, SelectItem, Menu, MenuItem, ResizablePanels, Chip, VirtualTable, VirtualTableColumn , iconSize } from "@rebasepro/ui";
+import { DatabaseIcon, TerminalIcon, XIcon, PlusIcon, PencilIcon, MoreVerticalIcon, MenuIcon, PlayIcon } from "lucide-react";
 // VirtualTableInput is conditionally loaded from CMS when available
 let VirtualTableInput: React.ComponentType<any> | null = null;
 try {
@@ -116,6 +84,7 @@ const FixedEditorOverlay = ({
             window.addEventListener('resize', handleResize);
             return () => window.removeEventListener('resize', handleResize);
         }
+        return undefined;
     }, []);
 
     if (!rect) {
@@ -481,7 +450,6 @@ isPrimaryKey });
             fetchSchema();
         }
     }, [fetchSchema, isLoadingConfig, selectedDatabase]);
-
 
     const [autoLimit, setAutoLimit] = useState(true);
     const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
@@ -1065,7 +1033,7 @@ id: String(ra.entityId) })}>
                                                         });
                                                     }}
                                                 >
-                                                    <EditIcon size="small"/>
+                                                    <PencilIcon size={iconSize.smallest}/>
                                                 </IconButton>
                                             </Tooltip>
                                         </div>
@@ -1081,7 +1049,7 @@ id: String(ra.entityId) })}>
                                                     className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
                                                     onClick={(e) => e.stopPropagation()}
                                                 >
-                                                    <MoreVertIcon size="small"/>
+                                                    <MoreVerticalIcon size={iconSize.smallest}/>
                                                 </IconButton>
                                             }
                                         >
@@ -1239,7 +1207,7 @@ id: String(ra.entityId) })}
                                     <Tabs value={activeTabId} onValueChange={handleTabChange} variant="boxy" className="w-[unset] flex-shrink-0" innerClassName="bg-white dark:bg-surface-950">
                                         {tabs.map(tab => (
                                             <Tab key={tab.id} value={tab.id} className="flex items-center justify-between group max-w-[200px]">
-                                                <TerminalIcon size="smallest" className="text-blue-500 mr-1.5 flex-shrink-0"/>
+                                                <TerminalIcon size={iconSize.smallest} className="text-blue-500 mr-1.5 flex-shrink-0"/>
                                                 <span className="truncate">{tab.name}</span>
                                                 {tabs.length > 1 && (
                                                     <IconButton
@@ -1247,7 +1215,7 @@ id: String(ra.entityId) })}
                                                         onClick={(e) => handleCloseTab(tab.id, e)}
                                                         className="ml-1 !p-0.5 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity"
                                                     >
-                                                        <CloseIcon size="smallest"/>
+                                                        <XIcon size={iconSize.smallest}/>
                                                     </IconButton>
                                                 )}
                                             </Tab>
@@ -1258,14 +1226,14 @@ id: String(ra.entityId) })}
                                         onClick={handleAddTab}
                                         className="ml-2 flex-shrink-0"
                                     >
-                                        <AddIcon size="small"/>
+                                        <PlusIcon size={iconSize.smallest}/>
                                     </IconButton>
                                 </div>
                             </div>
                             <div className="flex shrink-0 items-center justify-end pr-2 gap-1.5">
                                 <Tooltip title={t("studio_sql_format_sql")}>
                                     <IconButton size="small" onClick={handlePrettify} className="text-text-secondary hover:text-text-primary transition-colors">
-                                        <NotesIcon size="small"/>
+                                        <MenuIcon size={iconSize.smallest}/>
                                     </IconButton>
                                 </Tooltip>
 
@@ -1329,7 +1297,7 @@ isFavorite: !s.isFavorite } : s));
                                             variant="outlined"
                                             className="text-text-secondary dark:text-text-secondary-dark font-medium mr-2"
                                         >
-                                            <StorageIcon size="small" className="mr-1.5 text-text-disabled dark:text-text-disabled-dark"/>
+                                            <DatabaseIcon size={iconSize.small} className="mr-1.5 text-text-disabled dark:text-text-disabled-dark"/>
                                             <span className="max-w-[80px] truncate">{isLoadingConfig ? "..." : (selectedDatabase || t("studio_sql_select_db"))}</span>
                                         </Button>
                                     }
@@ -1373,7 +1341,7 @@ isFavorite: !s.isFavorite } : s));
                                     size="small"
                                     color="primary"
                                 >
-                                    {loading ? <CircularProgress size="smallest" className="mr-2"/> : <PlayArrowIcon size="small" className="mr-2"/>}
+                                    {loading ? <CircularProgress size="smallest" className="mr-2"/> : <PlayIcon size={iconSize.smallest} className="mr-2"/>}
                                     {t("studio_sql_run")}
                                 </Button>
                             </div>

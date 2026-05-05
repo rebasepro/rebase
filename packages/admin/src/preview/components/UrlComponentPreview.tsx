@@ -3,7 +3,8 @@ import React, { useMemo } from "react";
 import { ImagePreview } from "./ImagePreview";
 import { PreviewType } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
-import { cls, DescriptionIcon, OpenInNewIcon, Tooltip, Typography } from "@rebasepro/ui";
+import { cls, Tooltip, Typography } from "@rebasepro/ui";
+import { ExternalLinkIcon, FileTextIcon } from "lucide-react";
 import { EmptyValue } from "./EmptyValue";
 import { getThumbnailMeasure } from "../util";
 
@@ -37,7 +38,7 @@ export function UrlComponentPreview({
                     e.preventDefault();
                 }}
                 target="_blank">
-                <OpenInNewIcon size={"small"}/>
+                <ExternalLinkIcon/>
                 {url}
             </a>
         );
@@ -69,7 +70,7 @@ export function UrlComponentPreview({
                         width: getThumbnailMeasure(size),
                         height: getThumbnailMeasure(size)
                     }}>
-                    <DescriptionIcon className="text-surface-700 dark:text-surface-300"/>
+                    <FileTextIcon className="text-surface-700 dark:text-surface-300"/>
                     {hint && <Typography
                         className="max-w-full truncate rtl text-left"
                         variant={"caption"}>{hint}</Typography>}

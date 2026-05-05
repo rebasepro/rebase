@@ -1,4 +1,12 @@
 import React, { useEffect, useState } from "react";
+import { icons as lucideIcons } from "lucide-react";
+
+/** Tiny local wrapper for data-driven icon rendering in the demo */
+function Icon({ iconKey, size = 20, className = "" }: { iconKey: string; size?: number; className?: string }) {
+    const Comp = (lucideIcons as any)[iconKey];
+    if (!Comp) return null;
+    return <Comp size={size} className={className} />;
+}
 
 interface PropertyFieldProps {
     name: string;
@@ -45,17 +53,14 @@ function PropertyField({
                                 className="h-8 w-8 flex items-center justify-center rounded-full shadow text-white"
                                 style={{ background: isDisabled ? "rgb(107, 114, 128)" : iconColor }}
                             >
-                                <span className="material-icons select-none" style={{ fontSize: "20px" }}>
-                                    {icon}
-                                </span>
+                                <Icon iconKey={icon} size={20} className="select-none" />
                             </div>
                             {isDisabled && (
-                                <span
-                                    className="material-icons text-text-disabled dark:text-text-disabled-dark select-none absolute -right-2 -top-2"
-                                    style={{ fontSize: "20px" }}
-                                >
-                                    do_not_disturb_on
-                                </span>
+                                <Icon
+                                    iconKey="Ban"
+                                    size={20}
+                                    className="text-text-disabled dark:text-text-disabled-dark select-none absolute -right-2 -top-2"
+                                />
                             )}
                         </div>
                         <div
@@ -88,9 +93,7 @@ function PropertyField({
                 <div className="absolute top-2 right-2 flex flex-row">
                     <span
                         className="cursor-pointer text-surface-accent-600 dark:text-surface-accent-300 bg-transparent inline-flex items-center justify-center p-2 text-sm font-medium rounded-full w-8 h-8 min-w-8 min-h-8 hover:bg-surface-accent-200 hover:bg-opacity-75 dark:hover:bg-surface-accent-800">
-                        <span className="material-icons select-none" style={{ fontSize: "20px" }}>
-                            drag_handle
-                        </span>
+                        <Icon iconKey="GripVertical" size={20} className="select-none" />
                     </span>
                 </div>
             </div>
@@ -111,9 +114,7 @@ function PropertyTypeOption({
                 <div className="mr-8">
                     <div className="h-8 w-8 flex items-center justify-center rounded-full shadow text-white"
                          style={{ background: iconColor }}>
-                        <span className="material-icons select-none" style={{ fontSize: "20px" }}>
-                            {icon}
-                        </span>
+                        <Icon iconKey={icon} size={20} className="select-none" />
                     </div>
                 </div>
                 <div>
@@ -190,7 +191,7 @@ export function SchemaEditorDemo() {
             name: "Name",
             type: "Text field",
             dataType: "string",
-            icon: "short_text",
+            icon: "Type",
             iconColor: "rgb(45, 127, 249)",
             isSelected: true
         },
@@ -198,28 +199,28 @@ export function SchemaEditorDemo() {
             name: "Image",
             type: "File upload",
             dataType: "string",
-            icon: "upload_file",
+            icon: "Upload",
             iconColor: "rgb(249, 45, 154)"
         },
         {
             name: "Category",
             type: "Select/enum",
             dataType: "string",
-            icon: "list",
+            icon: "List",
             iconColor: "rgb(66, 35, 201)"
         },
         {
             name: "Available",
             type: "Switch",
             dataType: "boolean",
-            icon: "flag",
+            icon: "ToggleRight",
             iconColor: "rgb(32, 217, 210)"
         },
         {
             name: "price",
             type: "This property is defined as a property builder in code",
             dataType: "",
-            icon: "functions",
+            icon: "FunctionSquare",
             iconColor: "",
             isDisabled: true,
             disabledText: "This property is defined as a property builder in code"
@@ -228,35 +229,35 @@ export function SchemaEditorDemo() {
             name: "Currency",
             type: "Select/enum",
             dataType: "string",
-            icon: "list",
+            icon: "List",
             iconColor: "rgb(66, 35, 201)"
         },
         {
             name: "Public",
             type: "Switch",
             dataType: "boolean",
-            icon: "flag",
+            icon: "ToggleRight",
             iconColor: "rgb(32, 217, 210)"
         },
         {
             name: "Brand",
             type: "Text field",
             dataType: "string",
-            icon: "short_text",
+            icon: "Type",
             iconColor: "rgb(45, 127, 249)"
         },
         {
             name: "Description",
             type: "Markdown",
             dataType: "string",
-            icon: "format_quote",
+            icon: "Quote",
             iconColor: "rgb(45, 127, 249)"
         },
         {
             name: "Amazon link",
             type: "Url",
             dataType: "string",
-            icon: "http",
+            icon: "Globe",
             iconColor: "rgb(21, 79, 179)"
         }
     ];
@@ -266,7 +267,7 @@ export function SchemaEditorDemo() {
             name: "Name",
             type: "Text field",
             dataType: "string",
-            icon: "short_text",
+            icon: "Type",
             iconColor: "rgb(45, 127, 249)",
             indent: 1
         },
@@ -274,7 +275,7 @@ export function SchemaEditorDemo() {
             name: "External id",
             type: "Text field",
             dataType: "string",
-            icon: "short_text",
+            icon: "Type",
             iconColor: "rgb(45, 127, 249)",
             indent: 1
         }
@@ -285,49 +286,49 @@ export function SchemaEditorDemo() {
             name: "Images",
             type: "Multiple file upload",
             dataType: "array",
-            icon: "drive_folder_upload",
+            icon: "FolderUp",
             iconColor: "rgb(249, 45, 154)"
         },
         {
             name: "Related products",
             type: "Multiple references",
             dataType: "array",
-            icon: "add_link",
+            icon: "Link2",
             iconColor: "rgb(255, 0, 66)"
         },
         {
             name: "Available locales",
             type: "Multi select (enum)",
             dataType: "array",
-            icon: "list_alt",
+            icon: "ListChecks",
             iconColor: "rgb(66, 35, 201)"
         },
         {
             name: "Uppercase Name",
             type: "Text field",
             dataType: "string",
-            icon: "short_text",
+            icon: "Type",
             iconColor: "rgb(45, 127, 249)"
         },
         {
             name: "Tags",
             type: "Repeat/list",
             dataType: "array",
-            icon: "repeat",
+            icon: "Repeat",
             iconColor: "rgb(255, 148, 8)"
         },
         {
             name: "Added on",
             type: "Date/time",
             dataType: "date",
-            icon: "schedule",
+            icon: "Clock",
             iconColor: "rgb(139, 70, 255)"
         },
         {
             name: "spanish_title",
             type: "This field is defined as an additional field in code",
             dataType: "",
-            icon: "functions",
+            icon: "FunctionSquare",
             iconColor: "",
             isDisabled: true,
             disabledText: "This field is defined as an additional field in code"
@@ -336,7 +337,7 @@ export function SchemaEditorDemo() {
             name: "Metadata",
             type: "Key-value",
             dataType: "map",
-            icon: "ballot",
+            icon: "ListTodo",
             iconColor: "rgb(255, 148, 8)"
         }
     ];
@@ -366,19 +367,19 @@ export function SchemaEditorDemo() {
                             type="button"
                             className="cursor-pointer text-surface-accent-600 dark:text-surface-accent-300 bg-surface-accent-200 bg-opacity-50 dark:bg-surface-950 dark:bg-opacity-50 inline-flex items-center justify-center p-2 text-sm font-medium rounded-full w-10 h-10 min-w-10 min-h-10 hover:bg-opacity-75 dark:hover:bg-surface-accent-800 hover:scale-105 transition-transform"
                         >
-                            <span className="material-icons select-none" style={{ fontSize: "24px" }}>code</span>
+                            <Icon iconKey="Code" size={24} className="select-none" />
                         </button>
                         <button
                             type="button"
                             className="cursor-pointer text-surface-accent-600 dark:text-surface-accent-300 bg-surface-accent-200 bg-opacity-50 dark:bg-surface-950 dark:bg-opacity-50 inline-flex items-center justify-center p-2 text-sm font-medium rounded-full w-10 h-10 min-w-10 min-h-10 hover:bg-opacity-75 dark:hover:bg-surface-accent-800 hover:scale-105 transition-transform"
                         >
-                            <span className="material-icons select-none" style={{ fontSize: "24px" }}>autorenew</span>
+                            <Icon iconKey="RefreshCw" size={24} className="select-none" />
                         </button>
                         <button
                             type="button"
                             className="h-fit rounded-md inline-flex items-center justify-center p-2 gap-2 w-fit border border-primary text-primary hover:text-primary hover:bg-primary/10 py-2 px-4"
                         >
-                            <span className="material-icons select-none" style={{ fontSize: "24px" }}>add</span>
+                            <Icon iconKey="Plus" size={24} className="select-none" />
                         </button>
                     </div>
                 </div>
@@ -405,8 +406,7 @@ export function SchemaEditorDemo() {
                                         <div
                                             className="h-8 w-8 flex items-center justify-center rounded-full shadow text-white"
                                             style={{ background: "rgb(255, 148, 8)" }}>
-                                            <span className="material-icons select-none"
-                                                  style={{ fontSize: "20px" }}>ballot</span>
+                                            <Icon iconKey="ListTodo" size={20} className="select-none" />
                                         </div>
                                     </div>
                                     <div
@@ -427,8 +427,7 @@ export function SchemaEditorDemo() {
                             <div className="absolute top-2 right-2 flex flex-row">
                                 <span
                                     className="cursor-pointer text-surface-accent-600 dark:text-surface-accent-300 bg-transparent inline-flex items-center justify-center p-2 text-sm font-medium rounded-full w-8 h-8 min-w-8 min-h-8">
-                                    <span className="material-icons select-none"
-                                          style={{ fontSize: "20px" }}>drag_handle</span>
+                                    <Icon iconKey="GripVertical" size={20} className="select-none" />
                                 </span>
                             </div>
                             <div className="ml-16">
@@ -449,7 +448,7 @@ export function SchemaEditorDemo() {
                     type="button"
                     className="h-fit rounded-md inline-flex items-center justify-center p-2 gap-2 border border-primary text-primary hover:text-primary hover:bg-primary/10 py-2.5 px-5 mt-8 w-full"
                 >
-                    <span className="material-icons select-none" style={{ fontSize: "24px" }}>add</span>
+                    <Icon iconKey="Plus" size={24} className="select-none" />
                     Add new property
                 </button>
             </div>
@@ -467,8 +466,7 @@ export function SchemaEditorDemo() {
                                         <div
                                             className="h-8 w-8 flex items-center justify-center rounded-full shadow text-white"
                                             style={{ background: "rgb(45, 127, 249)" }}>
-                                            <span className="material-icons select-none"
-                                                  style={{ fontSize: "20px" }}>short_text</span>
+                                            <Icon iconKey="Type" size={20} className="select-none" />
                                         </div>
                                     </div>
                                     <div className="flex flex-col items-start text-base text-left">
@@ -483,7 +481,7 @@ export function SchemaEditorDemo() {
                             type="button"
                             className="cursor-pointer text-surface-accent-600 dark:text-surface-accent-300 bg-transparent inline-flex items-center justify-center p-2 text-sm font-medium rounded-full w-10 h-10 min-w-10 min-h-10 m-4 hover:bg-surface-accent-200 hover:bg-opacity-75 dark:hover:bg-surface-accent-800 hover:scale-105 transition-transform"
                         >
-                            <span className="material-icons select-none" style={{ fontSize: "24px" }}>delete</span>
+                            <Icon iconKey="Trash2" size={24} className="select-none" />
                         </button>
                     </div>
 
@@ -546,13 +544,11 @@ export function SchemaEditorDemo() {
                                     type="button"
                                     className="rounded-t flex items-center justify-between w-full min-h-[52px] hover:bg-surface-accent-200 hover:bg-opacity-40 dark:hover:bg-surface-800 dark:hover:bg-opacity-40 p-4 py-4 transition-all duration-200 bg-opacity-50 bg-surface-accent-200 dark:bg-surface-800 dark:bg-opacity-60"
                                 >
-                                    <div className="flex flex-row text-text-secondary dark:text-text-secondary-dark">
-                                        <span className="material-icons select-none"
-                                              style={{ fontSize: "24px" }}>rule</span>
+                                    <div className="flex flex-row text-text-secondary dark:text-text-secondary-dark items-center">
+                                        <Icon iconKey="CheckSquare" size={24} className="select-none" />
                                         <h6 className="typography-subtitle2 text-text-primary dark:text-text-primary-dark ml-2">Validation</h6>
                                     </div>
-                                    <span className="material-icons select-none transition"
-                                          style={{ fontSize: "24px" }}>keyboard_arrow_down</span>
+                                    <Icon iconKey="ChevronDown" size={24} className="select-none transition" />
                                 </button>
                             </div>
                         </div>
@@ -636,19 +632,19 @@ export function SchemaEditorDemo() {
                                         <label
                                             className="typography-label text-text-primary dark:text-text-primary-dark">Text</label>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 mt-4">
-                                            <PropertyTypeOption icon="short_text" iconColor="rgb(45, 127, 249)"
+                                            <PropertyTypeOption icon="Type" iconColor="rgb(45, 127, 249)"
                                                                 title="Text field" description="Simple short text"/>
-                                            <PropertyTypeOption icon="subject" iconColor="rgb(45, 127, 249)"
+                                            <PropertyTypeOption icon="AlignLeft" iconColor="rgb(45, 127, 249)"
                                                                 title="Multiline"
                                                                 description="Text with multiple lines"/>
-                                            <PropertyTypeOption icon="format_quote" iconColor="rgb(45, 127, 249)"
+                                            <PropertyTypeOption icon="Quote" iconColor="rgb(45, 127, 249)"
                                                                 title="Markdown"
                                                                 description="Text with advanced markdown syntax"/>
-                                            <PropertyTypeOption icon="http" iconColor="rgb(21, 79, 179)" title="Url"
+                                            <PropertyTypeOption icon="Globe" iconColor="rgb(21, 79, 179)" title="Url"
                                                                 description="Text with URL validation"/>
-                                            <PropertyTypeOption icon="mail" iconColor="rgb(21, 79, 179)" title="Email"
+                                            <PropertyTypeOption icon="Mail" iconColor="rgb(21, 79, 179)" title="Email"
                                                                 description="Text with email validation"/>
-                                            <PropertyTypeOption icon="link" iconColor="rgb(21, 79, 179)"
+                                            <PropertyTypeOption icon="Link" iconColor="rgb(21, 79, 179)"
                                                                 title="Reference (as string)"
                                                                 description="The value refers to a different collection (it is saved as a string)"/>
                                         </div>
@@ -659,7 +655,7 @@ export function SchemaEditorDemo() {
                                         <label
                                             className="typography-label text-text-primary dark:text-text-primary-dark">Boolean</label>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 mt-4">
-                                            <PropertyTypeOption icon="flag" iconColor="rgb(32, 217, 210)" title="Switch"
+                                            <PropertyTypeOption icon="ToggleRight" iconColor="rgb(32, 217, 210)" title="Switch"
                                                                 description="Boolean true or false field (or yes or no, 0 or 1...)"/>
                                         </div>
                                     </div>
@@ -669,17 +665,17 @@ export function SchemaEditorDemo() {
                                         <label
                                             className="typography-label text-text-primary dark:text-text-primary-dark">Select</label>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 mt-4">
-                                            <PropertyTypeOption icon="list" iconColor="rgb(66, 35, 201)"
+                                            <PropertyTypeOption icon="List" iconColor="rgb(66, 35, 201)"
                                                                 title="Select/enum"
                                                                 description="Select one text value from within an enumeration"/>
-                                            <PropertyTypeOption icon="list_alt" iconColor="rgb(66, 35, 201)"
+                                            <PropertyTypeOption icon="ListChecks" iconColor="rgb(66, 35, 201)"
                                                                 title="Multi select (enum)"
                                                                 description="Select multiple text values from within an enumeration"/>
-                                            <PropertyTypeOption icon="format_list_numbered"
+                                            <PropertyTypeOption icon="ListOrdered"
                                                                 iconColor="rgb(190, 201, 32)"
                                                                 title="Number select"
                                                                 description="Select a number value from within an enumeration"/>
-                                            <PropertyTypeOption icon="format_list_numbered"
+                                            <PropertyTypeOption icon="ListOrdered"
                                                                 iconColor="rgb(190, 201, 32)"
                                                                 title="Multiple number select"
                                                                 description="Select multiple number values from within an enumeration"/>
@@ -691,7 +687,7 @@ export function SchemaEditorDemo() {
                                         <label
                                             className="typography-label text-text-primary dark:text-text-primary-dark">Users</label>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 mt-4">
-                                            <PropertyTypeOption icon="person" iconColor="rgb(45, 127, 249)"
+                                            <PropertyTypeOption icon="User" iconColor="rgb(45, 127, 249)"
                                                                 title="User select"
                                                                 description="Select a user from the user management system. Store the user ID."/>
                                         </div>
@@ -702,7 +698,7 @@ export function SchemaEditorDemo() {
                                         <label
                                             className="typography-label text-text-primary dark:text-text-primary-dark">Number</label>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 mt-4">
-                                            <PropertyTypeOption icon="numbers" iconColor="rgb(190, 201, 32)"
+                                            <PropertyTypeOption icon="Hash" iconColor="rgb(190, 201, 32)"
                                                                 title="Number input"
                                                                 description="Simple number field with validation"/>
                                         </div>
@@ -713,10 +709,10 @@ export function SchemaEditorDemo() {
                                         <label
                                             className="typography-label text-text-primary dark:text-text-primary-dark">File</label>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 mt-4">
-                                            <PropertyTypeOption icon="upload_file" iconColor="rgb(249, 45, 154)"
+                                            <PropertyTypeOption icon="Upload" iconColor="rgb(249, 45, 154)"
                                                                 title="File upload"
                                                                 description="Input for uploading single files"/>
-                                            <PropertyTypeOption icon="drive_folder_upload" iconColor="rgb(249, 45, 154)"
+                                            <PropertyTypeOption icon="FolderUp" iconColor="rgb(249, 45, 154)"
                                                                 title="Multiple file upload"
                                                                 description="Input for uploading multiple files"/>
                                         </div>
@@ -727,10 +723,10 @@ export function SchemaEditorDemo() {
                                         <label
                                             className="typography-label text-text-primary dark:text-text-primary-dark">Reference</label>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 mt-4">
-                                            <PropertyTypeOption icon="link" iconColor="rgb(255, 0, 66)"
+                                            <PropertyTypeOption icon="Link" iconColor="rgb(255, 0, 66)"
                                                                 title="Reference"
                                                                 description="The value refers to a different collection (it is saved as a reference)"/>
-                                            <PropertyTypeOption icon="add_link" iconColor="rgb(255, 0, 66)"
+                                            <PropertyTypeOption icon="Link2" iconColor="rgb(255, 0, 66)"
                                                                 title="Multiple references"
                                                                 description="Multiple values that refer to a different collection"/>
                                         </div>
@@ -741,7 +737,7 @@ export function SchemaEditorDemo() {
                                         <label
                                             className="typography-label text-text-primary dark:text-text-primary-dark">Date</label>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 mt-4">
-                                            <PropertyTypeOption icon="schedule" iconColor="rgb(139, 70, 255)"
+                                            <PropertyTypeOption icon="Clock" iconColor="rgb(139, 70, 255)"
                                                                 title="Date/time"
                                                                 description="A date time select field"/>
                                         </div>
@@ -752,12 +748,12 @@ export function SchemaEditorDemo() {
                                         <label
                                             className="typography-label text-text-primary dark:text-text-primary-dark">Group</label>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 mt-4">
-                                            <PropertyTypeOption icon="ballot" iconColor="rgb(255, 148, 8)" title="Group"
+                                            <PropertyTypeOption icon="ListTodo" iconColor="rgb(255, 148, 8)" title="Group"
                                                                 description="Group of multiple fields"/>
-                                            <PropertyTypeOption icon="ballot" iconColor="rgb(255, 148, 8)"
+                                            <PropertyTypeOption icon="ListTodo" iconColor="rgb(255, 148, 8)"
                                                                 title="Key-value"
                                                                 description="Flexible field that allows the user to add multiple key-value pairs"/>
-                                            <PropertyTypeOption icon="view_stream" iconColor="rgb(255, 148, 8)"
+                                            <PropertyTypeOption icon="Rows" iconColor="rgb(255, 148, 8)"
                                                                 title="Block"
                                                                 description="A complex field that allows the user to compose different fields together, with a key/value format"/>
                                         </div>
@@ -768,7 +764,7 @@ export function SchemaEditorDemo() {
                                         <label
                                             className="typography-label text-text-primary dark:text-text-primary-dark">Array</label>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 mt-4">
-                                            <PropertyTypeOption icon="repeat" iconColor="rgb(255, 148, 8)"
+                                            <PropertyTypeOption icon="Repeat" iconColor="rgb(255, 148, 8)"
                                                                 title="Repeat/list"
                                                                 description="A field that gets repeated multiple times (e.g. multiple text fields)"/>
                                         </div>

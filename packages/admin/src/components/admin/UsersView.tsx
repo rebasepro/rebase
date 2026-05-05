@@ -1,41 +1,10 @@
+
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { User } from "@rebasepro/types";
 import { useSnackbarController, useAuthController, useTranslation } from "@rebasepro/core";
 import { useBreadcrumbsController } from "../../index";
-import {
-    AddIcon,
-    Button,
-    Container,
-    DeleteIcon,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    IconButton,
-    Table,
-    TableBody,
-    TableCell,
-    TableHeader,
-    TableRow,
-    TextField,
-    Typography,
-    CircularProgress,
-    CenteredView,
-    Tooltip,
-    MultiSelect,
-    MultiSelectItem,
-    LoadingButton,
-    ContentCopyIcon,
-    CheckCircleIcon,
-    EmailIcon,
-    SearchBar,
-    LockResetIcon,
-    ChevronLeftIcon,
-    ChevronRightIcon,
-    Select,
-    SelectItem,
-    Skeleton
-} from "@rebasepro/ui";
+import { Button, Container, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Table, TableBody, TableCell, TableHeader, TableRow, TextField, Typography, CircularProgress, CenteredView, Tooltip, MultiSelect, MultiSelectItem, LoadingButton, SearchBar, Select, SelectItem, Skeleton , iconSize } from "@rebasepro/ui";
+import { MailIcon, KeyRoundIcon, PlusIcon, Trash2Icon, CopyIcon, CheckCircleIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { RoleChip } from "./RoleChip";
 import { UserManagementDelegate, Role, UserCreationResult } from "@rebasepro/types";
 import { ConfirmationDialog } from "@rebasepro/core";
@@ -325,7 +294,7 @@ message: error instanceof Error ? error.message : t("error_resetting_password") 
                     size="small"
                     expandable
                 />
-                <Button startIcon={<AddIcon/>} onClick={handleAddUser} disabled={!saveUser}>
+                <Button startIcon={<PlusIcon/>} onClick={handleAddUser} disabled={!saveUser}>
                     {t("add_user")}
                 </Button>
             </div>
@@ -403,7 +372,7 @@ roles: ["w-16", "w-16"] }
                                                         setUserToReset(user);
                                                         setResetConfirmOpen(true);
                                                     }}>
-                                                    <LockResetIcon size="smallest"/>
+                                                    <KeyRoundIcon size={iconSize.smallest}/>
                                                 </IconButton>
                                             </Tooltip>
                                         )}
@@ -416,7 +385,7 @@ roles: ["w-16", "w-16"] }
                                                         setUserToDelete(user);
                                                         setDeleteConfirmOpen(true);
                                                     }}>
-                                                    <DeleteIcon size="smallest"/>
+                                                    <Trash2Icon size={iconSize.smallest}/>
                                                 </IconButton>
                                             </Tooltip>
                                         )}
@@ -451,7 +420,7 @@ roles: ["w-16", "w-16"] }
                             size="small"
                             disabled={page === 0}
                             onClick={() => handlePageChange(page - 1)}>
-                            <ChevronLeftIcon size="small"/>
+                            <ChevronLeftIcon size={iconSize.smallest}/>
                         </IconButton>
                         <Typography variant="body2" className="px-3 text-surface-accent-600 dark:text-surface-accent-300">
                             {page + 1} / {totalPages}
@@ -460,7 +429,7 @@ roles: ["w-16", "w-16"] }
                             size="small"
                             disabled={page >= totalPages - 1}
                             onClick={() => handlePageChange(page + 1)}>
-                            <ChevronRightIcon size="small"/>
+                            <ChevronRightIcon size={iconSize.smallest}/>
                         </IconButton>
                     </div>
                 </div>
@@ -553,7 +522,7 @@ message: t("password_copied") ?? "Password copied to clipboard" });
             <Dialog open={true} onOpenChange={(open) => !open ? onClose() : undefined} maxWidth="xl">
                 <DialogTitle variant="h5" gutterBottom={false}>
                     <div className="flex items-center gap-3">
-                        <EmailIcon/>
+                        <MailIcon/>
                         {t("invitation_sent_title") ?? "Invitation Sent"}
                     </div>
                 </DialogTitle>
@@ -609,9 +578,9 @@ message: t("password_copied") ?? "Password copied to clipboard" });
                                 <code className="flex-grow bg-surface-100 dark:bg-surface-800 border border-surface-300 dark:border-surface-600 rounded px-3 py-2 font-mono text-base select-all">
                                     {result.temporaryPassword}
                                 </code>
-                                <Tooltip title={t("copy_password") ?? "Copy password"} asChild>
+                                <Tooltip title={t("copy_password") ?? "CopyIcon password"} asChild>
                                     <IconButton onClick={handleCopyPassword}>
-                                        {copied ? <CheckCircleIcon className="text-green-600"/> : <ContentCopyIcon/>}
+                                        {copied ? <CheckCircleIcon className="text-green-600"/> : <CopyIcon/>}
                                     </IconButton>
                                 </Tooltip>
                             </div>

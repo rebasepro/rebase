@@ -1,15 +1,7 @@
+
 import React from "react";
-import {
-    Button,
-    CloudUploadIcon,
-    DebouncedTextField,
-    ExpandablePanel,
-    MultiSelect,
-    MultiSelectItem,
-    Select,
-    SelectItem,
-    Typography
-} from "@rebasepro/ui";
+import { Button, DebouncedTextField, ExpandablePanel, MultiSelect, MultiSelectItem, Select, SelectItem, Typography } from "@rebasepro/ui";
+import { UploadCloudIcon } from "lucide-react";
 
 import { Field, FormexFieldProps, getIn, useFormex } from "@rebasepro/formex";
 import { GeneralPropertyValidation } from "./validation/GeneralPropertyValidation";
@@ -89,7 +81,7 @@ export function StoragePropertyField({
                 <ExpandablePanel
                     title={
                         <div className="flex flex-row text-surface-500 text-text-secondary dark:text-text-secondary-dark">
-                            <CloudUploadIcon/>
+                            <UploadCloudIcon/>
                             <Typography variant={"subtitle2"}
                                 className="ml-4">
                                 File upload config

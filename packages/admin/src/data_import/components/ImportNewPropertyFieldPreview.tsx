@@ -5,7 +5,8 @@ import {
     getFieldConfig,
     PropertyConfigBadge
 } from "../../components";
-import { EditIcon, ErrorBoundary, IconButton, TextField } from "@rebasepro/ui";
+import { ErrorBoundary, IconButton, TextField } from "@rebasepro/ui";
+import { PencilIcon } from "lucide-react";
 
 export function ImportNewPropertyFieldPreview({
     propertyKey,
@@ -48,7 +49,7 @@ export function ImportNewPropertyFieldPreview({
                             }}/>}
 
                     <IconButton onClick={onEditClick} size={"small"}>
-                        <EditIcon size={"small"}/>
+                        <PencilIcon/>
                     </IconButton>
                 </div>
 

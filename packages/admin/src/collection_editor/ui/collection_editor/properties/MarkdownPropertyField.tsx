@@ -1,17 +1,11 @@
+
 import React, { useCallback } from "react";
 import { StringPropertyValidation } from "./validation/StringPropertyValidation";
 import { ValidationPanel } from "./validation/ValidationPanel";
 import { Field, getIn, useFormex } from "@rebasepro/formex";
 
-import {
-    BooleanSwitchWithLabel,
-    CloudUploadIcon,
-    DebouncedTextField,
-    ExpandablePanel,
-    SettingsIcon,
-    TextField,
-    Typography
-} from "@rebasepro/ui";
+import { BooleanSwitchWithLabel, DebouncedTextField, ExpandablePanel, TextField, Typography } from "@rebasepro/ui";
+import { UploadCloudIcon, SettingsIcon } from "lucide-react";
 
 export function MarkdownPropertyField({
     disabled,
@@ -131,7 +125,7 @@ export function MarkdownPropertyField({
                 <ExpandablePanel
                     title={
                         <div className="flex flex-row text-surface-500">
-                            <CloudUploadIcon/>
+                            <UploadCloudIcon/>
                             <Typography variant={"subtitle2"}
                                 className="ml-4">
                                 File upload config
@@ -140,7 +134,6 @@ export function MarkdownPropertyField({
                     }>
 
                     <div className={"grid grid-cols-12 gap-2 p-4"}>
-
 
                         <div className={"col-span-12"}>
                             <Field name={fileName}

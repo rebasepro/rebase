@@ -7,11 +7,12 @@ import type { EntityFormProps, OnUpdateParams } from "../types/components/Entity
 import { deepEqual as equal } from "fast-equals";
 
 import { ErrorBoundary } from "@rebasepro/ui";
+import { AlignLeftIcon, CheckIcon, PencilIcon } from "lucide-react";
 import { getDefaultValuesFor, getLocalChangesBackup, isHidden, isReadOnly } from "@rebasepro/common";
 
 import { saveEntityWithCallbacks, useAuthController, useCustomizationController, useData, useSnackbarController, useTranslation, useSlot } from "@rebasepro/core";
 import { getFormFieldKeys } from "@rebasepro/core";
-import { Alert, CheckIcon, Chip, cls, EditIcon, NotesIcon, paperMixin, Tooltip, Typography } from "@rebasepro/ui";
+import { Alert, Chip, cls, iconSize, paperMixin, Tooltip, Typography } from "@rebasepro/ui";
 import { Formex, FormexController, getIn, setIn, useCreateFormex } from "@rebasepro/formex";
 import { useAnalyticsController } from "@rebasepro/core";
 import { FormEntry, FormLayout, LabelWithIconAndTooltip, PropertyFieldBinding } from "../form";
@@ -57,7 +58,7 @@ export function extractTouchedValues(values: any, touched: Record<string, boolea
  * from falsely triggering the unsaved local changes indicator.
  */
 /**
- * Check if a value is semantically empty (null, undefined, or empty string).
+ * CheckIcon if a value is semantically empty (null, undefined, or empty string).
  */
 function isSemanticEmpty(v: any): boolean {
     return v === null || v === undefined || v === "";
@@ -648,7 +649,7 @@ export function EntityForm<M extends Record<string, unknown>>({
                             <div key={`additional_${key}`} className={"w-full"}>
                                 <LabelWithIconAndTooltip
                                     propertyKey={key}
-                                    icon={<NotesIcon size={"small"}/>}
+                                    icon={<AlignLeftIcon size={iconSize.small}/>}
                                     title={additionalField.name}
                                     className={"text-text-secondary dark:text-text-secondary-dark ml-3.5"}/>
                                 <div
@@ -769,12 +770,12 @@ export function EntityForm<M extends Record<string, unknown>>({
                             {formex.dirty
                                 ? <Tooltip title={t("form_modified")}>
                                     <Chip size={"small"} className={"py-1"} colorScheme={"orangeDarker"}>
-                                        <EditIcon size={"smallest"}/>
+                                        <PencilIcon size={iconSize.smallest}/>
                                     </Chip>
                                 </Tooltip>
                                 : <Tooltip title={t("form_in_sync")}>
                                     <Chip size={"small"} className={"py-1"}>
-                                        <CheckIcon size={"smallest"}/>
+                                        <CheckIcon size={iconSize.smallest}/>
                                     </Chip>
                                 </Tooltip>}
                         </div>
@@ -842,7 +843,6 @@ export function zodToFormErrors(zodError: z.ZodError): Record<string, any> {
     }
     return errors;
 }
-
 
 function useOnAutoSave(autoSave: undefined | boolean, formex: FormexController<any>, lastSavedValues: any, save: (values: EntityValues<any>) => Promise<Entity<any> | void>) {
     useEffect(() => {

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import { Button, CheckIcon, cls, DeleteIcon, focusedDisabled, Popover } from "@rebasepro/ui";
+import { Button, cls, focusedDisabled, Popover , iconSize } from "@rebasepro/ui";
+import { CheckIcon, Trash2Icon } from "lucide-react";
 import { useTranslation } from "@rebasepro/core";
 import { useProseMirrorContext } from "../hooks/useProseMirrorContext";
 import { getMarkAttributes, isMarkActive, setMark, unsetMark } from "../utils/prosemirror-utils";
@@ -103,13 +104,13 @@ export const LinkSelector = ({
                         className="flex items-center"
                         onClick={handleRemoveLink}
                     >
-                        <DeleteIcon size="small"/>
+                        <Trash2Icon size={iconSize.small}/>
                     </Button>
                 ) : (
                     <Button size={"small"}
                         type="submit"
                         variant={"text"}>
-                        <CheckIcon size="small"/>
+                        <CheckIcon size={iconSize.small}/>
                     </Button>
                 )}
             </form>

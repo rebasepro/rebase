@@ -1,10 +1,10 @@
+import { HistoryIcon } from "lucide-react";
 import React, { lazy } from "react";
 import type { EntityCustomView, EntityCollection } from "@rebasepro/types";
 import type { CustomizationController, EntityAction } from "@rebasepro/types";
-// Lazy-load: only resolved when History tab is visited
-const EntityHistoryView = lazy(() => import("../components/history").then(m => ({ default: m.EntityHistoryView })));
-import { HistoryIcon } from "@rebasepro/ui";
 
+// Lazy-load: only resolved when HistoryIcon tab is visited
+const EntityHistoryView = lazy(() => import("../components/history").then(m => ({ default: m.EntityHistoryView })));
 /**
  * Built-in entity views that are resolved by token name.
  * These are always available without needing to be registered
@@ -14,7 +14,7 @@ const BUILTIN_ENTITY_VIEWS: Record<string, EntityCustomView> = {
     "__rebase_history": {
         key: "__rebase_history",
         name: "History",
-        tabComponent: React.createElement(HistoryIcon, { size: "small" }),
+        tabComponent: React.createElement(HistoryIcon as any, { size: 20 }),
         Builder: EntityHistoryView,
         position: "end"
     }

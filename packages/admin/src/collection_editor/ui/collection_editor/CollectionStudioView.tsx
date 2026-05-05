@@ -1,12 +1,10 @@
+
 import { useUnsavedChangesDialog, UnsavedChangesDialog } from "@rebasepro/core";
 import { useUrlController } from "../../_cms_internals";
 import * as React from "react";
 import { useState, useMemo, useEffect } from "react";
-import {
-    Typography,
-    Button,
-    AddIcon
-} from "@rebasepro/ui";
+import { Typography, Button } from "@rebasepro/ui";
+import { PlusIcon } from "lucide-react";
 import { useSnackbarController } from "@rebasepro/core";
 import { CollectionEditorDialogProps } from "./CollectionEditorDialog";
 import { AIModifiedPathsProvider } from "./AIModifiedPathsContext";
@@ -77,7 +75,7 @@ export function CollectionStudioView({ collectionId, ...props }: CollectionStudi
                         <Button
                             onClick={() => navigate(urlController.buildAppUrlPath("schema/new"))}
                         >
-                            <AddIcon/>
+                            <PlusIcon/>
                             Add new collection
                         </Button>
                     </div>

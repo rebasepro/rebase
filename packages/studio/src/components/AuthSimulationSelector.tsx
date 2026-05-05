@@ -1,5 +1,6 @@
 import React from "react";
-import { Typography, cls } from "@rebasepro/ui";
+import { Typography, cls, iconSize } from "@rebasepro/ui";
+import { KeyRoundIcon } from "lucide-react";
 import { UserSelectPopover, SelectableUser } from "@rebasepro/core";
 
 export interface AuthSimulationSelectorProps {
@@ -23,9 +24,7 @@ export function AuthSimulationSelector({
 }: AuthSimulationSelectorProps) {
     return (
         <div className="flex flex-wrap items-center gap-3">
-            <span className="material-icons text-sm text-text-secondary dark:text-text-secondary-dark">
-                vpn_key
-            </span>
+            <KeyRoundIcon size={iconSize.small} className="text-text-secondary dark:text-text-secondary-dark" />
             <Typography
                 variant="caption"
                 className="text-text-secondary dark:text-text-secondary-dark text-xs font-medium"

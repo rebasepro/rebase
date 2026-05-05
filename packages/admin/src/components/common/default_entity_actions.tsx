@@ -1,5 +1,5 @@
+import { CopyIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import type { EntityAction } from "@rebasepro/types";
-import { DeleteIcon, EditIcon, FileCopyIcon } from "@rebasepro/ui";
 ;
 import { DeleteEntityDialog } from "../DeleteEntityDialog";
 import { addRecentId } from "../EntityCollectionView/utils";
@@ -7,7 +7,7 @@ import { navigateToEntity } from "../../util/navigation_utils";
 import { resolveDefaultSelectedView } from "@rebasepro/common";
 
 export const editEntityAction: EntityAction = {
-    icon: <EditIcon size={"small"}/>,
+    icon: <PencilIcon/>,
     key: "edit",
     name: "Edit",
     collapsed: false,
@@ -66,7 +66,7 @@ export const editEntityAction: EntityAction = {
 }
 
 export const copyEntityAction: EntityAction = {
-    icon: <FileCopyIcon size={"small"}/>,
+    icon: <CopyIcon/>,
     name: "Copy",
     key: "copy",
     isEnabled: ({ entity }) => Boolean(entity),
@@ -109,7 +109,7 @@ export const copyEntityAction: EntityAction = {
 }
 
 export const deleteEntityAction: EntityAction = {
-    icon: <DeleteIcon size={"small"}/>,
+    icon: <Trash2Icon/>,
     name: "Delete",
     key: "delete",
     isEnabled: ({ entity }) => Boolean(entity),

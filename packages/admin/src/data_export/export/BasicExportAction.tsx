@@ -1,18 +1,9 @@
+
 import React, { useCallback } from "react";
 
 import { Entity, Properties } from "@rebasepro/types";
-import {
-    BooleanSwitchWithLabel,
-    Button,
-    cls,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    DownloadIcon,
-    IconButton,
-    Tooltip
-} from "@rebasepro/ui";
+import { BooleanSwitchWithLabel, Button, cls, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Tooltip } from "@rebasepro/ui";
+import { DownloadIcon } from "lucide-react";
 import { downloadEntitiesExport } from "./export";
 
 export type BasicExportActionProps = {
@@ -78,7 +69,7 @@ export function BasicExportAction({
 
             <DialogContent className={"flex flex-col gap-4 my-4"}>
 
-                <div>Download the the content of this table as a CSV</div>
+                <div>DownloadIcon the the content of this table as a CSV</div>
 
                 <div className={"flex flex-row gap-4"}>
                     <div className={"p-4 flex flex-col"}>
@@ -141,7 +132,7 @@ export function BasicExportAction({
                 </Button>
 
                 <Button onClick={onOkClicked}>
-                    Download
+                    DownloadIcon
                 </Button>
 
             </DialogActions>

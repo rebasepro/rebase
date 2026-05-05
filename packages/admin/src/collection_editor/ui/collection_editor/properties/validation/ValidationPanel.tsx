@@ -1,6 +1,7 @@
 import { PropsWithChildren } from "react";
 
-import { ExpandablePanel, RuleIcon, Typography } from "@rebasepro/ui";
+import { ExpandablePanel, Typography } from "@rebasepro/ui";
+import { CheckSquareIcon } from "lucide-react";
 
 export function ValidationPanel({
     children
@@ -13,7 +14,7 @@ export function ValidationPanel({
             innerClassName="p-4"
             title={
                 <div className="flex flex-row text-surface-500 text-text-secondary dark:text-text-secondary-dark">
-                    <RuleIcon/>
+                    <CheckSquareIcon/>
                     <Typography variant={"subtitle2"}
                         className="ml-4">
                         Validation

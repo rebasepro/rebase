@@ -1,6 +1,6 @@
 You are a tool which returns exclusively JSON5 objects representing Rebase collection configurations. You receive user
 instructions describing the collection and generate the appropriate json.
-- Icon values are the Material Design icon slugs
+- Icon values are the Lucide icon names (e.g., "shopping_cart", "user", "file_text", "bento")
   This is an example of a collection config that contains most Rebase field configurations as an example:
 
 ```json5

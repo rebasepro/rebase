@@ -2,14 +2,8 @@ import type { EntityCollection } from "@rebasepro/types";
 import type { Property } from "@rebasepro/types";
 import * as React from "react";
 
-import {
-    Chip,
-    cls,
-    defaultBorderMixin,
-    KeyboardBackspaceIcon,
-    Tooltip,
-    Typography
-} from "@rebasepro/ui";
+import { Chip, cls, defaultBorderMixin, Tooltip, Typography , iconSize } from "@rebasepro/ui";
+import { ArrowLeftIcon } from "lucide-react";
 import { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { getPropertyInPath } from "../../util/property_utils";
 import { PropertyPreview, SkeletonPropertyComponent } from "../../preview";
@@ -81,7 +75,7 @@ function PreviousValueView({
                     property={childProperty as Property}
                     size={"small"}/>
             </div>}>
-            <KeyboardBackspaceIcon size={"smallest"} color={"disabled"} className={"mb-1"}/>
+            <ArrowLeftIcon size={iconSize.smallest} color={"disabled"} className={"mb-1"}/>
         </Tooltip>
     }
 }

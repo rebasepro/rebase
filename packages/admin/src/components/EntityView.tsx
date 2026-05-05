@@ -3,7 +3,8 @@ import type { EntityCollection } from "@rebasepro/types";
 import type { CustomizationController } from "@rebasepro/types";
 import React from "react";
 import { Entity } from "@rebasepro/types";
-import { cls, defaultBorderMixin, IconButton, OpenInNewIcon, Typography } from "@rebasepro/ui";
+import { cls, defaultBorderMixin, IconButton, Typography } from "@rebasepro/ui";
+import { ExternalLinkIcon } from "lucide-react";
 ;
 import { useCustomizationController } from "@rebasepro/core";
 import { useAuthController } from "@rebasepro/core";
@@ -53,8 +54,7 @@ export function EntityView<M extends Record<string, unknown>>(
                                     rel="noopener noreferrer"
                                     target="_blank">
                                     <IconButton>
-                                        <OpenInNewIcon
-                                            size={"small"}/>
+                                        <ExternalLinkIcon/>
                                     </IconButton>
                                 </a>}
                         </div>

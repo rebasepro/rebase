@@ -22,7 +22,6 @@
         "@firebase/analytics": "^0.10.18",
         "@firebase/app-check": "^0.11.0",
         "@fontsource/jetbrains-mono": "^5.2.8",
-        "@material-design-icons/font": "^0.14.15",
         "@rebasepro/admin": "workspace:*",
         "@rebasepro/client-firebase": "workspace:*",
         "@rebasepro/core": "workspace:*",

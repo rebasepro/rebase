@@ -1,3 +1,4 @@
+
 import React, { useDeferredValue, useEffect, useRef, useState } from "react";
 import { deepEqual as equal } from "fast-equals"
 
@@ -6,24 +7,8 @@ import { ConfirmationDialog } from "@rebasepro/core";
 import { DEFAULT_FIELD_CONFIGS, getFieldConfig, getFieldId, PropertyConfigBadge } from "../../_cms_internals";
 import { Property, PropertyConfig, PropertyConfigId } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";
-import {
-    Button,
-    Card,
-    cls,
-    DeleteIcon,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    fieldBackgroundDisabledMixin,
-    fieldBackgroundHoverMixin,
-    fieldBackgroundMixin,
-    IconButton,
-    InfoLabel,
-    Tooltip,
-    Typography,
-    WarningIcon
-} from "@rebasepro/ui";
+import { Button, Card, cls, Dialog, DialogActions, DialogContent, DialogTitle, fieldBackgroundDisabledMixin, fieldBackgroundHoverMixin, fieldBackgroundMixin, IconButton, InfoLabel, Tooltip, Typography , iconSize } from "@rebasepro/ui";
+import { Trash2Icon, AlertTriangleIcon } from "lucide-react";
 import { EnumPropertyField } from "./properties/EnumPropertyField";
 import { StoragePropertyField } from "./properties/StoragePropertyField";
 import { MapPropertyField } from "./properties/MapPropertyField";
@@ -526,7 +511,7 @@ function PropertyEditFormFields({
                         className="m-4"
                         disabled={disabled}
                         onClick={() => setDeleteDialogOpen(true)}>
-                        <DeleteIcon/>
+                        <Trash2Icon/>
                     </IconButton>}
             </div>
 
@@ -772,7 +757,7 @@ export function WidgetSelectViewItem({
                 <div className={"flex flex-row gap-2 items-center"}>
                     {shouldWarnChangingtype && <Tooltip
                         title={"This widget uses a different data type than the initially selected widget. This can cause errors with existing data."}>
-                        <WarningIcon size="smallest" className={"w-4"}/>
+                        <AlertTriangleIcon size={iconSize.smallest} className={"w-4"}/>
                     </Tooltip>}
                     <Typography
                         variant={"label"}

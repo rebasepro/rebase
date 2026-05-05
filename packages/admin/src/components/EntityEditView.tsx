@@ -6,7 +6,8 @@ import { Entity, EntityStatus } from "@rebasepro/types";
 import { PluginProviderStack } from "@rebasepro/core";
 
 import { EntityCollectionView, EntityView } from "../components";
-import { CircularProgressCenter } from "@rebasepro/ui";
+import { CircularProgressCenter , iconSize } from "@rebasepro/ui";
+import { CodeIcon, HistoryIcon, Maximize2Icon } from "lucide-react";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { ErrorView } from "@rebasepro/core";
 import {
@@ -16,7 +17,7 @@ import {
 } from "@rebasepro/common";
 import { resolvedSelectedEntityView } from "../util/resolutions";
 import { getEntityTitlePropertyKey } from "../util/previews";
-import { CenteredView, CircularProgress, cls, CodeIcon, defaultBorderMixin, HistoryIcon, IconButton, OpenInFullIcon, Tab, Tabs, Tooltip, Typography, Skeleton } from "@rebasepro/ui";
+import { CenteredView, CircularProgress, cls, defaultBorderMixin, IconButton, Tab, Tabs, Tooltip, Typography, Skeleton } from "@rebasepro/ui";
 import {
     useCustomizationController,
     useEntityFetch,
@@ -29,7 +30,7 @@ import { EntityForm } from "../form";
 import type { EntityFormProps, OnUpdateParams } from "../types/components/EntityFormProps";
 import { EntityEditViewFormActions } from "./EntityEditViewFormActions";
 import { EntityJsonPreview } from "../components/EntityJsonPreview";
-// Lazy-load history view — only loaded when user clicks the History tab
+// Lazy-load history view — only loaded when user clicks the HistoryIcon tab
 const EntityHistoryView = lazy(() => import("../components/history").then(m => ({ default: m.EntityHistoryView })));
 import { createFormexStub, getEntityFromCache } from "@rebasepro/core";
 import { usePermissions } from "@rebasepro/core";
@@ -451,7 +452,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                     navigate(`${entityUrl}#full`);
                 }}
             >
-                <OpenInFullIcon size="smallest"/>
+                <Maximize2Icon size={iconSize.smallest}/>
             </IconButton>
         </Tooltip>
     ) : null;
@@ -521,14 +522,14 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                         disabled={!hasAdditionalViews}
                         value={JSON_TAB_VALUE}
                         className={"text-sm"}>
-                        <CodeIcon size={"small"}/>
+                        <CodeIcon size={iconSize.small}/>
                     </Tab>}
 
                     {includeHistoryView && <Tab
                         disabled={!hasAdditionalViews}
                         value={HISTORY_TAB_VALUE}
                         className={"text-sm"}>
-                        <HistoryIcon size={"small"}/>
+                        <HistoryIcon size={iconSize.small}/>
                     </Tab>}
 
                     <Tab

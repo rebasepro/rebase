@@ -1,4 +1,5 @@
-import { AccountCircleIcon, cls, defaultBorderMixin } from "@rebasepro/ui";
+import { cls, defaultBorderMixin } from "@rebasepro/ui";
+import { CircleUserIcon } from "lucide-react";
 import { User } from "@rebasepro/types";
 
 /**
@@ -30,7 +31,7 @@ export function UserDisplay({
                     )}
                 />
             ) : (
-                <AccountCircleIcon
+                <CircleUserIcon
                     className={cls(
                         "text-text-secondary dark:text-text-secondary-dark",
                         avatarSizeClass

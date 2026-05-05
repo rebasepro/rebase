@@ -1,31 +1,22 @@
+import { Plus, Settings, User, ArrowRightToLine, Music, CreditCard, Smile, Baby, UserRound, UserCheck } from "lucide-react";
 import React, { useState } from "react";
 import {
-    AddIcon,
     BooleanSwitch,
     Button,
     Checkbox,
-    ChildFriendlyIcon,
     Chip,
-    CreditCardIcon,
     DateTimeField,
     Dialog,
     DialogActions,
     DialogContent,
     DialogTitle,
-    FaceIcon,
     FileUpload,
     IconButton,
-    KeyboardTabIcon,
     MultiSelect,
     MultiSelectItem,
-    MusicNoteIcon,
-    Person2Icon,
-    Person4Icon,
-    PersonIcon,
     SearchBar,
     Select,
     SelectItem,
-    SettingsIcon,
     Sheet,
     Skeleton,
     Tab,
@@ -101,7 +92,7 @@ export default function ClientUIComponentsTeaser() {
                     <Button color="neutral" size="small" onClick={() => setDialogOpen(true)}>Open Dialog</Button>
                     <Button color="neutral" size="small" onClick={() => setSheetOpen(true)}>Open side
                         sheet
-                        <KeyboardTabIcon size={"small"}/>
+                        <ArrowRightToLine size={"small"}/>
                     </Button>
                     <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
 
@@ -130,19 +121,19 @@ export default function ClientUIComponentsTeaser() {
                 <div className={cardClasses + " flex-row items-center"}>
                     <Tooltip title={"Small button"}>
                         <IconButton variant="filled" size="small" onClick={() => console.log("Small Clicked!")}>
-                            <SettingsIcon size="small"/>
+                            <Settings size={16}/>
                         </IconButton>
                     </Tooltip>
                     <Tooltip title={"Ghost button"}>
                         <IconButton variant="ghost" onClick={() => console.log("Clicked!")}>
-                            <MusicNoteIcon/>
+                            <Music/>
                         </IconButton>
                     </Tooltip>
                     <Tooltip title={"Filled button"}>
                         <IconButton
                             variant="filled"
                             onClick={() => console.log("Square Clicked!")}>
-                            <AddIcon/>
+                            <Plus/>
                         </IconButton>
                     </Tooltip>
                     <Tooltip title={"Square filled button"}>
@@ -150,7 +141,7 @@ export default function ClientUIComponentsTeaser() {
                             variant="filled"
                             shape="square"
                             onClick={() => console.log("Square Clicked!")}>
-                            <CreditCardIcon/>
+                            <CreditCard/>
                         </IconButton>
                     </Tooltip>
                 </div>
@@ -174,10 +165,10 @@ export default function ClientUIComponentsTeaser() {
                         onValueChange={setMultiSelectedValue}
                         placeholder={<i>Multi select</i>}
                     >
-                        <MultiSelectItem value="mother"><Person2Icon/>Mother</MultiSelectItem>
-                        <MultiSelectItem value="father"><PersonIcon/>Father</MultiSelectItem>
-                        <MultiSelectItem value="kid"><Person4Icon/>Kid</MultiSelectItem>
-                        <MultiSelectItem value="baby"><ChildFriendlyIcon/>Baby</MultiSelectItem>
+                        <MultiSelectItem value="mother"><UserRound/>Mother</MultiSelectItem>
+                        <MultiSelectItem value="father"><User/>Father</MultiSelectItem>
+                        <MultiSelectItem value="kid"><UserCheck/>Kid</MultiSelectItem>
+                        <MultiSelectItem value="baby"><Baby/>Baby</MultiSelectItem>
                     </MultiSelect>
                 </div>
 
@@ -188,7 +179,7 @@ export default function ClientUIComponentsTeaser() {
                 </div>
 
                 <div className={cardClasses}>
-                    <Chip colorScheme={"yellowLight"}><FaceIcon size={"small"}/>John Peterson</Chip>
+                    <Chip colorScheme={"yellowLight"}><Smile size={16}/>John Peterson</Chip>
                 </div>
 
             </div>

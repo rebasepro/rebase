@@ -1,14 +1,7 @@
+
 import React, { useCallback, useState } from "react";
-import {
-    Button,
-    cls,
-    CodeIcon,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    Typography
-} from "@rebasepro/ui";
+import { Button, cls, Dialog, DialogActions, DialogContent, DialogTitle, Typography , iconSize } from "@rebasepro/ui";
+import { CodeIcon } from "lucide-react";
 import { EntityCollection } from "@rebasepro/types";
 import { validateCollectionJson, CollectionValidationError } from "../../validateCollectionJson";
 
@@ -90,7 +83,7 @@ export function CollectionJsonImportDialog({
             maxWidth="2xl"
         >
             <DialogTitle className="flex items-center gap-2">
-                <CodeIcon size="small"/>
+                <CodeIcon size={iconSize.smallest}/>
                 Import Collection from JSON
             </DialogTitle>
             <DialogContent className="flex flex-col gap-4">

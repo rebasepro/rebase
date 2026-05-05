@@ -1,27 +1,12 @@
+
 import { IconForView } from "@rebasepro/core";
 import { FieldCaption } from "../../_cms_internals";
 import React, { useMemo, useState } from "react";
 import { useAuthController, useCustomizationController } from "@rebasepro/core";
 import { getFieldConfig, PropertyConfigBadge, SearchIconsView } from "../../_cms_internals";
 import { EntityCollection, Property } from "@rebasepro/types";
-import {
-    BooleanSwitchWithLabel,
-    Chip,
-    CloseIcon,
-    cls,
-    Container,
-    DebouncedTextField,
-    Dialog,
-    HistoryIcon,
-    IconButton,
-    Select,
-    SelectItem,
-    TextField,
-    Tooltip,
-    Typography,
-    useAutoComplete,
-    Button
-} from "@rebasepro/ui";
+import { BooleanSwitchWithLabel, Chip, cls, Container, DebouncedTextField, Dialog, IconButton, Select, SelectItem, TextField, Tooltip, Typography, useAutoComplete, Button , iconSize } from "@rebasepro/ui";
+import { XIcon, HistoryIcon } from "lucide-react";
 
 import { Field, getIn, useFormex } from "@rebasepro/formex";
 import { useCollectionEditorController } from "../../useCollectionEditorController";
@@ -125,7 +110,6 @@ export function CollectionDetailsForm({
 
     const isSubcollection = !!parentCollection;
 
-
     const showErrors = submitCount > 0;
 
     return (
@@ -220,7 +204,6 @@ export function CollectionDetailsForm({
                     {/*        {showErrors && Boolean(errors.group) ? errors.group : "Group in the home page"}*/}
                     {/*    </FieldCaption>*/}
 
-
                     {/*</div>}*/}
 
                     <LayoutModeSwitch
@@ -277,7 +260,7 @@ export function CollectionDetailsForm({
                                                     setFieldValue("orderProperty", undefined);
                                                 }}
                                             >
-                                                <CloseIcon size="small"/>
+                                                <XIcon size={iconSize.smallest}/>
                                             </IconButton>
                                         ) : undefined}
                                     >
@@ -352,7 +335,6 @@ export function CollectionDetailsForm({
                                         allowDataInference={false}
                                         propertyConfigs={customizationController.propertyConfigs}
 
-
                                         existingPropertyKeys={Object.keys(values.properties ?? {})}
                                         onPropertyChanged={({ id, property }) => {
                                             const newProperties = {
@@ -375,7 +357,7 @@ export function CollectionDetailsForm({
                         <BooleanSwitchWithLabel
                             position={"start"}
                             allowIndeterminate={true}
-                            label={<span className="flex items-center gap-2"><HistoryIcon size={"smallest"}/>{values.history === null || values.history === undefined ? "Document history revisions enabled if enabled globally" : (
+                            label={<span className="flex items-center gap-2"><HistoryIcon size={iconSize.smallest}/>{values.history === null || values.history === undefined ? "Document history revisions enabled if enabled globally" : (
                                 values.history ? "Document history revisions ENABLED" : "Document history revisions NOT enabled"
                             )}</span>}
                             onValueChange={(v) => setFieldValue("history", v)}
@@ -387,7 +369,6 @@ export function CollectionDetailsForm({
                             in your database, called <b>__history</b>.
                         </FieldCaption>
                     </div>
-
 
                     <div className={"col-span-12 mt-8"}>
 

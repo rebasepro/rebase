@@ -7,10 +7,11 @@ import { PreviewSize } from "../../../types";
 import { useDropzone } from "react-dropzone";
 import { PropertyPreview } from "../../../preview";
 import { ErrorBoundary } from "@rebasepro/ui";
+import { PencilIcon } from "lucide-react";
 import { useSnackbarController, useStorageSource, useTranslation, StorageFieldItem, useStorageUploadController } from "@rebasepro/core";
 import { getThumbnailMeasure } from "../../../preview/util";
 import { StorageUploadProgress } from "../../../form/components/StorageUploadProgress";
-import { cls, EditIcon, IconButton, Typography } from "@rebasepro/ui";
+import { cls, IconButton, Typography } from "@rebasepro/ui";
 import { EntityTableCellActions } from "../internal/EntityTableCellActions";
 
 const dropZoneClasses = "max-w-full box-border relative pt-[2px] items-center border border-transparent outline-hidden rounded-md duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] focus:border-primary-solid";
@@ -274,7 +275,7 @@ function StorageUpload({
                     color={"inherit"}
                     size={"small"}
                     onClick={open}>
-                    <EditIcon size={"small"} className={"text-surface-500"}/>
+                    <PencilIcon className={"text-surface-500"}/>
                 </IconButton>
             </EntityTableCellActions>
 

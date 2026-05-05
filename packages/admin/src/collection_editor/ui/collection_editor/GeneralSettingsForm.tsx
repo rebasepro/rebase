@@ -1,27 +1,12 @@
+
 import { IconForView } from "@rebasepro/core";
 import { FieldCaption } from "../../_cms_internals";
 import React, { useState } from "react";
 import { useAuthController, useCustomizationController } from "@rebasepro/core";
 import { SearchIconsView } from "../../_cms_internals";
 import { EntityCollection } from "@rebasepro/types";
-import {
-    BooleanSwitchWithLabel,
-    Chip,
-    cls,
-    Container,
-    DebouncedTextField,
-    Dialog,
-    ExpandablePanel,
-    HistoryIcon,
-    IconButton,
-    SearchIcon,
-    Select,
-    SelectItem,
-    TextField,
-    Tooltip,
-    Typography,
-    WarningIcon
-} from "@rebasepro/ui";
+import { BooleanSwitchWithLabel, Chip, cls, Container, DebouncedTextField, Dialog, ExpandablePanel, IconButton, Select, SelectItem, TextField, Tooltip, Typography , iconSize } from "@rebasepro/ui";
+import { HistoryIcon, SearchIcon, AlertTriangleIcon } from "lucide-react";
 import { Field, getIn, useFormex } from "@rebasepro/formex";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
 import { singular, toSnakeCase } from "@rebasepro/utils";
@@ -146,7 +131,7 @@ export function GeneralSettingsForm({
 
                             {(values as any).isTableMissing && (
                                 <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800/30 rounded-md text-sm font-medium flex gap-2">
-                                    <div className="mt-0.5"><WarningIcon size="smallest"/></div>
+                                    <div className="mt-0.5"><AlertTriangleIcon size={iconSize.smallest}/></div>
                                     <span>
                                         The table <b>&quot;{(values as any).table}&quot;</b> does not exist in the database schema.
                                         If you&apos;ve recently created it, make sure to generate and run your database migrations.
@@ -203,7 +188,6 @@ export function GeneralSettingsForm({
                             </FieldCaption>
                         </div>
 
-
                     </div>
 
                     {/* Advanced Settings */}
@@ -214,12 +198,12 @@ export function GeneralSettingsForm({
                         className="mt-4"
                         innerClassName="p-4 flex flex-col gap-4"
                     >
-                        {/* History revisions */}
+                        {/* HistoryIcon revisions */}
                         <div>
                             <BooleanSwitchWithLabel
                                 position={"start"}
                                 allowIndeterminate={true}
-                                label={<span className="flex items-center gap-2"><HistoryIcon size={"smallest"}/>{values.history === null || values.history === undefined ? "Document history revisions enabled if enabled globally" : (
+                                label={<span className="flex items-center gap-2"><HistoryIcon size={iconSize.smallest}/>{values.history === null || values.history === undefined ? "Document history revisions enabled if enabled globally" : (
                                     values.history ? "Document history revisions ENABLED" : "Document history revisions NOT enabled"
                                 )}</span>}
                                 onValueChange={(v) => setFieldValue("history", v)}

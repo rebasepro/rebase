@@ -1,13 +1,7 @@
+
 import React, { useState } from "react";
-import {
-    Typography,
-    cls,
-    defaultBorderMixin,
-    Tabs,
-    Tab,
-    IconButton,
-    DeleteIcon
-} from "@rebasepro/ui";
+import { Typography, cls, defaultBorderMixin, Tabs, Tab, IconButton , iconSize } from "@rebasepro/ui";
+import { Trash2Icon } from "lucide-react";
 import { useTranslation } from "@rebasepro/core";
 import { SchemaBrowser } from "./SchemaBrowser";
 import { TableInfo } from "./SQLEditor";
@@ -104,7 +98,7 @@ export const SQLEditorSidebar = ({
                                                                     onDeleteSnippet(snippet.id);
                                                                 }}
                                                             >
-                                                                <DeleteIcon size="smallest"/>
+                                                                <Trash2Icon size={iconSize.smallest}/>
                                                             </IconButton>
                                                         </div>
                                                     ))}
@@ -135,7 +129,7 @@ export const SQLEditorSidebar = ({
                                                                     onDeleteSnippet(snippet.id);
                                                                 }}
                                                             >
-                                                                <DeleteIcon size="smallest"/>
+                                                                <Trash2Icon size={iconSize.smallest}/>
                                                             </IconButton>
                                                         </div>
                                                     ))}

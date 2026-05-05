@@ -1,6 +1,8 @@
 import type { HomePageSection, PluginGenericProps } from "@rebasepro/types";
 import React, { useEffect } from "react";
-import { ArrowForwardIcon, Card, cls, Container, Typography } from "@rebasepro/ui";
+import { Card, cls, Container, Typography } from "@rebasepro/ui";
+import { ArrowRightIcon } from "lucide-react";
+import { iconSize } from "@rebasepro/ui";
 import { IconForView, useRebaseContext, useRestoreScroll, useSlot } from "@rebasepro/core";
 import { useNavigate } from "react-router-dom";
 import { useStudioBreadcrumbs } from "@rebasepro/core";
@@ -178,7 +180,7 @@ icon: tool.icon }}
                                             {/* Arrow */}
                                             <div style={{ alignSelf: "flex-end" }}>
                                                 <div className="p-2">
-                                                    <ArrowForwardIcon className="text-primary" size="small"/>
+                                                    <ArrowRightIcon className="text-primary" size={iconSize.small}/>
                                                 </div>
                                             </div>
                                         </div>

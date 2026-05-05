@@ -1,18 +1,8 @@
+
 import React from "react";
 import { useFormex } from "@rebasepro/formex";
-import {
-    DeleteIcon,
-    IconButton,
-    Select,
-    SelectItem,
-    Typography,
-    MultiSelect,
-    MultiSelectItem,
-    cls,
-    defaultBorderMixin,
-    DebouncedTextField,
-    BooleanSwitchWithLabel
-} from "@rebasepro/ui";
+import { IconButton, Select, SelectItem, Typography, MultiSelect, MultiSelectItem, cls, defaultBorderMixin, DebouncedTextField, BooleanSwitchWithLabel , iconSize } from "@rebasepro/ui";
+import { Trash2Icon } from "lucide-react";
 import { getFieldConfig, DEFAULT_FIELD_CONFIGS } from "../../../../_cms_internals";
 import { Properties, Property, EnumValueConfig } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";
@@ -369,7 +359,7 @@ function EnumConditionRow({
                     disabled={disabled}
                     size="small"
                     variant="ghost">
-                    <DeleteIcon size="smallest"/>
+                    <Trash2Icon size={iconSize.smallest}/>
                 </IconButton>
             </div>
 

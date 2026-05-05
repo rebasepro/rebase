@@ -1,3 +1,4 @@
+
 import React, { useEffect, useMemo, useState } from "react";
 
 import { Field, getIn, useFormex } from "@rebasepro/formex";
@@ -6,21 +7,10 @@ import {
     useSnackbarController
 } from "@rebasepro/core";
 import { ErrorBoundary } from "@rebasepro/ui";
+import { PlusIcon, CodeIcon, FileSearchIcon } from "lucide-react";
 import { EntityCollection, MapProperty, Properties, Property, PropertyConfig, User } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";
-import {
-    AddIcon,
-    Button,
-    CircularProgress,
-    cls,
-    CodeIcon,
-    DebouncedTextField,
-    defaultBorderMixin,
-    FindInPageIcon,
-    IconButton,
-    Tooltip,
-    Typography
-} from "@rebasepro/ui";
+import { Button, CircularProgress, cls, DebouncedTextField, defaultBorderMixin, IconButton, Tooltip, Typography } from "@rebasepro/ui";
 
 import { getFullId, idToPropertiesPath, namespaceToPropertiesOrderPath } from "./util";
 import { OnPropertyChangedParams, PropertyForm, PropertyFormDialog } from "./PropertyEditView";
@@ -452,7 +442,7 @@ export function CollectionPropertiesEditorForm({
                                 variant={"filled"}
                                 disabled={inferringProperties}
                                 onClick={inferPropertiesFromData}>
-                                {inferringProperties ? <CircularProgress size={"small"}/> : <FindInPageIcon/>}
+                                {inferringProperties ? <CircularProgress size={"small"}/> : <FileSearchIcon/>}
                             </IconButton>
                         </Tooltip>}
                         <Tooltip title={"Add new property"}
@@ -460,7 +450,7 @@ export function CollectionPropertiesEditorForm({
                             <Button
                                 disabled={configController?.readOnly}
                                 onClick={() => setNewPropertyDialogOpen(true)}>
-                                <AddIcon/>
+                                <PlusIcon/>
                             </Button>
                         </Tooltip>
                     </div>
@@ -486,7 +476,7 @@ export function CollectionPropertiesEditorForm({
                     color="neutral"
                     disabled={configController?.readOnly}
                     onClick={() => setNewPropertyDialogOpen(true)}
-                    startIcon={<AddIcon/>}>
+                    startIcon={<PlusIcon/>}>
                     Add new property
                 </Button>
             </div>
@@ -530,7 +520,7 @@ export function CollectionPropertiesEditorForm({
                                     disabled={configController?.readOnly}
                                     onClick={() => setNewPropertyDialogOpen(true)}
                                 >
-                                    <AddIcon/>
+                                    <PlusIcon/>
                                     Add new property
                                 </Button>
                             </div>}
@@ -560,7 +550,6 @@ export function CollectionPropertiesEditorForm({
                 initialErrors={initialErrors}
                 getData={getData}
                 propertyConfigs={propertyConfigs}
-
 
                 onCancel={closePropertyDialog}
                 onOkClicked={asDialog

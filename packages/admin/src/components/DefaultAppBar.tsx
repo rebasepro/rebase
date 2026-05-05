@@ -1,29 +1,17 @@
+
 import React from "react";
 
 import { Link, useNavigate } from "react-router-dom";
 import { RebaseLogo, LanguageToggle } from "@rebasepro/core";
-import { ErrorBoundary } from "@rebasepro/ui";
-import {
-    Avatar,
-    BrightnessMediumIcon,
-    cls,
-    DarkModeIcon,
-    IconButton,
-    LightModeIcon,
-    LogoutIcon,
-    Menu,
-    MenuItem,
-    Skeleton,
-    Typography,
-    SettingsIcon
-} from "@rebasepro/ui";
+import { ErrorBoundary , iconSize } from "@rebasepro/ui";
+import { MoonIcon, SunIcon, SettingsIcon, SunMoonIcon, LogOutIcon } from "lucide-react";
+import { Avatar, cls, IconButton, Menu, MenuItem, Skeleton, Typography } from "@rebasepro/ui";
 import { useAuthController, useLargeLayout, useModeController, useAdminModeController, useTranslation } from "@rebasepro/core";
 import { useUrlController } from "../hooks";
 import { User } from "@rebasepro/types";
 import { useApp } from "./app/useApp";
 import { useBreadcrumbsController } from "../hooks/useBreadcrumbsController";
 import { UserSettingsView } from "@rebasepro/core";
-
 
 export type DefaultAppBarProps<ADDITIONAL_PROPS = object> = {
 
@@ -133,7 +121,6 @@ export const DefaultAppBar = function DefaultAppBar({
                 },
                 className)}>
 
-
             {navigation && (!hasDrawer || title) && <div className="mr-2 hidden lg:block">
                 <Link
                     className="visited:text-inherit dark:visited:text-inherit block"
@@ -155,7 +142,6 @@ export const DefaultAppBar = function DefaultAppBar({
                     </div>
                 </Link>
             </div>}
-
 
             <div className="mr-8 hidden lg:block">
                 <nav aria-label="Breadcrumb">
@@ -195,17 +181,14 @@ export const DefaultAppBar = function DefaultAppBar({
             </div>
             {startAdornment}
 
-
             {startAdornment}
 
             <div className={"grow"}/>
-
 
             {endAdornment &&
                 <ErrorBoundary>
                     {endAdornment}
                 </ErrorBoundary>}
-
 
             <LanguageToggle/>
 
@@ -216,12 +199,12 @@ export const DefaultAppBar = function DefaultAppBar({
                         aria-label="Toggle theme"
 >
                         {mode === "dark"
-                            ? <DarkModeIcon/>
-                            : <LightModeIcon/>}
+                            ? <MoonIcon/>
+                            : <SunIcon/>}
                     </IconButton>}>
-                    <MenuItem onClick={() => setMode("dark")}><DarkModeIcon size={"smallest"}/> {t("dark_mode")}</MenuItem>
-                    <MenuItem onClick={() => setMode("light")}><LightModeIcon size={"smallest"}/> {t("light_mode")} </MenuItem>
-                    <MenuItem onClick={() => setMode("system")}> <BrightnessMediumIcon
+                    <MenuItem onClick={() => setMode("dark")}><MoonIcon size={iconSize.smallest}/> {t("dark_mode")}</MenuItem>
+                    <MenuItem onClick={() => setMode("light")}><SunIcon size={iconSize.smallest}/> {t("light_mode")} </MenuItem>
+                    <MenuItem onClick={() => setMode("system")}> <SunMoonIcon
                         size={"smallest"}/>{t("system_mode")}</MenuItem>
                 </Menu>}
 
@@ -247,7 +230,7 @@ export const DefaultAppBar = function DefaultAppBar({
                         // replace current route with home
                         navigate("/");
                     }}>
-                        <LogoutIcon/>
+                        <LogOutIcon/>
                         {t("log_out")}
                     </MenuItem>
                 </>}

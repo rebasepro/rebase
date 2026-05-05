@@ -1,7 +1,8 @@
 import type { NavigationEntry } from "@rebasepro/types";
 import { useNavigate } from "react-router-dom";
 ;
-import { Chip, Collapse, StarIcon } from "@rebasepro/ui";
+import { Chip, Collapse } from "@rebasepro/ui";
+import { StarIcon } from "lucide-react";
 import { useUserConfigurationPersistence } from "@rebasepro/core";
 import { useNavigationStateController } from "../../index";
 
@@ -32,7 +33,7 @@ function NavigationChip({ entry }: { entry: NavigationEntry }) {
         onClick={() => navigate(entry.url)}
         icon={<StarIcon
             onClick={onIconClick}
-            size={18}
+            size={"small"}
             className={favourite ? "text-secondary" : "text-surface-400 dark:text-surface-500"}/>
         }>
         {entry.name}

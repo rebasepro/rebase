@@ -1,18 +1,8 @@
+
 import React, { useCallback, useDeferredValue, useEffect, useRef } from "react";
 
-import {
-    Button,
-    CircularProgress,
-    CloseIcon,
-    cls,
-    focusedDisabled,
-    IconButton,
-    Menu,
-    MenuItem,
-    SendIcon,
-    Separator,
-    TextareaAutosize
-} from "@rebasepro/ui";
+import { Button, CircularProgress, cls, focusedDisabled, IconButton, Menu, MenuItem, Separator, TextareaAutosize , iconSize } from "@rebasepro/ui";
+import { XIcon, SendIcon } from "lucide-react";
 import {
     AIIcon,
     useLargeLayout
@@ -156,7 +146,7 @@ export function FormEnhanceAction({
                         }}
                         size={"smallest"}
                     >
-                        <CloseIcon size="smallest"/>
+                        <XIcon size={iconSize.smallest}/>
                     </IconButton>
                     }
                 </MenuItem>;
@@ -198,7 +188,7 @@ export function FormEnhanceAction({
                     }}
                     color={!instructions ? "primary" : undefined}
                     disabled={loading || !instructions}>
-                    <CloseIcon size={"small"}/>
+                    <XIcon size={iconSize.small}/>
                 </IconButton>
 
                 <IconButton

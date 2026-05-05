@@ -8,8 +8,10 @@ import {
     Button,
     Chip,
     defaultBorderMixin,
-    SearchBar
+    SearchBar,
+    iconSize
 } from "@rebasepro/ui";
+import { BookOpenIcon, PlayIcon } from "lucide-react";
 import { EndpointDetail } from "./EndpointDetail";
 import { TryItPanel } from "./TryItPanel";
 import type { OpenApiSpec, ParsedEndpoint } from "./types";
@@ -147,7 +149,7 @@ allEndpoints: [] };
                 {/* Header */}
                 <div className="p-4 space-y-3">
                     <div className="flex items-center gap-2">
-                        <span className="material-icons text-lg text-primary dark:text-primary-dark">auto_stories</span>
+                        <BookOpenIcon size={iconSize.medium} className="text-primary dark:text-primary-dark" />
                         <Typography variant="subtitle2" className="font-semibold">
                             {spec.info?.title ?? "API Reference"}
                         </Typography>
@@ -253,7 +255,7 @@ allEndpoints: [] };
                                 size="small"
                                 onClick={() => setTryItOpen((v) => !v)}
                             >
-                                <span className="material-icons text-base mr-1">play_arrow</span>
+                                <PlayIcon size={iconSize.small} className="mr-1" />
                                 Try It
                             </Button>
                         </div>

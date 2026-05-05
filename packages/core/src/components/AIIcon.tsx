@@ -1,5 +1,5 @@
+import { Wand2Icon } from "lucide-react";
 import React from "react";
-import { AutoAwesomeIcon } from "@rebasepro/ui";
 
 export interface AIIconProps {
     size?: "smallest" | "small" | "medium" | "large";
@@ -11,9 +11,17 @@ export interface AIIconProps {
  * Used consistently across AI features for visual identification.
  */
 export function AIIcon({ size = "small", className }: AIIconProps) {
+    const sizeMap: Record<string, number> = {
+        smallest: 16,
+        small: 20,
+        medium: 24,
+        large: 28
+    };
+    const numericSize = typeof size === "string" ? sizeMap[size] || 20 : size;
+
     return (
-        <AutoAwesomeIcon
-            size={size}
+        <Wand2Icon
+            size={numericSize}
             className={className}
             style={{
                 background: "linear-gradient(to right, var(--color-primary), var(--color-secondary))",

@@ -1,16 +1,8 @@
+
 import React, { ReactNode, useEffect, useRef, useState } from "react";
 
-import {
-    ArrowBackIcon,
-    Button,
-    cls,
-    IconButton,
-    LoadingButton,
-    MailIcon,
-    Paper,
-    TextField,
-    Typography
-} from "@rebasepro/ui";
+import { Button, cls, IconButton, LoadingButton, Paper, TextField, Typography } from "@rebasepro/ui";
+import { ArrowLeftIcon, MailIcon } from "lucide-react";
 import { AuthControllerExtended, User } from "@rebasepro/types";
 import { ErrorView } from "../ErrorView";
 import { RebaseLogo } from "../RebaseLogo";
@@ -460,7 +452,7 @@ function LoginForm({
             {!bootstrapMode && (
                 <div className="w-full mb-2">
                     <IconButton onClick={onClose}>
-                        <ArrowBackIcon/>
+                        <ArrowLeftIcon/>
                     </IconButton>
                 </div>
             )}
@@ -652,7 +644,7 @@ function ForgotPasswordForm({
             <div className="flex flex-col w-full gap-4 mt-2">
                 <div className="w-full">
                     <IconButton onClick={onClose}>
-                        <ArrowBackIcon/>
+                        <ArrowLeftIcon/>
                     </IconButton>
                 </div>
 
@@ -680,7 +672,7 @@ function ForgotPasswordForm({
         <form onSubmit={handleSubmit} className="flex flex-col w-full gap-1 mt-2">
             <div className="w-full mb-2">
                     <IconButton onClick={onClose}>
-                        <ArrowBackIcon/>
+                        <ArrowLeftIcon/>
                 </IconButton>
             </div>
 

@@ -7,7 +7,7 @@ const orderItemsCollection: PostgresCollection = {
     singularName: "Order Item",
     slug: "order_items",
     table: "order_items",
-    icon: "Receipt",
+    icon: "ReceiptText",
     group: "E-Commerce",
     hideFromNavigation: true,
     properties: {

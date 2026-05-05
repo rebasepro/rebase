@@ -1,25 +1,21 @@
+
 import type { Properties } from "@rebasepro/types";
 import type { EntityCollection, MapProperty, Property, PropertyConfig } from "@rebasepro/types";
 import React from "react";
 
 import { isPropertyBuilder } from "@rebasepro/common";
-import {
-    AddLinkIcon,
-    BallotIcon,
-    CircleIcon,
-    FlagIcon,
-    FunctionsIcon,
-    HttpIcon,
-    LinkIcon,
-    MailIcon,
-    NumbersIcon,
-    RepeatIcon,
-    ScheduleIcon,
-    ShortTextIcon,
-    SubjectIcon,
-    UploadFileIcon,
-    ViewStreamIcon
-} from "@rebasepro/ui";
+import { iconSize } from "@rebasepro/ui";
+import type { IconSize } from "@rebasepro/ui";
+import { CircleIcon, FlagIcon, FunctionSquareIcon, GlobeIcon, TextIcon, Rows3Icon, LinkIcon, VoteIcon, MailIcon, HashIcon, RepeatIcon, CalendarIcon, AlignLeftIcon, UploadIcon } from "lucide-react";
+
+/**
+ * Resolve a size value (string token or number) to a numeric pixel value
+ * suitable for passing to Lucide icons.
+ */
+function resolveSize(size: IconSize | number): number {
+    if (typeof size === "number") return size;
+    return iconSize[size];
+}
 
 export function isReferenceProperty(property: Property) {
 
@@ -47,59 +43,62 @@ export function isRelationProperty(property: Property) {
 }
 
 export function getIconForWidget(widget: PropertyConfig | undefined,
-    size: "smallest" | "small" | "medium" | "large" | number) {
+    size: IconSize | number) {
     const Icon = widget?.Icon ?? CircleIcon;
-    return <Icon size={size}/>;
+    const px = resolveSize(size);
+    return <Icon size={px}/>;
 }
 
 /**
  * Returns a default icon component based on property type.
  * This provides a sensible fallback when no PropertyConfig is available.
  */
-function getDefaultIconForProperty(property: Property): React.ComponentType<{ size: "smallest" | "small" | "medium" | "large" | number }> {
+function getDefaultIconForProperty(property: Property): React.ComponentType<{ size: number }> {
     switch (property.type) {
         case "string": {
-            if (property.storage) return UploadFileIcon;
-            if (property.url) return HttpIcon;
-            if (property.email) return MailIcon;
-            if (property.multiline || property.markdown) return SubjectIcon;
-            if (property.reference) return LinkIcon;
-            return ShortTextIcon;
+            if (property.storage) return UploadIcon as any;
+            if (property.url) return GlobeIcon as any;
+            if (property.email) return MailIcon as any;
+            if (property.multiline || property.markdown) return AlignLeftIcon as any;
+            if (property.reference) return LinkIcon as any;
+            return TextIcon as any;
         }
         case "number":
-            return NumbersIcon;
+            return HashIcon as any;
         case "boolean":
-            return FlagIcon;
+            return FlagIcon as any;
         case "date":
-            return ScheduleIcon;
+            return CalendarIcon as any;
         case "map":
-            return BallotIcon;
+            return VoteIcon as any;
         case "array": {
             const of = property.of;
             const oneOf = property.oneOf;
-            if (oneOf) return ViewStreamIcon;
+            if (oneOf) return Rows3Icon as any;
             if (of && !Array.isArray(of)) {
-                if (of.type === "reference") return AddLinkIcon;
-                if (of.type === "string" && of.storage) return UploadFileIcon;
+                if (of.type === "reference") return LinkIcon as any;
+                if (of.type === "string" && of.storage) return UploadIcon as any;
             }
-            return RepeatIcon;
+            return RepeatIcon as any;
         }
         case "reference":
-            return LinkIcon;
+            return LinkIcon as any;
         case "relation":
-            return AddLinkIcon;
+            return LinkIcon as any;
         default:
-            return CircleIcon;
+            return CircleIcon as any;
     }
 }
 
 export function getIconForProperty(
     property: Property,
-    size: "smallest" | "small" | "medium" | "large" | number = "small",
+    size: IconSize | number = "small",
     fields: Record<string, PropertyConfig> = {}
 ): React.ReactNode {
+    const px = resolveSize(size);
+
     if (isPropertyBuilder(property)) {
-        return <FunctionsIcon size={size}/>;
+        return <FunctionSquareIcon size={px}/>;
     }
 
     // Try to look up a custom PropertyConfig icon first
@@ -111,7 +110,7 @@ export function getIconForProperty(
 
     // Fall back to a type-based default icon
     const Icon = getDefaultIconForProperty(property);
-    return <Icon size={size}/>;
+    return <Icon size={px}/>;
 }
 
 /**

@@ -7,7 +7,7 @@ const postsCollection: PostgresCollection = {
     singularName: "Blog post",
     slug: "posts",
     table: "posts",
-    icon: "Article",
+    icon: "FileText",
     group: "Content",
     history: true,
     openEntityMode: "split",

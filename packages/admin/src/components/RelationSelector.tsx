@@ -1,27 +1,10 @@
+
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Command as CommandPrimitive } from "cmdk";
-import {
-    CheckIcon,
-    Chip,
-    CircularProgress,
-    CloseIcon,
-    cls,
-    defaultBorderMixin,
-    fieldBackgroundDisabledMixin,
-    fieldBackgroundHoverMixin,
-    fieldBackgroundInvisibleMixin,
-    fieldBackgroundMixin,
-    focusedDisabled,
-    IconButton,
-    KeyboardArrowDownIcon,
-    KeyboardTabIcon,
-    SearchIcon,
-    Separator,
-    Tooltip,
-    useInjectStyles
-} from "@rebasepro/ui";
+import { Chip, CircularProgress, cls, defaultBorderMixin, fieldBackgroundDisabledMixin, fieldBackgroundHoverMixin, fieldBackgroundInvisibleMixin, fieldBackgroundMixin, focusedDisabled, IconButton, Separator, Tooltip, useInjectStyles , iconSize } from "@rebasepro/ui";
+import { CheckIcon, XIcon, ChevronDownIcon, ArrowRightToLineIcon, SearchIcon } from "lucide-react";
 import { Entity, EntityRelation, FilterValues, Relation } from "@rebasepro/types";
 import { EntityPreviewData } from "./EntityPreview";
 import { useData, useRelationSelector } from "@rebasepro/core";
@@ -152,7 +135,7 @@ export const RelationSelector = React.forwardRef<
             .sort()
             .join(",");
 
-        // Check if every relation already has embedded data
+        // CheckIcon if every relation already has embedded data
         const allHaveData = relationsArray.length > 0 && relationsArray.every(rel => {
             if (typeof rel === "string" || typeof rel === "number") return false;
             return !!(rel as EntityRelation)?.data;
@@ -444,8 +427,8 @@ relation } as RelationItem;
                                                     ) : (
                                                         <span className="text-sm truncate">{item.label}</span>
                                                     )}
-                                                    <CloseIcon
-                                                        size={"smallest"}
+                                                    <XIcon
+                                                        size={iconSize.smallest}
                                                         onClick={(event) => {
                                                             event.stopPropagation();
                                                             handleRemoveItem(item);
@@ -482,12 +465,12 @@ relation } as RelationItem;
                                                         updateUrl: true
                                                     });
                                                 }}>
-                                                <KeyboardTabIcon size={"small"}/>
+                                                <ArrowRightToLineIcon size={iconSize.small}/>
                                             </IconButton>
                                         </Tooltip>
                                     )}
-                                    <KeyboardArrowDownIcon
-                                        size={size === "medium" ? "medium" : "small"}
+                                    <ChevronDownIcon
+                                        size={size === "medium" ? iconSize.medium : iconSize.small}
                                         className={cls("transition", isPopoverOpen ? "rotate-180" : "")}
                                     />
                                 </div>
@@ -518,7 +501,7 @@ relation } as RelationItem;
                                     <div className="relative flex-1">
                                         <SearchIcon
                                             className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary dark:text-text-secondary-dark"
-                                            size="small"/>
+                                            size={iconSize.smallest}/>
                                         <CommandPrimitive.Input
                                             ref={searchInputRef}
                                             className={cls(
@@ -642,7 +625,7 @@ function InnerCheckBox({ checked }: { checked: boolean }) {
                     checked ? "bg-primary text-surface-accent-100 dark:text-surface-accent-900 border-transparent" : "bg-white dark:bg-surface-accent-900 border-surface-accent-800 dark:border-surface-accent-200"
                 )}
             >
-                {checked && <CheckIcon size={16} className="absolute"/>}
+                {checked && <CheckIcon size={iconSize.smallest} className="absolute"/>}
             </div>
         </div>
     );

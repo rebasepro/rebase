@@ -1,10 +1,8 @@
+
 import { EntityCollection } from "@rebasepro/types";
 import React, { useState, useEffect } from "react";
-import {
-    Button, IconButton, Typography, cls, defaultBorderMixin, Chip, KeyIcon, DeleteIcon,
-    Paper, Container, Tooltip, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions,
-    TextField, Select, SelectItem, MultiSelect, MultiSelectItem
-} from "@rebasepro/ui";
+import { Button, IconButton, Typography, cls, defaultBorderMixin, Chip, Paper, Container, Tooltip, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, SelectItem, MultiSelect, MultiSelectItem , iconSize } from "@rebasepro/ui";
+import { KeyIcon, Trash2Icon } from "lucide-react";
 import { useFormex } from "@rebasepro/formex";
 import { useRebaseContext } from "@rebasepro/core";
 
@@ -117,7 +115,6 @@ export function CollectionRLSTab() {
         setEditingPolicy(null);
     };
 
-
     return (
         <div className={"overflow-auto my-auto"}>
             <Container maxWidth={"4xl"} className={"flex flex-col gap-4 p-8 m-auto"}>
@@ -140,7 +137,7 @@ export function CollectionRLSTab() {
                                 className={"p-4 border border-transparent hover:border-surface-200 dark:hover:border-surface-800 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors bg-white dark:bg-surface-950 shadow-sm"}>
                                 <div className="flex flex-col gap-1.5 min-w-0">
                                     <div className="flex items-center gap-2">
-                                        <KeyIcon size="small" className="text-text-disabled dark:text-text-disabled-dark shrink-0"/>
+                                        <KeyIcon size={iconSize.smallest} className="text-text-disabled dark:text-text-disabled-dark shrink-0"/>
                                         <Typography variant="subtitle2" className="truncate">{rule.name}</Typography>
                                     </div>
                                     <div className="flex gap-2 text-xs pl-6 overflow-x-auto hide-scrollbar">
@@ -163,7 +160,7 @@ export function CollectionRLSTab() {
                                     <IconButton size="small" onClick={() => {
                                         setFieldValue("securityRules", rules.filter((r: SecurityRule) => r.name !== rule.name));
                                     }}>
-                                        <DeleteIcon size="small" className="text-text-secondary dark:text-text-secondary-dark hover:text-red-500 dark:hover:text-red-500 transition-colors"/>
+                                        <Trash2Icon size={iconSize.smallest} className="text-text-secondary dark:text-text-secondary-dark hover:text-red-500 dark:hover:text-red-500 transition-colors"/>
                                     </IconButton>
                                 </div>
                             </Paper>
@@ -189,7 +186,7 @@ export function CollectionRLSTab() {
                                     className={"p-4 border border-orange-200 dark:border-orange-900/50 bg-orange-50/50 dark:bg-orange-900/10 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors"}>
                                     <div className="flex flex-col gap-1.5 min-w-0">
                                         <div className="flex items-center gap-2">
-                                            <KeyIcon size="small" className="text-orange-500 shrink-0"/>
+                                            <KeyIcon size={iconSize.smallest} className="text-orange-500 shrink-0"/>
                                             <Typography variant="subtitle2" className="truncate">{dp.policyname}</Typography>
                                             <Tooltip title="This policy is live in the database but missing from your codebase schema.">
                                                 <div className="px-1.5 py-0.5 rounded text-[10px] uppercase bg-orange-500/10 text-orange-600 border border-orange-500/20 shrink-0">

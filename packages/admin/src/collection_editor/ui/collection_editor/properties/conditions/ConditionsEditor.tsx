@@ -1,19 +1,8 @@
+
 import React from "react";
 import { useFormex } from "@rebasepro/formex";
-import {
-    DeleteIcon,
-    IconButton,
-    Select,
-    SelectItem,
-    DebouncedTextField,
-    Typography,
-    Chip,
-    TextField,
-    cls,
-    defaultBorderMixin,
-    Button,
-    BooleanSwitchWithLabel
-} from "@rebasepro/ui";
+import { IconButton, Select, SelectItem, DebouncedTextField, Typography, Chip, TextField, cls, defaultBorderMixin, Button, BooleanSwitchWithLabel , iconSize } from "@rebasepro/ui";
+import { Trash2Icon } from "lucide-react";
 import { getFieldConfig, DEFAULT_FIELD_CONFIGS } from "../../../../_cms_internals";
 import { Properties, Property, EnumValueConfig } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";
@@ -480,7 +469,7 @@ value: newValue })}
             {/* Remove button */}
             {showRemoveButton && (
                 <IconButton onClick={onRemove} disabled={disabled} size="small" variant="ghost">
-                    <DeleteIcon size="smallest"/>
+                    <Trash2Icon size={iconSize.smallest}/>
                 </IconButton>
             )}
         </div>
@@ -552,7 +541,7 @@ rules: [...group.rules, defaultRule] });
                     )}
                 </div>
                 <IconButton onClick={onRemove} disabled={disabled} size="small" variant="ghost">
-                    <DeleteIcon size="smallest"/>
+                    <Trash2Icon size={iconSize.smallest}/>
                 </IconButton>
             </div>
 

@@ -1,28 +1,14 @@
+
 import { useUnsavedChangesDialog, UnsavedChangesDialog } from "@rebasepro/core";
 import { useNavigationStateController, useCollectionRegistryController, useUrlController } from "../../_cms_internals";
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import { ConfirmationDialog, ErrorView, useAuthController, useCustomizationController, useSnackbarController } from "@rebasepro/core";
 import { CircularProgressCenter } from "@rebasepro/ui";
+import { ArrowLeftIcon, CheckIcon } from "lucide-react";
 import { Entity, EntityCollection, MapProperty, Properties, Property, PropertyConfig, User, getDataSourceCapabilities } from "@rebasepro/types";
 import { getSubcollections, isPropertyBuilder, removeInitialAndTrailingSlashes } from "@rebasepro/common";
-import {
-    ArrowBackIcon,
-    Button,
-    CheckIcon,
-    cls,
-    coolIconKeys,
-    defaultBorderMixin,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    IconButton,
-    LoadingButton,
-    Tab,
-    Tabs,
-    Typography
-} from "@rebasepro/ui";
+import { Button, cls, coolIconKeys, defaultBorderMixin, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, LoadingButton, Tab, Tabs, Typography } from "@rebasepro/ui";
 import { CollectionEditorSchema } from "./CollectionYupValidation";
 import { GeneralSettingsForm } from "./GeneralSettingsForm";
 import { DisplaySettingsForm } from "./DisplaySettingsForm";
@@ -596,7 +582,6 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
         setNextMode();
     };
 
-
     const [deleteRequested, setDeleteRequested] = useState(false);
 
     const deleteCollection = () => {
@@ -827,7 +812,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                                 type="button"
                                 color={"neutral"}
                                 onClick={() => setCurrentView("general")}>
-                                <ArrowBackIcon/>
+                                <ArrowLeftIcon/>
                                 Back
                             </Button>}
 

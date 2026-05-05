@@ -3,7 +3,8 @@ import type { EntityAction } from "@rebasepro/types";
 import React, { MouseEvent, useCallback } from "react";
 
 import { CollectionSize, Entity, SelectionController } from "@rebasepro/types";
-import { Badge, Checkbox, cls, IconButton, Menu, MenuItem, MoreVertIcon, Skeleton, Tooltip } from "@rebasepro/ui";
+import { Badge, Checkbox, cls, IconButton, Menu, MenuItem, Skeleton, Tooltip } from "@rebasepro/ui";
+import { MoreVerticalIcon } from "lucide-react";
 import { useRebaseContext, useLargeLayout, useTranslation } from "@rebasepro/core";
 import { getEntityFromCache } from "@rebasepro/core";
 import { getLocalChangesBackup } from "@rebasepro/common";
@@ -151,7 +152,7 @@ export const EntityCollectionRowActions = function EntityCollectionRowActions({
                         <Menu
                             trigger={<IconButton
                                 size={iconSize}>
-                                <MoreVertIcon/>
+                                <MoreVerticalIcon/>
                             </IconButton>}>
                             {collapsedActions.map((action, index) => (
                                 <MenuItem

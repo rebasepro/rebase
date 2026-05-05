@@ -1,4 +1,7 @@
+
 "use client";
+import { CheckIcon, ChevronDownIcon } from "lucide-react";
+import { iconSize } from "../icons/Icon";
 import React, { ChangeEvent, Children, forwardRef, useCallback, useEffect, useMemo, useState } from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import {
@@ -9,7 +12,7 @@ import {
     fieldBackgroundMixin,
     focusedDisabled
 } from "../styles";
-import { CheckIcon, KeyboardArrowDownIcon } from "../icons";
+
 import { cls } from "../util";
 import { SelectInputLabel } from "./common/SelectInputLabel";
 import { usePortalContainer } from "../hooks/PortalContainerContext";
@@ -211,7 +214,7 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                     </div>
 
                     <SelectPrimitive.Icon asChild>
-                        <KeyboardArrowDownIcon size={size === "large" ? "medium" : "small"}
+                        <ChevronDownIcon size={size === "large" ? iconSize.medium : iconSize.small}
                             className={cls("transition", open ? "rotate-180" : "", {
                                 "px-2": size === "large",
                                 "px-1": size === "medium" || size === "small"
@@ -282,7 +285,7 @@ export const SelectItem = React.memo(function SelectItem<T extends SelectValue =
         <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
         <div
             className="absolute left-1 data-[state=checked]:block hidden">
-            <CheckIcon size={16}/>
+            <CheckIcon size={iconSize.smallest}/>
         </div>
     </SelectPrimitive.Item>;
 });

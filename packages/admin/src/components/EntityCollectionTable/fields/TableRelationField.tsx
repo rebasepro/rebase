@@ -9,7 +9,8 @@ import { CollectionSize, Entity, EntityRelation, FilterValues, Relation } from "
 import { getPreviewSizeFrom } from "../../../preview/util";
 import { } from "@rebasepro/core";
 import { ErrorView } from "@rebasepro/core";
-import { cls, EditIcon } from "@rebasepro/ui";
+import { cls } from "@rebasepro/ui";
+import { PencilIcon } from "lucide-react";
 import { EntityPreviewContainer } from "../../EntityPreview";
 import { getRelationFrom, normalizeToEntityRelation } from "@rebasepro/common";
 import { TableMultipleRelationField } from "./TableMultipleRelationField";
@@ -170,8 +171,7 @@ export const TableRelationFieldInternal = React.memo(
                                 : "cursor-pointer text-text-secondary dark:text-text-secondary-dark hover:bg-surface-accent-50 dark:hover:bg-surface-800 group-hover:bg-surface-accent-50 dark:group-hover:bg-surface-800")}
                         onClick={handleOpen}
                         size={"medium"}>
-                        <EditIcon
-                            size={"small"}
+                        <PencilIcon
                             className={"ml-2 mr-1 text-surface-300 dark:text-surface-600"}/>
                         {title}
                     </EntityPreviewContainer>}

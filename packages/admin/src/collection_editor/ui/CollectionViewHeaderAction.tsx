@@ -1,6 +1,7 @@
 import { useTranslation } from "@rebasepro/core";
 import { EntityCollection, EntityTableController, Property } from "@rebasepro/types";
-import { IconButton, SettingsIcon, Tooltip } from "@rebasepro/ui";
+import { IconButton, Tooltip } from "@rebasepro/ui";
+import { SettingsIcon } from "lucide-react";
 import React from "react";
 import { useCollectionEditorController } from "../useCollectionEditorController";
 
@@ -42,7 +43,7 @@ export function CollectionViewHeaderAction({
                     });
                 }}
                 size={"small"}>
-                <SettingsIcon size={"small"}/>
+                <SettingsIcon/>
             </IconButton>
         </Tooltip>
     )

@@ -1,3 +1,4 @@
+
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     closestCenter,
@@ -12,21 +13,8 @@ import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-    AddIcon,
-    Button,
-    cls,
-    ContentCopyIcon,
-    HandleIcon,
-    IconButton,
-    KeyboardArrowDownIcon,
-    KeyboardArrowUpIcon,
-    Menu,
-    MenuItem,
-    RemoveIcon,
-    Tooltip,
-    useOutsideAlerter
-} from "@rebasepro/ui";
+import { Button, cls, HandleIcon, IconButton, Menu, MenuItem, Tooltip, useOutsideAlerter , iconSize } from "@rebasepro/ui";
+import { PlusIcon, CopyIcon, ChevronDownIcon, ChevronUpIcon, MinusIcon } from "lucide-react";
 import { useTranslation } from "@rebasepro/core";
 import { getHashValue } from "@rebasepro/utils";
 
@@ -299,7 +287,7 @@ export function ArrayItemOptions({
                             remove(index);
                         }}
                     >
-                        <RemoveIcon size={"small"}/>
+                        <MinusIcon size={iconSize.small}/>
                         {t("remove")}
                     </MenuItem>
                     <MenuItem
@@ -309,7 +297,7 @@ export function ArrayItemOptions({
                             copy(index);
                         }}
                     >
-                        <ContentCopyIcon size={"small"}/>
+                        <CopyIcon size={iconSize.small}/>
                         {t("copy")}
                     </MenuItem>
                     {addInIndex && (
@@ -320,7 +308,7 @@ export function ArrayItemOptions({
                                 addInIndex(index);
                             }}
                         >
-                            <KeyboardArrowUpIcon size={"small"}/>
+                            <ChevronUpIcon size={iconSize.small}/>
                             {t("add_on_top")}
                         </MenuItem>
                     )}
@@ -332,7 +320,7 @@ export function ArrayItemOptions({
                                 addInIndex(index + 1);
                             }}
                         >
-                            <KeyboardArrowDownIcon size={"small"}/>
+                            <ChevronDownIcon size={iconSize.small}/>
                             {t("add_below")}
                         </MenuItem>
                     )}
@@ -489,7 +477,7 @@ export function ArrayContainer<T>({
                                 variant={"text"}
                                 size={size === "small" ? "small" : "medium"}
                                 disabled={disabled || (value?.length ?? 0) >= max}
-                                startIcon={<AddIcon/>}
+                                startIcon={<PlusIcon/>}
                                 onClick={insertInEnd}
                             >
                                 {addLabel ?? "Add"}
@@ -530,7 +518,7 @@ export function ArrayContainer<T>({
                         variant={"text"}
                         size={size === "small" ? "small" : "medium"}
                         disabled={disabled || (value?.length ?? 0) >= max}
-                        startIcon={<AddIcon/>}
+                        startIcon={<PlusIcon/>}
                         onClick={insertInEnd}
                     >
                         {addLabel ?? "Add"}

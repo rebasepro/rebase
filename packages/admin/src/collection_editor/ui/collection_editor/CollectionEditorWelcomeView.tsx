@@ -3,7 +3,8 @@ import { AIIcon } from "@rebasepro/core";
 import React, { useState } from "react";
 ;
 import { EntityCollection } from "@rebasepro/types";
-import { Button, Card, Chip, cls, CodeIcon, Container, Icon, Tooltip, Typography } from "@rebasepro/ui";
+import { Button, Card, Chip, cls, Container, Tooltip, Typography , iconSize } from "@rebasepro/ui";
+import { CodeIcon, TableIcon, ShoppingCartIcon, UserIcon, FileTextIcon, FileIcon } from "lucide-react";
 import { CollectionJsonImportDialog } from "./CollectionJsonImportDialog";
 
 import { productsCollectionTemplate } from "./templates/products_template";
@@ -97,7 +98,7 @@ export function CollectionEditorWelcomeView({
                                     }
                                 }}
                                 size="small">
-                                <Icon iconKey={"table"} size={"smallest"}/>
+                                <TableIcon size={iconSize.smallest}/>
                                 {importingTable === tableName ? "Loading..." : tableName}
                             </Chip>
                         ))}
@@ -173,7 +174,7 @@ export function CollectionEditorWelcomeView({
                             variant="filled"
                             color="neutral"
                             onClick={() => setJsonImportOpen(true)}
-                            startIcon={<CodeIcon size="small"/>}
+                            startIcon={<CodeIcon size={iconSize.small}/>}
                         >
                             Paste JSON Configuration
                         </Button>
@@ -188,9 +189,7 @@ export function CollectionEditorWelcomeView({
                         />
                     </div>
 
-
                 </div>
-
 
                 {!parentCollection && <div>
 
@@ -213,29 +212,28 @@ export function CollectionEditorWelcomeView({
                     <div className={"flex gap-2"}>
                         <TemplateButton title={"Products"}
                             subtitle={"A collection of products with images, prices and stock"}
-                            icon={<Icon size={"small"}
-                                iconKey={productsCollectionTemplate.icon! as string}/>}
+                            icon={<ShoppingCartIcon size={iconSize.small}/>}
                             onClick={() => {
                                 setValues(productsCollectionTemplate);
                                 onContinue();
                             }}/>
                         <TemplateButton title={"Users"}
                             subtitle={"A collection of users with emails, names and roles"}
-                            icon={<Icon size={"small"} iconKey={usersCollectionTemplate.icon! as string}/>}
+                            icon={<UserIcon size={iconSize.small}/>}
                             onClick={() => {
                                 setValues(usersCollectionTemplate);
                                 onContinue();
                             }}/>
                         <TemplateButton title={"Blog posts"}
                             subtitle={"A collection of blog posts with images, authors and complex content"}
-                            icon={<Icon size={"small"} iconKey={blogCollectionTemplate.icon! as string}/>}
+                            icon={<FileTextIcon size={iconSize.small}/>}
                             onClick={() => {
                                 setValues(blogCollectionTemplate);
                                 onContinue();
                             }}/>
                         <TemplateButton title={"Pages"}
                             subtitle={"A collection of pages with images, authors and complex content"}
-                            icon={<Icon size={"small"} iconKey={pagesCollectionTemplate.icon! as string}/>}
+                            icon={<FileIcon size={iconSize.small}/>}
                             onClick={() => {
                                 setValues(pagesCollectionTemplate);
                                 onContinue();
@@ -243,7 +241,6 @@ export function CollectionEditorWelcomeView({
                     </div>
 
                 </div>
-
 
             </Container>
         </div>

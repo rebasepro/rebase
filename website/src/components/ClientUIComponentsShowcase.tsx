@@ -1,7 +1,6 @@
+import { Plus, Settings, ArrowRight, Music, CreditCard, Smile, Circle } from "lucide-react";
 import {
-    AddIcon,
     Alert,
-    ArrowForwardIcon,
     Avatar,
     Badge,
     BooleanSwitch,
@@ -11,14 +10,11 @@ import {
     Chip,
     CircularProgress,
     Collapse,
-    CreditCardIcon,
     DateTimeField,
     Dialog,
     DialogActions,
     DialogContent,
     ExpandablePanel,
-    FaceIcon,
-    FiberManualRecordIcon,
     FileUpload,
     IconButton,
     Label,
@@ -44,14 +40,12 @@ import {
     MenuItem,
     MultiSelect,
     MultiSelectItem,
-    MusicNoteIcon,
     Popover,
     RadioGroup,
     RadioGroupItem,
     SearchBar,
     Select,
     SelectItem,
-    SettingsIcon,
     Sheet,
     Skeleton,
     Slider,
@@ -92,7 +86,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/slider"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div" >Slider</Typography>
                 <Slider step={1}
@@ -108,7 +102,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/button"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Buttons</Typography>
                 <div className={"flex flex-row flex-wrap gap-2 items-center"}>
@@ -126,7 +120,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/tabs"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Tabs</Typography>
                 <Tabs value={tabValue} onValueChange={setTabValue}>
@@ -142,7 +136,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/file_upload"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">File Upload</Typography>
                 <FileUpload
@@ -159,7 +153,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/search_bar"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Search Bar</Typography>
                 <SearchBar innerClassName={"w-full"}/>
@@ -172,7 +166,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/alert"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Alert</Typography>
                 <Alert color="info">This is an info alert.</Alert>
@@ -187,7 +181,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/markdown"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Markdown
                     source={"## Markdown Example\nThis is a basic Markdown **rendering**.\n- Bullet one\n- Bullet two"}/>
@@ -199,7 +193,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/skeleton"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Skeleton</Typography>
                 <Skeleton width={240} height={20}/>
@@ -213,14 +207,14 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/chip"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Chip</Typography>
                 <div className={"flex flex-row flex-wrap gap-2"}>
                     <Chip>Basic Chip</Chip>
                     <Chip colorScheme="red">Red Chip</Chip>
                     <Chip colorScheme="blue" size="small">Small Chip</Chip>
-                    <Chip icon={<FaceIcon size="small"/>}>Chip with Icon</Chip>
+                    <Chip icon={<Smile size={16}/>}>Chip with Icon</Chip>
                     <Chip onClick={() => console.log("Chip clicked")}>Clickable Chip</Chip>
                 </div>
             </Card>
@@ -232,7 +226,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/boolean_switch"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Boolean Switch</Typography>
                 <div className={"flex flex-row items-center gap-2"}>
@@ -259,7 +253,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/checkbox"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Checkbox</Typography>
 
@@ -298,25 +292,25 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/icon_button"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">IconButton</Typography>
                 <div className={"flex gap-2 items-center"}>
                     <Tooltip title={"Ghost button"}>
                         <IconButton variant="ghost" onClick={() => console.log("Clicked!")}>
-                            <MusicNoteIcon/>
+                            <Music/>
                         </IconButton>
                     </Tooltip>
                     <Tooltip title={"Small button"}>
                         <IconButton variant="filled" size="small" onClick={() => console.log("Small Clicked!")}>
-                            <SettingsIcon size="small"/>
+                            <Settings size={16}/>
                         </IconButton>
                     </Tooltip>
                     <Tooltip title={"Filled button"}>
                         <IconButton
                             variant="filled"
                             onClick={() => console.log("Square Clicked!")}>
-                            <AddIcon/>
+                            <Plus/>
                         </IconButton>
                     </Tooltip>
                     <Tooltip title={"Square filled button"}>
@@ -324,7 +318,7 @@ export default function ClientUIComponentsShowcase({
                             variant="filled"
                             shape="square"
                             onClick={() => console.log("Square Clicked!")}>
-                            <CreditCardIcon/>
+                            <CreditCard/>
                         </IconButton>
                     </Tooltip>
                 </div>
@@ -337,7 +331,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/dialog"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Dialog</Typography>
                 <Button onClick={() => setDialogOpen(true)}>Open Dialog</Button>
@@ -363,7 +357,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/popover"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Popover</Typography>
                 <Popover trigger={<Button>Open Popover</Button>}>
@@ -377,7 +371,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/text_field"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Text Field</Typography>
                 <TextField value={textFieldValue} size={"small"} onChange={(event) => {
@@ -401,7 +395,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/radio_group"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Radio Group</Typography>
                 <RadioGroup className="flex items-center gap-2" defaultValue="black" id="color">
@@ -435,7 +429,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/circular_progress"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Circular Progress</Typography>
                 <div className={"flex items-center gap-2"}>
@@ -452,7 +446,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/menu"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Menu</Typography>
                 <Menu trigger={<Button color="neutral">Open Menu</Button>}>
@@ -468,7 +462,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/expandable_panel"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Expandable Panel</Typography>
                 <ExpandablePanel title={"Click to expand"}
@@ -486,7 +480,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/datetimefield"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">DateTime Field</Typography>
                 <DateTimeField value={selectedDate ?? undefined} onChange={setSelectedDate} label="Select a date"
@@ -501,7 +495,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/avatar"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Avatar</Typography>
                 <div className={"flex flex-row items-center gap-2"}>
@@ -520,7 +514,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/select"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Select</Typography>
                 <Select
@@ -552,7 +546,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/multiselect"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">MultiSelect</Typography>
 
@@ -588,7 +582,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/sheet"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Sheet</Typography>
                 <Button onClick={() => setSheetOpen(true)}>Open Sheet</Button>
@@ -605,10 +599,10 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/loading_button"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Loading Button</Typography>
-                <LoadingButton startIcon={<AddIcon size="small"/>} loading onClick={() => {
+                <LoadingButton startIcon={<Plus size={16}/>} loading onClick={() => {
                 }}>Submitting</LoadingButton>
             </Card>
 
@@ -618,7 +612,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/badge"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Badge</Typography>
                 <Badge color="primary"
@@ -642,7 +636,7 @@ export default function ClientUIComponentsShowcase({
                     target={linksInNewTab ? "_blank" : undefined}
                     href={(docsUrl ?? "") + "/docs/components/collapse"}
                     size="smallest">
-                    <ArrowForwardIcon size="smallest"/>
+                    <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Collapse</Typography>
                 <Button color="neutral" onClick={() => {
@@ -844,7 +838,7 @@ function MenubarDemo() {
                                     key={item}
                                     value={item}>
                                     <MenubarItemIndicator>
-                                        <FiberManualRecordIcon size={"smallest"}/>
+                                        <Circle size={8}/>
                                     </MenubarItemIndicator>
                                     {item}
                                 </MenubarRadioItem>

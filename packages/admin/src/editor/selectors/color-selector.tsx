@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { EditorBubbleItem } from "../components";
-import { Button, CheckIcon, KeyboardArrowDownIcon, Popover } from "@rebasepro/ui";
+import { Button, Popover } from "@rebasepro/ui";
+import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import { useProseMirrorContext } from "../hooks/useProseMirrorContext";
 import { isMarkActive, getMarkAttributes, setMark, unsetMark } from "../utils/prosemirror-utils";
 import { schema } from "../schema";
@@ -124,10 +125,9 @@ export const ColorSelector = ({
                     >
                         A
                     </span>
-                    <KeyboardArrowDownIcon size={"small"}/>
+                    <ChevronDownIcon/>
                 </Button>}
             modal={true} open={open} onOpenChange={onOpenChange}>
-
 
             <div className="flex flex-col">
                 <div className="my-1 px-2 text-sm font-semibold text-surface-400 dark:text-surface-400">

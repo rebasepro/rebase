@@ -1,6 +1,7 @@
 import React from "react";
 
-import { coolIconKeys, debounce, Icon, IconButton, iconKeys, SearchBar, Tooltip } from "@rebasepro/ui";
+import { coolIconKeys, debounce, IconButton, iconKeys, SearchBar, Tooltip, iconSize } from "@rebasepro/ui";
+import { icons as lucideIcons } from "lucide-react";
 import { iconsSearch, iconSynonyms } from "@rebasepro/core";
 import { useTranslation } from "@rebasepro/core";
 
@@ -12,6 +13,18 @@ if (iconSynonyms && process.env.NODE_ENV !== "production") {
             console.warn(`The icon ${icon} no longer exists. Remove it from \`iconSynonyms\``);
         }
     });
+}
+
+function toPascalCase(str: string): string {
+    return str.split(/[-_]/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('');
+}
+
+function resolveIcon(iconKey: string): React.ComponentType<any> | null {
+    let icon = (lucideIcons as any)[iconKey];
+    if (!icon) {
+        icon = (lucideIcons as any)[toPascalCase(iconKey)];
+    }
+    return icon ?? null;
 }
 
 export interface SearchIconsProps {
@@ -60,6 +73,8 @@ export function SearchIconsView({
 
             <div className={"flex max-w-full flex-wrap mt-4"}>
                 {icons.map((icon: string) => {
+                    const LucideIcon = resolveIcon(icon);
+                    if (!LucideIcon) return null;
                     return (
                         <Tooltip title={icon} key={icon}
                             asChild={true}>
@@ -69,7 +84,7 @@ export function SearchIconsView({
                                 onClick={onIconSelected ? () => onIconSelected(icon) : undefined}
                                 className="box-content m-1"
                             >
-                                <Icon iconKey={icon} size={24}/>
+                                <LucideIcon size={iconSize.medium}/>
                             </IconButton>
                         </Tooltip>
                     );

@@ -1,5 +1,6 @@
 import React, { PropsWithChildren, useCallback, useMemo } from "react";
-import { ChevronLeftIcon, cls, defaultBorderMixin, IconButton, MenuIcon, Sheet, Tooltip } from "@rebasepro/ui";
+import { cls, defaultBorderMixin, IconButton, Sheet, Tooltip } from "@rebasepro/ui";
+import { ChevronLeftIcon, MenuIcon } from "lucide-react";
 import { deepEqual as equal } from "fast-equals"
 
 import { useLargeLayout, useAdminModeController, useTranslation } from "@rebasepro/core";
@@ -188,7 +189,6 @@ function DrawerWrapper(props: {
             transition: "left 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms, opacity 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms, width 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms"
         }}
     >
-
 
         <div className={"flex flex-col h-full"}>
             {props.children}

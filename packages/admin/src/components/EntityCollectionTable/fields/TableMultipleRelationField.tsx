@@ -3,7 +3,8 @@ import type { EntityCollection } from "@rebasepro/types";
 import React, { useCallback } from "react";
 import { deepEqual as equal } from "fast-equals";
 
-import { cls, EditIcon } from "@rebasepro/ui";
+import { cls } from "@rebasepro/ui";
+import { PencilIcon } from "lucide-react";
 import { getRelationFrom, normalizeToEntityRelation } from "@rebasepro/common";
 
 import { RelationPreview } from "../../../preview";
@@ -119,8 +120,7 @@ export const TableMultipleRelationFieldInternal = React.memo(
                                 : "cursor-pointer text-text-secondary dark:text-text-secondary-dark hover:bg-surface-accent-50 dark:hover:bg-surface-800 group-hover:bg-surface-accent-50 dark:group-hover:bg-surface-800")}
                         onClick={handleOpen}
                         size={"medium"}>
-                        <EditIcon
-                            size={"small"}
+                        <PencilIcon
                             className={"ml-2 mr-1 text-surface-300 dark:text-surface-600"}/>
                         {title}
                     </EntityPreviewContainer>}

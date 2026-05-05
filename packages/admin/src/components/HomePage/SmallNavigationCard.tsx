@@ -1,4 +1,5 @@
-import { ArrowForwardIcon, cardClickableMixin, cardMixin, cls, Typography } from "@rebasepro/ui";
+import { cardClickableMixin, cardMixin, cls, Typography } from "@rebasepro/ui";
+import { ArrowRightIcon } from "lucide-react";
 
 import { Link } from "react-router-dom";
 
@@ -36,7 +37,7 @@ export function SmallNavigationCard({
                 </div>
 
                 <div className={"p-2"}>
-                    <ArrowForwardIcon color="primary" size={"small"}/>
+                    <ArrowRightIcon className="text-primary"/>
                 </div>
             </Link>
 

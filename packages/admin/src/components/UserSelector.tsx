@@ -1,23 +1,10 @@
+
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Command as CommandPrimitive } from "cmdk";
-import {
-    CircularProgress,
-    CloseIcon,
-    cls,
-    defaultBorderMixin,
-    fieldBackgroundDisabledMixin,
-    fieldBackgroundHoverMixin,
-    fieldBackgroundInvisibleMixin,
-    fieldBackgroundMixin,
-    focusedDisabled,
-    IconButton,
-    KeyboardArrowDownIcon,
-    SearchIcon,
-    Separator,
-    useInjectStyles
-} from "@rebasepro/ui";
+import { CircularProgress, cls, defaultBorderMixin, fieldBackgroundDisabledMixin, fieldBackgroundHoverMixin, fieldBackgroundInvisibleMixin, fieldBackgroundMixin, focusedDisabled, IconButton, Separator, useInjectStyles , iconSize } from "@rebasepro/ui";
+import { XIcon, ChevronDownIcon, SearchIcon } from "lucide-react";
 import { User } from "@rebasepro/types";
 import { useUserSelector, UserSelectorItem } from "@rebasepro/core";
 import { UserDisplay } from "@rebasepro/core";
@@ -55,7 +42,7 @@ export const UserSelector = React.forwardRef<
             clearable = true,
             className,
             pageSize,
-            searchPlaceholder = "Search users...",
+            searchPlaceholder = "SearchIcon users...",
             noResultsText = "No users found.",
             loadingText = "Loading..."
         },
@@ -234,11 +221,11 @@ export const UserSelector = React.forwardRef<
                                         <IconButton
                                             size="small"
                                             onClick={handleClear}>
-                                            <CloseIcon size={"small"}/>
+                                            <XIcon size={iconSize.small}/>
                                         </IconButton>
                                     )}
-                                    <KeyboardArrowDownIcon
-                                        size={size === "medium" ? "medium" : "small"}
+                                    <ChevronDownIcon
+                                        size={size === "medium" ? iconSize.medium : iconSize.small}
                                         className={cls("transition", isPopoverOpen ? "rotate-180" : "")}
                                     />
                                 </div>
@@ -266,7 +253,7 @@ export const UserSelector = React.forwardRef<
                                     <div className="relative flex-1">
                                         <SearchIcon
                                             className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary dark:text-text-secondary-dark"
-                                            size="small"/>
+                                            size={iconSize.smallest}/>
                                         <CommandPrimitive.Input
                                             ref={searchInputRef}
                                             className={cls(

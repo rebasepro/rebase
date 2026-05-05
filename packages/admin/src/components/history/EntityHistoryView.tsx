@@ -1,13 +1,8 @@
+
 import type { EntityCustomViewParams } from "@rebasepro/types";
 import { useRef, useEffect } from "react";
-import {
-    cls,
-    HistoryIcon,
-    IconButton,
-    Label,
-    Tooltip,
-    Typography
-} from "@rebasepro/ui";
+import { cls, IconButton, Label, Tooltip, Typography } from "@rebasepro/ui";
+import { HistoryIcon } from "lucide-react";
 import { EntityHistoryEntry } from "./EntityHistoryEntry";
 import { useSnackbarController, useAuthController } from "@rebasepro/core";
 import { ConfirmationDialog } from "@rebasepro/core";
@@ -78,7 +73,7 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
 
     if (!entity) {
         return <div className="flex items-center justify-center h-full">
-            <Label>History is only available for existing entities</Label>
+            <Label>HistoryIcon is only available for existing entities</Label>
         </div>;
     }
 
@@ -112,7 +107,7 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
         <div className="flex flex-col gap-2 max-w-6xl mx-auto w-full">
 
             <Typography variant={"h5"} className={"mt-24 ml-4"}>
-                History
+                HistoryIcon
             </Typography>
 
             {isLoading && entries.length === 0 && (

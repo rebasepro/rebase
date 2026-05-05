@@ -1,22 +1,10 @@
+
 import { EditorState, Transaction } from "prosemirror-state";
 import { EditorBubbleItem } from "../components";
 import { useTranslation } from "@rebasepro/core";
 
-import {
-    Button,
-    CheckBoxIcon,
-    CheckIcon,
-    CodeIcon,
-    FormatListBulletedIcon,
-    FormatListNumberedIcon,
-    FormatQuoteIcon,
-    KeyboardArrowDownIcon,
-    Looks3Icon,
-    LooksOneIcon,
-    LooksTwoIcon,
-    Popover,
-    TextFieldsIcon
-} from "@rebasepro/ui";
+import { Button, Popover , iconSize } from "@rebasepro/ui";
+import { CheckSquareIcon, Heading3Icon, Heading1Icon, Heading2Icon, CheckIcon, CodeIcon, ListIcon, ListOrderedIcon, QuoteIcon, ChevronDownIcon, TypeIcon } from "lucide-react";
 import { useProseMirrorContext } from "../hooks/useProseMirrorContext";
 import { isNodeActive } from "../utils/prosemirror-utils";
 import { schema } from "../schema";
@@ -35,7 +23,7 @@ const items: SelectorItem[] = [
     {
         name: "Text",
         labelKey: "editor_text",
-        icon: TextFieldsIcon,
+        icon: TypeIcon,
         command: (state, dispatch) => setBlockType(schema.nodes.paragraph)(state, dispatch),
         isActive: (state) =>
             isNodeActive(state, schema.nodes.paragraph) &&
@@ -45,49 +33,49 @@ const items: SelectorItem[] = [
     {
         name: "Heading 1",
         labelKey: "editor_heading_1",
-        icon: LooksOneIcon,
+        icon: Heading1Icon,
         command: (state, dispatch) => setBlockType(schema.nodes.heading, { level: 1 })(state, dispatch),
         isActive: (state) => isNodeActive(state, schema.nodes.heading, { level: 1 })
     },
     {
         name: "Heading 2",
         labelKey: "editor_heading_2",
-        icon: LooksTwoIcon,
+        icon: Heading2Icon,
         command: (state, dispatch) => setBlockType(schema.nodes.heading, { level: 2 })(state, dispatch),
         isActive: (state) => isNodeActive(state, schema.nodes.heading, { level: 2 })
     },
     {
         name: "Heading 3",
         labelKey: "editor_heading_3",
-        icon: Looks3Icon,
+        icon: Heading3Icon,
         command: (state, dispatch) => setBlockType(schema.nodes.heading, { level: 3 })(state, dispatch),
         isActive: (state) => isNodeActive(state, schema.nodes.heading, { level: 3 })
     },
     {
         name: "To-do List",
         labelKey: "editor_todo_list",
-        icon: CheckBoxIcon,
+        icon: CheckSquareIcon,
         command: (state, dispatch) => wrapInList(schema.nodes.task_list)(state, dispatch),
         isActive: (state) => isNodeActive(state, schema.nodes.task_item)
     },
     {
         name: "Bullet List",
         labelKey: "editor_bullet_list",
-        icon: FormatListBulletedIcon,
+        icon: ListIcon,
         command: (state, dispatch) => wrapInList(schema.nodes.bullet_list)(state, dispatch),
         isActive: (state) => isNodeActive(state, schema.nodes.bullet_list)
     },
     {
         name: "Numbered List",
         labelKey: "editor_numbered_list",
-        icon: FormatListNumberedIcon,
+        icon: ListOrderedIcon,
         command: (state, dispatch) => wrapInList(schema.nodes.ordered_list)(state, dispatch),
         isActive: (state) => isNodeActive(state, schema.nodes.ordered_list)
     },
     {
         name: "Quote",
         labelKey: "editor_quote",
-        icon: FormatQuoteIcon,
+        icon: QuoteIcon,
         command: (state, dispatch) => wrapIn(schema.nodes.blockquote)(state, dispatch),
         isActive: (state) => isNodeActive(state, schema.nodes.blockquote)
     },
@@ -130,7 +118,7 @@ export const NodeSelector = ({
                 className="gap-2 rounded-none"
                 color="text">
                 <span className="whitespace-nowrap text-sm">{t(activeItem.labelKey)}</span>
-                <KeyboardArrowDownIcon size={"small"}/>
+                <ChevronDownIcon size={iconSize.small}/>
             </Button>}
             modal={true}
             open={open}
@@ -146,10 +134,10 @@ export const NodeSelector = ({
                     className="flex cursor-pointer items-center justify-between rounded px-2 py-1 text-sm hover:bg-blue-50 hover:dark:bg-surface-700 text-surface-900 dark:text-white"
                 >
                     <div className="flex items-center space-x-2">
-                        <item.icon size="smallest"/>
+                        <item.icon size={iconSize.smallest}/>
                         <span>{t(item.labelKey)}</span>
                     </div>
-                    {activeItem.name === item.name && <CheckIcon size="smallest"/>}
+                    {activeItem.name === item.name && <CheckIcon size={iconSize.smallest}/>}
                 </EditorBubbleItem>
             ))}
         </Popover>

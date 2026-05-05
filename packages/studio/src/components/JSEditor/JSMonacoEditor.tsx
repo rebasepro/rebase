@@ -1,7 +1,9 @@
+
 import React, { useRef, useEffect } from "react";
 import Editor, { Monaco, OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { cls, defaultBorderMixin } from "@rebasepro/ui";
+import { FileIcon } from "lucide-react";
 import { useModeController } from "@rebasepro/core";
 
 /** Ambient type definitions for the Rebase client SDK injected into Monaco. */
@@ -137,7 +139,7 @@ interface RebaseAdmin {
 }
 
 interface UploadFileProps {
-    file: File;
+    file: FileIcon;
     fileName?: string;
     path?: string;
     metadata?: Record<string, any>;
@@ -159,7 +161,7 @@ interface DownloadConfig {
 interface StorageSource {
     putObject(props: UploadFileProps): Promise<UploadFileResult>;
     getSignedUrl(pathOrUrl: string, bucket?: string): Promise<DownloadConfig>;
-    getObject(path: string, bucket?: string): Promise<File | null>;
+    getObject(path: string, bucket?: string): Promise<FileIcon | null>;
     deleteObject(path: string, bucket?: string): Promise<void>;
     listObjects(path: string, options?: { bucket?: string; maxResults?: number; pageToken?: string }): Promise<any>;
 }

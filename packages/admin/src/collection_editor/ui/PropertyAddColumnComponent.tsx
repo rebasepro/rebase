@@ -4,7 +4,8 @@ import {
 } from "@rebasepro/core";
 import { getDefaultPropertiesOrder } from "../_cms_internals";
 import { EntityCollection, EntityTableController } from "@rebasepro/types";
-import { AddIcon, Tooltip } from "@rebasepro/ui";
+import { Tooltip } from "@rebasepro/ui";
+import { PlusIcon } from "lucide-react";
 import { useCollectionEditorController } from "../useCollectionEditorController";
 
 export function PropertyAddColumnComponent({
@@ -45,7 +46,7 @@ export function PropertyAddColumnComponent({
                         existingEntities: tableController.data
                     });
                 }}>
-                <AddIcon color={"inherit"}/>
+                <PlusIcon/>
             </div>
         </Tooltip>
     )

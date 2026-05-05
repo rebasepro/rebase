@@ -13,21 +13,8 @@ import {
     useSelectionController
 } from "../../components";
 import { useCollectionRegistryController } from "../../hooks";
-import {
-    Button,
-    cls,
-    defaultBorderMixin,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    IconButton,
-    Select,
-    SelectItem,
-    Tooltip,
-    Typography,
-    UploadIcon
-} from "@rebasepro/ui";
+import { Button, cls, defaultBorderMixin, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Select, SelectItem, Tooltip, Typography , iconSize } from "@rebasepro/ui";
+import { UploadIcon } from "lucide-react";
 import { buildEntityPropertiesFromData } from "@rebasepro/schema-inference";
 import { useImportConfig } from "../hooks";
 import { convertDataToEntity, getInferenceType } from "../utils";
@@ -107,7 +94,7 @@ export function ImportCollectionAction<M extends Record<string, unknown>, USER e
             <IconButton
                 size={"small"}
                 color={"primary"} onClick={handleClickOpen}>
-                <UploadIcon size={"small"}/>
+                <UploadIcon size={iconSize.small}/>
             </IconButton>
         </Tooltip>
 

@@ -1,5 +1,7 @@
+
 "use client";
 
+import { TagIcon } from "lucide-react";
 import React, { useRef } from "react";
 import { defaultBorderMixin } from "../styles";
 import { cls } from "../util";
@@ -116,9 +118,9 @@ export const TableCell = React.memo(({
                               ...rest
                           }: TableCellProps) => {
     const ref = useRef<HTMLTableCellElement>(null);
-    const Tag = header || getParentName(ref.current) === "TableHeader" ? "th" : "td";
+    const TagIcon = header || getParentName(ref.current) === "TableHeader" ? "th" : "td";
     return (
-        <Tag
+        <TagIcon
             scope={scope}
             colSpan={colspan}
             ref={ref}
@@ -131,7 +133,7 @@ export const TableCell = React.memo(({
             {...rest}
         >
             {children}
-        </Tag>
+        </TagIcon>
     );
 });
 

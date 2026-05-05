@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll, jest } from "@jest/globals";
 import { Hono, Context } from "hono";
-import { configureJwt, generateAccessToken } from "../src/auth/jwt.js";
-import { requireAuth, optionalAuth, requireAdmin, createAuthMiddleware, createRequireAuth } from "../src/auth/middleware.js";
-import type { HonoEnv } from "../src/api/types.js";
-import type { DataDriver } from "../../types/src/controllers/data_driver.js";
+import { configureJwt, generateAccessToken } from "../src/auth/jwt";
+import { requireAuth, optionalAuth, requireAdmin, createAuthMiddleware, createRequireAuth } from "../src/auth/middleware";
+import type { HonoEnv } from "../src/api/types";
+import type { DataDriver } from "../../types/src/controllers/data_driver";
 
 const TEST_SECRET = "test-secret-key-for-hono-middleware-testing-1234567890";
 

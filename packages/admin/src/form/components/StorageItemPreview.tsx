@@ -4,7 +4,8 @@ import React from "react";
 import { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { PropertyPreview } from "../../preview";
 
-import { cls, DescriptionIcon, IconButton, paperMixin, RemoveIcon, Tooltip } from "@rebasepro/ui";
+import { cls, IconButton, paperMixin, Tooltip } from "@rebasepro/ui";
+import { FileTextIcon, MinusIcon } from "lucide-react";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/core";
 
@@ -51,7 +52,7 @@ export function StorageItemPreview({
                                 event.stopPropagation();
                                 onRemove(value);
                             }}>
-                            <RemoveIcon size={"small"}/>
+                            <MinusIcon/>
                         </IconButton>
                     </Tooltip>
                 </div>
@@ -71,7 +72,7 @@ export function StorageItemPreview({
                 <div
                     onClick={(e) => e.stopPropagation()}
                     className="flex flex-col items-center justify-center w-full h-full">
-                    <DescriptionIcon className="text-surface-700 dark:text-surface-300"/>
+                    <FileTextIcon className="text-surface-700 dark:text-surface-300"/>
                 </div>
             }
 

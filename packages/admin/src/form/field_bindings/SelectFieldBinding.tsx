@@ -6,7 +6,8 @@ import React, { useCallback } from "react";
 import { FieldHelperText, LabelWithIcon } from "../components";
 import { EnumValuesChip } from "../../preview";
 import { getIconForProperty } from "../../util/property_utils";
-import { CloseIcon, cls, IconButton, Select, SelectItem } from "@rebasepro/ui";
+import { cls, IconButton, Select, SelectItem } from "@rebasepro/ui";
+import { XIcon } from "lucide-react";
 import { useClearRestoreValue } from "../useClearRestoreValue";
 import { PropertyIdCopyTooltip } from "../../components/PropertyIdCopyTooltip";
 import { resolveEnumValues } from "@rebasepro/common";
@@ -70,7 +71,7 @@ export function SelectFieldBinding({
                     property.clearable && !disabled && <IconButton
                         size="small"
                         onClick={handleClearClick}>
-                        <CloseIcon size={"small"}/>
+                        <XIcon/>
                     </IconButton>
                 }
                 onValueChange={(updatedValue: string) => {

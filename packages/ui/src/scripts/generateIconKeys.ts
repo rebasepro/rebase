@@ -1,34 +1,36 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import * as LucideIcons from "lucide-react";
 
-const extractIconKeys = (cssData: string): string[] => {
-    const iconKeys: string[] = [];
-    const regex = /"(.*?)"/g;
-    let match;
-
-    while ((match = regex.exec(cssData)) !== null) {
-        if (match[1]) {
-            iconKeys.push(match[1].replaceAll("-", "_"));
-        }
-    }
-
-    return iconKeys;
-};
-
-// export async function generateIconKeys() {
-//     const cssData = await fs.promises.readFile("../../node_modules/@material-symbols/font-400/index.d.ts", "utf-8");
-//     const keys = extractIconKeys(cssData);
-//     saveIconKeys(keys);
-//     return keys;
-// }
 export async function generateIconKeys() {
-    // fetch from https://raw.githubusercontent.com/google/material-design-icons/refs/heads/master/font/MaterialIconsRound-Regular.codepoints
-    const file = await fetch("https://raw.githubusercontent.com/google/material-design-icons/refs/heads/master/font/MaterialIconsRound-Regular.codepoints");
-    const data = await file.text();
-    const keys = data.split("\n").map((line) => line.split(" ")[0]);
-    saveIconKeys(keys);
-    return keys;
+    const keys = Object.keys(LucideIcons).filter(k => 
+        k !== "createLucideIcon" && 
+        k !== "default" && 
+        k !== "icons" && 
+        k !== "LucideIcon" && 
+        k !== "Icon" && 
+        k !== "LucideProvider" &&
+        k !== "useLucideContext" &&
+        !k.endsWith("Node") && 
+        !k.endsWith("Props") &&
+        !k.endsWith("Icon") &&
+        // Filter out Lucide-prefixed duplicates (e.g. "LucideArrowDown" duplicates "ArrowDown")
+        !k.startsWith("Lucide")
+    );
+
+    // Remove case-insensitive duplicates (e.g. "ArrowDownAZ" vs "ArrowDownAz"),
+    // keeping the first occurrence (typically the canonical PascalCase name)
+    const seen = new Set<string>();
+    const deduped = keys.filter(k => {
+        const lower = k.toLowerCase();
+        if (seen.has(lower)) return false;
+        seen.add(lower);
+        return true;
+    });
+
+    saveIconKeys(deduped);
+    return deduped;
 }
 
 function saveIconKeys(keys: string[]) {

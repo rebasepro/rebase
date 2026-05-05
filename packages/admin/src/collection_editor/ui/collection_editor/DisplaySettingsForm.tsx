@@ -1,19 +1,11 @@
+
 import { FieldCaption } from "../../_cms_internals";
 import React, { useMemo, useState } from "react";
 import { useAuthController, useCustomizationController } from "@rebasepro/core";
 import { getFieldConfig, PropertyConfigBadge } from "../../_cms_internals";
 import { EntityCollection, Property } from "@rebasepro/types";
-import {
-    BooleanSwitchWithLabel,
-    CloseIcon,
-    Container,
-    IconButton,
-    Select,
-    SelectItem,
-    TextField,
-    Typography,
-    Button
-} from "@rebasepro/ui";
+import { BooleanSwitchWithLabel, Container, IconButton, Select, SelectItem, TextField, Typography, Button , iconSize } from "@rebasepro/ui";
+import { XIcon } from "lucide-react";
 
 import { useFormex } from "@rebasepro/formex";
 import { LayoutModeSwitch } from "./LayoutModeSwitch";
@@ -61,7 +53,6 @@ export function DisplaySettingsForm({
 
     const showErrors = submitCount > 0;
 
-
     return (
         <div className={"overflow-auto my-auto"}>
             <Container maxWidth={"4xl"} className={"flex flex-col gap-4 p-8 m-auto"}>
@@ -80,7 +71,6 @@ export function DisplaySettingsForm({
                             className={"col-span-12"}
                             value={values.openEntityMode ?? "side_panel"}
                             onChange={(value) => setFieldValue("openEntityMode", value)}/>
-
 
                         {/* View Mode (Table/Cards/Kanban) */}
                         <ViewModeSwitch
@@ -133,7 +123,7 @@ export function DisplaySettingsForm({
                                                         setFieldValue("orderProperty", undefined);
                                                     }}
                                                 >
-                                                    <CloseIcon size="small"/>
+                                                    <XIcon size={iconSize.smallest}/>
                                                 </IconButton>
                                             ) : undefined}
                                         >
@@ -206,7 +196,6 @@ export function DisplaySettingsForm({
                                             allowDataInference={false}
                                             propertyConfigs={customizationController.propertyConfigs}
 
-
                                             existingPropertyKeys={Object.keys(values.properties ?? {})}
                                             onPropertyChanged={({ id, property }) => {
                                                 const newProperties = {
@@ -266,7 +255,7 @@ export function DisplaySettingsForm({
                                         setFieldValue("sideDialogWidth", null);
                                     }}
                                     disabled={!values.sideDialogWidth}>
-                                    <CloseIcon size={"small"}/>
+                                    <XIcon size={iconSize.small}/>
                                 </IconButton>}
                                 value={values.sideDialogWidth ?? ""}
                                 label={"Side dialog width"}/>

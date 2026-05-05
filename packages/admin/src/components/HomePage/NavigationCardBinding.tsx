@@ -1,7 +1,9 @@
 import type { NavigationEntry } from "@rebasepro/types";
 import { useNavigate } from "react-router-dom";
 ;
-import { IconButton, StarIcon, Tooltip, WarningIcon } from "@rebasepro/ui";
+import { IconButton, Tooltip } from "@rebasepro/ui";
+import { AlertTriangleIcon, StarIcon } from "lucide-react";
+import { iconSize } from "@rebasepro/ui";
 import { NavigationCard } from "./NavigationCard";
 import { SmallNavigationCard } from "./SmallNavigationCard";
 import React from "react";
@@ -64,7 +66,6 @@ export function NavigationCardBinding({
                     }
                 }}>
                 <StarIcon
-                    size={"small"}
                     className={favourite ? "text-secondary" : "text-surface-400 dark:text-surface-500"}/>
             </IconButton>
         ]
@@ -80,7 +81,7 @@ export function NavigationCardBinding({
         actionsArray.unshift(
             <Tooltip key="warning" title={`Table mapped to "${collection?.slug || collection?.name}" is missing in the database. Run migrations.`}>
                 <div>
-                    <WarningIcon size="small" className="text-red-600 dark:text-red-400"/>
+                    <AlertTriangleIcon className="text-red-600 dark:text-red-400" size={iconSize.small}/>
                 </div>
             </Tooltip>
         );

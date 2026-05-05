@@ -1,4 +1,5 @@
-import React, { CSSProperties, useMemo, useState, useEffect } from "react";import { ContentCopyIcon, IconButton, OpenInNewIcon, Tooltip, BrokenImageIcon } from "@rebasepro/ui";
+import { CopyIcon, ExternalLinkIcon, ImageOffIcon } from "lucide-react";
+import React, { CSSProperties, useMemo, useState, useEffect } from "react";import { IconButton, Tooltip } from "@rebasepro/ui";
 import { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { getThumbnailMeasure } from "../util";
 import { useTranslation } from "@rebasepro/core";
@@ -39,7 +40,7 @@ export function ImagePreview({
         if (hasError) {
             return (
                 <div className="w-full h-full flex items-center justify-center bg-surface-100 dark:bg-surface-800 rounded-md">
-                    <BrokenImageIcon className="text-surface-400 dark:text-surface-500"/>
+                    <ImageOffIcon className="text-surface-400 dark:text-surface-500"/>
                 </div>
             );
         }
@@ -60,7 +61,7 @@ export function ImagePreview({
                      style={{ width: imageSize,
 height: imageSize,
 maxHeight: "100%" }}>
-                    <BrokenImageIcon className="text-surface-400 dark:text-surface-500"/>
+                    <ImageOffIcon className="text-surface-400 dark:text-surface-500"/>
                 </div>
             );
         }
@@ -96,7 +97,7 @@ maxHeight: "100%" }}>
 
             {hasError ? (
                 <div className="w-full h-full flex items-center justify-center bg-surface-100 dark:bg-surface-800 rounded-md">
-                    <BrokenImageIcon className="text-surface-400 dark:text-surface-500"/>
+                    <ImageOffIcon className="text-surface-400 dark:text-surface-500"/>
                 </div>
             ) : (
                 <img src={url}
@@ -117,8 +118,7 @@ maxHeight: "100%" }}>
                             e.preventDefault();
                             return navigator.clipboard.writeText(url);
                         }}>
-                        <ContentCopyIcon className={"text-surface-700 dark:text-surface-300"}
-                            size={"smallest"}/>
+                        <CopyIcon className={"text-surface-700 dark:text-surface-300"}/>
                     </IconButton>
                 </Tooltip>}
 
@@ -133,8 +133,7 @@ maxHeight: "100%" }}>
                         size={"smallest"}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}
                     >
-                        <OpenInNewIcon className={"text-surface-700 dark:text-surface-300"}
-                            size={"smallest"}/>
+                        <ExternalLinkIcon className={"text-surface-700 dark:text-surface-300"}/>
                     </IconButton>
                 </Tooltip>
             </div>

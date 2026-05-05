@@ -1,3 +1,4 @@
+
 import { FieldCaption } from "../../_cms_internals";
 import React, { useEffect } from "react";
 import { deepEqual as equal } from "fast-equals"
@@ -5,22 +6,8 @@ import { deepEqual as equal } from "fast-equals"
 ;
 import { EnumValueConfig, EnumValues } from "@rebasepro/types";
 import { ArrayContainer, ArrayEntryParams } from "../../_cms_internals";
-import {
-    AutorenewIcon,
-    Badge,
-    Button,
-    CircularProgress,
-    DebouncedTextField,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    IconButton,
-    ListIcon,
-    Paper,
-    SettingsIcon,
-    Typography
-} from "@rebasepro/ui";
+import { Badge, Button, CircularProgress, DebouncedTextField, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Paper, Typography , iconSize } from "@rebasepro/ui";
+import { RefreshCcwIcon, ListIcon, SettingsIcon } from "lucide-react";
 import { extractEnumFromValues } from "@rebasepro/schema-inference";
 import { Field, Formex, getIn, useCreateFormex, useFormex } from "@rebasepro/formex";
 
@@ -192,7 +179,7 @@ function EnumFormFields({
                         variant={"text"}
                         size={"small"}
                         onClick={inferValues}>
-                        {inferring ? <CircularProgress size={"smallest"}/> : <AutorenewIcon/>}
+                        {inferring ? <CircularProgress size={"smallest"}/> : <RefreshCcwIcon/>}
                         Infer values from data
                     </Button>}
             </div>
@@ -279,7 +266,7 @@ const EnumEntry = React.memo(
                         size="small"
                         autoFocus={autoFocus}
                         autoComplete="off"
-                        endAdornment={inferredEntry && <AutorenewIcon size={"small"}/>}
+                        endAdornment={inferredEntry && <RefreshCcwIcon size={iconSize.small}/>}
                         error={Boolean(entryError?.label)}/>
 
                     {!disabled &&
@@ -289,7 +276,7 @@ const EnumEntry = React.memo(
                                 aria-label="edit"
                                 className={"m-1"}
                                 onClick={() => onDialogOpen()}>
-                                <SettingsIcon size={"small"}/>
+                                <SettingsIcon size={iconSize.small}/>
                             </IconButton>
                         </Badge>}
 

@@ -6,7 +6,7 @@ const ticketsCollection: PostgresCollection = {
     singularName: "Ticket",
     slug: "tickets",
     table: "tickets",
-    icon: "ConfirmationNumber",
+    icon: "Ticket",
     group: "Support",
     history: true,
     openEntityMode: "split",

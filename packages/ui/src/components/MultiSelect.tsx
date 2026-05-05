@@ -1,10 +1,13 @@
+
 "use client";
+import { CheckIcon, ChevronDownIcon, XIcon } from "lucide-react";
+import { iconSize } from "../icons/Icon";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import * as React from "react";
 import { ChangeEvent, Children, useEffect, useState } from "react";
 import { Command as CommandPrimitive } from "cmdk";
 import { cls } from "../util";
-import { CheckIcon, CloseIcon, KeyboardArrowDownIcon } from "../icons";
+
 import { Separator } from "./Separator";
 import { Chip } from "./Chip";
 import { SelectInputLabel } from "./common/SelectInputLabel";
@@ -258,8 +261,8 @@ export const MultiSelect = React.forwardRef<
                                                     className={cls("flex flex-row items-center p-1")}
                                                 >
                                                     {optionChildren}
-                                                    <CloseIcon
-                                                        size={"smallest"}
+                                                    <XIcon
+                                                        size={iconSize.smallest}
                                                         onClick={(event) => {
                                                             event.stopPropagation();
                                                             toggleOption(value);
@@ -270,16 +273,16 @@ export const MultiSelect = React.forwardRef<
                                         })}
                                     </div>
                                     <div className="flex items-center justify-between">
-                                        {includeClear && <CloseIcon
+                                        {includeClear && <XIcon
                                             className={"ml-4"}
-                                            size={"small"}
+                                            size={iconSize.small}
                                             onClick={(event) => {
                                                 event.stopPropagation();
                                                 handleClear();
                                             }}
                                         />}
                                         <div className={cls("px-2 h-full flex items-center")}>
-                                            <KeyboardArrowDownIcon size={size === "large" ? "medium" : "small"}
+                                            <ChevronDownIcon size={size === "large" ? iconSize.medium : iconSize.small}
                                                 className={cls("transition", isPopoverOpen ? "rotate-180" : "")}/>
                                         </div>
                                     </div>
@@ -290,7 +293,7 @@ export const MultiSelect = React.forwardRef<
                                         {placeholder}
                                     </span>
                                     <div className={cls("px-2 h-full flex items-center")}>
-                                        <KeyboardArrowDownIcon size={size === "large" ? "medium" : "small"}
+                                        <ChevronDownIcon size={size === "large" ? iconSize.medium : iconSize.small}
                                             className={cls("transition", isPopoverOpen ? "rotate-180" : "")}/>
                                     </div>
                                 </div>
@@ -417,7 +420,7 @@ const InnerCheckBox = React.memo(function InnerCheckBox({ checked }: { checked: 
                 (checked) ? "text-surface-accent-100 dark:text-surface-accent-900" : "",
                 (checked ? "border-transparent" : "border-surface-accent-800 dark:border-surface-accent-200")
             )}>
-            {checked && <CheckIcon size={16} className={"absolute"}/>}
+            {checked && <CheckIcon size={iconSize.smallest} className={"absolute"}/>}
         </div>
     </div>
 });

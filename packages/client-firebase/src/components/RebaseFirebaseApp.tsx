@@ -25,7 +25,7 @@ import {
     UrlContext,
     NavigationStateContext
 } from "@rebasepro/admin";
-import { PropertyConfig } from "@rebasepro/types";
+import { Entity, PropertyConfig } from "@rebasepro/types";
 import { CenteredView, CircularProgressCenter } from "@rebasepro/ui";
 import { buildRebaseData } from "@rebasepro/common";
 import { Route, Routes, Outlet } from "react-router-dom";
@@ -216,7 +216,7 @@ export function RebaseFirebaseApp({
                         driver={firestoreDelegate}
                         storageSource={storageSource}
                         userManagement={userManagement}
-                        entityLinkBuilder={({ entity }) => `https://console.firebase.google.com/project/${firebaseApp.options.projectId}/firestore/data/${entity.path}/${entity.id}`}
+                        entityLinkBuilder={({ entity }: { entity: Entity<any> }) => `https://console.firebase.google.com/project/${firebaseApp.options.projectId}/firestore/data/${entity.path}/${entity.id}`}
                         locale={locale}
                         onAnalyticsEvent={onAnalyticsEvent}
                         plugins={plugins}

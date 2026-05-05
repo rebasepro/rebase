@@ -1,15 +1,7 @@
+
 import React, { useEffect, useState } from "react";
-import {
-    Avatar,
-    Button,
-    CircularProgress,
-    Tabs,
-    Tab,
-    TextField,
-    Typography,
-    IconButton,
-    DeleteIcon
-} from "@rebasepro/ui";
+import { Avatar, Button, CircularProgress, Tabs, Tab, TextField, Typography, IconButton } from "@rebasepro/ui";
+import { Trash2Icon } from "lucide-react";
 import { useAuthController, useTranslation } from "../hooks";
 
 interface SessionInfo {
@@ -206,7 +198,7 @@ export function UserSettingsView() {
                                             <CircularProgress size="small"/>
                                         ) : (
                                             <IconButton onClick={() => handleRevokeSession(session.id, session.isCurrentSession)} aria-label="Revoke Session">
-                                                <DeleteIcon/>
+                                                <Trash2Icon/>
                                             </IconButton>
                                         )}
                                     </div>

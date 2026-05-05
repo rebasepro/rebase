@@ -1,17 +1,11 @@
+
 import type { EntityCollection } from "@rebasepro/types";
 import React, { lazy, Suspense } from "react";
 
 import { useAuthController, useLargeLayout, useTranslation, useSlot } from "@rebasepro/core";
 import { CollectionActionsProps, EntityTableController, SelectionController, ViewMode } from "@rebasepro/types";
-import {
-    AddIcon,
-    Button,
-    DeleteIcon,
-    IconButton,
-    Tooltip,
-    Popover,
-    MoreVertIcon
-} from "@rebasepro/ui";
+import { Button, IconButton, Tooltip, Popover , iconSize } from "@rebasepro/ui";
+import { PlusIcon, Trash2Icon, MoreVerticalIcon } from "lucide-react";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { usePermissions } from "@rebasepro/core";
 import { toArray } from "@rebasepro/utils";
@@ -69,7 +63,7 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
             ? <Button
                 id={`add_entity_${path}`}
                 onClick={onNewClick}
-                startIcon={<AddIcon size={"small"}/>}
+                startIcon={<PlusIcon size={iconSize.small}/>}
                 variant="filled"
                 color="primary">
                 Add {collection.singularName ?? collection.name}
@@ -81,7 +75,7 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
                 color={compact ? "neutral" : "primary"}
                 size={compact ? "small" : "medium"}
             >
-                <AddIcon size={"small"}/>
+                <PlusIcon size={iconSize.small}/>
             </Button>);
 
     const multipleDeleteEnabled = canDelete(collection, path, null);
@@ -92,7 +86,7 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
             ? <Button
                 variant={"text"}
                 disabled={!(selectedEntities?.length) || !multipleDeleteEnabled}
-                startIcon={<DeleteIcon size={"small"}/>}
+                startIcon={<Trash2Icon size={iconSize.small}/>}
                 onClick={onMultipleDeleteClick}
                 color={"primary"}
                 className="lg:w-20"
@@ -104,7 +98,7 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
                 color={"primary"}
                 disabled={!(selectedEntities?.length) || !multipleDeleteEnabled}
                 onClick={onMultipleDeleteClick}>
-                <DeleteIcon size={"small"}/>
+                <Trash2Icon size={iconSize.small}/>
             </IconButton>;
         multipleDeleteButton =
             <Tooltip
@@ -170,7 +164,7 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
                     onOpenChange={setOverflowOpen}
                     trigger={
                         <IconButton size="small">
-                            <MoreVertIcon size="small"/>
+                            <MoreVerticalIcon size={iconSize.smallest}/>
                         </IconButton>
                     }>
                     <div className="flex flex-col gap-1 p-2 min-w-[200px]" onClick={() => setOverflowOpen(false)}>

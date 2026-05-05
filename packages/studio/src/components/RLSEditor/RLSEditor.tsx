@@ -1,26 +1,8 @@
+
 import { useStudioCollectionRegistry } from "@rebasepro/core";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import {
-    Paper,
-    Typography,
-    CircularProgress,
-    cls,
-    Alert,
-    defaultBorderMixin,
-    Card,
-    Chip,
-    Button,
-    Tooltip,
-    ResizablePanels,
-    SecurityIcon,
-    RefreshIcon,
-    WarningIcon,
-    KeyIcon,
-    DeleteIcon,
-    IconButton,
-    Tabs,
-    Tab
-} from "@rebasepro/ui";
+import { Paper, Typography, CircularProgress, cls, Alert, defaultBorderMixin, Card, Chip, Button, Tooltip, ResizablePanels, IconButton, Tabs, Tab , iconSize } from "@rebasepro/ui";
+import { ShieldIcon, RefreshCwIcon, AlertTriangleIcon, KeyIcon, Trash2Icon } from "lucide-react";
 import { useRebaseContext, useSnackbarController, ErrorView, useTranslation } from "@rebasepro/core";
 import { isPostgresCollection } from "@rebasepro/types";
 import { PolicyEditor } from "./PolicyEditor";
@@ -315,7 +297,7 @@ totalPolicies };
                                             {t("studio_schema_tables")}
                                         </Typography>
                                         <IconButton size="small" onClick={fetchRLSData} title="Refresh">
-                                            <RefreshIcon size="small"/>
+                                            <RefreshCwIcon size={iconSize.smallest}/>
                                         </IconButton>
                                     </div>
                                     <div className="flex-grow overflow-y-auto no-scrollbar p-1">
@@ -391,7 +373,7 @@ totalPolicies };
                                     <div className="flex-grow overflow-y-auto p-3 space-y-3 no-scrollbar">
                                         <div className={cls("p-3 rounded-lg border bg-white dark:bg-surface-900", defaultBorderMixin)}>
                                             <div className="flex items-center gap-2 mb-2">
-                                                <SecurityIcon size="small" className="text-primary"/>
+                                                <ShieldIcon size={iconSize.smallest} className="text-primary"/>
                                                 <Typography variant="body2" className="font-semibold text-[13px]">RLS Studio</Typography>
                                             </div>
                                             <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-[11px] leading-relaxed block">
@@ -474,7 +456,7 @@ message: e instanceof Error ? e.message : String(e) });
                                             variant="text"
                                             size="small"
                                             onClick={fetchRLSData}
-                                            startIcon={<RefreshIcon size="smallest"/>}
+                                            startIcon={<RefreshCwIcon size={iconSize.smallest}/>}
                                         >
                                             Refresh
                                         </Button>
@@ -572,7 +554,7 @@ message: e instanceof Error ? e.message : String(e) });
                                         <div className={cls("p-4 sm:p-5 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900/50 rounded-lg flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between", defaultBorderMixin)}>
                                             <div className="flex gap-3 items-start">
                                                 <div className="mt-1 bg-yellow-100 dark:bg-yellow-900/50 p-1.5 rounded-md shrink-0 flex items-center justify-center">
-                                                    <WarningIcon size="small"/>
+                                                    <AlertTriangleIcon size={iconSize.smallest}/>
                                                 </div>
                                                 <div>
                                                     <Typography variant="subtitle2" className="text-yellow-800 dark:text-yellow-500">
@@ -603,7 +585,7 @@ message: e instanceof Error ? e.message : String(e) });
                                                 <Paper key={policy.policyname} className={cls("p-3 sm:px-4 sm:py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border rounded-lg", defaultBorderMixin)}>
                                                     <div className="flex flex-col gap-2 min-w-0">
                                                         <div className="flex items-center gap-2">
-                                                            <KeyIcon size="small" className="text-text-secondary dark:text-text-secondary-dark shrink-0"/>
+                                                            <KeyIcon size={iconSize.smallest} className="text-text-secondary dark:text-text-secondary-dark shrink-0"/>
                                                             <Typography variant="body2" className="truncate">{policy.policyname}</Typography>
                                                             {policy.status === "code_only" && (
                                                                 <Tooltip title="This policy is defined in your code but hasn't been applied to the database yet.">
@@ -688,7 +670,7 @@ message: e instanceof Error ? e.message : String(e) });
                                                                         }
                                                                     }}
                                                                 >
-                                                                    <DeleteIcon size="small"/>
+                                                                    <Trash2Icon size={iconSize.smallest}/>
                                                                 </IconButton>
                                                             </Tooltip>
                                                         )}

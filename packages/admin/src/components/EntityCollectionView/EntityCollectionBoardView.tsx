@@ -1,3 +1,4 @@
+
 import type { EntityCollection } from "@rebasepro/types";
 import type { Property } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -5,20 +6,8 @@ import { Entity, EntityTableController, EnumValueConfig, FilterValues, SaveEntit
 import { Board } from "./Board";
 import { BoardItem, BoardItemViewProps, ColumnLoadingState } from "./board_types";
 import { EntityBoardCard } from "./EntityBoardCard";
-import {
-    Button,
-    ChipColorKey,
-    ChipColorScheme,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    getColorSchemeForSeed,
-    IconButton,
-    RefreshIcon,
-    Tooltip,
-    Typography
-} from "@rebasepro/ui";
+import { Button, ChipColorKey, ChipColorScheme, CircularProgress, Dialog, DialogActions, DialogContent, getColorSchemeForSeed, IconButton, Tooltip, Typography , iconSize } from "@rebasepro/ui";
+import { RefreshCwIcon } from "lucide-react";
 import { resolveEnumValues } from "@rebasepro/common";
 import { getPropertyInPath } from "../../util/property_utils";
 import {
@@ -519,7 +508,7 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
                             size="small"
                             onClick={() => boardDataController.refreshAll()}
                         >
-                            <RefreshIcon size="small"/>
+                            <RefreshCwIcon size={iconSize.smallest}/>
                         </IconButton>
                     </Tooltip>
                     {indexUrl && (

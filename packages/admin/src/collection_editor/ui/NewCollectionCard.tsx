@@ -3,7 +3,8 @@ import {
     useTranslation
 } from "@rebasepro/core";
 import { PluginHomePageAdditionalCardsProps } from "@rebasepro/types";
-import { AddIcon, Card, cls, Typography } from "@rebasepro/ui";
+import { Card, cls, Typography } from "@rebasepro/ui";
+import { PlusIcon } from "lucide-react";
 import { useCollectionEditorController } from "../useCollectionEditorController";
 
 export function NewCollectionCard({
@@ -37,7 +38,7 @@ export function NewCollectionCard({
 
             <div
                 className="flex items-center justify-center h-full w-full grow flex-col">
-                <AddIcon color="primary"/>
+                <PlusIcon className="text-primary"/>
                 <Typography color="primary"
                     variant={"caption"}
                     className={"font-medium"}>{t("studio_new_collection_add").toUpperCase()}</Typography>

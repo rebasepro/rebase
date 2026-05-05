@@ -1,24 +1,11 @@
+
 import React, { useEffect, useRef, useState, ReactNode } from "react";
 import { Fragment, DOMParser } from "prosemirror-model";
 import { useProseMirrorContext } from "../hooks/useProseMirrorContext";
 import { autoUpdate, computePosition, flip, offset, shift, type VirtualElement } from "@floating-ui/dom";
 import { SlashCommandPluginKey } from "../plugins/slashCommandPlugin";
-import {
-    cls,
-    defaultBorderMixin,
-    TextFieldsIcon,
-    CheckBoxIcon,
-    LooksOneIcon,
-    LooksTwoIcon,
-    Looks3Icon,
-    FormatListBulletedIcon,
-    FormatListNumberedIcon,
-    FormatQuoteIcon,
-    CodeIcon,
-    ImageIcon,
-    AutoFixHighIcon,
-    TableChartIcon
-} from "@rebasepro/ui";
+import { cls, defaultBorderMixin , iconSize } from "@rebasepro/ui";
+import { CheckSquareIcon, Heading1Icon, Heading2Icon, Heading3Icon, Wand2Icon, TableIcon, TypeIcon, ListIcon, ListOrderedIcon, QuoteIcon, CodeIcon, ImageIcon } from "lucide-react";
 import { setBlockType, wrapIn } from "prosemirror-commands";
 import { wrapInList } from "prosemirror-schema-list";
 import { schema } from "../schema";
@@ -48,7 +35,7 @@ const suggestionItems: SuggestionItem[] = [
         title: "Text",
         description: "Just start typing with plain text.",
         searchTerms: ["p", "paragraph"],
-        icon: <TextFieldsIcon size={18}/>,
+        icon: <TypeIcon size={iconSize.small}/>,
         command: (view, range) => {
             view.dispatch(view.state.tr.deleteRange(range.from, range.to));
             setBlockType(schema.nodes.paragraph)(view.state, view.dispatch);
@@ -58,7 +45,7 @@ const suggestionItems: SuggestionItem[] = [
         title: "To-do List",
         description: "Track tasks with a to-do list.",
         searchTerms: ["todo", "task", "list", "check", "checkbox"],
-        icon: <CheckBoxIcon size={18}/>,
+        icon: <CheckSquareIcon size={iconSize.small}/>,
         command: (view, range) => {
             view.dispatch(view.state.tr.deleteRange(range.from, range.to));
             wrapInList(schema.nodes.task_list)(view.state, view.dispatch);
@@ -68,7 +55,7 @@ const suggestionItems: SuggestionItem[] = [
         title: "Heading 1",
         description: "Big section heading.",
         searchTerms: ["title", "big", "large"],
-        icon: <LooksOneIcon size={18}/>,
+        icon: <Heading1Icon size={iconSize.small}/>,
         command: (view, range) => {
             view.dispatch(view.state.tr.deleteRange(range.from, range.to));
             setBlockType(schema.nodes.heading, { level: 1 })(view.state, view.dispatch);
@@ -78,7 +65,7 @@ const suggestionItems: SuggestionItem[] = [
         title: "Heading 2",
         description: "Medium section heading.",
         searchTerms: ["subtitle", "medium"],
-        icon: <LooksTwoIcon size={18}/>,
+        icon: <Heading2Icon size={iconSize.small}/>,
         command: (view, range) => {
             view.dispatch(view.state.tr.deleteRange(range.from, range.to));
             setBlockType(schema.nodes.heading, { level: 2 })(view.state, view.dispatch);
@@ -88,7 +75,7 @@ const suggestionItems: SuggestionItem[] = [
         title: "Heading 3",
         description: "Small section heading.",
         searchTerms: ["subtitle", "small"],
-        icon: <Looks3Icon size={18}/>,
+        icon: <Heading3Icon size={iconSize.small}/>,
         command: (view, range) => {
             view.dispatch(view.state.tr.deleteRange(range.from, range.to));
             setBlockType(schema.nodes.heading, { level: 3 })(view.state, view.dispatch);
@@ -98,7 +85,7 @@ const suggestionItems: SuggestionItem[] = [
         title: "Bullet List",
         description: "Create a simple bullet list.",
         searchTerms: ["unordered", "point"],
-        icon: <FormatListBulletedIcon size={18}/>,
+        icon: <ListIcon size={iconSize.small}/>,
         command: (view, range) => {
             view.dispatch(view.state.tr.deleteRange(range.from, range.to));
             wrapInList(schema.nodes.bullet_list)(view.state, view.dispatch);
@@ -108,7 +95,7 @@ const suggestionItems: SuggestionItem[] = [
         title: "Numbered List",
         description: "Create a list with numbering.",
         searchTerms: ["ordered"],
-        icon: <FormatListNumberedIcon size={18}/>,
+        icon: <ListOrderedIcon size={iconSize.small}/>,
         command: (view, range) => {
             view.dispatch(view.state.tr.deleteRange(range.from, range.to));
             wrapInList(schema.nodes.ordered_list)(view.state, view.dispatch);
@@ -118,7 +105,7 @@ const suggestionItems: SuggestionItem[] = [
         title: "Quote",
         description: "Capture a quote.",
         searchTerms: ["blockquote"],
-        icon: <FormatQuoteIcon size={18}/>,
+        icon: <QuoteIcon size={iconSize.small}/>,
         command: (view, range) => {
             view.dispatch(view.state.tr.deleteRange(range.from, range.to));
             wrapIn(schema.nodes.blockquote)(view.state, view.dispatch);
@@ -128,7 +115,7 @@ const suggestionItems: SuggestionItem[] = [
         title: "Code",
         description: "Capture a code snippet.",
         searchTerms: ["codeblock"],
-        icon: <CodeIcon size={18}/>,
+        icon: <CodeIcon size={iconSize.small}/>,
         command: (view, range) => {
             view.dispatch(view.state.tr.deleteRange(range.from, range.to));
             setBlockType(schema.nodes.code_block)(view.state, view.dispatch);
@@ -138,7 +125,7 @@ const suggestionItems: SuggestionItem[] = [
         title: "Image",
         description: "Upload an image from your computer.",
         searchTerms: ["photo", "picture", "media", "upload", "file"],
-        icon: <ImageIcon size={18}/>,
+        icon: <ImageIcon size={iconSize.small}/>,
         command: (view, range, upload) => {
             view.dispatch(view.state.tr.deleteRange(range.from, range.to));
 
@@ -171,7 +158,7 @@ const suggestionItems: SuggestionItem[] = [
         title: "Table",
         description: "Insert a custom grid table.",
         searchTerms: ["table", "grid", "row", "col"],
-        icon: <TableChartIcon size={18}/>,
+        icon: <TableIcon size={iconSize.small}/>,
         command: (view, range, upload, aiController, setSubView) => {
             if (setSubView) setSubView("table-grid");
         }
@@ -182,7 +169,7 @@ const autocompleteSuggestionItem: SuggestionItem = {
     title: "Autocomplete",
     description: "Add text based on the context.",
     searchTerms: ["ai"],
-    icon: <AutoFixHighIcon size={18}/>,
+    icon: <Wand2Icon size={iconSize.small}/>,
     command: async (view, range, upload, aiController) => {
         if (!aiController) throw Error("No AiController");
 

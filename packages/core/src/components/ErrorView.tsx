@@ -1,6 +1,7 @@
 import React from "react";
 import { ErrorTooltip } from "./ErrorTooltip";
-import { WarningIcon, Typography, Button } from "@rebasepro/ui";
+import { Typography, Button } from "@rebasepro/ui";
+import { AlertTriangleIcon } from "lucide-react";
 
 /**
  * @group Components
@@ -35,7 +36,7 @@ export function ErrorView({
         <div
             className="flex flex-col m-2">
             <div className="flex items-start">
-                <WarningIcon className="mx-2 mt-0.5" size={"small"} color={"warning"}/>
+                <AlertTriangleIcon className="mx-2 mt-0.5"/>
                 <div className="pl-2">
                     {title && <Typography
                         variant={"body2"}

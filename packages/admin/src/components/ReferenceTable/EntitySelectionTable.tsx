@@ -15,7 +15,8 @@ import {
     usePermissions
 } from "@rebasepro/core";
 import { ErrorView } from "@rebasepro/core";
-import { AddIcon, Button, DialogActions, Typography } from "@rebasepro/ui";
+import { Button, DialogActions, Typography } from "@rebasepro/ui";
+import { PlusIcon } from "lucide-react";
 import { IconForView } from "@rebasepro/core";
 import { useSelectionController } from "../EntityCollectionView/useSelectionController";
 
@@ -257,7 +258,6 @@ export function EntitySelectionTable<M extends Record<string, unknown>>(
         updateUrl: false
     });
 
-
     return (
 
         <div className="flex flex-col h-full">
@@ -338,12 +338,12 @@ function EntitySelectionDialogActions({
         onClick && (largeLayout
             ? <Button
                 onClick={onClick}
-                startIcon={<AddIcon/>}>
+                startIcon={<PlusIcon/>}>
                 Add {collection.singularName ?? collection.name}
             </Button>
             : <Button
                 onClick={onClick}>
-                <AddIcon/>
+                <PlusIcon/>
             </Button>);
 
     return (

@@ -1,3 +1,4 @@
+
 import React, { useCallback } from "react";
 
 import {
@@ -8,20 +9,8 @@ import {
 import { useCMSContext } from "../../hooks";
 import { CollectionActionsProps, Entity, EntityCollection, ExportConfig, RebaseContext, User } from "@rebasepro/types";
 import { getDefaultValuesFor } from "@rebasepro/common";
-import {
-    Alert,
-    BooleanSwitchWithLabel,
-    Button,
-    CircularProgress,
-    cls,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    DownloadIcon,
-    IconButton,
-    Tooltip
-} from "@rebasepro/ui";
+import { Alert, BooleanSwitchWithLabel, Button, CircularProgress, cls, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Tooltip , iconSize } from "@rebasepro/ui";
+import { DownloadIcon } from "lucide-react";
 import { downloadEntitiesExport } from "./export";
 
 const DOCS_LIMIT = 500;
@@ -56,7 +45,6 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
         path,
         collection
     });
-
 
     const [dataLoading, setDataLoading] = React.useState<boolean>(false);
     const [dataLoadingError, setDataLoadingError] = React.useState<Error | undefined>();
@@ -172,7 +160,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
                 size={"small"}
                 color={"primary"}
                 onClick={handleClickOpen}>
-                <DownloadIcon size={"small"}/>
+                <DownloadIcon size={iconSize.small}/>
             </IconButton>
         </Tooltip>
 
@@ -185,7 +173,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
 
             <DialogContent className={"flex flex-col gap-4 my-4"}>
 
-                <div>Download the the content of this table as a CSV</div>
+                <div>DownloadIcon the the content of this table as a CSV</div>
 
                 {collectionEntitiesCount !== undefined && collectionEntitiesCount > DOCS_LIMIT &&
                     <Alert color={"warning"}>
@@ -267,7 +255,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
 
                 <Button onClick={onOkClicked}
                     disabled={dataLoading || !canExport}>
-                    Download
+                    DownloadIcon
                 </Button>
 
             </DialogActions>

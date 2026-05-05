@@ -1,19 +1,12 @@
+
 import type { EntityCollection } from "@rebasepro/types";
 import type { FormContext } from "../types/fields";
 import type { EntityAction, SideEntityController } from "@rebasepro/types";
 import React from "react";
 import { Entity, RebaseContext } from "@rebasepro/types";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
-import {
-    Button,
-    cls,
-    defaultBorderMixin,
-    DialogActions,
-    ErrorIcon,
-    IconButton,
-    LoadingButton,
-    Typography
-} from "@rebasepro/ui";
+import { Button, cls, defaultBorderMixin, DialogActions, IconButton, LoadingButton, Typography } from "@rebasepro/ui";
+import { AlertCircleIcon } from "lucide-react";
 import { useTranslation } from "@rebasepro/core";
 import { FormexController } from "@rebasepro/formex";
 import { useCMSContext } from "../index";
@@ -166,7 +159,7 @@ function buildBottomActions<M extends Record<string, unknown>>({
             color="primary"
             type="submit"
             disabled={disabled || formex.isSubmitting}
-            startIcon={hasErrors ? <ErrorIcon/> : undefined}>
+            startIcon={hasErrors ? <AlertCircleIcon/> : undefined}>
             {status === "existing" && t("save")}
             {status === "copy" && t("create_copy")}
             {status === "new" && t("create")}
@@ -200,7 +193,7 @@ function buildSideActions<M extends Record<string, unknown>>({
             variant="filled"
             color="primary"
             type="submit"
-            startIcon={hasErrors ? <ErrorIcon/> : undefined}
+            startIcon={hasErrors ? <AlertCircleIcon/> : undefined}
             disabled={disabled || formex.isSubmitting}>
             {status === "existing" && t("save")}
             {status === "copy" && t("create_copy")}

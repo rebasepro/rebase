@@ -7,7 +7,8 @@ import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
 import { EnumValuesChip } from "../../preview";
 import { getIconForProperty } from "../../util/property_utils";
 import { enumToObjectEntries, getLabelOrConfigFrom } from "@rebasepro/common";
-import { CloseIcon, MultiSelect, MultiSelectItem } from "@rebasepro/ui";
+import { MultiSelect, MultiSelectItem , iconSize } from "@rebasepro/ui";
+import { XIcon } from "lucide-react";
 import { useClearRestoreValue } from "../useClearRestoreValue";
 
 /**
@@ -77,7 +78,7 @@ export function MultiSelectFieldBinding({
                     setValue((value ?? []).filter((v: any) => v !== enumKey));
                 }}
             >
-                <CloseIcon size="smallest"/>
+                <XIcon size={iconSize.smallest}/>
             </button>}
         </EnumValuesChip>;
     }, [enumValues, setValue, value]);

@@ -1,34 +1,11 @@
+
 import React, { useState } from "react";
 import { useCollectionRegistryController } from "../../index";
 import { useSnackbarController, useTranslation } from "@rebasepro/core";
 import { isPostgresCollection, Role, SecurityRule, UserManagementDelegate } from "@rebasepro/types";
 import { useBreadcrumbsController } from "../../index";
-import {
-    AddIcon,
-    Button,
-    Chip,
-    Container,
-    DeleteIcon,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    IconButton,
-    Paper,
-    Table,
-    TableBody,
-    TableCell,
-    TableHeader,
-    TableRow,
-    TextField,
-    Typography,
-    CircularProgress,
-    CenteredView,
-    Tooltip,
-    Checkbox,
-    LoadingButton,
-    defaultBorderMixin
-} from "@rebasepro/ui";
+import { Button, Chip, Container, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Paper, Table, TableBody, TableCell, TableHeader, TableRow, TextField, Typography, CircularProgress, CenteredView, Tooltip, Checkbox, LoadingButton, defaultBorderMixin , iconSize } from "@rebasepro/ui";
+import { PlusIcon, Trash2Icon } from "lucide-react";
 import { RoleChip } from "./RoleChip";
 import { ConfirmationDialog } from "@rebasepro/core";
 
@@ -113,7 +90,7 @@ isAdmin: false }
                 <Typography gutterBottom variant="h4" className="grow mb-0" component="h4">
                     {t("roles")}
                 </Typography>
-                <Button startIcon={<AddIcon/>} onClick={handleAddRole} disabled={!saveRole}>
+                <Button startIcon={<PlusIcon/>} onClick={handleAddRole} disabled={!saveRole}>
                     {t("add_role")}
                 </Button>
             </div>
@@ -147,7 +124,7 @@ isAdmin: false }
                                                             setRoleToDelete(role);
                                                             setDeleteConfirmOpen(true);
                                                         }}>
-                                                        <DeleteIcon size="smallest"/>
+                                                        <Trash2Icon size={iconSize.smallest}/>
                                                     </IconButton>
                                                 </Tooltip>
                                             )}

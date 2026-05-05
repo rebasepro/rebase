@@ -1,3 +1,4 @@
+
 import React from "react";
 import {
     ConfirmationDialog,
@@ -6,21 +7,8 @@ import {
 import { resolveEntityAction } from "../../_cms_internals";
 import { type EntityCollection } from "@rebasepro/types";
 import { EntityAction } from "@rebasepro/types";
-import {
-    AddIcon,
-    Alert,
-    Button,
-    Container,
-    DeleteIcon,
-    IconButton,
-    Paper,
-    Table,
-    TableBody,
-    TableCell,
-    TableRow,
-    Tooltip,
-    Typography
-} from "@rebasepro/ui";
+import { Alert, Button, Container, IconButton, Paper, Table, TableBody, TableCell, TableRow, Tooltip, Typography , iconSize } from "@rebasepro/ui";
+import { PlusIcon, Trash2Icon } from "lucide-react";
 import { useFormex } from "@rebasepro/formex";
 import { EntityActionsSelectDialog } from "./EntityActionsSelectDialog";
 
@@ -79,7 +67,7 @@ export function EntityActionsEditTab({
                                                         setActionToDelete(action.key);
                                                     }}
                                                     color="inherit">
-                                                    <DeleteIcon size={"small"}/>
+                                                    <Trash2Icon size={iconSize.small}/>
                                                 </IconButton>
                                             </Tooltip>
                                         </TableCell>
@@ -108,13 +96,12 @@ export function EntityActionsEditTab({
                             }}
                             variant="filled"
                             color="neutral"
-                            startIcon={<AddIcon/>}>
+                            startIcon={<PlusIcon/>}>
                             Add custom entity action
                         </Button>
                     </div>
 
                 </>}
-
 
             </div>
 

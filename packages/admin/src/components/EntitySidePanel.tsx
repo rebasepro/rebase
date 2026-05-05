@@ -4,9 +4,10 @@ import React, { useCallback, useEffect, useMemo } from "react";
 
 import type { OnUpdateParams } from "../types/components/EntityFormProps";
 import { ErrorBoundary } from "@rebasepro/ui";
+import { Maximize2Icon, XIcon } from "lucide-react";
 import { EntityEditView } from "./EntityEditView";
 import { useSideDialogContext } from "./SideDialogs";
-import { CloseIcon, IconButton, OpenInFullIcon } from "@rebasepro/ui";
+import { IconButton } from "@rebasepro/ui";
 import { useLocation, useNavigate } from "react-router-dom";
 import { saveEntityToMemoryCache } from "@rebasepro/core";
 import { useCollectionRegistryController, useSideEntityController } from "../index";
@@ -112,7 +113,7 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
                                 className="self-center"
                                 size={"small"}
                                 onClick={onClose}>
-                                <CloseIcon size={"small"}/>
+                                <XIcon/>
                             </IconButton>
                             {allowFullScreen && <IconButton
                                 className="self-center"
@@ -134,7 +135,7 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
                                         navigate(fullScreenUrl + "#new", { state: null });
                                     }
                                 }}>
-                                <OpenInFullIcon size={"smallest"}/>
+                                <Maximize2Icon/>
                             </IconButton>}
                         </div>}
                     onTabChange={({

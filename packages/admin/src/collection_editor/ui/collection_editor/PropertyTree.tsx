@@ -1,22 +1,12 @@
+
 import React from "react";
 import { deepEqual as equal } from "fast-equals"
 
 import { AIModifiedIndicator } from "@rebasepro/core";
 import { AdditionalFieldDelegate, Properties, Property } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";
-import {
-    FindInPageIcon,
-    defaultBorderMixin,
-    cls,
-    DeleteIcon,
-    IconButton,
-    Menu,
-    MenuItem,
-    MoreVertIcon,
-    Tooltip,
-    VerticalAlignBottomIcon,
-    VerticalAlignTopIcon
-} from "@rebasepro/ui";
+import { defaultBorderMixin, cls, IconButton, Menu, MenuItem, Tooltip , iconSize } from "@rebasepro/ui";
+import { FileSearchIcon, ArrowDownToLineIcon, ArrowUpToLineIcon, Trash2Icon, MoreVerticalIcon } from "lucide-react";
 import { NonEditablePropertyPreview, PropertyFieldPreview } from "./PropertyFieldPreview";
 import {
     closestCenter,
@@ -289,7 +279,7 @@ export function PropertyTreeEntry({
                     {isPropertyInferred && <>
                         <Tooltip title={"Inferred property"} asChild={true}>
                             <IconButton size="smallest" disabled>
-                                <FindInPageIcon size="smallest"/>
+                                <FileSearchIcon size={iconSize.smallest}/>
                             </IconButton>
                         </Tooltip>
                         {onPropertyRemove && <Tooltip title={"Remove inferred property"}
@@ -300,7 +290,7 @@ export function PropertyTreeEntry({
                                     e.stopPropagation();
                                     onPropertyRemove(propertyKey, namespace);
                                 }}>
-                                <DeleteIcon size={"smallest"}/>
+                                <Trash2Icon size={iconSize.smallest}/>
                             </IconButton>
                         </Tooltip>}
                     </>}
@@ -310,7 +300,7 @@ export function PropertyTreeEntry({
                             <IconButton
                                 size="smallest"
                             >
-                                <MoreVertIcon size={"smallest"}/>
+                                <MoreVerticalIcon size={iconSize.smallest}/>
                             </IconButton>
                         }
                     >
@@ -325,7 +315,7 @@ export function PropertyTreeEntry({
                                 }
                             }}
                         >
-                            <VerticalAlignTopIcon size="smallest"/>
+                            <ArrowUpToLineIcon size={iconSize.smallest}/>
                             Move to top
                         </MenuItem>
                         <MenuItem
@@ -339,14 +329,14 @@ export function PropertyTreeEntry({
                                 }
                             }}
                         >
-                            <VerticalAlignBottomIcon size="smallest"/>
+                            <ArrowDownToLineIcon size={iconSize.smallest}/>
                             Move to bottom
                         </MenuItem>
                         <MenuItem
                             dense
                             onClick={() => onPropertyRemove?.(propertyKey, namespace)}
                         >
-                            <DeleteIcon size="smallest"/>
+                            <Trash2Icon size={iconSize.smallest}/>
                             Delete
                         </MenuItem>
                     </Menu>

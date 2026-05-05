@@ -1,5 +1,6 @@
 import React, { PropsWithChildren, useState } from "react";
-import { cls, EditIcon, IconButton, Typography, ExpandablePanel } from "@rebasepro/ui";
+import { cls, IconButton, Typography, ExpandablePanel , iconSize } from "@rebasepro/ui";
+import { PencilIcon } from "lucide-react";
 import { useTranslation } from "@rebasepro/core";
 
 export function NavigationGroup({
@@ -40,7 +41,7 @@ export function NavigationGroup({
                 color="secondary"
                 className={cls(
                     "p-4 py-2 rounded",
-                    "font-medium uppercase text-sm text-surface-600 dark:text-surface-400"
+                    "font-medium text-sm text-surface-600 dark:text-surface-400"
                 )}
             >
                 {currentGroupName}
@@ -54,7 +55,7 @@ export function NavigationGroup({
                     }}
                     className={cls("ml-2 ", isHovered ? "opacity-100" : "opacity-0", "transition-opacity duration-100")}
                 >
-                    <EditIcon size="smallest"/>
+                    <PencilIcon size={iconSize.smallest}/>
                 </IconButton>
             )}
         </div>

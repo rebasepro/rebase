@@ -1,37 +1,9 @@
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Highlight, themes } from "prism-react-renderer";
 import { toSnakeCase } from "@rebasepro/utils";
-import {
-    Button,
-    Typography,
-    CircularProgress,
-    cls,
-    IconButton,
-    Dialog,
-    DialogContent,
-    DialogActions,
-    DialogTitle,
-    TextField,
-    Tooltip,
-    defaultBorderMixin,
-    ResizablePanels,
-    Chip,
-    Menu,
-    MenuItem,
-    Tabs,
-    Tab,
-    TerminalIcon,
-    CloseIcon,
-    AddIcon,
-    SaveIcon,
-    DownloadIcon,
-    PlayArrowIcon,
-    MoreVertIcon,
-    EditIcon,
-    VirtualTable,
-    VirtualTableColumn,
-    CellRendererParams
-} from "@rebasepro/ui";
+import { Button, Typography, CircularProgress, cls, IconButton, Dialog, DialogContent, DialogActions, DialogTitle, TextField, Tooltip, defaultBorderMixin, ResizablePanels, Chip, Menu, MenuItem, Tabs, Tab, VirtualTable, VirtualTableColumn, CellRendererParams , iconSize } from "@rebasepro/ui";
+import { TerminalIcon, XIcon, PlusIcon, SaveIcon, DownloadIcon, PlayIcon, MoreVerticalIcon, PencilIcon, MenuIcon } from "lucide-react";
 import { useStudioUrlController, useStudioCollectionRegistry, useStudioSideEntityController } from "@rebasepro/core";
 import { useRebaseContext, useRebaseClient, useSnackbarController, useApiConfig, useTranslation, useModeController, ErrorView, SelectableUser, IconForView } from "@rebasepro/core";
 import { EntityCollection } from "@rebasepro/types";
@@ -113,7 +85,6 @@ interface MatchedJSCollection {
     collection: EntityCollection;
     pkColumn: string;
 }
-
 
 /**
  * Given the raw SDK result, try to detect which collections are present.
@@ -646,7 +617,7 @@ message: t("studio_sql_markdown_copy_failed") });
                                         <Tabs value={activeTabId} onValueChange={setActiveTabId} variant="boxy" className="w-[unset] flex-shrink-0" innerClassName="bg-white dark:bg-surface-950">
                                             {tabs.map(tab => (
                                                 <Tab key={tab.id} value={tab.id} className="flex items-center justify-between group max-w-[200px]">
-                                                    <TerminalIcon size="smallest" className="text-amber-500 mr-1.5 flex-shrink-0"/>
+                                                    <TerminalIcon size={iconSize.smallest} className="text-amber-500 mr-1.5 flex-shrink-0"/>
                                                     <span className="truncate">{tab.name}</span>
                                                     {tabs.length > 1 && (
                                                         <IconButton
@@ -654,7 +625,7 @@ message: t("studio_sql_markdown_copy_failed") });
                                                             onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
                                                             className="ml-1 !p-0.5 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity"
                                                         >
-                                                            <CloseIcon size="smallest"/>
+                                                            <XIcon size={iconSize.smallest}/>
                                                         </IconButton>
                                                     )}
                                                 </Tab>
@@ -665,12 +636,12 @@ message: t("studio_sql_markdown_copy_failed") });
                                             onClick={addTab}
                                             className="ml-2 flex-shrink-0"
                                         >
-                                            <AddIcon size="small"/>
+                                            <PlusIcon size={iconSize.smallest}/>
                                         </IconButton>
                                     </div>
                                 </div>
                                 <div className="flex shrink-0 items-center justify-end gap-1.5">
-                                    <Tooltip title="Save as snippet">
+                                    <Tooltip title="SaveIcon as snippet">
                                         <IconButton
                                             size="small"
                                             onClick={() => {
@@ -679,14 +650,14 @@ message: t("studio_sql_markdown_copy_failed") });
                                             }}
                                             disabled={!activeTab?.code.trim()}
                                         >
-                                            <SaveIcon size="small"/>
+                                            <SaveIcon size={iconSize.smallest}/>
                                         </IconButton>
                                     </Tooltip>
 
                                     {result?.value && (
                                         <Tooltip title="Export result as JSON">
                                             <IconButton size="small" onClick={exportResult}>
-                                                <DownloadIcon size="small"/>
+                                                <DownloadIcon size={iconSize.smallest}/>
                                             </IconButton>
                                         </Tooltip>
                                     )}
@@ -697,7 +668,7 @@ message: t("studio_sql_markdown_copy_failed") });
                                         disabled={isRunning || !activeTab?.code.trim()}
                                         onClick={() => executeCode()}
                                     >
-                                        {isRunning ? <CircularProgress size="smallest" className="mr-2"/> : <PlayArrowIcon size="small" className="mr-2"/>}
+                                        {isRunning ? <CircularProgress size="smallest" className="mr-2"/> : <PlayIcon size={iconSize.smallest} className="mr-2"/>}
                                         Run
                                     </Button>
                                 </div>
@@ -862,7 +833,7 @@ id: String(ra.entityId) })}>
                                                                                                 });
                                                                                             }}
                                                                                         >
-                                                                                            <EditIcon size="small"/>
+                                                                                            <PencilIcon size={iconSize.smallest}/>
                                                                                         </IconButton>
                                                                                     </Tooltip>
                                                                                 </div>
@@ -874,11 +845,11 @@ id: String(ra.entityId) })}>
                                                                                 <Menu
                                                                                     trigger={
                                                                                         <IconButton
-                                                                                            size="small"
+                                                                                            size={"small"}
                                                                                             className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300"
                                                                                             onClick={(e) => e.stopPropagation()}
                                                                                         >
-                                                                                            <MoreVertIcon size="small"/>
+                                                                                            <MoreVerticalIcon size={iconSize.smallest}/>
                                                                                         </IconButton>
                                                                                     }
                                                                                 >
@@ -1009,9 +980,9 @@ id: String(ra.entityId) })}
                 />
             </div>
 
-            {/* Save snippet dialog */}
+            {/* SaveIcon snippet dialog */}
             <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
-                <DialogTitle>Save Snippet</DialogTitle>
+                <DialogTitle>SaveIcon Snippet</DialogTitle>
                 <DialogContent>
                     <TextField
                         label="Snippet name"

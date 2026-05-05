@@ -1,12 +1,7 @@
+
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import {
-    Typography, cls, defaultBorderMixin, Button, Chip,
-    CircularProgress, IconButton, Paper,
-    ForkRightIcon, RefreshIcon, AddIcon,
-    DeleteOutlineIcon, ContentCopyIcon,
-    Dialog, DialogTitle, DialogContent, DialogActions,
-    TextField, Select, SelectItem, Alert
-} from "@rebasepro/ui";
+import { Typography, cls, defaultBorderMixin, Button, Chip, CircularProgress, IconButton, Paper, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, SelectItem, Alert , iconSize } from "@rebasepro/ui";
+import { GitBranchIcon, Trash2Icon, RefreshCwIcon, PlusIcon, CopyIcon } from "lucide-react";
 import { useRebaseContext, useSnackbarController, ConfirmationDialog } from "@rebasepro/core";
 import { isBranchAdmin } from "@rebasepro/types";
 import type { BranchInfo } from "@rebasepro/types";
@@ -127,7 +122,7 @@ export function BranchesView() {
     if (!branchAdmin) {
         return (
             <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
-                <ForkRightIcon size="large" className="text-surface-300 dark:text-surface-600"/>
+                <GitBranchIcon size={iconSize.large} className="text-surface-300 dark:text-surface-600"/>
                 <Typography variant="h6" color="secondary">Database Branching Not Available</Typography>
                 <Typography variant="body2" color="disabled" className="max-w-md">
                     Branching requires a PostgreSQL backend with an admin connection configured.
@@ -153,23 +148,23 @@ export function BranchesView() {
             <div className={cls("flex flex-col w-[340px] min-w-[280px] border-r h-full", defaultBorderMixin)}>
                 <div className={cls("flex items-center justify-between px-4 py-2.5 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
                     <div className="flex items-center gap-2">
-                        <ForkRightIcon size="small" className="text-primary"/>
+                        <GitBranchIcon size={iconSize.small} className="text-primary"/>
                         <Typography variant="subtitle2" className="font-semibold">Branches</Typography>
                         <Chip size="smallest" className="bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300">{branches.length}</Chip>
                     </div>
                     <div className="flex items-center gap-1">
                         <IconButton size="small" onClick={loadBranches} title="Refresh">
-                            <RefreshIcon size="small"/>
+                            <RefreshCwIcon size={iconSize.smallest}/>
                         </IconButton>
                         <IconButton size="small" onClick={() => setCreateOpen(true)} title="Create branch" className="text-primary">
-                            <AddIcon size="small"/>
+                            <PlusIcon size={iconSize.smallest}/>
                         </IconButton>
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
                     {branches.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
-                            <ContentCopyIcon size="medium" className="text-surface-300 dark:text-surface-600"/>
+                            <CopyIcon size={iconSize.small} className="text-surface-300 dark:text-surface-600"/>
                             <Typography variant="body2" color="disabled" className="text-[13px]">
                                 No branches yet. Create one to start working with an isolated database copy.
                             </Typography>
@@ -177,7 +172,7 @@ export function BranchesView() {
                                 size="small"
                                 variant="outlined"
                                 onClick={() => setCreateOpen(true)}
-                                startIcon={<AddIcon size="smallest"/>}
+                                startIcon={<PlusIcon size={iconSize.smallest}/>}
                             >
                                 Create Branch
                             </Button>
@@ -216,7 +211,7 @@ export function BranchesView() {
             <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
                 {!selected ? (
                     <div className="flex flex-col items-center justify-center h-full gap-3">
-                        <ForkRightIcon size="large" className="text-surface-200 dark:text-surface-700"/>
+                        <GitBranchIcon size={iconSize.large} className="text-surface-200 dark:text-surface-700"/>
                         <Typography variant="body2" color="disabled">
                             {branches.length === 0 ? "Create a branch to get started" : "Select a branch to view details"}
                         </Typography>
@@ -240,7 +235,7 @@ export function BranchesView() {
                                     color="error"
                                     variant="outlined"
                                     onClick={() => setDeleteTarget(selected.name)}
-                                    startIcon={<DeleteOutlineIcon size="smallest"/>}
+                                    startIcon={<Trash2Icon size={iconSize.smallest}/>}
                                 >
                                     Delete
                                 </Button>
@@ -335,7 +330,7 @@ export function BranchesView() {
                         color="primary"
                         onClick={handleCreate}
                         disabled={!newBranchName.trim() || creating}
-                        startIcon={creating ? <CircularProgress size="smallest"/> : <AddIcon size="smallest"/>}
+                        startIcon={creating ? <CircularProgress size="smallest"/> : <PlusIcon size={iconSize.smallest}/>}
                     >
                         {creating ? "Creating..." : "Create Branch"}
                     </Button>

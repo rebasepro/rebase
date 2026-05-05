@@ -1,14 +1,7 @@
 import React, { useState } from "react";
 
-import {
-    CircularProgress,
-    cls,
-    defaultBorderMixin,
-    IconButton,
-    Popover,
-    SearchBar
-} from "@rebasepro/ui";
-import { MoreVertIcon } from "@rebasepro/ui";
+import { CircularProgress, cls, defaultBorderMixin, IconButton, Popover, SearchBar , iconSize } from "@rebasepro/ui";
+import { MoreVerticalIcon } from "lucide-react";
 import { useLargeLayout, useTranslation } from "@rebasepro/core";
 
 interface CollectionTableToolbarProps {
@@ -115,7 +108,7 @@ export function CollectionTableToolbar({
                             onOpenChange={setOverflowOpen}
                             trigger={
                                 <IconButton size="small">
-                                    <MoreVertIcon size="small"/>
+                                    <MoreVerticalIcon size={iconSize.small}/>
                                 </IconButton>
                             }>
                             <div className="flex flex-col gap-1 p-2 min-w-[200px]">

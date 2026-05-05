@@ -1,7 +1,8 @@
+
 import React from "react";
 import { CHIP_COLORS, cls } from "../util";
 import { ChipColorKey, ChipColorScheme } from "./Chip";
-import { CheckIcon } from "../icons";
+import { CheckIcon } from "lucide-react";
 import { Tooltip } from "./Tooltip";
 
 export interface ColorPickerProps {

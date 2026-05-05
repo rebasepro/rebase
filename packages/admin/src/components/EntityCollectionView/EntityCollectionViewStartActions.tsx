@@ -3,10 +3,11 @@ import type { EntityCollection } from "@rebasepro/types";
 import React, { useState, useCallback } from "react";
 import { useAuthController, useLargeLayout, useTranslation, useSlot } from "@rebasepro/core";
 import { CollectionActionsProps, EntityTableController, SelectionController } from "@rebasepro/types";
-import { ErrorBoundary } from "@rebasepro/ui";
+import { ErrorBoundary , iconSize } from "@rebasepro/ui";
+import { ArrowLeftIcon, FilterIcon } from "lucide-react";
 import { ClearFilterSortButton } from "../ClearFilterSortButton";
 import { FiltersDialog } from "./FiltersDialog";
-import { Badge, Button, cls, FilterListIcon, ArrowBackIcon, IconButton, Tooltip } from "@rebasepro/ui";
+import { Badge, Button, cls, IconButton, Tooltip } from "@rebasepro/ui";
 import { toArray } from "@rebasepro/utils";
 import { useNavigate } from "react-router-dom";
 import { useUrlController, useCMSContext } from "../../index";
@@ -78,7 +79,7 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
                 onClick={handleBackClick}
                 className="mr-1"
             >
-                <ArrowBackIcon size="small"/>
+                <ArrowLeftIcon size={iconSize.small}/>
             </IconButton>
         </Tooltip>
     );
@@ -96,7 +97,7 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
                         variant="text"
                         size="small"
                         onClick={() => setFiltersDialogOpen(true)}
-                        startIcon={<FilterListIcon size="small"/>}
+                        startIcon={<FilterIcon size={iconSize.small}/>}
                         className={cls(activeFilterCount > 0 && "text-primary")}
                     >
                         {t("filters")}{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
@@ -107,7 +108,7 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
                         onClick={() => setFiltersDialogOpen(true)}
                         className={cls(activeFilterCount > 0 && "text-primary")}
                     >
-                        <FilterListIcon size="small"/>
+                        <FilterIcon size={iconSize.small}/>
                     </IconButton>
                 )}
             </Badge>

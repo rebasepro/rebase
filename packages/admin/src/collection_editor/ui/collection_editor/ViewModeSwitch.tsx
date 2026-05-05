@@ -1,5 +1,6 @@
 import { ViewMode } from "@rebasepro/types";
-import { AppsIcon, cls, ListIcon, ToggleButtonGroup, Typography, ViewKanbanIcon } from "@rebasepro/ui";
+import { cls, ToggleButtonGroup, Typography } from "@rebasepro/ui";
+import { KanbanIcon, LayoutGridIcon, ListIcon } from "lucide-react";
 
 export function ViewModeSwitch({
     value,
@@ -26,12 +27,12 @@ export function ViewModeSwitch({
                     {
                         value: "cards",
                         label: "Cards",
-                        icon: <AppsIcon/>
+                        icon: <LayoutGridIcon/>
                     },
                     {
                         value: "kanban",
                         label: "Kanban",
-                        icon: <ViewKanbanIcon/>
+                        icon: <KanbanIcon/>
                     }
                 ]}
             />

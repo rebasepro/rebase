@@ -6,7 +6,7 @@ const profilesCollection: EntityCollection = {
     singularName: "Profile",
     slug: "profiles",
     table: "profiles",
-    icon: "AccountCircle",
+    icon: "CircleUser",
     group: "Content",
     history: true,
     properties: {

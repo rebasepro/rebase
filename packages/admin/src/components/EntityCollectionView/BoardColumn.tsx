@@ -4,7 +4,8 @@ import { CSS } from "@dnd-kit/utilities";
 import { BoardSortableList } from "./BoardSortableList";
 import { BoardColumnTitle } from "./BoardColumnTitle";
 import { BoardItem, BoardItemViewProps } from "./board_types";
-import { AddIcon, ChipColorKey, ChipColorScheme, cls, defaultBorderMixin, IconButton } from "@rebasepro/ui";
+import { ChipColorKey, ChipColorScheme, cls, defaultBorderMixin, IconButton , iconSize } from "@rebasepro/ui";
+import { PlusIcon } from "lucide-react";
 
 export interface BoardColumnProps<M extends Record<string, unknown>> {
     id: string;
@@ -134,7 +135,7 @@ export const BoardColumn = memo(function BoardColumn<M extends Record<string, un
                         }}
                         className="opacity-60 hover:opacity-100"
                     >
-                        <AddIcon size="small"/>
+                        <PlusIcon size={iconSize.small}/>
                     </IconButton>
                 )}
             </div>

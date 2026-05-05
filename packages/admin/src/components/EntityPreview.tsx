@@ -6,7 +6,8 @@ import { useEffect, useMemo } from "react";
 import { Entity } from "@rebasepro/types";
 import type { PreviewSize } from "../types/components/PropertyPreviewProps";
 import { getEntityImagePreviewPropertyKey } from "@rebasepro/common";
-import { cls, defaultBorderMixin, IconButton, KeyboardTabIcon, Skeleton, Tooltip, Typography } from "@rebasepro/ui";
+import { cls, defaultBorderMixin, IconButton, Skeleton, Tooltip, Typography } from "@rebasepro/ui";
+import { ArrowRightToLineIcon } from "lucide-react";
 import { PropertyPreview, SkeletonPropertyComponent } from "../preview";
 import {
     useAuthController,
@@ -196,7 +197,7 @@ export function EntityPreviewData({
                                     updateUrl: true
                                 });
                             }}>
-                            <KeyboardTabIcon size={"small"}/>
+                            <ArrowRightToLineIcon/>
                         </IconButton>
                     </Tooltip>
                 </div>}

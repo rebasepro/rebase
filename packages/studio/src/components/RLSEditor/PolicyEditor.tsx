@@ -1,22 +1,7 @@
+
 import React, { useState, useEffect } from "react";
-import {
-    Button,
-    Paper,
-    Typography,
-    TextField,
-    Select,
-    SelectItem,
-    MultiSelect,
-    MultiSelectItem,
-    cls,
-    defaultBorderMixin,
-    IconButton,
-    HelpOutlineIcon,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions
-} from "@rebasepro/ui";
+import { Button, Paper, Typography, TextField, Select, SelectItem, MultiSelect, MultiSelectItem, cls, defaultBorderMixin, IconButton, Dialog, DialogTitle, DialogContent, DialogActions , iconSize } from "@rebasepro/ui";
+import { HelpCircleIcon } from "lucide-react";
 import { useTranslation } from "@rebasepro/core";
 import { MonacoEditor } from "../SQLEditor/MonacoEditor";
 import { PostgresPolicy } from "./RLSEditor";
@@ -193,7 +178,7 @@ export const PolicyEditor = ({
                     </div>
                 </div>
                 <IconButton size="small" onClick={() => setHelpOpen(true)}>
-                    <HelpOutlineIcon size="small"/>
+                    <HelpCircleIcon size={iconSize.smallest}/>
                 </IconButton>
             </DialogTitle>
 

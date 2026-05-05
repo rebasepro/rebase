@@ -1,9 +1,12 @@
+
 "use client";
+import { SearchIcon, XIcon } from "lucide-react";
+import { iconSize } from "../icons/Icon";
 import React, { useCallback, useState } from "react";
 
 import { defaultBorderMixin } from "../styles";
 import { CircularProgress, IconButton } from "./index";
-import { CloseIcon, SearchIcon } from "../icons";
+
 import { cls } from "../util";
 import { useDebounceValue } from "../hooks";
 
@@ -47,7 +50,7 @@ export function SearchBar({
     const deferredValues = useDebounceValue(searchText, 200);
 
     /**
-     * Debounce on Search text update
+     * Debounce on SearchIcon text update
      */
     React.useEffect(() => {
         if (!onTextSearch) return;
@@ -83,7 +86,7 @@ export function SearchBar({
                 className)}>
             <div
                 className={cls("absolute p-0 h-full pointer-events-none flex items-center justify-center top-0", iconPaddingClass)}>
-                {loading ? <CircularProgress size={"smallest"}/> : <SearchIcon className={"text-text-disabled dark:text-text-disabled-dark"} size={size === "small" ? "small" : "medium"}/>}
+                {loading ? <CircularProgress size={"smallest"}/> : <SearchIcon className={"text-text-disabled dark:text-text-disabled-dark"} size={size === "smallest" ? 14 : size === "small" ? 18 : 20}/>}
             </div>
             <input
                 value={searchText ?? ""}
@@ -116,7 +119,7 @@ export function SearchBar({
                     size={"small"}
                     aria-label="Clear search"
                     onClick={clearText}>
-                    <CloseIcon size={"smallest"}/>
+                    <XIcon size={iconSize.smallest}/>
                 </IconButton>
                 : <div style={{ width: 26 }}/>
             }

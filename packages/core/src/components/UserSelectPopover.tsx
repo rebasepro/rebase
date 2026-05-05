@@ -1,15 +1,7 @@
+
 import React, { useCallback, useMemo, useRef, useState } from "react";
-import {
-    cls,
-    defaultBorderMixin,
-    Popover,
-    Typography,
-    CircularProgress,
-    AccountCircleIcon,
-    SearchIcon,
-    CloseIcon,
-    IconButton
-} from "@rebasepro/ui";
+import { cls, defaultBorderMixin, Popover, Typography, CircularProgress, IconButton , iconSize } from "@rebasepro/ui";
+import { CircleUserIcon, SearchIcon, XIcon } from "lucide-react";
 import { User } from "@rebasepro/types";
 
 /**
@@ -236,11 +228,11 @@ export function UserSelectPopover({
                     )}
                 </div>
 
-                {/* Search input */}
+                {/* SearchIcon input */}
                 <div className={cls("px-2 py-1.5 border-b shrink-0", defaultBorderMixin)}>
                     <div className="relative">
                         <SearchIcon
-                            size="smallest"
+                            size={"smallest"}
                             className="absolute left-2 top-1/2 -translate-y-1/2 text-text-disabled dark:text-text-disabled-dark pointer-events-none"
                         />
                         <input
@@ -248,7 +240,7 @@ export function UserSelectPopover({
                             type="text"
                             value={searchText}
                             onChange={(e) => setSearchText(e.target.value)}
-                            placeholder="Search by name, email, or role…"
+                            placeholder="SearchIcon by name, email, or role…"
                             className={cls(
                                 "w-full pl-7 pr-7 py-1.5 text-xs rounded-md",
                                 "bg-surface-100 dark:bg-surface-800 border",
@@ -266,7 +258,7 @@ export function UserSelectPopover({
                                 }}
                                 className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-surface-200 dark:hover:bg-surface-700 text-text-disabled"
                             >
-                                <CloseIcon size="smallest"/>
+                                <XIcon size={iconSize.smallest}/>
                             </button>
                         )}
                     </div>
@@ -331,7 +323,6 @@ export function UserSelectPopover({
     );
 }
 
-
 // ─── Internal Components ─────────────────────────────────────────────
 
 interface UserRowProps {
@@ -361,8 +352,8 @@ function UserRow({ user, isSelected, isSelf, onClick }: UserRowProps) {
                 />
             ) : (
                 <div className="w-7 h-7 rounded-full bg-surface-200 dark:bg-surface-700 flex items-center justify-center shrink-0">
-                    <AccountCircleIcon
-                        size="small"
+                    <CircleUserIcon
+                        size={"smallest"}
                         className="text-text-disabled dark:text-text-disabled-dark"
                     />
                 </div>
@@ -410,7 +401,6 @@ function UserRow({ user, isSelected, isSelf, onClick }: UserRowProps) {
         </button>
     );
 }
-
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 

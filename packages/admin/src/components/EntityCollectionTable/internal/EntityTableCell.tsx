@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import useMeasure from "react-use-measure";
 
-import { cls, DoNotDisturbOnIcon, Tooltip } from "@rebasepro/ui";
+import { cls, Tooltip , iconSize } from "@rebasepro/ui";
+import { MinusCircleIcon } from "lucide-react";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { getRowHeight, TableSize } from "@rebasepro/core";
 import { ErrorTooltip } from "@rebasepro/core";
@@ -99,7 +100,6 @@ export const EntityTableCell = React.memo<EntityTableCellProps>(
         isDraggable,
         frozen
     }: EntityTableCellProps) {
-
 
         const [measureRef, bounds] = useMeasure();
         const ref = useRef<HTMLDivElement>(null);
@@ -249,7 +249,7 @@ export const EntityTableCell = React.memo<EntityTableCellProps>(
                 {/*{disabled && onHover && disabledTooltip &&*/}
                 {/*    <div className="absolute top-1 right-1 text-xs">*/}
                 {/*        <Tooltip title={disabledTooltip}>*/}
-                {/*            <DoNotDisturbOnIcon size={"smallest"} color={"disabled"} className={"text-text-disabled"} />*/}
+                {/*            <MinusCircleIcon size={iconSize.smallest} color={"disabled"} className={"text-text-disabled"} />*/}
                 {/*        </Tooltip>*/}
                 {/*    </div>}*/}
 

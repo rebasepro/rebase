@@ -1,3 +1,4 @@
+
 import { useEffect, useRef } from "react";
 import type { RebasePlugin, RebaseContext, User } from "@rebasepro/types";
 

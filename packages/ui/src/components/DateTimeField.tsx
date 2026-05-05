@@ -1,7 +1,9 @@
+
 "use client";
 
 import React, { useRef, useState } from "react";
-import { CalendarMonthIcon, CloseIcon, ErrorIcon } from "../icons";
+import { CalendarIcon, XIcon, AlertCircleIcon } from "lucide-react";
+import { iconSize } from "../icons/Icon";
 import { IconButton } from "./IconButton";
 import { fieldBackgroundDisabledMixin, fieldBackgroundHoverMixin, fieldBackgroundMixin } from "../styles";
 import { InputLabel } from "./InputLabel";
@@ -290,20 +292,20 @@ hour12: false,
                     }}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-surface-accent-500!"
                 >
-                    <CalendarMonthIcon color={"disabled"}/>
+                    <CalendarIcon color={"disabled"}/>
                 </IconButton>
                 {clearable && value && (
                     <IconButton
                         onClick={handleClear}
                         className="absolute right-14 top-1/2 transform -translate-y-1/2 text-surface-accent-400 "
                     >
-                        <CloseIcon/>
+                        <XIcon/>
                     </IconButton>
                 )}
             </div>
             {invalidValue && (
                 <div className="flex items-center m-2">
-                    <ErrorIcon size={"small"} color={"error"}/>
+                    <AlertCircleIcon size={iconSize.small} color={"error"}/>
                     <div className="pl-2">
                         <Typography variant={"body2"}>
                             Invalid date value for this field

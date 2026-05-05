@@ -1,5 +1,6 @@
 import React from "react";
-import { Typography, Chip, cls, defaultBorderMixin } from "@rebasepro/ui";
+import { Typography, Chip, cls, defaultBorderMixin, iconSize } from "@rebasepro/ui";
+import { SlidersHorizontalIcon, UploadIcon, ArrowRightFromLineIcon } from "lucide-react";
 import type { ParsedEndpoint, OpenApiSpec, OpenApiSchema } from "./types";
 import { resolveRef, resolveRefName } from "./parseSpec";
 
@@ -29,7 +30,7 @@ export function EndpointDetail({ endpoint, spec }: { endpoint: ParsedEndpoint; s
             {/* Parameters */}
             {endpoint.parameters.length > 0 && (
                 <section>
-                    <SectionHeading icon="tune" title="Parameters"/>
+                    <SectionHeading icon={<SlidersHorizontalIcon size={iconSize.small} className="text-text-secondary dark:text-text-secondary-dark" />} title="Parameters"/>
                     <div className={cls("rounded-lg border overflow-hidden", defaultBorderMixin)}>
                         <table className="w-full text-sm">
                             <thead>
@@ -83,7 +84,7 @@ export function EndpointDetail({ endpoint, spec }: { endpoint: ParsedEndpoint; s
             {/* Request Body */}
             {endpoint.requestBody && (
                 <section>
-                    <SectionHeading icon="upload" title="Request Body"/>
+                    <SectionHeading icon={<UploadIcon size={iconSize.small} className="text-text-secondary dark:text-text-secondary-dark" />} title="Request Body"/>
                     {Object.entries(endpoint.requestBody.content ?? {}).map(([contentType, media]) => (
                         <div key={contentType}>
                             <Chip size="smallest" colorScheme="blueDarker" className="mb-3">
@@ -97,7 +98,7 @@ export function EndpointDetail({ endpoint, spec }: { endpoint: ParsedEndpoint; s
 
             {/* Responses */}
             <section>
-                <SectionHeading icon="output" title="Responses"/>
+                <SectionHeading icon={<ArrowRightFromLineIcon size={iconSize.small} className="text-text-secondary dark:text-text-secondary-dark" />} title="Responses"/>
                 <div className="space-y-3">
                     {Object.entries(endpoint.responses).map(([code, res]) => (
                         <div
@@ -244,10 +245,10 @@ function schemaTypeLabel(schema?: OpenApiSchema): string {
     return schema.type ?? "object";
 }
 
-function SectionHeading({ icon, title }: { icon: string; title: string }) {
+function SectionHeading({ icon, title }: { icon: React.ReactNode; title: string }) {
     return (
         <div className="flex items-center gap-2 mb-3">
-            <span className="material-icons text-base text-text-secondary dark:text-text-secondary-dark">{icon}</span>
+            {icon}
             <Typography variant="subtitle2" className="font-semibold text-sm">
                 {title}
             </Typography>

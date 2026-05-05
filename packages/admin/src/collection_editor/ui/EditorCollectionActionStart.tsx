@@ -6,7 +6,8 @@ import {
     useTranslation
 } from "@rebasepro/core";
 import { EntityCollection, CollectionActionsProps } from "@rebasepro/types";
-import { Button, SaveIcon, Tooltip, UndoIcon } from "@rebasepro/ui";
+import { Button, Tooltip } from "@rebasepro/ui";
+import { SaveIcon, UndoIcon } from "lucide-react";
 
 import { useCollectionEditorController } from "../useCollectionEditorController";
 import { useCollectionsConfigController } from "../useCollectionsConfigController";

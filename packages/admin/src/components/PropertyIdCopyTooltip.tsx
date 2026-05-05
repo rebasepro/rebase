@@ -1,4 +1,5 @@
-import { ContentCopyIcon, IconButton, Tooltip, Typography } from "@rebasepro/ui";
+import { IconButton, Tooltip, Typography } from "@rebasepro/ui";
+import { CopyIcon } from "lucide-react";
 import { useCallback, useState } from "react";
 
 export function PropertyIdCopyTooltip({
@@ -33,7 +34,7 @@ export function PropertyIdCopyTooltipContent({ propertyKey }: { propertyKey: str
                 <Typography variant={"caption"} className={"text-on-surface"}><code>{propertyKey}</code></Typography>
             </div>
             <IconButton size={"small"}>
-                <ContentCopyIcon size={"smallest"}
+                <CopyIcon
                     className={"text-on-surface"}
                     onClick={useCallback(() => {
                         navigator.clipboard.writeText(propertyKey);

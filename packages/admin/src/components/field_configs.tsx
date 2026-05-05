@@ -1,3 +1,4 @@
+
 import type { DefaultFieldConfig } from "../types/fields";
 import type { ArrayProperty, NumberProperty, Property, PropertyConfig, StringProperty } from "@rebasepro/types";
 import { ArrayCustomShapedFieldBinding } from "../form/field_bindings/ArrayCustomShapedFieldBinding";
@@ -17,27 +18,7 @@ import { SwitchFieldBinding } from "../form/field_bindings/SwitchFieldBinding";
 import { TextFieldBinding } from "../form/field_bindings/TextFieldBinding";
 import { isPropertyBuilder } from "@rebasepro/common";
 
-import {
-    AddLinkIcon,
-    BallotIcon,
-    DriveFolderUploadIcon,
-    FlagIcon,
-    FormatListNumberedIcon,
-    FormatQuoteIcon,
-    HttpIcon,
-    LinkIcon,
-    ListAltIcon,
-    ListIcon,
-    MailIcon,
-    NumbersIcon, PersonIcon,
-    RepeatIcon,
-    ScheduleIcon,
-    ShortTextIcon,
-    SubjectIcon,
-    UploadFileIcon,
-    VerifiedUserIcon,
-    ViewStreamIcon
-} from "@rebasepro/ui";
+import { FolderUpIcon, FlagIcon, GlobeIcon, ListIcon, TextIcon, UserCheckIcon, Rows3Icon, LinkIcon, VoteIcon, ListOrderedIcon, QuoteIcon, MailIcon, HashIcon, UserIcon, RepeatIcon, CalendarIcon, AlignLeftIcon, UploadIcon } from "lucide-react";
 import { RelationFieldBinding } from "../form/field_bindings/RelationFieldBinding";
 import { UserSelectFieldBinding } from "../form/field_bindings/UserSelectFieldBinding";
 import { mergeDeep } from "@rebasepro/utils";
@@ -47,7 +28,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         key: "text_field",
         name: "Text field",
         description: "Simple short text",
-        Icon: ShortTextIcon,
+        Icon: TextIcon,
         color: "#2d7ff9",
         property: {
             type: "string",
@@ -58,7 +39,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         key: "multiline",
         name: "Multiline",
         description: "Text with multiple lines",
-        Icon: SubjectIcon,
+        Icon: AlignLeftIcon,
         color: "#2d7ff9",
         property: {
             type: "string",
@@ -70,7 +51,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         key: "markdown",
         name: "Markdown",
         description: "Text with advanced markdown syntax",
-        Icon: FormatQuoteIcon,
+        Icon: QuoteIcon,
         color: "#2d7ff9",
         property: {
             type: "string",
@@ -82,7 +63,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         key: "url",
         name: "Url",
         description: "Text with URL validation",
-        Icon: HttpIcon,
+        Icon: GlobeIcon,
         color: "#154fb3",
         property: {
             type: "string",
@@ -129,7 +110,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         key: "multi_select",
         name: "Multi select (enum)",
         description: "Select multiple text values from within an enumeration",
-        Icon: ListAltIcon,
+        Icon: ListIcon,
         color: "#4223c9",
         property: {
             type: "array",
@@ -142,9 +123,9 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
     },
     user_select: {
         key: "user_select",
-        name: "User select",
+        name: "UserIcon select",
         description: "Select a user from the user management system. Store the user ID.",
-        Icon: PersonIcon,
+        Icon: UserIcon,
         property: {
             type: "string",
             Field: UserSelectFieldBinding
@@ -154,7 +135,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         key: "number_input",
         name: "Number input",
         description: "Simple number field with validation",
-        Icon: NumbersIcon,
+        Icon: HashIcon,
         color: "#bec920",
         property: {
             type: "number",
@@ -165,7 +146,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         key: "number_select",
         name: "Number select",
         description: "Select a number value from within an enumeration",
-        Icon: FormatListNumberedIcon,
+        Icon: ListOrderedIcon,
         color: "#bec920",
         property: {
             type: "number",
@@ -177,7 +158,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         key: "multi_number_select",
         name: "Multiple number select",
         description: "Select multiple number values from within an enumeration",
-        Icon: FormatListNumberedIcon,
+        Icon: ListOrderedIcon,
         color: "#bec920",
         property: {
             type: "array",
@@ -192,7 +173,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         key: "file_upload",
         name: "File upload",
         description: "Input for uploading single files",
-        Icon: UploadFileIcon,
+        Icon: UploadIcon,
         color: "#f92d9a",
         property: {
             type: "string",
@@ -206,7 +187,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         key: "multi_file_upload",
         name: "Multiple file upload",
         description: "Input for uploading multiple files",
-        Icon: DriveFolderUploadIcon,
+        Icon: FolderUpIcon,
         color: "#f92d9a",
         property: {
             type: "array",
@@ -245,7 +226,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         key: "multi_references",
         name: "Multiple references",
         description: "Multiple values that refer to a different collection",
-        Icon: AddLinkIcon,
+        Icon: LinkIcon,
         color: "#ff0042",
         property: {
             type: "array",
@@ -259,7 +240,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         key: "relation",
         name: "Relation",
         description: "Multiple values that refer to a different collection",
-        Icon: AddLinkIcon,
+        Icon: LinkIcon,
         color: "#ff0042",
         property: {
             relationName: "",
@@ -271,7 +252,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         key: "date_time",
         name: "Date/time",
         description: "A date time select field",
-        Icon: ScheduleIcon,
+        Icon: CalendarIcon,
         color: "#8b46ff",
         property: {
             type: "date",
@@ -282,7 +263,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         key: "group",
         name: "Group",
         description: "Group of multiple fields",
-        Icon: BallotIcon,
+        Icon: VoteIcon,
         color: "#ff9408",
         property: {
             type: "map",
@@ -294,7 +275,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         key: "key_value",
         name: "Key-value",
         description: "Flexible field that allows the user to add multiple key-value pairs",
-        Icon: BallotIcon,
+        Icon: VoteIcon,
         color: "#ff9408",
         property: {
             type: "map",
@@ -331,7 +312,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         key: "block",
         name: "Block",
         description: "A complex field that allows the user to compose different fields together, with a key/value format",
-        Icon: ViewStreamIcon,
+        Icon: Rows3Icon,
         color: "#ff9408",
         property: {
             type: "array",

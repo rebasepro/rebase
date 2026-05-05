@@ -1,17 +1,7 @@
+
 import React, { useState } from "react";
-import {
-    Typography,
-    CircularProgress,
-    cls,
-    IconButton,
-    defaultBorderMixin,
-    Menu,
-    MenuItem,
-    Button,
-    ContentCopyIcon,
-    MoreVertIcon,
-    RefreshIcon
-} from "@rebasepro/ui";
+import { Typography, CircularProgress, cls, IconButton, defaultBorderMixin, Menu, MenuItem, Button , iconSize } from "@rebasepro/ui";
+import { CopyIcon, MoreVerticalIcon, RefreshCwIcon } from "lucide-react";
 import { TableInfo } from "./SQLEditor";
 import { ErrorView, useTranslation } from "@rebasepro/core";
 
@@ -44,7 +34,7 @@ export const SchemaBrowser = ({
             <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
                 <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">{t("studio_schema_tables")}</Typography>
                 <IconButton size="small" onClick={onRetrySchema} title="Refresh schema">
-                    <RefreshIcon size="small"/>
+                    <RefreshCwIcon size={iconSize.smallest}/>
                 </IconButton>
             </div>
 
@@ -85,20 +75,20 @@ export const SchemaBrowser = ({
                                                         e.stopPropagation();
                                                         navigator.clipboard.writeText(table.tableName);
                                                     }}
-                                                    title="Copy table name"
+                                                    title="CopyIcon table name"
                                                 >
-                                                    <ContentCopyIcon size="smallest"/>
+                                                    <CopyIcon size={iconSize.smallest}/>
                                                 </IconButton>
 
                                                 <Menu
                                                     trigger={
                                                         <IconButton
-                                                            size="smallest"
+                                                            size={"smallest"}
                                                             className="transition-colors text-text-secondary hover:text-text-primary pointer-events-auto"
                                                             onClick={(e) => e.stopPropagation()}
                                                             title="Generate SQL templates"
                                                         >
-                                                            <MoreVertIcon size="smallest"/>
+                                                            <MoreVerticalIcon size={iconSize.smallest}/>
                                                         </IconButton>
                                                     }
                                                 >
@@ -148,9 +138,9 @@ export const SchemaBrowser = ({
                                                                 e.stopPropagation();
                                                                 navigator.clipboard.writeText(col.name);
                                                             }}
-                                                            title="Copy column name"
+                                                            title="CopyIcon column name"
                                                         >
-                                                            <ContentCopyIcon size="smallest"/>
+                                                            <CopyIcon size={iconSize.smallest}/>
                                                         </IconButton>
                                                     </div>
                                                 ))}

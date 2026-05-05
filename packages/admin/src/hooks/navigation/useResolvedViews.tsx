@@ -1,3 +1,4 @@
+
 import type { AppView, AppViewsBuilder, EffectiveRoleController, EntityCollection, RebasePlugin } from "@rebasepro/types";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { deepEqual as equal } from "fast-equals";

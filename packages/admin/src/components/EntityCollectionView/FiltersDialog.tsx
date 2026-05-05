@@ -1,17 +1,9 @@
+
 import type { Property } from "@rebasepro/types";
 import React, { useCallback, useMemo, useState } from "react";
 import { FilterValues, WhereFilterOp } from "@rebasepro/types";
-import {
-    Button,
-    cls,
-    defaultBorderMixin,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    FilterListIcon,
-    Typography
-} from "@rebasepro/ui";
+import { Button, cls, defaultBorderMixin, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@rebasepro/ui";
+import { FilterIcon } from "lucide-react";
 import { StringNumberFilterField } from "../SelectableTable/filters/StringNumberFilterField";
 import { BooleanFilterField } from "../SelectableTable/filters/BooleanFilterField";
 import { DateTimeFilterField } from "../SelectableTable/filters/DateTimeFilterField";
@@ -211,7 +203,7 @@ export function FiltersDialog({
                                             </Typography>
                                         </td>
 
-                                        {/* Filter field on the right */}
+                                        {/* FilterIcon field on the right */}
                                         <td className="py-3">
                                             {renderFilterField(propertyKey, property)}
                                         </td>

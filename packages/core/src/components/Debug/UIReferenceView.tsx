@@ -1,3 +1,4 @@
+
 /**
  * UIReferenceView — hidden debug route at /debug/ui
  *
@@ -10,56 +11,8 @@
  *   DrawerNavigationGroup.tsx, UsersView.tsx, RolesView.tsx
  */
 import React, { useState } from "react";
-import {
-    AddIcon,
-    Alert,
-    Avatar,
-    BooleanSwitch,
-    BrightnessMediumIcon,
-    Button,
-    Checkbox,
-    Chip,
-    CircularProgress,
-    cls,
-    DarkModeIcon,
-    defaultBorderMixin,
-    DeleteIcon,
-    EditIcon,
-    ExpandMoreIcon,
-    FilterListIcon,
-    IconButton,
-    KeyboardDoubleArrowLeftIcon,
-    KeyboardDoubleArrowRightIcon,
-    LightModeIcon,
-    LoadingButton,
-    LogoutIcon,
-    Menu,
-    MenuItem,
-    MultiSelect,
-    MultiSelectItem,
-    SearchBar,
-    Select,
-    SelectItem,
-    Separator,
-    SettingsIcon,
-    Skeleton,
-    Tab,
-    Table,
-    TableBody,
-    TableCell,
-    TableHeader,
-    TableRow,
-    Tabs,
-    TextField,
-    Tooltip,
-    Typography,
-    ViewKanbanIcon,
-    AppsIcon,
-    ListIcon,
-    PersonIcon,
-    FolderIcon,
-    LabelIcon
-} from "@rebasepro/ui";
+import { Alert, Avatar, BooleanSwitch, Button, Checkbox, Chip, CircularProgress, cls, defaultBorderMixin, IconButton, LoadingButton, Menu, MenuItem, MultiSelect, MultiSelectItem, SearchBar, Select, SelectItem, Separator, Skeleton, Tab, Table, TableBody, TableCell, TableHeader, TableRow, Tabs, TextField, Tooltip, Typography , iconSize } from "@rebasepro/ui";
+import { SunMoonIcon, ChevronsLeftIcon, ChevronsRightIcon, LogOutIcon, TagIcon, PlusIcon, MoonIcon, Trash2Icon, PencilIcon, ChevronDownIcon, FilterIcon, SunIcon, SettingsIcon, KanbanIcon, LayoutGridIcon, ListIcon, FolderIcon, UserIcon } from "lucide-react";
 import { RebaseLogo } from "../RebaseLogo";
 
 const SECTIONS = [
@@ -118,7 +71,7 @@ block: "start" });
                     <div className="my-2 mx-2 flex flex-col">
                         {/* Group header — from DrawerNavigationGroup */}
                         <div className={cls("pl-4 pr-2 py-1 flex flex-row items-center transition-colors cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-700/50 rounded-t-lg bg-surface-50 dark:bg-surface-800/30")}>
-                            <ExpandMoreIcon size="smallest" className="text-surface-500 dark:text-surface-400 transition-transform duration-200 mr-1"/>
+                            <ChevronDownIcon size={iconSize.smallest} className="text-surface-500 dark:text-surface-400 transition-transform duration-200 mr-1"/>
                             <Typography variant="caption" color="secondary" className="font-medium flex-grow line-clamp-1">
                                 SECTIONS
                             </Typography>
@@ -139,7 +92,7 @@ block: "start" });
                                         )}
                                     >
                                         <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px] text-text-secondary dark:text-text-secondary-dark">
-                                            <SettingsIcon size={18}/>
+                                            <SettingsIcon size={iconSize.small}/>
                                         </div>
                                         <div className="text-text-primary dark:text-surface-200 opacity-100 font-inherit truncate space-x-2">
                                             {s.label.toUpperCase()}
@@ -160,7 +113,7 @@ block: "start" });
                         "py-2"
                     )}>
                         <div className="shrink-0 flex items-center justify-center w-[56px] h-[24px] text-surface-500 dark:text-surface-400">
-                            <KeyboardDoubleArrowLeftIcon size="small"/>
+                            <ChevronsLeftIcon size={iconSize.small}/>
                         </div>
                         <Typography variant="body2" className="text-surface-500 dark:text-surface-400 select-none whitespace-nowrap">
                             Collapse
@@ -194,7 +147,7 @@ block: "start" });
                                 <div className="mt-3 flex-grow overflow-hidden">
                                     <div className="my-2 mx-2 flex flex-col">
                                         <div className="overflow-hidden rounded-lg bg-surface-50 dark:bg-surface-800/30">
-                                            {[<FolderIcon size={18}/>, <PersonIcon size={18}/>, <LabelIcon size={18}/>].map((icon, i) => (
+                                            {[<FolderIcon size={iconSize.small}/>, <UserIcon size={iconSize.small}/>, <TagIcon size={iconSize.small}/>].map((icon, i) => (
                                                 <div key={i} className="rounded-lg truncate hover:bg-surface-accent-300/75 dark:hover:bg-surface-accent-800/75 flex flex-row items-center h-10">
                                                     <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px] text-text-secondary dark:text-text-secondary-dark">
                                                         {icon}
@@ -207,7 +160,7 @@ block: "start" });
                                 <div className={cls("shrink-0 mt-auto border-t px-2 py-2", defaultBorderMixin)}>
                                     <div className="flex flex-row items-center rounded-lg cursor-pointer hover:bg-surface-accent-100 dark:hover:bg-surface-800 transition-colors duration-150 py-2">
                                         <div className="shrink-0 flex items-center justify-center w-[56px] h-[24px] text-surface-500 dark:text-surface-400">
-                                            <KeyboardDoubleArrowRightIcon size="small"/>
+                                            <ChevronsRightIcon size={iconSize.small}/>
                                         </div>
                                     </div>
                                 </div>
@@ -231,19 +184,19 @@ block: "start" });
                                 <div className="mt-3 flex-grow overflow-hidden">
                                     <div className="my-2 mx-2 flex flex-col">
                                         <div className="pl-4 pr-2 py-1 flex flex-row items-center transition-colors cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-700/50 rounded-t-lg bg-surface-50 dark:bg-surface-800/30">
-                                            <ExpandMoreIcon size="smallest" className="text-surface-500 dark:text-surface-400 mr-1"/>
+                                            <ChevronDownIcon size={iconSize.smallest} className="text-surface-500 dark:text-surface-400 mr-1"/>
                                             <Typography variant="caption" color="secondary" className="font-medium flex-grow line-clamp-1">CONTENT</Typography>
                                         </div>
                                         <div className="overflow-hidden bg-surface-50 dark:bg-surface-800/30 rounded-b-lg">
                                             {[
                                                 { label: "Posts",
-icon: <FolderIcon size={18}/>,
+icon: <FolderIcon size={iconSize.small}/>,
 active: true },
                                                 { label: "Authors",
-icon: <PersonIcon size={18}/>,
+icon: <UserIcon size={iconSize.small}/>,
 active: false },
                                                 { label: "Tags",
-icon: <LabelIcon size={18}/>,
+icon: <TagIcon size={iconSize.small}/>,
 active: false }
                                             ].map(({ label, icon, active }) => (
                                                 <div key={label} className={cls(
@@ -265,7 +218,7 @@ active: false }
                                 <div className={cls("shrink-0 mt-auto border-t px-2 py-2", defaultBorderMixin)}>
                                     <div className="flex flex-row items-center rounded-lg cursor-pointer hover:bg-surface-accent-100 dark:hover:bg-surface-800 transition-colors duration-150 py-2">
                                         <div className="shrink-0 flex items-center justify-center w-[56px] h-[24px] text-surface-500 dark:text-surface-400">
-                                            <KeyboardDoubleArrowLeftIcon size="small"/>
+                                            <ChevronsLeftIcon size={iconSize.small}/>
                                         </div>
                                         <div className="overflow-hidden transition-all duration-200 ease-in-out opacity-100 w-auto">
                                             <Typography variant="body2" className="text-surface-500 dark:text-surface-400 select-none whitespace-nowrap">
@@ -316,12 +269,12 @@ active: false }
                         {/* Theme menu — from DefaultAppBar line 227-241 */}
                         <Menu trigger={
                             <IconButton color="inherit">
-                                <DarkModeIcon/>
+                                <MoonIcon/>
                             </IconButton>
                         }>
-                            <MenuItem><DarkModeIcon size="smallest"/> Dark</MenuItem>
-                            <MenuItem><LightModeIcon size="smallest"/> Light</MenuItem>
-                            <MenuItem><BrightnessMediumIcon size="smallest"/> System</MenuItem>
+                            <MenuItem><MoonIcon size={iconSize.smallest}/> Dark</MenuItem>
+                            <MenuItem><SunIcon size={iconSize.smallest}/> Light</MenuItem>
+                            <MenuItem><SunMoonIcon size={iconSize.smallest}/> System</MenuItem>
                         </Menu>
                         {/* Avatar menu — from DefaultAppBar line 243-270 */}
                         <Menu trigger={<Avatar>A</Avatar>}>
@@ -330,7 +283,7 @@ active: false }
                                 <Typography variant="body2" color="secondary">alice@example.com</Typography>
                             </div>
                             <MenuItem><SettingsIcon/> Account Settings</MenuItem>
-                            <MenuItem><LogoutIcon/> Log Out</MenuItem>
+                            <MenuItem><LogOutIcon/> Log Out</MenuItem>
                         </Menu>
                     </div>
                 </SectionBlock>
@@ -368,7 +321,7 @@ active: false }
                                 <div className={cls("p-3 border-b flex justify-between items-center bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
                                     <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">TABLES</Typography>
                                     <IconButton size="small">
-                                        <SettingsIcon size="smallest"/>
+                                        <SettingsIcon size={iconSize.smallest}/>
                                     </IconButton>
                                 </div>
                                 <div className="p-2 h-24">
@@ -393,7 +346,7 @@ active: false }
                                         </Tab>
                                     </Tabs>
                                     <IconButton size="small" className="ml-2 flex-shrink-0">
-                                        <AddIcon/>
+                                        <PlusIcon/>
                                     </IconButton>
                                 </div>
                                 <div className="flex items-center gap-1.5">
@@ -429,7 +382,7 @@ active: false }
                                 <div className={cls("p-3 border-b flex justify-between items-center bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
                                     <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-secondary dark:text-text-secondary-dark">TABLES</Typography>
                                     <IconButton size="small">
-                                        <SettingsIcon size="smallest"/>
+                                        <SettingsIcon size={iconSize.smallest}/>
                                     </IconButton>
                                 </div>
                                 <div className="flex-grow overflow-y-auto no-scrollbar p-1">
@@ -463,7 +416,7 @@ active: false }
                                 <div className={cls("p-3 border-b flex justify-between items-center bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
                                     <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">RLS</Typography>
                                     <IconButton size="small">
-                                        <SettingsIcon size="smallest"/>
+                                        <SettingsIcon size={iconSize.smallest}/>
                                     </IconButton>
                                 </div>
                                 <div className="flex-grow overflow-y-auto no-scrollbar p-1">
@@ -496,14 +449,14 @@ enabled: false }].map(t => (
                                 <div className={cls("p-3 border-b flex justify-between items-center bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
                                     <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">COLLECTIONS</Typography>
                                     <IconButton size="small">
-                                        <AddIcon size="small"/>
+                                        <PlusIcon size={iconSize.smallest}/>
                                     </IconButton>
                                 </div>
                                 <div className="flex-grow overflow-y-auto no-scrollbar p-2 space-y-0.5">
                                     {[{ name: "Authors" }, { name: "Posts",
 selected: true }, { name: "Tags" }].map(c => (
                                         <div key={c.name} className={cls("flex items-center gap-3 px-3 py-2 cursor-pointer rounded-md text-sm transition-colors", c.selected ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light" : "hover:bg-surface-100 dark:hover:bg-surface-800 text-text-secondary dark:text-text-secondary-dark")}>
-                                            <FolderIcon size={18} className={cls(c.selected ? "text-primary dark:text-primary-light" : "text-text-secondary dark:text-text-secondary-dark")}/>
+                                            <FolderIcon size={iconSize.small} className={cls(c.selected ? "text-primary dark:text-primary-light" : "text-text-secondary dark:text-text-secondary-dark")}/>
                                             <span className="truncate flex-1">{c.name}</span>
                                         </div>
                                     ))}
@@ -533,7 +486,7 @@ selected: true }, { name: "Tags" }].map(c => (
                                         Select a property to edit it
                                     </Typography>
                                     <Button>
-                                        <AddIcon/>
+                                        <PlusIcon/>
                                         Add new property
                                     </Button>
                                 </div>
@@ -549,7 +502,7 @@ selected: true }, { name: "Tags" }].map(c => (
                                         Now you can add your first property
                                     </Typography>
                                     <Button>
-                                        <AddIcon/>
+                                        <PlusIcon/>
                                         Add new property
                                     </Button>
                                 </div>
@@ -558,14 +511,14 @@ selected: true }, { name: "Tags" }].map(c => (
 
                         {/* Collection list empty state */}
                         <div>
-                            <Typography variant="caption" color="secondary" className="block mb-1">Collection List (no selection)</Typography>
+                            <Typography variant="caption" color="secondary" className="block mb-1">Collection ListIcon (no selection)</Typography>
                             <div className={cls("flex flex-col items-center justify-center h-48 w-[320px] border rounded-lg", defaultBorderMixin)}>
                                 <div className="flex flex-col items-center justify-center h-full gap-4">
                                     <Typography variant="label">
                                         Select a collection or create a new one to start editing
                                     </Typography>
                                     <Button>
-                                        <AddIcon/>
+                                        <PlusIcon/>
                                         Add new collection
                                     </Button>
                                 </div>
@@ -624,12 +577,12 @@ selected: true }, { name: "Tags" }].map(c => (
                             <Typography variant="caption" color="secondary" className="block mb-2 font-mono">IconButton</Typography>
                             <div className="flex flex-wrap gap-3 items-center">
                                 {(["primary", "secondary", "inherit"] as const).map(c => (
-                                    <IconButton key={c} color={c}><EditIcon/></IconButton>
+                                    <IconButton key={c} color={c}><PencilIcon/></IconButton>
                                 ))}
                                 {(["small", "medium", "large"] as const).map(s => (
-                                    <IconButton key={s} size={s}><DeleteIcon/></IconButton>
+                                    <IconButton key={s} size={s}><Trash2Icon/></IconButton>
                                 ))}
-                                <IconButton disabled><AddIcon/></IconButton>
+                                <IconButton disabled><PlusIcon/></IconButton>
                             </div>
                         </div>
                         <div>
@@ -760,7 +713,7 @@ selected: true }, { name: "Tags" }].map(c => (
                     {/* Header — from UsersView line 121-128 */}
                     <div className="flex items-center mt-12">
                         <Typography gutterBottom variant="h4" className="grow" component="h4">Users</Typography>
-                        <Button startIcon={<AddIcon/>}>Add user</Button>
+                        <Button startIcon={<PlusIcon/>}>Add user</Button>
                     </div>
                     {/* Table — from UsersView line 130-182 */}
                     <div className="overflow-auto">
@@ -793,7 +746,7 @@ roles: [] }
                                     <TableRow key={user.uid}>
                                         <TableCell style={{ width: "64px" }}>
                                             <Tooltip asChild title="Delete this user">
-                                                <IconButton size="small"><DeleteIcon/></IconButton>
+                                                <IconButton size="small"><Trash2Icon/></IconButton>
                                             </Tooltip>
                                         </TableCell>
                                         <TableCell>{user.email}</TableCell>
@@ -858,7 +811,7 @@ roles: [] }
                     </Typography>
                     <div className="flex items-center mt-12">
                         <Typography gutterBottom variant="h4" className="grow" component="h4">Roles</Typography>
-                        <Button startIcon={<AddIcon/>}>Add role</Button>
+                        <Button startIcon={<PlusIcon/>}>Add role</Button>
                     </div>
                     <div className="w-full overflow-auto">
                         <Table className="w-full">
@@ -883,7 +836,7 @@ isAdmin: false }
                                         <TableCell style={{ width: "64px" }}>
                                             {!role.isAdmin && (
                                                 <Tooltip asChild title="Delete this role">
-                                                    <IconButton size="small"><DeleteIcon/></IconButton>
+                                                    <IconButton size="small"><Trash2Icon/></IconButton>
                                                 </Tooltip>
                                             )}
                                         </TableCell>

@@ -1,3 +1,4 @@
+
 import React, { useCallback, useMemo, useState } from "react";
 import {
     useSnackbarController,
@@ -6,36 +7,8 @@ import {
 } from "@rebasepro/core";
 import { AppView, EntityCollection, Role, SecurityRule, User } from "@rebasepro/types";
 
-import {
-    AddIcon,
-    Button,
-    Chip,
-    Container,
-    DeleteIcon,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    IconButton,
-    Paper,
-    Table,
-    TableBody,
-    TableCell,
-    TableHeader,
-    TableRow,
-    TextField,
-    Typography,
-    CircularProgress,
-    CenteredView,
-    Tooltip,
-    Checkbox,
-    MultiSelect,
-    MultiSelectItem,
-    LoadingButton,
-    getColorSchemeForSeed,
-    ChipColorScheme,
-    ChipColorKey
-} from "@rebasepro/ui";
+import { Button, Chip, Container, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Paper, Table, TableBody, TableCell, TableHeader, TableRow, TextField, Typography, CircularProgress, CenteredView, Tooltip, Checkbox, MultiSelect, MultiSelectItem, LoadingButton, getColorSchemeForSeed, ChipColorScheme, ChipColorKey } from "@rebasepro/ui";
+import { PlusIcon, Trash2Icon } from "lucide-react";
 import { UserManagement } from "../hooks/useBackendUserManagement";
 
 interface AdminViewsProps {
@@ -199,7 +172,7 @@ message: error instanceof Error ? error.message : "Error deleting user" });
                 <Typography gutterBottom variant="h4" className="grow" component="h4">
                     Users
                 </Typography>
-                <Button startIcon={<AddIcon/>} onClick={handleAddUser}>
+                <Button startIcon={<PlusIcon/>} onClick={handleAddUser}>
                     Add user
                 </Button>
             </div>
@@ -224,7 +197,7 @@ message: error instanceof Error ? error.message : "Error deleting user" });
                                                 setUserToDelete(user);
                                                 setDeleteConfirmOpen(true);
                                             }}>
-                                            <DeleteIcon/>
+                                            <Trash2Icon/>
                                         </IconButton>
                                     </Tooltip>
                                 </TableCell>
@@ -497,7 +470,7 @@ isAdmin: false }
                 <Typography gutterBottom variant="h4" className="grow" component="h4">
                     Roles
                 </Typography>
-                <Button startIcon={<AddIcon/>} onClick={handleAddRole}>
+                <Button startIcon={<PlusIcon/>} onClick={handleAddRole}>
                     Add role
                 </Button>
             </div>
@@ -523,7 +496,7 @@ isAdmin: false }
                                                         setRoleToDelete(role);
                                                         setDeleteConfirmOpen(true);
                                                     }}>
-                                                    <DeleteIcon/>
+                                                    <Trash2Icon/>
                                                 </IconButton>
                                             </Tooltip>
                                         )}

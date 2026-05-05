@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { AddIcon, Button, Paper, Typography } from "@rebasepro/ui";
+import { Button, Paper, Typography } from "@rebasepro/ui";
+import { PlusIcon } from "lucide-react";
 import { getIn, useFormex } from "@rebasepro/formex";
 import { OnPropertyChangedParams, PropertyFormDialog } from "../PropertyEditView";
 import {
@@ -70,7 +71,7 @@ export function BlockPropertyField({
     const addChildButton = <Button
         autoFocus
         onClick={() => setPropertyDialogOpen(true)}
-        startIcon={<AddIcon/>}
+        startIcon={<PlusIcon/>}
     >
         Add property to {values.name ?? "this block"}
     </Button>;

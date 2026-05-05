@@ -1,5 +1,6 @@
-import { ArrowForwardIcon, Card, cls, Markdown, Typography } from "@rebasepro/ui";
-import React from "react"; // Import React
+import { Card, cls, Markdown, Typography } from "@rebasepro/ui";
+import { ArrowRightIcon } from "lucide-react";
+import React from "react";
 
 export type NavigationCardProps = {
     name: string,
@@ -69,7 +70,7 @@ export const NavigationCard = React.memo(function NavigationCard({
                 {/* Arrow */}
                 <div className="self-end mt-1">
                     <div className={"transition-transform duration-200 group-hover:translate-x-0.5"}>
-                        <ArrowForwardIcon className="text-primary" size={"small"}/>
+                        <ArrowRightIcon className="text-primary"/>
                     </div>
                 </div>
 

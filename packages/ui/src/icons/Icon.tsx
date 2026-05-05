@@ -1,19 +1,28 @@
 "use client";
 
-import * as React from "react";
-import { cls } from "../util";
-import "@material-design-icons/font/filled.css";
-
 export type IconColor = "inherit" | "primary" | "secondary" | "disabled" | "error" | "success" | "warning";
+export type IconSize = "smallest" | "small" | "medium" | "large";
+
+/**
+ * Standardized icon size map in px.
+ * Use with direct Lucide imports: `<Database size={iconSize.small} />`
+ */
+export const iconSize = {
+    smallest: 16,
+    small: 20,
+    medium: 24,
+    large: 28,
+} as const satisfies Record<IconSize, number>;
+
 export type IconProps = {
-    size?: "smallest" | "small" | "medium" | "large" | number,
+    size?: IconSize | number,
     color?: IconColor,
     className?: string,
     onClick?: (e: React.SyntheticEvent) => void,
     style?: React.CSSProperties,
 }
 
-const colorClassesMapping: Record<IconColor, string> = {
+export const colorClassesMapping: Record<IconColor, string> = {
     inherit: "",
     primary: "text-primary",
     success: "text-green-500",
@@ -22,47 +31,3 @@ const colorClassesMapping: Record<IconColor, string> = {
     disabled: "text-text-disabled dark:text-text-disabled-dark",
     error: "text-red-500"
 }
-
-export const Icon = React.forwardRef<HTMLSpanElement, IconProps & { iconKey: string }>(
-    ({
-         iconKey,
-         size = "medium",
-         color,
-         className,
-         onClick,
-         style
-     }, ref) => {
-        let sizeInPx: number;
-        switch (size) {
-            case "smallest":
-                sizeInPx = 16;
-                break;
-            case "small":
-                sizeInPx = 20;
-                break;
-            case "medium":
-                sizeInPx = 24;
-                break;
-            case "large":
-                sizeInPx = 28;
-                break
-            default:
-                sizeInPx = typeof size === "number" ? size : 24;
-        }
-
-        return <span
-            ref={ref} // Attach the ref to the span
-            style={{
-                fontSize: `${sizeInPx}px`,
-                verticalAlign: "middle",
-                ...style
-            }}
-            className={
-                cls("material-icons",
-                    color ? colorClassesMapping[color] : "",
-                    "select-none",
-                    className)}
-            onClick={onClick}>{iconKey}</span>
-    });
-
-Icon.displayName = "Icon";

@@ -1,6 +1,7 @@
 import { useSnackbarController } from "@rebasepro/core";
 import { EntityCollection } from "@rebasepro/types";
-import { Button, ContentCopyIcon, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@rebasepro/ui";
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@rebasepro/ui";
+import { CopyIcon } from "lucide-react";
 import React from "react";
 import JSON5 from "json5";
 import { Highlight, themes } from "prism-react-renderer"
@@ -70,8 +71,8 @@ export function GetCodeDialog({
                     })
                     return navigator.clipboard.writeText(code);
                 }}>
-                <ContentCopyIcon size={"small"}/>
-                Copy to clipboard
+                <CopyIcon/>
+                CopyIcon to clipboard
             </Button>
             <Button onClick={() => onOpenChange(false)}>Close</Button>
         </DialogActions>
@@ -108,7 +109,6 @@ function collectionToCode(collection: EntityCollection): object {
             delete obj.resolved;
             delete obj.propertiesOrder;
             delete obj.propertyConfig;
-
 
         }
 

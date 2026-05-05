@@ -1,7 +1,8 @@
 import { useCollectionRegistryController } from "../_cms_internals";
 import { useAuthController, useTranslation } from "@rebasepro/core";
 import { EntityCollection, PluginFormActionProps } from "@rebasepro/types";
-import { IconButton, SettingsIcon, Tooltip } from "@rebasepro/ui";
+import { IconButton, Tooltip } from "@rebasepro/ui";
+import { SettingsIcon } from "lucide-react";
 
 import { useCollectionEditorController } from "../useCollectionEditorController";
 
@@ -42,7 +43,7 @@ export function EditorEntityAction({
                     parentCollection: parentCollection as EntityCollection
                 })
                 : undefined}>
-            <SettingsIcon size={"small"}/>
+            <SettingsIcon/>
         </IconButton>
     </Tooltip>;
 

@@ -1,8 +1,7 @@
+
 import React, { useState } from "react";
-import {
-    Button, IconButton, Typography, Table, TableHeader, TableCell, TableBody, TableRow,
-    TextField, Select, SelectItem, Container, DeleteIcon, Dialog, DialogTitle, DialogContent, DialogActions
-} from "@rebasepro/ui";
+import { Button, IconButton, Typography, Table, TableHeader, TableCell, TableBody, TableRow, TextField, Select, SelectItem, Container, Dialog, DialogTitle, DialogContent, DialogActions } from "@rebasepro/ui";
+import { Trash2Icon } from "lucide-react";
 import { useFormex } from "@rebasepro/formex";
 import { PostgresCollection, Relation } from "@rebasepro/types";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
@@ -98,7 +97,7 @@ direction: "owning" });
                                                 e.stopPropagation();
                                                 handleDelete(index);
                                             }}>
-                                                <DeleteIcon/>
+                                                <Trash2Icon/>
                                             </IconButton>
                                         </TableCell>
                                         <TableCell className="font-medium">{relation.relationName}</TableCell>

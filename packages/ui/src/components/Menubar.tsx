@@ -1,8 +1,10 @@
+
 import * as React from "react";
 
 import * as MenubarPrimitive from "@radix-ui/react-menubar";
 import { cls } from "../util";
-import { CheckIcon, ChevronRightIcon } from "../icons";
+import { CheckIcon, ChevronRightIcon } from "lucide-react";
+import { iconSize } from "../icons/Icon";
 import { usePortalContainer } from "../hooks/PortalContainerContext";
 
 export function Menubar({
@@ -251,7 +253,7 @@ export function MenubarItemIndicator({
         <MenubarPrimitive.ItemIndicator
             className={cls("absolute left-0 w-4 inline-flex items-center justify-center", className)}
             {...rest}>
-            {children ?? <CheckIcon size={"smallest"}/>}
+            {children ?? <CheckIcon size={iconSize.smallest}/>}
         </MenubarPrimitive.ItemIndicator>
     )
 }
@@ -277,7 +279,7 @@ export function MenubarRadioGroup({
             onValueChange={onValueChange}
             onSelect={onSelect}
             {...rest}>
-            {children ?? <CheckIcon size={"small"}/>}
+            {children ?? <CheckIcon size={iconSize.small}/>}
         </MenubarPrimitive.RadioGroup>
     )
 }
@@ -301,7 +303,7 @@ export function MenubarRadioItem({
                 className)}
             value={value}
             {...rest}>
-            {children ?? <CheckIcon size={"small"}/>}
+            {children ?? <CheckIcon size={iconSize.small}/>}
         </MenubarPrimitive.RadioItem>
     )
 }
@@ -327,7 +329,7 @@ export function MenubarShortcut({
 export function MenubarSubTriggerIndicator() {
     return (
         <div className="ml-auto pl-5 ">
-            <ChevronRightIcon size={"small"}/>
+            <ChevronRightIcon size={iconSize.small}/>
         </div>
     )
 }

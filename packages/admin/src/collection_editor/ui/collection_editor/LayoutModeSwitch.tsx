@@ -1,4 +1,5 @@
-import { cls, SquareIcon, ToggleButtonGroup, Typography, VerticalSplitIcon } from "@rebasepro/ui";
+import { cls, ToggleButtonGroup, Typography } from "@rebasepro/ui";
+import { ColumnsIcon, SquareIcon } from "lucide-react";
 
 export function LayoutModeSwitch({
     value,
@@ -20,7 +21,7 @@ export function LayoutModeSwitch({
                     {
                         value: "side_panel",
                         label: "Side panel",
-                        icon: <VerticalSplitIcon/>
+                        icon: <ColumnsIcon/>
                     },
                     {
                         value: "full_screen",

@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useRef, useState, useEffect, useMemo } from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { cls } from "../util";
@@ -7,7 +8,8 @@ export type TabVariant = "standard" | "boxy" | "pill";
 
 const TabsContext = createContext<{ variant: TabVariant }>({ variant: "standard" });
 import { IconButton } from "./IconButton";
-import { ChevronLeftIcon, ChevronRightIcon } from "../icons";
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { iconSize } from "../icons/Icon";
 
 export type TabsProps = {
     value: string,
@@ -94,7 +96,7 @@ export function Tabs({
                         "bg-surface-50 dark:bg-surface-900 border shadow-sm", defaultBorderMixin
                     )}
                 >
-                    <ChevronLeftIcon size="small"/>
+                    <ChevronLeftIcon size={iconSize.smallest}/>
                 </button>
             )}
             <div
@@ -127,7 +129,7 @@ msOverflowStyle: "none" }}
                         "bg-surface-50 dark:bg-surface-900 border shadow-sm", defaultBorderMixin
                     )}
                 >
-                    <ChevronRightIcon size="small"/>
+                    <ChevronRightIcon size={iconSize.smallest}/>
                 </button>
             )}
         </TabsPrimitive.Root>

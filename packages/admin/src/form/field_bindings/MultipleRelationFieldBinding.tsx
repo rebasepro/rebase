@@ -9,7 +9,8 @@ import { getIconForProperty } from "../../util/property_utils";
 import { getRelationFrom, resolveRelationProperty } from "@rebasepro/common";
 
 import { useTranslation, ErrorView } from "@rebasepro/core";
-import { Button, cls, EditIcon, ExpandablePanel, fieldBackgroundMixin, Typography } from "@rebasepro/ui";
+import { Button, cls, ExpandablePanel, fieldBackgroundMixin, Typography } from "@rebasepro/ui";
+import { PencilIcon } from "lucide-react";
 import { RelationPreview } from "../../preview";
 
 /**
@@ -128,7 +129,7 @@ export function MultipleRelationFieldBinding({
                 color="primary"
                 disabled={isSubmitting}
                 onClick={onEntryClick}>
-                <EditIcon size={"small"}/>
+                <PencilIcon/>
                 {t("edit")} {property.name}
             </Button>
         </div>}

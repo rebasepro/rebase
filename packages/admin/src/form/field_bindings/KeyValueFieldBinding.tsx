@@ -1,3 +1,4 @@
+
 import type { FieldProps } from "../../types/fields";
 import type { MapProperty } from "@rebasepro/types";
 import React, { useEffect, useState } from "react";
@@ -5,22 +6,8 @@ import { DataType, GeoPoint } from "@rebasepro/types";
 
 import { ArrayContainer } from "../../components/ArrayContainer";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
-import {
-    AddIcon,
-    ArrowDropDownIcon,
-    BooleanSwitchWithLabel,
-    Button,
-    cls,
-    DateTimeField,
-    defaultBorderMixin,
-    ExpandablePanel,
-    IconButton,
-    Menu,
-    MenuItem,
-    RemoveIcon,
-    TextField,
-    Typography
-} from "@rebasepro/ui";
+import { BooleanSwitchWithLabel, Button, cls, DateTimeField, defaultBorderMixin, ExpandablePanel, IconButton, Menu, MenuItem, TextField, Typography , iconSize } from "@rebasepro/ui";
+import { PlusIcon, ChevronDownIcon, MinusIcon } from "lucide-react";
 import { getIconForProperty } from "../../util/property_utils";
 import { useCustomizationController, useTranslation } from "@rebasepro/core";
 import { getIn } from "@rebasepro/formex";
@@ -217,7 +204,7 @@ function MapEditView<T extends Record<string, any>>({
             size={"small"}
             className="w-full"
             disabled={disabled}
-            startIcon={<AddIcon/>}
+            startIcon={<PlusIcon/>}
             onClick={(e) => {
                 e.preventDefault();
                 setValue({
@@ -401,7 +388,7 @@ function MapKeyValueRow<T extends Record<string, any>>({
             <div className={"flex flex-col"}>
                 <Menu
                     trigger={<IconButton size={"smallest"}>
-                        <ArrowDropDownIcon size={"small"}/>
+                        <ChevronDownIcon size={iconSize.small}/>
                     </IconButton>}
                 >
                     <MenuItem dense
@@ -421,7 +408,7 @@ function MapKeyValueRow<T extends Record<string, any>>({
                 <IconButton aria-label="delete"
                     size={"smallest"}
                     onClick={onDeleteClick}>
-                    <RemoveIcon size={"smallest"}/>
+                    <MinusIcon size={iconSize.smallest}/>
                 </IconButton>
             </div>
         </Typography>
@@ -517,7 +504,7 @@ function ArrayKeyValueRow<T>({
             <Menu
                 trigger={<IconButton size={"small"}
                     className="h-7 w-7">
-                    <ArrowDropDownIcon/>
+                    <ChevronDownIcon/>
                 </IconButton>}>
                 <MenuItem dense
                     onClick={() => doUpdatetype("string")}>string</MenuItem>

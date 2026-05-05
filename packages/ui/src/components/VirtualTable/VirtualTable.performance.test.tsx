@@ -1,3 +1,4 @@
+import { ListIcon } from "lucide-react";
 
 /**
  * @jest-environment jsdom
@@ -169,7 +170,7 @@ width: 100 }];
        // `react-fast-compare` (used in VirtualTableRow) should return true.
        // So `VirtualTableRow` should NOT re-render even if context changes?
 
-       // WAIT. `VirtualTableRow` does NOT consume the context itself. `Row` (the render prop of List) consumes it.
+       // WAIT. `VirtualTableRow` does NOT consume the context itself. `Row` (the render prop of ListIcon) consumes it.
        // So `Row` renders -> Consumer renders -> Render Prop runs -> returns VirtualTableRow.
        // VirtualTableRow is memoized.
        // So if props are equal, it shouldn't render.
@@ -307,7 +308,7 @@ width: 100 }];
        /*
        function MemoizedList(...) {
            const Row = useCallback(...)
-           return <List ...>{Row}</List>
+           return <ListIcon ...>{Row}</ListIcon>
        }
        */
        // `MemoizedList` is NOT memoized (it's a function).

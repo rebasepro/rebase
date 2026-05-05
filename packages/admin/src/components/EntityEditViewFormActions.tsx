@@ -1,3 +1,4 @@
+
 import type { EntityCollection } from "@rebasepro/types";
 import type { FormContext } from "../types/fields";
 import type { EntityAction, EntityActionClickProps, SideEntityController } from "@rebasepro/types";
@@ -7,18 +8,9 @@ import type { EntityFormActionsProps } from "../types/components/EntityFormActio
 import { copyEntityAction, deleteEntityAction } from "../components";
 import { mergeEntityActions } from "../util/entity_actions";
 import { resolveEntityAction } from "../util/resolutions";
-import {
-    Button,
-    CircularProgress,
-    cls,
-    defaultBorderMixin,
-    DialogActions,
-    ErrorIcon,
-    IconButton,
-    LoadingButton,
-    Tooltip,
-    Typography
-} from "@rebasepro/ui";
+import { Button, CircularProgress, cls, defaultBorderMixin, DialogActions, IconButton, LoadingButton, Tooltip, Typography } from "@rebasepro/ui";
+import { AlertCircleIcon } from "lucide-react";
+import { iconSize } from "@rebasepro/ui";
 import {
     useCustomizationController,
     useSnackbarController,
@@ -200,7 +192,7 @@ function buildBottomActions<M extends Record<string, unknown>>({
 
         {hasErrors ?
             <ErrorTooltip title={"This form has errors"}>
-                <ErrorIcon className="ml-4" color="error" size={"smallest"}/>
+                <AlertCircleIcon className="ml-4 text-red-500" size={iconSize.smallest}/>
             </ErrorTooltip> : null}
         <Button variant="text"
             color="primary"
@@ -260,7 +252,7 @@ function buildSideActions<M extends Record<string, unknown>>({
             variant="filled"
             color="primary"
             type="submit"
-            startIcon={hasErrors ? <ErrorIcon/> : undefined}
+            startIcon={hasErrors ? <AlertCircleIcon/> : undefined}
             disabled={disabled || formex.isSubmitting}
             onClick={() => {
                 sideDialogContext.setPendingClose?.(false);

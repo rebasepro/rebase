@@ -1,7 +1,8 @@
+
 import React from "react";
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
 
-import { CheckIcon, RemoveIcon } from "../icons";
+import { CheckIcon, MinusIcon } from "lucide-react";
 import { cls } from "../util";
 
 export interface CheckboxProps {
@@ -93,7 +94,7 @@ export const Checkbox = React.memo(({
                     <CheckboxPrimitive.Indicator asChild>
                         {indeterminate
                             ? (
-                                <RemoveIcon size={iconSize} className={"absolute"}/>
+                                <MinusIcon size={iconSize} className={"absolute"}/>
                             )
                             : (
                                 <CheckIcon size={iconSize} className={"absolute"}/>

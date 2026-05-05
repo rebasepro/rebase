@@ -4,7 +4,8 @@ import { useAuthController, useStorageSource } from "@rebasepro/core";
 import { getIconForProperty } from "../../util/property_utils";
 import type { FieldProps } from "../../types/fields";
 import type { ArrayProperty, StringProperty } from "@rebasepro/types";
-import { cls, fieldBackgroundDisabledMixin, fieldBackgroundHoverMixin, fieldBackgroundMixin, IconButton, CloseIcon, Skeleton } from "@rebasepro/ui";
+import { cls, fieldBackgroundDisabledMixin, fieldBackgroundHoverMixin, fieldBackgroundMixin, IconButton, Skeleton } from "@rebasepro/ui";
+import { XIcon } from "lucide-react";
 import type { RebaseEditorProps } from "../../editor";
 import { resolveStorageFilenameString, resolveStoragePathString } from "@rebasepro/common";
 import { randomString } from "@rebasepro/utils";
@@ -211,7 +212,7 @@ export function MarkdownEditorFieldBinding({
                             setValue(null);
                         }}
                     >
-                        <CloseIcon size={"small"}/>
+                        <XIcon/>
                     </IconButton>
                 )}
             </div>

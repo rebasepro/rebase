@@ -51,7 +51,7 @@ export function DrawerNavigationItem({
                     drawerOpen ? "opacity-100" : "opacity-0 hidden",
                     "font-inherit truncate space-x-2"
                 )}>
-                {name.toUpperCase()}
+                {name}
             </div>
         </NavLink>
     </div>;

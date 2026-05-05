@@ -1,15 +1,7 @@
+
 import React, { useState } from "react";
-import {
-    Typography,
-    cls,
-    defaultBorderMixin,
-    Tabs,
-    Tab,
-    Tooltip,
-    IconButton,
-    AddIcon,
-    DeleteIcon
-} from "@rebasepro/ui";
+import { Typography, cls, defaultBorderMixin, Tabs, Tab, Tooltip, IconButton , iconSize } from "@rebasepro/ui";
+import { PlusIcon, Trash2Icon } from "lucide-react";
 
 export interface JSSnippet {
     id: string;
@@ -299,7 +291,7 @@ function CollectionItem({ collection, onInsertCode }: { collection: CollectionIn
                             onInsertCode(`const result = await client.data.${collection.slug}.find({ limit: 20 });\nreturn result;`);
                         }}
                     >
-                        <AddIcon size="smallest"/>
+                        <PlusIcon size={iconSize.smallest}/>
                     </IconButton>
                 </Tooltip>
             </div>
@@ -341,7 +333,7 @@ function SnippetItem({ snippet, onSelect, onDelete }: { snippet: JSSnippet; onSe
                     onDelete(snippet.id);
                 }}
             >
-                <DeleteIcon size="smallest"/>
+                <Trash2Icon size={iconSize.smallest}/>
             </IconButton>
         </div>
     );

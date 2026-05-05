@@ -1,16 +1,11 @@
+
 import { FieldCaption } from "../../_cms_internals";
 import React, { useMemo, useRef, useState } from "react";
 import { useAuthController, useCustomizationController } from "@rebasepro/core";
 import { EntityCollection, Property } from "@rebasepro/types";
 import { PropertyConfigBadge, getFieldConfig } from "../../_cms_internals";
-import {
-    CloseIcon,
-    IconButton,
-    Select,
-    SelectItem,
-    Typography,
-    Button
-} from "@rebasepro/ui";
+import { IconButton, Select, SelectItem, Typography, Button , iconSize } from "@rebasepro/ui";
+import { XIcon } from "lucide-react";
 import { useFormex } from "@rebasepro/formex";
 import { PropertyFormDialog } from "./PropertyEditView";
 import { unslugify } from "@rebasepro/utils";
@@ -112,7 +107,7 @@ block: "center" });
                             setFieldValue("kanban", undefined);
                         }}
                     >
-                        <CloseIcon size="small"/>
+                        <XIcon size={iconSize.smallest}/>
                     </IconButton>
                 ) : undefined}
             >
@@ -174,7 +169,6 @@ label: "Done" }
                         inArray={false}
                         allowDataInference={false}
                         propertyConfigs={customizationController.propertyConfigs}
-
 
                         existingPropertyKeys={Object.keys(values.properties ?? {})}
                         onPropertyChanged={({ id, property }) => {

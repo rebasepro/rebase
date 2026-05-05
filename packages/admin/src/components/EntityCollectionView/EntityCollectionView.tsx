@@ -1,3 +1,4 @@
+
 import type { AdditionalFieldDelegate, EntityCollection } from "@rebasepro/types";
 import type { EntityAction, Property } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -37,21 +38,8 @@ import { EntityCollectionListView } from "./EntityCollectionListView";
 import { SplitListView } from "./SplitListView";
 import { EntityCollectionBoardView } from "./EntityCollectionBoardView";
 import { ViewModeToggle, KanbanPropertyOption } from "./ViewModeToggle";
-import {
-    AddIcon,
-    Button,
-    cls,
-    focusedDisabled,
-    IconButton,
-    KeyboardTabIcon,
-    Markdown,
-    Popover,
-    SearchIcon,
-    Skeleton,
-    Tooltip,
-    Typography,
-    VirtualTableColumn
-} from "@rebasepro/ui";
+import { Button, cls, focusedDisabled, IconButton, Markdown, Popover, Skeleton, Tooltip, Typography, VirtualTableColumn , iconSize } from "@rebasepro/ui";
+import { PlusIcon, ArrowRightToLineIcon, SearchIcon } from "lucide-react";
 import { setIn } from "@rebasepro/formex";
 import { getSubcollectionColumnId } from "../EntityCollectionTable/internal/common";
 import {
@@ -604,7 +592,7 @@ export const EntityCollectionView = React.memo(
                     Builder: ({ entity }: { entity: Entity }) => (
                         <Button
                             className={"max-w-full truncate justify-start"}
-                            startIcon={<KeyboardTabIcon size={"small"}/>}
+                            startIcon={<ArrowRightToLineIcon size={iconSize.small}/>}
                             onClick={(event: React.MouseEvent) => {
                                 event.stopPropagation();
                                 navigateToEntity({
@@ -798,7 +786,6 @@ export const EntityCollectionView = React.memo(
             }
         }, [collection, setLocalPropertiesOrder, customizationController, path, parentCollectionIds]);
 
-
         // Popover open state managed at parent level to prevent closing when view changes
         const [viewModePopoverOpen, setViewModePopoverOpen] = useState(false);
 
@@ -840,7 +827,7 @@ export const EntityCollectionView = React.memo(
                         onClick={onNewClick}
                         className="mt-4"
                     >
-                        <AddIcon/>
+                        <PlusIcon/>
                         {t("create_your_first_entry")}
                     </Button>
                 </div>
@@ -1187,7 +1174,7 @@ function EntityIdHeaderWidget({
                 alignOffset={-117}
                 trigger={
                     <IconButton size={"small"}>
-                        <SearchIcon size={"small"}/>
+                        <SearchIcon size={iconSize.small}/>
                     </IconButton>
                 }>
                 <div
@@ -1224,7 +1211,7 @@ function EntityIdHeaderWidget({
                             <Button variant={"text"}
                                 disabled={!(searchString.trim())}
                                 type={"submit"}
-                            ><KeyboardTabIcon/></Button>
+                            ><ArrowRightToLineIcon/></Button>
                         </div>
                     </form>
                     {recentIds && recentIds.length > 0 && <div className="flex flex-col gap-2 p-2">

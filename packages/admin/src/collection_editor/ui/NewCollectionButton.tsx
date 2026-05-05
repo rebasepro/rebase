@@ -1,4 +1,5 @@
-import { AddIcon, Button } from "@rebasepro/ui";
+import { Button } from "@rebasepro/ui";
+import { PlusIcon } from "lucide-react";
 import { useCollectionEditorController } from "../useCollectionEditorController";
 import { useAdminModeController, useTranslation } from "@rebasepro/core";
 
@@ -19,7 +20,7 @@ export function NewCollectionButton() {
                 redirect: true,
                 sourceClick: "new_collection_button"
             })}>
-            <AddIcon/>
+            <PlusIcon/>
             {t("studio_new_collection")}
         </Button>
     </div>

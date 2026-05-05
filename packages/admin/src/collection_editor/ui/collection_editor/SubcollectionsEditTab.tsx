@@ -1,3 +1,4 @@
+
 import React from "react";
 import {
     ConfirmationDialog,
@@ -6,21 +7,8 @@ import {
 import { resolveEntityView } from "../../_cms_internals";
 import { EntityCollection, EntityCustomView, User } from "@rebasepro/types";
 import { getSubcollections } from "@rebasepro/common";
-import {
-    AddIcon,
-    Alert,
-    Button,
-    Container,
-    DeleteIcon,
-    IconButton,
-    Paper,
-    Table,
-    TableBody,
-    TableCell,
-    TableRow,
-    Tooltip,
-    Typography
-} from "@rebasepro/ui";
+import { Alert, Button, Container, IconButton, Paper, Table, TableBody, TableCell, TableRow, Tooltip, Typography , iconSize } from "@rebasepro/ui";
+import { PlusIcon, Trash2Icon } from "lucide-react";
 import { CollectionEditorDialog } from "./CollectionEditorDialog";
 import { CollectionsConfigController } from "../../types/config_controller";
 import { CollectionInference } from "../../types/collection_inference";
@@ -101,7 +89,7 @@ export function SubcollectionsEditTab({
                                                             setSubcollectionToDelete(subcollection.slug);
                                                         }}
                                                         color="inherit">
-                                                        <DeleteIcon size={"small"}/>
+                                                        <Trash2Icon size={iconSize.small}/>
                                                     </IconButton>
                                                 </Tooltip>
                                             </TableCell>
@@ -118,7 +106,7 @@ export function SubcollectionsEditTab({
                                 }}
                                 variant="filled"
                                 color="neutral"
-                                startIcon={<AddIcon/>}>
+                                startIcon={<PlusIcon/>}>
                                 Add subcollection
                             </Button>
 
@@ -130,7 +118,6 @@ export function SubcollectionsEditTab({
                         <Typography variant={"h6"}>
                             Custom views
                         </Typography>
-
 
                         {<>
                             <div className={"flex flex-col gap-4 w-full"}>
@@ -155,7 +142,7 @@ export function SubcollectionsEditTab({
                                                                 setViewToDelete(view.key);
                                                             }}
                                                             color="inherit">
-                                                            <DeleteIcon size={"small"}/>
+                                                            <Trash2Icon size={iconSize.small}/>
                                                         </IconButton>
                                                     </Tooltip>
                                                 </TableCell>
@@ -184,13 +171,12 @@ export function SubcollectionsEditTab({
                                     }}
                                     variant="filled"
                                     color="neutral"
-                                    startIcon={<AddIcon/>}>
+                                    startIcon={<PlusIcon/>}>
                                     Add custom entity view
                                 </Button>
                             </div>
 
                         </>}
-
 
                     </div>
 

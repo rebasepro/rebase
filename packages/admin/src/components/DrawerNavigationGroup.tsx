@@ -1,6 +1,7 @@
 import type { NavigationEntry } from "@rebasepro/types";
 import React from "react";
-import { cls, ExpandMoreIcon, Typography } from "@rebasepro/ui";
+import { cls, Typography } from "@rebasepro/ui";
+import { ChevronDownIcon } from "lucide-react";
 ;
 import { IconForView } from "@rebasepro/core";
 import { DrawerNavigationItem } from "./DrawerNavigationItem";
@@ -79,8 +80,7 @@ export function DrawerNavigationGroup({
                     )}
                     onClick={drawerOpen ? onToggleCollapsed : undefined}
                 >
-                    <ExpandMoreIcon
-                        size={"smallest"}
+                    <ChevronDownIcon
                         className={cls(
                             "text-surface-500 dark:text-surface-400 transition-transform duration-200 mr-1",
                             collapsed ? "-rotate-90" : "rotate-0"
@@ -91,7 +91,7 @@ export function DrawerNavigationGroup({
                         color={"secondary"}
                         className="font-medium flex-grow line-clamp-1"
                     >
-                        {(group || t("views_group")).toUpperCase()}
+                        {(group || t("views_group"))}
                     </Typography>
                     {headerActions && (
                         <div onClick={(e) => e.stopPropagation()}>
@@ -114,7 +114,7 @@ export function DrawerNavigationGroup({
                 {entries.map((entry) => (
                     <DrawerNavigationItem
                         key={entry.id}
-                        icon={<IconForView collectionOrView={entry.collection ?? entry.view} size={18}/>}
+                        icon={<IconForView collectionOrView={entry.collection ?? entry.view} size={"small"}/>}
                         tooltipsOpen={!collapsed && tooltipsOpen}
                         adminMenuOpen={adminMenuOpen}
                         drawerOpen={drawerOpen}

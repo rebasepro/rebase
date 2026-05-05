@@ -157,9 +157,9 @@ export interface AppView {
 
     /**
      * Icon key to use in this view.
-     * You can use any of the icons in the Material specs:
-     * https://fonts.google.com/icons
-     * e.g. 'account_tree' or 'person'
+     * You can use any of the icons in the Lucide specs:
+     * https://lucide.dev/icons/
+     * e.g. 'ShoppingCart' or 'User'
      * Find all the icons in https://rebase.pro/docs/icons
      */
     icon?: string | React.ReactNode;

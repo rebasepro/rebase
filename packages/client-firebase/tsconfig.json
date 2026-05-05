@@ -53,6 +53,9 @@
       ],
       "@rebasepro/schema-inference": [
         "../schema-inference/src"
+      ],
+      "@rebasepro/ui": [
+        "../ui/src"
       ]
     }
   },

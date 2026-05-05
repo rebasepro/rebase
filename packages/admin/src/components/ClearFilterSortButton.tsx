@@ -1,4 +1,5 @@
-import { FilterListOffIcon, Button, Tooltip } from "@rebasepro/ui";
+import { Button, Tooltip , iconSize } from "@rebasepro/ui";
+import { FilterXIcon } from "lucide-react";
 import { EntityTableController } from "@rebasepro/types";
 import { useTranslation } from "@rebasepro/core";
 
@@ -38,7 +39,7 @@ export function ClearFilterSortButton({
                         tableController.setSortBy?.(undefined);
                     }}
                 >
-                    <FilterListOffIcon size="small"/>
+                    <FilterXIcon size={iconSize.small}/>
                 </Button>
             </Tooltip>
         );

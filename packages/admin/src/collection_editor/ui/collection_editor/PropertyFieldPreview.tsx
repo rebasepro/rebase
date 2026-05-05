@@ -3,13 +3,9 @@ import { getFieldConfig, PropertyConfigBadge } from "../../_cms_internals";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { Property } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";
-import {
-    cls,
-    DoNotDisturbOnIcon,
-    FunctionsIcon,
-    Paper,
-    Typography
-} from "@rebasepro/ui";
+import { cls, Paper, Typography } from "@rebasepro/ui";
+import { MinusCircleIcon, FunctionSquareIcon } from "lucide-react";
+import { iconSize } from "@rebasepro/ui";
 
 
 export function PropertyFieldPreview({
@@ -118,9 +114,9 @@ export function NonEditablePropertyPreview({
                 {propertyConfig && <PropertyConfigBadge propertyConfig={propertyConfig} size="small"/>}
                 {!propertyConfig && <div
                     className={"h-8 w-8 flex items-center justify-center rounded-full shadow-2xs text-white bg-surface-500"}>
-                    <FunctionsIcon color={"inherit"} size={"small"}/>
+                    <FunctionSquareIcon className={"text-inherit"} size={iconSize.small}/>
                 </div>}
-                <DoNotDisturbOnIcon color={"disabled"} size={"small"} className={"absolute -right-2 -top-2 bg-surface-50 dark:bg-surface-900 rounded-full"}/>
+                <MinusCircleIcon className={"text-surface-accent-400 absolute -right-2 -top-2 bg-surface-50 dark:bg-surface-900 rounded-full"} size={iconSize.small}/>
             </div>
 
             <div className="flex-1 flex flex-col min-w-0 pr-8">

@@ -1,20 +1,10 @@
+
 import React, { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import { FirebaseApp, FirebaseError } from "@firebase/app";
 import { ErrorView, RebaseLogo, useModeController, useSnackbarController } from "@rebasepro/core";
-import {
-    ArrowBackIcon,
-    Button,
-    CallIcon,
-    CircularProgress,
-    cls,
-    IconButton,
-    LoadingButton,
-    MailIcon,
-    PersonIcon,
-    TextField,
-    Typography
-} from "@rebasepro/ui";
+import { Button, CircularProgress, cls, IconButton, LoadingButton, TextField, Typography , iconSize } from "@rebasepro/ui";
+import { ArrowLeftIcon, MailIcon, PhoneIcon, UserIcon } from "lucide-react";
 import { appleIcon, facebookIcon, githubIcon, googleIcon, microsoftIcon, twitterIcon } from "./social_icons";
 import {
     getAuth,
@@ -298,22 +288,22 @@ export function FirebaseLoginView({
                         <LoginButton
                             disabled={disabled}
                             text={"Email/password"}
-                            icon={<MailIcon size={28}/>}
+                            icon={<MailIcon size={iconSize.medium}/>}
                             onClick={() => setPasswordLoginSelected(true)}/>}
 
                     {resolvedSignInOptions.includes("phone") &&
                         <LoginButton
                             disabled={disabled}
-                            text={"Phone number"}
-                            icon={<CallIcon size={28}/>}
+                            text={"PhoneIcon number"}
+                            icon={<PhoneIcon size={iconSize.medium}/>}
                             onClick={() => setPhoneLoginSelected(true)}/>}
 
                     {resolvedSignInOptions.includes("anonymous") &&
                         <LoginButton
                             disabled={disabled}
                             text={"Log in anonymously"}
-                            icon={<PersonIcon
-                                size={28}/>}
+                            icon={<UserIcon
+                                size={"medium"}/>}
                             onClick={authController.anonymousLogin}/>}
 
                     {allowSkipLogin &&
@@ -428,7 +418,7 @@ function PhoneLoginForm({
             <div className={"flex flex-col gap-1"}>
                 <IconButton
                     onClick={onClose}>
-                    <ArrowBackIcon className="w-5 h-5"/>
+                    <ArrowLeftIcon className="w-5 h-5"/>
                 </IconButton>
                 <div className="p-1 flex">
                     <Typography align={"center"}
@@ -438,7 +428,7 @@ function PhoneLoginForm({
                     value={phone ?? ""}
                     disabled={Boolean(phone && (authController.authLoading || authController.confirmationResult))}
                     type="phone"
-                    onChange={(event) => setPhone(event.target.value)}/>
+                    onChange={(event: any) => setPhone(event.target.value)}/>
                 {Boolean(phone && authController.confirmationResult) &&
                     <>
                         <div className="mt-2 p-1 flex">
@@ -448,7 +438,7 @@ function PhoneLoginForm({
                         <TextField placeholder=""
                             value={code ?? ""}
                             type="text"
-                            onChange={(event) => setCode(event.target.value)}/>
+                            onChange={(event: any) => setCode(event.target.value)}/>
                     </>
                 }
 
@@ -569,7 +559,7 @@ function LoginForm({
             <div className={"max-w-[480px] w-full flex flex-col gap-4"}>
                 <IconButton
                     onClick={onBackPressed}>
-                    <ArrowBackIcon className="w-5 h-5"/>
+                    <ArrowLeftIcon className="w-5 h-5"/>
                 </IconButton>
 
                 <div>
@@ -584,7 +574,7 @@ function LoginForm({
                     value={email ?? ""}
                     disabled={authController.authLoading}
                     type="email"
-                    onChange={(event) => setEmail(event.target.value)}/>}
+                    onChange={(event: any) => setEmail(event.target.value)}/>}
 
                 <div
                     className={`${loginState === "password" || (loginState === "registration" && !disableSignupScreen) ? "block" : "hidden"}`}>
@@ -593,7 +583,7 @@ function LoginForm({
                         disabled={authController.authLoading}
                         inputRef={passwordRef}
                         type="password"
-                        onChange={(event) => setPassword(event.target.value)}/>
+                        onChange={(event: any) => setPassword(event.target.value)}/>
                 </div>
 
                 <div

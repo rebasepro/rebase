@@ -2,7 +2,8 @@ import type { FieldProps } from "../../types/fields";
 import type { NumberProperty, StringProperty } from "@rebasepro/types";
 import React, { useCallback } from "react";
 
-import { CloseIcon, Collapse, IconButton, TextField, TextareaAutosize, fieldBackgroundHoverMixin, fieldBackgroundMixin, cls } from "@rebasepro/ui";
+import { Collapse, IconButton, TextField, TextareaAutosize, fieldBackgroundHoverMixin, fieldBackgroundMixin, cls } from "@rebasepro/ui";
+import { XIcon } from "lucide-react";
 import { PreviewType } from "@rebasepro/types";
 import { FieldHelperText, LabelWithIcon } from "../components";
 import { PropertyPreview } from "../../preview";
@@ -106,7 +107,7 @@ export function TextFieldBinding<T extends string | number>({
                     {property.clearable && (
                         <div className="flex flex-row justify-center items-center absolute h-full right-0 top-0 mr-4">
                             <IconButton onClick={handleClearClick}>
-                                <CloseIcon/>
+                                <XIcon/>
                             </IconButton>
                         </div>
                     )}
@@ -127,7 +128,7 @@ export function TextFieldBinding<T extends string | number>({
                     endAdornment={
                         property.clearable && <IconButton
                             onClick={handleClearClick}>
-                            <CloseIcon/>
+                            <XIcon/>
                         </IconButton>
                     }
                     error={showError ? !!error : undefined}

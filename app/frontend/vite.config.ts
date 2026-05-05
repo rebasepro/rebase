@@ -55,7 +55,7 @@ export default defineConfig({
             }
         }
     },
-    optimizeDeps: { include: ["react/jsx-runtime", "pgsql-ast-parser", "moo"] },
+    optimizeDeps: { include: ["react/jsx-runtime", "pgsql-ast-parser"] },
     plugins: [
         svgr(),
         react({}),

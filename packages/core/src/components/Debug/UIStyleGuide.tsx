@@ -1,14 +1,7 @@
+
 import React from "react";
-import {
-    Typography,
-    Button,
-    IconButton,
-    Paper,
-    Container,
-    Separator,
-    cls,
-    DeleteIcon
-} from "@rebasepro/ui";
+import { Typography, Button, IconButton, Paper, Container, Separator, cls } from "@rebasepro/ui";
+import { Trash2Icon } from "lucide-react";
 
 export const UIStyleGuide = () => {
     const typographyVariants = [
@@ -140,7 +133,7 @@ export const UIStyleGuide = () => {
                         </div>
                         <div className="flex flex-col items-center gap-2">
                             <IconButton size="small" color="error">
-                                <DeleteIcon/>
+                                <Trash2Icon/>
                             </IconButton>
                             <span className="text-[10px] text-text-disabled font-mono">delete</span>
                         </div>

@@ -1,18 +1,8 @@
+
 import React, { useCallback, useMemo, useRef } from "react";
 import { CollectionSize, ViewMode } from "@rebasepro/types";
-import {
-    AppsIcon,
-    Button,
-    FormatListBulletedIcon,
-    ListIcon,
-    Popover,
-    Select,
-    SelectItem,
-    ToggleButtonGroup,
-    ToggleButtonOption,
-    ViewColumnIcon,
-    ViewKanbanIcon
-} from "@rebasepro/ui";
+import { Button, Popover, Select, SelectItem, ToggleButtonGroup, ToggleButtonOption , iconSize } from "@rebasepro/ui";
+import { LayoutGridIcon, ListIcon, ColumnsIcon, KanbanIcon } from "lucide-react";
 import { useTranslation } from "@rebasepro/core";
 
 export type KanbanPropertyOption = {
@@ -82,10 +72,10 @@ export function ViewModeToggle({
 
     // Get icon for current view mode
     const getViewModeIcon = () => {
-        if (viewMode === "kanban") return <ViewKanbanIcon size="small"/>;
-        if (viewMode === "cards") return <AppsIcon size="small"/>;
-        if (viewMode === "table") return <ListIcon size="small"/>;
-        return <FormatListBulletedIcon size="small"/>;
+        if (viewMode === "kanban") return <KanbanIcon size={iconSize.smallest}/>;
+        if (viewMode === "cards") return <LayoutGridIcon size={iconSize.smallest}/>;
+        if (viewMode === "table") return <ListIcon size={iconSize.smallest}/>;
+        return <ListIcon size={iconSize.smallest}/>;
     };
 
     const getViewModeName = () => {
@@ -107,22 +97,22 @@ export function ViewModeToggle({
             {
                 value: "list",
                 label: t("list"),
-                icon: <FormatListBulletedIcon size="small"/>
+                icon: <ListIcon size={iconSize.smallest}/>
             },
             {
                 value: "table",
                 label: t("table_view_mode"),
-                icon: <ListIcon size="small"/>
+                icon: <ListIcon size={iconSize.smallest}/>
             },
             {
                 value: "cards",
                 label: t("cards"),
-                icon: <AppsIcon size="small"/>
+                icon: <LayoutGridIcon size={iconSize.smallest}/>
             },
             {
                 value: "kanban",
                 label: t("board"),
-                icon: <ViewKanbanIcon size="small"/>
+                icon: <KanbanIcon size={iconSize.smallest}/>
             }
         ];
 
@@ -176,7 +166,7 @@ export function ViewModeToggle({
                     {showSizeSelector && (
                         <div className="flex flex-row items-center justify-between gap-2">
                             <div className="flex items-center gap-2 text-sm text-surface-600 dark:text-surface-300">
-                                <ViewColumnIcon size="small"/>
+                                <ColumnsIcon size={iconSize.smallest}/>
                                 <span>{t("size_label")}</span>
                             </div>
                             <Select
@@ -195,11 +185,11 @@ export function ViewModeToggle({
                         </div>
                     )}
 
-                    {/* Kanban column property selector */}
+                    {/* KanbanIcon column property selector */}
                     {showKanbanPropertySelector && (
                         <div className="flex flex-row items-center justify-between gap-2">
                             <div className="flex items-center gap-2 text-sm text-surface-600 dark:text-surface-300">
-                                <ViewKanbanIcon size="small"/>
+                                <KanbanIcon size={iconSize.smallest}/>
                                 <span>{t("group_by")}</span>
                             </div>
                             <Select

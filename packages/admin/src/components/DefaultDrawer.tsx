@@ -1,12 +1,13 @@
 import type { NavigationEntry, NavigationResult } from "@rebasepro/types";
 import React from "react";
 
-import { useCollapsedGroups, useLargeLayout, useAdminModeController, useEffectiveRoleController, useTranslation, useSlot, useRebaseContext, useAnalyticsController, useRebaseRegistry } from "@rebasepro/core";
+import { useCollapsedGroups, useLargeLayout, useAdminModeController, useEffectiveRoleController, useTranslation, useSlot, useRebaseContext, useAnalyticsController, useRebaseRegistry, STUDIO_NAVIGATION_GROUPS } from "@rebasepro/core";
 import { useNavigationStateController, useUrlController } from "../hooks";
 
 import { Link, useNavigate } from "react-router-dom";
 import { AnalyticsEvent } from "@rebasepro/types";
-import { cls, Tooltip, Typography } from "@rebasepro/ui";
+import { cls, Tooltip, Typography , iconSize } from "@rebasepro/ui";
+import { ChevronsLeftIcon, ChevronsRightIcon } from "lucide-react";
 import { DrawerNavigationGroup } from "./DrawerNavigationGroup";
 import { RebaseLogo } from "@rebasepro/core";
 import { useApp } from "./app/useApp";
@@ -65,9 +66,9 @@ export function DefaultDrawer({
 
     let groupsToRender = navigationState.topLevelNavigation?.groups ?? [];
     if (adminModeController.mode === "studio") {
-        groupsToRender = groupsToRender.filter(g => g === "Database" || g === "Compute" || g === "API" || g === "Storage" || g === "Access Control");
+        groupsToRender = groupsToRender.filter(g => STUDIO_NAVIGATION_GROUPS.includes(g));
     } else {
-        groupsToRender = groupsToRender.filter(g => g !== "Database" && g !== "Compute" && g !== "API" && g !== "Storage" && g !== "Access Control");
+        groupsToRender = groupsToRender.filter(g => !STUDIO_NAVIGATION_GROUPS.includes(g));
     }
 
     // Collapsible groups state - using "drawer" namespace for independent state from home page
@@ -165,12 +166,6 @@ context });
         </>
     );
 }
-
-/**
- * Logo section at the top of the drawer.
- * The logo is always visible (even when collapsed). Title appears on open/hover.
- */
-import { KeyboardDoubleArrowLeftIcon, KeyboardDoubleArrowRightIcon } from "@rebasepro/ui";
 
 export function DrawerLogo({
     logo,
@@ -271,8 +266,8 @@ export function DrawerToggle({
                 >
                     <div className="shrink-0 flex items-center justify-center w-[56px] h-[24px] text-surface-500 dark:text-surface-400">
                         {isExpanded
-                            ? <KeyboardDoubleArrowLeftIcon size="small"/>
-                            : <KeyboardDoubleArrowRightIcon size="small"/>
+                            ? <ChevronsLeftIcon size={iconSize.small}/>
+                            : <ChevronsRightIcon size={iconSize.small}/>
                         }
                     </div>
                     <div className={cls(

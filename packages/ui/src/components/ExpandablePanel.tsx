@@ -1,9 +1,10 @@
+
 "use client";
 import React, { PropsWithChildren, useEffect, useState } from "react";
 
 import * as Collapsible from "@radix-ui/react-collapsible";
 import { defaultBorderMixin, fieldBackgroundMixin } from "../styles";
-import { KeyboardArrowDownIcon } from "../icons";
+import { ChevronDownIcon } from "lucide-react";
 import { cls } from "../util";
 import { useInjectStyles } from "../hooks";
 
@@ -109,7 +110,7 @@ export function ExpandablePanel({
                         aria-expanded={open}
                     >
                         {title}
-                        <KeyboardArrowDownIcon className={cls("transition", open ? "rotate-180" : "")}/>
+                        <ChevronDownIcon className={cls("transition", open ? "rotate-180" : "")}/>
                     </div>
                 </Collapsible.Trigger>
 

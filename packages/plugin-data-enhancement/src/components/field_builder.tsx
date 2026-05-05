@@ -3,18 +3,9 @@ import { deepEqual as equal } from "fast-equals"
 
 import { MarkdownEditorFieldBinding } from "@rebasepro/admin";
 import { FieldProps, NumberProperty, PluginFieldBuilderParams, Property, StringProperty } from "@rebasepro/types";
-import {
-    AutoAwesomeIcon,
-    CircularProgress,
-    cls,
-    IconButton,
-    Menu,
-    MenuItem,
-    SendIcon,
-    TextField,
-    Tooltip,
-    Typography
-} from "@rebasepro/ui";
+import { AIIcon } from "@rebasepro/core";
+import { CircularProgress, cls, IconButton, Menu, MenuItem, TextField, Tooltip, Typography , iconSize } from "@rebasepro/ui";
+import { SendIcon } from "lucide-react";
 import { useDataEnhancementController } from "./DataEnhancementControllerProvider";
 import { SUPPORTED_FIELDS_ENHANCEMENT } from "../utils/fields";
 import { EnhanceTextFieldBinding } from "./fields/EnhanceTextField";
@@ -200,11 +191,11 @@ const FieldInner = React.memo(function FieldInner<M extends Record<string, any> 
                             }}>
                             {dataLoading || loading
                                 ? <CircularProgress size={"smallest"}/>
-                                : <AutoAwesomeIcon
+                                : <AIIcon
                                     size={"smallest"}/>}
                         </IconButton>}>
                     <MenuItem onClick={() => enhanceData()}>
-                        <AutoAwesomeIcon size="small"/>
+                        <AIIcon size="small"/>
                         <div className={"flex flex-col"}>
                             <Typography
                                 variant={"body2"}> {`Autofill ${property.name ?? "this field"}`}</Typography>
@@ -228,7 +219,7 @@ const FieldInner = React.memo(function FieldInner<M extends Record<string, any> 
                                 size={"small"}
                                 onClick={() => enhanceData(propertyInstructions)}
                                 disabled={!propertyInstructions}>
-                                <SendIcon size={"small"}/>
+                                <SendIcon size={iconSize.small}/>
                             </IconButton>}>
                         </TextField>
                     </div>}

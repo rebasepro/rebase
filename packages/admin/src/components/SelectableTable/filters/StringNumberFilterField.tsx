@@ -1,15 +1,9 @@
+
 import React, { useState } from "react";
 import { EnumValuesChip } from "../../../preview";
 import { VirtualTableWhereFilterOp } from "@rebasepro/ui";
-import {
-    CloseIcon,
-    IconButton,
-    MultiSelect,
-    MultiSelectItem,
-    Select,
-    SelectItem,
-    TextField
-} from "@rebasepro/ui";
+import { XIcon } from "lucide-react";
+import { IconButton, MultiSelect, MultiSelectItem, Select, SelectItem, TextField } from "@rebasepro/ui";
 import { EnumValueConfig } from "@rebasepro/types";
 import { useTranslation } from "@rebasepro/core";
 
@@ -148,7 +142,7 @@ export function StringNumberFilterField({
                     }}
                     endAdornment={internalValue !== undefined && internalValue != null && <IconButton
                         onClick={(e) => updateFilter(operation, undefined)}>
-                        <CloseIcon/>
+                        <XIcon/>
                     </IconButton>}
                 />}
 
@@ -165,7 +159,7 @@ export function StringNumberFilterField({
                         }}
                         endAdornment={internalValue && <IconButton
                             onClick={(e) => updateFilter(operation, undefined)}>
-                            <CloseIcon/>
+                            <XIcon/>
                         </IconButton>}
                         renderValue={(enumKey) => {
                             if (enumKey === null)
@@ -204,7 +198,7 @@ export function StringNumberFilterField({
                         endAdornment={internalValue && <IconButton
                             className="absolute right-2 top-3"
                             onClick={(e) => updateFilter(operation, undefined)}>
-                            <CloseIcon/>
+                            <XIcon/>
                         </IconButton>}
                     >
                         {enumValues.map((enumConfig) => (

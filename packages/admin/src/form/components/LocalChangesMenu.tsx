@@ -1,21 +1,8 @@
+
 import type { Properties } from "@rebasepro/types";
 import React, { useState } from "react";
-import {
-    Button,
-    CancelIcon,
-    CheckIcon,
-    defaultBorderMixin,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    KeyboardArrowDownIcon,
-    Menu,
-    MenuItem,
-    Typography,
-    VisibilityIcon,
-    WarningIcon
-} from "@rebasepro/ui";
+import { Button, defaultBorderMixin, Dialog, DialogActions, DialogContent, DialogTitle, Menu, MenuItem, Typography , iconSize } from "@rebasepro/ui";
+import { XCircleIcon, CheckIcon, ChevronDownIcon, EyeIcon, AlertTriangleIcon } from "lucide-react";
 import { FormexController } from "@rebasepro/formex";
 import { useSnackbarController, useTranslation } from "@rebasepro/core";
 import { flattenKeys, removeEntityFromCache } from "@rebasepro/core";
@@ -91,9 +78,9 @@ export function LocalChangesMenu<M extends Record<string, unknown>>({
                         }
                         onClick={handleOpenMenu}
                     >
-                        <WarningIcon size={"smallest"} className={"mr-1 text-yellow-600 dark:text-yellow-400"}/>
+                        <AlertTriangleIcon size={iconSize.smallest} className={"mr-1 text-yellow-600 dark:text-yellow-400"}/>
                         {t("unsaved_local_changes")}
-                        <KeyboardArrowDownIcon size={"smallest"}/>
+                        <ChevronDownIcon size={iconSize.smallest}/>
                     </Button>
                 }
                 open={open}
@@ -102,9 +89,9 @@ export function LocalChangesMenu<M extends Record<string, unknown>>({
                 <div className={"max-w-xs px-4 py-4 text-sm text-gray-700 dark:text-gray-300"}>
                     {t("unsaved_local_changes_description")}
                 </div>
-                <MenuItem dense onClick={handlePreview}><VisibilityIcon size={"small"}/>{t("preview_changes")}</MenuItem>
-                <MenuItem dense onClick={handleApply}><CheckIcon size={"small"}/>{t("apply_changes")}</MenuItem>
-                <MenuItem dense onClick={handleDiscard}><CancelIcon size={"small"}/>{t("discard_local_changes")}</MenuItem>
+                <MenuItem dense onClick={handlePreview}><EyeIcon size={iconSize.small}/>{t("preview_changes")}</MenuItem>
+                <MenuItem dense onClick={handleApply}><CheckIcon size={iconSize.small}/>{t("apply_changes")}</MenuItem>
+                <MenuItem dense onClick={handleDiscard}><XCircleIcon size={iconSize.small}/>{t("discard_local_changes")}</MenuItem>
             </Menu>
 
             <Dialog

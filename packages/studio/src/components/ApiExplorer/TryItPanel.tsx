@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect } from "react";
-import { Typography, Button, cls, defaultBorderMixin } from "@rebasepro/ui";
+import { Typography, Button, cls, defaultBorderMixin, iconSize } from "@rebasepro/ui";
+import { LoaderIcon, SendIcon, PlusIcon, XIcon } from "lucide-react";
 import { useRebaseContext, UserSelectPopover, SelectableUser } from "@rebasepro/core";
 import { AuthSimulationSelector } from "../AuthSimulationSelector";
 import type { ParsedEndpoint } from "./types";
@@ -271,12 +272,12 @@ time: elapsed });
                 <Button variant="filled" onClick={execute} disabled={loading} className="w-full">
                     {loading ? (
                         <span className="flex items-center gap-2">
-                            <span className="material-icons text-base animate-spin">autorenew</span>
+                            <LoaderIcon size={iconSize.small} className="animate-spin" />
                             Sending…
                         </span>
                     ) : (
                         <span className="flex items-center gap-2">
-                            <span className="material-icons text-base">send</span>
+                            <SendIcon size={iconSize.small} />
                             Send Request
                         </span>
                     )}
@@ -400,7 +401,7 @@ function CustomKeyValueSection({
                     onClick={onAdd}
                     className="text-xs text-primary dark:text-primary-dark hover:underline flex items-center gap-1 font-medium"
                 >
-                    <span className="material-icons text-[14px]">add</span> Add Header
+                    <PlusIcon size={iconSize.small} className="mr-1" /> Add Header
                 </button>
             </div>
             <div className="space-y-2">
@@ -443,7 +444,7 @@ function CustomKeyValueSection({
                             className="p-1.5 text-text-secondary hover:text-red-500 rounded transition-colors flex items-center justify-center shrink-0"
                             title="Remove"
                         >
-                            <span className="material-icons text-[16px]">close</span>
+                            <XIcon size={iconSize.small} />
                         </button>
                     </div>
                 ))}

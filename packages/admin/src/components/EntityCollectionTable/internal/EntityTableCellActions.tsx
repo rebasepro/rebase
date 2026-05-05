@@ -1,4 +1,5 @@
-import { ErrorIcon, IconButton } from "@rebasepro/ui";
+import { IconButton } from "@rebasepro/ui";
+import { AlertCircleIcon } from "lucide-react";
 import { ErrorTooltip } from "@rebasepro/core";
 import { useCallback, useEffect, useRef } from "react";
 
@@ -68,9 +69,7 @@ export function EntityTableCellActions({
                             width: 32,
                             height: 32
                         }}>
-                        <ErrorIcon
-                            size={"small"}
-                            color={"error"}
+                        <AlertCircleIcon
                         />
                     </div>
                 </ErrorTooltip>

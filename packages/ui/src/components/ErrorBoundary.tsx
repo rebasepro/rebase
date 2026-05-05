@@ -1,6 +1,8 @@
+
 import React, { ErrorInfo, PropsWithChildren } from "react";
 
-import { ErrorIcon } from "../icons";
+import { AlertCircleIcon } from "lucide-react";
+import { iconSize } from "../icons/Icon";
 import { Typography } from "./Typography";
 
 export class ErrorBoundary extends React.Component<PropsWithChildren<Record<string, unknown>>, {
@@ -25,7 +27,7 @@ export class ErrorBoundary extends React.Component<PropsWithChildren<Record<stri
             return (
                 <div className="flex flex-col m-2">
                     <div className="flex items-center m-2">
-                        <ErrorIcon color={"error"} size={"small"}/>
+                        <AlertCircleIcon className={"text-red-500"} size={iconSize.small}/>
                         <div className="ml-4">Error</div>
                     </div>
                     <Typography variant={"caption"}>

@@ -1,3 +1,4 @@
+
 import React, { useCallback, useMemo, useState } from "react";
 import {
     useAuthController,
@@ -7,18 +8,8 @@ import {
 import { getPropertyInPath } from "../_cms_internals";
 import { EntityCollection, EnumValueConfig, StringProperty } from "@rebasepro/types";
 import { resolveEnumValues } from "@rebasepro/common";
-import {
-    AddIcon,
-    Button,
-    cls,
-    defaultBorderMixin,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    IconButton,
-    TextField,
-    Typography
-} from "@rebasepro/ui";
+import { Button, cls, defaultBorderMixin, Dialog, DialogActions, DialogContent, IconButton, TextField, Typography } from "@rebasepro/ui";
+import { PlusIcon } from "lucide-react";
 import { useCollectionsConfigController } from "../useCollectionsConfigController";
 import { toSnakeCase } from "@rebasepro/utils";
 
@@ -150,7 +141,7 @@ export function AddKanbanColumnAction({
                 onClick={() => setDialogOpen(true)}
             >
                 <IconButton className="opacity-60 hover:opacity-100">
-                    <AddIcon/>
+                    <PlusIcon/>
                 </IconButton>
                 <Typography variant="caption" color="secondary" className="mt-2">
                     {t("studio_add_kanban_column")}

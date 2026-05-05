@@ -1,4 +1,5 @@
-import { FileUpload, UploadIcon } from "@rebasepro/ui";
+import { FileUpload } from "@rebasepro/ui";
+import { UploadIcon } from "lucide-react";
 import { convertFileToJson } from "../utils/file_to_json";
 import { useSnackbarController } from "@rebasepro/core";
 

@@ -2,7 +2,8 @@ import { FieldCaption } from "../../../_cms_internals";
 import React, { useState } from "react";
 ;
 import { MapProperty, Property, PropertyConfig } from "@rebasepro/types";
-import { AddIcon, BooleanSwitchWithLabel, Button, Paper, Typography } from "@rebasepro/ui";
+import { BooleanSwitchWithLabel, Button, Paper, Typography } from "@rebasepro/ui";
+import { PlusIcon } from "lucide-react";
 import { PropertyFormDialog } from "../PropertyEditView";
 import { getIn, useFormex } from "@rebasepro/formex";
 import { PropertyTree } from "../PropertyTree";
@@ -77,7 +78,7 @@ export function MapPropertyField({ disabled, getData, allowDataInference, proper
                     <Typography variant={"subtitle2"}>Properties in this group</Typography>
                     <Button
                         onClick={() => setPropertyDialogOpen(true)}
-                        startIcon={<AddIcon/>}
+                        startIcon={<PlusIcon/>}
                     >
                         Add property to {values.name ?? "this group"}
                     </Button>

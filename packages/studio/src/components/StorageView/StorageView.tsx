@@ -1,32 +1,7 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import {
-    Typography,
-    cls,
-    defaultBorderMixin,
-    Button,
-    IconButton,
-    Tooltip,
-    CircularProgress,
-    ResizablePanels,
-    Chip,
-    Dialog,
-    DialogContent,
-    DialogActions,
-    RefreshIcon,
-    DeleteIcon,
-    CloseIcon,
-    AddIcon,
-    DownloadIcon,
-    CloudUploadIcon,
-    FolderIcon,
-    DescriptionIcon,
-    ImageIcon,
-    VideoLibraryIcon,
-    AudiotrackIcon,
-    ArrowBackIcon,
-    Icon,
-    FileUpload
-} from "@rebasepro/ui";
+import { Typography, cls, defaultBorderMixin, Button, IconButton, Tooltip, CircularProgress, ResizablePanels, Chip, Dialog, DialogContent, DialogActions, FileUpload , iconSize } from "@rebasepro/ui";
+import { VideoIcon, Music2Icon, RefreshCwIcon, Trash2Icon, XIcon, PlusIcon, DownloadIcon, UploadCloudIcon, FolderIcon, FileTextIcon, ImageIcon, ArrowLeftIcon, FileIcon, HomeIcon, LayoutGridIcon, ListIcon } from "lucide-react";
 import { useStorageSource, useSnackbarController, ErrorView } from "@rebasepro/core";
 import type { StorageListResult } from "@rebasepro/types";
 
@@ -56,11 +31,11 @@ function formatFileSize(bytes: number): string {
 }
 
 function getFileIcon(contentType?: string) {
-    if (!contentType) return DescriptionIcon;
+    if (!contentType) return FileTextIcon;
     if (contentType.startsWith("image/")) return ImageIcon;
-    if (contentType.startsWith("video/")) return VideoLibraryIcon;
-    if (contentType.startsWith("audio/")) return AudiotrackIcon;
-    return DescriptionIcon;
+    if (contentType.startsWith("video/")) return VideoIcon;
+    if (contentType.startsWith("audio/")) return Music2Icon;
+    return FileTextIcon;
 }
 
 function getExtension(name: string): string {
@@ -151,7 +126,7 @@ function UploadDialog({
                         size="large"
                         uploadDescription={
                             <div className="flex flex-col items-center justify-center pointer-events-none mt-2">
-                                <CloudUploadIcon className="text-surface-accent-400 mb-2 w-8 h-8"/>
+                                <UploadCloudIcon className="text-surface-accent-400 mb-2 w-8 h-8"/>
                                 <Typography variant="h6" className="font-bold">
                                     Drop files here or click to browse
                                 </Typography>
@@ -233,7 +208,7 @@ function UploadDialog({
 }
 
 // ──────────────────────────────────────────────
-// File preview panel
+// FileIcon preview panel
 // ──────────────────────────────────────────────
 
 function FilePreviewPanel({
@@ -272,7 +247,7 @@ function FilePreviewPanel({
                                     size="small"
                                     onClick={() => window.open(downloadUrl, "_blank")}
                                 >
-                                    <DownloadIcon size="smallest"/>
+                                    <DownloadIcon size={iconSize.smallest}/>
                                 </IconButton>
                             </Tooltip>
                         )}
@@ -282,11 +257,11 @@ function FilePreviewPanel({
                                 onClick={() => setDeleteDialogOpen(true)}
                                 className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
                             >
-                                <DeleteIcon size="smallest"/>
+                                <Trash2Icon size={iconSize.smallest}/>
                             </IconButton>
                         </Tooltip>
                         <IconButton size="small" onClick={onClose}>
-                            <CloseIcon size="smallest"/>
+                            <XIcon size={iconSize.smallest}/>
                         </IconButton>
                     </div>
                 </div>
@@ -320,7 +295,7 @@ function FilePreviewPanel({
                             } else if (isAudio && downloadUrl) {
                                 return (
                                     <div className="flex flex-col items-center gap-4">
-                                        <AudiotrackIcon className="text-surface-accent-400 w-10 h-10"/>
+                                        <Music2Icon className="text-surface-accent-400 w-10 h-10"/>
                                         <audio src={downloadUrl} controls className="w-full max-w-xs"/>
                                     </div>
                                 );
@@ -480,7 +455,7 @@ function StorageSidebar({
                     )}
                     onClick={() => onNavigate("")}
                 >
-                    <Icon iconKey="home" size="smallest" className="mr-1.5 shrink-0"/>
+                    <HomeIcon size={iconSize.smallest} className="mr-1.5 shrink-0"/>
                     <Typography variant="body2" className="text-xs truncate">Root</Typography>
                 </div>
 
@@ -503,7 +478,7 @@ function StorageSidebar({
                                     )}
                                     onClick={() => onNavigate(folder.fullPath)}
                                 >
-                                    <FolderIcon size="smallest" className="mr-1.5 shrink-0 text-amber-500 dark:text-amber-400"/>
+                                    <FolderIcon size={iconSize.smallest} className="mr-1.5 shrink-0 text-amber-500 dark:text-amber-400"/>
                                     <Typography variant="body2" className="text-xs truncate flex-1 min-w-0">
                                         {folder.name}
                                     </Typography>
@@ -715,7 +690,7 @@ message: e instanceof Error ? e.message : String(e) });
                             This folder is empty
                         </Typography>
                         <Button className="mt-3" onClick={() => setUploadDialogOpen(true)}>
-                            <AddIcon size="small"/>
+                            <PlusIcon size={iconSize.smallest}/>
                             Upload files
                         </Button>
                     </div>
@@ -743,7 +718,7 @@ message: e instanceof Error ? e.message : String(e) });
                                 >
                                     <td className="px-4 py-2.5">
                                         <div className="flex items-center gap-2">
-                                            <FolderIcon size="smallest" className="text-amber-500 dark:text-amber-400 shrink-0"/>
+                                            <FolderIcon size={iconSize.smallest} className="text-amber-500 dark:text-amber-400 shrink-0"/>
                                             <Typography variant="body2" className="text-[13px] font-medium truncate">
                                                 {folder.name}
                                             </Typography>
@@ -777,7 +752,7 @@ message: e instanceof Error ? e.message : String(e) });
                                     >
                                         <td className="px-4 py-2.5">
                                             <div className="flex items-center gap-2">
-                                                <FileIconComp size="smallest" className="text-surface-accent-400 shrink-0"/>
+                                                <FileIconComp size={iconSize.smallest} className="text-surface-accent-400 shrink-0"/>
                                                 <Typography variant="body2" className="text-[13px] truncate">
                                                     {file.name}
                                                 </Typography>
@@ -823,7 +798,7 @@ message: e instanceof Error ? e.message : String(e) });
                                     )}
                                     onClick={() => handleNavigate(folder.fullPath)}
                                 >
-                                    <FolderIcon size="small" className="text-amber-500 dark:text-amber-400 shrink-0"/>
+                                    <FolderIcon size={iconSize.smallest} className="text-amber-500 dark:text-amber-400 shrink-0"/>
                                     <Typography variant="body2" className="text-[13px] font-medium truncate">
                                         {folder.name}
                                     </Typography>
@@ -833,7 +808,7 @@ message: e instanceof Error ? e.message : String(e) });
                     </div>
                 )}
 
-                {/* File cards */}
+                {/* FileIcon cards */}
                 {files.length > 0 && (
                     <div>
                         <Typography variant="caption" className="text-[10px] uppercase tracking-wider font-bold text-text-disabled dark:text-text-disabled-dark mb-2 block">
@@ -929,7 +904,7 @@ message: e instanceof Error ? e.message : String(e) });
                                     {currentPath && (
                                         <Tooltip title="Go up">
                                             <IconButton size="small" onClick={handleNavigateUp}>
-                                                <ArrowBackIcon size="smallest"/>
+                                                <ArrowLeftIcon size={iconSize.smallest}/>
                                             </IconButton>
                                         </Tooltip>
                                     )}
@@ -958,7 +933,7 @@ message: e instanceof Error ? e.message : String(e) });
 
                                     <div className="flex-1"/>
 
-                                    {/* File count */}
+                                    {/* FileIcon count */}
                                     {!loading && (
                                         <Chip size="small" className="shrink-0 text-[10px]">
                                             {files.length} file{files.length !== 1 ? "s" : ""}
@@ -975,7 +950,7 @@ message: e instanceof Error ? e.message : String(e) });
                                             onClick={() => setViewMode("grid")}
                                             className={cls(viewMode === "grid" && "bg-surface-100 dark:bg-surface-800")}
                                         >
-                                            <Icon iconKey="apps" size="smallest"/>
+                                            <LayoutGridIcon size={iconSize.smallest}/>
                                         </IconButton>
                                     </Tooltip>
                                     <Tooltip title="List view">
@@ -984,7 +959,7 @@ message: e instanceof Error ? e.message : String(e) });
                                             onClick={() => setViewMode("list")}
                                             className={cls(viewMode === "list" && "bg-surface-100 dark:bg-surface-800")}
                                         >
-                                            <Icon iconKey="list" size="smallest"/>
+                                            <ListIcon size={iconSize.smallest}/>
                                         </IconButton>
                                     </Tooltip>
 
@@ -992,7 +967,7 @@ message: e instanceof Error ? e.message : String(e) });
 
                                     <Tooltip title="Refresh">
                                         <IconButton size="small" onClick={handleRefresh} disabled={loading}>
-                                            <RefreshIcon size="smallest"/>
+                                            <RefreshCwIcon size={iconSize.smallest}/>
                                         </IconButton>
                                     </Tooltip>
 
@@ -1001,13 +976,13 @@ message: e instanceof Error ? e.message : String(e) });
                                         color="primary"
                                         onClick={() => setUploadDialogOpen(true)}
                                     >
-                                        <CloudUploadIcon size="smallest" className="mr-1"/>
+                                        <UploadCloudIcon size={iconSize.smallest} className="mr-1"/>
                                         Upload
                                     </Button>
                                 </div>
                             </div>
 
-                            {/* File grid / list */}
+                            {/* FileIcon grid / list */}
                             <div className="flex-grow flex flex-col overflow-hidden min-h-0">
                                 {renderContents()}
                             </div>

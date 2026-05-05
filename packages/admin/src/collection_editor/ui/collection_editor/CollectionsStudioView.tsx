@@ -1,17 +1,11 @@
+
 import { IconForView } from "@rebasepro/core";
 ;
 import { useUrlController } from "../../_cms_internals";
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import {
-    cls,
-    defaultBorderMixin,
-    ResizablePanels,
-    Typography,
-    IconButton,
-    AddIcon,
-    Button
-} from "@rebasepro/ui";
+import { cls, defaultBorderMixin, ResizablePanels, Typography, IconButton, Button , iconSize } from "@rebasepro/ui";
+import { PlusIcon } from "lucide-react";
 ;
 import { CollectionsConfigController } from "../../types/config_controller";
 import { CollectionStudioView } from "./CollectionStudioView";
@@ -69,7 +63,7 @@ export function CollectionsStudioView({ configController }: CollectionsStudioVie
                                 onClick={() => navigate(urlController.buildAppUrlPath("schema/new"))}
                                 className={activeCollectionId === "new" ? "text-primary dark:text-primary-dark" : "text-text-secondary dark:text-text-secondary-dark"}
                             >
-                                <AddIcon size="small"/>
+                                <PlusIcon size={iconSize.smallest}/>
                             </IconButton>
                         </div>
 
@@ -95,7 +89,7 @@ export function CollectionsStudioView({ configController }: CollectionsStudioVie
                                                 : "hover:bg-surface-100 dark:hover:bg-surface-800 text-text-secondary dark:text-text-secondary-dark"
                                         )}
                                     >
-                                        <IconForView collectionOrView={collection} size={18} className={cls(
+                                        <IconForView collectionOrView={collection} size={"small"} className={cls(
                                             isSelected
                                                 ? "text-primary dark:text-primary-light"
                                                 : "text-text-secondary dark:text-text-secondary-dark"
@@ -126,7 +120,7 @@ export function CollectionsStudioView({ configController }: CollectionsStudioVie
                                 <Button
                                     onClick={() => navigate(urlController.buildAppUrlPath("schema/new"))}
                                 >
-                                    <AddIcon/>
+                                    <PlusIcon/>
                                     Add new collection
                                 </Button>
                             </div>

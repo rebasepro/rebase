@@ -1,3 +1,6 @@
+import { ArrowUpIcon, FilterIcon } from "lucide-react";
+import { iconSize } from "../../icons/Icon";
+
 import React, { RefObject, useCallback, useEffect, useState } from "react";
 import { deepEqual as equal } from "fast-equals";
 
@@ -7,8 +10,6 @@ import { Badge } from "../Badge";
 import { Button } from "../Button";
 import { IconButton } from "../IconButton";
 import { Popover } from "../Popover";
-import { ArrowUpwardIcon } from "../../icons/components/ArrowUpwardIcon";
-import { FilterListIcon } from "../../icons/components/FilterListIcon";
 import { defaultBorderMixin } from "../../styles";
 import { cls } from "../../util/cls";
 interface FilterFormProps<T> {
@@ -139,11 +140,11 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<any>>(
                                     }}
                                 >
                                     {!sort &&
-                                        <ArrowUpwardIcon/>}
+                                        <ArrowUpIcon/>}
                                     {sort === "asc" &&
-                                        <ArrowUpwardIcon/>}
+                                        <ArrowUpIcon/>}
                                     {sort === "desc" &&
-                                        <ArrowUpwardIcon className={"rotate-180"}/>}
+                                        <ArrowUpIcon className={"rotate-180"}/>}
                                 </IconButton>
                             </Badge>
                         }
@@ -163,7 +164,7 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<any>>(
                                         className={onHover || openFilter ? "bg-white dark:bg-surface-950" : undefined}
                                         size={"small"}
                                         onClick={handleSettingsClick}>
-                                        <FilterListIcon size={"small"}/>
+                                        <FilterIcon size={iconSize.small}/>
                                     </IconButton>}
                             >
                                 <FilterForm column={column}

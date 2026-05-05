@@ -5,7 +5,7 @@ const productsCollection: EntityCollection = {
     singularName: "Product",
     slug: "products",
     table: "products",
-    icon: "Inventory",
+    icon: "Package",
     group: "E-Commerce",
     history: true,
     openEntityMode: "split",
