@@ -123,7 +123,7 @@ export function useResolvedViews<USER extends User>(
                     slug: "roles",
                     name: "Roles",
                     group: NAVIGATION_ADMIN_GROUP_NAME,
-                    icon: "admin_panel_settings",
+                    icon: "Shield",
                     view: rolesViewElement
                 });
             }

@@ -118,13 +118,13 @@ isAdmin: false }
                                             {!role.isAdmin && deleteRole && (
                                                 <Tooltip asChild title={t("delete_this_role")}>
                                                     <IconButton
-                                                        size="smallest"
+                                                        size="small"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             setRoleToDelete(role);
                                                             setDeleteConfirmOpen(true);
                                                         }}>
-                                                        <Trash2Icon size={iconSize.smallest}/>
+                                                        <Trash2Icon size={iconSize.small}/>
                                                     </IconButton>
                                                 </Tooltip>
                                             )}

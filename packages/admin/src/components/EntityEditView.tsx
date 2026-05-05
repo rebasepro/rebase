@@ -502,7 +502,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
             {subcollectionContextTitle && (
                 <Typography
                     variant="label"
-                    className="truncate ml-2 text-surface-600 dark:text-surface-400"
+                    className="truncate min-w-0 shrink ml-2 text-surface-600 dark:text-surface-400"
                 >
                     {subcollectionContextTitle}
                 </Typography>
@@ -510,7 +510,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
 
             {pluginActionsTop}
 
-            {hasAdditionalViews && <div className={"flex-1 flex justify-end min-w-0"}>
+            {hasAdditionalViews && <div className={"flex-1 flex justify-end min-w-0 shrink-0"}>
                 <Tabs
                     className={"!w-fit max-w-full"}
                     value={selectedTab}

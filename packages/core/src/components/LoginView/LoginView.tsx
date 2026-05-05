@@ -450,7 +450,7 @@ function LoginForm({
     return (
         <form onSubmit={handleSubmit} className="flex flex-col w-full gap-1 mt-2">
             {!bootstrapMode && (
-                <div className="w-full mb-2">
+                <div className="w-full mb-2 -ml-2.5">
                     <IconButton onClick={onClose}>
                         <ArrowLeftIcon/>
                     </IconButton>
@@ -642,7 +642,7 @@ function ForgotPasswordForm({
     if (submitted) {
         return (
             <div className="flex flex-col w-full gap-4 mt-2">
-                <div className="w-full">
+                <div className="w-full -ml-2.5">
                     <IconButton onClick={onClose}>
                         <ArrowLeftIcon/>
                     </IconButton>
@@ -670,7 +670,7 @@ function ForgotPasswordForm({
 
     return (
         <form onSubmit={handleSubmit} className="flex flex-col w-full gap-1 mt-2">
-            <div className="w-full mb-2">
+            <div className="w-full mb-2 -ml-2.5">
                     <IconButton onClick={onClose}>
                         <ArrowLeftIcon/>
                 </IconButton>

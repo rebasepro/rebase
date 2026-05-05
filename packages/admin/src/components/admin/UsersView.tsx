@@ -366,26 +366,26 @@ roles: ["w-16", "w-16"] }
                                         {resetPassword && (
                                             <Tooltip asChild title={t("reset_password")}>
                                                 <IconButton
-                                                    size="smallest"
+                                                    size="small"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         setUserToReset(user);
                                                         setResetConfirmOpen(true);
                                                     }}>
-                                                    <KeyRoundIcon size={iconSize.smallest}/>
+                                                    <KeyRoundIcon size={iconSize.small}/>
                                                 </IconButton>
                                             </Tooltip>
                                         )}
                                         {deleteUser && (
                                             <Tooltip asChild title={t("delete_this_user")}>
                                                 <IconButton
-                                                    size="smallest"
+                                                    size="small"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         setUserToDelete(user);
                                                         setDeleteConfirmOpen(true);
                                                     }}>
-                                                    <Trash2Icon size={iconSize.smallest}/>
+                                                    <Trash2Icon size={iconSize.small}/>
                                                 </IconButton>
                                             </Tooltip>
                                         )}

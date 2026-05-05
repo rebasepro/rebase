@@ -46,23 +46,27 @@ export function ArrayOneOfPreview({
     return (
         <div className={"flex flex-col"}>
             {values &&
-                values.map((value: any, index: number) =>
-                    <React.Fragment
-                        key={"preview_array_" + value + "_" + index}>
-                        <div className={cls(defaultBorderMixin, "m-1 border-b last:border-b-0 py-2")}>
-                            <ErrorBoundary>
-                                {value && <PropertyPreview
-                                    propertyKey={propertyKey}
-                                    // @ts-ignore
-                                    value={value[valueField]}
-                                    // entity={entity}
-                                    // @ts-ignore
-                                    property={(property.resolvedProperties[index] ?? properties[value[typeField]]) as Property}
-                                    size={childSize}/>}
-                            </ErrorBoundary>
-                        </div>
-                    </React.Fragment>
-                )}
+                values.map((value: any, index: number) => {
+                    const resolvedProperty = property.resolvedProperties?.[index] ?? properties[value?.[typeField]];
+                    if (!value || !resolvedProperty) return null;
+                    return (
+                        <React.Fragment
+                            key={"preview_array_" + value + "_" + index}>
+                            <div className={cls(defaultBorderMixin, "m-1 border-b last:border-b-0 py-2")}>
+                                <ErrorBoundary>
+                                    <PropertyPreview
+                                        propertyKey={propertyKey}
+                                        // @ts-ignore
+                                        value={value[valueField]}
+                                        // entity={entity}
+                                        // @ts-ignore
+                                        property={resolvedProperty as Property}
+                                        size={childSize}/>
+                                </ErrorBoundary>
+                            </div>
+                        </React.Fragment>
+                    );
+                })}
         </div>
     );
 }

@@ -1,6 +1,6 @@
 import type { NavigationEntry } from "@rebasepro/types";
 import React from "react";
-import { cls, Typography } from "@rebasepro/ui";
+import { cls, iconSize, Typography } from "@rebasepro/ui";
 import { ChevronDownIcon } from "lucide-react";
 ;
 import { IconForView } from "@rebasepro/core";
@@ -75,12 +75,13 @@ export function DrawerNavigationGroup({
             {/* Group Header */}
             {!hideHeader && (
                 <div
-                    className={cls("pl-4 pr-2 py-1 flex flex-row items-center transition-colors",
+                    className={cls("pl-4 pr-2 py-0.5 flex flex-row items-center transition-colors",
                         drawerOpen ? "cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-700/50 rounded-t-lg bg-surface-50 dark:bg-surface-800/30" : "opacity-0 invisible pointer-events-none"
                     )}
                     onClick={drawerOpen ? onToggleCollapsed : undefined}
                 >
                     <ChevronDownIcon
+                        size={iconSize.small}
                         className={cls(
                             "text-surface-500 dark:text-surface-400 transition-transform duration-200 mr-1",
                             collapsed ? "-rotate-90" : "rotate-0"

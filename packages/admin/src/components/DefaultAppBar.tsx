@@ -199,13 +199,13 @@ export const DefaultAppBar = function DefaultAppBar({
                         aria-label="Toggle theme"
 >
                         {mode === "dark"
-                            ? <MoonIcon/>
-                            : <SunIcon/>}
+                            ? <MoonIcon size={iconSize.small}/>
+                            : <SunIcon size={iconSize.small}/>}
                     </IconButton>}>
                     <MenuItem onClick={() => setMode("dark")}><MoonIcon size={iconSize.smallest}/> {t("dark_mode")}</MenuItem>
                     <MenuItem onClick={() => setMode("light")}><SunIcon size={iconSize.smallest}/> {t("light_mode")} </MenuItem>
                     <MenuItem onClick={() => setMode("system")}> <SunMoonIcon
-                        size={"smallest"}/>{t("system_mode")}</MenuItem>
+                        size={iconSize.smallest}/>{t("system_mode")}</MenuItem>
                 </Menu>}
 
             <Menu trigger={<div aria-label="User menu" role="button">{avatarComponent}</div>}>
