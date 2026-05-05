@@ -4,7 +4,7 @@ import {
   interpolate,
   spring,
   useCurrentFrame,
-  useVideoConfig,
+  useVideoConfig
 } from "remotion";
 import { RebaseLogo } from "./RebaseLogo";
 
@@ -24,7 +24,8 @@ const FeatureBadge: React.FC<{
   const progress = spring({
     frame: frame - delay,
     fps,
-    config: { damping: 14, mass: 0.6 },
+    config: { damping: 14,
+mass: 0.6 }
   });
 
   const scale = interpolate(progress, [0, 1], [0.5, 1]);
@@ -50,10 +51,11 @@ const FeatureBadge: React.FC<{
         fontSize: 14,
         fontWeight: 500,
         color: "rgba(255,255,255,0.7)",
-        whiteSpace: "nowrap" as const,
+        whiteSpace: "nowrap" as const
       }}
     >
-      <span style={{ fontSize: 14, color: "#0070F4" }}>{icon}</span>
+      <span style={{ fontSize: 14,
+color: "#0070F4" }}>{icon}</span>
       {label}
     </div>
   );
@@ -69,7 +71,7 @@ const GridBackground: React.FC<{ opacity: number }> = ({ opacity }) => {
       dots.push({
         x: col * 40 + 20,
         y: row * 40 + 20,
-        delay: (row + col) * 0.03,
+        delay: (row + col) * 0.03
       });
     }
   }
@@ -81,14 +83,17 @@ const GridBackground: React.FC<{ opacity: number }> = ({ opacity }) => {
     <svg
       width="1440"
       height="810"
-      style={{ position: "absolute", top: 0, left: 0, opacity }}
+      style={{ position: "absolute",
+top: 0,
+left: 0,
+opacity }}
     >
       {dots.map((dot, i) => {
         const dotOpacity = interpolate(
           spring({
             frame: frame - dot.delay * fps,
             fps,
-            config: { damping: 100 },
+            config: { damping: 100 }
           }),
           [0, 1],
           [0, 0.15]
@@ -120,7 +125,8 @@ export const HeroIntro: React.FC = () => {
   const logoProgress = spring({
     frame,
     fps,
-    config: { damping: 14, mass: 0.8 },
+    config: { damping: 14,
+mass: 0.8 }
   });
   const logoScale = interpolate(logoProgress, [0, 1], [0.3, 1]);
   const logoOpacity = interpolate(logoProgress, [0, 1], [0, 1]);
@@ -130,7 +136,8 @@ export const HeroIntro: React.FC = () => {
   const headlineProgress = spring({
     frame: frame - 15,
     fps,
-    config: { damping: 16, mass: 0.7 },
+    config: { damping: 16,
+mass: 0.7 }
   });
   const headlineOpacity = interpolate(headlineProgress, [0, 1], [0, 1]);
   const headlineY = interpolate(headlineProgress, [0, 1], [40, 0]);
@@ -139,7 +146,8 @@ export const HeroIntro: React.FC = () => {
   const taglineProgress = spring({
     frame: frame - 28,
     fps,
-    config: { damping: 18, mass: 0.6 },
+    config: { damping: 18,
+mass: 0.6 }
   });
   const taglineOpacity = interpolate(taglineProgress, [0, 1], [0, 1]);
   const taglineY = interpolate(taglineProgress, [0, 1], [30, 0]);
@@ -148,7 +156,8 @@ export const HeroIntro: React.FC = () => {
   const cmdProgress = spring({
     frame: frame - 45,
     fps,
-    config: { damping: 18, mass: 0.6 },
+    config: { damping: 18,
+mass: 0.6 }
   });
   const cmdOpacity = interpolate(cmdProgress, [0, 1], [0, 1]);
   const cmdY = interpolate(cmdProgress, [0, 1], [20, 0]);
@@ -173,7 +182,8 @@ export const HeroIntro: React.FC = () => {
     frame,
     [durationInFrames - 15, durationInFrames],
     [1, 0],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+    { extrapolateLeft: "clamp",
+extrapolateRight: "clamp" }
   );
 
   return (
@@ -185,10 +195,10 @@ export const HeroIntro: React.FC = () => {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        opacity: fadeOut,
+        opacity: fadeOut
       }}
     >
-      <GridBackground opacity={0.6} />
+      <GridBackground opacity={0.6}/>
 
       {/* Radial glow behind logo */}
       <div
@@ -203,7 +213,7 @@ export const HeroIntro: React.FC = () => {
           top: "50%",
           left: "50%",
           transform: "translate(-50%, -60%)",
-          pointerEvents: "none",
+          pointerEvents: "none"
         }}
       />
 
@@ -212,10 +222,10 @@ export const HeroIntro: React.FC = () => {
         style={{
           transform: `scale(${logoScale}) rotate(${logoRotate}deg)`,
           opacity: logoOpacity,
-          marginBottom: 32,
+          marginBottom: 32
         }}
       >
-        <RebaseLogo size={100} />
+        <RebaseLogo size={100}/>
       </div>
 
       {/* Headline */}
@@ -229,18 +239,18 @@ export const HeroIntro: React.FC = () => {
           color: "#fff",
           opacity: headlineOpacity,
           transform: `translateY(${headlineY}px)`,
-          maxWidth: 900,
+          maxWidth: 900
         }}
       >
         Ship your back-office
-        <br />
+        <br/>
         in a{" "}
         <span
           style={{
             background:
               "linear-gradient(135deg, #0070F4 0%, #FF3773 50%, #FFA400 100%)",
             WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
+            WebkitTextFillColor: "transparent"
           }}
         >
           sprint
@@ -260,11 +270,12 @@ export const HeroIntro: React.FC = () => {
           lineHeight: 1.6,
           marginTop: 20,
           opacity: taglineOpacity,
-          transform: `translateY(${taglineY}px)`,
+          transform: `translateY(${taglineY}px)`
         }}
       >
         Admin panel, APIs, and typed SDK — generated from a{" "}
-        <span style={{ color: "#fff", fontWeight: 600 }}>
+        <span style={{ color: "#fff",
+fontWeight: 600 }}>
           single TypeScript schema
         </span>
         .
@@ -285,7 +296,7 @@ export const HeroIntro: React.FC = () => {
           border: "1px solid rgba(255,255,255,0.08)",
           fontFamily: "'JetBrains Mono', monospace",
           fontSize: 16,
-          color: "rgba(255,255,255,0.5)",
+          color: "rgba(255,255,255,0.5)"
         }}
       >
         <span style={{ color: "rgba(255,255,255,0.3)" }}>$</span>
@@ -296,13 +307,13 @@ export const HeroIntro: React.FC = () => {
             height: 20,
             background: "#0070F4",
             opacity: cursorVisible ? 1 : 0,
-            marginLeft: -4,
+            marginLeft: -4
           }}
         />
       </div>
 
       {/* Feature badges floating at the bottom */}
-      <FeatureBadge label="Admin Panel" icon="📊" delay={38} x={120} y={580} />
+      <FeatureBadge label="Admin Panel" icon="📊" delay={38} x={120} y={580}/>
       <FeatureBadge
         label="REST & GraphQL"
         icon="🔌"
@@ -310,8 +321,8 @@ export const HeroIntro: React.FC = () => {
         x={340}
         y={620}
       />
-      <FeatureBadge label="Typed SDK" icon="⌨️" delay={46} x={880} y={580} />
-      <FeatureBadge label="Real-time" icon="⚡" delay={50} x={1080} y={620} />
+      <FeatureBadge label="Typed SDK" icon="⌨️" delay={46} x={880} y={580}/>
+      <FeatureBadge label="Real-time" icon="⚡" delay={50} x={1080} y={620}/>
       <FeatureBadge
         label="Built-in Auth"
         icon="🔐"

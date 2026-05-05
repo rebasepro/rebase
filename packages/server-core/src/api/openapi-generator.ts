@@ -58,10 +58,14 @@ export function generateOpenApiSpec(
                 PaginationMeta: {
                     type: "object",
                     properties: {
-                        total: { type: "integer", description: "Total number of matching records" },
-                        limit: { type: "integer", description: "Page size used for this query" },
-                        offset: { type: "integer", description: "Number of records skipped" },
-                        hasMore: { type: "boolean", description: "Whether more records exist beyond this page" }
+                        total: { type: "integer",
+description: "Total number of matching records" },
+                        limit: { type: "integer",
+description: "Page size used for this query" },
+                        offset: { type: "integer",
+description: "Number of records skipped" },
+                        hasMore: { type: "boolean",
+description: "Whether more records exist beyond this page" }
                     }
                 }
             } as Record<string, unknown>,
@@ -123,9 +127,22 @@ export function generateOpenApiSpec(
                 summary: `List ${collection.name}`,
                 operationId: `list${schemaName}`,
                 parameters: [
-                    { name: "limit", in: "query", schema: { type: "integer", default: 20, maximum: 100 }, description: "Maximum number of records to return" },
-                    { name: "offset", in: "query", schema: { type: "integer", default: 0 }, description: "Number of records to skip" },
-                    { name: "page", in: "query", schema: { type: "integer", minimum: 1 }, description: "Page number (alternative to offset). Calculates offset as (page-1)*limit" },
+                    { name: "limit",
+in: "query",
+schema: { type: "integer",
+default: 20,
+maximum: 100 },
+description: "Maximum number of records to return" },
+                    { name: "offset",
+in: "query",
+schema: { type: "integer",
+default: 0 },
+description: "Number of records to skip" },
+                    { name: "page",
+in: "query",
+schema: { type: "integer",
+minimum: 1 },
+description: "Page number (alternative to offset). Calculates offset as (page-1)*limit" },
                     {
                         name: "orderBy",
                         in: "query",
@@ -216,7 +233,11 @@ export function generateOpenApiSpec(
                 summary: `Get ${collection.singularName || collection.name} by ID`,
                 operationId: `get${schemaName}ById`,
                 parameters: [
-                    { name: "id", in: "path", required: true, schema: { type: "string" }, description: "Entity ID" },
+                    { name: "id",
+in: "path",
+required: true,
+schema: { type: "string" },
+description: "Entity ID" },
                     {
                         name: "include",
                         in: "query",
@@ -234,7 +255,8 @@ export function generateOpenApiSpec(
                             }
                         }
                     },
-                    404: { description: "Entity not found", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
+                    404: { description: "Entity not found",
+content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
                     ...errorResponses(requireAuth)
                 }
             },
@@ -243,7 +265,11 @@ export function generateOpenApiSpec(
                 summary: `Update ${collection.singularName || collection.name}`,
                 operationId: `update${schemaName}`,
                 parameters: [
-                    { name: "id", in: "path", required: true, schema: { type: "string" }, description: "Entity ID" }
+                    { name: "id",
+in: "path",
+required: true,
+schema: { type: "string" },
+description: "Entity ID" }
                 ],
                 requestBody: {
                     required: true,
@@ -262,7 +288,8 @@ export function generateOpenApiSpec(
                             }
                         }
                     },
-                    404: { description: "Entity not found", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
+                    404: { description: "Entity not found",
+content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
                     ...errorResponses(requireAuth)
                 }
             },
@@ -271,11 +298,16 @@ export function generateOpenApiSpec(
                 summary: `Delete ${collection.singularName || collection.name}`,
                 operationId: `delete${schemaName}`,
                 parameters: [
-                    { name: "id", in: "path", required: true, schema: { type: "string" }, description: "Entity ID" }
+                    { name: "id",
+in: "path",
+required: true,
+schema: { type: "string" },
+description: "Entity ID" }
                 ],
                 responses: {
                     204: { description: "Deleted successfully" },
-                    404: { description: "Entity not found", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
+                    404: { description: "Entity not found",
+content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
                     ...errorResponses(requireAuth)
                 }
             }
@@ -306,11 +338,25 @@ export function generateOpenApiSpec(
                         summary: `List ${relationName} for a ${collection.singularName || collection.name}`,
                         operationId: `list${schemaName}${toPascalCase(relationName)}`,
                         parameters: [
-                            { name: "parentId", in: "path", required: true, schema: { type: "string" }, description: `${collection.singularName || collection.name} ID` },
-                            { name: "limit", in: "query", schema: { type: "integer", default: 20 } },
-                            { name: "offset", in: "query", schema: { type: "integer", default: 0 } },
-                            { name: "orderBy", in: "query", schema: { type: "string" } },
-                            { name: "searchString", in: "query", schema: { type: "string" } }
+                            { name: "parentId",
+in: "path",
+required: true,
+schema: { type: "string" },
+description: `${collection.singularName || collection.name} ID` },
+                            { name: "limit",
+in: "query",
+schema: { type: "integer",
+default: 20 } },
+                            { name: "offset",
+in: "query",
+schema: { type: "integer",
+default: 0 } },
+                            { name: "orderBy",
+in: "query",
+schema: { type: "string" } },
+                            { name: "searchString",
+in: "query",
+schema: { type: "string" } }
                         ],
                         responses: {
                             200: {
@@ -351,7 +397,8 @@ export function generateOpenApiSpec(
  */
 function buildCollectionSchema(collection: EntityCollection): Record<string, unknown> {
     const properties: Record<string, unknown> = {
-        id: { type: "string", description: "Unique identifier" }
+        id: { type: "string",
+description: "Unique identifier" }
     };
     const required: string[] = ["id"];
 
@@ -526,7 +573,8 @@ function convertPropertyToSchema(property: Property): Record<string, unknown> {
                     variants.push({
                         type: "object",
                         properties: {
-                            [typeField]: { type: "string", enum: [variantKey] },
+                            [typeField]: { type: "string",
+enum: [variantKey] },
                             [valueField]: convertPropertyToSchema(variantProp)
                         },
                         required: [typeField, valueField]

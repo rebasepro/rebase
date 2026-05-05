@@ -32,7 +32,7 @@ async function main() {
     const report = await runDoctor({
         collectionsPath: path.resolve(process.cwd(), collectionsPath),
         schemaPath: path.resolve(process.cwd(), schemaPath),
-        databaseUrl: databaseUrl ?? undefined,
+        databaseUrl: databaseUrl ?? undefined
     });
 
     // Exit with non-zero code if there are errors

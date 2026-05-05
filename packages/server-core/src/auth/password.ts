@@ -6,7 +6,9 @@ const scryptAsync = promisify(scrypt);
 // Scrypt parameters (recommended values for 2024+)
 const SALT_LENGTH = 32;
 const KEY_LENGTH = 64;
-const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1 };
+const SCRYPT_PARAMS = { N: 16384,
+r: 8,
+p: 1 };
 
 export interface PasswordValidationResult {
     valid: boolean;

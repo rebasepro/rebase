@@ -5,7 +5,7 @@ import { EmailService } from "./email";
 /**
  * Event type for authentication state changes
  */
-export type AuthChangeEvent = 'SIGNED_IN' | 'SIGNED_OUT' | 'TOKEN_REFRESHED' | 'USER_UPDATED';
+export type AuthChangeEvent = "SIGNED_IN" | "SIGNED_OUT" | "TOKEN_REFRESHED" | "USER_UPDATED";
 
 /**
  * Standard session interface representing an authenticated state
@@ -110,13 +110,13 @@ export interface AdminAPI {
 export interface RebaseClient<DB = unknown> {
     /** Unified Data access layer */
     data: RebaseData;
-    
+
     /** Unified Authentication layer */
     auth: AuthClient;
-    
+
     /** Unified Storage layer */
     storage?: StorageSource;
-    
+
     /**
      * Server-side email service.
      *
@@ -127,7 +127,7 @@ export interface RebaseClient<DB = unknown> {
      * > The client-side SDK does not include an email service.
      */
     email?: EmailService;
-    
+
     /** Admin API for user and role management */
     admin?: AdminAPI;
 }

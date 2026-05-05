@@ -4,7 +4,9 @@ import { users, refreshTokens, passwordResetTokens, User } from "../src/schema/a
 
 // Mock the drizzle-orm functions
 jest.mock("drizzle-orm", () => ({
-    eq: jest.fn((field, value) => ({ field, value, type: "eq" })),
+    eq: jest.fn((field, value) => ({ field,
+value,
+type: "eq" })),
     sql: jest.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
         strings,
         values,
@@ -28,7 +30,7 @@ describe("Auth Services", () => {
     beforeEach(() => {
         // Create chainable mocks
         mockInsertReturning = jest.fn().mockResolvedValue([]);
-        mockInsertValues = jest.fn().mockReturnValue({ 
+        mockInsertValues = jest.fn().mockReturnValue({
             returning: mockInsertReturning,
             onConflictDoUpdate: jest.fn().mockReturnValue({ returning: mockInsertReturning }),
             onConflictDoNothing: jest.fn().mockReturnValue({ returning: mockInsertReturning })
@@ -69,7 +71,10 @@ describe("Auth Services", () => {
                     email: "test@example.com",
                     displayName: "Test User"
                 };
-                const createdUser = { id: "user-123", ...newUser, createdAt: new Date(), updatedAt: new Date() };
+                const createdUser = { id: "user-123",
+...newUser,
+createdAt: new Date(),
+updatedAt: new Date() };
                 mockInsertReturning.mockResolvedValueOnce([createdUser]);
 
                 const result = await userService.createUser(newUser);
@@ -82,7 +87,8 @@ describe("Auth Services", () => {
 
         describe("getUserById", () => {
             it("should return user when found", async () => {
-                const mockUser = { id: "user-123", email: "test@example.com" };
+                const mockUser = { id: "user-123",
+email: "test@example.com" };
                 mockSelectWhere.mockResolvedValueOnce([mockUser]);
 
                 const result = await userService.getUserById("user-123");
@@ -102,7 +108,8 @@ describe("Auth Services", () => {
 
         describe("getUserByEmail", () => {
             it("should return user when found by email", async () => {
-                const mockUser = { id: "user-123", email: "test@example.com" };
+                const mockUser = { id: "user-123",
+email: "test@example.com" };
                 mockSelectWhere.mockResolvedValueOnce([mockUser]);
 
                 const result = await userService.getUserByEmail("test@example.com");
@@ -151,7 +158,9 @@ describe("Auth Services", () => {
 
         describe("updateUser", () => {
             it("should update user and return updated record", async () => {
-                const updatedUser = { id: "user-123", email: "test@example.com", displayName: "Updated Name" };
+                const updatedUser = { id: "user-123",
+email: "test@example.com",
+displayName: "Updated Name" };
                 mockUpdateReturning.mockResolvedValueOnce([updatedUser]);
 
                 const result = await userService.updateUser("user-123", { displayName: "Updated Name" });
@@ -185,8 +194,10 @@ describe("Auth Services", () => {
         describe("listUsers", () => {
             it("should return all users", async () => {
                 const mockUsers = [
-                    { id: "user-1", email: "user1@example.com" },
-                    { id: "user-2", email: "user2@example.com" }
+                    { id: "user-1",
+email: "user1@example.com" },
+                    { id: "user-2",
+email: "user2@example.com" }
                 ];
                 mockSelectFrom.mockReturnValueOnce(Promise.resolve(mockUsers));
 
@@ -253,7 +264,8 @@ describe("Auth Services", () => {
 
         describe("getUserByVerificationToken", () => {
             it("should find user by verification token", async () => {
-                const mockUser = { id: "user-123", email: "test@example.com" };
+                const mockUser = { id: "user-123",
+email: "test@example.com" };
                 mockSelectWhere.mockResolvedValueOnce([mockUser]);
 
                 const result = await userService.getUserByVerificationToken("token-abc");
@@ -266,8 +278,18 @@ describe("Auth Services", () => {
             it("should return roles for user", async () => {
                 mockExecute.mockResolvedValueOnce({
                     rows: [
-                        { id: "admin", name: "Admin", is_admin: true, default_permissions: null, collection_permissions: null, config: null },
-                        { id: "editor", name: "Editor", is_admin: false, default_permissions: { edit: true }, collection_permissions: null, config: null }
+                        { id: "admin",
+name: "Admin",
+is_admin: true,
+default_permissions: null,
+collection_permissions: null,
+config: null },
+                        { id: "editor",
+name: "Editor",
+is_admin: false,
+default_permissions: { edit: true },
+collection_permissions: null,
+config: null }
                     ]
                 });
 
@@ -289,7 +311,12 @@ describe("Auth Services", () => {
             it("should return role IDs for user", async () => {
                 mockExecute.mockResolvedValueOnce({
                     rows: [
-                        { id: "admin", name: "Admin", is_admin: true, default_permissions: null, collection_permissions: null, config: null }
+                        { id: "admin",
+name: "Admin",
+is_admin: true,
+default_permissions: null,
+collection_permissions: null,
+config: null }
                     ]
                 });
 
@@ -326,17 +353,28 @@ describe("Auth Services", () => {
 
         describe("getUserWithRoles", () => {
             it("should return user with roles", async () => {
-                const mockUser = { id: "user-123", email: "test@example.com" };
+                const mockUser = { id: "user-123",
+email: "test@example.com" };
                 mockSelectWhere.mockResolvedValueOnce([mockUser]);
                 mockExecute.mockResolvedValueOnce({
-                    rows: [{ id: "admin", name: "Admin", is_admin: true, default_permissions: null, collection_permissions: null, config: null }]
+                    rows: [{ id: "admin",
+name: "Admin",
+is_admin: true,
+default_permissions: null,
+collection_permissions: null,
+config: null }]
                 });
 
                 const result = await userService.getUserWithRoles("user-123");
 
                 expect(result).toEqual({
                     user: mockUser,
-                    roles: [{ id: "admin", name: "Admin", isAdmin: true, defaultPermissions: null, collectionPermissions: null, config: null }]
+                    roles: [{ id: "admin",
+name: "Admin",
+isAdmin: true,
+defaultPermissions: null,
+collectionPermissions: null,
+config: null }]
                 });
             });
 
@@ -360,7 +398,12 @@ describe("Auth Services", () => {
         describe("getRoleById", () => {
             it("should return role when found", async () => {
                 mockExecute.mockResolvedValueOnce({
-                    rows: [{ id: "admin", name: "Admin", is_admin: true, default_permissions: null, collection_permissions: null, config: null }]
+                    rows: [{ id: "admin",
+name: "Admin",
+is_admin: true,
+default_permissions: null,
+collection_permissions: null,
+config: null }]
                 });
 
                 const result = await roleService.getRoleById("admin");
@@ -388,8 +431,18 @@ describe("Auth Services", () => {
             it("should return all roles", async () => {
                 mockExecute.mockResolvedValueOnce({
                     rows: [
-                        { id: "admin", name: "Admin", is_admin: true, default_permissions: null, collection_permissions: null, config: null },
-                        { id: "editor", name: "Editor", is_admin: false, default_permissions: null, collection_permissions: null, config: null }
+                        { id: "admin",
+name: "Admin",
+is_admin: true,
+default_permissions: null,
+collection_permissions: null,
+config: null },
+                        { id: "editor",
+name: "Editor",
+is_admin: false,
+default_permissions: null,
+collection_permissions: null,
+config: null }
                     ]
                 });
 
@@ -402,7 +455,12 @@ describe("Auth Services", () => {
         describe("createRole", () => {
             it("should create a role", async () => {
                 mockExecute.mockResolvedValueOnce({
-                    rows: [{ id: "custom", name: "Custom Role", is_admin: false, default_permissions: null, collection_permissions: null, config: null }]
+                    rows: [{ id: "custom",
+name: "Custom Role",
+is_admin: false,
+default_permissions: null,
+collection_permissions: null,
+config: null }]
                 });
 
                 const role = await roleService.createRole({
@@ -420,9 +478,19 @@ describe("Auth Services", () => {
         describe("updateRole", () => {
             it("should update a role", async () => {
                 mockExecute
-                    .mockResolvedValueOnce({ rows: [{ id: "admin", name: "Admin", is_admin: true, default_permissions: null, collection_permissions: null, config: null }] })
+                    .mockResolvedValueOnce({ rows: [{ id: "admin",
+name: "Admin",
+is_admin: true,
+default_permissions: null,
+collection_permissions: null,
+config: null }] })
                     .mockResolvedValueOnce({ rows: [] })
-                    .mockResolvedValueOnce({ rows: [{ id: "admin", name: "Super Admin", is_admin: true, default_permissions: null, collection_permissions: null, config: null }] });
+                    .mockResolvedValueOnce({ rows: [{ id: "admin",
+name: "Super Admin",
+is_admin: true,
+default_permissions: null,
+collection_permissions: null,
+config: null }] });
 
                 const result = await roleService.updateRole("admin", { name: "Super Admin" });
 
@@ -474,11 +542,13 @@ describe("Auth Services", () => {
         describe("findByHash", () => {
             it("should find token by hash", async () => {
                 const expiresAt = new Date();
-                mockSelectWhere.mockResolvedValueOnce([{ userId: "user-123", expiresAt }]);
+                mockSelectWhere.mockResolvedValueOnce([{ userId: "user-123",
+expiresAt }]);
 
                 const result = await refreshTokenService.findByHash("token-hash");
 
-                expect(result).toEqual({ userId: "user-123", expiresAt });
+                expect(result).toEqual({ userId: "user-123",
+expiresAt });
             });
 
             it("should return null when token not found", async () => {
@@ -530,14 +600,17 @@ describe("Auth Services", () => {
         describe("findValidByHash", () => {
             it("should find valid token", async () => {
                 const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-                mockSelectWhere.mockResolvedValueOnce([{ userId: "user-123", expiresAt }]);
+                mockSelectWhere.mockResolvedValueOnce([{ userId: "user-123",
+expiresAt }]);
                 mockExecute.mockResolvedValueOnce({
-                    rows: [{ user_id: "user-123", expires_at: expiresAt }]
+                    rows: [{ user_id: "user-123",
+expires_at: expiresAt }]
                 });
 
                 const result = await passwordResetTokenService.findValidByHash("token-hash");
 
-                expect(result).toEqual({ userId: "user-123", expiresAt });
+                expect(result).toEqual({ userId: "user-123",
+expiresAt });
             });
 
             it("should return null when token not found", async () => {
@@ -550,7 +623,8 @@ describe("Auth Services", () => {
 
             it("should return null when token is expired or used", async () => {
                 const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-                mockSelectWhere.mockResolvedValueOnce([{ userId: "user-123", expiresAt }]);
+                mockSelectWhere.mockResolvedValueOnce([{ userId: "user-123",
+expiresAt }]);
                 mockExecute.mockResolvedValueOnce({ rows: [] }); // No valid token found
 
                 const result = await passwordResetTokenService.findValidByHash("token-hash");

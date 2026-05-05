@@ -1,8 +1,8 @@
-import { pgTable, integer, varchar } from 'drizzle-orm/pg-core';
-import { eq } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { Client } from 'pg';
-import { config } from 'dotenv';
+import { pgTable, integer, varchar } from "drizzle-orm/pg-core";
+import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Client } from "pg";
+import { config } from "dotenv";
 config({ path: "../../.env" });
 
 const authors = pgTable("authors", {
@@ -20,7 +20,7 @@ const profiles = pgTable("profiles", {
 
 async function main() {
     const client = new Client({
-        connectionString: process.env.DATABASE_URL || "postgres://postgres:postgres@localhost:5432/postgres",
+        connectionString: process.env.DATABASE_URL || "postgres://postgres:postgres@localhost:5432/postgres"
     });
     await client.connect();
     const db = drizzle(client);

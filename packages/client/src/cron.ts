@@ -47,7 +47,7 @@ export function createCron(transport: Transport, options?: CreateCronOptions) {
             cronPath + "/" + encodeURIComponent(jobId),
             {
                 method: "PUT",
-                body: JSON.stringify({ enabled }),
+                body: JSON.stringify({ enabled })
             }
         );
     }
@@ -57,6 +57,6 @@ export function createCron(transport: Transport, options?: CreateCronOptions) {
         getJob,
         triggerJob,
         getJobLogs,
-        toggleJob,
+        toggleJob
     };
 }

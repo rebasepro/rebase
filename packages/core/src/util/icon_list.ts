@@ -8,7 +8,7 @@ const map = iconKeys
         const iconSynonym = importName in iconSynonyms ? (iconSynonyms as Record<string, string>)[importName] : "";
         return {
             key: importName,
-            synonyms: iconSynonym,
+            synonyms: iconSynonym
         }
     });
 export const iconsSearch = new Fuse(map, {

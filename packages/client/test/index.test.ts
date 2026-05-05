@@ -1,14 +1,24 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from "@jest/globals";
-import { createRebaseClient, RebaseClient } from "../src/index";
+import { createRebaseClient as _createRebaseClient, RebaseClient, CreateRebaseClientOptions } from "../src/index";
 import { createMemoryStorage } from "../src/auth";
 import { CollectionClient } from "../src/collection";
 
 describe("createRebaseClient", () => {
+    let clients: RebaseClient<any>[] = [];
+
+    const createRebaseClient = <DB = Record<string, unknown>>(options: CreateRebaseClientOptions): RebaseClient<DB> => {
+        const client = _createRebaseClient<DB>(options);
+        clients.push(client);
+        return client;
+    };
+
     beforeEach(() => {
         jest.useFakeTimers();
     });
 
     afterEach(() => {
+        clients.forEach(c => c.ws?.disconnect());
+        clients = [];
         jest.clearAllTimers();
         jest.useRealTimers();
     });
@@ -18,7 +28,8 @@ describe("createRebaseClient", () => {
     // -----------------------------------------------------------------------
     describe("Initialization", () => {
         it("initializes with config properties", () => {
-            const client = createRebaseClient({ baseUrl: "https://api.example.com", token: "jwt-token" });
+            const client = createRebaseClient({ baseUrl: "https://api.example.com",
+token: "jwt-token" });
             expect(client).toBeDefined();
             expect(client.auth).toBeDefined();
             expect(client.admin).toBeDefined();
@@ -131,7 +142,7 @@ describe("createRebaseClient", () => {
         describe("camelCase to snake_case proxy mapping", () => {
             it("maps access paths correctly and returns same cached instance", () => {
                 const client = createRebaseClient({ baseUrl: "https://api.example.com" });
-                
+
                 // 1. Single word
                 const posts = client.data.posts;
                 const postsColl = client.data.collection("posts");
@@ -168,14 +179,15 @@ describe("createRebaseClient", () => {
                     return {
                         ok: true,
                         status: 200,
-                        json: async () => ({ data: [], meta: { total: 0 } }),
-                        headers: new Headers(),
+                        text: async () => JSON.stringify({ data: [],
+meta: { total: 0 } }),
+                        headers: new Headers()
                     } as unknown as Response;
                 }) as unknown as typeof globalThis.fetch;
 
                 const client = createRebaseClient({
                     baseUrl: "http://localhost",
-                    fetch: mockFetch,
+                    fetch: mockFetch
                 });
 
                 await (client.data as any).companyMembers.find();
@@ -208,7 +220,10 @@ describe("createRebaseClient", () => {
                 accessToken: "active-token",
                 refreshToken: "active-refresh",
                 expiresAt: Date.now() + 1000000,
-                user: { uid: "u", email: "u@m.com", displayName: "u", photoURL: null }
+                user: { uid: "u",
+email: "u@m.com",
+displayName: "u",
+photoURL: null }
             }));
 
             const client = createRebaseClient({
@@ -252,7 +267,7 @@ describe("createRebaseClient", () => {
     describe("onUnauthorized auto-setup", () => {
         it("auto-configures onUnauthorized to refresh auth session", () => {
             const client = createRebaseClient({
-                baseUrl: "https://api.example.com",
+                baseUrl: "https://api.example.com"
             });
             // The onUnauthorized should have been auto-set
             expect(client).toBeDefined();
@@ -262,7 +277,7 @@ describe("createRebaseClient", () => {
             const customHandler = jest.fn().mockResolvedValue(true);
             const client = createRebaseClient({
                 baseUrl: "https://api.example.com",
-                onUnauthorized: customHandler,
+                onUnauthorized: customHandler
             });
             expect(client).toBeDefined();
         });
@@ -282,8 +297,9 @@ describe("createRebaseClient", () => {
                         ok: false,
                         status: 401,
                         statusText: "Unauthorized",
+                        text: async () => JSON.stringify({ error: { message: "Token expired", code: "UNAUTHORIZED" } }),
                         json: async () => ({ error: { message: "Token expired", code: "UNAUTHORIZED" } }),
-                        headers: new Headers(),
+                        headers: new Headers()
                     } as unknown as Response;
                 }
                 if (callCount === 2) {
@@ -291,22 +307,30 @@ describe("createRebaseClient", () => {
                     return {
                         ok: true,
                         status: 200,
+                        text: async () => JSON.stringify({
+                            tokens: {
+                                accessToken: "new-jwt",
+                                refreshToken: "new-refresh",
+                                accessTokenExpiresAt: Date.now() + 3600000
+                            }
+                        }),
                         json: async () => ({
                             tokens: {
                                 accessToken: "new-jwt",
                                 refreshToken: "new-refresh",
-                                accessTokenExpiresAt: Date.now() + 3600000,
+                                accessTokenExpiresAt: Date.now() + 3600000
                             }
                         }),
-                        headers: new Headers(),
+                        headers: new Headers()
                     } as unknown as Response;
                 }
                 // Third call: retry of original request — must match collection.find() shape
                 return {
                     ok: true,
                     status: 200,
+                    text: async () => JSON.stringify({ data: [{ id: 1, title: "Post" }], meta: { total: 1 } }),
                     json: async () => ({ data: [{ id: 1, title: "Post" }], meta: { total: 1 } }),
-                    headers: new Headers(),
+                    headers: new Headers()
                 } as unknown as Response;
             }) as unknown as typeof globalThis.fetch;
 
@@ -316,13 +340,17 @@ describe("createRebaseClient", () => {
                 accessToken: "expired-jwt",
                 refreshToken: "valid-refresh",
                 expiresAt: Date.now() + 1000000,
-                user: { uid: "u", email: "u@m.com", displayName: "u", photoURL: null },
+                user: { uid: "u",
+email: "u@m.com",
+displayName: "u",
+photoURL: null }
             }));
 
             const client = createRebaseClient({
                 baseUrl: "http://localhost",
                 fetch: mockFetch,
-                auth: { storage, autoRefresh: false },
+                auth: { storage,
+autoRefresh: false }
             });
 
             // Make a request that will get 401 → auto-refresh → retry

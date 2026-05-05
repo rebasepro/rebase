@@ -9,7 +9,7 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 /** Create a minimal mock DrizzleClient with a configurable `execute` spy. */
 function createMockDb() {
     return {
-        execute: jest.fn().mockResolvedValue({ rows: [] }),
+        execute: jest.fn().mockResolvedValue({ rows: [] })
     } as unknown as jest.Mocked<NodePgDatabase>;
 }
 
@@ -21,7 +21,7 @@ function createMockPoolManager(defaultDbName = "my_app_db") {
         getDrizzle: jest.fn(),
         getPool: jest.fn(),
         hasPool: jest.fn(),
-        shutdown: jest.fn().mockResolvedValue(undefined),
+        shutdown: jest.fn().mockResolvedValue(undefined)
     } as unknown as jest.Mocked<DatabasePoolManager>;
 }
 
@@ -78,9 +78,9 @@ describe("BranchService", () => {
             // No existing branch
             db.execute
                 .mockResolvedValueOnce({ rows: [] } as never) // existence check
-                .mockResolvedValueOnce(undefined as never)    // disconnectDatabase (noop)
-                .mockResolvedValueOnce(undefined as never)    // CREATE DATABASE
-                .mockResolvedValueOnce(undefined as never);   // INSERT metadata
+                .mockResolvedValueOnce(undefined as never) // disconnectDatabase (noop)
+                .mockResolvedValueOnce(undefined as never) // CREATE DATABASE
+                .mockResolvedValueOnce(undefined as never); // INSERT metadata
 
             const result = await service.createBranch("staging");
 
@@ -121,7 +121,7 @@ describe("BranchService", () => {
 
         it("should throw when the branch already exists in metadata", async () => {
             db.execute.mockResolvedValueOnce({
-                rows: [{ name: "staging" }],
+                rows: [{ name: "staging" }]
             } as never);
 
             await expect(service.createBranch("staging")).rejects.toThrow(
@@ -242,9 +242,15 @@ describe("BranchService", () => {
             const now = new Date().toISOString();
             db.execute.mockResolvedValueOnce({
                 rows: [
-                    { name: "staging", parent_db: "my_app_db", created_at: now, size_bytes: 1048576 },
-                    { name: "preview", parent_db: "my_app_db", created_at: now, size_bytes: null },
-                ],
+                    { name: "staging",
+parent_db: "my_app_db",
+created_at: now,
+size_bytes: 1048576 },
+                    { name: "preview",
+parent_db: "my_app_db",
+created_at: now,
+size_bytes: null }
+                ]
             } as never);
 
             const result = await service.listBranches();
@@ -269,10 +275,12 @@ describe("BranchService", () => {
             const now = new Date().toISOString();
             db.execute
                 .mockResolvedValueOnce({
-                    rows: [{ name: "staging", parent_db: "my_app_db", created_at: now }],
+                    rows: [{ name: "staging",
+parent_db: "my_app_db",
+created_at: now }]
                 } as never)
                 .mockResolvedValueOnce({
-                    rows: [{ size_bytes: 2097152 }],
+                    rows: [{ size_bytes: 2097152 }]
                 } as never);
 
             const result = await service.getBranchInfo("staging");
@@ -296,7 +304,9 @@ describe("BranchService", () => {
             const now = new Date().toISOString();
             db.execute
                 .mockResolvedValueOnce({
-                    rows: [{ name: "staging", parent_db: "my_app_db", created_at: now }],
+                    rows: [{ name: "staging",
+parent_db: "my_app_db",
+created_at: now }]
                 } as never)
                 .mockRejectedValueOnce(new Error("database does not exist")); // size query fails
 

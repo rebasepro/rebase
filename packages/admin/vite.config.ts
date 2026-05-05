@@ -10,7 +10,7 @@ const ReactCompilerConfig = {
 
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;
-    
+
     return true;
 };
 
@@ -29,10 +29,11 @@ export default defineConfig(() => ({
         lib: {
             entry: {
                 index: path.resolve(__dirname, "src/index.ts"),
-                collection_editor_ui: path.resolve(__dirname, "src/collection_editor_ui.ts"),
+                editor: path.resolve(__dirname, "src/editor/index.ts"),
+                collection_editor_ui: path.resolve(__dirname, "src/collection_editor_ui.ts")
             },
             name: "Rebase CMS",
-            formats: ["es"],
+            formats: ["es"]
         },
         target: "ESNEXT",
         minify: false,
@@ -40,7 +41,7 @@ export default defineConfig(() => ({
         rollupOptions: {
             external: isExternal,
             output: {
-                preserveModules: false,
+                preserveModules: false
             }
         }
     },
@@ -52,23 +53,23 @@ export default defineConfig(() => ({
             "@rebasepro/formex": path.resolve(__dirname, "../formex/src"),
             "@rebasepro/schema-inference": path.resolve(__dirname, "../schema-inference/src"),
             "@rebasepro/types": path.resolve(__dirname, "../types/src"),
-            "@rebasepro/ui": path.resolve(__dirname, "../ui/src"),
+            "@rebasepro/ui": path.resolve(__dirname, "../ui/src")
         }
     },
     plugins: [
         react({
             babel: {
                 plugins: [
-                    ["babel-plugin-react-compiler", ReactCompilerConfig],
-                ],
+                    ["babel-plugin-react-compiler", ReactCompilerConfig]
+                ]
             }
         })
     ],
     css: {
         preprocessorOptions: {
             scss: {
-                api: 'modern-compiler',
-                silenceDeprecations: ['mixed-decls', 'color-functions', 'global-builtin', 'import', 'legacy-js-api', 'slash-div']
+                api: "modern-compiler",
+                silenceDeprecations: ["mixed-decls", "color-functions", "global-builtin", "import", "legacy-js-api", "slash-div"]
             }
         }
     }

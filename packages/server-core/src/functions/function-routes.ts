@@ -18,8 +18,8 @@ export function createFunctionRoutes(
         return c.json({
             functions: functions.map((fn) => ({
                 name: fn.name,
-                endpoint: `/functions/${fn.name}`,
-            })),
+                endpoint: `/functions/${fn.name}`
+            }))
         });
     });
 

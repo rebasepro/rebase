@@ -20,7 +20,7 @@ const testCollection = buildCollection({
                         type: "string",
                         enumValues: {
                             oneNum: "Saturation without range",
-                            fromTo: "Saturation available range",
+                            fromTo: "Saturation available range"
                         }
                     },
                     value: buildProperty(({
@@ -61,7 +61,7 @@ const testCollection = buildCollection({
                                             min: 0,
                                             max: 100
                                         }
-                                    },
+                                    }
                                 }
                             }
                             )
@@ -74,8 +74,8 @@ const testCollection = buildCollection({
                         }
                     })
                 }
-            },
-        },
+            }
+        }
     }
 });
 

@@ -193,7 +193,7 @@ export const PolicyEditor = ({
                     </div>
                 </div>
                 <IconButton size="small" onClick={() => setHelpOpen(true)}>
-                    <HelpOutlineIcon size="small" />
+                    <HelpOutlineIcon size="small"/>
                 </IconButton>
             </DialogTitle>
 
@@ -364,7 +364,7 @@ export const PolicyEditor = ({
                             {t("studio_policy_help_intro")}
                         </Typography>
                     </div>
-                    
+
                     <div className="flex flex-col gap-4">
                         <Paper className={cls("p-4 sm:p-5 flex flex-col gap-1", defaultBorderMixin)}>
                             <Typography variant="subtitle2" className="text-primary dark:text-primary-light font-medium">{t("studio_policy_help_step1_title")}</Typography>
@@ -372,7 +372,7 @@ export const PolicyEditor = ({
                                 {t("studio_policy_help_step1_desc")}
                             </Typography>
                         </Paper>
-                        
+
                         <Paper className={cls("p-4 sm:p-5 flex flex-col gap-1", defaultBorderMixin)}>
                             <Typography variant="subtitle2" className="text-primary dark:text-primary-light font-medium">{t("studio_policy_help_step2_title")}</Typography>
                             <Typography variant="body2" className="text-text-secondary dark:text-text-secondary-dark mb-1">
@@ -419,15 +419,15 @@ export const PolicyEditor = ({
                             <ul className="list-disc pl-5 space-y-2 text-sm text-text-secondary dark:text-text-secondary-dark font-normal">
                                 <li>
                                     <code className="bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">auth.uid()</code>
-                                    <span className="block mt-0.5">Returns the current user's ID as text. Example: <code className="bg-surface-100 dark:bg-surface-800 px-1 py-0.5 rounded text-[11px]">auth.uid() = user_id</code></span>
+                                    <span className="block mt-0.5">Returns the current user&apos;s ID as text. Example: <code className="bg-surface-100 dark:bg-surface-800 px-1 py-0.5 rounded text-[11px]">auth.uid() = user_id</code></span>
                                 </li>
                                 <li>
                                     <code className="bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">auth.jwt()</code>
-                                    <span className="block mt-0.5">Returns the full JWT payload as JSONB so you can check custom claims. Example: <code className="bg-surface-100 dark:bg-surface-800 px-1 py-0.5 rounded text-[11px]">auth.jwt() -&gt;&gt; 'email' = 'admin@example.com'</code></span>
+                                    <span className="block mt-0.5">Returns the full JWT payload as JSONB so you can check custom claims. Example: <code className="bg-surface-100 dark:bg-surface-800 px-1 py-0.5 rounded text-[11px]">auth.jwt() -&gt;&gt; &apos;email&apos; = &apos;admin@example.com&apos;</code></span>
                                 </li>
                                 <li>
                                     <code className="bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">auth.roles()</code>
-                                    <span className="block mt-0.5">Returns the user's role IDs as a comma-separated string. Best used with: <code className="bg-surface-100 dark:bg-surface-800 px-1 py-0.5 rounded text-[11px]">string_to_array(auth.roles(), ',') @&gt; ARRAY['admin']</code></span>
+                                    <span className="block mt-0.5">Returns the user&apos;s role IDs as a comma-separated string. Best used with: <code className="bg-surface-100 dark:bg-surface-800 px-1 py-0.5 rounded text-[11px]">string_to_array(auth.roles(), &apos;,&apos;) @&gt; ARRAY[&apos;admin&apos;]</code></span>
                                 </li>
                             </ul>
                         </Paper>
@@ -437,12 +437,12 @@ export const PolicyEditor = ({
                         <Typography variant="body2" className="text-primary dark:text-primary-light mb-4 sm:mb-0 max-w-md">
                             {t("studio_policy_help_docs_cta")}
                         </Typography>
-                        <Button 
-                            component="a" 
-                            href="https://www.postgresql.org/docs/current/sql-createpolicy.html" 
-                            target="_blank" 
-                            variant="outlined" 
-                            color="primary" 
+                        <Button
+                            component="a"
+                            href="https://www.postgresql.org/docs/current/sql-createpolicy.html"
+                            target="_blank"
+                            variant="outlined"
+                            color="primary"
                             size="small"
                             className="whitespace-nowrap flex-shrink-0"
                         >

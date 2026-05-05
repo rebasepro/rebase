@@ -24,7 +24,7 @@ describe("isDefaultFieldConfigId", () => {
         "key_value",
         "repeat",
         "custom_array",
-        "block",
+        "block"
     ];
 
     it.each(validIds)("returns true for known field config id: '%s'", (id) => {

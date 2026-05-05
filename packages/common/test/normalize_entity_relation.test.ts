@@ -1,7 +1,7 @@
 import {
     normalizeToEntityRelation,
     getRelationFrom,
-    traverseValueProperty,
+    traverseValueProperty
 } from "../src/util/entities";
 import { EntityRelation, Property } from "@rebasepro/types";
 
@@ -16,7 +16,9 @@ describe("normalizeToEntityRelation", () => {
     });
 
     it("coerces a plain object with __type === 'relation'", () => {
-        const obj = { __type: "relation", id: "abc", path: "posts" };
+        const obj = { __type: "relation",
+id: "abc",
+path: "posts" };
         const result = normalizeToEntityRelation(obj);
         expect(result).toBeInstanceOf(EntityRelation);
         expect(result!.id).toBe("abc");
@@ -27,7 +29,7 @@ describe("normalizeToEntityRelation", () => {
         const obj = {
             id: 42,
             path: "products",
-            isEntityRelation: () => true,
+            isEntityRelation: () => true
         };
         const result = normalizeToEntityRelation(obj);
         expect(result).toBeInstanceOf(EntityRelation);
@@ -36,7 +38,8 @@ describe("normalizeToEntityRelation", () => {
     });
 
     it("returns null for a plain object without relation markers", () => {
-        const obj = { id: "x", path: "users" };
+        const obj = { id: "x",
+path: "users" };
         expect(normalizeToEntityRelation(obj)).toBeNull();
     });
 
@@ -62,14 +65,19 @@ describe("normalizeToEntityRelation", () => {
         const obj = {
             id: "abc",
             path: "posts",
-            isEntityRelation: () => false,
+            isEntityRelation: () => false
         };
         expect(normalizeToEntityRelation(obj)).toBeNull();
     });
 
     it("includes data from the source object", () => {
-        const data = { id: "ent-1", path: "users", values: { name: "Alice" } };
-        const obj = { __type: "relation", id: "ent-1", path: "users", data };
+        const data = { id: "ent-1",
+path: "users",
+values: { name: "Alice" } };
+        const obj = { __type: "relation",
+id: "ent-1",
+path: "users",
+data };
         const result = normalizeToEntityRelation(obj);
         expect(result).toBeInstanceOf(EntityRelation);
         expect(result!.data).toBe(data);
@@ -81,7 +89,9 @@ describe("normalizeToEntityRelation", () => {
 // ─────────────────────────────────────────────────────────────
 describe("getRelationFrom", () => {
     it("creates an EntityRelation from an entity", () => {
-        const entity = { id: "r1", path: "posts", values: { title: "Test" } };
+        const entity = { id: "r1",
+path: "posts",
+values: { title: "Test" } };
         const rel = getRelationFrom(entity as any);
         expect(rel).toBeInstanceOf(EntityRelation);
         expect(rel.id).toBe("r1");
@@ -89,13 +99,17 @@ describe("getRelationFrom", () => {
     });
 
     it("includes the entity as data", () => {
-        const entity = { id: "r2", path: "users", values: { name: "Bob" } };
+        const entity = { id: "r2",
+path: "users",
+values: { name: "Bob" } };
         const rel = getRelationFrom(entity as any);
         expect(rel.data).toBe(entity);
     });
 
     it("handles numeric IDs", () => {
-        const entity = { id: 42, path: "products", values: {} };
+        const entity = { id: 42,
+path: "products",
+values: {} };
         const rel = getRelationFrom(entity as any);
         expect(rel.id).toBe(42);
     });
@@ -113,15 +127,19 @@ describe("traverseValueProperty — oneOf arrays", () => {
                 typeField: "type",
                 valueField: "value",
                 properties: {
-                    text: { type: "string", name: "Text" } as Property,
-                    number: { type: "number", name: "Number" } as Property,
-                },
-            },
+                    text: { type: "string",
+name: "Text" } as Property,
+                    number: { type: "number",
+name: "Number" } as Property
+                }
+            }
         } as Property;
 
         const input = [
-            { type: "text", value: "hello" },
-            { type: "number", value: 42 },
+            { type: "text",
+value: "hello" },
+            { type: "number",
+value: 42 }
         ];
 
         const operation = (value: unknown, prop: Property) => {
@@ -142,12 +160,14 @@ describe("traverseValueProperty — oneOf arrays", () => {
                 typeField: "type",
                 valueField: "value",
                 properties: {
-                    text: { type: "string", name: "Text" } as Property,
-                },
-            },
+                    text: { type: "string",
+name: "Text" } as Property
+                }
+            }
         } as Property;
 
-        const input = [null, { type: "text", value: "ok" }];
+        const input = [null, { type: "text",
+value: "ok" }];
         const result = traverseValueProperty(input, property, (v) => v) as any[];
         expect(result[0]).toBeNull();
     });
@@ -160,15 +180,18 @@ describe("traverseValueProperty — oneOf arrays", () => {
                 typeField: "type",
                 valueField: "value",
                 properties: {
-                    text: { type: "string", name: "Text" } as Property,
-                },
-            },
+                    text: { type: "string",
+name: "Text" } as Property
+                }
+            }
         } as Property;
 
-        const input = [{ type: "unknown_type", value: "data" }];
+        const input = [{ type: "unknown_type",
+value: "data" }];
         const result = traverseValueProperty(input, property, (v) => "CHANGED") as any[];
         // Unknown type => returned as-is
-        expect(result[0]).toEqual({ type: "unknown_type", value: "data" });
+        expect(result[0]).toEqual({ type: "unknown_type",
+value: "data" });
     });
 
     it("handles array-of-arrays (tuple-style) with of as array", () => {
@@ -176,9 +199,11 @@ describe("traverseValueProperty — oneOf arrays", () => {
             type: "array",
             name: "Pair",
             of: [
-                { type: "string", name: "Key" } as Property,
-                { type: "number", name: "Value" } as Property,
-            ],
+                { type: "string",
+name: "Key" } as Property,
+                { type: "number",
+name: "Value" } as Property
+            ]
         } as Property;
 
         const input = ["hello", 42];
@@ -193,7 +218,8 @@ describe("traverseValueProperty — oneOf arrays", () => {
     });
 
     it("returns the input unchanged for non-array, non-map types", () => {
-        const property: Property = { type: "string", name: "Name" } as Property;
+        const property: Property = { type: "string",
+name: "Name" } as Property;
         const operation = (value: unknown) => `modified_${value}`;
         const result = traverseValueProperty("original", property, operation);
         expect(result).toBe("modified_original");

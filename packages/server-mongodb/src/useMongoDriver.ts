@@ -26,7 +26,7 @@ const rebaseToMongoDB: Record<WhereFilterOp, string> = {
     "array-contains": "$eq",
     "array-contains-any": "in",
     "in": "$in",
-    "not-in": "$nin", // Please note the semantic difference
+    "not-in": "$nin" // Please note the semantic difference
     // "array-contains-any": ??? // There's no MongoDB equivalent
 };
 
@@ -38,7 +38,7 @@ const rebaseToMongoDB: Record<WhereFilterOp, string> = {
 export function useMongoDriver({
     app,
     cluster,
-    database,
+    database
 }: UseMongoDriverProps): DataDriver {
 
     const buildQuery = useCallback((
@@ -103,7 +103,7 @@ export function useMongoDriver({
                             "path": { "wildcard": "*" },
                             "fuzzy": {}
                         }
-                    },
+                    }
 
                 },
                 {
@@ -206,7 +206,7 @@ export function useMongoDriver({
             orderBy,
             order,
             onUpdate,
-            onError,
+            onError
         }: ListenCollectionProps<M>
     ): () => void => {
 
@@ -469,7 +469,8 @@ const convertFromMongoValues = (values: object): object => {
     return Object
         .entries(values)
         .map(([k, v]) => ({ [k]: convertFromMongoValue(v) }))
-        .reduce((a, b) => ({ ...a, ...b }), {});
+        .reduce((a, b) => ({ ...a,
+...b }), {});
 }
 
 function convertFromMongoValue(value: unknown): any {
@@ -482,7 +483,8 @@ function convertFromMongoValue(value: unknown): any {
             return value;
         }
         if ("path" in value && "id" in value && typeof value.path === "string") {
-            return new EntityReference({ id: String(value.id), path: value.path });
+            return new EntityReference({ id: String(value.id),
+path: value.path });
         }
         return convertFromMongoValues(value);
     }
@@ -492,7 +494,8 @@ function convertFromMongoValue(value: unknown): any {
 function valuesToMongoValues(values: EntityValues<any>) {
     return Object.entries(values)
         .map(([key, value]) => ({ [key]: valueToMongoValue(value) }))
-        .reduce((a, b) => ({ ...a, ...b }), {});
+        .reduce((a, b) => ({ ...a,
+...b }), {});
 }
 
 function valueToMongoValue(value: any): any {

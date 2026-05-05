@@ -43,7 +43,7 @@ export class RelationService {
         const relation = findRelation(resolvedRelations, relationKey);
 
         if (!relation) {
-            const available = Object.keys(resolvedRelations).join(', ') || '(none)';
+            const available = Object.keys(resolvedRelations).join(", ") || "(none)";
             throw new Error(`Relation '${relationKey}' not found in collection '${parentCollectionPath}'. Available relations: [${available}]`);
         }
 
@@ -220,7 +220,7 @@ export class RelationService {
         const resolvedRelations = resolveCollectionRelations(parentCollection);
         const relation = findRelation(resolvedRelations, relationKey);
         if (!relation) {
-            const available = Object.keys(resolvedRelations).join(', ') || '(none)';
+            const available = Object.keys(resolvedRelations).join(", ") || "(none)";
             throw new Error(`Relation '${relationKey}' not found in collection '${parentCollectionPath}'. Available relations: [${available}]`);
         }
 
@@ -943,7 +943,7 @@ export class RelationService {
                 if (newValue && Array.isArray(newValue) && newValue.length > 0) {
                     const targetPks = getPrimaryKeys(targetCollection, this.registry);
                     const targetIdInfo = targetPks[0];
-                    const targetEntityIds = (newValue as Array<{ id: string | number } | string | number>).map((rel) => typeof rel === 'object' && rel !== null ? rel.id : rel);
+                    const targetEntityIds = (newValue as Array<{ id: string | number } | string | number>).map((rel) => typeof rel === "object" && rel !== null ? rel.id : rel);
                     const parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
 
                     const newLinks = parsedTargetIds.map(targetId => ({
@@ -958,7 +958,7 @@ export class RelationService {
                     // Single value for one-to-one
                     const targetPks = getPrimaryKeys(targetCollection, this.registry);
                     const targetIdInfo = targetPks[0];
-                    const targetId = typeof newValue === 'object' && newValue !== null ? (newValue as Record<string, unknown>).id as string | number : newValue as string | number;
+                    const targetId = typeof newValue === "object" && newValue !== null ? (newValue as Record<string, unknown>).id as string | number : newValue as string | number;
                     const parsedTargetIdObj = parseIdValues(targetId, targetPks);
                     const parsedTargetId = parsedTargetIdObj[targetIdInfo.fieldName];
 
@@ -1146,7 +1146,8 @@ export class RelationService {
             currentFrom = prevStep.on.from;
         }
         const parentSourceColName = DrizzleConditionBuilder.getColumnNamesFromColumns(currentFrom)[0];
-        return { targetFKColName, parentSourceColName };
+        return { targetFKColName,
+parentSourceColName };
     }
 
     /**

@@ -74,7 +74,7 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
     useEffect(() => {
         try {
             localStorage.setItem("rebase_rls_editor_sidebar_size", sidebarSize.toString());
-        } catch (e) { }
+        } catch (e) { /* ignore */ }
     }, [sidebarSize]);
 
     const fetchRLSData = useCallback(async () => {
@@ -228,7 +228,8 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
 
         // Load live policies
         (activeTableData.policies || []).forEach(p => {
-            policiesMap[p.policyname] = { ...p, status: "live" };
+            policiesMap[p.policyname] = { ...p,
+status: "live" };
         });
 
         // Merge code-based policies
@@ -273,7 +274,10 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
         const enabled = tables.filter(t => t.rlsEnabled).length;
         const withPolicies = tables.filter(t => t.policies.length > 0).length;
         const totalPolicies = tables.reduce((sum, t) => sum + t.policies.length, 0);
-        return { total, enabled, withPolicies, totalPolicies };
+        return { total,
+enabled,
+withPolicies,
+totalPolicies };
     }, [tables]);
 
     const renderPolicyTag = (label: string, value: string) => {
@@ -311,12 +315,12 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
                                             {t("studio_schema_tables")}
                                         </Typography>
                                         <IconButton size="small" onClick={fetchRLSData} title="Refresh">
-                                            <RefreshIcon size="small" />
+                                            <RefreshIcon size="small"/>
                                         </IconButton>
                                     </div>
                                     <div className="flex-grow overflow-y-auto no-scrollbar p-1">
                                         {isLoading && tables.length === 0 ? (
-                                            <div className="flex justify-center p-4"><CircularProgress size="small" /></div>
+                                            <div className="flex justify-center p-4"><CircularProgress size="small"/></div>
                                         ) : Object.keys(groupedTables).length === 0 ? (
                                             <div className="p-4 text-center">
                                                 <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark italic">{t("studio_rls_no_tables")}</Typography>
@@ -326,9 +330,10 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
                                                 <div key={schemaName} className="mb-2">
                                                     <div
                                                         className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-800 rounded transition-colors"
-                                                        onClick={() => setExpandedSchemas(prev => ({ ...prev, [schemaName]: !prev[schemaName] }))}
+                                                        onClick={() => setExpandedSchemas(prev => ({ ...prev,
+[schemaName]: !prev[schemaName] }))}
                                                     >
-                                                        <svg className={cls("w-3 h-3 mr-1 transition-transform", expandedSchemas[schemaName] ? "rotate-90" : "")} fill="currentColor" viewBox="0 0 20 20"><path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" /></svg>
+                                                        <svg className={cls("w-3 h-3 mr-1 transition-transform", expandedSchemas[schemaName] ? "rotate-90" : "")} fill="currentColor" viewBox="0 0 20 20"><path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/></svg>
                                                         <Typography variant="body2" className="text-text-primary dark:text-text-primary-dark font-medium text-xs truncate flex-grow">{schemaName}</Typography>
                                                     </div>
 
@@ -348,16 +353,16 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
                                                                                 : "hover:bg-surface-100 dark:hover:bg-surface-800 text-text-secondary dark:text-text-secondary-dark"
                                                                         )}
                                                                     >
-                                                                        <svg className="w-3.5 h-3.5 mr-1 shrink-0 text-text-disabled dark:text-text-disabled-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                                                        <svg className="w-3.5 h-3.5 mr-1 shrink-0 text-text-disabled dark:text-text-disabled-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                                                                         <Typography variant="body2" className="text-xs truncate flex-1 min-w-0">{table.tableName}</Typography>
                                                                         <div className="flex items-center gap-1.5 shrink-0 ml-2">
                                                                             {table.rlsEnabled ? (
                                                                                 <Tooltip title={t("studio_rls_enabled")}>
-                                                                                    <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                                                                                    <div className="w-1.5 h-1.5 rounded-full bg-green-500"/>
                                                                                 </Tooltip>
                                                                             ) : (
                                                                                 <Tooltip title={t("studio_rls_disabled")}>
-                                                                                    <div className="w-1.5 h-1.5 rounded-full bg-orange-400 opacity-50" />
+                                                                                    <div className="w-1.5 h-1.5 rounded-full bg-orange-400 opacity-50"/>
                                                                                 </Tooltip>
                                                                             )}
                                                                             <span className="text-[10px] opacity-40 group-hover:opacity-100 min-w-[1.2rem] text-right font-medium">
@@ -386,7 +391,7 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
                                     <div className="flex-grow overflow-y-auto p-3 space-y-3 no-scrollbar">
                                         <div className={cls("p-3 rounded-lg border bg-white dark:bg-surface-900", defaultBorderMixin)}>
                                             <div className="flex items-center gap-2 mb-2">
-                                                <SecurityIcon size="small" className="text-primary" />
+                                                <SecurityIcon size="small" className="text-primary"/>
                                                 <Typography variant="body2" className="font-semibold text-[13px]">RLS Studio</Typography>
                                             </div>
                                             <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-[11px] leading-relaxed block">
@@ -402,7 +407,7 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
                                             <div className={cls("p-2.5 rounded border bg-white dark:bg-surface-900 flex items-center justify-between", defaultBorderMixin)}>
                                                 <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-[11px]">RLS enabled</Typography>
                                                 <div className="flex items-center gap-1.5">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-green-500"/>
                                                     <Typography variant="body2" className="font-mono text-[13px] font-medium">{rlsStats.enabled}</Typography>
                                                 </div>
                                             </div>
@@ -451,28 +456,30 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
                                                 if (!confirm(`Are you sure you want to ${action.toLowerCase()} Row Level Security on "${table}"?`)) return;
                                                 try {
                                                     await databaseAdmin!.executeSql!(`ALTER TABLE "${table}" ${action} ROW LEVEL SECURITY`);
-                                                    snackbarController.open({ type: "success", message: `RLS ${action.toLowerCase()}d on ${table}` });
+                                                    snackbarController.open({ type: "success",
+message: `RLS ${action.toLowerCase()}d on ${table}` });
                                                     fetchRLSData();
                                                 } catch (e: unknown) {
-                                                    snackbarController.open({ type: "error", message: e instanceof Error ? e.message : String(e) });
+                                                    snackbarController.open({ type: "error",
+message: e instanceof Error ? e.message : String(e) });
                                                 }
                                             }}
                                         >
                                             {activeTableData.rlsEnabled ? t("studio_rls_disable_rls") : t("studio_rls_enable_rls")}
                                         </Button>
 
-                                        <div className="h-4 w-px bg-surface-200 dark:bg-surface-800 mx-1" />
+                                        <div className="h-4 w-px bg-surface-200 dark:bg-surface-800 mx-1"/>
 
                                         <Button
                                             variant="text"
                                             size="small"
                                             onClick={fetchRLSData}
-                                            startIcon={<RefreshIcon size="smallest" />}
+                                            startIcon={<RefreshIcon size="smallest"/>}
                                         >
                                             Refresh
                                         </Button>
 
-                                        <div className="h-4 w-px bg-surface-200 dark:bg-surface-800 mx-1" />
+                                        <div className="h-4 w-px bg-surface-200 dark:bg-surface-800 mx-1"/>
 
                                         <Button
                                             size="small"
@@ -489,12 +496,12 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
 
                         {error ? (
                             <div className="p-6 h-full flex items-center justify-center">
-                                <ErrorView title={t("studio_rls_error")} error={error} onRetry={fetchRLSData} />
+                                <ErrorView title={t("studio_rls_error")} error={error} onRetry={fetchRLSData}/>
                             </div>
                         ) : !activeTableData ? (
                             <div className="flex-grow flex items-center justify-center text-text-disabled h-full">
                                 <div className="text-center">
-                                    <svg className="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                                    <svg className="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                                     <Typography variant="body2">{t("studio_rls_select_table")}</Typography>
                                 </div>
                             </div>
@@ -533,11 +540,13 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
                                         });
                                         if (!response.ok) throw new Error("Failed to save policy");
 
-                                        snackbarController.open({ type: "success", message: "Policy saved successfully" });
+                                        snackbarController.open({ type: "success",
+message: "Policy saved successfully" });
                                         setEditingPolicy(null);
                                         fetchRLSData();
                                     } catch (e: unknown) {
-                                        snackbarController.open({ type: "error", message: e instanceof Error ? e.message : String(e) });
+                                        snackbarController.open({ type: "error",
+message: e instanceof Error ? e.message : String(e) });
                                     }
                                 }}
                                 onCancel={() => setEditingPolicy(null)}
@@ -563,7 +572,7 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
                                         <div className={cls("p-4 sm:p-5 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900/50 rounded-lg flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between", defaultBorderMixin)}>
                                             <div className="flex gap-3 items-start">
                                                 <div className="mt-1 bg-yellow-100 dark:bg-yellow-900/50 p-1.5 rounded-md shrink-0 flex items-center justify-center">
-                                                    <WarningIcon size="small" />
+                                                    <WarningIcon size="small"/>
                                                 </div>
                                                 <div>
                                                     <Typography variant="subtitle2" className="text-yellow-800 dark:text-yellow-500">
@@ -594,7 +603,7 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
                                                 <Paper key={policy.policyname} className={cls("p-3 sm:px-4 sm:py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border rounded-lg", defaultBorderMixin)}>
                                                     <div className="flex flex-col gap-2 min-w-0">
                                                         <div className="flex items-center gap-2">
-                                                            <KeyIcon size="small" className="text-text-secondary dark:text-text-secondary-dark shrink-0" />
+                                                            <KeyIcon size="small" className="text-text-secondary dark:text-text-secondary-dark shrink-0"/>
                                                             <Typography variant="body2" className="truncate">{policy.policyname}</Typography>
                                                             {policy.status === "code_only" && (
                                                                 <Tooltip title="This policy is defined in your code but hasn't been applied to the database yet.">
@@ -646,10 +655,12 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
                                                                         });
                                                                         if (!response.ok) throw new Error("Failed to save policy");
 
-                                                                        snackbarController.open({ type: "success", message: "Policy imported successfully" });
+                                                                        snackbarController.open({ type: "success",
+message: "Policy imported successfully" });
                                                                         fetchRLSData();
                                                                     } catch (e: unknown) {
-                                                                        snackbarController.open({ type: "error", message: e instanceof Error ? e.message : String(e) });
+                                                                        snackbarController.open({ type: "error",
+message: e instanceof Error ? e.message : String(e) });
                                                                     }
                                                                 }}
                                                             >
@@ -668,14 +679,16 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
                                                                         if (!confirm(`Drop policy "${policy.policyname}" from table "${table}"?`)) return;
                                                                         try {
                                                                             await databaseAdmin!.executeSql!(`DROP POLICY "${policy.policyname}" ON "${table}"`);
-                                                                            snackbarController.open({ type: "success", message: `Policy "${policy.policyname}" dropped` });
+                                                                            snackbarController.open({ type: "success",
+message: `Policy "${policy.policyname}" dropped` });
                                                                             fetchRLSData();
                                                                         } catch (e: unknown) {
-                                                                            snackbarController.open({ type: "error", message: e instanceof Error ? e.message : String(e) });
+                                                                            snackbarController.open({ type: "error",
+message: e instanceof Error ? e.message : String(e) });
                                                                         }
                                                                     }}
                                                                 >
-                                                                    <DeleteIcon size="small" />
+                                                                    <DeleteIcon size="small"/>
                                                                 </IconButton>
                                                             </Tooltip>
                                                         )}

@@ -16,7 +16,7 @@ describe("setIn", () => {
         } = objectWithFalseValues;
 
         const target = {
-            name: "John Doe",
+            name: "John Doe"
         }
         const res = setIn(target, "user", rest);
         expect(res).toEqual({

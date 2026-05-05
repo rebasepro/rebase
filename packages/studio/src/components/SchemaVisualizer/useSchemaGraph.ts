@@ -74,7 +74,7 @@ const extractColumns = (collection: EntityCollection): ColumnInfo[] => {
             isForeignKey: false,
             isRequired: Boolean(prop.validation?.required),
             isEnum,
-            enumValues,
+            enumValues
         });
     }
 
@@ -96,7 +96,7 @@ const extractColumns = (collection: EntityCollection): ColumnInfo[] => {
                             isForeignKey: true,
                             isRequired: false,
                             isEnum: false,
-                            relationName: rel.relationName,
+                            relationName: rel.relationName
                         });
                     } else {
                         // Mark existing column as FK
@@ -163,14 +163,15 @@ const buildGraph = (
             isUnmanaged: false,
             rlsEnabled: Boolean(collection.securityRules && collection.securityRules.length > 0),
             historyEnabled: Boolean(collection.history),
-            icon: typeof collection.icon === "string" ? collection.icon : undefined,
+            icon: typeof collection.icon === "string" ? collection.icon : undefined
         };
 
         nodes.push({
             id: nodeId,
             type: "tableNode",
-            position: { x: 0, y: 0 },
-            data: nodeData,
+            position: { x: 0,
+y: 0 },
+            data: nodeData
         });
     }
 
@@ -216,7 +217,7 @@ const buildGraph = (
                 relationName: rel.relationName ?? relationKey,
                 hasJunction: Boolean(rel.through),
                 hasJoinPath: Boolean(rel.joinPath),
-                label: getCardinalityLabel(rel.cardinality, rel.direction ?? "owning"),
+                label: getCardinalityLabel(rel.cardinality, rel.direction ?? "owning")
             };
 
             if (rel.through && !processedJunctions.has(rel.through.table)) {
@@ -232,7 +233,7 @@ const buildGraph = (
                         isPrimaryKey: true,
                         isForeignKey: true,
                         isRequired: true,
-                        isEnum: false,
+                        isEnum: false
                     },
                     {
                         name: rel.through.targetColumn,
@@ -241,15 +242,16 @@ const buildGraph = (
                         isPrimaryKey: true,
                         isForeignKey: true,
                         isRequired: true,
-                        isEnum: false,
-                    },
+                        isEnum: false
+                    }
                 ];
                 nodeColumns.set(junctionNodeId, junctionColumns);
 
                 nodes.push({
                     id: junctionNodeId,
                     type: "tableNode",
-                    position: { x: 0, y: 0 },
+                    position: { x: 0,
+y: 0 },
                     data: {
                         tableName: rel.through.table,
                         collectionName: rel.through.table,
@@ -258,8 +260,8 @@ const buildGraph = (
                         isJunction: true,
                         isUnmanaged: false,
                         rlsEnabled: false,
-                        historyEnabled: false,
-                    } satisfies TableNodeData,
+                        historyEnabled: false
+                    } satisfies TableNodeData
                 });
 
                 // Source table → junction (junction references source PK)
@@ -271,8 +273,11 @@ const buildGraph = (
                     sourceHandle: sourcePk ? `source-${sourcePk.name}` : "source-default",
                     targetHandle: `target-${rel.through.sourceColumn}`,
                     type: "relationEdge",
-                    data: { ...edgeData, label: "1:N" } as Record<string, unknown>,
-                    markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
+                    data: { ...edgeData,
+label: "1:N" } as Record<string, unknown>,
+                    markerEnd: { type: MarkerType.ArrowClosed,
+width: 16,
+height: 16 }
                 });
 
                 // Junction → target table
@@ -283,8 +288,11 @@ const buildGraph = (
                     sourceHandle: `source-${rel.through.targetColumn}`,
                     targetHandle: getPkHandle(targetNodeId),
                     type: "relationEdge",
-                    data: { ...edgeData, label: "N:1" } as Record<string, unknown>,
-                    markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
+                    data: { ...edgeData,
+label: "N:1" } as Record<string, unknown>,
+                    markerEnd: { type: MarkerType.ArrowClosed,
+width: 16,
+height: 16 }
                 });
             } else if (!rel.through) {
                 // Direct relation (one-to-one or many-to-one)
@@ -296,7 +304,9 @@ const buildGraph = (
                     targetHandle: getPkHandle(targetNodeId),
                     type: "relationEdge",
                     data: { ...edgeData } as Record<string, unknown>,
-                    markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
+                    markerEnd: { type: MarkerType.ArrowClosed,
+width: 16,
+height: 16 }
                 });
             }
         }
@@ -364,13 +374,16 @@ export const useSchemaGraph = (
 
     const { nodes, edges, tableCount, relationCount } = useMemo(() => {
         if (!collections || collections.length === 0) {
-            return { nodes: [], edges: [], tableCount: 0, relationCount: 0 };
+            return { nodes: [],
+edges: [],
+tableCount: 0,
+relationCount: 0 };
         }
         const result = buildGraph(collections, direction);
         return {
             ...result,
             tableCount: result.nodes.length,
-            relationCount: result.edges.length,
+            relationCount: result.edges.length
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [collections, direction, version]);
@@ -383,6 +396,6 @@ export const useSchemaGraph = (
         relayout,
         isLoading: !collections,
         tableCount,
-        relationCount,
+        relationCount
     };
 };

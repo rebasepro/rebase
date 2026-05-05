@@ -69,10 +69,11 @@ export async function loadCronJobsFromDirectory(
                     description: def.description as string | undefined,
                     enabled: def.enabled !== false,
                     timeoutSeconds: (def.timeoutSeconds as number) || 300,
-                    handler: def.handler as CronJobDefinition["handler"],
+                    handler: def.handler as CronJobDefinition["handler"]
                 };
 
-                jobs.push({ id, definition });
+                jobs.push({ id,
+definition });
                 console.log(`⏰ Loaded cron job: ${id} (${definition.schedule})`);
             } catch (err: unknown) {
                 const message =

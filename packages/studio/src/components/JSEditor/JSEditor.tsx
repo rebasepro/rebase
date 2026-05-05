@@ -30,14 +30,15 @@ import {
     EditIcon,
     VirtualTable,
     VirtualTableColumn,
-    CellRendererParams,
+    CellRendererParams
 } from "@rebasepro/ui";
 import { useStudioUrlController, useStudioCollectionRegistry, useStudioSideEntityController } from "@rebasepro/core";
-import { useRebaseContext, useRebaseClient, useSnackbarController, useApiConfig, useTranslation, useModeController, ErrorView, UserSelectPopover, SelectableUser, IconForView } from "@rebasepro/core";
+import { useRebaseContext, useRebaseClient, useSnackbarController, useApiConfig, useTranslation, useModeController, ErrorView, SelectableUser, IconForView } from "@rebasepro/core";
 import { EntityCollection } from "@rebasepro/types";
 import { createRebaseClient } from "@rebasepro/client";
 import { JSMonacoEditor } from "./JSMonacoEditor";
 import { JSEditorSidebar, JSSnippet } from "./JSEditorSidebar";
+import { AuthSimulationSelector } from "../AuthSimulationSelector";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -114,7 +115,6 @@ interface MatchedJSCollection {
 }
 
 
-
 /**
  * Given the raw SDK result, try to detect which collections are present.
  * JS SDK results typically come back as `{ data: [{ id, values }] }` or plain arrays.
@@ -170,7 +170,7 @@ function detectCollectionsInResult(
             matched.push({
                 collectionSlug: col.slug,
                 collection: col,
-                pkColumn: "id",
+                pkColumn: "id"
             });
         }
     }
@@ -196,7 +196,9 @@ export function JSEditor() {
 
     // State
     const [tabs, setTabs] = useState<EditorTab[]>(() =>
-        loadFromStorage("tabs", [{ id: "1", name: "Script 1", code: DEFAULT_CODE }])
+        loadFromStorage("tabs", [{ id: "1",
+name: "Script 1",
+code: DEFAULT_CODE }])
     );
     const [activeTabId, setActiveTabId] = useState<string>(() =>
         loadFromStorage("activeTab", "1")
@@ -215,6 +217,7 @@ export function JSEditor() {
 
     // "Run as" user state — null means "self" (current admin)
     const [selectedUser, setSelectedUser] = useState<SelectableUser | null>(null);
+    const [authMode, setAuthMode] = useState<"jwt" | "none">("jwt");
 
     const [sidebarSize, setSidebarSize] = useState<number>(() => {
         try {
@@ -238,7 +241,7 @@ export function JSEditor() {
         return collections.map(col => ({
             slug: col.slug,
             name: col.name,
-            properties: Object.keys(col.properties ?? {}),
+            properties: Object.keys(col.properties ?? {})
         }));
     }, [collectionRegistry?.collections]);
 
@@ -251,7 +254,7 @@ export function JSEditor() {
             displayName: u.displayName,
             email: u.email,
             photoURL: u.photoURL,
-            roles: u.roles,
+            roles: u.roles
         }));
         // Ensure the current user is in the list
         if (currentUser && !managed.some(u => u.uid === currentUser.uid)) {
@@ -260,7 +263,7 @@ export function JSEditor() {
                 displayName: currentUser.displayName,
                 email: currentUser.email,
                 photoURL: currentUser.photoURL,
-                roles: currentUser.roles,
+                roles: currentUser.roles
             });
         }
         return managed;
@@ -274,7 +277,7 @@ export function JSEditor() {
             displayName: currentUser.displayName,
             email: currentUser.email,
             photoURL: currentUser.photoURL,
-            roles: currentUser.roles,
+            roles: currentUser.roles
         };
     }, [currentUser]);
 
@@ -286,22 +289,25 @@ export function JSEditor() {
     useEffect(() => { saveToStorage("history", history); }, [history]);
 
     useEffect(() => {
-        try { localStorage.setItem(STORAGE_PREFIX + "sidebar_size", sidebarSize.toString()); } catch { }
+        try { localStorage.setItem(STORAGE_PREFIX + "sidebar_size", sidebarSize.toString()); } catch { /* ignore */ }
     }, [sidebarSize]);
 
     useEffect(() => {
-        try { localStorage.setItem(STORAGE_PREFIX + "editor_height", editorHeight.toString()); } catch { }
+        try { localStorage.setItem(STORAGE_PREFIX + "editor_height", editorHeight.toString()); } catch { /* ignore */ }
     }, [editorHeight]);
 
     // ─── Tab management ──────────────────────────────────────────
 
     const updateActiveCode = useCallback((code: string | undefined) => {
-        setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, code: code ?? "" } : t));
+        setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t,
+code: code ?? "" } : t));
     }, [activeTabId]);
 
     const addTab = useCallback(() => {
         const id = String(Date.now());
-        const newTab: EditorTab = { id, name: `Script ${tabs.length + 1}`, code: DEFAULT_CODE };
+        const newTab: EditorTab = { id,
+name: `Script ${tabs.length + 1}`,
+code: DEFAULT_CODE };
         setTabs(prev => [...prev, newTab]);
         setActiveTabId(id);
     }, [tabs.length]);
@@ -310,7 +316,9 @@ export function JSEditor() {
         setTabs(prev => {
             const filtered = prev.filter(t => t.id !== tabId);
             if (filtered.length === 0) {
-                const fresh = { id: String(Date.now()), name: "Script 1", code: DEFAULT_CODE };
+                const fresh = { id: String(Date.now()),
+name: "Script 1",
+code: DEFAULT_CODE };
                 setActiveTabId(fresh.id);
                 return [fresh];
             }
@@ -324,19 +332,27 @@ export function JSEditor() {
     // ─── Create an authenticated client for execution ────────────
 
     const buildClient = useCallback(async () => {
+        const apiUrl = apiConfig?.apiUrl;
+        const getAuthToken = apiConfig?.getAuthToken;
+
+        if (!apiUrl) {
+            throw new Error("API URL not configured. Make sure apiUrl is set.");
+        }
+
+        if (authMode === "none") {
+            const client = createRebaseClient({
+                baseUrl: apiUrl,
+                token: undefined
+            });
+            return { client, isScoped: true };
+        }
+
         // If not running as another user safely reuse the application's global client.
         if (!selectedUser || (currentUser && selectedUser.uid === currentUser.uid)) {
             if (!rebaseClient) {
                 throw new Error("Application client is not initialized.");
             }
             return { client: rebaseClient, isScoped: false };
-        }
-
-        const apiUrl = apiConfig?.apiUrl;
-        const getAuthToken = apiConfig?.getAuthToken;
-
-        if (!apiUrl) {
-            throw new Error("API URL not configured. Make sure apiUrl is set.");
         }
 
         // Get the current auth token
@@ -353,11 +369,12 @@ export function JSEditor() {
         // without mutating the global client.
         const client = createRebaseClient({
             baseUrl: apiUrl,
-            token,
+            token
         });
 
-        return { client, isScoped: true };
-    }, [apiConfig, rebaseClient, selectedUser, currentUser]);
+        return { client,
+isScoped: true };
+    }, [apiConfig, rebaseClient, selectedUser, currentUser, authMode]);
 
     // ─── Execution engine ────────────────────────────────────────
 
@@ -383,11 +400,13 @@ export function JSEditor() {
             log: console.log,
             warn: console.warn,
             error: console.error,
-            info: console.info,
+            info: console.info
         };
 
         const captureConsole = (type: ConsoleEntry["type"]) => (...args: any[]) => {
-            consoleEntries.push({ type, args, timestamp: Date.now() });
+            consoleEntries.push({ type,
+args,
+timestamp: Date.now() });
             originalConsole[type](...args);
         };
 
@@ -409,13 +428,13 @@ export function JSEditor() {
                     uid: currentUser.uid,
                     displayName: currentUser.displayName,
                     email: currentUser.email,
-                    roles: currentUser.roles,
+                    roles: currentUser.roles
                 } : null),
-                collections: collectionInfos,
+                collections: collectionInfos
             };
 
             // Create async function with `client` and `context` injected
-            // eslint-disable-next-line no-new-func
+
             const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
             const fn = new AsyncFunction("client", "context", code);
 
@@ -426,7 +445,7 @@ export function JSEditor() {
                 value,
                 console: consoleEntries,
                 duration,
-                timestamp: Date.now(),
+                timestamp: Date.now()
             });
 
             // Auto-detect best view
@@ -444,7 +463,7 @@ export function JSEditor() {
                 console: consoleEntries,
                 duration,
                 error: err?.message || String(err),
-                timestamp: Date.now(),
+                timestamp: Date.now()
             });
             setResultView("json");
         } finally {
@@ -469,12 +488,13 @@ export function JSEditor() {
             id: String(Date.now()),
             name: snippetName.trim(),
             code: activeTab.code,
-            createdAt: Date.now(),
+            createdAt: Date.now()
         };
         setSnippets(prev => [snippet, ...prev]);
         setShowSaveDialog(false);
         setSnippetName("");
-        snackbar.open({ type: "success", message: "Snippet saved" });
+        snackbar.open({ type: "success",
+message: "Snippet saved" });
     }, [snippetName, activeTab?.code, snackbar]);
 
     const deleteSnippet = useCallback((id: string) => {
@@ -497,20 +517,22 @@ export function JSEditor() {
     // ─── Table columns for array data ────────────────────────────
 
     const tableData = useMemo(() => {
-        if (!result?.value) return { columns: [] as VirtualTableColumn[], data: [] as Record<string, unknown>[] };
+        if (!result?.value) return { columns: [] as VirtualTableColumn[],
+data: [] as Record<string, unknown>[] };
 
         let rows: any[] = [];
         if (result.value?.data && Array.isArray(result.value.data)) {
             rows = result.value.data.map((entity: any) => ({
                 id: entity.id,
                 ...entity.values,
-                ...(entity.values ? {} : entity),
+                ...(entity.values ? {} : entity)
             }));
         } else if (Array.isArray(result.value)) {
             rows = result.value;
         }
 
-        if (rows.length === 0) return { columns: [] as VirtualTableColumn[], data: [] as Record<string, unknown>[] };
+        if (rows.length === 0) return { columns: [] as VirtualTableColumn[],
+data: [] as Record<string, unknown>[] };
 
         const keys = new Set<string>();
         rows.slice(0, 20).forEach(row => {
@@ -522,10 +544,11 @@ export function JSEditor() {
         const columns: VirtualTableColumn[] = Array.from(keys).map(key => ({
             key,
             title: key,
-            width: key === "id" ? 100 : 200,
+            width: key === "id" ? 100 : 200
         }));
 
-        return { columns, data: rows };
+        return { columns,
+data: rows };
     }, [result]);
 
     // ─── Matched collections for entity actions ──────────────────
@@ -545,7 +568,7 @@ export function JSEditor() {
             .filter(mc => rowData[mc.pkColumn] != null)
             .map(mc => ({
                 collection: mc,
-                entityId: rowData[mc.pkColumn],
+                entityId: rowData[mc.pkColumn]
             }));
     }, [matchedCollections]);
 
@@ -585,9 +608,11 @@ export function JSEditor() {
         );
         const markdown = [headerRow, dividerRow, ...dataRows].join("\n");
         navigator.clipboard.writeText(markdown).then(() => {
-            snackbar.open({ type: "success", message: t("studio_sql_markdown_copied") });
+            snackbar.open({ type: "success",
+message: t("studio_sql_markdown_copied") });
         }).catch(() => {
-            snackbar.open({ type: "error", message: t("studio_sql_markdown_copy_failed") });
+            snackbar.open({ type: "error",
+message: t("studio_sql_markdown_copy_failed") });
         });
     }, [tableData, snackbar, t]);
 
@@ -621,7 +646,7 @@ export function JSEditor() {
                                         <Tabs value={activeTabId} onValueChange={setActiveTabId} variant="boxy" className="w-[unset] flex-shrink-0" innerClassName="bg-white dark:bg-surface-950">
                                             {tabs.map(tab => (
                                                 <Tab key={tab.id} value={tab.id} className="flex items-center justify-between group max-w-[200px]">
-                                                    <TerminalIcon size="smallest" className="text-amber-500 mr-1.5 flex-shrink-0" />
+                                                    <TerminalIcon size="smallest" className="text-amber-500 mr-1.5 flex-shrink-0"/>
                                                     <span className="truncate">{tab.name}</span>
                                                     {tabs.length > 1 && (
                                                         <IconButton
@@ -629,7 +654,7 @@ export function JSEditor() {
                                                             onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
                                                             className="ml-1 !p-0.5 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity"
                                                         >
-                                                            <CloseIcon size="smallest" />
+                                                            <CloseIcon size="smallest"/>
                                                         </IconButton>
                                                     )}
                                                 </Tab>
@@ -640,23 +665,11 @@ export function JSEditor() {
                                             onClick={addTab}
                                             className="ml-2 flex-shrink-0"
                                         >
-                                            <AddIcon size="small" />
+                                            <AddIcon size="small"/>
                                         </IconButton>
                                     </div>
                                 </div>
                                 <div className="flex shrink-0 items-center justify-end gap-1.5">
-                                    {/* "Run as" user picker */}
-                                    <UserSelectPopover
-                                        selectedUser={selectedUser}
-                                        onUserSelected={setSelectedUser}
-                                        users={users}
-                                        loading={userManagement?.loading}
-                                        currentUser={currentSelectableUser}
-                                        className="mr-2"
-                                    />
-
-                                    <div className="h-4 w-px bg-surface-200 dark:bg-surface-800 mx-1" />
-
                                     <Tooltip title="Save as snippet">
                                         <IconButton
                                             size="small"
@@ -666,14 +679,14 @@ export function JSEditor() {
                                             }}
                                             disabled={!activeTab?.code.trim()}
                                         >
-                                            <SaveIcon size="small" />
+                                            <SaveIcon size="small"/>
                                         </IconButton>
                                     </Tooltip>
 
                                     {result?.value && (
                                         <Tooltip title="Export result as JSON">
                                             <IconButton size="small" onClick={exportResult}>
-                                                <DownloadIcon size="small" />
+                                                <DownloadIcon size="small"/>
                                             </IconButton>
                                         </Tooltip>
                                     )}
@@ -684,7 +697,7 @@ export function JSEditor() {
                                         disabled={isRunning || !activeTab?.code.trim()}
                                         onClick={() => executeCode()}
                                     >
-                                        {isRunning ? <CircularProgress size="smallest" className="mr-2" /> : <PlayArrowIcon size="small" className="mr-2" />}
+                                        {isRunning ? <CircularProgress size="smallest" className="mr-2"/> : <PlayArrowIcon size="small" className="mr-2"/>}
                                         Run
                                     </Button>
                                 </div>
@@ -698,15 +711,29 @@ export function JSEditor() {
                                     onPanelSizeChange={setEditorHeight}
                                     minPanelSizePx={100}
                                     firstPanel={
-                                        <div className="h-full w-full overflow-hidden">
-                                            <JSMonacoEditor
-                                                value={activeTab?.code ?? ""}
-                                                onChange={updateActiveCode}
-                                                onRun={(selectedText) => executeCode(selectedText)}
-                                                collectionSlugs={collectionSlugs}
-                                                collections={collectionInfos}
-                                                autoFocus
-                                            />
+                                        <div className="h-full w-full overflow-hidden flex flex-col">
+                                            {/* Auth Simulation UI */}
+                                            <div className="p-2 px-3 border-b border-surface-200 dark:border-surface-800 bg-surface-50 dark:bg-surface-900 flex items-center shrink-0">
+                                                <AuthSimulationSelector
+                                                    authMode={authMode}
+                                                    setAuthMode={setAuthMode}
+                                                    selectedUser={selectedUser}
+                                                    setSelectedUser={setSelectedUser}
+                                                    users={users}
+                                                    loading={userManagement?.loading}
+                                                    currentUser={currentSelectableUser}
+                                                />
+                                            </div>
+                                            <div className="flex-1 min-h-0">
+                                                <JSMonacoEditor
+                                                    value={activeTab?.code ?? ""}
+                                                    onChange={updateActiveCode}
+                                                    onRun={(selectedText) => executeCode(selectedText)}
+                                                    collectionSlugs={collectionSlugs}
+                                                    collections={collectionInfos}
+                                                    autoFocus
+                                                />
+                                            </div>
                                         </div>
                                     }
                                     secondPanel={
@@ -719,7 +746,7 @@ export function JSEditor() {
 
                                                 {result && (
                                                     <>
-                                                        <div className="flex-grow" />
+                                                        <div className="flex-grow"/>
 
                                                         <Tabs value={resultView} onValueChange={(val) => setResultView(val as "json" | "table" | "console")} variant="pill" className="w-[unset] mr-2">
                                                             <Tab value="json">JSON</Tab>
@@ -739,7 +766,7 @@ export function JSEditor() {
                                                 {isRunning && (
                                                     <div className="flex-grow flex items-center justify-center">
                                                         <div className="text-center">
-                                                            <CircularProgress size="medium" />
+                                                            <CircularProgress size="medium"/>
                                                             <Typography variant="body2" className="mt-4 text-text-secondary dark:text-text-secondary-dark font-mono tracking-tight animate-pulse">
                                                                 EXECUTING SCRIPT...
                                                             </Typography>
@@ -750,7 +777,7 @@ export function JSEditor() {
                                                 {!isRunning && !result && (
                                                     <div className="flex-grow flex items-center justify-center text-text-disabled dark:text-text-disabled-dark">
                                                         <div className="text-center">
-                                                            <svg className="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                            <svg className="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                                             <Typography variant="body2">Write JavaScript and press <kbd className="px-1.5 py-0.5 rounded bg-surface-200 dark:bg-surface-700 text-[11px] font-mono">⌘ Enter</kbd> to run</Typography>
                                                         </div>
                                                     </div>
@@ -770,7 +797,7 @@ export function JSEditor() {
                                                         {result.value === undefined ? (
                                                             <span className="text-text-disabled italic">undefined (no return value)</span>
                                                         ) : (
-                                                            <JSONHighlight value={result.value} />
+                                                            <JSONHighlight value={result.value}/>
                                                         )}
                                                     </pre>
                                                 )}
@@ -788,7 +815,7 @@ export function JSEditor() {
                                                                         <Tooltip key={mc.collectionSlug} title={`${mc.collection.name} (${mc.collectionSlug})`}>
                                                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-primary/10 dark:bg-primary-dark/15 text-primary dark:text-primary-dark whitespace-nowrap border border-primary/20 dark:border-primary-dark/20">
                                                                                 {typeof mc.collection.icon === "string" && (
-                                                                                    <IconForView collectionOrView={{ icon: mc.collection.icon } as never} className="text-[12px]" />
+                                                                                    <IconForView collectionOrView={{ icon: mc.collection.icon } as never} className="text-[12px]"/>
                                                                                 )}
                                                                                 {mc.collection.name}
                                                                             </span>
@@ -802,7 +829,11 @@ export function JSEditor() {
                                                                 data={tableData.data}
                                                                 columns={
                                                                     matchedCollections.length > 0
-                                                                        ? [{ key: "__entity_action__", title: "", width: 36, sortable: false, resizable: false }, ...tableData.columns]
+                                                                        ? [{ key: "__entity_action__",
+title: "",
+width: 36,
+sortable: false,
+resizable: false }, ...tableData.columns]
                                                                         : tableData.columns
                                                                 }
                                                                 rowHeight={32}
@@ -811,12 +842,13 @@ export function JSEditor() {
                                                                     // Entity action column
                                                                     if (column.key === "__entity_action__") {
                                                                         const rowActions = getRowEntityActions(rowData);
-                                                                        if (rowActions.length === 0) return <div className="h-full w-full" />;
+                                                                        if (rowActions.length === 0) return <div className="h-full w-full"/>;
                                                                         if (rowActions.length === 1) {
                                                                             const ra = rowActions[0];
                                                                             return (
                                                                                 <div className="h-full flex items-center justify-center">
-                                                                                    <Tooltip title={t("studio_sql_edit_entity", { name: ra.collection.collection.name, id: String(ra.entityId) })}>
+                                                                                    <Tooltip title={t("studio_sql_edit_entity", { name: ra.collection.collection.name,
+id: String(ra.entityId) })}>
                                                                                         <IconButton
                                                                                             size="small"
                                                                                             className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300"
@@ -830,7 +862,7 @@ export function JSEditor() {
                                                                                                 });
                                                                                             }}
                                                                                         >
-                                                                                            <EditIcon size="small" />
+                                                                                            <EditIcon size="small"/>
                                                                                         </IconButton>
                                                                                     </Tooltip>
                                                                                 </div>
@@ -846,7 +878,7 @@ export function JSEditor() {
                                                                                             className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300"
                                                                                             onClick={(e) => e.stopPropagation()}
                                                                                         >
-                                                                                            <MoreVertIcon size="small" />
+                                                                                            <MoreVertIcon size="small"/>
                                                                                         </IconButton>
                                                                                     }
                                                                                 >
@@ -863,7 +895,8 @@ export function JSEditor() {
                                                                                                 });
                                                                                             }}
                                                                                         >
-                                                                                            {t("studio_sql_edit_entity", { name: ra.collection.collection.name, id: String(ra.entityId) })}
+                                                                                            {t("studio_sql_edit_entity", { name: ra.collection.collection.name,
+id: String(ra.entityId) })}
                                                                                         </MenuItem>
                                                                                     ))}
                                                                                 </Menu>
@@ -901,7 +934,7 @@ export function JSEditor() {
                                                                         entry.type === "error" && "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400",
                                                                         entry.type === "warn" && "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400",
                                                                         entry.type === "log" && "text-text-primary dark:text-text-primary-dark",
-                                                                        entry.type === "info" && "text-blue-700 dark:text-blue-400",
+                                                                        entry.type === "info" && "text-blue-700 dark:text-blue-400"
                                                                     )}
                                                                 >
                                                                     <span className="text-[10px] opacity-50 flex-shrink-0 mt-0.5">
@@ -1013,11 +1046,12 @@ function JSONHighlight({ value }: { value: any }) {
             language="json"
         >
             {({ style, tokens, getLineProps, getTokenProps }) => (
-                <span style={{ ...style, backgroundColor: "transparent" }}>
+                <span style={{ ...style,
+backgroundColor: "transparent" }}>
                     {tokens.map((line, i) => (
                         <div key={i} {...getLineProps({ line })}>
                             {line.map((token, key) => (
-                                <span key={key} {...getTokenProps({ token })} />
+                                <span key={key} {...getTokenProps({ token })}/>
                             ))}
                         </div>
                     ))}

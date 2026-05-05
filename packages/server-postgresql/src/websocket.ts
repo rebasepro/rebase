@@ -81,7 +81,10 @@ export function createPostgresWebSocket(
         wsDebug(`WebSocket client connected: ${clientId}`);
 
         // Initialize client session
-        clientSessions.set(clientId, { ws, authenticated: !requireAuth, messageCount: 0, messageWindowStart: Date.now() });
+        clientSessions.set(clientId, { ws,
+authenticated: !requireAuth,
+messageCount: 0,
+messageWindowStart: Date.now() });
         realtimeService.addClient(clientId, ws);
 
         ws.on("close", () => {
@@ -108,7 +111,8 @@ export function createPostgresWebSocket(
                     ws.send(JSON.stringify({
                         type: errType,
                         requestId,
-                        payload: { error: { message: msg, code } }
+                        payload: { error: { message: msg,
+code } }
                     }));
                 };
 
@@ -130,7 +134,8 @@ export function createPostgresWebSocket(
                         ws.send(JSON.stringify({
                             type: "AUTH_SUCCESS",
                             requestId,
-                            payload: { userId: user.userId, roles: user.roles }
+                            payload: { userId: user.userId,
+roles: user.roles }
                         }));
                         wsDebug(`🔐 [WebSocket Server] Client ${clientId} authenticated as ${user.userId}`);
                     } else {
@@ -230,10 +235,12 @@ export function createPostgresWebSocket(
                     case "SAVE_ENTITY": {
                         wsDebug("💾 [WebSocket Server] Processing SAVE_ENTITY request");
                         const request: SaveEntityProps = payload;
-                        wsDebug("💾 [WebSocket Server] Saving entity with request:", inspect(request, { depth: null, colors: true }));
+                        wsDebug("💾 [WebSocket Server] Saving entity with request:", inspect(request, { depth: null,
+colors: true }));
                         const delegate = await getScopedDelegate();
                         const entity = await delegate.saveEntity(request);
-                        wsDebug("💾 [WebSocket Server] SAVE_ENTITY result:", inspect(entity, { depth: null, colors: true }));
+                        wsDebug("💾 [WebSocket Server] SAVE_ENTITY result:", inspect(entity, { depth: null,
+colors: true }));
                         const response = {
                             type: "SAVE_ENTITY_SUCCESS",
                             payload: { entity },
@@ -302,7 +309,7 @@ export function createPostgresWebSocket(
                         const delegate = await getScopedDelegate();
                         const result = await (delegate as unknown as { executeSql: (sql: string, options?: { database?: string, role?: string }) => Promise<Record<string, unknown>[]> }).executeSql(sql, options);
                         if (process.env.NODE_ENV !== "production") {
-                            wsDebug(`⚡ [WebSocket Server] SQL executed. Returned ${Array.isArray(result) ? result.length : 'non-array'} rows.`);
+                            wsDebug(`⚡ [WebSocket Server] SQL executed. Returned ${Array.isArray(result) ? result.length : "non-array"} rows.`);
                         }
                         const response = {
                             type: "EXECUTE_SQL_SUCCESS",
@@ -461,7 +468,8 @@ export function createPostgresWebSocket(
                         // Attach auth context from the WS session so RLS-aware refetches work
                         const session = clientSessions.get(clientId);
                         const authContext = session?.user
-                            ? { userId: session.user.userId, roles: session.user.roles ?? [] }
+                            ? { userId: session.user.userId,
+roles: session.user.roles ?? [] }
                             : undefined;
                         // Let RealtimeService handle these messages
                         await realtimeService.handleClientMessage(clientId, {

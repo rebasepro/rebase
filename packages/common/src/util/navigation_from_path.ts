@@ -42,7 +42,7 @@ export function getNavigationEntriesFromPath(props: {
     const {
         path,
         collections = [],
-        currentFullPath,
+        currentFullPath
     } = props;
 
     const subpaths = removeInitialAndTrailingSlashes(path).split("/");

@@ -140,9 +140,9 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
      */
     const apiRequest = useCallback(async (
         endpoint: string,
-        method: string = "GET",
+        method = "GET",
         body?: Record<string, unknown>,
-        retryCount: number = 6,
+        retryCount = 6,
         signal?: AbortSignal
     ): Promise<any> => {
         let lastError: Error | null = null;
@@ -157,7 +157,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
                 // Determine token provider
                 const token = getAuthToken ? await getAuthToken() : (client ? await client.resolveToken() : null);
                 const baseUrl = apiUrl || (client?.baseUrl ? client.baseUrl : "");
-                
+
                 // Use /api/admin prefix for admin endpoints
                 const response = await fetch(`${baseUrl}/api/admin${endpoint}`, {
                     method,
@@ -198,7 +198,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
                 if (attempt < retryCount - 1 && (isNetworkError || isServerError)) {
                     const delay = Math.min(1000 * Math.pow(2, attempt), 5000); // 1s, 2s, 4s...
                     console.warn(`Admin API request to ${endpoint} failed, retrying in ${delay}ms...`);
-                    
+
                     // Wait for delay or abort
                     await new Promise<void>((resolve, reject) => {
                         if (signal?.aborted) return reject(new Error("AbortError"));
@@ -210,7 +210,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
                             }, { once: true });
                         }
                     }).catch(() => {}); // Catch AbortError from wait
-                    
+
                     if (signal?.aborted) {
                         const abortError = new Error("Request aborted");
                         abortError.name = "AbortError";
@@ -288,13 +288,13 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
             if (!abortController.signal.aborted) {
                 await loadUsers(abortController.signal);
             }
-            
+
             if (!abortController.signal.aborted) {
                 setLoading(false);
             }
         };
         load();
-        
+
         return () => {
             abortController.abort();
         };
@@ -473,7 +473,6 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
      * Check if current user is admin
      */
     const isAdmin = currentUser?.roles?.includes("admin") ?? false;
-
 
 
     /**

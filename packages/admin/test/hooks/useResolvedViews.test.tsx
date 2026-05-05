@@ -18,13 +18,15 @@ describe("useResolvedViews", () => {
         } as unknown as AuthController;
 
         const mockViews: AppView[] = [
-            { name: "My View", slug: "my-view", view: null! }
+            { name: "My View",
+slug: "my-view",
+view: null! }
         ];
 
         const { result } = renderHook(() => useResolvedViews({
             authController: mockAuthController,
             views: mockViews,
-            driver: mockDataDriver,
+            driver: mockDataDriver
         }));
 
         expect(result.current.loading).toBe(true);
@@ -47,7 +49,7 @@ describe("useResolvedViews", () => {
         const { result, rerender } = renderHook(() => useResolvedViews({
             authController: mockAuthController,
             views: [],
-            driver: mockDataDriver,
+            driver: mockDataDriver
         }));
 
         expect(result.current.loading).toBe(true);
@@ -79,7 +81,7 @@ describe("useResolvedViews", () => {
             authController: mockAuthController,
             views: undefined,
             userManagement: userManagementActive,
-            driver: mockDataDriver,
+            driver: mockDataDriver
         }));
 
         await waitFor(() => {

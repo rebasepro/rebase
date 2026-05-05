@@ -60,7 +60,7 @@ export async function enhanceDataAPIStream<M extends Record<string, unknown>>(pr
             headers: {
                 "Content-Type": "application/json",
                 Authorization: `Basic ${props.firebaseToken}`,
-                "x-de-api-key": `Basic ${props.apiKey}`,
+                "x-de-api-key": `Basic ${props.apiKey}`
                 // "x-de-version": version
             },
             body: JSON.stringify(request)
@@ -165,7 +165,7 @@ export async function autocompleteStream(props: {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                Authorization: `Basic ${props.firebaseToken}`,
+                Authorization: `Basic ${props.firebaseToken}`
                 // "x-de-version": version
             },
             body: JSON.stringify({

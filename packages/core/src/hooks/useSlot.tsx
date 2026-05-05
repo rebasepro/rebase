@@ -57,7 +57,7 @@ export function useSlot<K extends SlotName>(
             .sort((a, b) => (a.order ?? 50) - (b.order ?? 50))
             .map((s, i) => (
                 <ErrorBoundary key={`${slot}_${i}`}>
-                    <s.Component {...(stableProps as unknown as Record<string, unknown>)} {...(s.props ?? {})} />
+                    <s.Component {...(stableProps as unknown as Record<string, unknown>)} {...(s.props ?? {})}/>
                 </ErrorBoundary>
             ));
     }, [resolvedSlots, slot, stableProps]);

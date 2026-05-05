@@ -36,47 +36,47 @@ interface JSEditorSidebarProps {
 const QUICK_REFERENCE: { label: string; code: string; description: string }[] = [
     {
         label: "Find all",
-        code: `const result = await client.data.collection("COLLECTION").find({ limit: 20 });\nreturn result;`,
+        code: "const result = await client.data.collection(\"COLLECTION\").find({ limit: 20 });\nreturn result;",
         description: "Fetch records with pagination"
     },
     {
         label: "Find by ID",
-        code: `const item = await client.data.collection("COLLECTION").findById("ID");\nreturn item;`,
+        code: "const item = await client.data.collection(\"COLLECTION\").findById(\"ID\");\nreturn item;",
         description: "Fetch a single record"
     },
     {
         label: "Create",
-        code: `const created = await client.data.collection("COLLECTION").create({\n  // your fields here\n});\nreturn created;`,
+        code: "const created = await client.data.collection(\"COLLECTION\").create({\n  // your fields here\n});\nreturn created;",
         description: "Insert a new record"
     },
     {
         label: "Update",
-        code: `const updated = await client.data.collection("COLLECTION").update("ID", {\n  // fields to update\n});\nreturn updated;`,
+        code: "const updated = await client.data.collection(\"COLLECTION\").update(\"ID\", {\n  // fields to update\n});\nreturn updated;",
         description: "Update an existing record"
     },
     {
         label: "Delete",
-        code: `await client.data.collection("COLLECTION").delete("ID");\nreturn { success: true };`,
+        code: "await client.data.collection(\"COLLECTION\").delete(\"ID\");\nreturn { success: true };",
         description: "Delete a record"
     },
     {
         label: "Fluent query",
-        code: `const result = await client.data.collection("COLLECTION")\n  .where("field", ">", value)\n  .orderBy("field", "desc")\n  .limit(10)\n  .find();\nreturn result;`,
+        code: "const result = await client.data.collection(\"COLLECTION\")\n  .where(\"field\", \">\", value)\n  .orderBy(\"field\", \"desc\")\n  .limit(10)\n  .find();\nreturn result;",
         description: "Chained query builder"
     },
     {
         label: "Auth: Current session",
-        code: `const session = client.auth.getSession();\nreturn session;`,
+        code: "const session = client.auth.getSession();\nreturn session;",
         description: "Get current auth session"
     },
     {
         label: "Admin: List users",
-        code: `const { users } = await client.admin.listUsers();\nreturn users;`,
+        code: "const { users } = await client.admin.listUsers();\nreturn users;",
         description: "List all registered users"
     },
     {
         label: "Custom endpoint",
-        code: `const result = await client.call("/my-endpoint", { key: "value" });\nreturn result;`,
+        code: "const result = await client.call(\"/my-endpoint\", { key: \"value\" });\nreturn result;",
         description: "Call a custom API endpoint"
     }
 ];
@@ -87,7 +87,7 @@ export const JSEditorSidebar = ({
     history,
     onSelectSnippet,
     onDeleteSnippet,
-    onInsertCode,
+    onInsertCode
 }: JSEditorSidebarProps) => {
     const [activeTab, setActiveTab] = useState<"collections" | "snippets" | "history" | "reference">("collections");
 
@@ -165,7 +165,7 @@ export const JSEditorSidebar = ({
                                             {ref.label}
                                         </Typography>
                                         <svg className="w-3.5 h-3.5 text-text-disabled group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                                         </svg>
                                     </div>
                                     <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark text-[10px] leading-tight">
@@ -199,12 +199,12 @@ export const JSEditorSidebar = ({
                                         {favorites.length > 0 && (
                                             <div className="mb-3">
                                                 <Typography variant="caption" className="text-[10px] font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark mb-2 px-1 flex items-center">
-                                                    <svg className="w-3 h-3 mr-1 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                                                    <svg className="w-3 h-3 mr-1 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
                                                     Favorites
                                                 </Typography>
                                                 <div className="space-y-2">
                                                     {favorites.map(snippet => (
-                                                        <SnippetItem key={snippet.id} snippet={snippet} onSelect={onSelectSnippet} onDelete={onDeleteSnippet} />
+                                                        <SnippetItem key={snippet.id} snippet={snippet} onSelect={onSelectSnippet} onDelete={onDeleteSnippet}/>
                                                     ))}
                                                 </div>
                                             </div>
@@ -218,7 +218,7 @@ export const JSEditorSidebar = ({
                                                 )}
                                                 <div className="space-y-2">
                                                     {others.map(snippet => (
-                                                        <SnippetItem key={snippet.id} snippet={snippet} onSelect={onSelectSnippet} onDelete={onDeleteSnippet} />
+                                                        <SnippetItem key={snippet.id} snippet={snippet} onSelect={onSelectSnippet} onDelete={onDeleteSnippet}/>
                                                     ))}
                                                 </div>
                                             </div>
@@ -251,7 +251,7 @@ export const JSEditorSidebar = ({
                                         onClick={() => onSelectSnippet(code)}
                                     >
                                         <svg className="w-3 h-3 mt-1 mr-2 text-text-disabled dark:text-text-disabled-dark group-hover:text-primary transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                         </svg>
                                         <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark group-hover:text-text-primary dark:group-hover:text-text-primary-dark text-[11px] line-clamp-2 leading-tight flex-grow font-mono">
                                             {code.length > 120 ? code.substring(0, 120) + "…" : code}
@@ -282,10 +282,10 @@ function CollectionItem({ collection, onInsertCode }: { collection: CollectionIn
                     className={cls("w-3 h-3 mr-1 transition-transform", expanded && "rotate-90")}
                     fill="currentColor" viewBox="0 0 20 20"
                 >
-                    <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" />
+                    <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
                 </svg>
                 <svg className="w-3.5 h-3.5 mr-1 shrink-0 text-text-disabled dark:text-text-disabled-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
                 </svg>
                 <Typography variant="body2" className="text-text-secondary dark:text-text-secondary-dark text-xs truncate flex-1 min-w-0">
                     {collection.slug}
@@ -299,7 +299,7 @@ function CollectionItem({ collection, onInsertCode }: { collection: CollectionIn
                             onInsertCode(`const result = await client.data.${collection.slug}.find({ limit: 20 });\nreturn result;`);
                         }}
                     >
-                        <AddIcon size="smallest" />
+                        <AddIcon size="smallest"/>
                     </IconButton>
                 </Tooltip>
             </div>
@@ -311,7 +311,7 @@ function CollectionItem({ collection, onInsertCode }: { collection: CollectionIn
                             className="flex items-center p-1 pl-2 hover:bg-surface-50 dark:hover:bg-surface-800 rounded-r cursor-pointer transition-colors group/prop relative min-h-[28px]"
                             onClick={() => onInsertCode(`"${prop}"`)}
                         >
-                            <svg className="w-3 h-3 mr-1.5 text-text-disabled dark:text-text-disabled-dark shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 4.5v15m6-15v15m-10.5-1.5h15c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125h-15c-.621 0-1.125.504-1.125 1.125v12.75c0 .621.504 1.125 1.125 1.125Z" /></svg>
+                            <svg className="w-3 h-3 mr-1.5 text-text-disabled dark:text-text-disabled-dark shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 4.5v15m6-15v15m-10.5-1.5h15c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125h-15c-.621 0-1.125.504-1.125 1.125v12.75c0 .621.504 1.125 1.125 1.125Z"/></svg>
                             <Typography variant="caption" className="text-text-primary dark:text-text-primary-dark text-[11px] truncate flex-grow font-mono">{prop}</Typography>
                         </div>
                     ))}
@@ -341,7 +341,7 @@ function SnippetItem({ snippet, onSelect, onDelete }: { snippet: JSSnippet; onSe
                     onDelete(snippet.id);
                 }}
             >
-                <DeleteIcon size="smallest" />
+                <DeleteIcon size="smallest"/>
             </IconButton>
         </div>
     );

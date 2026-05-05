@@ -25,7 +25,7 @@ export const UIStyleGuide = () => {
 
     const IconExample = () => (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
         </svg>
     );
 
@@ -57,7 +57,7 @@ export const UIStyleGuide = () => {
                         <div key={color} className="flex items-center gap-4">
                             <span className="w-24 text-[10px] uppercase tracking-wider text-text-disabled font-mono">{color}</span>
                             <Typography color={color}>
-                                This text is rendered with color="{color}"
+                                This text is rendered with color=&quot;{color}&quot;
                             </Typography>
                         </div>
                     ))}
@@ -116,31 +116,31 @@ export const UIStyleGuide = () => {
                     <div className="flex flex-wrap gap-8 items-center">
                         <div className="flex flex-col items-center gap-2">
                             <IconButton color="primary">
-                                <IconExample />
+                                <IconExample/>
                             </IconButton>
                             <span className="text-[10px] text-text-disabled font-mono">primary</span>
                         </div>
                         <div className="flex flex-col items-center gap-2">
                             <IconButton color="secondary">
-                                <IconExample />
+                                <IconExample/>
                             </IconButton>
                             <span className="text-[10px] text-text-disabled font-mono">secondary</span>
                         </div>
                         <div className="flex flex-col items-center gap-2">
                             <IconButton size="small">
-                                <IconExample />
+                                <IconExample/>
                             </IconButton>
                             <span className="text-[10px] text-text-disabled font-mono">small</span>
                         </div>
                         <div className="flex flex-col items-center gap-2">
                             <IconButton disabled>
-                                <IconExample />
+                                <IconExample/>
                             </IconButton>
                             <span className="text-[10px] text-text-disabled font-mono">disabled</span>
                         </div>
                         <div className="flex flex-col items-center gap-2">
                             <IconButton size="small" color="error">
-                                <DeleteIcon />
+                                <DeleteIcon/>
                             </IconButton>
                             <span className="text-[10px] text-text-disabled font-mono">delete</span>
                         </div>
@@ -154,7 +154,7 @@ export const UIStyleGuide = () => {
                         <Typography variant="h5">Dark Mode Check</Typography>
                         <Typography variant="body2" color="secondary">Typography and buttons should adapt automatically.</Typography>
                     </div>
-                    <Button variant="filled" color="neutral" startIcon={<IconExample />}>
+                    <Button variant="filled" color="neutral" startIcon={<IconExample/>}>
                         Sample Action
                     </Button>
                 </div>

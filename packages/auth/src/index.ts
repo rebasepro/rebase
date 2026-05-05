@@ -1,9 +1,9 @@
 /**
  * @rebasepro/auth
- * 
+ *
  * Custom JWT authentication adapter for the Rebase backend.
  * This package provides backend-specific auth hooks and API utilities.
- * 
+ *
  * For the generic LoginView and RebaseAuth components, see @rebasepro/core.
  */
 

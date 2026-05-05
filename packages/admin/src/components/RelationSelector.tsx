@@ -135,95 +135,100 @@ export const RelationSelector = React.forwardRef<
         const selectedItemsRef = useRef(selectedItems);
         selectedItemsRef.current = selectedItems;
 
+        // Normalize incoming values — plain { __type: "relation" } objects
+        // from the server are converted to proper EntityRelation instances.
+        const rawArray = !value ? [] : Array.isArray(value) ? value : [value];
+        const relationsArray = rawArray.map(rel => {
+            if (typeof rel === "string" || typeof rel === "number") return rel;
+            return normalizeToEntityRelation(rel) ?? rel;
+        });
+
+        // Build a fingerprint of the incoming value's IDs
+        const incomingIds = relationsArray
+            .map(rel => {
+                const isPrimitive = typeof rel === "string" || typeof rel === "number";
+                return String(isPrimitive ? rel : (rel as EntityRelation).id);
+            })
+            .sort()
+            .join(",");
+
+        // Check if every relation already has embedded data
+        const allHaveData = relationsArray.length > 0 && relationsArray.every(rel => {
+            if (typeof rel === "string" || typeof rel === "number") return false;
+            return !!(rel as EntityRelation)?.data;
+        });
+
+        const relationsArrayRef = useRef(relationsArray);
+        relationsArrayRef.current = relationsArray;
+
         useEffect(() => {
             let active = true;
-
-            // Normalize incoming values — plain { __type: "relation" } objects
-            // from the server are converted to proper EntityRelation instances.
-            const rawArray = !value ? [] : Array.isArray(value) ? value : [value];
-            const relationsArray = rawArray.map(rel => {
-                if (typeof rel === "string" || typeof rel === "number") return rel;
-                return normalizeToEntityRelation(rel) ?? rel;
-            });
-
-            // Build a fingerprint of the incoming value's IDs
-            const incomingIds = relationsArray
-                .map(rel => {
-                    const isPrimitive = typeof rel === "string" || typeof rel === "number";
-                    return String(isPrimitive ? rel : (rel as EntityRelation).id);
-                })
-                .sort()
-                .join(",");
-
-            // Check if every relation already has embedded data
-            const allHaveData = relationsArray.length > 0 && relationsArray.every(rel => {
-                if (typeof rel === "string" || typeof rel === "number") return false;
-                return !!(rel as EntityRelation)?.data;
-            });
+            const currentRelationsArray = relationsArrayRef.current;
 
             // If the IDs haven't changed and we already resolved them, skip entirely
             if (incomingIds === resolvedIdsRef.current && (allHaveData || hasResolvedItemsRef.current)) {
                 return;
             }
 
-            // MATCH PATH: selectedItems already cover all incoming IDs.
-            // Happens when the user just picked from the dropdown and the server echoes back
-            // the value without embedded .data — no need to re-fetch.
             const currentSelected = selectedItemsRef.current;
-            if (currentSelected.length > 0 && currentSelected.length === relationsArray.length) {
-                const currentIds = new Set(currentSelected.map(item => String(item.id)));
-                const allCovered = relationsArray.every(rel => {
-                    const isPrimitive = typeof rel === "string" || typeof rel === "number";
-                    return currentIds.has(String(isPrimitive ? rel : (rel as EntityRelation).id));
-                });
-                if (allCovered) {
-                    hasResolvedItemsRef.current = true;
-                    resolvedIdsRef.current = incomingIds;
-                    return;
+            const currentSelectedMap = new Map(currentSelected.map(item => [String(item.id), item]));
+
+            let allCovered = true;
+            const newResolvedItems: RelationItem[] = [];
+            const toRelationItem = entityToRelationItemRef.current;
+            const slug = collectionSlugRef.current;
+
+            for (const rel of currentRelationsArray) {
+                const isPrimitive = typeof rel === "string" || typeof rel === "number";
+                const relId = String(isPrimitive ? rel : (rel as EntityRelation).id);
+                const hasEmbeddedData = !isPrimitive && !!(rel as EntityRelation).data;
+
+                if (hasEmbeddedData) {
+                    const r = rel as EntityRelation;
+                    newResolvedItems.push(toRelationItem(r.data!, r));
+                } else if (currentSelectedMap.has(relId)) {
+                    // We already have it in currentSelected
+                    const existingItem = currentSelectedMap.get(relId)!;
+                    newResolvedItems.push(existingItem);
+                } else {
+                    allCovered = false;
+                    break;
                 }
             }
 
-            // FAST PATH: all data is embedded — resolve synchronously, no loading flash
-            if (allHaveData) {
-                const toRelationItem = entityToRelationItemRef.current;
-                const resolved = relationsArray.map(rel => {
-                    const r = rel as EntityRelation;
-                    if (r.data) return toRelationItem(r.data, r);
-                    return { id: r.id,
-label: String(r.id),
-relation: r } as RelationItem;
-                });
-                setSelectedItems(resolved);
+            // FAST PATH: We have all necessary data embedded or in local cache
+            if (allCovered) {
+                setSelectedItems(newResolvedItems);
                 hasResolvedItemsRef.current = true;
                 resolvedIdsRef.current = incomingIds;
+                setIsLoadingSelectedItems(false);
                 return;
             }
 
-            // SLOW PATH: need to fetch missing data — show loading
-            if (value && (!Array.isArray(value) || value.length > 0)) {
-                setIsLoadingSelectedItems(true);
-            }
-
-            const slug = collectionSlugRef.current;
+            // SLOW PATH: fetch missing data
+            setIsLoadingSelectedItems(true);
             const client = dataClientRef.current;
-            const toRelationItem = entityToRelationItemRef.current;
 
             Promise.all(
-                relationsArray.map(async (rel) => {
+                currentRelationsArray.map(async (rel) => {
                     const isPrimitive = typeof rel === "string" || typeof rel === "number";
                     const relId = isPrimitive ? rel : (rel as EntityRelation).id;
                     const path = isPrimitive ? slug : (rel as EntityRelation).path;
+                    const relation = isPrimitive ? new EntityRelation(relId, path) : rel as EntityRelation;
+
+                    if (!isPrimitive && (rel as EntityRelation).data) {
+                        return toRelationItem((rel as EntityRelation).data!, relation);
+                    }
+                    if (currentSelectedMap.has(String(relId))) {
+                        return currentSelectedMap.get(String(relId))!;
+                    }
+
                     try {
-                        let entity = isPrimitive ? undefined : (rel as EntityRelation)?.data;
-                        if (!entity) {
-                            entity = await client.collection(path).findById(relId);
-                        }
-                        const relation = isPrimitive ? new EntityRelation(relId, path) : rel as EntityRelation;
+                        const entity = await client.collection(path).findById(relId);
                         if (entity) return toRelationItem(entity, relation);
                     } catch (e) {
                         console.warn("RelationSelector: could not fetch entity for relation", rel, e);
                     }
-                    const relation = isPrimitive ? new EntityRelation(relId as string | number, path) : rel as EntityRelation;
                     return { id: relId,
 label: String(relId),
 relation } as RelationItem;
@@ -240,7 +245,7 @@ relation } as RelationItem;
             return () => {
                 active = false;
             };
-        }, [value]);
+        }, [incomingIds, allHaveData]);
 
         const sentinelCallbackRef = useCallback((node: HTMLDivElement | null) => {
             if (observerRef.current) {

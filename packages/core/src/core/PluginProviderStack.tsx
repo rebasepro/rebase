@@ -19,7 +19,7 @@ export function PluginProviderStack({
     plugins,
     scope,
     scopeProps,
-    children,
+    children
 }: {
     plugins: RebasePlugin[];
     scope: "root" | "form";

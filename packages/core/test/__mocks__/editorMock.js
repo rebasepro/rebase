@@ -2,6 +2,6 @@
 module.exports = {
     Editor: () => null,
     EditorContent: () => null,
-    useEditor: () => ({}),
+    useEditor: () => ({})
     // Add any other exports as needed
 };

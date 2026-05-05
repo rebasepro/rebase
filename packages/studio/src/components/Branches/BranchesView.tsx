@@ -5,7 +5,7 @@ import {
     ForkRightIcon, RefreshIcon, AddIcon,
     DeleteOutlineIcon, ContentCopyIcon,
     Dialog, DialogTitle, DialogContent, DialogActions,
-    TextField, Select, SelectItem, Alert,
+    TextField, Select, SelectItem, Alert
 } from "@rebasepro/ui";
 import { useRebaseContext, useSnackbarController, ConfirmationDialog } from "@rebasepro/core";
 import { isBranchAdmin } from "@rebasepro/types";
@@ -127,7 +127,7 @@ export function BranchesView() {
     if (!branchAdmin) {
         return (
             <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
-                <ForkRightIcon size="large" className="text-surface-300 dark:text-surface-600" />
+                <ForkRightIcon size="large" className="text-surface-300 dark:text-surface-600"/>
                 <Typography variant="h6" color="secondary">Database Branching Not Available</Typography>
                 <Typography variant="body2" color="disabled" className="max-w-md">
                     Branching requires a PostgreSQL backend with an admin connection configured.
@@ -140,7 +140,7 @@ export function BranchesView() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-full">
-                <CircularProgress />
+                <CircularProgress/>
             </div>
         );
     }
@@ -153,23 +153,23 @@ export function BranchesView() {
             <div className={cls("flex flex-col w-[340px] min-w-[280px] border-r h-full", defaultBorderMixin)}>
                 <div className={cls("flex items-center justify-between px-4 py-2.5 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
                     <div className="flex items-center gap-2">
-                        <ForkRightIcon size="small" className="text-primary" />
+                        <ForkRightIcon size="small" className="text-primary"/>
                         <Typography variant="subtitle2" className="font-semibold">Branches</Typography>
                         <Chip size="smallest" className="bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300">{branches.length}</Chip>
                     </div>
                     <div className="flex items-center gap-1">
                         <IconButton size="small" onClick={loadBranches} title="Refresh">
-                            <RefreshIcon size="small" />
+                            <RefreshIcon size="small"/>
                         </IconButton>
                         <IconButton size="small" onClick={() => setCreateOpen(true)} title="Create branch" className="text-primary">
-                            <AddIcon size="small" />
+                            <AddIcon size="small"/>
                         </IconButton>
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
                     {branches.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
-                            <ContentCopyIcon size="medium" className="text-surface-300 dark:text-surface-600" />
+                            <ContentCopyIcon size="medium" className="text-surface-300 dark:text-surface-600"/>
                             <Typography variant="body2" color="disabled" className="text-[13px]">
                                 No branches yet. Create one to start working with an isolated database copy.
                             </Typography>
@@ -177,7 +177,7 @@ export function BranchesView() {
                                 size="small"
                                 variant="outlined"
                                 onClick={() => setCreateOpen(true)}
-                                startIcon={<AddIcon size="smallest" />}
+                                startIcon={<AddIcon size="smallest"/>}
                             >
                                 Create Branch
                             </Button>
@@ -194,7 +194,7 @@ export function BranchesView() {
                                         : "hover:bg-surface-100 dark:hover:bg-surface-800"
                                 )}
                             >
-                                <div className="w-2 h-2 rounded-full shrink-0 bg-emerald-500" />
+                                <div className="w-2 h-2 rounded-full shrink-0 bg-emerald-500"/>
                                 <div className="flex-1 min-w-0">
                                     <Typography variant="body2" className="truncate font-medium text-[13px]">{branch.name}</Typography>
                                     <Typography variant="caption" color="secondary" className="truncate text-[11px]">
@@ -216,7 +216,7 @@ export function BranchesView() {
             <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
                 {!selected ? (
                     <div className="flex flex-col items-center justify-center h-full gap-3">
-                        <ForkRightIcon size="large" className="text-surface-200 dark:text-surface-700" />
+                        <ForkRightIcon size="large" className="text-surface-200 dark:text-surface-700"/>
                         <Typography variant="body2" color="disabled">
                             {branches.length === 0 ? "Create a branch to get started" : "Select a branch to view details"}
                         </Typography>
@@ -226,7 +226,7 @@ export function BranchesView() {
                         {/* Header */}
                         <div className={cls("flex items-center justify-between px-5 py-3 border-b bg-white dark:bg-surface-950 min-h-[56px]", defaultBorderMixin)}>
                             <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"/>
                                 <div className="min-w-0">
                                     <Typography variant="subtitle1" className="font-semibold truncate">{selected.name}</Typography>
                                     <Typography variant="caption" color="secondary" className="truncate">
@@ -240,7 +240,7 @@ export function BranchesView() {
                                     color="error"
                                     variant="outlined"
                                     onClick={() => setDeleteTarget(selected.name)}
-                                    startIcon={<DeleteOutlineIcon size="smallest" />}
+                                    startIcon={<DeleteOutlineIcon size="smallest"/>}
                                 >
                                     Delete
                                 </Button>
@@ -250,10 +250,10 @@ export function BranchesView() {
                         {/* Info Cards */}
                         <div className="px-5 py-4 bg-surface-50 dark:bg-surface-900/50">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                <StatCard label="Branch Name" value={selected.name} mono />
-                                <StatCard label="Source Database" value={selected.parentDatabase} mono />
-                                <StatCard label="Created" value={formatRelative(selected.createdAt)} />
-                                <StatCard label="Size" value={formatSize(selected.sizeBytes)} />
+                                <StatCard label="Branch Name" value={selected.name} mono/>
+                                <StatCard label="Source Database" value={selected.parentDatabase} mono/>
+                                <StatCard label="Created" value={formatRelative(selected.createdAt)}/>
+                                <StatCard label="Size" value={formatSize(selected.sizeBytes)}/>
                             </div>
                         </div>
 
@@ -261,9 +261,9 @@ export function BranchesView() {
                         <div className="flex-1 overflow-y-auto px-5 py-4">
                             <Alert color="info">
                                 <Typography variant="body2" className="text-[13px]">
-                                    <strong>How to use this branch:</strong> Switch your application's database connection to 
+                                    <strong>How to use this branch:</strong> Switch your application&apos;s database connection to
                                     <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-100 dark:bg-surface-800 font-mono text-[12px]">{selected.name}</code>
-                                    to work with an isolated copy of your data. Changes made to this branch won't affect your main database.
+                                    to work with an isolated copy of your data. Changes made to this branch won&apos;t affect your main database.
                                 </Typography>
                             </Alert>
                             <div className="mt-4 p-4 rounded-lg border bg-surface-50 dark:bg-surface-900 border-surface-200 dark:border-surface-700">
@@ -335,7 +335,7 @@ export function BranchesView() {
                         color="primary"
                         onClick={handleCreate}
                         disabled={!newBranchName.trim() || creating}
-                        startIcon={creating ? <CircularProgress size="smallest" /> : <AddIcon size="smallest" />}
+                        startIcon={creating ? <CircularProgress size="smallest"/> : <AddIcon size="smallest"/>}
                     >
                         {creating ? "Creating..." : "Create Branch"}
                     </Button>

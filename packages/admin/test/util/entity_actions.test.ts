@@ -9,31 +9,31 @@ describe("mergeEntityActions", () => {
     const editAction: EntityAction = {
         key: "edit",
         name: "Edit",
-        onClick: jest.fn(),
+        onClick: jest.fn()
     } as unknown as EntityAction;
 
     const deleteAction: EntityAction = {
         key: "delete",
         name: "Delete",
-        onClick: jest.fn(),
+        onClick: jest.fn()
     } as unknown as EntityAction;
 
     const copyAction: EntityAction = {
         key: "copy",
         name: "Copy",
-        onClick: jest.fn(),
+        onClick: jest.fn()
     } as unknown as EntityAction;
 
     const customAction: EntityAction = {
         key: "export",
         name: "Export Data",
-        onClick: jest.fn(),
+        onClick: jest.fn()
     } as unknown as EntityAction;
 
     const anotherCustom: EntityAction = {
         key: "archive",
         name: "Archive",
-        onClick: jest.fn(),
+        onClick: jest.fn()
     } as unknown as EntityAction;
 
     it("returns the original actions when new list is empty", () => {
@@ -50,7 +50,7 @@ describe("mergeEntityActions", () => {
         const updatedEdit: EntityAction = {
             key: "edit",
             name: "Edit V2",
-            onClick: jest.fn(),
+            onClick: jest.fn()
         } as unknown as EntityAction;
 
         const result = mergeEntityActions([editAction, deleteAction], [updatedEdit]);
@@ -78,7 +78,7 @@ describe("mergeEntityActions", () => {
         const customDeleteOverride: EntityAction = {
             key: "delete",
             name: "Custom Delete",
-            onClick: jest.fn(),
+            onClick: jest.fn()
         } as unknown as EntityAction;
 
         // "delete" is in current actions, so it gets replaced
@@ -91,7 +91,7 @@ describe("mergeEntityActions", () => {
     it("handles actions with undefined keys", () => {
         const noKeyAction: EntityAction = {
             name: "No Key Action",
-            onClick: jest.fn(),
+            onClick: jest.fn()
         } as unknown as EntityAction;
 
         const result = mergeEntityActions([editAction], [noKeyAction]);
@@ -104,12 +104,12 @@ describe("mergeEntityActions", () => {
         const baseAction: EntityAction = {
             key: "export",
             name: "Export",
-            icon: "download",
+            icon: "download"
         } as unknown as EntityAction;
 
         const overrideAction: EntityAction = {
             key: "export",
-            name: "Export CSV",
+            name: "Export CSV"
         } as unknown as EntityAction;
 
         const result = mergeEntityActions([baseAction], [overrideAction]);

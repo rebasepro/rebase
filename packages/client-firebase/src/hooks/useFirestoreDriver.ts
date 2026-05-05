@@ -160,7 +160,7 @@ export function useFirestoreDriver({
             entityId,
             collection,
             onUpdate,
-            onError,
+            onError
         }: ListenEntityProps<M>): () => void => {
         if (!firebaseApp) throw Error("useFirestoreDriver Firebase not initialised");
 
@@ -183,7 +183,7 @@ export function useFirestoreDriver({
         path,
         databaseId,
         searchString,
-        onUpdate,
+        onUpdate
     }: {
         path: string,
         databaseId?: string,
@@ -297,7 +297,7 @@ export function useFirestoreDriver({
             searchString,
             orderBy,
             order,
-            collection,
+            collection
         }: FetchCollectionProps<M>
         ): Promise<Entity<M>[]> => {
 
@@ -346,7 +346,7 @@ export function useFirestoreDriver({
                 order,
                 onUpdate,
                 onError,
-                collection,
+                collection
             }: ListenCollectionProps<M>
         ): () => void => {
 
@@ -372,7 +372,7 @@ export function useFirestoreDriver({
                     path,
                     searchString,
                     onUpdate,
-                    databaseId,
+                    databaseId
                 });
             }
 
@@ -404,7 +404,7 @@ export function useFirestoreDriver({
         fetchEntity: useCallback(<M extends Record<string, any>>({
             path,
             entityId,
-            collection,
+            collection
         }: FetchEntityProps<M>
         ): Promise<Entity<M> | undefined> => {
             const resolvedPath = path;
@@ -440,7 +440,7 @@ export function useFirestoreDriver({
                 entityId,
                 values: valuesProp,
                 collection,
-                status,
+                status
             }: SaveEntityProps<M>): Promise<Entity<M>> => {
 
             if (!firebaseApp) throw Error("useFirestoreDriver Firebase not initialised");
@@ -482,7 +482,7 @@ export function useFirestoreDriver({
                     return {
                         id: documentReference.id,
                         path,
-                        values: firestoreToCMSModel(values),
+                        values: firestoreToCMSModel(values)
                     } as Entity<M>;
                 })
                 .catch((error) => {
@@ -548,7 +548,7 @@ export function useFirestoreDriver({
             filter,
             order,
             orderBy,
-            collection,
+            collection
         }: FetchCollectionProps<any>): Promise<number> => {
             if (!firebaseApp) throw Error("useFirestoreDriver Firebase not initialised");
             const databaseId = collection?.databaseId;
@@ -562,7 +562,7 @@ export function useFirestoreDriver({
             path,
             collection,
             filterValues,
-            sortBy,
+            sortBy
         }: {
             path: string,
             collection: EntityCollection<any>,
@@ -656,7 +656,8 @@ export function firestoreToCMSModel(data: any): any {
         return data; // already translated
     }
     if (data instanceof VectorValue || (typeof data === "object" && data !== null && typeof data.toArray === "function" && data.constructor?.name === "VectorValue")) {
-        return { __type__: "__vector__", value: data.toArray() };
+        return { __type__: "__vector__",
+value: data.toArray() };
     }
 
     if (data instanceof FirestoreGeoPoint) {
@@ -665,7 +666,9 @@ export function firestoreToCMSModel(data: any): any {
     if (data instanceof DocumentReference) {
         // @ts-ignore
         const databaseId = data?.firestore?._databaseId?.database;
-        return new EntityReference({ id: data.id, path: getCMSPathFromFirestorePath(data.path), databaseId });
+        return new EntityReference({ id: data.id,
+path: getCMSPathFromFirestorePath(data.path),
+databaseId });
     }
     if (Array.isArray(data)) {
         return data.map(firestoreToCMSModel).filter(v => v !== undefined);
@@ -718,7 +721,8 @@ export function cmsToFirestoreModel(data: any, firestore: Firestore, inArray = f
                 else
                     return {};
             })
-            .reduce((a, b) => ({ ...a, ...b }), {});
+            .reduce((a, b) => ({ ...a,
+...b }), {});
     }
     return data;
 }

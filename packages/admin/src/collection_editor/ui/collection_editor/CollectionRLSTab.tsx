@@ -181,7 +181,7 @@ export function CollectionRLSTab() {
                     <div className="mt-12 flex flex-col gap-4">
                         <Typography variant="h6" className="text-text-secondary">Unmapped Database Policies</Typography>
                         <Typography variant="body2" className="text-text-secondary opacity-80 -mt-2">
-                            These policies exist in your Postgres database but are not mapped to this collection's codebase configuration.
+                            These policies exist in your Postgres database but are not mapped to this collection&apos;s codebase configuration.
                         </Typography>
                         <div className="flex flex-col gap-3">
                             {unmappedPolicies.map(dp => (

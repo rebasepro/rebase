@@ -9,7 +9,7 @@ export class AstSchemaEditor {
     constructor(collectionsDir: string) {
         this.project = new Project({
             manipulationSettings: {
-                indentationText: IndentationText.FourSpaces,
+                indentationText: IndentationText.FourSpaces
             }
         });
         if (fs.existsSync(collectionsDir)) {
@@ -77,8 +77,8 @@ export class AstSchemaEditor {
         return null;
     }
 
-    private convertJsonToAstString(obj: unknown, indentLevel: number = 0, oldAstNode?: ObjectLiteralExpression): string {
-        // Base TS-morph parses arrays as 2 levels deep from the property key: 
+    private convertJsonToAstString(obj: unknown, indentLevel = 0, oldAstNode?: ObjectLiteralExpression): string {
+        // Base TS-morph parses arrays as 2 levels deep from the property key:
         // PropertiesObject = level 1, PropertyConfig = level 2.
         // We calibrate the spacing multiples to keep the items flush with standard TS format.
         const indentStr = "    ";
@@ -145,7 +145,7 @@ export class AstSchemaEditor {
                 let childAstNode: ObjectLiteralExpression | undefined;
                 if (oldAstNode && typeof record[key] === "object" && record[key] !== null && !Array.isArray(record[key])) {
                     const oldProp = oldAstNode.getProperty(
-                        (p: ObjectLiteralElementLike) => 'getName' in p && typeof (p as PropertyAssignment).getName === 'function' && ((p as PropertyAssignment).getName() === key || (p as PropertyAssignment).getName() === `"${key}"` || (p as PropertyAssignment).getName() === `'${key}'`)
+                        (p: ObjectLiteralElementLike) => "getName" in p && typeof (p as PropertyAssignment).getName === "function" && ((p as PropertyAssignment).getName() === key || (p as PropertyAssignment).getName() === `"${key}"` || (p as PropertyAssignment).getName() === `'${key}'`)
                     );
                     if (oldProp && oldProp.isKind(SyntaxKind.PropertyAssignment)) {
                         childAstNode = oldProp.getInitializerIfKind(SyntaxKind.ObjectLiteralExpression);
@@ -175,8 +175,8 @@ export class AstSchemaEditor {
 
         const propsObj = propertiesProp.getInitializerIfKind(SyntaxKind.ObjectLiteralExpression);
         if (propsObj) {
-            let existingProp = propsObj.getProperty(
-                (p: ObjectLiteralElementLike) => 'getName' in p && typeof (p as PropertyAssignment).getName === 'function' && ((p as PropertyAssignment).getName() === propertyKey || (p as PropertyAssignment).getName() === `"${propertyKey}"`)
+            const existingProp = propsObj.getProperty(
+                (p: ObjectLiteralElementLike) => "getName" in p && typeof (p as PropertyAssignment).getName === "function" && ((p as PropertyAssignment).getName() === propertyKey || (p as PropertyAssignment).getName() === `"${propertyKey}"`)
             );
 
             let oldPropAstNode: ObjectLiteralExpression | undefined;
@@ -214,7 +214,7 @@ export class AstSchemaEditor {
             const propsObj = propertiesProp.getInitializerIfKind(SyntaxKind.ObjectLiteralExpression);
             if (propsObj) {
                 const existingProp = propsObj.getProperty(
-                    (p: ObjectLiteralElementLike) => 'getName' in p && typeof (p as PropertyAssignment).getName === 'function' && ((p as PropertyAssignment).getName() === propertyKey || (p as PropertyAssignment).getName() === `"${propertyKey}"`)
+                    (p: ObjectLiteralElementLike) => "getName" in p && typeof (p as PropertyAssignment).getName === "function" && ((p as PropertyAssignment).getName() === propertyKey || (p as PropertyAssignment).getName() === `"${propertyKey}"`)
                 );
                 if (existingProp) {
                     existingProp.remove();
@@ -230,7 +230,7 @@ export class AstSchemaEditor {
 
     public async saveCollection(collectionId: string, collectionData: Record<string, unknown>) {
         let file = this.getCollectionFile(collectionId);
-        let collectionObj = this.getCollectionObject(collectionId);
+        const collectionObj = this.getCollectionObject(collectionId);
 
         if (!file || !collectionObj) {
             // Create a new file
@@ -239,14 +239,14 @@ export class AstSchemaEditor {
             file = this.project.createSourceFile(newFilePath, `import { EntityCollection } from "@rebasepro/types";\n\nconst ${safeId}Collection: EntityCollection = ${this.convertJsonToAstString(collectionData)};\n\nexport default ${safeId}Collection;\n`, { overwrite: true });
         } else {
             // Update root level properties gracefully
-            
+
             // Force delete securityRules if empty or undefined to handle Formex / serialization stripping
             if (!("securityRules" in collectionData) || collectionData.securityRules === undefined || (Array.isArray(collectionData.securityRules) && collectionData.securityRules.length === 0)) {
                 const srProp = collectionObj.getProperty("securityRules");
                 if (srProp) {
                     srProp.remove();
                 }
-                
+
                 // If it was in collectionData as an empty array, delete it so the loop below doesn't add it back as "[]"
                 // Actually, if it's "[]", omitting it entirely from the TS file achieves the same logical effect (no RLS rules)
                 // and correctly triggers "unmapped policies" if the DB still has them.
@@ -256,7 +256,7 @@ export class AstSchemaEditor {
             for (const key of Object.keys(collectionData)) {
                 if (key === "relations") continue; // Kept via other AST functions or handled separately.
 
-                let prop = collectionObj.getProperty(key) as PropertyAssignment;
+                const prop = collectionObj.getProperty(key) as PropertyAssignment;
 
                 let oldAstNode: ObjectLiteralExpression | undefined;
                 if (prop && prop.isKind(SyntaxKind.PropertyAssignment)) {

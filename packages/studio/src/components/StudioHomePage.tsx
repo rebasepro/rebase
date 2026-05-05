@@ -26,42 +26,50 @@ interface StudioSection {
 const SECTIONS: StudioSection[] = [
     {
         label: "Database",
+        dotColor: "bg-emerald-400",
+        iconColor: "text-emerald-400",
+        tools: [
+            { path: "/schema", name: "Collections", description: "Define and manage your data model and collection schemas", icon: "view_list" },
+            { path: "/schema-visualizer", name: "Schema Visualizer", description: "Interactive ERD showing tables, columns, and relationships", icon: "account_tree" },
+            { path: "/sql", name: "SQL Console", description: "Execute raw SQL queries directly against your database", icon: "terminal" },
+            { path: "/branches", name: "Branches", description: "Create and manage isolated database copies for development", icon: "fork_right" },
+            { path: "/rls", name: "RLS Policies", description: "Configure Row Level Security for fine-grained data access", icon: "security" }
+        ]
+    },
+    {
+        label: "Compute",
         dotColor: "bg-blue-400",
         iconColor: "text-blue-400",
         tools: [
-            { path: "/sql", name: "SQL Console", description: "Execute raw SQL queries directly against your database", icon: "terminal" },
             { path: "/js", name: "JS Console", description: "Run JavaScript with the Rebase SDK in a live sandbox", icon: "code" },
-            { path: "/rls", name: "RLS Policies", description: "Configure Row Level Security for fine-grained data access", icon: "security" },
-            { path: "/schema-visualizer", name: "Schema Visualizer", description: "Interactive ERD showing tables, columns, and relationships", icon: "account_tree" },
-            { path: "/branches", name: "Branches", description: "Create and manage isolated database copies for development", icon: "fork_right" },
-        ],
+            { path: "/cron", name: "Cron Jobs", description: "Monitor and manage scheduled background tasks", icon: "schedule" }
+        ]
     },
     {
-        label: "Schema & Data",
+        label: "API",
         dotColor: "bg-violet-400",
         iconColor: "text-violet-400",
         tools: [
-            { path: "/schema", name: "Collections", description: "Define and manage your data model and collection schemas", icon: "view_list" },
-            { path: "/storage", name: "Storage", description: "Browse, upload, and manage files in your storage bucket", icon: "cloud" },
-        ],
+            { path: "/api", name: "API Explorer", description: "Interactive API documentation with live request testing", icon: "auto_stories" }
+        ]
     },
     {
-        label: "Administration",
+        label: "Storage",
         dotColor: "bg-amber-400",
         iconColor: "text-amber-400",
         tools: [
-            { path: "/users", name: "Users", description: "Manage developers and assign roles in your workspace", icon: "group" },
-            { path: "/roles", name: "Roles", description: "Create and configure fine-grained access permissions", icon: "admin_panel_settings" },
-        ],
+            { path: "/storage", name: "Storage", description: "Browse, upload, and manage files in your storage bucket", icon: "cloud" }
+        ]
     },
     {
-        label: "Automation",
-        dotColor: "bg-teal-400",
-        iconColor: "text-teal-400",
+        label: "Access Control",
+        dotColor: "bg-rose-400",
+        iconColor: "text-rose-400",
         tools: [
-            { path: "/cron", name: "Cron Jobs", description: "Monitor and manage scheduled background tasks", icon: "schedule" },
-        ],
-    },
+            { path: "/users", name: "Users", description: "Manage developers and assign roles in your workspace", icon: "group" },
+            { path: "/roles", name: "Roles", description: "Create and configure fine-grained access permissions", icon: "admin_panel_settings" }
+        ]
+    }
 ];
 
 /* ═══════════════════════════════════════════════════════════════ */
@@ -71,7 +79,7 @@ export function StudioHomePage({
     additionalChildrenStart,
     additionalChildrenEnd,
     sections,
-    hiddenGroups,
+    hiddenGroups
 }: {
     additionalActions?: React.ReactNode;
     additionalChildrenStart?: React.ReactNode;
@@ -144,7 +152,9 @@ export function StudioHomePage({
                                                 {/* Icon */}
                                                 <div className={cls("h-6 flex items-center", section.iconColor)}>
                                                     <IconForView
-                                                        collectionOrView={{ slug: tool.path, name: tool.name, icon: tool.icon }}
+                                                        collectionOrView={{ slug: tool.path,
+name: tool.name,
+icon: tool.icon }}
                                                         size="small"
                                                     />
                                                 </div>
@@ -168,7 +178,7 @@ export function StudioHomePage({
                                             {/* Arrow */}
                                             <div style={{ alignSelf: "flex-end" }}>
                                                 <div className="p-2">
-                                                    <ArrowForwardIcon className="text-primary" size="small" />
+                                                    <ArrowForwardIcon className="text-primary" size="small"/>
                                                 </div>
                                             </div>
                                         </div>
@@ -205,9 +215,9 @@ export function StudioHomePage({
                         <div className="flex items-center justify-between px-4 py-2.5 border-b border-surface-200/40 dark:border-surface-700/40 bg-surface-50 dark:bg-surface-900/80">
                             <div className="flex items-center gap-2.5">
                                 <div className="flex gap-1.5">
-                                    <span className="w-2.5 h-2.5 rounded-full bg-red-400/60" />
-                                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400/60" />
-                                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400/60" />
+                                    <span className="w-2.5 h-2.5 rounded-full bg-red-400/60"/>
+                                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400/60"/>
+                                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400/60"/>
                                 </div>
                                 <span className="text-xs font-mono text-surface-400 dark:text-surface-500 ml-1">
                                     app.ts
@@ -220,7 +230,7 @@ export function StudioHomePage({
 
                         {/* Syntax-highlighted code */}
                         <div className="px-5 py-4 overflow-x-auto text-[13px] leading-6 font-mono">
-                            <SyntaxHighlightedSnippet />
+                            <SyntaxHighlightedSnippet/>
                         </div>
                     </div>
                 </div>
@@ -254,13 +264,13 @@ export function StudioHomePage({
    ═══════════════════════════════════════════════════════════════ */
 
 function SyntaxHighlightedSnippet() {
-    const kw = "text-violet-600 dark:text-violet-400";       // keywords
-    const str = "text-emerald-600 dark:text-emerald-400";     // strings
-    const typ = "text-amber-600 dark:text-amber-300";       // types
-    const fn = "text-blue-600 dark:text-blue-400";          // functions
+    const kw = "text-violet-600 dark:text-violet-400"; // keywords
+    const str = "text-emerald-600 dark:text-emerald-400"; // strings
+    const typ = "text-amber-600 dark:text-amber-300"; // types
+    const fn = "text-blue-600 dark:text-blue-400"; // functions
     const cm = "text-surface-500 dark:text-surface-400 italic"; // comments
-    const op = "text-surface-500 dark:text-surface-400";       // operators / punctuation
-    const tx = "text-surface-800 dark:text-surface-200";       // plain text
+    const op = "text-surface-500 dark:text-surface-400"; // operators / punctuation
+    const tx = "text-surface-800 dark:text-surface-200"; // plain text
 
     return (
         <pre className="m-0 whitespace-pre">
@@ -270,7 +280,7 @@ function SyntaxHighlightedSnippet() {
             <span className={tx}>{" } "}</span>
             <span className={kw}>from</span>
             <span className={tx}> </span>
-            <span className={str}>'@rebasepro/client'</span>
+            <span className={str}>&apos;@rebasepro/client&apos;</span>
             <span className={op}>;</span>
             {"\n"}
 
@@ -282,7 +292,7 @@ function SyntaxHighlightedSnippet() {
             <span className={tx}>{" } "}</span>
             <span className={kw}>from</span>
             <span className={tx}> </span>
-            <span className={str}>'./database.types'</span>
+            <span className={str}>&apos;./database.types&apos;</span>
             <span className={op}>;</span>
             {"\n\n"}
 
@@ -297,7 +307,7 @@ function SyntaxHighlightedSnippet() {
             {"\n"}
             <span className={tx}>{"    baseUrl"}</span>
             <span className={op}>: </span>
-            <span className={str}>'http://localhost:3001'</span>
+            <span className={str}>&apos;http://localhost:3001&apos;</span>
             <span className={op}>,</span>
             {"\n"}
             <span className={tx}>{"}"}</span>
@@ -338,7 +348,7 @@ function SyntaxHighlightedSnippet() {
             <span className={op}>.</span>
             <span className={fn}>collection</span>
             <span className={op}>(</span>
-            <span className={str}>'posts'</span>
+            <span className={str}>&apos;posts&apos;</span>
             <span className={op}>)</span>
             <span className={op}>.</span>
             <span className={fn}>find</span>

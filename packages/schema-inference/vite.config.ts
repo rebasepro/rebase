@@ -5,7 +5,7 @@ import { defineConfig } from "vite";
 
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;
-    
+
     return true;
 };
 
@@ -39,7 +39,7 @@ export default defineConfig(() => ({
     },
     resolve: {
         alias: {
-            "@rebasepro/types": path.resolve(__dirname, "../types/src"),
+            "@rebasepro/types": path.resolve(__dirname, "../types/src")
         }
-    },
+    }
 }));

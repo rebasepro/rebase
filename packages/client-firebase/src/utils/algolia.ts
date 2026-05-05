@@ -14,7 +14,7 @@ export function performAlgoliaTextSearch(client: any, indexName: string, query: 
 
     return client.searchSingleIndex({
         indexName,
-        searchParams: { query },
+        searchParams: { query }
     }).then(({ hits }: any) => {
         return hits.map((hit: any) => hit.objectID as string);
     })

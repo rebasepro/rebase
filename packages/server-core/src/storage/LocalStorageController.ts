@@ -2,14 +2,14 @@
  * Local filesystem storage controller
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-import { promisify } from 'util';
+import * as fs from "fs";
+import * as path from "path";
+import { promisify } from "util";
 import {
     StorageController,
     LocalStorageConfig,
     DEFAULT_MAX_FILE_SIZE
-} from './types';
+} from "./types";
 import {
     UploadFileProps,
     UploadFileResult,
@@ -17,7 +17,7 @@ import {
     DownloadMetadata,
     StorageListResult,
     StorageReference
-} from '@rebasepro/types';
+} from "@rebasepro/types";
 
 const mkdir = promisify(fs.mkdir);
 const writeFile = promisify(fs.writeFile);
@@ -33,10 +33,10 @@ const access = promisify(fs.access);
  */
 function normalizeStoragePath(s: string): string {
     let result = s;
-    while (result.startsWith('/')) {
+    while (result.startsWith("/")) {
         result = result.slice(1);
     }
-    while (result.endsWith('/')) {
+    while (result.endsWith("/")) {
         result = result.slice(0, -1);
     }
     return result;
@@ -55,8 +55,8 @@ export class LocalStorageController implements StorageController {
         this.basePath = path.resolve(config.basePath);
     }
 
-    getType(): 'local' {
-        return 'local';
+    getType(): "local" {
+        return "local";
     }
 
     /**
@@ -66,7 +66,7 @@ export class LocalStorageController implements StorageController {
         try {
             await mkdir(dirPath, { recursive: true });
         } catch (error: unknown) {
-            if (error instanceof Error && (error as NodeJS.ErrnoException).code !== 'EEXIST') {
+            if (error instanceof Error && (error as NodeJS.ErrnoException).code !== "EEXIST") {
                 throw error;
             }
         }
@@ -96,7 +96,7 @@ export class LocalStorageController implements StorageController {
 
         if (this.config.allowedMimeTypes && this.config.allowedMimeTypes.length > 0) {
             if (!this.config.allowedMimeTypes.includes(file.type)) {
-                throw new Error(`File type ${file.type} is not allowed. Allowed types: ${this.config.allowedMimeTypes.join(', ')}`);
+                throw new Error(`File type ${file.type} is not allowed. Allowed types: ${this.config.allowedMimeTypes.join(", ")}`);
             }
         }
     }
@@ -110,7 +110,7 @@ export class LocalStorageController implements StorageController {
         this.validateFile(file);
 
         // Always use a bucket (default to 'default')
-        const usedBucket = bucket ?? 'default';
+        const usedBucket = bucket ?? "default";
         const fullStoragePath = key;
         const fullPath = this.getFullPath(fullStoragePath, usedBucket);
 
@@ -143,9 +143,9 @@ export class LocalStorageController implements StorageController {
         let resolvedPath = key;
         let resolvedBucket = bucket;
 
-        if (key.startsWith('local://')) {
-            const withoutProtocol = key.substring('local://'.length);
-            const firstSlash = withoutProtocol.indexOf('/');
+        if (key.startsWith("local://")) {
+            const withoutProtocol = key.substring("local://".length);
+            const firstSlash = withoutProtocol.indexOf("/");
             if (firstSlash > 0) {
                 resolvedBucket = withoutProtocol.substring(0, firstSlash);
                 resolvedPath = withoutProtocol.substring(firstSlash + 1);
@@ -169,16 +169,16 @@ export class LocalStorageController implements StorageController {
         let metadata: DownloadMetadata | undefined;
         const metadataPath = `${fullPath}.metadata.json`;
         try {
-            const metadataContent = await readFile(metadataPath, 'utf-8');
+            const metadataContent = await readFile(metadataPath, "utf-8");
             const savedMetadata = JSON.parse(metadataContent);
             const fileStat = await stat(fullPath);
 
             metadata = {
-                bucket: resolvedBucket ?? 'default',
+                bucket: resolvedBucket ?? "default",
                 fullPath: resolvedPath,
                 name: path.basename(resolvedPath),
                 size: fileStat.size,
-                contentType: savedMetadata.contentType || 'application/octet-stream',
+                contentType: savedMetadata.contentType || "application/octet-stream",
                 customMetadata: savedMetadata
             };
         } catch {
@@ -186,11 +186,11 @@ export class LocalStorageController implements StorageController {
             try {
                 const fileStat = await stat(fullPath);
                 metadata = {
-                    bucket: resolvedBucket ?? 'default',
+                    bucket: resolvedBucket ?? "default",
                     fullPath: resolvedPath,
                     name: path.basename(resolvedPath),
                     size: fileStat.size,
-                    contentType: 'application/octet-stream',
+                    contentType: "application/octet-stream",
                     customMetadata: {}
                 };
             } catch {
@@ -199,7 +199,7 @@ export class LocalStorageController implements StorageController {
         }
 
         // Return a relative URL that will be served by the storage routes
-        const bucketPath = resolvedBucket ? `${resolvedBucket}/` : '';
+        const bucketPath = resolvedBucket ? `${resolvedBucket}/` : "";
         const url = `/api/storage/file/${bucketPath}${resolvedPath}`;
 
         return {
@@ -213,9 +213,9 @@ export class LocalStorageController implements StorageController {
         let resolvedPath = key;
         let resolvedBucket = bucket;
 
-        if (key.startsWith('local://')) {
-            const withoutProtocol = key.substring('local://'.length);
-            const firstSlash = withoutProtocol.indexOf('/');
+        if (key.startsWith("local://")) {
+            const withoutProtocol = key.substring("local://".length);
+            const firstSlash = withoutProtocol.indexOf("/");
             if (firstSlash > 0) {
                 resolvedBucket = withoutProtocol.substring(0, firstSlash);
                 resolvedPath = withoutProtocol.substring(firstSlash + 1);
@@ -231,10 +231,10 @@ export class LocalStorageController implements StorageController {
             const buffer = await readFile(fullPath);
 
             // Try to get content type from metadata
-            let contentType = 'application/octet-stream';
+            let contentType = "application/octet-stream";
             try {
                 const metadataPath = `${fullPath}.metadata.json`;
-                const metadataContent = await readFile(metadataPath, 'utf-8');
+                const metadataContent = await readFile(metadataPath, "utf-8");
                 const metadata = JSON.parse(metadataContent);
                 contentType = metadata.contentType || contentType;
             } catch {
@@ -253,9 +253,9 @@ export class LocalStorageController implements StorageController {
         let resolvedPath = key;
         let resolvedBucket = bucket;
 
-        if (key.startsWith('local://')) {
-            const withoutProtocol = key.substring('local://'.length);
-            const firstSlash = withoutProtocol.indexOf('/');
+        if (key.startsWith("local://")) {
+            const withoutProtocol = key.substring("local://".length);
+            const firstSlash = withoutProtocol.indexOf("/");
             if (firstSlash > 0) {
                 resolvedBucket = withoutProtocol.substring(0, firstSlash);
                 resolvedPath = withoutProtocol.substring(firstSlash + 1);
@@ -275,7 +275,7 @@ export class LocalStorageController implements StorageController {
                 // Metadata file might not exist
             }
         } catch (error: unknown) {
-            if (error instanceof Error && (error as NodeJS.ErrnoException).code !== 'ENOENT') {
+            if (error instanceof Error && (error as NodeJS.ErrnoException).code !== "ENOENT") {
                 throw error;
             }
             // File doesn't exist, nothing to delete
@@ -305,12 +305,12 @@ export class LocalStorageController implements StorageController {
                 const entry = entries[i];
 
                 // Skip metadata files
-                if (entry.name.endsWith('.metadata.json')) {
+                if (entry.name.endsWith(".metadata.json")) {
                     continue;
                 }
 
                 const entryPath = prefix ? `${prefix}/${entry.name}` : entry.name;
-                const bucket = options?.bucket ?? 'default';
+                const bucket = options?.bucket ?? "default";
 
                 const ref: StorageReference = {
                     bucket,
@@ -340,8 +340,9 @@ export class LocalStorageController implements StorageController {
             };
         } catch (error: unknown) {
             const code = (error as NodeJS.ErrnoException)?.code;
-            if (code === 'ENOENT' || code === 'ENOTDIR') {
-                return { items: [], prefixes: [] };
+            if (code === "ENOENT" || code === "ENOTDIR") {
+                return { items: [],
+prefixes: [] };
             }
             throw error;
         }

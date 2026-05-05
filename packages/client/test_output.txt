@@ -1,0 +1,1571 @@
+npm warn Unknown project config "link-workspace-packages". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown project config "hoist". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown project config "public-hoist-pattern". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown project config "auto-install-peers". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown project config "prefer-workspace-packages". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+(node:63454) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+FAIL test/index.test.ts
+  ● createRebaseClient › onUnauthorized auto-setup › auto-refresh retries the request after 401 (wiring regression test)
+
+    RebaseApiError: Token expired
+
+      214 |
+      215 |         if (!res.ok) {
+    > 216 |             throw new RebaseApiError(
+          |                   ^
+      217 |                 res.status,
+      218 |                 body?.error?.message || body?.message || res.statusText,
+      219 |                 body?.error?.code || body?.code,
+
+      at Object.request (src/transport.ts:216:19)
+      at Object.find (src/collection.ts:144:25)
+      at Object.<anonymous> (test/index.test.ts:341:28)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 529.213833
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 533.977333
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 535.314458
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 537.103041
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 538.452375
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 539.678958
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 540.820583
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 542.017791
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 543.220208
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 544.42125
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 545.661083
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 547.138375
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 548.4435
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 549.674791
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 550.84175
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 552.3675
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 553.600333
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 554.785416
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 556.042333
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 557.263875
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 558.392916
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+PASS test/websocket.test.ts
+PASS test/relations.test.ts
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 659.302708
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 660.87225
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+PASS test/auth.test.ts
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 697.093541
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 698.576291
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 699.655666
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 700.721333
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 701.763958
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 702.797541
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "WebSocket error: ErrorEvent {
+      type: 'error',
+      defaultPrevented: false,
+      cancelable: false,
+      timeStamp: 704.03225
+    }".
+
+      215 |         }
+      216 |     }
+    > 217 |
+          | ^
+      218 |     // Initialize WebSocket connection
+      219 |     private initWebSocket() {
+      220 |         if (!this.WebSocketConstructor) return;
+
+      at console.error (../../node_modules/@jest/console/build/BufferedConsole.js:127:10)
+      at WebSocket.ws.onerror (src/websocket.ts:217:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Disconnected from PostgreSQL backend".
+
+      192 |         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
+      193 |             console.log("WebSocket auto-authenticating after token getter set");
+    > 194 |             this.getAuthToken().then(token => {
+          |                         ^
+      195 |                 if (token) {
+      196 |                     this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+      197 |                 }
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at WebSocket.ws.onclose (src/websocket.ts:194:25)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "Attempting to reconnect in 2000ms (attempt 1)".
+
+      239 |                         }
+      240 |                     } catch (error) {
+    > 241 |                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
+          |                 ^
+      242 |                     }
+      243 |                 }
+      244 |
+
+      at console.log (../../node_modules/@jest/console/build/BufferedConsole.js:156:10)
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:241:17)
+      at WebSocket.ws.onclose (src/websocket.ts:214:22)
+
+PASS test/transport.test.ts
+PASS test/collection.test.ts
+PASS test/query_builder.test.ts
+PASS test/storage.test.ts
+PASS test/admin.test.ts
+PASS src/cron.test.ts
+
+Test Suites: 1 failed, 9 passed, 10 total
+Tests:       1 failed, 483 passed, 484 total
+Snapshots:   0 total
+Time:        0.643 s, estimated 1 s
+Ran all test suites.
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?

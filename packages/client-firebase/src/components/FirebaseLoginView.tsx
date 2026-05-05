@@ -1,7 +1,7 @@
 import React, { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import { FirebaseApp, FirebaseError } from "@firebase/app";
-import { ErrorView, RebaseLogo, useModeController, useSnackbarController, } from "@rebasepro/core";
+import { ErrorView, RebaseLogo, useModeController, useSnackbarController } from "@rebasepro/core";
 import {
     ArrowBackIcon,
     Button,
@@ -13,7 +13,7 @@ import {
     MailIcon,
     PersonIcon,
     TextField,
-    Typography,
+    Typography
 } from "@rebasepro/ui";
 import { appleIcon, facebookIcon, githubIcon, googleIcon, microsoftIcon, twitterIcon } from "./social_icons";
 import {
@@ -194,7 +194,7 @@ export function FirebaseLoginView({
                         <div className="p-4">
                             <ErrorView
                                 title={"Firebase Auth not enabled"}
-                                error={"You need to enable Firebase Auth and the corresponding login provider in your Firebase project"} />
+                                error={"You need to enable Firebase Auth and the corresponding login provider in your Firebase project"}/>
                         </div>
                         {firebaseApp &&
                             <div className="p-4">
@@ -212,19 +212,19 @@ export function FirebaseLoginView({
                 errorView = <div className="p-4">
                     <ErrorView
                         title={"Invalid API key"}
-                        error={"auth/invalid-api-key: Check that your Firebase config is set correctly in your `firebase_config.ts` file"} />
+                        error={"auth/invalid-api-key: Check that your Firebase config is set correctly in your `firebase_config.ts` file"}/>
                 </div>;
             } else if (authError.code === "auth/email-already-in-use") {
                 errorView = <div className="p-4">
                     <ErrorView
                         title={"Email already in use"}
-                        error={"The selected email is already in use by another account"} />
+                        error={"The selected email is already in use by another account"}/>
                 </div>;
             } else if (authError.code === "auth/invalid-credential") {
                 errorView = <div className="p-4">
                     <ErrorView
                         title={"Invalid credential"}
-                        error={"The provided credential is not correct"} />
+                        error={"The provided credential is not correct"}/>
                 </div>;
             } else if (!ignoredCodes.includes(authError.code)) {
                 if (authError.code === "auth/multi-factor-auth-required") {
@@ -232,7 +232,7 @@ export function FirebaseLoginView({
                 }
                 errorView =
                     <div className="p-4">
-                        <ErrorView error={authController.authProviderError as Error} />
+                        <ErrorView error={authController.authProviderError as Error}/>
                     </div>;
             }
         }
@@ -247,9 +247,9 @@ export function FirebaseLoginView({
                 width: "100%",
                 objectFit: "contain"
             }}
-            alt={"Logo"} />;
+            alt={"Logo"}/>;
     } else {
-        logoComponent = <RebaseLogo />;
+        logoComponent = <RebaseLogo/>;
     }
 
     let notAllowedMessage: string | undefined;
@@ -285,7 +285,7 @@ export function FirebaseLoginView({
 
                 {notAllowedMessage &&
                     <div className="p-8">
-                        <ErrorView error={notAllowedMessage} />
+                        <ErrorView error={notAllowedMessage}/>
                     </div>}
 
                 {buildErrorView()}
@@ -298,23 +298,23 @@ export function FirebaseLoginView({
                         <LoginButton
                             disabled={disabled}
                             text={"Email/password"}
-                            icon={<MailIcon size={28} />}
-                            onClick={() => setPasswordLoginSelected(true)} />}
+                            icon={<MailIcon size={28}/>}
+                            onClick={() => setPasswordLoginSelected(true)}/>}
 
                     {resolvedSignInOptions.includes("phone") &&
                         <LoginButton
                             disabled={disabled}
                             text={"Phone number"}
-                            icon={<CallIcon size={28} />}
-                            onClick={() => setPhoneLoginSelected(true)} />}
+                            icon={<CallIcon size={28}/>}
+                            onClick={() => setPhoneLoginSelected(true)}/>}
 
                     {resolvedSignInOptions.includes("anonymous") &&
                         <LoginButton
                             disabled={disabled}
                             text={"Log in anonymously"}
                             icon={<PersonIcon
-                                size={28} />}
-                            onClick={authController.anonymousLogin} />}
+                                size={28}/>}
+                            onClick={authController.anonymousLogin}/>}
 
                     {allowSkipLogin &&
                         <Button
@@ -420,15 +420,15 @@ function PhoneLoginForm({
         <form onSubmit={handleSubmit}>
             {isInvalidCode &&
                 <div className="p-8">
-                    <ErrorView error={"Invalid confirmation code"} />
+                    <ErrorView error={"Invalid confirmation code"}/>
                 </div>}
 
-            <div id={RECAPTCHA_CONTAINER_ID} />
+            <div id={RECAPTCHA_CONTAINER_ID}/>
 
             <div className={"flex flex-col gap-1"}>
                 <IconButton
                     onClick={onClose}>
-                    <ArrowBackIcon className="w-5 h-5" />
+                    <ArrowBackIcon className="w-5 h-5"/>
                 </IconButton>
                 <div className="p-1 flex">
                     <Typography align={"center"}
@@ -438,7 +438,7 @@ function PhoneLoginForm({
                     value={phone ?? ""}
                     disabled={Boolean(phone && (authController.authLoading || authController.confirmationResult))}
                     type="phone"
-                    onChange={(event) => setPhone(event.target.value)} />
+                    onChange={(event) => setPhone(event.target.value)}/>
                 {Boolean(phone && authController.confirmationResult) &&
                     <>
                         <div className="mt-2 p-1 flex">
@@ -448,14 +448,14 @@ function PhoneLoginForm({
                         <TextField placeholder=""
                             value={code ?? ""}
                             type="text"
-                            onChange={(event) => setCode(event.target.value)} />
+                            onChange={(event) => setCode(event.target.value)}/>
                     </>
                 }
 
                 <div className="flex justify-end items-center w-full">
 
                     {authController.authLoading &&
-                        <CircularProgress className="p-1" size={"small"} />
+                        <CircularProgress className="p-1" size={"small"}/>
                     }
 
                     <Button type="submit">
@@ -569,7 +569,7 @@ function LoginForm({
             <div className={"max-w-[480px] w-full flex flex-col gap-4"}>
                 <IconButton
                     onClick={onBackPressed}>
-                    <ArrowBackIcon className="w-5 h-5" />
+                    <ArrowBackIcon className="w-5 h-5"/>
                 </IconButton>
 
                 <div>
@@ -584,7 +584,7 @@ function LoginForm({
                     value={email ?? ""}
                     disabled={authController.authLoading}
                     type="email"
-                    onChange={(event) => setEmail(event.target.value)} />}
+                    onChange={(event) => setEmail(event.target.value)}/>}
 
                 <div
                     className={`${loginState === "password" || (loginState === "registration" && !disableSignupScreen) ? "block" : "hidden"}`}>
@@ -593,14 +593,14 @@ function LoginForm({
                         disabled={authController.authLoading}
                         inputRef={passwordRef}
                         type="password"
-                        onChange={(event) => setPassword(event.target.value)} />
+                        onChange={(event) => setPassword(event.target.value)}/>
                 </div>
 
                 <div
                     className={`${loginState === "registration" && disableSignupScreen ? "hidden" : "flex"} justify-end items-center w-full flex gap-2`}>
 
                     {authController.authLoading &&
-                        <CircularProgress className="p-1" size={"small"} />
+                        <CircularProgress className="p-1" size={"small"}/>
                     }
 
                     {!disableResetPassword && <LoadingButton variant="text"
@@ -668,36 +668,36 @@ function buildOauthLoginButtons(authController: FirebaseAuthController, provider
             disabled={disabled}
             text={"Sign in with Google"}
             icon={googleIcon(mode)}
-            onClick={authController.googleLogin} />}
+            onClick={authController.googleLogin}/>}
 
         {providers.includes("microsoft.com") && <LoginButton
             disabled={disabled}
             text={"Sign in with Microsoft"}
             icon={microsoftIcon(mode)}
-            onClick={authController.microsoftLogin} />}
+            onClick={authController.microsoftLogin}/>}
 
         {providers.includes("apple.com") && <LoginButton
             disabled={disabled}
             text={"Sign in with Apple"}
             icon={appleIcon(mode)}
-            onClick={authController.appleLogin} />}
+            onClick={authController.appleLogin}/>}
 
         {providers.includes("github.com") && <LoginButton
             disabled={disabled}
             text={"Sign in with Github"}
             icon={githubIcon(mode)}
-            onClick={authController.githubLogin} />}
+            onClick={authController.githubLogin}/>}
 
         {providers.includes("facebook.com") && <LoginButton
             disabled={disabled}
             text={"Sign in with Facebook"}
             icon={facebookIcon(mode)}
-            onClick={authController.facebookLogin} />}
+            onClick={authController.facebookLogin}/>}
 
         {providers.includes("twitter.com") && <LoginButton
             disabled={disabled}
             text={"Sign in with Twitter"}
             icon={twitterIcon(mode)}
-            onClick={authController.twitterLogin} />}
+            onClick={authController.twitterLogin}/>}
     </>
 }

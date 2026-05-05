@@ -2,11 +2,11 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { AuthClient, AuthController, User } from "@rebasepro/types";
 
 export function useAuthSubscription(authClient?: AuthClient): AuthController {
-    
+
     // Check initial state
     const currentSession = authClient?.getSession();
     const [user, setUser] = useState<User | null>(currentSession?.user ?? null);
-    
+
     const [initialLoading, setInitialLoading] = useState(!currentSession);
     const [authLoading, setAuthLoading] = useState(false);
     const [authError, setAuthError] = useState<Error>();
@@ -81,7 +81,7 @@ export function useAuthSubscription(authClient?: AuthClient): AuthController {
         extra,
         setExtra
     } as AuthController), [
-        user, initialLoading, authLoading, signOut, authError, 
+        user, initialLoading, authLoading, signOut, authError,
         getAuthToken, loginSkipped, extra, setExtra, authClient
     ]);
 }

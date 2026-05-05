@@ -49,7 +49,7 @@ export const productsCollection: EntityCollection = {
             clearable: true,
             validation: {
                 required: true
-            },
+            }
         },
         main_image: {
             type: "string",
@@ -68,7 +68,7 @@ export const productsCollection: EntityCollection = {
             description: "Upload field for images",
             validation: {
                 required: true
-            },
+            }
         },
         category: {
             type: "string",
@@ -80,14 +80,14 @@ export const productsCollection: EntityCollection = {
                 babys: "Babies and kids",
                 backpacks: "Backpacks and bags",
                 bath: "Bath",
-                bicycle: "Bicycle",
-            },
+                bicycle: "Bicycle"
+            }
         },
         available: {
             type: "boolean",
             name: "Available",
             columnWidth: 100,
-            description: "Is this product available in the website",
+            description: "Is this product available in the website"
         },
         price: {
             type: "number",
@@ -96,19 +96,19 @@ export const productsCollection: EntityCollection = {
                 requiredMessage: "You must set a price between 0 and 1000",
                 min: 0,
                 max: 1000
-            },
+            }
         },
         currency: {
             type: "string",
             name: "Currency",
             validation: {
                 required: true
-            },
+            }
         },
         public: {
             type: "boolean",
             name: "Public",
-            description: "Should this product be visible in the website",
+            description: "Should this product be visible in the website"
         },
         brand: {
             type: "string",
@@ -116,18 +116,18 @@ export const productsCollection: EntityCollection = {
             validation: {
                 required: true
             },
-            description: "This field uses a custom component defined by the developer",
+            description: "This field uses a custom component defined by the developer"
         },
         description: {
             type: "string",
             name: "Description",
             description: "Example of a markdown field",
-            markdown: true,
+            markdown: true
         },
         amazon_link: {
             type: "string",
             name: "Amazon link",
-            url: true,
+            url: true
         },
         images: {
             type: "array",
@@ -143,7 +143,7 @@ export const productsCollection: EntityCollection = {
                     }
                 }
             },
-            description: "This fields allows uploading multiple images at once",
+            description: "This fields allows uploading multiple images at once"
         },
         related_products: {
             type: "array",
@@ -152,7 +152,7 @@ export const productsCollection: EntityCollection = {
             of: {
                 type: "reference",
                 path: "products"
-            },
+            }
         },
         publisher: {
             name: "Publisher",
@@ -167,25 +167,25 @@ export const productsCollection: EntityCollection = {
                     name: "External id",
                     type: "string"
                 }
-            },
+            }
         },
         uppercase_name: {
             name: "Uppercase Name",
             type: "string",
             readOnly: true,
-            description: "This field gets updated with a preSave callback",
+            description: "This field gets updated with a preSave callback"
         },
         added_on: {
             type: "date",
             name: "Added on",
-            autoValue: "on_create",
+            autoValue: "on_create"
         },
         tags: {
             type: "array",
             name: "Tags",
             of: {
-                type: "string",
-            },
+                type: "string"
+            }
         }
     }
 

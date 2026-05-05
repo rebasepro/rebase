@@ -97,21 +97,23 @@ describe("Storage routes (sub-router integration)", () => {
         // Upload a test file so we have something to serve
         const content = Buffer.from("Hello test file");
         const file = new File([content], "test.txt", { type: "text/plain" });
-        await controller.putObject({ file, key: "photos/test.txt" });
+        await controller.putObject({ file,
+key: "photos/test.txt" });
 
         // Create the Hono app with storage routes mounted as a SUB-ROUTER
         // (this is the exact pattern that caused the bug)
         app = new Hono<HonoEnv>();
-        app.onError(errorHandler);  // required to convert ApiError throws to proper HTTP responses
+        app.onError(errorHandler); // required to convert ApiError throws to proper HTTP responses
         const storageRoutes = createStorageRoutes({
             controller,
-            requireAuth: false  // skip auth for tests
+            requireAuth: false // skip auth for tests
         });
         app.route("/api/storage", storageRoutes);
     });
 
     afterEach(async () => {
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
+        await fs.promises.rm(tempDir, { recursive: true,
+force: true });
     });
 
     describe("GET /metadata/*", () => {
@@ -193,7 +195,8 @@ describe("Storage routes (sub-router integration)", () => {
         it("should delete an existing file", async () => {
             // Upload another file to delete
             const file = new File([Buffer.from("delete me")], "deleteme.txt", { type: "text/plain" });
-            await controller.putObject({ file, key: "photos/deleteme.txt" });
+            await controller.putObject({ file,
+key: "photos/deleteme.txt" });
 
             const res = await app.fetch(
                 new Request("http://localhost/api/storage/file/default/photos/deleteme.txt", { method: "DELETE" })

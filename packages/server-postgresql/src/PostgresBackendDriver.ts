@@ -90,8 +90,8 @@ export class PostgresBackendDriver implements DataDriver {
                 createBranch: this.branchService.createBranch.bind(this.branchService),
                 deleteBranch: this.branchService.deleteBranch.bind(this.branchService),
                 listBranches: this.branchService.listBranches.bind(this.branchService),
-                getBranchInfo: this.branchService.getBranchInfo.bind(this.branchService),
-            } : {}),
+                getBranchInfo: this.branchService.getBranchInfo.bind(this.branchService)
+            } : {})
         };
     }
 
@@ -101,12 +101,14 @@ export class PostgresBackendDriver implements DataDriver {
     admin: DatabaseAdmin;
 
 
-
     private resolveCollectionCallbacks<M extends Record<string, unknown>>(collection: EntityCollection<M> | undefined, path: string) {
-        if (!collection && !path) return { collection: undefined, callbacks: undefined, propertyCallbacks: undefined };
+        if (!collection && !path) return { collection: undefined,
+callbacks: undefined,
+propertyCallbacks: undefined };
         const registryCollection = this.registry.getCollectionByPath(path);
         const resolvedCollection = registryCollection
-            ? { ...collection, ...registryCollection } as EntityCollection<M>
+            ? { ...collection,
+...registryCollection } as EntityCollection<M>
             : collection as EntityCollection<M>;
 
         const callbacks = resolvedCollection?.callbacks;
@@ -611,7 +613,8 @@ export class PostgresBackendDriver implements DataDriver {
     }: FetchCollectionProps<M>): Promise<number> {
         return this.entityService.countEntities(
             path,
-            { filter, searchString }
+            { filter,
+searchString }
         );
     }
 
@@ -682,7 +685,7 @@ export class PostgresBackendDriver implements DataDriver {
     }
 
     async fetchAvailableRoles(): Promise<string[]> {
-        const result = await this.executeSql(`SELECT rolname FROM pg_roles;`);
+        const result = await this.executeSql("SELECT rolname FROM pg_roles;");
         return result.map((r: Record<string, unknown>) => r.rolname as string);
     }
 
@@ -758,7 +761,7 @@ export class PostgresBackendDriver implements DataDriver {
         return filteredTables.filter((name: string) => !mappedSet.has(name.toLowerCase()));
     }
 
-    
+
     /**
      * Fetch metadata for a given table from information_schema (columns, policies, constraints).
      */
@@ -896,17 +899,17 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         operation: (delegate: PostgresBackendDriver) => Promise<T>
     ): Promise<T> {
         const pendingNotifications: PostgresBackendDriver["_pendingNotifications"] = [];
-        
+
         const result = await this.delegate.db.transaction(async (tx) => {
             let userId = this.user?.uid;
             if (!userId) {
-                console.warn(`[DataDriver] User ID (uid) is missing for authenticated delegate. Using 'anonymous'. User object:`, this.user);
-                userId = 'anonymous';
+                console.warn("[DataDriver] User ID (uid) is missing for authenticated delegate. Using 'anonymous'. User object:", this.user);
+                userId = "anonymous";
             }
 
-            let userRoles = this.user?.roles ?? [];
+            const userRoles = this.user?.roles ?? [];
             if (!this.user?.roles) {
-                console.warn(`[DataDriver] User roles are missing for authenticated delegate. Using empty array. User object:`, this.user);
+                console.warn("[DataDriver] User roles are missing for authenticated delegate. Using empty array. User object:", this.user);
             }
             const normalizedRoles = userRoles.map((r: unknown) =>
                 typeof r === "string" ? r : (r as Record<string, unknown>)?.id ?? String(r)
@@ -917,12 +920,13 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                 SELECT 
                     set_config('app.user_id', ${userId}, true),
                     set_config('app.user_roles', ${rolesString}, true),
-                    set_config('app.jwt', ${JSON.stringify({ sub: userId, roles: userRoles })}, true)
+                    set_config('app.jwt', ${JSON.stringify({ sub: userId,
+roles: userRoles })}, true)
             `);
 
             const txEntityService = new EntityService(tx, this.delegate.registry);
             const txDelegate = new PostgresBackendDriver(tx, this.delegate.realtimeService, this.delegate.registry, this.user, this.delegate.poolManager, this.delegate.historyService);
-            
+
             txDelegate.entityService = txEntityService;
             txDelegate._deferNotifications = true;
             txDelegate._pendingNotifications = pendingNotifications;
@@ -955,7 +959,8 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
      * registered realtime subscription so RLS-aware polling can apply.
      */
     private injectAuthContext(unsubscribe: () => void): () => void {
-        const authContext = { userId: this.user?.uid || "anonymous", roles: this.user?.roles ?? [] };
+        const authContext = { userId: this.user?.uid || "anonymous",
+roles: this.user?.roles ?? [] };
         const entries = Array.from(this.delegate.realtimeService.subscriptions.entries());
         const lastEntry = entries[entries.length - 1];
         const lastSub = lastEntry?.[1] as Record<string, unknown> | undefined;

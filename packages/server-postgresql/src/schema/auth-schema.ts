@@ -105,7 +105,7 @@ export const userIdentities = rebaseSchema.table("user_identities", {
     userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     provider: varchar("provider", { length: 50 }).notNull(), // e.g. 'google', 'linkedin'
     providerId: varchar("provider_id", { length: 255 }).notNull(),
-    profileData: jsonb("profile_data"), 
+    profileData: jsonb("profile_data"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull()
 }, (table) => ({

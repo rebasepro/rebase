@@ -393,7 +393,7 @@ export class EntityFetchService {
                         key,
                         relation
                     );
-                    
+
                     for (const row of rows) {
                         const parsed = parseIdValues(String(row.id), idInfoArray);
                         const entityId = parsed[idInfo.fieldName] as string | number;
@@ -456,15 +456,18 @@ export class EntityFetchService {
                         );
                         if (nestedKey) {
                             const nested = item[nestedKey] as Record<string, unknown>;
-                            return { id: String(nested.id ?? nested[Object.keys(nested)[0]]), ...nested };
+                            return { id: String(nested.id ?? nested[Object.keys(nested)[0]]),
+...nested };
                         }
                     }
-                    return { id: String(item.id ?? item[Object.keys(item)[0]]), ...item };
+                    return { id: String(item.id ?? item[Object.keys(item)[0]]),
+...item };
                 });
             } else if (typeof v === "object" && v !== null && !Array.isArray(v) && relation) {
                 // One-to-one relation — inline the object
                 const relObj = v as Record<string, unknown>;
-                flat[k] = { id: String(relObj.id ?? relObj[Object.keys(relObj)[0]]), ...relObj };
+                flat[k] = { id: String(relObj.id ?? relObj[Object.keys(relObj)[0]]),
+...relObj };
             } else {
                 flat[k] = v;
             }
@@ -619,14 +622,14 @@ export class EntityFetchService {
         const parsedId = parsedIdObj[idInfo.fieldName];
 
         // Primary path: use db.query.findFirst with relation loading
-        
+
         const tableName = getTableName(table);
 
         const qb = this.getQueryBuilder(tableName);
         if (qb) {
             try {
                 const withConfig = this.buildWithConfig(collection);
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic query config
+
                 const row = await qb.findFirst({
                     where: eq(idField, parsedId),
                     with: withConfig
@@ -741,7 +744,7 @@ export class EntityFetchService {
         // Skip when collection has relations — lateral JOINs are catastrophically
         // slow for large collections (7s+ for 350 rows). The db.select fallback
         // path uses batch relation resolution which is 50x faster.
-        
+
         const tableName = getTableName(table);
 
         const qb = this.getQueryBuilder(tableName);
@@ -754,7 +757,7 @@ export class EntityFetchService {
                     table, idField, idInfo, options, collectionPath, undefined
                 );
 
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic query config
+
                 const results = await qb.findMany(queryOpts as unknown as Parameters<NonNullable<typeof qb>["findMany"]>[0]);
 
                 const entities = (results as Record<string, unknown>[]).map(row =>
@@ -832,7 +835,7 @@ export class EntityFetchService {
         collectionPath: string,
         idInfo: { fieldName: string; type: "string" | "number" },
         databaseId?: string,
-        skipRelations: boolean = false,
+        skipRelations = false,
         idInfoArray?: { fieldName: string; type: "string" | "number" }[]
     ): Promise<Entity<M>[]> {
         if (results.length === 0) return [];
@@ -1207,7 +1210,7 @@ export class EntityFetchService {
         // NOTE: Skip db.query path when searchString is present because
         // Drizzle's relational query API doesn't properly apply raw SQL
         // ILIKE conditions — the fallback db.select path handles them correctly.
-        
+
         const tableName = getTableName(table);
 
         const qb = this.getQueryBuilder(tableName);
@@ -1221,7 +1224,7 @@ export class EntityFetchService {
                     table, idField, idInfo, options, collectionPath, withConfig
                 );
 
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic query config
+
                 const results = await qb.findMany(queryOpts as unknown as Parameters<NonNullable<typeof qb>["findMany"]>[0]);
 
                 const restRows = (results as Record<string, unknown>[]).map(row =>
@@ -1265,7 +1268,8 @@ export class EntityFetchService {
                     const eid = entity[idInfo.fieldName] as string | number;
                     const related = batchResults.get(String(eid));
                     if (related) {
-                        (entity as Record<string, unknown>)[key] = { id: related.id, ...related.values };
+                        (entity as Record<string, unknown>)[key] = { id: related.id,
+...related.values };
                     }
                 }
             } catch (e) {
@@ -1283,7 +1287,8 @@ export class EntityFetchService {
                     const eid = entity[idInfo.fieldName] as string | number;
                     const relatedList = batchResults.get(String(eid)) || [];
                     (entity as Record<string, unknown>)[key] = relatedList.map(e => ({
-                        id: e.id, ...e.values
+                        id: e.id,
+...e.values
                     }));
                 }
             } catch (e) {
@@ -1316,7 +1321,7 @@ export class EntityFetchService {
         const parsedId = parsedIdObj[idInfo.fieldName];
 
         // Primary path: use db.query.findFirst
-        
+
         const tableName = getTableName(table);
 
         const qb = this.getQueryBuilder(tableName);
@@ -1326,7 +1331,7 @@ export class EntityFetchService {
                     ? this.buildWithConfig(collection, include)
                     : undefined;
 
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic query config
+
                 const row = await qb.findFirst({
                     where: eq(idField, parsedId),
                     ...(withConfig ? { with: withConfig } : {})
@@ -1355,7 +1360,8 @@ export class EntityFetchService {
         if (result.length === 0) return null;
 
         const raw = result[0] as Record<string, unknown>;
-        const flatEntity: Record<string, unknown> = { id: (idInfoArray.length > 1) ? buildCompositeId(raw as Record<string, unknown>, idInfoArray) : String(raw[idInfo.fieldName]), ...raw };
+        const flatEntity: Record<string, unknown> = { id: (idInfoArray.length > 1) ? buildCompositeId(raw as Record<string, unknown>, idInfoArray) : String(raw[idInfo.fieldName]),
+...raw };
 
         if (!include || include.length === 0) {
             return flatEntity;
@@ -1378,11 +1384,13 @@ export class EntityFetchService {
                 if (relation.cardinality === "one") {
                     if (relatedEntities.length > 0) {
                         const e = relatedEntities[0];
-                        flatEntity[key] = { id: e.id, ...e.values };
+                        flatEntity[key] = { id: e.id,
+...e.values };
                     }
                 } else {
                     flatEntity[key] = relatedEntities.map(e => ({
-                        id: e.id, ...e.values
+                        id: e.id,
+...e.values
                     }));
                 }
             } catch (e) {
@@ -1460,7 +1468,7 @@ export class EntityFetchService {
      * Note: Primary path now uses inline `getQueryBuilder()` checks.
      */
     private hasDrizzleQueryAPI(collectionPath: string): boolean {
-        
+
         const qb = this.getQueryBuilder("__probe__");
         if (!qb) {
             // If getQueryBuilder returns undefined even for a probe, query API is not available
@@ -1492,7 +1500,7 @@ export class EntityFetchService {
         idInfoArray?: { fieldName: string; type: "string" | "number" }[]
     ): Promise<Record<string, unknown>[] | null> {
         try {
-            
+
             const table = getTableForCollection(collection, this.registry);
             const tableName = getTableName(table);
             const queryTarget = this.getQueryBuilder(tableName);
@@ -1532,7 +1540,7 @@ export class EntityFetchService {
                 }
             }
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- deprecated method, will be removed
+
             const results = await queryTarget.findMany(queryOpts as unknown as Parameters<NonNullable<typeof queryTarget>["findMany"]>[0]);
 
             // Flatten the nested Drizzle results into REST format
@@ -1549,14 +1557,17 @@ export class EntityFetchService {
                             const nestedObj = keys.find(nk => typeof item[nk] === "object" && item[nk] !== null && !Array.isArray(item[nk]));
                             if (nestedObj && keys.length <= 3) {
                                 const nested = item[nestedObj] as Record<string, unknown>;
-                                return { id: String(nested.id ?? nested[Object.keys(nested)[0]]), ...nested };
+                                return { id: String(nested.id ?? nested[Object.keys(nested)[0]]),
+...nested };
                             }
-                            return { id: String(item.id ?? item[Object.keys(item)[0]]), ...item };
+                            return { id: String(item.id ?? item[Object.keys(item)[0]]),
+...item };
                         });
                     } else if (typeof v === "object" && v !== null) {
                         // One-to-one relation — inline the object
                         const relObj = v as Record<string, unknown>;
-                        flat[k] = { id: String(relObj.id ?? relObj[Object.keys(relObj)[0]]), ...relObj };
+                        flat[k] = { id: String(relObj.id ?? relObj[Object.keys(relObj)[0]]),
+...relObj };
                     } else {
                         flat[k] = v;
                     }

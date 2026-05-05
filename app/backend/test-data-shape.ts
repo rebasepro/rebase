@@ -64,7 +64,8 @@ function assert(label: string, condition: boolean, detail?: string) {
 }
 
 async function main() {
-    const pool = new pg.Pool({ connectionString: DATABASE_URL, max: 5 });
+    const pool = new pg.Pool({ connectionString: DATABASE_URL,
+max: 5 });
 
     // Monkey-patch pool.query for SQL tracing
     const _origQuery = pool.query.bind(pool);
@@ -74,12 +75,15 @@ async function main() {
         const start = performance.now();
         const resultPromise = _origQuery(...args);
         resultPromise.then(() => {
-            sqlQueries.push({ sql: sqlStr.slice(0, 500), durationMs: performance.now() - start });
+            sqlQueries.push({ sql: sqlStr.slice(0, 500),
+durationMs: performance.now() - start });
         }).catch(() => {});
         return resultPromise;
     };
 
-    const fullSchema = { ...schema.tables, ...schema.enums, ...schema.relations };
+    const fullSchema = { ...schema.tables,
+...schema.enums,
+...schema.relations };
     const db = drizzle(pool, { schema: fullSchema });
 
     // Build registry
@@ -103,7 +107,9 @@ async function main() {
 
     startTrace();
     const authors = await entityService.fetchEntitiesWithConditions("authors", {
-        limit: 20, orderBy: "email", order: "asc"
+        limit: 20,
+orderBy: "email",
+order: "asc"
     });
     stopTrace();
 
@@ -169,7 +175,9 @@ async function main() {
 
     startTrace();
     const postEntities = await entityService.fetchEntitiesWithConditions("posts", {
-        limit: 10, orderBy: "title", order: "asc"
+        limit: 10,
+orderBy: "title",
+order: "asc"
     });
     stopTrace();
 
@@ -194,7 +202,7 @@ async function main() {
             assert("posts: author.path is 'authors'", author.path === "authors");
             console.log(`  ✅ Owning relation correct: { id: "${author.id}", path: "${author.path}", __type: "${author.__type}" }`);
         } else {
-            console.log(`  ℹ️  author is null (FK might be nullable)`);
+            console.log("  ℹ️  author is null (FK might be nullable)");
         }
     }
 
@@ -242,7 +250,9 @@ async function main() {
 
     startTrace();
     const restAuthors = await entityService.fetchCollectionForRest("authors", {
-        limit: 10, orderBy: "email", order: "asc"
+        limit: 10,
+orderBy: "email",
+order: "asc"
     }, ["profile"]);
     stopTrace();
 
@@ -275,7 +285,9 @@ async function main() {
 
     startTrace();
     const restNoInclude = await entityService.fetchCollectionForRest("authors", {
-        limit: 10, orderBy: "email", order: "asc"
+        limit: 10,
+orderBy: "email",
+order: "asc"
     });
     stopTrace();
 
@@ -304,10 +316,14 @@ async function main() {
         startTrace();
         const t0 = performance.now();
         await entityService.fetchEntitiesWithConditions("authors", {
-            limit: n, orderBy: "email", order: "asc"
+            limit: n,
+orderBy: "email",
+order: "asc"
         });
         stopTrace();
-        scaling.push({ n, queries: sqlQueries.length, ms: Math.round(performance.now() - t0) });
+        scaling.push({ n,
+queries: sqlQueries.length,
+ms: Math.round(performance.now() - t0) });
     }
 
     console.log(`\n  ${"N".padStart(5)}  ${"Queries".padStart(8)}  ${"Wall(ms)".padStart(10)}`);

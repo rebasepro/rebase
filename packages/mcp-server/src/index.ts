@@ -4,7 +4,7 @@ import {
     CallToolRequestSchema,
     ListToolsRequestSchema,
     ListResourcesRequestSchema,
-    ReadResourceRequestSchema,
+    ReadResourceRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
 import { spawn, type ChildProcess } from "node:child_process";
 import { config as loadDotenv } from "dotenv";
@@ -28,7 +28,7 @@ const PROJECT_DIR = process.env.REBASE_PROJECT_DIR || process.cwd();
 // Try to load .env from the project directory
 for (const envPath of [
     resolve(PROJECT_DIR, ".env"),
-    resolve(PROJECT_DIR, "app", ".env"),
+    resolve(PROJECT_DIR, "app", ".env")
 ]) {
     if (existsSync(envPath)) {
         loadDotenv({ path: envPath });
@@ -67,7 +67,7 @@ async function getClient(): Promise<RebaseClient> {
         const createRebaseClient = await loadClientSdk();
         _client = createRebaseClient({
             baseUrl: BASE_URL,
-            token: API_TOKEN || undefined,
+            token: API_TOKEN || undefined
         }) as RebaseClient;
     }
     return _client;
@@ -76,8 +76,10 @@ async function getClient(): Promise<RebaseClient> {
 // ── MCP Server ──────────────────────────────────────────────────────────────
 
 const server = new Server(
-    { name: "rebase-mcp-server", version: "0.0.1" },
-    { capabilities: { tools: {}, resources: {} } },
+    { name: "rebase-mcp-server",
+version: "0.0.1" },
+    { capabilities: { tools: {},
+resources: {} } }
 );
 
 // ── Tool Definitions ────────────────────────────────────────────────────────
@@ -96,39 +98,45 @@ const CLI_TOOLS: (ToolDef & { cmd: string[] })[] = [
     {
         name: "rebase_schema_generate",
         description: "Generate Drizzle schema from Rebase TypeScript collection definitions. Run this after adding or modifying collection files.",
-        inputSchema: { type: "object", properties: {} },
-        cmd: ["schema", "generate"],
+        inputSchema: { type: "object",
+properties: {} },
+        cmd: ["schema", "generate"]
     },
     {
         name: "rebase_db_push",
         description: "Apply the current Drizzle schema directly to the database (development shortcut, skips migration files).",
-        inputSchema: { type: "object", properties: {} },
-        cmd: ["db", "push"],
+        inputSchema: { type: "object",
+properties: {} },
+        cmd: ["db", "push"]
     },
     {
         name: "rebase_db_pull",
         description: "Introspect the live database and write back a Drizzle schema (reverse-engineer existing tables).",
-        inputSchema: { type: "object", properties: {} },
-        cmd: ["db", "pull"],
+        inputSchema: { type: "object",
+properties: {} },
+        cmd: ["db", "pull"]
     },
     {
         name: "rebase_db_generate",
         description: "Generate SQL migration files from schema changes (compares current Drizzle schema against the last snapshot).",
-        inputSchema: { type: "object", properties: {} },
-        cmd: ["db", "generate"],
+        inputSchema: { type: "object",
+properties: {} },
+        cmd: ["db", "generate"]
     },
     {
         name: "rebase_db_migrate",
         description: "Run all pending SQL migrations against the database.",
-        inputSchema: { type: "object", properties: {} },
-        cmd: ["db", "migrate"],
+        inputSchema: { type: "object",
+properties: {} },
+        cmd: ["db", "migrate"]
     },
     {
         name: "rebase_generate_sdk",
         description: "Generate a fully-typed JavaScript/TypeScript SDK from collection definitions.",
-        inputSchema: { type: "object", properties: {} },
-        cmd: ["generate-sdk"],
-    },
+        inputSchema: { type: "object",
+properties: {} },
+        cmd: ["generate-sdk"]
+    }
 ];
 
 const DATA_TOOLS: ToolDef[] = [
@@ -138,18 +146,22 @@ const DATA_TOOLS: ToolDef[] = [
         inputSchema: {
             type: "object",
             properties: {
-                collection: { type: "string", description: "Collection slug" },
-                limit: { type: "number", description: "Max results (default 25)" },
-                offset: { type: "number", description: "Skip N results" },
-                orderBy: { type: "string", description: "Sort field, optionally with :asc or :desc suffix" },
+                collection: { type: "string",
+description: "Collection slug" },
+                limit: { type: "number",
+description: "Max results (default 25)" },
+                offset: { type: "number",
+description: "Skip N results" },
+                orderBy: { type: "string",
+description: "Sort field, optionally with :asc or :desc suffix" },
                 where: {
                     type: "object",
                     description: "Filter object, e.g. { \"status\": \"eq.active\", \"price\": \"gte.100\" }",
-                    additionalProperties: { type: "string" },
-                },
+                    additionalProperties: { type: "string" }
+                }
             },
-            required: ["collection"],
-        },
+            required: ["collection"]
+        }
     },
     {
         name: "get_document",
@@ -157,11 +169,13 @@ const DATA_TOOLS: ToolDef[] = [
         inputSchema: {
             type: "object",
             properties: {
-                collection: { type: "string", description: "Collection slug" },
-                id: { type: "string", description: "Document ID" },
+                collection: { type: "string",
+description: "Collection slug" },
+                id: { type: "string",
+description: "Document ID" }
             },
-            required: ["collection", "id"],
-        },
+            required: ["collection", "id"]
+        }
     },
     {
         name: "create_document",
@@ -169,11 +183,14 @@ const DATA_TOOLS: ToolDef[] = [
         inputSchema: {
             type: "object",
             properties: {
-                collection: { type: "string", description: "Collection slug" },
-                data: { type: "object", description: "Document fields", additionalProperties: true },
+                collection: { type: "string",
+description: "Collection slug" },
+                data: { type: "object",
+description: "Document fields",
+additionalProperties: true }
             },
-            required: ["collection", "data"],
-        },
+            required: ["collection", "data"]
+        }
     },
     {
         name: "update_document",
@@ -181,12 +198,16 @@ const DATA_TOOLS: ToolDef[] = [
         inputSchema: {
             type: "object",
             properties: {
-                collection: { type: "string", description: "Collection slug" },
-                id: { type: "string", description: "Document ID" },
-                data: { type: "object", description: "Fields to update", additionalProperties: true },
+                collection: { type: "string",
+description: "Collection slug" },
+                id: { type: "string",
+description: "Document ID" },
+                data: { type: "object",
+description: "Fields to update",
+additionalProperties: true }
             },
-            required: ["collection", "id", "data"],
-        },
+            required: ["collection", "id", "data"]
+        }
     },
     {
         name: "delete_document",
@@ -194,19 +215,22 @@ const DATA_TOOLS: ToolDef[] = [
         inputSchema: {
             type: "object",
             properties: {
-                collection: { type: "string", description: "Collection slug" },
-                id: { type: "string", description: "Document ID" },
+                collection: { type: "string",
+description: "Collection slug" },
+                id: { type: "string",
+description: "Document ID" }
             },
-            required: ["collection", "id"],
-        },
-    },
+            required: ["collection", "id"]
+        }
+    }
 ];
 
 const ADMIN_TOOLS: ToolDef[] = [
     {
         name: "list_users",
         description: "List all users registered in the Rebase backend, including their roles.",
-        inputSchema: { type: "object", properties: {} },
+        inputSchema: { type: "object",
+properties: {} }
     },
     {
         name: "create_user",
@@ -214,13 +238,18 @@ const ADMIN_TOOLS: ToolDef[] = [
         inputSchema: {
             type: "object",
             properties: {
-                email: { type: "string", description: "User email" },
-                displayName: { type: "string", description: "Display name" },
-                password: { type: "string", description: "Initial password" },
-                roles: { type: "array", items: { type: "string" }, description: "Role IDs to assign" },
+                email: { type: "string",
+description: "User email" },
+                displayName: { type: "string",
+description: "Display name" },
+                password: { type: "string",
+description: "Initial password" },
+                roles: { type: "array",
+items: { type: "string" },
+description: "Role IDs to assign" }
             },
-            required: ["email"],
-        },
+            required: ["email"]
+        }
     },
     {
         name: "update_user",
@@ -228,13 +257,15 @@ const ADMIN_TOOLS: ToolDef[] = [
         inputSchema: {
             type: "object",
             properties: {
-                userId: { type: "string", description: "User UID" },
+                userId: { type: "string",
+description: "User UID" },
                 email: { type: "string" },
                 displayName: { type: "string" },
-                roles: { type: "array", items: { type: "string" } },
+                roles: { type: "array",
+items: { type: "string" } }
             },
-            required: ["userId"],
-        },
+            required: ["userId"]
+        }
     },
     {
         name: "delete_user",
@@ -242,23 +273,26 @@ const ADMIN_TOOLS: ToolDef[] = [
         inputSchema: {
             type: "object",
             properties: {
-                userId: { type: "string", description: "User UID" },
+                userId: { type: "string",
+description: "User UID" }
             },
-            required: ["userId"],
-        },
+            required: ["userId"]
+        }
     },
     {
         name: "list_roles",
         description: "List all roles defined in the Rebase backend.",
-        inputSchema: { type: "object", properties: {} },
-    },
+        inputSchema: { type: "object",
+properties: {} }
+    }
 ];
 
 const DEV_TOOLS: ToolDef[] = [
     {
         name: "rebase_dev_start",
         description: "Start the Rebase development server (frontend + backend). Returns immediately — use rebase_dev_logs to check output.",
-        inputSchema: { type: "object", properties: {} },
+        inputSchema: { type: "object",
+properties: {} }
     },
     {
         name: "rebase_dev_logs",
@@ -266,28 +300,30 @@ const DEV_TOOLS: ToolDef[] = [
         inputSchema: {
             type: "object",
             properties: {
-                lines: { type: "number", description: "Number of recent lines to return (default 50)" },
-            },
-        },
+                lines: { type: "number",
+description: "Number of recent lines to return (default 50)" }
+            }
+        }
     },
     {
         name: "rebase_dev_stop",
         description: "Stop the running Rebase development server.",
-        inputSchema: { type: "object", properties: {} },
-    },
+        inputSchema: { type: "object",
+properties: {} }
+    }
 ];
 
 const ALL_TOOLS: ToolDef[] = [
     ...CLI_TOOLS.map(({ cmd: _c, ...rest }) => rest),
     ...DATA_TOOLS,
     ...ADMIN_TOOLS,
-    ...DEV_TOOLS,
+    ...DEV_TOOLS
 ];
 
 // ── Tool Handlers ───────────────────────────────────────────────────────────
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: ALL_TOOLS,
+    tools: ALL_TOOLS
 }));
 
 /** Spawn `npx rebase <args>` and capture output. */
@@ -296,7 +332,7 @@ function runRebaseCmd(commandArgs: string[]): Promise<string> {
         const child = spawn("npx", ["rebase", ...commandArgs], {
             cwd: PROJECT_DIR,
             shell: true,
-            env: { ...process.env },
+            env: { ...process.env }
         });
         const chunks: string[] = [];
         child.stdout?.on("data", (d: Buffer) => chunks.push(d.toString()));
@@ -322,7 +358,8 @@ function appendDevLog(line: string) {
 }
 
 function textResult(text: string) {
-    return { content: [{ type: "text" as const, text }] };
+    return { content: [{ type: "text" as const,
+text }] };
 }
 
 function jsonResult(data: unknown) {
@@ -350,7 +387,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 limit,
                 offset,
                 orderBy,
-                where,
+                where
             });
             return jsonResult(result);
         }
@@ -393,14 +430,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         case "create_user": {
             const argsObj = args as { email: string; displayName?: string; password?: string; roles?: string[] };
             const { email, displayName, password, roles } = argsObj;
-            const result = await client.admin.createUser({ email, displayName, password, roles });
+            const result = await client.admin.createUser({ email,
+displayName,
+password,
+roles });
             return jsonResult(result);
         }
 
         case "update_user": {
             const argsObj = args as { userId: string; email?: string; displayName?: string; roles?: string[] };
             const { userId, email, displayName, roles } = argsObj;
-            const result = await client.admin.updateUser(userId, { email, displayName, roles });
+            const result = await client.admin.updateUser(userId, { email,
+displayName,
+roles });
             return jsonResult(result);
         }
 
@@ -425,7 +467,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             devProcess = spawn("pnpm", ["run", "dev"], {
                 cwd: resolve(PROJECT_DIR, "app"),
                 shell: true,
-                env: { ...process.env },
+                env: { ...process.env }
             });
             devProcess.stdout?.on("data", (d: Buffer) => appendDevLog(d.toString()));
             devProcess.stderr?.on("data", (d: Buffer) => appendDevLog(d.toString()));
@@ -467,7 +509,7 @@ function findCollectionsDir(): string | null {
     const candidates = [
         resolve(PROJECT_DIR, "app", "shared", "collections"),
         resolve(PROJECT_DIR, "shared", "collections"),
-        resolve(PROJECT_DIR, "collections"),
+        resolve(PROJECT_DIR, "collections")
     ];
     for (const dir of candidates) {
         if (existsSync(dir)) return dir;
@@ -488,7 +530,7 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
                 uri: `rebase://collections/${name}`,
                 name: `Collection: ${name}`,
                 description: `TypeScript collection definition for "${name}"`,
-                mimeType: "text/typescript",
+                mimeType: "text/typescript"
             });
         }
     }
@@ -500,7 +542,7 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
             uri: "rebase://schema",
             name: "Generated Drizzle Schema",
             description: "Auto-generated Drizzle ORM schema from collection definitions",
-            mimeType: "text/typescript",
+            mimeType: "text/typescript"
         });
     }
 
@@ -519,8 +561,8 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
             contents: [{
                 uri,
                 mimeType: "text/typescript",
-                text: readFileSync(schemaPath, "utf-8"),
-            }],
+                text: readFileSync(schemaPath, "utf-8")
+            }]
         };
     }
 
@@ -537,8 +579,8 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
             contents: [{
                 uri,
                 mimeType: "text/typescript",
-                text: readFileSync(filePath, "utf-8"),
-            }],
+                text: readFileSync(filePath, "utf-8")
+            }]
         };
     }
 

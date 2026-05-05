@@ -44,7 +44,9 @@ export function CollectionsStudioView({ configController }: CollectionsStudioVie
     useEffect(() => {
         try {
             localStorage.setItem("rebase_collections_editor_sidebar_size", sidebarSize.toString());
-        } catch (e) { }
+        } catch (e) {
+            // ignore local storage error
+        }
     }, [sidebarSize]);
 
     const collections = configController.collections || [];

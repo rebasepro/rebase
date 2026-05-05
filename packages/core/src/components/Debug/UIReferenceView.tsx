@@ -58,31 +58,45 @@ import {
     ListIcon,
     PersonIcon,
     FolderIcon,
-    LabelIcon,
+    LabelIcon
 } from "@rebasepro/ui";
 import { RebaseLogo } from "../RebaseLogo";
 
 const SECTIONS = [
-    { id: "drawer", label: "Drawer" },
-    { id: "appbar", label: "App Bar" },
-    { id: "tabs", label: "Tabs" },
-    { id: "editor-sidebar", label: "Editor Sidebar" },
-    { id: "empty-states", label: "Empty States" },
-    { id: "typography", label: "Typography" },
-    { id: "buttons", label: "Buttons" },
-    { id: "inputs", label: "Form Inputs" },
-    { id: "chips-alerts", label: "Chips & Alerts" },
-    { id: "users", label: "Users View" },
-    { id: "user-dialog", label: "User Dialog" },
-    { id: "roles", label: "Roles View" },
-    { id: "role-dialog", label: "Role Dialog" },
+    { id: "drawer",
+label: "Drawer" },
+    { id: "appbar",
+label: "App Bar" },
+    { id: "tabs",
+label: "Tabs" },
+    { id: "editor-sidebar",
+label: "Editor Sidebar" },
+    { id: "empty-states",
+label: "Empty States" },
+    { id: "typography",
+label: "Typography" },
+    { id: "buttons",
+label: "Buttons" },
+    { id: "inputs",
+label: "Form Inputs" },
+    { id: "chips-alerts",
+label: "Chips & Alerts" },
+    { id: "users",
+label: "Users View" },
+    { id: "user-dialog",
+label: "User Dialog" },
+    { id: "roles",
+label: "Roles View" },
+    { id: "role-dialog",
+label: "Role Dialog" }
 ];
 
 export function UIReferenceView() {
     const [activeSection, setActiveSection] = useState("drawer");
 
     const scrollTo = (id: string) => {
-        document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+        document.getElementById(id)?.scrollIntoView({ behavior: "smooth",
+block: "start" });
         setActiveSection(id);
     };
 
@@ -94,7 +108,7 @@ export function UIReferenceView() {
                 {/* DrawerLogo */}
                 <div className="flex flex-row items-center shrink-0 pt-4 pb-2 px-2">
                     <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px]">
-                        <RebaseLogo width="28px" height="28px" />
+                        <RebaseLogo width="28px" height="28px"/>
                     </div>
                     <Typography variant="subtitle1" noWrap className="truncate">UI Ref</Typography>
                 </div>
@@ -104,7 +118,7 @@ export function UIReferenceView() {
                     <div className="my-2 mx-2 flex flex-col">
                         {/* Group header — from DrawerNavigationGroup */}
                         <div className={cls("pl-4 pr-2 py-1 flex flex-row items-center transition-colors cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-700/50 rounded-t-lg bg-surface-50 dark:bg-surface-800/30")}>
-                            <ExpandMoreIcon size="smallest" className="text-surface-500 dark:text-surface-400 transition-transform duration-200 mr-1" />
+                            <ExpandMoreIcon size="smallest" className="text-surface-500 dark:text-surface-400 transition-transform duration-200 mr-1"/>
                             <Typography variant="caption" color="secondary" className="font-medium flex-grow line-clamp-1">
                                 SECTIONS
                             </Typography>
@@ -125,7 +139,7 @@ export function UIReferenceView() {
                                         )}
                                     >
                                         <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px] text-text-secondary dark:text-text-secondary-dark">
-                                            <SettingsIcon size={18} />
+                                            <SettingsIcon size={18}/>
                                         </div>
                                         <div className="text-text-primary dark:text-surface-200 opacity-100 font-inherit truncate space-x-2">
                                             {s.label.toUpperCase()}
@@ -146,7 +160,7 @@ export function UIReferenceView() {
                         "py-2"
                     )}>
                         <div className="shrink-0 flex items-center justify-center w-[56px] h-[24px] text-surface-500 dark:text-surface-400">
-                            <KeyboardDoubleArrowLeftIcon size="small" />
+                            <KeyboardDoubleArrowLeftIcon size="small"/>
                         </div>
                         <Typography variant="body2" className="text-surface-500 dark:text-surface-400 select-none whitespace-nowrap">
                             Collapse
@@ -174,7 +188,7 @@ export function UIReferenceView() {
                             <div className={cls("flex flex-col h-72 relative w-[72px] border rounded-lg overflow-hidden", defaultBorderMixin)}>
                                 <div className="flex flex-row items-center shrink-0 pt-4 pb-2 px-2">
                                     <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px]">
-                                        <RebaseLogo width="28px" height="28px" />
+                                        <RebaseLogo width="28px" height="28px"/>
                                     </div>
                                 </div>
                                 <div className="mt-3 flex-grow overflow-hidden">
@@ -193,7 +207,7 @@ export function UIReferenceView() {
                                 <div className={cls("shrink-0 mt-auto border-t px-2 py-2", defaultBorderMixin)}>
                                     <div className="flex flex-row items-center rounded-lg cursor-pointer hover:bg-surface-accent-100 dark:hover:bg-surface-800 transition-colors duration-150 py-2">
                                         <div className="shrink-0 flex items-center justify-center w-[56px] h-[24px] text-surface-500 dark:text-surface-400">
-                                            <KeyboardDoubleArrowRightIcon size="small" />
+                                            <KeyboardDoubleArrowRightIcon size="small"/>
                                         </div>
                                     </div>
                                 </div>
@@ -207,7 +221,7 @@ export function UIReferenceView() {
                                 {/* DrawerLogo */}
                                 <div className="flex flex-row items-center shrink-0 pt-4 pb-2 px-2">
                                     <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px]">
-                                        <RebaseLogo width="28px" height="28px" />
+                                        <RebaseLogo width="28px" height="28px"/>
                                     </div>
                                     <div className="flex flex-row items-center overflow-hidden transition-all duration-200 ease-in-out opacity-100 w-full ml-1">
                                         <Typography variant="subtitle1" noWrap className="truncate">Rebase</Typography>
@@ -217,14 +231,20 @@ export function UIReferenceView() {
                                 <div className="mt-3 flex-grow overflow-hidden">
                                     <div className="my-2 mx-2 flex flex-col">
                                         <div className="pl-4 pr-2 py-1 flex flex-row items-center transition-colors cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-700/50 rounded-t-lg bg-surface-50 dark:bg-surface-800/30">
-                                            <ExpandMoreIcon size="smallest" className="text-surface-500 dark:text-surface-400 mr-1" />
+                                            <ExpandMoreIcon size="smallest" className="text-surface-500 dark:text-surface-400 mr-1"/>
                                             <Typography variant="caption" color="secondary" className="font-medium flex-grow line-clamp-1">CONTENT</Typography>
                                         </div>
                                         <div className="overflow-hidden bg-surface-50 dark:bg-surface-800/30 rounded-b-lg">
                                             {[
-                                                { label: "Posts", icon: <FolderIcon size={18}/>, active: true },
-                                                { label: "Authors", icon: <PersonIcon size={18}/>, active: false },
-                                                { label: "Tags", icon: <LabelIcon size={18}/>, active: false }
+                                                { label: "Posts",
+icon: <FolderIcon size={18}/>,
+active: true },
+                                                { label: "Authors",
+icon: <PersonIcon size={18}/>,
+active: false },
+                                                { label: "Tags",
+icon: <LabelIcon size={18}/>,
+active: false }
                                             ].map(({ label, icon, active }) => (
                                                 <div key={label} className={cls(
                                                     "rounded-lg truncate hover:bg-surface-accent-300/75 dark:hover:bg-surface-accent-800/75 text-text-primary dark:text-surface-200 hover:text-surface-900 dark:hover:text-white flex flex-row items-center pr-4 h-10 font-semibold text-xs cursor-pointer",
@@ -245,7 +265,7 @@ export function UIReferenceView() {
                                 <div className={cls("shrink-0 mt-auto border-t px-2 py-2", defaultBorderMixin)}>
                                     <div className="flex flex-row items-center rounded-lg cursor-pointer hover:bg-surface-accent-100 dark:hover:bg-surface-800 transition-colors duration-150 py-2">
                                         <div className="shrink-0 flex items-center justify-center w-[56px] h-[24px] text-surface-500 dark:text-surface-400">
-                                            <KeyboardDoubleArrowLeftIcon size="small" />
+                                            <KeyboardDoubleArrowLeftIcon size="small"/>
                                         </div>
                                         <div className="overflow-hidden transition-all duration-200 ease-in-out opacity-100 w-auto">
                                             <Typography variant="body2" className="text-surface-500 dark:text-surface-400 select-none whitespace-nowrap">
@@ -283,7 +303,7 @@ export function UIReferenceView() {
                                 </div>
                             </div>
                         </div>
-                        <div className="grow" />
+                        <div className="grow"/>
                         {/* Content/Studio toggle — from DefaultAppBar line 204-225 */}
                         <div className={cls("mr-2 hidden sm:flex bg-surface-100 dark:bg-surface-800 rounded-lg p-0.5 border", defaultBorderMixin)}>
                             <button className={cls("px-3 py-1 text-xs font-semibold rounded-md transition-all", "bg-white dark:bg-surface-900 shadow-sm text-primary dark:text-primary-400")}>
@@ -296,12 +316,12 @@ export function UIReferenceView() {
                         {/* Theme menu — from DefaultAppBar line 227-241 */}
                         <Menu trigger={
                             <IconButton color="inherit">
-                                <DarkModeIcon />
+                                <DarkModeIcon/>
                             </IconButton>
                         }>
-                            <MenuItem><DarkModeIcon size="smallest" /> Dark</MenuItem>
-                            <MenuItem><LightModeIcon size="smallest" /> Light</MenuItem>
-                            <MenuItem><BrightnessMediumIcon size="smallest" /> System</MenuItem>
+                            <MenuItem><DarkModeIcon size="smallest"/> Dark</MenuItem>
+                            <MenuItem><LightModeIcon size="smallest"/> Light</MenuItem>
+                            <MenuItem><BrightnessMediumIcon size="smallest"/> System</MenuItem>
                         </Menu>
                         {/* Avatar menu — from DefaultAppBar line 243-270 */}
                         <Menu trigger={<Avatar>A</Avatar>}>
@@ -309,8 +329,8 @@ export function UIReferenceView() {
                                 <Typography variant="body1" color="secondary">Alice Johnson</Typography>
                                 <Typography variant="body2" color="secondary">alice@example.com</Typography>
                             </div>
-                            <MenuItem><SettingsIcon /> Account Settings</MenuItem>
-                            <MenuItem><LogoutIcon /> Log Out</MenuItem>
+                            <MenuItem><SettingsIcon/> Account Settings</MenuItem>
+                            <MenuItem><LogoutIcon/> Log Out</MenuItem>
                         </Menu>
                     </div>
                 </SectionBlock>
@@ -320,14 +340,14 @@ export function UIReferenceView() {
                 ═══════════════════════════════════════════════ */}
                 <SectionBlock id="tabs" title="Tabs — Tabs.tsx">
                     <Typography variant="body2" color="secondary" className="mb-4">
-                        All editor components use <code className="font-mono text-xs">variant="boxy"</code> tabs for sidebar navigation.
+                        All editor components use <code className="font-mono text-xs">variant=&quot;boxy&quot;</code> tabs for sidebar navigation.
                         The boxy variant provides a segmented, flat tab bar that integrates tightly with editor chrome.
                     </Typography>
 
                     <div className="flex flex-col gap-6">
                         {/* Default variant */}
                         <div>
-                            <Typography variant="caption" color="secondary" className="block mb-2 font-mono">variant="default"</Typography>
+                            <Typography variant="caption" color="secondary" className="block mb-2 font-mono">variant=&quot;default&quot;</Typography>
                             <Tabs value="tab1" onValueChange={() => {}}>
                                 <Tab value="tab1">Schema</Tab>
                                 <Tab value="tab2">Snippets</Tab>
@@ -337,7 +357,7 @@ export function UIReferenceView() {
 
                         {/* Boxy variant — exact pattern from SQLEditorSidebar, JSEditorSidebar, RLSEditor */}
                         <div>
-                            <Typography variant="caption" color="secondary" className="block mb-2 font-mono">variant="boxy" (Editor Standard)</Typography>
+                            <Typography variant="caption" color="secondary" className="block mb-2 font-mono">variant=&quot;boxy&quot; (Editor Standard)</Typography>
                             <div className={cls("border rounded-lg overflow-hidden w-[320px]", defaultBorderMixin)}>
                                 <Tabs value="schema" onValueChange={() => {}} variant="boxy" className="border-b border-surface-200 dark:border-surface-800">
                                     <Tab value="schema">Schema</Tab>
@@ -348,7 +368,7 @@ export function UIReferenceView() {
                                 <div className={cls("p-3 border-b flex justify-between items-center bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
                                     <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">TABLES</Typography>
                                     <IconButton size="small">
-                                        <SettingsIcon size="smallest" />
+                                        <SettingsIcon size="smallest"/>
                                     </IconButton>
                                 </div>
                                 <div className="p-2 h-24">
@@ -364,21 +384,21 @@ export function UIReferenceView() {
                                 <div className="flex items-center">
                                     <Tabs value="query1" onValueChange={() => {}} variant="boxy" className="w-[unset] flex-shrink-0">
                                         <Tab value="query1" className="flex items-center gap-1.5">
-                                            <svg className="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>
+                                            <svg className="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>
                                             Query 1
                                         </Tab>
                                         <Tab value="query2" className="flex items-center gap-1.5">
-                                            <svg className="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>
+                                            <svg className="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>
                                             Query 2
                                         </Tab>
                                     </Tabs>
                                     <IconButton size="small" className="ml-2 flex-shrink-0">
-                                        <AddIcon />
+                                        <AddIcon/>
                                     </IconButton>
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                     <Button variant="text" size="small">Explain</Button>
-                                    <div className="h-4 w-px bg-surface-200 dark:bg-surface-800" />
+                                    <div className="h-4 w-px bg-surface-200 dark:bg-surface-800"/>
                                     <Button size="small" color="primary">Run</Button>
                                 </div>
                             </div>
@@ -392,7 +412,7 @@ export function UIReferenceView() {
                 <SectionBlock id="editor-sidebar" title="Editor Sidebar — Harmonized Pattern">
                     <Typography variant="body2" color="secondary" className="mb-4">
                         All studio editor components (SQL, JS, RLS, Collection) share the same underlying sidebar foundation:
-                        <code className="font-mono text-xs">Tabs variant="boxy"</code> at top (optional) → section header with uppercase label → scrollable list.
+                        <code className="font-mono text-xs">Tabs variant=&quot;boxy&quot;</code> at top (optional) → section header with uppercase label → scrollable list.
                         While SQL/JS/RLS use dense tree entries, the Collection Schema Editor uses larger items (<code className="font-mono text-xs">px-3 py-2</code>, <code className="font-mono text-xs">text-sm</code>) suitable for primary navigation.
                     </Typography>
 
@@ -409,20 +429,20 @@ export function UIReferenceView() {
                                 <div className={cls("p-3 border-b flex justify-between items-center bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
                                     <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-secondary dark:text-text-secondary-dark">TABLES</Typography>
                                     <IconButton size="small">
-                                        <SettingsIcon size="smallest" />
+                                        <SettingsIcon size="smallest"/>
                                     </IconButton>
                                 </div>
                                 <div className="flex-grow overflow-y-auto no-scrollbar p-1">
                                     {/* Schema tree items — from SchemaBrowser */}
                                     <div className="mb-2">
                                         <div className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-800 rounded transition-colors">
-                                            <svg className="w-3 h-3 mr-1 rotate-90" fill="currentColor" viewBox="0 0 20 20"><path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" /></svg>
+                                            <svg className="w-3 h-3 mr-1 rotate-90" fill="currentColor" viewBox="0 0 20 20"><path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/></svg>
                                             <Typography variant="body2" className="text-text-primary dark:text-text-primary-dark font-medium text-xs">public</Typography>
                                         </div>
                                         <div className="ml-3 mt-1 space-y-1">
                                             {["users", "posts", "comments"].map(t => (
                                                 <div key={t} className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-800 rounded transition-colors group">
-                                                    <svg className="w-3.5 h-3.5 mr-1 shrink-0 text-text-disabled dark:text-text-disabled-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                                    <svg className="w-3.5 h-3.5 mr-1 shrink-0 text-text-disabled dark:text-text-disabled-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                                                     <Typography variant="body2" className="text-text-secondary dark:text-text-secondary-dark text-xs truncate">{t}</Typography>
                                                 </div>
                                             ))}
@@ -443,21 +463,24 @@ export function UIReferenceView() {
                                 <div className={cls("p-3 border-b flex justify-between items-center bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
                                     <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">RLS</Typography>
                                     <IconButton size="small">
-                                        <SettingsIcon size="smallest" />
+                                        <SettingsIcon size="smallest"/>
                                     </IconButton>
                                 </div>
                                 <div className="flex-grow overflow-y-auto no-scrollbar p-1">
                                     <div className="mb-2">
                                         <div className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-800 rounded transition-colors">
-                                            <svg className="w-3 h-3 mr-1 rotate-90" fill="currentColor" viewBox="0 0 20 20"><path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" /></svg>
+                                            <svg className="w-3 h-3 mr-1 rotate-90" fill="currentColor" viewBox="0 0 20 20"><path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/></svg>
                                             <Typography variant="body2" className="text-text-primary dark:text-text-primary-dark font-medium text-xs">public</Typography>
                                         </div>
                                         <div className="ml-3 mt-1 space-y-0.5">
-                                            {[{ name: "users", enabled: true }, { name: "posts", enabled: true }, { name: "sessions", enabled: false }].map(t => (
+                                            {[{ name: "users",
+enabled: true }, { name: "posts",
+enabled: true }, { name: "sessions",
+enabled: false }].map(t => (
                                                 <div key={t.name} className={cls("flex items-center p-1 cursor-pointer rounded transition-colors", t.name === "users" ? "bg-primary/10 text-primary dark:bg-primary/20" : "hover:bg-surface-100 dark:hover:bg-surface-800 text-text-secondary")}>
-                                                    <svg className="w-3.5 h-3.5 mr-1 shrink-0 text-text-disabled" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                                    <svg className="w-3.5 h-3.5 mr-1 shrink-0 text-text-disabled" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                                                     <Typography variant="body2" className="text-xs truncate flex-1">{t.name}</Typography>
-                                                    <div className={cls("w-1.5 h-1.5 rounded-full shrink-0", t.enabled ? "bg-green-500" : "bg-orange-400 opacity-50")} />
+                                                    <div className={cls("w-1.5 h-1.5 rounded-full shrink-0", t.enabled ? "bg-green-500" : "bg-orange-400 opacity-50")}/>
                                                 </div>
                                             ))}
                                         </div>
@@ -473,13 +496,14 @@ export function UIReferenceView() {
                                 <div className={cls("p-3 border-b flex justify-between items-center bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
                                     <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">COLLECTIONS</Typography>
                                     <IconButton size="small">
-                                        <AddIcon size="small" />
+                                        <AddIcon size="small"/>
                                     </IconButton>
                                 </div>
                                 <div className="flex-grow overflow-y-auto no-scrollbar p-2 space-y-0.5">
-                                    {[{ name: "Authors" }, { name: "Posts", selected: true }, { name: "Tags" }].map(c => (
+                                    {[{ name: "Authors" }, { name: "Posts",
+selected: true }, { name: "Tags" }].map(c => (
                                         <div key={c.name} className={cls("flex items-center gap-3 px-3 py-2 cursor-pointer rounded-md text-sm transition-colors", c.selected ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light" : "hover:bg-surface-100 dark:hover:bg-surface-800 text-text-secondary dark:text-text-secondary-dark")}>
-                                            <FolderIcon size={18} className={cls(c.selected ? "text-primary dark:text-primary-light" : "text-text-secondary dark:text-text-secondary-dark")} />
+                                            <FolderIcon size={18} className={cls(c.selected ? "text-primary dark:text-primary-light" : "text-text-secondary dark:text-text-secondary-dark")}/>
                                             <span className="truncate flex-1">{c.name}</span>
                                         </div>
                                     ))}
@@ -495,7 +519,7 @@ export function UIReferenceView() {
                 <SectionBlock id="empty-states" title="Empty States — Canonical Pattern">
                     <Typography variant="body2" color="secondary" className="mb-4">
                         All empty / placeholder states share the same layout: a centered <code className="font-mono text-xs">flex-col</code> container
-                        with <code className="font-mono text-xs">Typography variant="label"</code> for the message and a <code className="font-mono text-xs">Button</code> with <code className="font-mono text-xs">AddIcon</code> for the primary action.
+                        with <code className="font-mono text-xs">Typography variant=&quot;label&quot;</code> for the message and a <code className="font-mono text-xs">Button</code> with <code className="font-mono text-xs">AddIcon</code> for the primary action.
                         Sources: <code className="font-mono text-xs">CollectionPropertiesEditorForm</code>, <code className="font-mono text-xs">CollectionsStudioView</code>, <code className="font-mono text-xs">CollectionStudioView</code>.
                     </Typography>
 
@@ -509,7 +533,7 @@ export function UIReferenceView() {
                                         Select a property to edit it
                                     </Typography>
                                     <Button>
-                                        <AddIcon />
+                                        <AddIcon/>
                                         Add new property
                                     </Button>
                                 </div>
@@ -525,7 +549,7 @@ export function UIReferenceView() {
                                         Now you can add your first property
                                     </Typography>
                                     <Button>
-                                        <AddIcon />
+                                        <AddIcon/>
                                         Add new property
                                     </Button>
                                 </div>
@@ -541,7 +565,7 @@ export function UIReferenceView() {
                                         Select a collection or create a new one to start editing
                                     </Typography>
                                     <Button>
-                                        <AddIcon />
+                                        <AddIcon/>
                                         Add new collection
                                     </Button>
                                 </div>
@@ -558,7 +582,7 @@ export function UIReferenceView() {
                         All variants from <code className="font-mono text-xs">Typography</code>. Colors: primary (default), secondary, disabled, error.
                     </Typography>
                     <div className="flex flex-col gap-3">
-                        {(["h1","h2","h3","h4","h5","h6","subtitle1","subtitle2","body1","body2","caption","label","button"] as const).map(v => (
+                        {(["h1", "h2", "h3", "h4", "h5", "h6", "subtitle1", "subtitle2", "body1", "body2", "caption", "label", "button"] as const).map(v => (
                             <div key={v} className={cls("flex items-baseline gap-4 border-b pb-3 last:border-0", defaultBorderMixin)}>
                                 <span className="w-24 shrink-0 text-xs text-surface-400 font-mono">{v}</span>
                                 <Typography variant={v}>The quick brown fox jumps over the lazy dog</Typography>
@@ -566,8 +590,8 @@ export function UIReferenceView() {
                         ))}
                     </div>
                     <div className="flex gap-4 flex-wrap mt-4">
-                        {(["primary","secondary","disabled","error"] as const).map(c => (
-                            <Typography key={c} color={c}>color="{c}"</Typography>
+                        {(["primary", "secondary", "disabled", "error"] as const).map(c => (
+                            <Typography key={c} color={c}>color=&quot;{c}&quot;</Typography>
                         ))}
                     </div>
                 </SectionBlock>
@@ -577,11 +601,11 @@ export function UIReferenceView() {
                 ═══════════════════════════════════════════════ */}
                 <SectionBlock id="buttons" title="Buttons">
                     <div className="flex flex-col gap-6">
-                        {(["filled","text"] as const).map(variant => (
+                        {(["filled", "text"] as const).map(variant => (
                             <div key={variant}>
-                                <Typography variant="caption" color="secondary" className="block mb-2 font-mono">variant="{variant}"</Typography>
+                                <Typography variant="caption" color="secondary" className="block mb-2 font-mono">variant=&quot;{variant}&quot;</Typography>
                                 <div className="flex flex-wrap gap-3 items-center">
-                                    {(["primary","secondary","text","error","neutral"] as const).map(color => (
+                                    {(["primary", "secondary", "text", "error", "neutral"] as const).map(color => (
                                         <Button key={color} variant={variant} color={color}>{color}</Button>
                                     ))}
                                     <Button variant={variant} disabled>disabled</Button>
@@ -591,7 +615,7 @@ export function UIReferenceView() {
                         <div>
                             <Typography variant="caption" color="secondary" className="block mb-2 font-mono">sizes</Typography>
                             <div className="flex flex-wrap items-end gap-3">
-                                {(["small","medium","large","xl","2xl"] as const).map(s => (
+                                {(["small", "medium", "large", "xl", "2xl"] as const).map(s => (
                                     <Button key={s} size={s}>{s}</Button>
                                 ))}
                             </div>
@@ -599,13 +623,13 @@ export function UIReferenceView() {
                         <div>
                             <Typography variant="caption" color="secondary" className="block mb-2 font-mono">IconButton</Typography>
                             <div className="flex flex-wrap gap-3 items-center">
-                                {(["primary","secondary","inherit"] as const).map(c => (
-                                    <IconButton key={c} color={c}><EditIcon /></IconButton>
+                                {(["primary", "secondary", "inherit"] as const).map(c => (
+                                    <IconButton key={c} color={c}><EditIcon/></IconButton>
                                 ))}
-                                {(["small","medium","large"] as const).map(s => (
-                                    <IconButton key={s} size={s}><DeleteIcon /></IconButton>
+                                {(["small", "medium", "large"] as const).map(s => (
+                                    <IconButton key={s} size={s}><DeleteIcon/></IconButton>
                                 ))}
-                                <IconButton disabled><AddIcon /></IconButton>
+                                <IconButton disabled><AddIcon/></IconButton>
                             </div>
                         </div>
                         <div>
@@ -626,10 +650,10 @@ export function UIReferenceView() {
                         <div className="col-span-12 sm:col-span-6">
                             <Typography variant="caption" color="secondary" className="block mb-2 font-mono">TextField</Typography>
                             <div className="flex flex-col gap-3">
-                                <TextField label="Default" placeholder="Type something…" />
-                                <TextField label="With value" value="Filled value" onChange={() => {}} />
-                                <TextField label="Error state" error value="Bad value" onChange={() => {}} />
-                                <TextField label="Disabled" disabled value="Read only" onChange={() => {}} />
+                                <TextField label="Default" placeholder="Type something…"/>
+                                <TextField label="With value" value="Filled value" onChange={() => {}}/>
+                                <TextField label="Error state" error value="Bad value" onChange={() => {}}/>
+                                <TextField label="Disabled" disabled value="Read only" onChange={() => {}}/>
                             </div>
                         </div>
                         <div className="col-span-12 sm:col-span-6 flex flex-col gap-4">
@@ -652,25 +676,25 @@ export function UIReferenceView() {
                         </div>
                         <div className="col-span-12 sm:col-span-6 flex flex-col gap-3">
                             <Typography variant="caption" color="secondary" className="block font-mono">Checkbox</Typography>
-                            <label className="flex items-center gap-2 cursor-pointer"><Checkbox checked={true} onCheckedChange={() => {}} /><span>Checked</span></label>
-                            <label className="flex items-center gap-2 cursor-pointer"><Checkbox checked={false} onCheckedChange={() => {}} /><span>Unchecked</span></label>
-                            <label className="flex items-center gap-2"><Checkbox checked={true} disabled /><span>Disabled</span></label>
+                            <label className="flex items-center gap-2 cursor-pointer"><Checkbox checked={true} onCheckedChange={() => {}}/><span>Checked</span></label>
+                            <label className="flex items-center gap-2 cursor-pointer"><Checkbox checked={false} onCheckedChange={() => {}}/><span>Unchecked</span></label>
+                            <label className="flex items-center gap-2"><Checkbox checked={true} disabled/><span>Disabled</span></label>
                         </div>
                         <div className="col-span-12 sm:col-span-6 flex flex-col gap-3">
                             <Typography variant="caption" color="secondary" className="block font-mono">BooleanSwitch</Typography>
-                            <div className="flex items-center gap-2"><BooleanSwitch value={true} onValueChange={() => {}} /><span>On</span></div>
-                            <div className="flex items-center gap-2"><BooleanSwitch value={false} onValueChange={() => {}} /><span>Off</span></div>
+                            <div className="flex items-center gap-2"><BooleanSwitch value={true} onValueChange={() => {}}/><span>On</span></div>
+                            <div className="flex items-center gap-2"><BooleanSwitch value={false} onValueChange={() => {}}/><span>Off</span></div>
                         </div>
                         <div className="col-span-12">
                             <Typography variant="caption" color="secondary" className="block mb-2 font-mono">SearchBar</Typography>
-                            <SearchBar placeholder="Search entities…" />
+                            <SearchBar placeholder="Search entities…"/>
                         </div>
                         <div className="col-span-12">
                             <Typography variant="caption" color="secondary" className="block mb-2 font-mono">Skeleton</Typography>
                             <div className="flex gap-4 items-center flex-wrap">
-                                <Skeleton className="w-10 h-10 rounded-full" />
-                                <Skeleton className="w-48 h-4 rounded" />
-                                <Skeleton className="w-32 h-8 rounded-md" />
+                                <Skeleton className="w-10 h-10 rounded-full"/>
+                                <Skeleton className="w-48 h-4 rounded"/>
+                                <Skeleton className="w-32 h-8 rounded-md"/>
                             </div>
                         </div>
                     </div>
@@ -682,12 +706,12 @@ export function UIReferenceView() {
                 <SectionBlock id="chips-alerts" title="Chips & Alerts">
                     <Typography variant="caption" color="secondary" className="block mb-2 font-mono">Chip — colorScheme × size</Typography>
                     <div className="flex flex-wrap gap-2 mb-4">
-                        {(["grayLight","grayDark","redLight","redDark","blueDark","blueLight","greenDark","greenLight","yellowLight","yellowDark","orangeLight","purpleDark","pinkLight"] as const).map(s => (
+                        {(["grayLight", "grayDark", "redLight", "redDark", "blueDark", "blueLight", "greenDark", "greenLight", "yellowLight", "yellowDark", "orangeLight", "purpleDark", "pinkLight"] as const).map(s => (
                             <Chip key={s} colorScheme={s} size="small">{s}</Chip>
                         ))}
                     </div>
                     <div className="flex flex-wrap gap-2 mb-6">
-                        {(["smallest","small","medium"] as const).map(sz => (
+                        {(["smallest", "small", "medium"] as const).map(sz => (
                             <Chip key={sz} colorScheme="blueDark" size={sz}>{sz}</Chip>
                         ))}
                     </div>
@@ -701,15 +725,15 @@ export function UIReferenceView() {
                     <div className="mt-4">
                         <Typography variant="caption" color="secondary" className="block mb-2 font-mono">Separator</Typography>
                         <div>Above</div>
-                        <Separator orientation="horizontal" />
+                        <Separator orientation="horizontal"/>
                         <div>Below</div>
                     </div>
                     <div className="mt-4">
                         <Typography variant="caption" color="secondary" className="block mb-2 font-mono">CircularProgress</Typography>
                         <div className="flex gap-6 items-center">
-                            {(["small","medium","large"] as const).map(s => (
+                            {(["small", "medium", "large"] as const).map(s => (
                                 <div key={s} className="flex flex-col items-center gap-1">
-                                    <CircularProgress size={s} />
+                                    <CircularProgress size={s}/>
                                     <Typography variant="caption" color="secondary">{s}</Typography>
                                 </div>
                             ))}
@@ -722,7 +746,7 @@ export function UIReferenceView() {
                 ═══════════════════════════════════════════════ */}
                 <SectionBlock id="users" title="Users View — UsersView.tsx">
                     <Typography variant="body2" color="secondary" className="mb-4">
-                        Layout from <code className="font-mono text-xs">UsersView</code>: <code className="font-mono text-xs">Container maxWidth="6xl"</code>, header row, and table with <code className="font-mono text-xs">RoleChip</code>s.
+                        Layout from <code className="font-mono text-xs">UsersView</code>: <code className="font-mono text-xs">Container maxWidth=&quot;6xl&quot;</code>, header row, and table with <code className="font-mono text-xs">RoleChip</code>s.
                     </Typography>
                     {/* Bootstrap warning — from UsersView line 105-119 */}
                     <div className="bg-yellow-100 dark:bg-yellow-900 border border-yellow-400 dark:border-yellow-700 rounded p-4 flex items-center justify-between mb-4">
@@ -736,7 +760,7 @@ export function UIReferenceView() {
                     {/* Header — from UsersView line 121-128 */}
                     <div className="flex items-center mt-12">
                         <Typography gutterBottom variant="h4" className="grow" component="h4">Users</Typography>
-                        <Button startIcon={<AddIcon />}>Add user</Button>
+                        <Button startIcon={<AddIcon/>}>Add user</Button>
                     </div>
                     {/* Table — from UsersView line 130-182 */}
                     <div className="overflow-auto">
@@ -749,14 +773,27 @@ export function UIReferenceView() {
                             </TableHeader>
                             <TableBody>
                                 {[
-                                    { uid: "1", email: "alice@example.com", displayName: "Alice Johnson", roles: [{ id: "admin", name: "Admin", isAdmin: true }] },
-                                    { uid: "2", email: "bob@example.com", displayName: "Bob Smith", roles: [{ id: "editor", name: "Editor", isAdmin: false }] },
-                                    { uid: "3", email: "carol@example.com", displayName: "Carol White", roles: [] },
+                                    { uid: "1",
+email: "alice@example.com",
+displayName: "Alice Johnson",
+roles: [{ id: "admin",
+name: "Admin",
+isAdmin: true }] },
+                                    { uid: "2",
+email: "bob@example.com",
+displayName: "Bob Smith",
+roles: [{ id: "editor",
+name: "Editor",
+isAdmin: false }] },
+                                    { uid: "3",
+email: "carol@example.com",
+displayName: "Carol White",
+roles: [] }
                                 ].map(user => (
                                     <TableRow key={user.uid}>
                                         <TableCell style={{ width: "64px" }}>
                                             <Tooltip asChild title="Delete this user">
-                                                <IconButton size="small"><DeleteIcon /></IconButton>
+                                                <IconButton size="small"><DeleteIcon/></IconButton>
                                             </Tooltip>
                                         </TableCell>
                                         <TableCell>{user.email}</TableCell>
@@ -791,10 +828,10 @@ export function UIReferenceView() {
                         <div className="px-6 py-4">
                             <div className="grid grid-cols-12 gap-4">
                                 <div className="col-span-12">
-                                    <TextField name="displayName" required value="Alice Johnson" onChange={() => {}} label="Name" />
+                                    <TextField name="displayName" required value="Alice Johnson" onChange={() => {}} label="Name"/>
                                 </div>
                                 <div className="col-span-12">
-                                    <TextField required name="email" value="alice@example.com" onChange={() => {}} label="Email" disabled />
+                                    <TextField required name="email" value="alice@example.com" onChange={() => {}} label="Email" disabled/>
                                 </div>
                                 <div className="col-span-12">
                                     <MultiSelect className="w-full" label="Roles" value={["admin"]} onValueChange={() => {}}>
@@ -821,7 +858,7 @@ export function UIReferenceView() {
                     </Typography>
                     <div className="flex items-center mt-12">
                         <Typography gutterBottom variant="h4" className="grow" component="h4">Roles</Typography>
-                        <Button startIcon={<AddIcon />}>Add role</Button>
+                        <Button startIcon={<AddIcon/>}>Add role</Button>
                     </div>
                     <div className="w-full overflow-auto">
                         <Table className="w-full">
@@ -832,15 +869,21 @@ export function UIReferenceView() {
                             </TableHeader>
                             <TableBody>
                                 {[
-                                    { id: "admin", name: "Admin", isAdmin: true },
-                                    { id: "editor", name: "Editor", isAdmin: false },
-                                    { id: "viewer", name: "Viewer", isAdmin: false },
+                                    { id: "admin",
+name: "Admin",
+isAdmin: true },
+                                    { id: "editor",
+name: "Editor",
+isAdmin: false },
+                                    { id: "viewer",
+name: "Viewer",
+isAdmin: false }
                                 ].map(role => (
                                     <TableRow key={role.id}>
                                         <TableCell style={{ width: "64px" }}>
                                             {!role.isAdmin && (
                                                 <Tooltip asChild title="Delete this role">
-                                                    <IconButton size="small"><DeleteIcon /></IconButton>
+                                                    <IconButton size="small"><DeleteIcon/></IconButton>
                                                 </Tooltip>
                                             )}
                                         </TableCell>
@@ -848,7 +891,7 @@ export function UIReferenceView() {
                                             <Chip colorScheme={role.isAdmin ? "purpleDark" : "blueDark"} size="small">{role.name}</Chip>
                                         </TableCell>
                                         <TableCell className="items-center">
-                                            <Checkbox checked={role.isAdmin ?? false} disabled />
+                                            <Checkbox checked={role.isAdmin ?? false} disabled/>
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -869,7 +912,9 @@ export function UIReferenceView() {
                                     ))}
                                 </TableHeader>
                                 <TableBody>
-                                    {[{ name: "Posts", slug: "posts" }, { name: "Authors", slug: "authors" }].map(col => (
+                                    {[{ name: "Posts",
+slug: "posts" }, { name: "Authors",
+slug: "authors" }].map(col => (
                                         <TableRow key={col.slug}>
                                             <TableCell>
                                                 <div className="flex items-center gap-1.5">
@@ -907,14 +952,14 @@ export function UIReferenceView() {
                         <div className="px-6 py-4">
                             <div className="grid grid-cols-12 gap-4">
                                 <div className="col-span-12 sm:col-span-4">
-                                    <TextField name="id" required value="editor" onChange={() => {}} label="Role ID" disabled />
+                                    <TextField name="id" required value="editor" onChange={() => {}} label="Role ID" disabled/>
                                 </div>
                                 <div className="col-span-12 sm:col-span-4">
-                                    <TextField name="name" required value="Editor" onChange={() => {}} label="Role Name" />
+                                    <TextField name="name" required value="Editor" onChange={() => {}} label="Role Name"/>
                                 </div>
                                 <div className="col-span-12 sm:col-span-4 flex items-start pt-2">
                                     <label className="flex items-center gap-2 cursor-pointer mt-3">
-                                        <Checkbox checked={false} onCheckedChange={() => {}} />
+                                        <Checkbox checked={false} onCheckedChange={() => {}}/>
                                         <span className="font-medium">Is Admin</span>
                                     </label>
                                 </div>

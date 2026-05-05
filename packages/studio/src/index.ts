@@ -9,22 +9,23 @@ export {
     useStudioSideEntityController,
     useStudioUrlController,
     useStudioNavigationState,
-    useStudioBreadcrumbs,
+    useStudioBreadcrumbs
 } from "@rebasepro/core";
 export type {
     StudioBridge,
     BreadcrumbEntry,
-    BreadcrumbsController,
+    BreadcrumbsController
 } from "@rebasepro/core";
 
-// ─── Studio Tools ───────────────────────────────────────────────────
-export * from "./components/SQLEditor/SQLEditor";
-export * from "./components/JSEditor/JSEditor";
-export * from "./components/RLSEditor/RLSEditor";
-export * from "./components/RLSEditor/PolicyEditor";
-export * from "./components/StorageView/StorageView";
-export * from "./components/StudioHomePage";
-export * from "./utils/sql_utils";
-export * from "./components/CronJobs/CronJobsView";
-export * from "./components/SchemaVisualizer";
+// ─── Studio Entry Point ─────────────────────────────────────────────
+// Only export the lightweight orchestrator & home page.
+// Individual tools (SQLEditor, JSEditor, RLSEditor, StorageView, etc.)
+// are lazy-loaded by RebaseStudio.tsx — DO NOT re-export them here
+// or they'll be pulled into the main bundle, defeating code splitting.
 export * from "./components/RebaseStudio";
+export * from "./components/StudioHomePage";
+
+// ─── Direct tool imports (for advanced usage) ───────────────────────
+// Consumers that need direct access to a tool should use deep imports:
+//   import { SQLEditor } from "@rebasepro/studio/components/SQLEditor/SQLEditor";
+// This avoids pulling all tools into their bundle.

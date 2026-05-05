@@ -153,7 +153,7 @@ export class CollectionRegistry {
         const properties: Properties = this.normalizeProperties(collection.properties, relations);
 
         collection.properties = properties;
-        
+
         // Populate childCollections from driver-specific fields
         if (!collection.childCollections) {
             if (isFirebaseCollection(collection) && collection.subcollections) {
@@ -168,7 +168,7 @@ export class CollectionRegistry {
                 }
             }
         }
-        
+
         return collection;
     }
 

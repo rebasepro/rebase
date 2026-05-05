@@ -3,7 +3,7 @@ import {
     getTableName,
     getTableVarName,
     getEnumVarName,
-    getColumnName,
+    getColumnName
 } from "../src/util/relations";
 import { EntityCollection, Relation } from "@rebasepro/types";
 
@@ -14,7 +14,7 @@ function makeCollection(overrides: Partial<EntityCollection> = {}): EntityCollec
         slug: "source",
         table: "source",
         properties: {},
-        ...overrides,
+        ...overrides
     };
 }
 
@@ -24,7 +24,7 @@ function makeTargetCollection(overrides: Partial<EntityCollection> = {}): Entity
         slug: "target",
         table: "target",
         properties: {},
-        ...overrides,
+        ...overrides
     };
 }
 
@@ -33,11 +33,14 @@ function makeTargetCollection(overrides: Partial<EntityCollection> = {}): Entity
 // ─────────────────────────────────────────────────────────────
 describe("table/column naming utilities", () => {
     it("getTableName returns table first", () => {
-        expect(getTableName(makeCollection({ table: "my_table", slug: "mySlug", name: "My Name" }))).toBe("my_table");
+        expect(getTableName(makeCollection({ table: "my_table",
+slug: "mySlug",
+name: "My Name" }))).toBe("my_table");
     });
 
     it("getTableName always returns the table property", () => {
-        expect(getTableName(makeCollection({ table: "my_slug", slug: "mySlug" }))).toBe("my_slug");
+        expect(getTableName(makeCollection({ table: "my_slug",
+slug: "mySlug" }))).toBe("my_slug");
     });
 
     it("getTableVarName converts snake_case to camelCase", () => {
@@ -69,7 +72,8 @@ describe("sanitizeRelation", () => {
     it("defaults relationName from target slug", () => {
         const target = makeTargetCollection({ slug: "user_profiles" });
         const result = sanitizeRelation(
-            { target: () => target, cardinality: "one" } as Partial<Relation>,
+            { target: () => target,
+cardinality: "one" } as Partial<Relation>,
             makeCollection()
         );
         expect(result.relationName).toBe("user_profiles");
@@ -78,7 +82,8 @@ describe("sanitizeRelation", () => {
     it("infers direction as owning for one-to-one without foreignKeyOnTarget", () => {
         const target = makeTargetCollection();
         const result = sanitizeRelation(
-            { target: () => target, cardinality: "one" } as Partial<Relation>,
+            { target: () => target,
+cardinality: "one" } as Partial<Relation>,
             makeCollection()
         );
         expect(result.direction).toBe("owning");
@@ -87,7 +92,9 @@ describe("sanitizeRelation", () => {
     it("infers direction as inverse for one-to-one with foreignKeyOnTarget", () => {
         const target = makeTargetCollection();
         const result = sanitizeRelation(
-            { target: () => target, cardinality: "one", foreignKeyOnTarget: "source_id" } as Partial<Relation>,
+            { target: () => target,
+cardinality: "one",
+foreignKeyOnTarget: "source_id" } as Partial<Relation>,
             makeCollection()
         );
         expect(result.direction).toBe("inverse");
@@ -96,7 +103,8 @@ describe("sanitizeRelation", () => {
     it("infers direction as inverse for has-many", () => {
         const target = makeTargetCollection();
         const result = sanitizeRelation(
-            { target: () => target, cardinality: "many" } as Partial<Relation>,
+            { target: () => target,
+cardinality: "many" } as Partial<Relation>,
             makeCollection()
         );
         expect(result.direction).toBe("inverse");
@@ -105,7 +113,9 @@ describe("sanitizeRelation", () => {
     it("generates localKey for owning one-to-one", () => {
         const target = makeTargetCollection({ slug: "authors" });
         const result = sanitizeRelation(
-            { target: () => target, cardinality: "one", direction: "owning" } as Partial<Relation>,
+            { target: () => target,
+cardinality: "one",
+direction: "owning" } as Partial<Relation>,
             makeCollection()
         );
         // Should generate a FK name from the relation name
@@ -116,17 +126,25 @@ describe("sanitizeRelation", () => {
     it("generates foreignKeyOnTarget for inverse one-to-many", () => {
         const target = makeTargetCollection({ slug: "comments" });
         const result = sanitizeRelation(
-            { target: () => target, cardinality: "many", direction: "inverse" } as Partial<Relation>,
-            makeCollection({ slug: "posts", name: "Posts" })
+            { target: () => target,
+cardinality: "many",
+direction: "inverse" } as Partial<Relation>,
+            makeCollection({ slug: "posts",
+name: "Posts" })
         );
         expect(result.foreignKeyOnTarget).toBeDefined();
     });
 
     it("generates junction table for owning many-to-many", () => {
-        const target = makeTargetCollection({ slug: "tags", table: "tags" });
-        const source = makeCollection({ slug: "posts", name: "Posts", table: "posts" });
+        const target = makeTargetCollection({ slug: "tags",
+table: "tags" });
+        const source = makeCollection({ slug: "posts",
+name: "Posts",
+table: "posts" });
         const result = sanitizeRelation(
-            { target: () => target, cardinality: "many", direction: "owning" } as Partial<Relation>,
+            { target: () => target,
+cardinality: "many",
+direction: "owning" } as Partial<Relation>,
             source
         );
         expect(result.through).toBeDefined();
@@ -136,10 +154,15 @@ describe("sanitizeRelation", () => {
     });
 
     it("creates sorted junction table name", () => {
-        const target = makeTargetCollection({ slug: "tags", table: "tags" });
-        const source = makeCollection({ slug: "posts", name: "Posts", table: "posts" });
+        const target = makeTargetCollection({ slug: "tags",
+table: "tags" });
+        const source = makeCollection({ slug: "posts",
+name: "Posts",
+table: "posts" });
         const result = sanitizeRelation(
-            { target: () => target, cardinality: "many", direction: "owning" } as Partial<Relation>,
+            { target: () => target,
+cardinality: "many",
+direction: "owning" } as Partial<Relation>,
             source
         );
         // Should be alphabetically sorted: "posts_tags"
@@ -152,7 +175,9 @@ describe("sanitizeRelation", () => {
         // Actually let's test the validation error by using custom joinPath=undefined but no auto-generation
         // The current code auto-generates localKey, so this won't throw. Let's verify it's generated.
         const result = sanitizeRelation(
-            { target: () => target, cardinality: "one", direction: "owning" } as Partial<Relation>,
+            { target: () => target,
+cardinality: "one",
+direction: "owning" } as Partial<Relation>,
             makeCollection()
         );
         expect(result.localKey).toBeDefined();
@@ -161,7 +186,10 @@ describe("sanitizeRelation", () => {
     it("preserves explicit localKey", () => {
         const target = makeTargetCollection();
         const result = sanitizeRelation(
-            { target: () => target, cardinality: "one", direction: "owning", localKey: "custom_fk" } as Partial<Relation>,
+            { target: () => target,
+cardinality: "one",
+direction: "owning",
+localKey: "custom_fk" } as Partial<Relation>,
             makeCollection()
         );
         expect(result.localKey).toBe("custom_fk");
@@ -170,7 +198,10 @@ describe("sanitizeRelation", () => {
     it("preserves explicit foreignKeyOnTarget", () => {
         const target = makeTargetCollection();
         const result = sanitizeRelation(
-            { target: () => target, cardinality: "one", direction: "inverse", foreignKeyOnTarget: "custom_fk" } as Partial<Relation>,
+            { target: () => target,
+cardinality: "one",
+direction: "inverse",
+foreignKeyOnTarget: "custom_fk" } as Partial<Relation>,
             makeCollection()
         );
         expect(result.foreignKeyOnTarget).toBe("custom_fk");

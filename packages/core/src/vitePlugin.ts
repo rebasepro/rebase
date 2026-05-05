@@ -13,11 +13,11 @@ export interface RebaseCollectionsPluginOptions {
  * It provides a virtual module "virtual:rebase-collections" that statically exports the resolved collections array.
  */
 export function rebaseCollectionsPlugin(options: RebaseCollectionsPluginOptions) {
-    const virtualModuleId = 'virtual:rebase-collections';
-    const resolvedVirtualModuleId = '\0' + virtualModuleId;
+    const virtualModuleId = "virtual:rebase-collections";
+    const resolvedVirtualModuleId = "\0" + virtualModuleId;
 
     return {
-        name: 'rebase-collections-plugin',
+        name: "rebase-collections-plugin",
         resolveId(id: string) {
             if (id === virtualModuleId) {
                 return resolvedVirtualModuleId;
@@ -28,7 +28,7 @@ export function rebaseCollectionsPlugin(options: RebaseCollectionsPluginOptions)
             if (id === resolvedVirtualModuleId) {
                 // Vite evaluates `import.meta.glob` relative to the project root.
                 // We ensure it starts with '/' so Vite knows evaluating it from the root.
-                const globPath = options.collectionsDir.startsWith('/')
+                const globPath = options.collectionsDir.startsWith("/")
                     ? `${options.collectionsDir}/*.ts`
                     : `/${options.collectionsDir}/*.ts`;
 

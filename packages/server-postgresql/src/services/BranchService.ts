@@ -103,7 +103,7 @@ export class BranchService {
             if (msg.includes("being accessed by other users")) {
                 throw new Error(
                     `Cannot create branch: the source database "${sourceDb}" has active connections. ` +
-                    `Close other clients or connections and try again.`
+                    "Close other clients or connections and try again."
                 );
             }
             throw err;
@@ -119,7 +119,7 @@ export class BranchService {
         return {
             name: sanitizedName,
             parentDatabase: sourceDb,
-            createdAt: now,
+            createdAt: now
         };
     }
 
@@ -156,7 +156,7 @@ export class BranchService {
             if (msg.includes("being accessed by other users")) {
                 throw new Error(
                     `Cannot delete branch "${sanitizedName}": the database has active connections. ` +
-                    `Close other clients and try again.`
+                    "Close other clients and try again."
                 );
             }
             throw err;
@@ -188,7 +188,7 @@ export class BranchService {
             name: row.name as string,
             parentDatabase: row.parent_db as string,
             createdAt: new Date(row.created_at as string),
-            sizeBytes: row.size_bytes != null ? Number(row.size_bytes) : undefined,
+            sizeBytes: row.size_bytes != null ? Number(row.size_bytes) : undefined
         }));
     }
 
@@ -231,7 +231,7 @@ export class BranchService {
             name: row.name as string,
             parentDatabase: row.parent_db as string,
             createdAt: new Date(row.created_at as string),
-            sizeBytes,
+            sizeBytes
         };
     }
 }

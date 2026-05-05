@@ -32,7 +32,7 @@ const envSchema = z.object({
     S3_ACCESS_KEY_ID: z.string().optional(),
     S3_SECRET_ACCESS_KEY: z.string().optional(),
     S3_ENDPOINT: z.string().url().optional(),
-    S3_FORCE_PATH_STYLE: z.enum(["true", "false", ""]).optional().transform(v => v === "true"),
+    S3_FORCE_PATH_STYLE: z.enum(["true", "false", ""]).optional().transform(v => v === "true")
 }).superRefine((data, ctx) => {
     if (data.NODE_ENV === "production" && !data.CORS_ORIGINS && !data.FRONTEND_URL) {
         ctx.addIssue({

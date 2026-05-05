@@ -22,14 +22,14 @@ const CONSUMER_EXTERNALS = [
     "chokidar",
     "fsevents",
     "ws",
-    "ts-morph",
+    "ts-morph"
 ];
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;
     // Externalize server-core to prevent singleton duplication (e.g. JWT config, etc)
     if (id === "@rebasepro/server-core" || id.startsWith("@rebasepro/server-core/")) return true;
     // Inline other @rebasepro/* packages (like common, types)
-    
+
     // Externalize only deps the consumer app explicitly installs
     if (CONSUMER_EXTERNALS.some(ext => id === ext || id.startsWith(ext + "/"))) return true;
     // Externalize Node built-ins
@@ -67,15 +67,15 @@ export default defineConfig(() => ({
             "@rebasepro/common": path.resolve(__dirname, "../common/src"),
             "@rebasepro/server-core": path.resolve(__dirname, "../server-core/src"),
             "@rebasepro/types": path.resolve(__dirname, "../types/src"),
-            "@rebasepro/utils": path.resolve(__dirname, "../utils/src"),
+            "@rebasepro/utils": path.resolve(__dirname, "../utils/src")
         }
     },
     plugins: [
         react({
             babel: {
                 plugins: [
-                    ["babel-plugin-react-compiler", ReactCompilerConfig],
-                ],
+                    ["babel-plugin-react-compiler", ReactCompilerConfig]
+                ]
             }
         })
     ]

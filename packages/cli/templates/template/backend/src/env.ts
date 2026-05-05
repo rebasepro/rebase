@@ -37,7 +37,7 @@ const envSchema = z.object({
      * When set, scripts can send `Authorization: Bearer <key>` to get admin access.
      * Generate with: node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"
      */
-    REBASE_SERVICE_KEY: z.string().min(32, "REBASE_SERVICE_KEY must be at least 32 characters").optional(),
+    REBASE_SERVICE_KEY: z.string().min(32, "REBASE_SERVICE_KEY must be at least 32 characters").optional()
 }).superRefine((data, ctx) => {
     if (data.NODE_ENV === "production" && !data.CORS_ORIGINS && !data.FRONTEND_URL) {
         ctx.addIssue({

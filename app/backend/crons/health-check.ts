@@ -50,9 +50,9 @@ const job: CronJobDefinition = {
             heapUsedMB: Math.round(memUsage.heapUsed / 1024 / 1024),
             rssMB,
             authorCount,
-            timestamp: new Date().toISOString(),
+            timestamp: new Date().toISOString()
         };
-    },
+    }
 };
 
 export default job;

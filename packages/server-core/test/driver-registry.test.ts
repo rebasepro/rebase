@@ -14,7 +14,9 @@ function createMockDataDriverDelegate(key: string): DataDriver {
         initialised: true,
         fetchCollection: jest.fn().mockResolvedValue([]),
         fetchEntity: jest.fn().mockResolvedValue(undefined),
-        saveEntity: jest.fn().mockResolvedValue({ id: "test-id", path: "test", values: {} }),
+        saveEntity: jest.fn().mockResolvedValue({ id: "test-id",
+path: "test",
+values: {} }),
         deleteEntity: jest.fn().mockResolvedValue(undefined),
         checkUniqueField: jest.fn().mockResolvedValue(true)
     };
@@ -86,7 +88,7 @@ describe("DriverRegistry", () => {
                 const registry = new DefaultDriverRegistry();
 
                 expect(() => registry.getDefault()).toThrow(
-                    `[DriverRegistry] No default driver registered.`
+                    "[DriverRegistry] No default driver registered."
                 );
             });
         });

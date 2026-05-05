@@ -117,7 +117,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         return {
             slug: "schema",
             name: "Edit collections",
-            group: "Schema",
+            group: "Database",
             icon: "view_list",
             nestedRoutes: true,
             view: (

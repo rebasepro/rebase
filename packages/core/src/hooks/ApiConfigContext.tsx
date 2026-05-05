@@ -31,7 +31,8 @@ export function ApiConfigProvider({
     getAuthToken,
     children
 }: ApiConfig & { children: React.ReactNode }) {
-    const value = React.useMemo(() => ({ apiUrl, getAuthToken }), [apiUrl, getAuthToken]);
+    const value = React.useMemo(() => ({ apiUrl,
+getAuthToken }), [apiUrl, getAuthToken]);
     return (
         <ApiConfigContext.Provider value={value}>
             {children}

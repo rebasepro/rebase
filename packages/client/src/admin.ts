@@ -51,20 +51,20 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
     async function createUser(data: { email: string, displayName?: string, password?: string, roles?: string[] }) {
         return transport.request<{ user: AdminUser }>(adminPath + "/users", {
             method: "POST",
-            body: JSON.stringify(data),
+            body: JSON.stringify(data)
         });
     }
 
     async function updateUser(userId: string, data: { email?: string, displayName?: string, password?: string, roles?: string[] }) {
         return transport.request<{ user: AdminUser }>(adminPath + "/users/" + encodeURIComponent(userId), {
             method: "PUT",
-            body: JSON.stringify(data),
+            body: JSON.stringify(data)
         });
     }
 
     async function deleteUser(userId: string) {
         return transport.request<{ success: boolean }>(adminPath + "/users/" + encodeURIComponent(userId), {
-            method: "DELETE",
+            method: "DELETE"
         });
     }
 
@@ -79,26 +79,26 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
     async function createRole(data: { id: string, name: string, isAdmin?: boolean, defaultPermissions?: Record<string, unknown>, config?: Record<string, unknown> }) {
         return transport.request<{ role: RebaseRole }>(adminPath + "/roles", {
             method: "POST",
-            body: JSON.stringify(data),
+            body: JSON.stringify(data)
         });
     }
 
     async function updateRole(roleId: string, data: { name?: string, isAdmin?: boolean, defaultPermissions?: Record<string, unknown>, config?: Record<string, unknown> }) {
         return transport.request<{ role: RebaseRole }>(adminPath + "/roles/" + encodeURIComponent(roleId), {
             method: "PUT",
-            body: JSON.stringify(data),
+            body: JSON.stringify(data)
         });
     }
 
     async function deleteRole(roleId: string) {
         return transport.request<{ success: boolean }>(adminPath + "/roles/" + encodeURIComponent(roleId), {
-            method: "DELETE",
+            method: "DELETE"
         });
     }
 
     async function bootstrap() {
         return transport.request<{ success: boolean; message: string; user: { uid: string; roles: string[] } }>(adminPath + "/bootstrap", {
-            method: "POST",
+            method: "POST"
         });
     }
 
@@ -114,6 +114,6 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
         createRole,
         updateRole,
         deleteRole,
-        bootstrap,
+        bootstrap
     };
 }

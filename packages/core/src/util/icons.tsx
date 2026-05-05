@@ -6,7 +6,7 @@ import { hashString, slugify } from "@rebasepro/utils";
 export function getIcon(iconKey?: string | React.ReactNode,
     className?: string,
     color?: IconColor,
-    size?: "smallest" | "small" | "medium" | "large" | number,): React.ReactElement | undefined {
+    size?: "smallest" | "small" | "medium" | "large" | number): React.ReactElement | undefined {
 
     if (React.isValidElement(iconKey)) {
         return iconKey;
@@ -20,7 +20,7 @@ export function getIcon(iconKey?: string | React.ReactNode,
             return undefined;
         }
         return usedIconKey in iconKeysMap ?
-            <Icon iconKey={usedIconKey} size={size} className={className} color={color} /> : undefined;
+            <Icon iconKey={usedIconKey} size={size} className={className} color={color}/> : undefined;
     }
 
     console.warn("Invalid icon key provided:", iconKey);
@@ -40,7 +40,7 @@ export const IconForView = React.memo(
         collectionOrView,
         className,
         color,
-        size = "medium",
+        size = "medium"
     }: {
         collectionOrView?: IconViewProps,
         color?: IconColor,
@@ -69,7 +69,7 @@ export const IconForView = React.memo(
         if (!key)
             key = coolIconKeys[hashString(collectionOrView.slug) % iconsCount];
 
-        return <Icon iconKey={key} size={size} className={className} color={color} />;
+        return <Icon iconKey={key} size={size} className={className} color={color}/>;
     }, (prevProps, nextProps) => {
         return equal(prevProps.collectionOrView?.icon, nextProps.collectionOrView?.icon) &&
             prevProps.collectionOrView?.name === nextProps.collectionOrView?.name &&

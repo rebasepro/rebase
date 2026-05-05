@@ -135,7 +135,8 @@ export const VirtualTable = React.memo<VirtualTableProps<any>>(
         endAdornment,
         AddColumnComponent,
         initialScroll = 0,
-        onColumnsOrderChange
+        onColumnsOrderChange,
+        extraData
     }: VirtualTableProps<T>) {
 
         const sortByProperty: string | undefined = sortBy ? sortBy[0] : undefined;
@@ -361,8 +362,9 @@ export const VirtualTable = React.memo<VirtualTableProps<any>>(
                 setColumns(newColumns);
                 onColumnsOrderChange(newColumns);
             } : undefined,
-            draggingColumnId
-        }), [data, rowHeight, cellRenderer, columns, currentSort, onRowClick, customView, onColumnResizeInternal, onColumnResizeEndInternal, filterInput, onColumnSort, onFilterUpdateInternal, sortByProperty, hoverRow, createFilterField, rowClassName, endAdornment, AddColumnComponent, onColumnsOrderChange, draggingColumnId]);
+            draggingColumnId,
+            extraData
+        }), [data, rowHeight, cellRenderer, columns, currentSort, onRowClick, customView, onColumnResizeInternal, onColumnResizeEndInternal, filterInput, onColumnSort, onFilterUpdateInternal, sortByProperty, hoverRow, createFilterField, rowClassName, endAdornment, AddColumnComponent, onColumnsOrderChange, draggingColumnId, extraData]);
 
         // Get sortable column keys (excluding frozen columns)
         const sortableColumnKeys = columns
@@ -512,7 +514,8 @@ function MemoizedList({
                 rowClassName,
                 endAdornment,
                 draggingColumnId,
-                onColumnsOrderChange
+                onColumnsOrderChange,
+                extraData
             }) => {
 
                 if (endAdornment && index === (data ?? []).length) {
@@ -566,13 +569,14 @@ function MemoizedList({
                                         rowData={rowData}
                                         cellData={cellData}
                                         rowIndex={index}
-                                        columnIndex={columnIndex}/>
+                                        columnIndex={columnIndex}
+                                        extraData={extraData}/>
                                 </SortableCellWrapper>
                             ) : (
                                 <div
                                     key={`cell_wrapper_${column.key}`}
                                     className={cls(
-                                        "flex-shrink-0",
+                                        "flex-shrink-0 relative",
                                         column.frozen && "sticky left-0 z-10 bg-white dark:bg-surface-950"
                                     )}
                                     style={{
@@ -590,7 +594,8 @@ function MemoizedList({
                                         rowData={rowData}
                                         cellData={cellData}
                                         rowIndex={index}
-                                        columnIndex={columnIndex}/>
+                                        columnIndex={columnIndex}
+                                        extraData={extraData}/>
                                 </div>
                             );
                         })}

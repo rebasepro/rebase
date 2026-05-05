@@ -15,7 +15,7 @@ function createMockCollection(): CollectionClient<any> {
         limit: jest.fn(),
         offset: jest.fn(),
         search: jest.fn(),
-        include: jest.fn(),
+        include: jest.fn()
     } as unknown as CollectionClient<any>;
 }
 
@@ -280,7 +280,8 @@ describe("QueryBuilder", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("age", "==", 18).limit(10).offset(5);
 
-            (mockCollection.find as jest.Mock).mockResolvedValueOnce({ data: [], meta: {} });
+            (mockCollection.find as jest.Mock).mockResolvedValueOnce({ data: [],
+meta: {} });
             await qb.find();
 
             expect(mockCollection.find).toHaveBeenCalledWith({
@@ -294,13 +295,14 @@ describe("QueryBuilder", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.include("tags", "author").limit(5);
 
-            (mockCollection.find as jest.Mock).mockResolvedValueOnce({ data: [], meta: {} });
+            (mockCollection.find as jest.Mock).mockResolvedValueOnce({ data: [],
+meta: {} });
             await qb.find();
 
             expect(mockCollection.find).toHaveBeenCalledWith(
                 expect.objectContaining({
                     include: ["tags", "author"],
-                    limit: 5,
+                    limit: 5
                 })
             );
         });
@@ -309,12 +311,13 @@ describe("QueryBuilder", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.search("test query");
 
-            (mockCollection.find as jest.Mock).mockResolvedValueOnce({ data: [], meta: {} });
+            (mockCollection.find as jest.Mock).mockResolvedValueOnce({ data: [],
+meta: {} });
             await qb.find();
 
             expect(mockCollection.find).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    searchString: "test query",
+                    searchString: "test query"
                 })
             );
         });

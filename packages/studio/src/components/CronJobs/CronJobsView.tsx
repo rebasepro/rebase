@@ -3,7 +3,7 @@ import {
     Typography, cls, defaultBorderMixin, Button, Chip,
     CircularProgress, IconButton, Card, Paper,
     ScheduleIcon, RefreshIcon, PlayArrowIcon, PauseIcon,
-    CheckCircleIcon, ErrorIcon, HistoryIcon,
+    CheckCircleIcon, ErrorIcon, HistoryIcon
 } from "@rebasepro/ui";
 import { useRebaseClient, useSnackbarController } from "@rebasepro/core";
 import type { CronJobStatus, CronJobLogEntry } from "@rebasepro/types";
@@ -28,8 +28,11 @@ function formatRelative(iso: string | undefined): string {
 }
 
 const stateColors: Record<string, string> = {
-    idle: "bg-emerald-500", running: "bg-blue-500", success: "bg-emerald-500",
-    error: "bg-red-500", disabled: "bg-surface-400",
+    idle: "bg-emerald-500",
+running: "bg-blue-500",
+success: "bg-emerald-500",
+    error: "bg-red-500",
+disabled: "bg-surface-400"
 };
 
 export function CronJobsView() {
@@ -124,11 +127,13 @@ export function CronJobsView() {
         setTriggering(id);
         try {
             await c.cron.triggerJob(id);
-            snackbarRef.current.open({ type: "success", message: "Job triggered" });
+            snackbarRef.current.open({ type: "success",
+message: "Job triggered" });
             await refreshJobs();
             if (selectedId === id) refreshLogs(id);
         } catch (e: unknown) {
-            snackbarRef.current.open({ type: "error", message: e instanceof Error ? e.message : String(e) });
+            snackbarRef.current.open({ type: "error",
+message: e instanceof Error ? e.message : String(e) });
         } finally { setTriggering(null); }
     };
 
@@ -137,20 +142,22 @@ export function CronJobsView() {
         if (!c?.cron) return;
         try {
             await c.cron.toggleJob(id, enabled);
-            snackbarRef.current.open({ type: "success", message: enabled ? "Job enabled" : "Job paused" });
+            snackbarRef.current.open({ type: "success",
+message: enabled ? "Job enabled" : "Job paused" });
             await refreshJobs();
         } catch (e: unknown) {
-            snackbarRef.current.open({ type: "error", message: e instanceof Error ? e.message : String(e) });
+            snackbarRef.current.open({ type: "error",
+message: e instanceof Error ? e.message : String(e) });
         }
     };
 
     const selectedJob = jobs.find(j => j.id === selectedId);
 
-    if (loading) return <div className="flex items-center justify-center h-full"><CircularProgress /></div>;
+    if (loading) return <div className="flex items-center justify-center h-full"><CircularProgress/></div>;
 
     if (jobs.length === 0) return (
         <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
-            <ScheduleIcon size="large" className="text-surface-300 dark:text-surface-600" />
+            <ScheduleIcon size="large" className="text-surface-300 dark:text-surface-600"/>
             <Typography variant="h6" color="secondary">No Cron Jobs Registered</Typography>
             <Typography variant="body2" color="disabled" className="max-w-md">
                 Create a file in your <code className="text-xs bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded font-mono">crons/</code> directory that default-exports a <code className="text-xs bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded font-mono">CronJobDefinition</code>.
@@ -164,11 +171,11 @@ export function CronJobsView() {
             <div className={cls("flex flex-col w-[340px] min-w-[280px] border-r h-full", defaultBorderMixin)}>
                 <div className={cls("flex items-center justify-between px-4 py-2.5 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
                     <div className="flex items-center gap-2">
-                        <ScheduleIcon size="small" className="text-primary" />
+                        <ScheduleIcon size="small" className="text-primary"/>
                         <Typography variant="subtitle2" className="font-semibold">Cron Jobs</Typography>
                         <Chip size="smallest" className="bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300">{jobs.length}</Chip>
                     </div>
-                    <IconButton size="small" onClick={refreshJobs} title="Refresh"><RefreshIcon size="small" /></IconButton>
+                    <IconButton size="small" onClick={refreshJobs} title="Refresh"><RefreshIcon size="small"/></IconButton>
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
                     {jobs.map(job => (
@@ -182,12 +189,12 @@ export function CronJobsView() {
                                     : "hover:bg-surface-100 dark:hover:bg-surface-800"
                             )}
                         >
-                            <div className={cls("w-2 h-2 rounded-full shrink-0", stateColors[job.state] || "bg-surface-400")} />
+                            <div className={cls("w-2 h-2 rounded-full shrink-0", stateColors[job.state] || "bg-surface-400")}/>
                             <div className="flex-1 min-w-0">
                                 <Typography variant="body2" className="truncate font-medium text-[13px]">{job.name}</Typography>
                                 <Typography variant="caption" color="secondary" className="truncate text-[11px] font-mono">{job.schedule}</Typography>
                             </div>
-                            {job.state === "running" && <CircularProgress size="smallest" />}
+                            {job.state === "running" && <CircularProgress size="smallest"/>}
                         </div>
                     ))}
                 </div>
@@ -204,7 +211,7 @@ export function CronJobsView() {
                         {/* Header */}
                         <div className={cls("flex items-center justify-between px-5 py-3 border-b bg-white dark:bg-surface-950 min-h-[56px]", defaultBorderMixin)}>
                             <div className="flex items-center gap-3 min-w-0">
-                                <div className={cls("w-2.5 h-2.5 rounded-full", stateColors[selectedJob.state])} />
+                                <div className={cls("w-2.5 h-2.5 rounded-full", stateColors[selectedJob.state])}/>
                                 <div className="min-w-0">
                                     <Typography variant="subtitle1" className="font-semibold truncate">{selectedJob.name}</Typography>
                                     {selectedJob.description && <Typography variant="caption" color="secondary" className="truncate">{selectedJob.description}</Typography>}
@@ -212,14 +219,14 @@ export function CronJobsView() {
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                                 <IconButton title={selectedJob.enabled ? "Pause job" : "Enable job"} size="small" onClick={() => handleToggle(selectedJob.id, !selectedJob.enabled)}>
-                                    {selectedJob.enabled ? <PauseIcon size="small" /> : <PlayArrowIcon size="small" />}
+                                    {selectedJob.enabled ? <PauseIcon size="small"/> : <PlayArrowIcon size="small"/>}
                                 </IconButton>
                                 <Button
                                     size="small"
                                     color="primary"
                                     onClick={() => handleTrigger(selectedJob.id)}
                                     disabled={triggering === selectedJob.id}
-                                    startIcon={triggering === selectedJob.id ? <CircularProgress size="smallest" /> : <PlayArrowIcon size="smallest" />}
+                                    startIcon={triggering === selectedJob.id ? <CircularProgress size="smallest"/> : <PlayArrowIcon size="smallest"/>}
                                 >
                                     Run Now
                                 </Button>
@@ -229,20 +236,20 @@ export function CronJobsView() {
                         {/* Stats Cards */}
                         <div className="px-5 py-4 bg-surface-50 dark:bg-surface-900/50">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                <StatCard label="Schedule" value={selectedJob.schedule} mono />
-                                <StatCard label="Last Run" value={formatRelative(selectedJob.lastRunAt)} />
-                                <StatCard label="Next Run" value={selectedJob.enabled ? formatRelative(selectedJob.nextRunAt) : "Paused"} />
-                                <StatCard label="Duration" value={selectedJob.lastDurationMs !== undefined ? formatDuration(selectedJob.lastDurationMs) : "—"} />
+                                <StatCard label="Schedule" value={selectedJob.schedule} mono/>
+                                <StatCard label="Last Run" value={formatRelative(selectedJob.lastRunAt)}/>
+                                <StatCard label="Next Run" value={selectedJob.enabled ? formatRelative(selectedJob.nextRunAt) : "Paused"}/>
+                                <StatCard label="Duration" value={selectedJob.lastDurationMs !== undefined ? formatDuration(selectedJob.lastDurationMs) : "—"}/>
                             </div>
                             <div className="grid grid-cols-3 gap-3 mt-3">
-                                <StatCard label="Status" value={selectedJob.state.toUpperCase()} chipColor={selectedJob.state === "error" ? "red" : selectedJob.state === "disabled" ? "gray" : "green"} />
-                                <StatCard label="Total Runs" value={String(selectedJob.totalRuns)} />
-                                <StatCard label="Failures" value={String(selectedJob.totalFailures)} highlight={selectedJob.totalFailures > 0} />
+                                <StatCard label="Status" value={selectedJob.state.toUpperCase()} chipColor={selectedJob.state === "error" ? "red" : selectedJob.state === "disabled" ? "gray" : "green"}/>
+                                <StatCard label="Total Runs" value={String(selectedJob.totalRuns)}/>
+                                <StatCard label="Failures" value={String(selectedJob.totalFailures)} highlight={selectedJob.totalFailures > 0}/>
                             </div>
                             {selectedJob.lastError && (
                                 <div className="mt-3 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50">
                                     <div className="flex items-center gap-2 mb-1">
-                                        <ErrorIcon size="smallest" className="text-red-500" />
+                                        <ErrorIcon size="smallest" className="text-red-500"/>
                                         <Typography variant="caption" className="font-semibold text-red-700 dark:text-red-400">Last Error</Typography>
                                     </div>
                                     <Typography variant="caption" className="font-mono text-red-600 dark:text-red-300 text-[11px] break-all">{selectedJob.lastError}</Typography>
@@ -253,14 +260,14 @@ export function CronJobsView() {
                         {/* Logs Section */}
                         <div className={cls("flex items-center justify-between px-5 py-2 border-y bg-white dark:bg-surface-950", defaultBorderMixin)}>
                             <div className="flex items-center gap-2">
-                                <HistoryIcon size="small" className="text-surface-400" />
+                                <HistoryIcon size="small" className="text-surface-400"/>
                                 <Typography variant="subtitle2" className="font-semibold text-[13px]">Execution History</Typography>
                             </div>
-                            <IconButton size="small" onClick={() => refreshLogs(selectedJob.id)} title="Refresh logs"><RefreshIcon size="smallest" /></IconButton>
+                            <IconButton size="small" onClick={() => refreshLogs(selectedJob.id)} title="Refresh logs"><RefreshIcon size="smallest"/></IconButton>
                         </div>
                         <div className="flex-1 overflow-y-auto">
                             {logsLoading ? (
-                                <div className="flex justify-center p-8"><CircularProgress size="small" /></div>
+                                <div className="flex justify-center p-8"><CircularProgress size="small"/></div>
                             ) : logs.length === 0 ? (
                                 <div className="flex items-center justify-center h-32">
                                     <Typography variant="body2" color="disabled">No executions yet</Typography>
@@ -268,7 +275,7 @@ export function CronJobsView() {
                             ) : (
                                 <div className="divide-y divide-surface-100 dark:divide-surface-800">
                                     {logs.map((log, idx) => (
-                                        <LogRow key={idx} log={log} />
+                                        <LogRow key={idx} log={log}/>
                                     ))}
                                 </div>
                             )}
@@ -304,8 +311,8 @@ function LogRow({ log }: { log: CronJobLogEntry }) {
         <div className="px-5 py-2.5 hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors">
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => setExpanded(!expanded)}>
                 {log.success
-                    ? <CheckCircleIcon size="smallest" className="text-emerald-500 shrink-0" />
-                    : <ErrorIcon size="smallest" className="text-red-500 shrink-0" />}
+                    ? <CheckCircleIcon size="smallest" className="text-emerald-500 shrink-0"/>
+                    : <ErrorIcon size="smallest" className="text-red-500 shrink-0"/>}
                 <div className="flex-1 min-w-0">
                     <Typography variant="caption" className="font-mono text-[11px] text-surface-500">{new Date(log.startedAt).toLocaleString()}</Typography>
                 </div>

@@ -37,7 +37,7 @@ export const useRebaseContext = <USER extends User = User, AuthControllerType ex
     const analyticsController = useAnalyticsController();
     const effectiveRoleController = useEffectiveRoleController();
     const userManagement = useInternalUserManagementController<USER>();
-    
+
     // Will get `databaseAdmin` from context
     const databaseAdmin = useContext(DatabaseAdminContext);
 

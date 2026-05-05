@@ -3,7 +3,7 @@
 // Collection: Posts (slug: posts)
 // ────────────────────────────────────────────────────────────────────
 
-import { createCollectionClient } from './client.js';
+import { createCollectionClient } from "./client.js";
 
 // ─── Type Definitions ──────────────────────────────────────────────
 

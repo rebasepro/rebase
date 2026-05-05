@@ -159,7 +159,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 driver,
                 realtimeProvider: realtimeService,
                 collectionRegistry: registry,
-                internals,
+                internals
             };
         },
 
@@ -181,7 +181,10 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             const roleService = new RoleService(db);
             const authRepository = new PostgresAuthRepository(db);
 
-            return { userService, roleService, emailService, authRepository };
+            return { userService,
+roleService,
+emailService,
+authRepository };
         },
 
         async initializeHistory(config: unknown, driverResult: InitializedDriver): Promise<{ historyService: HistoryService } | undefined> {
@@ -192,7 +195,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             const db = internals.db;
 
             await ensureHistoryTableExists(db);
-            
+
             const retention = typeof historyConfig === "object" && historyConfig !== null ? (historyConfig as { retention?: number }).retention : undefined;
             const historyService = new HistoryService(db, retention ? { ttlDays: retention } : undefined);
 

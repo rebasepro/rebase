@@ -3,8 +3,11 @@
  * Call this early in your application to set up proper logging levels
  */
 export function configureLogLevel(logLevel?: string) {
-    const LOG_LEVEL = logLevel || process.env.LOG_LEVEL || 'info';
-    const logLevels = { error: 0, warn: 1, info: 2, debug: 3 };
+    const LOG_LEVEL = logLevel || process.env.LOG_LEVEL || "info";
+    const logLevels = { error: 0,
+warn: 1,
+info: 2,
+debug: 3 };
     const currentLevel = logLevels[LOG_LEVEL as keyof typeof logLevels] ?? 2;
 
     if (currentLevel < 3) console.debug = () => { };

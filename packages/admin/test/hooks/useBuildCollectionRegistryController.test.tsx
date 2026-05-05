@@ -20,7 +20,7 @@ describe("useBuildCollectionRegistryController", () => {
     it("should allow type-safe getCollection access without throwing", () => {
         const { result } = renderHook(() => useBuildCollectionRegistryController<TestDatabase>({}));
         const controller = result.current;
-        
+
         expect(controller).toBeDefined();
         expect(typeof controller.getCollection).toBe("function");
 

@@ -18,15 +18,18 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 // ─── Mock Tables ──────────────────────────────────────────────────
 const mockAuthorsTable = {
-    id: { name: "id", dataType: "number" },
+    id: { name: "id",
+dataType: "number" },
     name: { name: "name" },
     _def: { tableName: "authors" }
 };
 
 const mockPostsTable = {
-    id: { name: "id", dataType: "number" },
+    id: { name: "id",
+dataType: "number" },
     title: { name: "title" },
-    author_id: { name: "author_id", dataType: "number" },
+    author_id: { name: "author_id",
+dataType: "number" },
     _def: { tableName: "posts" }
 };
 
@@ -262,7 +265,8 @@ describe("N+1 Query Regression: batchFetchRelatedEntities (owning relations)", (
             title: `Post ${i + 1}`,
             author_id: 1
         }));
-        const singleAuthor = [{ id: 1, name: "Shared Author" }];
+        const singleAuthor = [{ id: 1,
+name: "Shared Author" }];
 
         const db = createSpiedDb(sameAuthorPosts, singleAuthor);
         const relationService = new RelationService(db, registry);

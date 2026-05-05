@@ -42,7 +42,11 @@ export function useAuth() {
     setUser(null);
   }, []);
 
-  return { user, loading, signIn, signUp, signOut };
+  return { user,
+loading,
+signIn,
+signUp,
+signOut };
 }
 
 // ===== Collection Hook =====
@@ -51,7 +55,10 @@ export function useCollection(
   options?: { limit?: number; page?: number; orderBy?: string; where?: Record<string, string> }
 ) {
   const [data, setData] = useState<any[]>([]);
-  const [meta, setMeta] = useState({ total: 0, limit: 20, offset: 0, hasMore: false });
+  const [meta, setMeta] = useState({ total: 0,
+limit: 20,
+offset: 0,
+hasMore: false });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,7 +74,7 @@ export function useCollection(
         limit,
         offset,
         orderBy: options?.orderBy,
-        where: options?.where,
+        where: options?.where
       });
       setData(result.data);
       setMeta(result.meta);
@@ -82,5 +89,9 @@ export function useCollection(
     fetchData();
   }, [fetchData]);
 
-  return { data, meta, loading, error, refetch: fetchData };
+  return { data,
+meta,
+loading,
+error,
+refetch: fetchData };
 }

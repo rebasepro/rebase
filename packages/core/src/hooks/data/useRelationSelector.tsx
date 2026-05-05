@@ -145,7 +145,7 @@ export function useRelationSelector<M extends Record<string, any> = any>(
                 if (value && Array.isArray(value)) {
                     const [op, val] = value;
                     const postgrestOp = op === "==" ? "eq" : op === "!=" ? "neq" : op === ">" ? "gt" : op === ">=" ? "gte" : op === "<" ? "lt" : op === "<=" ? "lte" : op === "in" ? "in" : op === "not-in" ? "nin" : op === "array-contains" ? "cs" : op === "array-contains-any" ? "csa" : "eq";
-                    
+
                     let stringVal: string;
                     if (Array.isArray(val)) {
                         stringVal = `(${val.join(",")})`;
@@ -157,7 +157,7 @@ export function useRelationSelector<M extends Record<string, any> = any>(
             });
         }
         const whereParams = Object.keys(whereMap).length > 0 ? whereMap : undefined;
-        
+
         const onEntitiesUpdate = (res: { data: Entity<M>[], meta: { hasMore: boolean } }) => {
             const newItems = res.data.map((e) => entityToRelationItem(e));
             setItems(newItems);
@@ -172,9 +172,9 @@ export function useRelationSelector<M extends Record<string, any> = any>(
         };
 
         const accessor = dataClient.collection(path);
-        
+
         let unsubscribe: (() => void) | undefined;
-        
+
         if (accessor.listen) {
             unsubscribe = accessor.listen({
                 where: whereParams,
@@ -244,6 +244,6 @@ export function useRelationSelector<M extends Record<string, any> = any>(
         search,
         loadMore,
         hasMore,
-        entityToRelationItem,
+        entityToRelationItem
     }), [items, isLoading, error, search, loadMore, hasMore, entityToRelationItem]);
 }

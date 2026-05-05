@@ -192,8 +192,12 @@ describe("S3StorageController", () => {
         it("should list objects in S3 bucket", async () => {
             mockSend.mockResolvedValueOnce({
                 Contents: [
-                    { Key: "uploads/file1.txt", Size: 100, LastModified: new Date() },
-                    { Key: "uploads/file2.txt", Size: 200, LastModified: new Date() }
+                    { Key: "uploads/file1.txt",
+Size: 100,
+LastModified: new Date() },
+                    { Key: "uploads/file2.txt",
+Size: 200,
+LastModified: new Date() }
                 ],
                 CommonPrefixes: [],
                 IsTruncated: false
@@ -203,7 +207,7 @@ describe("S3StorageController", () => {
 
             expect(ListObjectsV2Command).toHaveBeenCalledWith(expect.objectContaining({
                 Bucket: "test-bucket",
-                Prefix: "uploads"  // Implementation doesn't add trailing slash
+                Prefix: "uploads" // Implementation doesn't add trailing slash
             }));
             expect(result.items).toHaveLength(2);
         });
@@ -211,7 +215,9 @@ describe("S3StorageController", () => {
         it("should handle pagination with maxResults", async () => {
             mockSend.mockResolvedValueOnce({
                 Contents: [
-                    { Key: "uploads/file1.txt", Size: 100, LastModified: new Date() }
+                    { Key: "uploads/file1.txt",
+Size: 100,
+LastModified: new Date() }
                 ],
                 CommonPrefixes: [],
                 IsTruncated: true,

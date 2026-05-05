@@ -17,7 +17,7 @@ describe("rebase singleton", () => {
     it("should return the correctly initialized instance properties", () => {
         const mockClient = {
             data: { test: "mockData" },
-            auth: { test: "mockAuth" },
+            auth: { test: "mockAuth" }
         } as unknown as RebaseClient;
 
         _initRebase(mockClient);

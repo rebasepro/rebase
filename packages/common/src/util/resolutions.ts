@@ -11,7 +11,7 @@ import {
     RelationProperty,
     StringProperty,
     isPostgresCollection,
-    isFirebaseCollection,
+    isFirebaseCollection
 } from "@rebasepro/types";
 
 type PropertyConfig = { property: unknown; [key: string]: unknown };
@@ -92,7 +92,7 @@ export function resolveProperty<M extends Record<string, unknown> = Record<strin
         const properties = resolveProperties({
             ignoreMissingFields,
             ...rest,
-            properties: resultProperty.properties,
+            properties: resultProperty.properties
         });
         resolvedProperty = {
             ...resultProperty,
@@ -120,7 +120,8 @@ export function resolveProperty<M extends Record<string, unknown> = Record<strin
             const restConfigProperty = { ...customField.property } as Record<string, unknown>;
             delete restConfigProperty.propertyConfig;
             const customFieldProperty = resolveProperty({
-                property: { name: "", ...restConfigProperty } as Property,
+                property: { name: "",
+...restConfigProperty } as Property,
                 ignoreMissingFields,
                 ...rest
             });
@@ -155,7 +156,7 @@ export function resolvePropertyEnum(property: StringProperty | NumberProperty): 
     if (typeof property.enum === "object") {
         return {
             ...property,
-            enum: enumToObjectEntries(property.enum)?.filter((value) => value && (value.id || value.id === 0) && value.label) ?? [],
+            enum: enumToObjectEntries(property.enum)?.filter((value) => value && (value.id || value.id === 0) && value.label) ?? []
         };
     }
     return property as StringProperty | NumberProperty;
@@ -197,7 +198,8 @@ export function resolveProperties<M extends Record<string, unknown>>({
             };
         })
         .filter((a) => a !== null)
-        .reduce((a, b) => ({ ...a, ...b }), {}) as Properties;
+        .reduce((a, b) => ({ ...a,
+...b }), {}) as Properties;
 }
 
 export function resolveArrayProperties<M>({
@@ -227,7 +229,7 @@ export function resolveArrayProperties<M>({
                     property: p as Property,
                     ignoreMissingFields,
                     ...props,
-                    index,
+                    index
                 });
             }) as Property[];
         } else {
@@ -330,22 +332,21 @@ export function resolveEnumValues(input: EnumValues): EnumValueConfig[] | undefi
 }
 
 
-
 export function getSubcollections<M extends Record<string, unknown> = Record<string, unknown>>(collection: EntityCollection<M>): EntityCollection<Record<string, unknown>>[] {
     if (collection.childCollections) {
         return collection.childCollections() ?? [];
     }
-    
+
     if (isFirebaseCollection(collection) && collection.subcollections) {
         return collection.subcollections() ?? [];
     }
-    
+
     if (isPostgresCollection(collection) && collection.relations) {
         const manyRelations = collection.relations.filter(r => r.cardinality === "many");
         return manyRelations.map(r => {
             const target = r.target();
             const relationKey = r.relationName || target.slug;
-            
+
             // Try to find corresponding property to get custom name
             let customName: string | undefined;
             if (collection.properties) {
@@ -362,11 +363,12 @@ export function getSubcollections<M extends Record<string, unknown> = Record<str
                 baseOverrides.name = customName;
                 baseOverrides.singularName = customName;
             }
-            
-            const targetWithOverrides = { ...target, ...baseOverrides };
+
+            const targetWithOverrides = { ...target,
+...baseOverrides };
             return (r.overrides ? mergeDeep(targetWithOverrides, r.overrides) : targetWithOverrides) as EntityCollection<Record<string, unknown>>;
         });
     }
-    
+
     return [];
 }

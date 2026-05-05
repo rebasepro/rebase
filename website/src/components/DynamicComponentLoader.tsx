@@ -1,6 +1,6 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense } from "react";
 
-const modules = import.meta.glob('/src/content/docs/samples/components/**/*.tsx');
+const modules = import.meta.glob("/src/content/docs/samples/components/**/*.tsx");
 
 const DynamicComponentLoader = ({ componentName }: { componentName: string }) => {
     const componentPath = `/src/content/docs/samples/components/${componentName}.tsx`;
@@ -16,7 +16,7 @@ const DynamicComponentLoader = ({ componentName }: { componentName: string }) =>
 
     return (
         <Suspense fallback={null}>
-            <Component />
+            <Component/>
         </Suspense>
     );
 };

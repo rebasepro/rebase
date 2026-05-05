@@ -7,7 +7,7 @@ function makeCollection(overrides: Record<string, any> = {}): EntityCollection {
         slug: "products",
         table: "products",
         properties: {},
-        ...overrides,
+        ...overrides
     };
     return base as EntityCollection;
 }
@@ -18,7 +18,7 @@ describe("getNavigationEntriesFromPath", () => {
         const collections = [makeCollection()];
         const result = getNavigationEntriesFromPath({
             path: "products",
-            collections,
+            collections
         });
         expect(result).toHaveLength(1);
         expect(result[0].type).toBe("collection");
@@ -29,7 +29,7 @@ describe("getNavigationEntriesFromPath", () => {
         const collections = [makeCollection()];
         const result = getNavigationEntriesFromPath({
             path: "products/123",
-            collections,
+            collections
         });
         expect(result).toHaveLength(2);
         expect(result[0].type).toBe("collection");
@@ -41,16 +41,16 @@ describe("getNavigationEntriesFromPath", () => {
         const subCol = makeCollection({
             name: "Variants",
             slug: "variants",
-            table: "variants",
+            table: "variants"
         });
         const collections = [
             makeCollection({
-                childCollections: () => [subCol],
-            }),
+                childCollections: () => [subCol]
+            })
         ];
         const result = getNavigationEntriesFromPath({
             path: "products/123/variants",
-            collections,
+            collections
         });
         expect(result).toHaveLength(3);
         expect(result[0].type).toBe("collection");
@@ -63,16 +63,16 @@ describe("getNavigationEntriesFromPath", () => {
         const customView: EntityCustomView<any> = {
             key: "analytics",
             name: "Analytics",
-            Builder: () => null,
+            Builder: () => null
         };
         const collections = [
             makeCollection({
-                entityViews: [customView],
-            }),
+                entityViews: [customView]
+            })
         ];
         const result = getNavigationEntriesFromPath({
             path: "products/123/analytics",
-            collections,
+            collections
         });
         expect(result).toHaveLength(3);
         expect(result[2].type).toBe("custom_view");
@@ -83,17 +83,17 @@ describe("getNavigationEntriesFromPath", () => {
         const contextView: EntityCustomView<any> = {
             key: "preview",
             name: "Preview",
-            Builder: () => null,
+            Builder: () => null
         };
         const collections = [
             makeCollection({
-                entityViews: ["preview"],
-            }),
+                entityViews: ["preview"]
+            })
         ];
         const result = getNavigationEntriesFromPath({
             path: "products/123/preview",
             collections,
-            contextEntityViews: [contextView],
+            contextEntityViews: [contextView]
         });
         expect(result).toHaveLength(3);
         expect(result[2].type).toBe("custom_view");
@@ -102,7 +102,7 @@ describe("getNavigationEntriesFromPath", () => {
     it("returns empty array for empty collections", () => {
         const result = getNavigationEntriesFromPath({
             path: "unknown",
-            collections: [],
+            collections: []
         });
         expect(result).toEqual([]);
     });
@@ -111,7 +111,7 @@ describe("getNavigationEntriesFromPath", () => {
         const collections = [makeCollection()];
         const result = getNavigationEntriesFromPath({
             path: "nonexistent",
-            collections,
+            collections
         });
         expect(result).toEqual([]);
     });
@@ -120,7 +120,7 @@ describe("getNavigationEntriesFromPath", () => {
         const collections = [makeCollection()];
         const result = getNavigationEntriesFromPath({
             path: "/products/",
-            collections,
+            collections
         });
         expect(result).toHaveLength(1);
         expect(result[0].type).toBe("collection");

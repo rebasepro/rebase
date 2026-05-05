@@ -14,7 +14,7 @@ import {
     findBackendDir,
     findFrontendDir,
     findEnvFile,
-    getActiveBackendPlugin,
+    getActiveBackendPlugin
 } from "./project";
 
 let tmpDir: string;
@@ -42,7 +42,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(tmpDir, { recursive: true,
+force: true });
 });
 
 // =============================================================================
@@ -78,7 +79,7 @@ describe("findProjectRoot", () => {
         const projectDir = createDir("workspace-app");
         writeJSON(path.join(projectDir, "package.json"), {
             name: "workspace-app",
-            workspaces: ["backend", "frontend", "config"],
+            workspaces: ["backend", "frontend", "config"]
         });
 
         expect(findProjectRoot(projectDir)).toBe(projectDir);
@@ -88,7 +89,7 @@ describe("findProjectRoot", () => {
         const projectDir = createDir("wildcard-app");
         writeJSON(path.join(projectDir, "package.json"), {
             name: "wildcard-app",
-            workspaces: ["packages/*", "backend"],
+            workspaces: ["packages/*", "backend"]
         });
 
         expect(findProjectRoot(projectDir)).toBe(projectDir);
@@ -194,8 +195,8 @@ describe("getActiveBackendPlugin", () => {
             dependencies: {
                 "@rebasepro/server-core": "workspace:*",
                 "@rebasepro/server-postgresql": "workspace:*",
-                "hono": "^4.0.0",
-            },
+                "hono": "^4.0.0"
+            }
         });
 
         expect(getActiveBackendPlugin(backendDir)).toBe("@rebasepro/server-postgresql");
@@ -206,11 +207,11 @@ describe("getActiveBackendPlugin", () => {
         writeJSON(path.join(backendDir, "package.json"), {
             name: "my-backend",
             dependencies: {
-                "@rebasepro/server-core": "workspace:*",
+                "@rebasepro/server-core": "workspace:*"
             },
             devDependencies: {
-                "@rebasepro/server-mongodb": "^1.0.0",
-            },
+                "@rebasepro/server-mongodb": "^1.0.0"
+            }
         });
 
         expect(getActiveBackendPlugin(backendDir)).toBe("@rebasepro/server-mongodb");
@@ -222,8 +223,8 @@ describe("getActiveBackendPlugin", () => {
             name: "my-backend",
             dependencies: {
                 "@rebasepro/server-core": "workspace:*",
-                "hono": "^4.0.0",
-            },
+                "hono": "^4.0.0"
+            }
         });
 
         expect(getActiveBackendPlugin(backendDir)).toBeNull();

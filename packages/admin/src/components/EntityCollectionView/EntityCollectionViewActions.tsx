@@ -1,5 +1,5 @@
 import type { EntityCollection } from "@rebasepro/types";
-import React from "react";
+import React, { lazy, Suspense } from "react";
 
 import { useAuthController, useLargeLayout, useTranslation, useSlot } from "@rebasepro/core";
 import { CollectionActionsProps, EntityTableController, SelectionController, ViewMode } from "@rebasepro/types";
@@ -15,8 +15,9 @@ import {
 import { ErrorBoundary } from "@rebasepro/ui";
 import { usePermissions } from "@rebasepro/core";
 import { toArray } from "@rebasepro/utils";
-import { ImportCollectionAction } from "../../data_import/import";
-import { ExportCollectionAction } from "../../data_export/export";
+// Lazy-load import/export — pulls in xlsx (~800KB) only on demand
+const ImportCollectionAction = lazy(() => import("../../data_import/import").then(m => ({ default: m.ImportCollectionAction })));
+const ExportCollectionAction = lazy(() => import("../../data_export/export").then(m => ({ default: m.ExportCollectionAction })));
 import { EditorCollectionAction } from "../../collection_editor/ui/EditorCollectionAction";
 import { useCollectionEditorController } from "../../collection_editor/useCollectionEditorController";
 import { useCMSContext } from "../../index";
@@ -140,10 +141,14 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
                 {pluginActions}
             </ErrorBoundary>
             <ErrorBoundary>
-                <ImportCollectionAction {...(actionProps as any)}/>
+                <Suspense fallback={null}>
+                    <ImportCollectionAction {...(actionProps as any)}/>
+                </Suspense>
             </ErrorBoundary>
             <ErrorBoundary>
-                <ExportCollectionAction {...(actionProps as any)}/>
+                <Suspense fallback={null}>
+                    <ExportCollectionAction {...(actionProps as any)}/>
+                </Suspense>
             </ErrorBoundary>
             {hasCollectionEditor && (
                 <ErrorBoundary>

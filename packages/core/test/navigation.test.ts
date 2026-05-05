@@ -223,7 +223,7 @@ describe("Resolving paths test", () => {
             table: "products",
             name: "Products",
             properties: {},
-            subcollections:() =>  [localesCollection]
+            subcollections: () => [localesCollection]
         });
 
         const testCollections = [productsCollection];

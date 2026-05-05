@@ -33,7 +33,7 @@ const MOCK_TABLES: RLSTable[] = [
                 using: "auth.uid() = id",
                 roles: ["public"],
                 permissive: true,
-                syncStatus: "synced",
+                syncStatus: "synced"
             },
             {
                 id: "2",
@@ -43,7 +43,7 @@ const MOCK_TABLES: RLSTable[] = [
                 withCheck: "auth.uid() = id",
                 roles: ["public"],
                 permissive: true,
-                syncStatus: "synced",
+                syncStatus: "synced"
             },
             {
                 id: "3",
@@ -52,9 +52,9 @@ const MOCK_TABLES: RLSTable[] = [
                 using: "auth.role() = 'admin'",
                 roles: ["admin"],
                 permissive: true,
-                syncStatus: "unapplied",
-            },
-        ],
+                syncStatus: "unapplied"
+            }
+        ]
     },
     {
         name: "posts",
@@ -68,7 +68,7 @@ const MOCK_TABLES: RLSTable[] = [
                 using: "true",
                 roles: ["public"],
                 permissive: true,
-                syncStatus: "synced",
+                syncStatus: "synced"
             },
             {
                 id: "5",
@@ -78,9 +78,9 @@ const MOCK_TABLES: RLSTable[] = [
                 withCheck: "auth.uid() = author_id",
                 roles: ["authenticated"],
                 permissive: true,
-                syncStatus: "synced",
-            },
-        ],
+                syncStatus: "synced"
+            }
+        ]
     },
     {
         name: "comments",
@@ -94,15 +94,15 @@ const MOCK_TABLES: RLSTable[] = [
                 using: "true",
                 roles: ["public"],
                 permissive: true,
-                syncStatus: "synced",
-            },
-        ],
+                syncStatus: "synced"
+            }
+        ]
     },
     {
         name: "orders",
         schema: "public",
         rlsEnabled: false,
-        policies: [],
+        policies: []
     },
     {
         name: "products",
@@ -116,7 +116,7 @@ const MOCK_TABLES: RLSTable[] = [
                 using: "true",
                 roles: ["public", "anon"],
                 permissive: true,
-                syncStatus: "synced",
+                syncStatus: "synced"
             },
             {
                 id: "8",
@@ -125,31 +125,48 @@ const MOCK_TABLES: RLSTable[] = [
                 using: "auth.role() = 'admin'",
                 roles: ["admin"],
                 permissive: true,
-                syncStatus: "db-only",
-            },
-        ],
+                syncStatus: "db-only"
+            }
+        ]
     },
     {
         name: "sessions",
         schema: "auth",
         rlsEnabled: false,
-        policies: [],
-    },
+        policies: []
+    }
 ];
 
 const COMMAND_COLORS: Record<string, { bg: string; text: string }> = {
-    SELECT: { bg: "bg-blue-950", text: "text-blue-300" },
-    INSERT: { bg: "bg-green-950", text: "text-green-300" },
-    UPDATE: { bg: "bg-amber-950", text: "text-amber-300" },
-    DELETE: { bg: "bg-red-950", text: "text-red-300" },
-    ALL: { bg: "bg-green-950", text: "text-green-300" },
+    SELECT: { bg: "bg-blue-950",
+text: "text-blue-300" },
+    INSERT: { bg: "bg-green-950",
+text: "text-green-300" },
+    UPDATE: { bg: "bg-amber-950",
+text: "text-amber-300" },
+    DELETE: { bg: "bg-red-950",
+text: "text-red-300" },
+    ALL: { bg: "bg-green-950",
+text: "text-green-300" }
 };
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; border: string; label: string }> = {
-    synced: { bg: "bg-green-900/20", text: "text-green-400", border: "border-green-800/30", label: "Live + Code" },
-    unapplied: { bg: "bg-primary/10", text: "text-primary", border: "border-primary/20", label: "Unapplied" },
-    "code-only": { bg: "bg-amber-900/20", text: "text-amber-400", border: "border-amber-800/30", label: "Code Only" },
-    "db-only": { bg: "bg-cyan-900/20", text: "text-cyan-400", border: "border-cyan-800/30", label: "DB Only" },
+    synced: { bg: "bg-green-900/20",
+text: "text-green-400",
+border: "border-green-800/30",
+label: "Live + Code" },
+    unapplied: { bg: "bg-primary/10",
+text: "text-primary",
+border: "border-primary/20",
+label: "Unapplied" },
+    "code-only": { bg: "bg-amber-900/20",
+text: "text-amber-400",
+border: "border-amber-800/30",
+label: "Code Only" },
+    "db-only": { bg: "bg-cyan-900/20",
+text: "text-cyan-400",
+border: "border-cyan-800/30",
+label: "DB Only" }
 };
 
 // ─── Component ───────────────────────────────────────────
@@ -166,13 +183,15 @@ export function RLSEditorDemo() {
 
     const toggleRLS = useCallback((tableName: string) => {
         setTables(prev => prev.map(t =>
-            t.name === tableName ? { ...t, rlsEnabled: !t.rlsEnabled } : t
+            t.name === tableName ? { ...t,
+rlsEnabled: !t.rlsEnabled } : t
         ));
     }, []);
 
     const deletePolicy = useCallback((tableId: string, policyId: string) => {
         setTables(prev => prev.map(t =>
-            t.name === tableId ? { ...t, policies: t.policies.filter(p => p.id !== policyId) } : t
+            t.name === tableId ? { ...t,
+policies: t.policies.filter(p => p.id !== policyId) } : t
         ));
     }, []);
 
@@ -185,10 +204,11 @@ export function RLSEditorDemo() {
             using: newPolicyUsing.trim(),
             roles: ["public"],
             permissive: true,
-            syncStatus: "unapplied",
+            syncStatus: "unapplied"
         };
         setTables(prev => prev.map(t =>
-            t.name === selectedTable ? { ...t, policies: [...t.policies, newPolicy] } : t
+            t.name === selectedTable ? { ...t,
+policies: [...t.policies, newPolicy] } : t
         ));
         setNewPolicyName("");
         setNewPolicyUsing("");
@@ -220,7 +240,7 @@ export function RLSEditorDemo() {
                                 >
                                     <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                                         table.rlsEnabled ? "bg-green-500" : "bg-orange-400 opacity-50"
-                                    }`} />
+                                    }`}/>
                                     <span className="truncate flex-1 font-mono text-[11px]">{table.name}</span>
                                     <span className="text-[10px] opacity-40">{table.policies.length}</span>
                                 </button>

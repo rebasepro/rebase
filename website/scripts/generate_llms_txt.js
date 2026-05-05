@@ -134,7 +134,7 @@ async function extractSidebarIds(configFilePath) {
     const absolutePath = path.resolve(__dirname, configFilePath);
 
     // Read the config file as text instead of importing it
-    const configContent = fs.readFileSync(absolutePath, 'utf-8');
+    const configContent = fs.readFileSync(absolutePath, "utf-8");
 
     // Extract the sidebar array from the config content
     // Find the sidebar configuration using regex
@@ -192,9 +192,9 @@ async function buildSlugMap(directoryPath, slugMap) {
 
 // Entry point of the script
 (async () => {
-    const rootDirectory = "./src/content/docs/docs";       // Root directory to start processing
+    const rootDirectory = "./src/content/docs/docs"; // Root directory to start processing
     const configFilePath = "../astro.config.mjs"; // Path to astro.config.mjs
-    const outputFilePath = "./public/llms.txt";    // Single output file
+    const outputFilePath = "./public/llms.txt"; // Single output file
 
     try {
         // Extract sidebar slugs from astro config

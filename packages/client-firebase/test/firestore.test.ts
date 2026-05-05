@@ -47,9 +47,9 @@ it("vector conversion", () => {
             value: [0.1, 0.2, 0.3]
         }
     };
-    
-    // As mock firestore doesn't do much here, we expect cmsToFirestoreModel to transform it 
-    // to a Firestore VectorValue instance if available, but for our simple test we can just check 
+
+    // As mock firestore doesn't do much here, we expect cmsToFirestoreModel to transform it
+    // to a Firestore VectorValue instance if available, but for our simple test we can just check
     // if the object looks structurally like what it should, or just verify no crash.
     const result: any = cmsToFirestoreModel(inputValues, {} as unknown as Firestore);
     // @firebase/firestore VectorValue produces an object with toArray() method, but in our unit test mock

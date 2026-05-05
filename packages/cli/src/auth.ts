@@ -47,7 +47,7 @@ export function parseJwt(token: string): object {
 export async function refreshCredentials(
     env: "dev" | "prod",
     credentials?: object | null,
-    _onErr?: (e: unknown) => void,
+    _onErr?: (e: unknown) => void
 ): Promise<object | null> {
     if (!credentials) return null;
     // If the token hasn't expired, just return it.
@@ -64,7 +64,7 @@ export async function login(env: "prod" | "dev", _debug?: boolean): Promise<void
     console.log(
         "Interactive login is not yet implemented in @rebasepro/cli.\n" +
         "Please authenticate via the Rebase dashboard and copy your tokens to " +
-        tokenPath(env),
+        tokenPath(env)
     );
 }
 

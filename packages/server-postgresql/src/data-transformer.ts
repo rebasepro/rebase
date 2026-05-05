@@ -96,7 +96,7 @@ export function serializeDataToServer<M extends Record<string, unknown>>(
 
     for (const [key, value] of Object.entries(entity)) {
         const property = properties[key as keyof M] as Property;
-        
+
         // Coerce empty strings to null for any field that acts as a foreign key
         const effectiveValue = (foreignKeys.has(key) && value === "") ? null : value;
 
@@ -482,12 +482,12 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
                 if (!relationDef) {
                     relationDef = isPostgresCollection(collection) ? collection.relations?.find((rel) => rel.relationName === (property as RelationProperty).relationName) : undefined;
                 }
-                
+
                 if (!relationDef) {
-                    console.warn(`Relation not defined in property for key: ${propertyKey || 'unknown'}`);
+                    console.warn(`Relation not defined in property for key: ${propertyKey || "unknown"}`);
                     return value;
                 }
-                
+
                 try {
                     const targetCollection = relationDef.target();
                     return {
@@ -496,7 +496,7 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
                         __type: "relation"
                     };
                 } catch (e) {
-                    console.warn(`Could not resolve target collection for relation property: ${propertyKey || 'unknown'}`, e);
+                    console.warn(`Could not resolve target collection for relation property: ${propertyKey || "unknown"}`, e);
                     return value;
                 }
             }

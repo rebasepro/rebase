@@ -7,5 +7,6 @@ export function flatMapEntityValues<M extends object>(values: M, path = ""): obj
         } else {
             return { [currentPath]: value };
         }
-    }).reduce((acc, curr) => ({ ...acc, ...curr }), {})
+    }).reduce((acc, curr) => ({ ...acc,
+...curr }), {})
 }

@@ -1,10 +1,10 @@
 /**
  * Example Rebase Script
- * 
- * To run this script against a local environment, you need to have your 
+ *
+ * To run this script against a local environment, you need to have your
  * Rebase development server running (`pnpm dev` or `rebase dev`).
- * 
- * Alternatively, you can run this against a deployed environment by 
+ *
+ * Alternatively, you can run this against a deployed environment by
  * setting the REBASE_URL environment variable.
  */
 
@@ -41,14 +41,14 @@ if (!baseUrl) {
 // Initialize the SDK client.
 // If your script requires authentication or admin privileges, provide the secret or token.
 const rebase = createRebaseClient({
-    baseUrl,
+    baseUrl
     // Provide a service key if your backend requires admin privileges for this script
-    // token: process.env.REBASE_SERVICE_KEY 
+    // token: process.env.REBASE_SERVICE_KEY
 });
 
 async function run() {
     console.log("🚀 Starting script...");
-    
+
     try {
         // Example: Check backend health
         const health = await fetch(`${baseUrl}/api/health`).then(res => res.json());

@@ -18,7 +18,8 @@ describe("LocalStorageController", () => {
 
     afterEach(async () => {
         // Clean up temporary directory
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
+        await fs.promises.rm(tempDir, { recursive: true,
+force: true });
     });
 
     describe("constructor", () => {

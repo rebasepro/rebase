@@ -16,7 +16,7 @@ function createMockTransport() {
         get apiPath() { return "/api"; },
         get fetchFn() { return globalThis.fetch; },
         getHeaders: () => ({}),
-        resolveToken: async () => null,
+        resolveToken: async () => null
     };
 }
 
@@ -66,7 +66,8 @@ describe("createCron", () => {
 
     describe("triggerJob", () => {
         it("calls POST /cron/:id/trigger", async () => {
-            transport.request.mockResolvedValue({ log: {}, job: {} });
+            transport.request.mockResolvedValue({ log: {},
+job: {} });
             const cron = createCron(transport);
 
             await cron.triggerJob("my-job");
@@ -115,7 +116,7 @@ describe("createCron", () => {
                 "/cron/my-job",
                 {
                     method: "PUT",
-                    body: JSON.stringify({ enabled: true }),
+                    body: JSON.stringify({ enabled: true })
                 }
             );
         });
@@ -130,7 +131,7 @@ describe("createCron", () => {
                 "/cron/my-job",
                 {
                     method: "PUT",
-                    body: JSON.stringify({ enabled: false }),
+                    body: JSON.stringify({ enabled: false })
                 }
             );
         });

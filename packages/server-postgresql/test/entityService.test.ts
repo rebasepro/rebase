@@ -11,19 +11,24 @@ const mockAuthorsTable = {
     _def: { tableName: "authors" }
 };
 const mockPostsTable = {
-    id: { name: "id", dataType: "number" },
+    id: { name: "id",
+dataType: "number" },
     title: { name: "title" },
-    author_id: { name: "author_id", dataType: "number" },
+    author_id: { name: "author_id",
+dataType: "number" },
     _def: { tableName: "posts" }
 };
 const mockTagsTable = {
-    id: { name: "id", dataType: "number" },
+    id: { name: "id",
+dataType: "number" },
     name: { name: "name" },
     _def: { tableName: "tags" }
 };
 const mockPostsTagsTable = {
-    post_id: { name: "post_id", dataType: "number" },
-    tag_id: { name: "tag_id", dataType: "number" },
+    post_id: { name: "post_id",
+dataType: "number" },
+    tag_id: { name: "tag_id",
+dataType: "number" },
     _def: { tableName: "posts_tags" }
 };
 const mockProjectUsersTable = {
@@ -43,7 +48,7 @@ const tagsCollection: EntityCollection = {
         id: { type: "number" },
         name: { type: "string" }
     },
-    idField: "id",
+    idField: "id"
 };
 
 const projectUsersCollection: EntityCollection = {
@@ -94,7 +99,7 @@ const postsCollection: EntityCollection = {
             }
         }
     ],
-    idField: "id",
+    idField: "id"
 };
 
 authorsCollection = {
@@ -118,7 +123,7 @@ authorsCollection = {
             foreignKeyOnTarget: "author_id"
         }
     ],
-    idField: "id",
+    idField: "id"
 };
 
 describe("EntityService", () => {
@@ -157,7 +162,7 @@ describe("EntityService", () => {
             update: jest.fn().mockReturnThis(),
             set: jest.fn().mockReturnThis(),
             delete: jest.fn().mockReturnThis(),
-            transaction: jest.fn((callback) => callback(db)),
+            transaction: jest.fn((callback) => callback(db))
         } as unknown as jest.Mocked<NodePgDatabase>;
 
         entityService = new EntityService(db, collectionRegistry);
@@ -220,7 +225,7 @@ describe("EntityService", () => {
             db.limit.mockResolvedValue([{
                 id: 4,
                 title: "Post by Jane",
-                author_id: "3"  // Database stores the foreign key
+                author_id: "3" // Database stores the foreign key
             }]);
 
             const entity = await entityService.saveEntity("posts", newPost);
@@ -228,7 +233,7 @@ describe("EntityService", () => {
             // 1. Check that the relation was serialized to a foreign key for the database insert
             expect(db.values).toHaveBeenCalledWith(expect.objectContaining({
                 title: "Post by Jane",
-                author_id: "3"  // Should be serialized to FK for database storage
+                author_id: "3" // Should be serialized to FK for database storage
             }));
 
             // 2. Check that the returned entity has the relation deserialized correctly
@@ -303,8 +308,12 @@ describe("EntityService", () => {
     describe("fetchCollectionFromPath", () => {
         it("should fetch related entities from a nested path", async () => {
             const mockRelatedPosts = [
-                { id: 1, title: "Post by John", author_id: 1 },
-                { id: 2, title: "Another Post by John", author_id: 1 }
+                { id: 1,
+title: "Post by John",
+author_id: 1 },
+                { id: 2,
+title: "Another Post by John",
+author_id: 1 }
             ];
             // RelationService.fetchEntitiesUsingJoins ends query chain with where(), not orderBy()
             // Make where() awaitable by returning a promise-like object
@@ -333,7 +342,8 @@ describe("EntityService - Comprehensive Tests", () => {
 
     // Extended mock tables for more complex scenarios
     const mockUsersTable = {
-        id: { name: "id", dataType: "number" },
+        id: { name: "id",
+dataType: "number" },
         email: { name: "email" },
         name: { name: "name" },
         created_at: { name: "created_at" },
@@ -384,7 +394,8 @@ describe("EntityService - Comprehensive Tests", () => {
     };
 
     const mockTagsTable = {
-        id: { name: "id", dataType: "number" },
+        id: { name: "id",
+dataType: "number" },
         name: { name: "name" },
         _def: { tableName: "tags" }
     };
@@ -399,7 +410,8 @@ describe("EntityService - Comprehensive Tests", () => {
             email: { type: "string" },
             name: { type: "string" },
             created_at: { type: "date" },
-            companies: { type: "relation", relationName: "companies" }
+            companies: { type: "relation",
+relationName: "companies" }
         },
         relations: [{
             relationName: "companies",
@@ -418,8 +430,10 @@ describe("EntityService - Comprehensive Tests", () => {
         properties: {
             id: { type: "number" },
             name: { type: "string" },
-            owner: { type: "relation", relationName: "owner" },
-            projects: { type: "relation", relationName: "projects" }
+            owner: { type: "relation",
+relationName: "owner" },
+            projects: { type: "relation",
+relationName: "projects" }
         },
         relations: [
             {
@@ -450,9 +464,12 @@ describe("EntityService - Comprehensive Tests", () => {
             description: { type: "string" },
             status: { type: "string" },
             priority: { type: "number" },
-            company: { type: "relation", relationName: "company" },
-            tasks: { type: "relation", relationName: "tasks" },
-            tags: { type: "relation", relationName: "tags" }
+            company: { type: "relation",
+relationName: "company" },
+            tasks: { type: "relation",
+relationName: "tasks" },
+            tags: { type: "relation",
+relationName: "tags" }
         },
         relations: [
             {
@@ -491,8 +508,10 @@ describe("EntityService - Comprehensive Tests", () => {
         properties: {
             id: { type: "number" },
             title: { type: "string" },
-            project: { type: "relation", relationName: "project" },
-            assignee: { type: "relation", relationName: "assignee" }
+            project: { type: "relation",
+relationName: "project" },
+            assignee: { type: "relation",
+relationName: "assignee" }
         },
         relations: [
             {
@@ -531,8 +550,10 @@ describe("EntityService - Comprehensive Tests", () => {
         properties: {
             id: { type: "number" },
             name: { type: "string" },
-            parent: { type: "relation", relationName: "parent" },
-            children: { type: "relation", relationName: "children" }
+            parent: { type: "relation",
+relationName: "parent" },
+            children: { type: "relation",
+relationName: "children" }
         },
         relations: [
             {
@@ -591,7 +612,7 @@ describe("EntityService - Comprehensive Tests", () => {
             update: jest.fn().mockReturnThis(),
             set: jest.fn().mockReturnThis(),
             delete: jest.fn().mockReturnThis(),
-            transaction: jest.fn((callback) => callback(db)),
+            transaction: jest.fn((callback) => callback(db))
         } as unknown as jest.Mocked<NodePgDatabase>;
 
         // Add a then method to make the db object awaitable when the query chain ends
@@ -602,7 +623,9 @@ describe("EntityService - Comprehensive Tests", () => {
 
     describe("fetchEntity - Edge Cases", () => {
         it("should handle numeric IDs correctly", async () => {
-            const mockUser = { id: 123, email: "test@example.com", name: "Test User" };
+            const mockUser = { id: 123,
+email: "test@example.com",
+name: "Test User" };
             db.limit.mockResolvedValue([mockUser]);
 
             const entity = await entityService.fetchEntity("users", 123);
@@ -623,7 +646,8 @@ describe("EntityService - Comprehensive Tests", () => {
             jest.spyOn(collectionRegistry, "getCollectionByPath").mockReturnValue(stringIdCollection);
             jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
                 if (tableName === "users") return {
-                    id: { name: "id", dataType: "string" },
+                    id: { name: "id",
+dataType: "string" },
                     email: { name: "email" },
                     name: { name: "name" },
                     _def: { tableName: "users" }
@@ -637,7 +661,9 @@ describe("EntityService - Comprehensive Tests", () => {
                 return undefined;
             });
 
-            const mockUser = { id: "uuid-123", email: "test@example.com", name: "Test User" };
+            const mockUser = { id: "uuid-123",
+email: "test@example.com",
+name: "Test User" };
             db.limit.mockResolvedValue([mockUser]);
 
             const entity = await entityService.fetchEntity("users", "uuid-123");
@@ -655,7 +681,10 @@ describe("EntityService - Comprehensive Tests", () => {
         });
 
         it("should handle entities with null relation fields", async () => {
-            const mockTask = { id: 1, title: "Task 1", project_id: null, assignee_id: null };
+            const mockTask = { id: 1,
+title: "Task 1",
+project_id: null,
+assignee_id: null };
             db.limit.mockResolvedValue([mockTask]);
 
             const entity = await entityService.fetchEntity("tasks", 1);
@@ -665,10 +694,10 @@ describe("EntityService - Comprehensive Tests", () => {
             // on the relation resolution logic, so we should check if they are either
             // undefined or have the expected structure
             if (entity?.values.project) {
-                expect(entity.values.project).toHaveProperty('__type', 'relation');
+                expect(entity.values.project).toHaveProperty("__type", "relation");
             }
             if (entity?.values.assignee) {
-                expect(entity.values.assignee).toHaveProperty('__type', 'relation');
+                expect(entity.values.assignee).toHaveProperty("__type", "relation");
             }
 
             // The main test is that the entity was successfully fetched despite null relations
@@ -680,13 +709,20 @@ describe("EntityService - Comprehensive Tests", () => {
     describe("fetchCollection - Filtering and Pagination", () => {
         it("should apply filters correctly", async () => {
             const mockProjects = [
-                { id: 1, title: "Project 1", status: "active", priority: 1 },
-                { id: 2, title: "Project 2", status: "active", priority: 2 }
+                { id: 1,
+title: "Project 1",
+status: "active",
+priority: 1 },
+                { id: 2,
+title: "Project 2",
+status: "active",
+priority: 2 }
             ];
             db.orderBy.mockResolvedValue(mockProjects);
 
             await entityService.fetchCollection("projects", {
-                filter: { status: ["==", "active"], priority: [">=", 1] }
+                filter: { status: ["==", "active"],
+priority: [">=", 1] }
             });
 
             expect(db.where).toHaveBeenCalled();
@@ -694,8 +730,12 @@ describe("EntityService - Comprehensive Tests", () => {
 
         it("should apply ordering correctly", async () => {
             const mockProjects = [
-                { id: 2, title: "Project 2", priority: 2 },
-                { id: 1, title: "Project 1", priority: 1 }
+                { id: 2,
+title: "Project 2",
+priority: 2 },
+                { id: 1,
+title: "Project 1",
+priority: 1 }
             ];
             db.orderBy.mockResolvedValue(mockProjects);
 
@@ -709,8 +749,10 @@ describe("EntityService - Comprehensive Tests", () => {
 
         it("should apply limit correctly", async () => {
             const mockProjects = [
-                { id: 1, title: "Project 1" },
-                { id: 2, title: "Project 2" }
+                { id: 1,
+title: "Project 1" },
+                { id: 2,
+title: "Project 2" }
             ];
             // Override the then method to return our mock data for this specific test
             (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve) => resolve(mockProjects));
@@ -726,8 +768,12 @@ describe("EntityService - Comprehensive Tests", () => {
     describe("Nested Path Relations", () => {
         it("should handle deep nested paths", async () => {
             const mockTasks = [
-                { id: 1, title: "Task 1", project_id: 1 },
-                { id: 2, title: "Task 2", project_id: 1 }
+                { id: 1,
+title: "Task 1",
+project_id: 1 },
+                { id: 2,
+title: "Task 2",
+project_id: 1 }
             ];
             // RelationService.fetchEntitiesUsingJoins ends query chain with where(), not orderBy()
             // Make where() awaitable by returning a promise-like object
@@ -746,8 +792,12 @@ describe("EntityService - Comprehensive Tests", () => {
 
         it("should handle self-referencing relations", async () => {
             const mockCategories = [
-                { id: 2, name: "Subcategory 1", parent_id: 1 },
-                { id: 3, name: "Subcategory 2", parent_id: 1 }
+                { id: 2,
+name: "Subcategory 1",
+parent_id: 1 },
+                { id: 3,
+name: "Subcategory 2",
+parent_id: 1 }
             ];
             // RelationService.fetchEntitiesUsingJoins ends query chain with where(), not orderBy()
             db.where.mockReturnValue({
@@ -780,7 +830,9 @@ describe("EntityService - Comprehensive Tests", () => {
             const newProject = {
                 title: "New Project",
                 description: "A new project",
-                company: { id: "1", path: "companies", __type: "relation" }
+                company: { id: "1",
+path: "companies",
+__type: "relation" }
             };
 
             db.returning.mockResolvedValue([{ id: 5 }]);
@@ -803,7 +855,9 @@ describe("EntityService - Comprehensive Tests", () => {
         it("should handle updating entity with relation changes", async () => {
             const updatedTask = {
                 title: "Updated Task",
-                assignee: { id: "2", path: "users", __type: "relation" }
+                assignee: { id: "2",
+path: "users",
+__type: "relation" }
             };
 
             db.returning.mockResolvedValue([{ id: 1 }]);
@@ -864,7 +918,9 @@ describe("EntityService - Comprehensive Tests", () => {
     describe("searchEntities", () => {
         it("should perform search across specified fields", async () => {
             const mockResults = [
-                { id: 1, title: "Searchable Project", description: "Test description" }
+                { id: 1,
+title: "Searchable Project",
+description: "Test description" }
             ];
             // Override the then method to return our mock data for this specific test
             (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve) => resolve(mockResults));
@@ -877,7 +933,9 @@ describe("EntityService - Comprehensive Tests", () => {
 
         it("should combine search with filters", async () => {
             const mockResults = [
-                { id: 1, title: "Active Project", status: "active" }
+                { id: 1,
+title: "Active Project",
+status: "active" }
             ];
             // Override the then method to return our mock data for this specific test
             (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve) => resolve(mockResults));

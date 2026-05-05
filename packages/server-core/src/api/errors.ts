@@ -97,21 +97,21 @@ export const errorHandler: ErrorHandler = (err, c) => {
 
     // Handle DB connection and specific system errors for better logging
     let logMessage = error.message;
-    if (error.cause && typeof error.cause === 'object' && error.cause !== null && 'code' in error.cause) {
+    if (error.cause && typeof error.cause === "object" && error.cause !== null && "code" in error.cause) {
         const cause = error.cause as PgLikeError;
-        if (cause.code === 'ENETUNREACH') {
+        if (cause.code === "ENETUNREACH") {
             logMessage = `Network unreachable. Cannot connect to database at ${cause.address}:${cause.port}.`;
-        } else if (cause.code === 'ECONNREFUSED') {
+        } else if (cause.code === "ECONNREFUSED") {
             logMessage = `Connection refused to database at ${cause.address}:${cause.port}.`;
-        } else if (cause.code === '42703' || cause.code === '42P01') {
-            const issue = cause.code === '42703' ? 'column' : 'table';
+        } else if (cause.code === "42703" || cause.code === "42P01") {
+            const issue = cause.code === "42703" ? "column" : "table";
             logMessage = `Database schema mismatch (${issue} missing): ${cause.message}. Did you forget to run migrations ('pnpm db:push' or 'pnpm db:migrate')?`;
         }
-    } else if ('code' in error && error.code === 'ENETUNREACH') {
+    } else if ("code" in error && error.code === "ENETUNREACH") {
          const netErr = error as unknown as PgLikeError;
          logMessage = `Network unreachable. Cannot connect to service at ${netErr.address}:${netErr.port}.`;
-    } else if ('code' in error && (error.code === '42703' || error.code === '42P01')) {
-        const issue = error.code === '42703' ? 'column' : 'table';
+    } else if ("code" in error && (error.code === "42703" || error.code === "42P01")) {
+        const issue = error.code === "42703" ? "column" : "table";
         logMessage = `Database schema mismatch (${issue} missing): ${error.message}. Did you forget to run migrations ('pnpm db:push' or 'pnpm db:migrate')?`;
     }
 
@@ -119,11 +119,11 @@ export const errorHandler: ErrorHandler = (err, c) => {
     console.error(
         `❌ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}`
     );
-    
+
     // Suppress the huge stack trace for known missing schema errors (it's noisy and not a code bug)
-    const causePg = (error.cause && typeof error.cause === 'object') ? (error.cause as PgLikeError) : undefined;
+    const causePg = (error.cause && typeof error.cause === "object") ? (error.cause as PgLikeError) : undefined;
     const pgErrorCode = causePg?.code || error.code;
-    if (pgErrorCode !== '42703' && pgErrorCode !== '42P01') {
+    if (pgErrorCode !== "42703" && pgErrorCode !== "42P01") {
         console.error(error.stack || error);
     }
 
@@ -136,10 +136,10 @@ export const errorHandler: ErrorHandler = (err, c) => {
     } else if (error instanceof ApiError || error.name === "ApiError") {
         // We already handled ApiError above, but just in case
         clientMessage = error.message;
-    } else if (pgErrorCode === '42703' || pgErrorCode === '42P01') {
-        const issue = pgErrorCode === '42703' ? 'column' : 'table';
+    } else if (pgErrorCode === "42703" || pgErrorCode === "42P01") {
+        const issue = pgErrorCode === "42703" ? "column" : "table";
         clientMessage = `Database schema mismatch (${issue} missing). Ensure backend migrations are up to date!`;
-    } else if (code === 'INTERNAL_ERROR') {
+    } else if (code === "INTERNAL_ERROR") {
         clientMessage = "Internal Server Error";
     }
 
@@ -171,7 +171,7 @@ function codeToStatus(code?: string): number | undefined {
         ROLE_EXISTS: 409,
         INTERNAL_ERROR: 500,
         NOT_CONFIGURED: 503,
-        SERVICE_UNAVAILABLE: 503,
+        SERVICE_UNAVAILABLE: 503
     };
     return map[code];
 }

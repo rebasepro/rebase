@@ -4,7 +4,7 @@
 import {
     getEntitySchema,
     mapPropertyToZod,
-    getZodMapObjectSchema,
+    getZodMapObjectSchema
 } from "../../src/form/validation";
 import type { StringProperty, NumberProperty, BooleanProperty, DateProperty, MapProperty, ArrayProperty, ReferenceProperty, RelationProperty, Property, Properties, GeopointProperty } from "@rebasepro/types";
 
@@ -13,21 +13,24 @@ import type { StringProperty, NumberProperty, BooleanProperty, DateProperty, Map
 // ---------------------------------------------------------------------------
 describe("String property validation", () => {
     it("accepts valid string values", async () => {
-        const property: StringProperty = { type: "string", name: "Name" } as StringProperty;
+        const property: StringProperty = { type: "string",
+name: "Name" } as StringProperty;
         const schema = mapPropertyToZod({ property });
         const result = await schema.safeParseAsync("hello");
         expect(result.success).toBe(true);
     });
 
     it("accepts null for optional strings", async () => {
-        const property: StringProperty = { type: "string", name: "Name" } as StringProperty;
+        const property: StringProperty = { type: "string",
+name: "Name" } as StringProperty;
         const schema = mapPropertyToZod({ property });
         const result = await schema.safeParseAsync(null);
         expect(result.success).toBe(true);
     });
 
     it("accepts undefined for optional strings", async () => {
-        const property: StringProperty = { type: "string", name: "Name" } as StringProperty;
+        const property: StringProperty = { type: "string",
+name: "Name" } as StringProperty;
         const schema = mapPropertyToZod({ property });
         const result = await schema.safeParseAsync(undefined);
         expect(result.success).toBe(true);
@@ -59,7 +62,8 @@ describe("String property validation", () => {
         const property: StringProperty = {
             type: "string",
             name: "Name",
-            validation: { required: true, requiredMessage: "Please fill this field" }
+            validation: { required: true,
+requiredMessage: "Please fill this field" }
         } as StringProperty;
         const schema = mapPropertyToZod({ property });
         const result = await schema.safeParseAsync("");
@@ -150,7 +154,7 @@ describe("String property validation", () => {
         const property: StringProperty = {
             type: "string",
             name: "ID",
-            isId: true,
+            isId: true
         } as unknown as StringProperty;
         const schema = mapPropertyToZod({ property });
 
@@ -165,7 +169,7 @@ describe("String property validation", () => {
         const property: StringProperty = {
             type: "string",
             name: "ID",
-            isId: "manual",
+            isId: "manual"
         } as unknown as StringProperty;
         const schema = mapPropertyToZod({ property });
 
@@ -188,7 +192,8 @@ describe("String property validation", () => {
         const property: StringProperty = {
             type: "string",
             name: "Name",
-            validation: { trim: true, required: true }
+            validation: { trim: true,
+required: true }
         } as StringProperty;
         const schema = mapPropertyToZod({ property });
 
@@ -224,9 +229,11 @@ describe("String property validation", () => {
             type: "string",
             name: "Status",
             enum: [
-                { id: "active", label: "Active" },
-                { id: "inactive", label: "Inactive" }
-            ],
+                { id: "active",
+label: "Active" },
+                { id: "inactive",
+label: "Inactive" }
+            ]
         } as unknown as StringProperty;
         const schema = mapPropertyToZod({ property });
 
@@ -243,14 +250,16 @@ describe("String property validation", () => {
 // ---------------------------------------------------------------------------
 describe("Number property validation", () => {
     it("accepts valid numbers", async () => {
-        const property: NumberProperty = { type: "number", name: "Age" } as NumberProperty;
+        const property: NumberProperty = { type: "number",
+name: "Age" } as NumberProperty;
         const schema = mapPropertyToZod({ property });
         const result = await schema.safeParseAsync(25);
         expect(result.success).toBe(true);
     });
 
     it("accepts null for optional numbers", async () => {
-        const property: NumberProperty = { type: "number", name: "Age" } as NumberProperty;
+        const property: NumberProperty = { type: "number",
+name: "Age" } as NumberProperty;
         const schema = mapPropertyToZod({ property });
         const result = await schema.safeParseAsync(null);
         expect(result.success).toBe(true);
@@ -373,7 +382,8 @@ describe("Number property validation", () => {
     });
 
     it("coerces string numbers", async () => {
-        const property: NumberProperty = { type: "number", name: "Age" } as NumberProperty;
+        const property: NumberProperty = { type: "number",
+name: "Age" } as NumberProperty;
         const schema = mapPropertyToZod({ property });
         const result = await schema.safeParseAsync("42");
         expect(result.success).toBe(true);
@@ -385,7 +395,8 @@ describe("Number property validation", () => {
 // ---------------------------------------------------------------------------
 describe("Boolean property validation", () => {
     it("accepts boolean values", async () => {
-        const property: BooleanProperty = { type: "boolean", name: "Active" } as BooleanProperty;
+        const property: BooleanProperty = { type: "boolean",
+name: "Active" } as BooleanProperty;
         const schema = mapPropertyToZod({ property });
 
         expect((await schema.safeParseAsync(true)).success).toBe(true);
@@ -393,7 +404,8 @@ describe("Boolean property validation", () => {
     });
 
     it("accepts null for optional booleans", async () => {
-        const property: BooleanProperty = { type: "boolean", name: "Active" } as BooleanProperty;
+        const property: BooleanProperty = { type: "boolean",
+name: "Active" } as BooleanProperty;
         const schema = mapPropertyToZod({ property });
         const result = await schema.safeParseAsync(null);
         expect(result.success).toBe(true);
@@ -416,14 +428,16 @@ describe("Boolean property validation", () => {
 // ---------------------------------------------------------------------------
 describe("Date property validation", () => {
     it("accepts Date objects", async () => {
-        const property: DateProperty = { type: "date", name: "Created" } as DateProperty;
+        const property: DateProperty = { type: "date",
+name: "Created" } as DateProperty;
         const schema = mapPropertyToZod({ property });
         const result = await schema.safeParseAsync(new Date());
         expect(result.success).toBe(true);
     });
 
     it("accepts null for optional dates", async () => {
-        const property: DateProperty = { type: "date", name: "Created" } as DateProperty;
+        const property: DateProperty = { type: "date",
+name: "Created" } as DateProperty;
         const schema = mapPropertyToZod({ property });
         const result = await schema.safeParseAsync(null);
         expect(result.success).toBe(true);
@@ -476,10 +490,12 @@ describe("Map property validation", () => {
 
         const schema = mapPropertyToZod({ property });
 
-        const valid = await schema.safeParseAsync({ street: "123 Main St", city: "NYC" });
+        const valid = await schema.safeParseAsync({ street: "123 Main St",
+city: "NYC" });
         expect(valid.success).toBe(true);
 
-        const invalid = await schema.safeParseAsync({ street: "", city: "NYC" });
+        const invalid = await schema.safeParseAsync({ street: "",
+city: "NYC" });
         expect(invalid.success).toBe(false);
     });
 
@@ -488,7 +504,8 @@ describe("Map property validation", () => {
             type: "map",
             name: "Meta",
             properties: {
-                key: { type: "string", name: "Key" } as StringProperty
+                key: { type: "string",
+name: "Key" } as StringProperty
             }
         } as MapProperty;
 
@@ -519,7 +536,8 @@ describe("Array property validation", () => {
         const property: ArrayProperty = {
             type: "array",
             name: "Tags",
-            of: { type: "string", name: "Tag" } as StringProperty
+            of: { type: "string",
+name: "Tag" } as StringProperty
         } as ArrayProperty;
 
         const schema = mapPropertyToZod({ property });
@@ -531,7 +549,8 @@ describe("Array property validation", () => {
         const property: ArrayProperty = {
             type: "array",
             name: "Tags",
-            of: { type: "string", name: "Tag" } as StringProperty
+            of: { type: "string",
+name: "Tag" } as StringProperty
         } as ArrayProperty;
 
         const schema = mapPropertyToZod({ property });
@@ -543,7 +562,8 @@ describe("Array property validation", () => {
         const property: ArrayProperty = {
             type: "array",
             name: "Tags",
-            of: { type: "string", name: "Tag" } as StringProperty,
+            of: { type: "string",
+name: "Tag" } as StringProperty,
             validation: { required: true }
         } as ArrayProperty;
 
@@ -560,7 +580,8 @@ describe("Array property validation", () => {
         const property: ArrayProperty = {
             type: "array",
             name: "Tags",
-            of: { type: "string", name: "Tag" } as StringProperty,
+            of: { type: "string",
+name: "Tag" } as StringProperty,
             validation: { min: 2 }
         } as ArrayProperty;
 
@@ -577,7 +598,8 @@ describe("Array property validation", () => {
         const property: ArrayProperty = {
             type: "array",
             name: "Tags",
-            of: { type: "string", name: "Tag" } as StringProperty,
+            of: { type: "string",
+name: "Tag" } as StringProperty,
             validation: { max: 2 }
         } as ArrayProperty;
 
@@ -603,7 +625,8 @@ describe("Reference property validation", () => {
         } as ReferenceProperty;
 
         const schema = mapPropertyToZod({ property });
-        const result = await schema.safeParseAsync({ id: "abc", path: "users" });
+        const result = await schema.safeParseAsync({ id: "abc",
+path: "users" });
         expect(result.success).toBe(true);
     });
 
@@ -640,7 +663,7 @@ describe("Relation property validation", () => {
     it("accepts null for optional relations", async () => {
         const property: RelationProperty = {
             type: "relation",
-            name: "Tags",
+            name: "Tags"
         } as RelationProperty;
 
         const schema = mapPropertyToZod({ property });
@@ -689,7 +712,8 @@ describe("GeoPoint property validation", () => {
         } as GeopointProperty;
 
         const schema = mapPropertyToZod({ property });
-        const result = await schema.safeParseAsync({ lat: 40.7, lng: -74.0 });
+        const result = await schema.safeParseAsync({ lat: 40.7,
+lng: -74.0 });
         expect(result.success).toBe(true);
     });
 
@@ -736,15 +760,19 @@ describe("getEntitySchema", () => {
             active: {
                 type: "boolean",
                 name: "Active"
-            } as BooleanProperty,
+            } as BooleanProperty
         };
 
         const schema = getEntitySchema("entity1", properties);
 
-        const valid = await schema.safeParseAsync({ title: "Hello", count: 5, active: true });
+        const valid = await schema.safeParseAsync({ title: "Hello",
+count: 5,
+active: true });
         expect(valid.success).toBe(true);
 
-        const invalid = await schema.safeParseAsync({ title: "", count: -1, active: true });
+        const invalid = await schema.safeParseAsync({ title: "",
+count: -1,
+active: true });
         expect(invalid.success).toBe(false);
     });
 
@@ -753,12 +781,12 @@ describe("getEntitySchema", () => {
             id: {
                 type: "string",
                 name: "ID",
-                isId: "uuid",
+                isId: "uuid"
             } as unknown as Property,
             title: {
                 type: "string",
-                name: "Title",
-            } as StringProperty,
+                name: "Title"
+            } as StringProperty
         };
 
         // For new entities (entityId undefined), auto-id fields are skipped entirely
@@ -772,27 +800,30 @@ describe("getEntitySchema", () => {
             id: {
                 type: "string",
                 name: "ID",
-                isId: true,
+                isId: true
             } as unknown as Property,
             title: {
                 type: "string",
-                name: "Title",
-            } as StringProperty,
+                name: "Title"
+            } as StringProperty
         };
 
         // For existing entities, id is required since isId=true
         const schema = getEntitySchema("existing-entity", properties);
-        const result = await schema.safeParseAsync({ id: "", title: "Test" });
+        const result = await schema.safeParseAsync({ id: "",
+title: "Test" });
         expect(result.success).toBe(false);
     });
 
     it("passes through extra properties via passthrough()", async () => {
         const properties: Properties = {
-            title: { type: "string", name: "Title" } as StringProperty,
+            title: { type: "string",
+name: "Title" } as StringProperty
         };
 
         const schema = getEntitySchema("e1", properties);
-        const result = await schema.safeParseAsync({ title: "Hello", extra: "world" });
+        const result = await schema.safeParseAsync({ title: "Hello",
+extra: "world" });
         expect(result.success).toBe(true);
     });
 });

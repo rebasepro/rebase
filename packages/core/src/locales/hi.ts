@@ -482,7 +482,6 @@ export const hi: RebaseTranslations = {
     auth_sign_up: "साइन अप करें",
 
 
-
     auto_setup_collections_button: "संग्रहों को स्वचालित रूप से सेट करें",
     auto_setup_collections_title: "संग्रहों की स्वचालित सेटअप",
     auto_setup_collections_desc: "अपने मौजूदा Firestore डेटा के आधार पर संग्रहों को स्वचालित रूप से सेट करें। FireCMS को आपके लिए परफेक्ट CMS कॉन्फ़िगर करने दें।",
@@ -857,5 +856,5 @@ no_filter: "No filter",
     studio_home_collection_deleted: "Collection deleted",
     studio_kanban_configure: "Configure Kanban",
     studio_missing_reference_error: "No collection for path: {{path}}",
-    studio_new_collection_add: "Add new collection",
+    studio_new_collection_add: "Add new collection"
 };

@@ -1,5 +1,5 @@
 import { EntityCollection } from "./collections";
-import { Entity, EntityStatus, EntityValues, } from "./entities";
+import { Entity, EntityStatus, EntityValues } from "./entities";
 import { User } from "../users";
 import { RebaseCallContext } from "../rebase_context";
 

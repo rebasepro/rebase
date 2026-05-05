@@ -36,55 +36,86 @@ const MOCK_SCHEMAS: SchemaInfo[] = [
             {
                 name: "users",
                 columns: [
-                    { name: "id", type: "uuid", isPK: true },
-                    { name: "email", type: "text" },
-                    { name: "display_name", type: "text" },
-                    { name: "role", type: "text" },
-                    { name: "created_at", type: "timestamptz" },
-                ],
+                    { name: "id",
+type: "uuid",
+isPK: true },
+                    { name: "email",
+type: "text" },
+                    { name: "display_name",
+type: "text" },
+                    { name: "role",
+type: "text" },
+                    { name: "created_at",
+type: "timestamptz" }
+                ]
             },
             {
                 name: "posts",
                 columns: [
-                    { name: "id", type: "uuid", isPK: true },
-                    { name: "title", type: "text" },
-                    { name: "status", type: "text" },
-                    { name: "author_id", type: "uuid" },
-                    { name: "created_at", type: "timestamptz" },
-                    { name: "content", type: "text" },
-                ],
+                    { name: "id",
+type: "uuid",
+isPK: true },
+                    { name: "title",
+type: "text" },
+                    { name: "status",
+type: "text" },
+                    { name: "author_id",
+type: "uuid" },
+                    { name: "created_at",
+type: "timestamptz" },
+                    { name: "content",
+type: "text" }
+                ]
             },
             {
                 name: "comments",
                 columns: [
-                    { name: "id", type: "uuid", isPK: true },
-                    { name: "post_id", type: "uuid" },
-                    { name: "user_id", type: "uuid" },
-                    { name: "body", type: "text" },
-                    { name: "created_at", type: "timestamptz" },
-                ],
+                    { name: "id",
+type: "uuid",
+isPK: true },
+                    { name: "post_id",
+type: "uuid" },
+                    { name: "user_id",
+type: "uuid" },
+                    { name: "body",
+type: "text" },
+                    { name: "created_at",
+type: "timestamptz" }
+                ]
             },
             {
                 name: "products",
                 columns: [
-                    { name: "id", type: "serial", isPK: true },
-                    { name: "name", type: "text" },
-                    { name: "price", type: "numeric" },
-                    { name: "category", type: "text" },
-                    { name: "stock", type: "integer" },
-                ],
+                    { name: "id",
+type: "serial",
+isPK: true },
+                    { name: "name",
+type: "text" },
+                    { name: "price",
+type: "numeric" },
+                    { name: "category",
+type: "text" },
+                    { name: "stock",
+type: "integer" }
+                ]
             },
             {
                 name: "orders",
                 columns: [
-                    { name: "id", type: "uuid", isPK: true },
-                    { name: "customer_id", type: "uuid" },
-                    { name: "total", type: "numeric" },
-                    { name: "status", type: "text" },
-                    { name: "created_at", type: "timestamptz" },
-                ],
-            },
-        ],
+                    { name: "id",
+type: "uuid",
+isPK: true },
+                    { name: "customer_id",
+type: "uuid" },
+                    { name: "total",
+type: "numeric" },
+                    { name: "status",
+type: "text" },
+                    { name: "created_at",
+type: "timestamptz" }
+                ]
+            }
+        ]
     },
     {
         name: "auth",
@@ -92,50 +123,98 @@ const MOCK_SCHEMAS: SchemaInfo[] = [
             {
                 name: "sessions",
                 columns: [
-                    { name: "id", type: "uuid", isPK: true },
-                    { name: "user_id", type: "uuid" },
-                    { name: "token", type: "text" },
-                    { name: "expires_at", type: "timestamptz" },
-                ],
-            },
-        ],
-    },
+                    { name: "id",
+type: "uuid",
+isPK: true },
+                    { name: "user_id",
+type: "uuid" },
+                    { name: "token",
+type: "text" },
+                    { name: "expires_at",
+type: "timestamptz" }
+                ]
+            }
+        ]
+    }
 ];
 
 const MOCK_RESULTS: Record<string, QueryResult> = {
     default: {
         columns: ["title", "status", "author", "comments"],
         rows: [
-            { title: "Getting Started with Rebase", status: "published", author: "Alice Chen", comments: 24 },
-            { title: "Schema Migrations Guide", status: "published", author: "Bob Park", comments: 18 },
-            { title: "Custom Views Tutorial", status: "draft", author: "Alice Chen", comments: 7 },
-            { title: "RLS Best Practices", status: "published", author: "Eve Müller", comments: 31 },
-            { title: "REST API Deep Dive", status: "draft", author: "Bob Park", comments: 3 },
+            { title: "Getting Started with Rebase",
+status: "published",
+author: "Alice Chen",
+comments: 24 },
+            { title: "Schema Migrations Guide",
+status: "published",
+author: "Bob Park",
+comments: 18 },
+            { title: "Custom Views Tutorial",
+status: "draft",
+author: "Alice Chen",
+comments: 7 },
+            { title: "RLS Best Practices",
+status: "published",
+author: "Eve Müller",
+comments: 31 },
+            { title: "REST API Deep Dive",
+status: "draft",
+author: "Bob Park",
+comments: 3 }
         ],
         rowCount: 5,
-        execTime: 12,
+        execTime: 12
     },
     users: {
         columns: ["id", "email", "display_name", "role", "created_at"],
         rows: [
-            { id: "a1b2c3d4", email: "alice@example.com", display_name: "Alice Chen", role: "admin", created_at: "2025-01-15" },
-            { id: "e5f6g7h8", email: "bob@example.com", display_name: "Bob Park", role: "editor", created_at: "2025-02-20" },
-            { id: "i9j0k1l2", email: "eve@example.com", display_name: "Eve Müller", role: "viewer", created_at: "2025-03-10" },
+            { id: "a1b2c3d4",
+email: "alice@example.com",
+display_name: "Alice Chen",
+role: "admin",
+created_at: "2025-01-15" },
+            { id: "e5f6g7h8",
+email: "bob@example.com",
+display_name: "Bob Park",
+role: "editor",
+created_at: "2025-02-20" },
+            { id: "i9j0k1l2",
+email: "eve@example.com",
+display_name: "Eve Müller",
+role: "viewer",
+created_at: "2025-03-10" }
         ],
         rowCount: 3,
-        execTime: 8,
+        execTime: 8
     },
     products: {
         columns: ["id", "name", "price", "category", "stock"],
         rows: [
-            { id: 1, name: "Ergonomic Keyboard", price: 129.99, category: "peripherals", stock: 42 },
-            { id: 2, name: "USB-C Hub", price: 59.99, category: "peripherals", stock: 128 },
-            { id: 3, name: "Monitor Stand", price: 89.00, category: "accessories", stock: 15 },
-            { id: 4, name: "Webcam Pro", price: 179.99, category: "peripherals", stock: 0 },
+            { id: 1,
+name: "Ergonomic Keyboard",
+price: 129.99,
+category: "peripherals",
+stock: 42 },
+            { id: 2,
+name: "USB-C Hub",
+price: 59.99,
+category: "peripherals",
+stock: 128 },
+            { id: 3,
+name: "Monitor Stand",
+price: 89.00,
+category: "accessories",
+stock: 15 },
+            { id: 4,
+name: "Webcam Pro",
+price: 179.99,
+category: "peripherals",
+stock: 0 }
         ],
         rowCount: 4,
-        execTime: 5,
-    },
+        execTime: 5
+    }
 };
 
 const DEFAULT_SQL = `SELECT
@@ -185,7 +264,9 @@ function highlightSQL(sql: string): React.ReactNode[] {
 // ─── Component ───────────────────────────────────────────
 export function SQLEditorDemo() {
     const [tabs, setTabs] = useState<SQLTab[]>([
-        { id: "1", name: "Query 1", sql: DEFAULT_SQL },
+        { id: "1",
+name: "Query 1",
+sql: DEFAULT_SQL }
     ]);
     const [activeTabId, setActiveTabId] = useState("1");
     const [sidebarTab, setSidebarTab] = useState<"schema" | "snippets" | "history">("schema");
@@ -219,10 +300,11 @@ export function SQLEditorDemo() {
                 setResult(null);
                 const targetSQL = "SELECT *\nFROM users\nORDER BY created_at DESC\nLIMIT 10;";
                 let currentSQL = "";
-                
+
                 for (let i = 0; i < targetSQL.length; i++) {
                     currentSQL += targetSQL[i];
-                    setTabs(prev => prev.map(t => t.id === "1" ? { ...t, sql: currentSQL } : t));
+                    setTabs(prev => prev.map(t => t.id === "1" ? { ...t,
+sql: currentSQL } : t));
                     await new Promise(r => { timer = setTimeout(r, 30 + Math.random() * 40); });
                     if (!isMounted) return;
                 }
@@ -230,11 +312,11 @@ export function SQLEditorDemo() {
                 // Wait 0.5s before run
                 await new Promise(r => { timer = setTimeout(r, 500); });
                 if (!isMounted) return;
-                
+
                 setIsRunning(true);
                 await new Promise(r => { timer = setTimeout(r, 600); });
                 if (!isMounted) return;
-                
+
                 setIsRunning(false);
                 setResult(MOCK_RESULTS.users);
 
@@ -246,21 +328,22 @@ export function SQLEditorDemo() {
                 setResult(null);
                 const targetSQL2 = "SELECT name, price, stock\nFROM products\nWHERE category = 'peripherals';";
                 currentSQL = "";
-                
+
                 for (let i = 0; i < targetSQL2.length; i++) {
                     currentSQL += targetSQL2[i];
-                    setTabs(prev => prev.map(t => t.id === "1" ? { ...t, sql: currentSQL } : t));
+                    setTabs(prev => prev.map(t => t.id === "1" ? { ...t,
+sql: currentSQL } : t));
                     await new Promise(r => { timer = setTimeout(r, 30 + Math.random() * 40); });
                     if (!isMounted) return;
                 }
 
                 await new Promise(r => { timer = setTimeout(r, 500); });
                 if (!isMounted) return;
-                
+
                 setIsRunning(true);
                 await new Promise(r => { timer = setTimeout(r, 600); });
                 if (!isMounted) return;
-                
+
                 setIsRunning(false);
                 setResult(MOCK_RESULTS.products);
 
@@ -273,11 +356,12 @@ export function SQLEditorDemo() {
                 currentSQL = "";
                 for (let i = 0; i < DEFAULT_SQL.length; i += 3) {
                     currentSQL += DEFAULT_SQL.substring(i, i + 3);
-                    setTabs(prev => prev.map(t => t.id === "1" ? { ...t, sql: currentSQL } : t));
+                    setTabs(prev => prev.map(t => t.id === "1" ? { ...t,
+sql: currentSQL } : t));
                     await new Promise(r => { timer = setTimeout(r, 10); });
                     if (!isMounted) return;
                 }
-                
+
                 await new Promise(r => { timer = setTimeout(r, 500); });
                 if (!isMounted) return;
                 setIsRunning(true);
@@ -308,19 +392,24 @@ export function SQLEditorDemo() {
     }, [activeTab.sql]);
 
     const handleSQLChange = useCallback((newSql: string) => {
-        setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, sql: newSql } : t));
+        setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t,
+sql: newSql } : t));
     }, [activeTabId]);
 
     const addTab = useCallback(() => {
         const id = String(Date.now());
-        setTabs(prev => [...prev, { id, name: `Query ${prev.length + 1}`, sql: "SELECT * FROM " }]);
+        setTabs(prev => [...prev, { id,
+name: `Query ${prev.length + 1}`,
+sql: "SELECT * FROM " }]);
         setActiveTabId(id);
     }, []);
 
     const closeTab = useCallback((tabId: string) => {
         setTabs(prev => {
             const filtered = prev.filter(t => t.id !== tabId);
-            if (filtered.length === 0) return [{ id: "1", name: "Query 1", sql: DEFAULT_SQL }];
+            if (filtered.length === 0) return [{ id: "1",
+name: "Query 1",
+sql: DEFAULT_SQL }];
             if (activeTabId === tabId) setActiveTabId(filtered[filtered.length - 1].id);
             return filtered;
         });
@@ -331,7 +420,7 @@ export function SQLEditorDemo() {
     const toggleSchema = (name: string) => {
         setExpandedSchemas(prev => {
             const next = new Set(prev);
-            next.has(name) ? next.delete(name) : next.add(name);
+            if (next.has(name)) { next.delete(name); } else { next.add(name); }
             return next;
         });
     };
@@ -339,7 +428,7 @@ export function SQLEditorDemo() {
     const toggleTable = (name: string) => {
         setExpandedTables(prev => {
             const next = new Set(prev);
-            next.has(name) ? next.delete(name) : next.add(name);
+            if (next.has(name)) { next.delete(name); } else { next.add(name); }
             return next;
         });
     };
@@ -380,7 +469,7 @@ export function SQLEditorDemo() {
                                         onClick={() => toggleTable(table.name)}
                                         className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-surface-400 hover:bg-surface-800/40 cursor-pointer w-full text-left transition-colors"
                                     >
-                                        <svg className="w-3 h-3 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16M4 12h16M4 17h16" /></svg>
+                                        <svg className="w-3 h-3 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16M4 12h16M4 17h16"/></svg>
                                         <span className="truncate flex-1 font-mono text-[11px]">{table.name}</span>
                                         <span className="text-[10px] opacity-40">{table.columns.length}</span>
                                     </button>
@@ -465,14 +554,14 @@ export function SQLEditorDemo() {
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16"/></svg>
                         </button>
                         <button className="px-2 py-1 text-[10px] text-surface-500 hover:text-surface-300 transition-colors">EXPLAIN</button>
-                        <div className="h-4 w-px bg-surface-800 mx-1" />
+                        <div className="h-4 w-px bg-surface-800 mx-1"/>
                         <label className="flex items-center gap-1.5 cursor-pointer select-none" onClick={() => setAutoLimit(!autoLimit)}>
                             <span className="text-[10px] text-surface-500">LIMIT 1000</span>
                             <div className={`w-3.5 h-3.5 rounded border ${autoLimit ? "bg-primary border-primary" : "border-surface-600"} flex items-center justify-center transition-colors`}>
                                 {autoLimit && <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
                             </div>
                         </label>
-                        <div className="h-4 w-px bg-surface-800 mx-1" />
+                        <div className="h-4 w-px bg-surface-800 mx-1"/>
 
                         {/* DB Selector */}
                         <div className="px-2 py-1 rounded bg-surface-800/60 text-[10px] text-surface-400 font-mono flex items-center gap-1 cursor-pointer">
@@ -528,7 +617,7 @@ export function SQLEditorDemo() {
                     </div>
 
                     {/* Resize handle */}
-                    <div className="h-1 bg-surface-800/40 cursor-ns-resize hover:bg-primary/30 transition-colors" />
+                    <div className="h-1 bg-surface-800/40 cursor-ns-resize hover:bg-primary/30 transition-colors"/>
 
                     {/* Results panel */}
                     <div className="flex-1 flex flex-col min-h-0 bg-surface-950">

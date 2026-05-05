@@ -15,7 +15,7 @@ function walkDir(dir) {
     } else if (/\.(ts|tsx)$/.test(entry.name)) {
       // PERMANENT FIX: strictly exclude all .d.ts files (declaration maps) to avoid false positive duplicates
       if (entry.name.endsWith(".d.ts")) continue;
-      
+
       results.push(full);
     }
   }
@@ -38,7 +38,7 @@ for (const filePath of files) {
         name: m[2],
         kind: m[1],
         file: path.relative(ROOT, filePath),
-        line: i + 1,
+        line: i + 1
       });
     }
   }
@@ -80,7 +80,7 @@ console.log("=== DUPLICATES (defined in multiple distinct files) ===\n");
 for (const [name, entries] of sortedDupes) {
   const distinctFiles = new Set(entries.map((e) => e.file));
   console.log(`--- ${name} (${distinctFiles.size} files) ---`);
-  
+
   // Group entries by package
   const byPkg = {};
   for (const e of entries) {
@@ -88,7 +88,7 @@ for (const [name, entries] of sortedDupes) {
     if (!byPkg[pkg]) byPkg[pkg] = [];
     byPkg[pkg].push(e);
   }
-  
+
   for (const [pkg, pkgEntries] of Object.entries(byPkg)) {
     for (const e of pkgEntries) {
       console.log(`  [${e.kind}] ${e.file}:${e.line}`);
@@ -116,7 +116,7 @@ for (const filePath of files) {
           const parts = n.trim().split(/\s+as\s+/);
           return parts[parts.length - 1].trim();
         }).filter(Boolean);
-        
+
         for (const n of names) {
           if (/^[A-Z]/.test(n) && byName[n]) {
             // This type is both directly declared and re-exported
@@ -134,7 +134,7 @@ let shadowCount = 0;
 for (const [name, reexportFiles] of Object.entries(reexportCount)) {
   const declaredIn = new Set((byName[name] || []).map((e) => getPackage(e.file)));
   const reexportedIn = new Set(reexportFiles.map((f) => getPackage(f)));
-  
+
   // Only interesting if re-exported from a different package than declared
   const crossPkgReexports = [...reexportedIn].filter((p) => !declaredIn.has(p));
   if (crossPkgReexports.length > 0) {

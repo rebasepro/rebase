@@ -22,8 +22,8 @@ function makeJob(
                 ctx.log("executed");
                 return { ran: true };
             },
-            ...overrides,
-        },
+            ...overrides
+        }
     };
 }
 
@@ -40,8 +40,9 @@ describe("cron-routes", () => {
     beforeEach(() => {
         scheduler = new CronScheduler();
         scheduler.registerJobs([
-            makeJob("job-a", { name: "Job A", description: "First job" }),
-            makeJob("job-b", { name: "Job B" }),
+            makeJob("job-a", { name: "Job A",
+description: "First job" }),
+            makeJob("job-b", { name: "Job B" })
         ]);
 
         app = new Hono();
@@ -104,7 +105,7 @@ describe("cron-routes", () => {
     describe("POST /cron/:id/trigger", () => {
         it("triggers a job and returns log + updated status", async () => {
             const res = await app.request("/cron/job-a/trigger", {
-                method: "POST",
+                method: "POST"
             });
             expect(res.status).toBe(200);
 
@@ -123,7 +124,7 @@ describe("cron-routes", () => {
 
         it("returns 404 for nonexistent job", async () => {
             const res = await app.request("/cron/ghost/trigger", {
-                method: "POST",
+                method: "POST"
             });
             expect(res.status).toBe(404);
         });
@@ -176,7 +177,7 @@ describe("cron-routes", () => {
             const res = await app.request("/cron/job-a", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ enabled: false }),
+                body: JSON.stringify({ enabled: false })
             });
             expect(res.status).toBe(200);
 
@@ -191,14 +192,14 @@ describe("cron-routes", () => {
             await app.request("/cron/job-a", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ enabled: false }),
+                body: JSON.stringify({ enabled: false })
             });
 
             // Re-enable
             const res = await app.request("/cron/job-a", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ enabled: true }),
+                body: JSON.stringify({ enabled: true })
             });
             expect(res.status).toBe(200);
 
@@ -210,7 +211,7 @@ describe("cron-routes", () => {
             const res = await app.request("/cron/job-a", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ something: "else" }),
+                body: JSON.stringify({ something: "else" })
             });
             expect(res.status).toBe(400);
 
@@ -222,7 +223,7 @@ describe("cron-routes", () => {
             const res = await app.request("/cron/ghost", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ enabled: false }),
+                body: JSON.stringify({ enabled: false })
             });
             expect(res.status).toBe(404);
         });
@@ -236,12 +237,12 @@ describe("cron-routes", () => {
                 makeJob("fail-job", {
                     handler: async () => {
                         throw new Error("kaboom");
-                    },
-                }),
+                    }
+                })
             ]);
 
             const res = await app.request("/cron/fail-job/trigger", {
-                method: "POST",
+                method: "POST"
             });
             expect(res.status).toBe(200); // trigger still returns 200
 

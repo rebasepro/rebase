@@ -35,37 +35,58 @@ const MOCK_RESULTS: Record<string, ExecutionResult> = {
     default: {
         value: {
             data: [
-                { id: "a1b2c3", values: { title: "Getting Started with Rebase", status: "published", author_id: "usr_1" }},
-                { id: "d4e5f6", values: { title: "Schema Migrations Guide", status: "published", author_id: "usr_2" }},
-                { id: "g7h8i9", values: { title: "Custom Views Tutorial", status: "draft", author_id: "usr_1" }},
+                { id: "a1b2c3",
+values: { title: "Getting Started with Rebase",
+status: "published",
+author_id: "usr_1" } },
+                { id: "d4e5f6",
+values: { title: "Schema Migrations Guide",
+status: "published",
+author_id: "usr_2" } },
+                { id: "g7h8i9",
+values: { title: "Custom Views Tutorial",
+status: "draft",
+author_id: "usr_1" } }
             ],
-            pagination: { hasMore: true, cursor: "g7h8i9" }
+            pagination: { hasMore: true,
+cursor: "g7h8i9" }
         },
         console: [
-            { type: "log", message: "Found 3 posts", timestamp: Date.now() },
+            { type: "log",
+message: "Found 3 posts",
+timestamp: Date.now() }
         ],
-        duration: 142,
+        duration: 142
     },
     users: {
         value: [
-            { uid: "usr_1", email: "alice@example.com", displayName: "Alice Chen", role: "admin" },
-            { uid: "usr_2", email: "bob@example.com", displayName: "Bob Park", role: "editor" },
+            { uid: "usr_1",
+email: "alice@example.com",
+displayName: "Alice Chen",
+role: "admin" },
+            { uid: "usr_2",
+email: "bob@example.com",
+displayName: "Bob Park",
+role: "editor" }
         ],
         console: [],
-        duration: 89,
+        duration: 89
     },
     error: {
         value: undefined,
         console: [],
         duration: 12,
-        error: "ReferenceError: undefinedVariable is not defined",
-    },
+        error: "ReferenceError: undefinedVariable is not defined"
+    }
 };
 
 const SNIPPETS = [
-    { name: "List all users", code: `const users = await client.admin.listUsers();\nreturn users;` },
-    { name: "Count posts", code: `const result = await client.data.collection("posts").find();\nconsole.log("Total:", result.data.length);\nreturn { count: result.data.length };` },
-    { name: "Get current session", code: `const session = client.auth.getSession();\nreturn session;` },
+    { name: "List all users",
+code: "const users = await client.admin.listUsers();\nreturn users;" },
+    { name: "Count posts",
+code: "const result = await client.data.collection(\"posts\").find();\nconsole.log(\"Total:\", result.data.length);\nreturn { count: result.data.length };" },
+    { name: "Get current session",
+code: "const session = client.auth.getSession();\nreturn session;" }
 ];
 
 // ─── Highlighting ────────────────────────────────────────
@@ -103,7 +124,9 @@ function highlightJS(code: string): React.ReactNode[] {
 // ─── Component ───────────────────────────────────────────
 export function JSEditorDemo() {
     const [tabs, setTabs] = useState<JSTab[]>([
-        { id: "1", name: "Script 1", code: DEFAULT_CODE },
+        { id: "1",
+name: "Script 1",
+code: DEFAULT_CODE }
     ]);
     const [activeTabId, setActiveTabId] = useState("1");
     const [sidebarTab, setSidebarTab] = useState<"collections" | "snippets" | "history">("collections");
@@ -115,7 +138,8 @@ export function JSEditorDemo() {
     const codeLines = activeTab.code.split("\n");
 
     const handleCodeChange = useCallback((newCode: string) => {
-        setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, code: newCode } : t));
+        setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t,
+code: newCode } : t));
     }, [activeTabId]);
 
     const handleRun = useCallback(() => {
@@ -133,7 +157,9 @@ export function JSEditorDemo() {
 
     const addTab = useCallback(() => {
         const id = String(Date.now());
-        setTabs(prev => [...prev, { id, name: `Script ${prev.length + 1}`, code: "// New script\n" }]);
+        setTabs(prev => [...prev, { id,
+name: `Script ${prev.length + 1}`,
+code: "// New script\n" }]);
         setActiveTabId(id);
     }, []);
 
@@ -235,7 +261,7 @@ export function JSEditorDemo() {
                             <div className="w-4 h-4 rounded-full bg-indigo-500/30 flex items-center justify-center text-[8px] text-indigo-300 font-bold">A</div>
                             <span>Run as Admin</span>
                         </div>
-                        <div className="h-4 w-px bg-surface-800 mx-1" />
+                        <div className="h-4 w-px bg-surface-800 mx-1"/>
                         <button className="p-1.5 text-surface-500 hover:text-surface-300 transition-colors" title="Save snippet">
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
                         </button>
@@ -280,7 +306,7 @@ export function JSEditorDemo() {
                         </div>
                     </div>
 
-                    <div className="h-1 bg-surface-800/40 cursor-ns-resize hover:bg-primary/30 transition-colors" />
+                    <div className="h-1 bg-surface-800/40 cursor-ns-resize hover:bg-primary/30 transition-colors"/>
 
                     {/* Results */}
                     <div className="flex-1 flex flex-col min-h-0 bg-surface-950">
@@ -288,7 +314,7 @@ export function JSEditorDemo() {
                             <span className="font-bold text-surface-500 uppercase tracking-widest text-[10px]">RESULTS</span>
                             {result && (
                                 <>
-                                    <div className="flex-grow" />
+                                    <div className="flex-grow"/>
                                     <div className="flex rounded bg-surface-800/60 p-0.5 mr-2">
                                         {["json", "console"].map(v => (
                                             <button

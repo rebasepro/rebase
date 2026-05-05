@@ -24,12 +24,12 @@ function makeParams(overrides: Partial<{
     const file = new MockFile(overrides.fileName ?? "photo.jpg") as unknown as File;
     const storage: StorageConfig = {
         storagePath: "/uploads",
-        acceptedFiles: ["image/*"],
+        acceptedFiles: ["image/*"]
     };
     const property: StringProperty = {
         type: "string",
         name: "Image",
-        storage,
+        storage
     };
     return {
         input: overrides.input ?? "{path}/{entityId}/{file}",
@@ -39,7 +39,7 @@ function makeParams(overrides: Partial<{
         path: overrides.path ?? "products",
         property,
         file,
-        propertyKey: overrides.propertyKey ?? "thumbnail",
+        propertyKey: overrides.propertyKey ?? "thumbnail"
     };
 }
 
@@ -66,13 +66,15 @@ describe("Storage Path Resolution", () => {
         });
 
         it("replaces {file} placeholder", () => {
-            const params = makeParams({ input: "files/{file}", fileName: "document.pdf" });
+            const params = makeParams({ input: "files/{file}",
+fileName: "document.pdf" });
             const result = resolveStoragePathString(params);
             expect(result).toBe("files/document.pdf");
         });
 
         it("replaces {propertyKey}", () => {
-            const params = makeParams({ input: "{propertyKey}/files", propertyKey: "avatar" });
+            const params = makeParams({ input: "{propertyKey}/files",
+propertyKey: "avatar" });
             const result = resolveStoragePathString(params);
             expect(result).toBe("avatar/files");
         });
@@ -92,7 +94,7 @@ describe("Storage Path Resolution", () => {
         it("calls function input when provided", () => {
             const params = {
                 ...makeParams(),
-                input: (() => "custom/path") as any,
+                input: (() => "custom/path") as any
             };
             const result = resolveStoragePathString(params);
             expect(result).toBe("custom/path");
@@ -101,7 +103,8 @@ describe("Storage Path Resolution", () => {
 
     describe("resolveStorageFilenameString", () => {
         it("replaces {file.name} and {file.ext}", async () => {
-            const params = makeParams({ input: "{file.name}_thumb.{file.ext}", fileName: "photo.jpg" });
+            const params = makeParams({ input: "{file.name}_thumb.{file.ext}",
+fileName: "photo.jpg" });
             const result = await resolveStorageFilenameString(params);
             expect(result).toBe("photo_thumb.jpg");
         });
@@ -114,7 +117,9 @@ describe("Storage Path Resolution", () => {
         });
 
         it("replaces {entityId}", async () => {
-            const params = makeParams({ input: "{entityId}_{file}", entityId: "e42", fileName: "avatar.png" });
+            const params = makeParams({ input: "{entityId}_{file}",
+entityId: "e42",
+fileName: "avatar.png" });
             const result = await resolveStorageFilenameString(params);
             expect(result).toBe("e42_avatar.png");
         });
@@ -122,7 +127,7 @@ describe("Storage Path Resolution", () => {
         it("calls async function input when provided", async () => {
             const params = {
                 ...makeParams(),
-                input: (async () => "dynamic-name.jpg") as any,
+                input: (async () => "dynamic-name.jpg") as any
             };
             const result = await resolveStorageFilenameString(params);
             expect(result).toBe("dynamic-name.jpg");
@@ -131,7 +136,7 @@ describe("Storage Path Resolution", () => {
         it("generates random fallback when function returns empty", async () => {
             const params = {
                 ...makeParams(),
-                input: (() => "") as any,
+                input: (() => "") as any
             };
             const result = await resolveStorageFilenameString(params);
             expect(result).toBeTruthy();

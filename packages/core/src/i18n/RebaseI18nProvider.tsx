@@ -74,8 +74,8 @@ export function RebaseI18nProvider({
                 resources,
                 interpolation: {
                     // React already escapes — don't double-escape
-                    escapeValue: false,
-                },
+                    escapeValue: false
+                }
             }, () => {
                 setReady(true);
             });
@@ -109,8 +109,8 @@ export function RebaseI18nProvider({
                 lang,
                 REBASE_NS,
                 bundle[REBASE_NS],
-                true,  // deep merge
-                true   // overwrite existing keys
+                true, // deep merge
+                true // overwrite existing keys
             );
         }
     }, [translations]);
@@ -138,7 +138,7 @@ function buildResources(
         fr: { [REBASE_NS]: { ...fr } },
         it: { [REBASE_NS]: { ...it } },
         hi: { [REBASE_NS]: { ...hi } },
-        pt: { [REBASE_NS]: { ...pt } },
+        pt: { [REBASE_NS]: { ...pt } }
     };
 
     if (!translations) return resources;
@@ -152,7 +152,7 @@ function buildResources(
         // is a flat record — deepMerge option in addResourceBundle handles deeper)
         resources[lang][REBASE_NS] = {
             ...resources[lang][REBASE_NS],
-            ...overrides,
+            ...overrides
         };
     }
 

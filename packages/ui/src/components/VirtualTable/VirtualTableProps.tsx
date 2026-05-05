@@ -169,6 +169,11 @@ export interface VirtualTableProps<T extends Record<string, any>> {
      */
     onColumnsOrderChange?: (columns: VirtualTableColumn[]) => void;
 
+    /**
+     * Extra data passed to the cell renderer
+     */
+    extraData?: any;
+
 }
 
 export type CellRendererParams<T = any> = {
@@ -186,6 +191,7 @@ export type CellRendererParams<T = any> = {
     isDragging?: boolean;
     isDraggable?: boolean;
     frozen?: boolean;
+    extraData?: any;
 };
 
 /**

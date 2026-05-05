@@ -32,7 +32,7 @@ type RealTimeListenEntityProps = ListenEntityProps & { subscriptionId: string };
 /**
  * PostgreSQL-specific realtime service.
  * Handles WebSocket connections and subscriptions for real-time entity updates.
- * 
+ *
  * Implements the RealtimeProvider interface for database abstraction.
  */
 export class RealtimeService extends EventEmitter implements RealtimeProvider {
@@ -570,7 +570,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 return await this.db.transaction(async (tx) => {
                     await tx.execute(drizzleSql`SELECT set_config('app.user_id', ${authContext.userId}, true)`);
                     await tx.execute(drizzleSql`SELECT set_config('app.user_roles', ${authContext.roles.join(",")}, true)`);
-                    await tx.execute(drizzleSql`SELECT set_config('app.jwt', ${JSON.stringify({ sub: authContext.userId, roles: authContext.roles })}, true)`);
+                    await tx.execute(drizzleSql`SELECT set_config('app.jwt', ${JSON.stringify({ sub: authContext.userId,
+roles: authContext.roles })}, true)`);
                     const txEntityService = new EntityService(tx, this.registry);
                     let fetchedEntities;
                     if (collectionRequest.searchString) {
@@ -600,18 +601,20 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                     // Re-apply `afterRead` lifecycle hooks to ensure consistent data structures
                     // between the initial driver fetch and this RLS-bound refetch.
                     const registryCollection = this.registry.getCollectionByPath(notifyPath);
-                    const resolvedCollection = collection ? { ...collection, ...registryCollection } as EntityCollection : registryCollection as EntityCollection;
-                    
+                    const resolvedCollection = collection ? { ...collection,
+...registryCollection } as EntityCollection : registryCollection as EntityCollection;
+
                     const callbacks = resolvedCollection?.callbacks;
                     const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
 
                     if (callbacks?.afterRead || propertyCallbacks?.afterRead) {
                         const contextForCallback = {
-                            user: { uid: authContext.userId, roles: authContext.roles },
+                            user: { uid: authContext.userId,
+roles: authContext.roles },
                             driver: this.driver,
                             data: this.driver ? (this.driver as unknown as Record<string, unknown>).data : undefined
                         } as unknown as RebaseCallContext;
-                        
+
                         return await Promise.all(fetchedEntities.map(async (entity) => {
                             let processedEntity = entity;
                             if (callbacks?.afterRead) {
@@ -739,24 +742,27 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 return await this.db.transaction(async (tx) => {
                     await tx.execute(drizzleSql`SELECT set_config('app.user_id', ${authContext.userId}, true)`);
                     await tx.execute(drizzleSql`SELECT set_config('app.user_roles', ${authContext.roles.join(",")}, true)`);
-                    await tx.execute(drizzleSql`SELECT set_config('app.jwt', ${JSON.stringify({ sub: authContext.userId, roles: authContext.roles })}, true)`);
+                    await tx.execute(drizzleSql`SELECT set_config('app.jwt', ${JSON.stringify({ sub: authContext.userId,
+roles: authContext.roles })}, true)`);
                     const txEntityService = new EntityService(tx, this.registry);
                     let processedEntity = await txEntityService.fetchEntity(notifyPath, entityId, collection?.databaseId);
 
                     if (processedEntity) {
                         const registryCollection = this.registry.getCollectionByPath(notifyPath);
-                        const resolvedCollection = collection ? { ...collection, ...registryCollection } as EntityCollection : registryCollection as EntityCollection;
-                        
+                        const resolvedCollection = collection ? { ...collection,
+...registryCollection } as EntityCollection : registryCollection as EntityCollection;
+
                         const callbacks = resolvedCollection?.callbacks;
                         const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
 
                         if (callbacks?.afterRead || propertyCallbacks?.afterRead) {
                             const contextForCallback = {
-                                user: { uid: authContext.userId, roles: authContext.roles },
+                                user: { uid: authContext.userId,
+roles: authContext.roles },
                                 driver: this.driver,
                                 data: this.driver ? (this.driver as unknown as Record<string, unknown>).data : undefined
                             } as unknown as RebaseCallContext;
-                            
+
                             if (callbacks?.afterRead) {
                                 processedEntity = await callbacks.afterRead({
                                     collection: resolvedCollection,

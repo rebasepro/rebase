@@ -17,80 +17,93 @@ const MOCK_ENTITIES: Entity[] = [
     title: "Captivating Caption for Your Latest Post",
     image: "https://images.unsplash.com/photo-1504805572947-34fad45aed93?w=240&h=160&fit=crop",
     status: "Published",
-    author: { name: "Emily Watson", email: "emily.w@example.com" },
-    tags: ["Travel", "Music", "Business", "Sports", "Gaming"],
+    author: { name: "Emily Watson",
+email: "emily.w@example.com" },
+    tags: ["Travel", "Music", "Business", "Sports", "Gaming"]
   },
   {
     id: 42,
     title: "Visually Appealing Image Design!",
     image: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=240&h=160&fit=crop",
     status: "Published",
-    author: { name: "Steve Rogers", email: "steve.r@example.com" },
-    tags: ["DIY", "Fashion"],
+    author: { name: "Steve Rogers",
+email: "steve.r@example.com" },
+    tags: ["DIY", "Fashion"]
   },
   {
     id: 41,
     title: "The Importance of Mental Health",
     image: null,
     status: "In Review",
-    author: { name: "Alice Johnson", email: "alice.j@example.com" },
-    tags: ["Movies", "Books"],
+    author: { name: "Alice Johnson",
+email: "alice.j@example.com" },
+    tags: ["Movies", "Books"]
   },
   {
     id: 40,
     title: "A Look at Sustainable Farming Practices",
     image: "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=240&h=160&fit=crop",
     status: "Draft",
-    author: { name: "George Costanza", email: "george.c@example.com" },
-    tags: [],
+    author: { name: "George Costanza",
+email: "george.c@example.com" },
+    tags: []
   },
   {
     id: 39,
     title: "The Psychology of Color in Marketing",
     image: "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=240&h=160&fit=crop",
     status: "Published",
-    author: { name: "Rachel Green", email: "rachel.g@example.com" },
-    tags: ["Music", "Movies", "Art"],
+    author: { name: "Rachel Green",
+email: "rachel.g@example.com" },
+    tags: ["Music", "Movies", "Art"]
   },
   {
     id: 38,
     title: "DIY Home Renovation Tips",
     image: null,
     status: "Draft",
-    author: { name: "Pam Beesly", email: "pam.b@example.com" },
-    tags: ["Lifestyle", "DIY"],
+    author: { name: "Pam Beesly",
+email: "pam.b@example.com" },
+    tags: ["Lifestyle", "DIY"]
   },
   {
     id: 37,
     title: "Mastering the Art of Negotiation",
     image: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=240&h=160&fit=crop",
     status: "Published",
-    author: { name: "Laura Palmer", email: "laura.p@example.com" },
-    tags: [],
+    author: { name: "Laura Palmer",
+email: "laura.p@example.com" },
+    tags: []
   },
   {
     id: 36,
     title: "Modern Architectural Marvels",
     image: "https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=240&h=160&fit=crop",
     status: "Draft",
-    author: { name: "George Costanza", email: "george.c@example.com" },
-    tags: [],
+    author: { name: "George Costanza",
+email: "george.c@example.com" },
+    tags: []
   },
   {
     id: 35,
     title: "Exploring the Deep Sea",
     image: "https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?w=240&h=160&fit=crop",
     status: "Archived",
-    author: { name: "Hannah Abbott", email: "hannah.a@example.com" },
-    tags: ["Science"],
-  },
+    author: { name: "Hannah Abbott",
+email: "hannah.a@example.com" },
+    tags: ["Science"]
+  }
 ];
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  Published: { bg: "rgb(147, 224, 136)", text: "rgb(11, 29, 5)" },
-  "In Review": { bg: "rgb(255, 169, 129)", text: "rgb(107, 38, 19)" },
-  Draft: { bg: "rgb(204, 204, 204)", text: "rgb(4, 4, 4)" },
-  Archived: { bg: "rgb(255, 158, 183)", text: "rgb(76, 12, 28)" },
+  Published: { bg: "rgb(147, 224, 136)",
+text: "rgb(11, 29, 5)" },
+  "In Review": { bg: "rgb(255, 169, 129)",
+text: "rgb(107, 38, 19)" },
+  Draft: { bg: "rgb(204, 204, 204)",
+text: "rgb(4, 4, 4)" },
+  Archived: { bg: "rgb(255, 158, 183)",
+text: "rgb(76, 12, 28)" }
 };
 
 // ─── Kanban Data (for TAGS collection) ───────────────────
@@ -114,41 +127,57 @@ const KANBAN_COLUMNS: KanbanColumn[] = [
     title: "Backlog",
     color: "rgb(156, 163, 175)",
     cards: [
-      { id: "871492", title: "Dark mode", image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=80&h=80&fit=crop" },
-      { id: "871388", title: "Search indexing", image: "https://images.unsplash.com/photo-1504639725590-34d0984388bd?w=80&h=80&fit=crop" },
-      { id: "871204", title: "API documentation", image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=80&h=80&fit=crop" },
-    ],
+      { id: "871492",
+title: "Dark mode",
+image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=80&h=80&fit=crop" },
+      { id: "871388",
+title: "Search indexing",
+image: "https://images.unsplash.com/photo-1504639725590-34d0984388bd?w=80&h=80&fit=crop" },
+      { id: "871204",
+title: "API documentation",
+image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=80&h=80&fit=crop" }
+    ]
   },
   {
     id: "in_progress",
     title: "In Progress",
     color: "rgb(251, 191, 36)",
     cards: [
-      { id: "871090", title: "Auth middleware refactor", image: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=80&h=80&fit=crop" },
-      { id: "870984", title: "Onboarding flow", image: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=80&h=80&fit=crop" },
-    ],
+      { id: "871090",
+title: "Auth middleware refactor",
+image: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=80&h=80&fit=crop" },
+      { id: "870984",
+title: "Onboarding flow",
+image: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=80&h=80&fit=crop" }
+    ]
   },
   {
     id: "review",
     title: "Review",
     color: "rgb(96, 165, 250)",
     cards: [
-      { id: "870812", title: "RLS policies", image: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=80&h=80&fit=crop" },
-    ],
+      { id: "870812",
+title: "RLS policies",
+image: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=80&h=80&fit=crop" }
+    ]
   },
   {
     id: "done",
     title: "Done",
     color: "rgb(74, 222, 128)",
     cards: [
-      { id: "870650", title: "CI/CD pipeline", image: "https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=80&h=80&fit=crop" },
-      { id: "870511", title: "Export to CSV", image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=80&h=80&fit=crop" },
-    ],
-  },
+      { id: "870650",
+title: "CI/CD pipeline",
+image: "https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=80&h=80&fit=crop" },
+      { id: "870511",
+title: "Export to CSV",
+image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=80&h=80&fit=crop" }
+    ]
+  }
 ];
 
-import { 
-  Filter, Pencil, MoreVertical, Image as ImageIcon, User, ChevronDown, 
+import {
+  Filter, Pencil, MoreVertical, Image as ImageIcon, User, ChevronDown,
   Tag, Home, Languages, Moon, ChevronsRight, List, Kanban, Folder
 } from "lucide-react";
 
@@ -157,7 +186,7 @@ function MI({
   children,
   size = 20,
   className = "",
-  filled = true,
+  filled = true
 }: {
   children: string;
   size?: number;
@@ -180,12 +209,12 @@ function MI({
     "list": List,
     "view_kanban": Kanban,
     "folder": Folder,
-    "sell": Tag,
+    "sell": Tag
   }[children] || Folder;
 
   return (
     <span className={`inline-flex items-center justify-center select-none ${className}`}>
-      <IconComponent size={size} />
+      <IconComponent size={size}/>
     </span>
   );
 }
@@ -196,7 +225,7 @@ function ColHeader({
   label,
   width,
   showFilter = true,
-  align = "left",
+  align = "left"
 }: {
   icon?: string;
   label: string;
@@ -207,11 +236,14 @@ function ColHeader({
   return (
     <div
       className="flex-shrink-0 h-full"
-      style={{ minWidth: width, maxWidth: width, width }}
+      style={{ minWidth: width,
+maxWidth: width,
+width }}
     >
       <div
         className="flex py-0 px-3 h-full text-xs uppercase font-semibold select-none items-center bg-surface-50 dark:bg-surface-900 text-text-secondary dark:text-surface-400 relative"
-        style={{ minWidth: width, maxWidth: width }}
+        style={{ minWidth: width,
+maxWidth: width }}
       >
         <div className="overflow-hidden grow">
           <div
@@ -246,7 +278,7 @@ function EntityRow({
   highlightedField,
   onHover,
   onLeave,
-  onClick,
+  onClick
 }: {
   entity: Entity;
   isHovered: boolean;
@@ -269,7 +301,9 @@ function EntityRow({
       {/* Row Actions — always visible (production: EntityCollectionRowActions) */}
       <div
         className="flex-shrink-0 h-full sticky left-0 z-10"
-        style={{ minWidth: 138, maxWidth: 138, width: 138 }}
+        style={{ minWidth: 138,
+maxWidth: 138,
+width: 138 }}
       >
         <div className="h-full flex items-center justify-center flex-col bg-surface-50/90 dark:bg-surface-900/90">
           <div className="w-34 flex justify-center gap-0.5">
@@ -280,7 +314,7 @@ function EntityRow({
               <MI size={20}>more_vert</MI>
             </button>
             <div className="p-1">
-              <div className="border-2 w-4 h-4 rounded flex items-center justify-center bg-white dark:bg-surface-900 border-surface-400 dark:border-surface-500" />
+              <div className="border-2 w-4 h-4 rounded flex items-center justify-center bg-white dark:bg-surface-900 border-surface-400 dark:border-surface-500"/>
             </div>
           </div>
           <div className="w-[138px] overflow-hidden truncate font-mono text-xs text-text-secondary dark:text-text-secondary-dark px-2 text-center">
@@ -292,7 +326,9 @@ function EntityRow({
       {/* Title */}
       <div
         className="flex-shrink-0 flex items-center px-2"
-        style={{ minWidth: 280, maxWidth: 280, width: 280 }}
+        style={{ minWidth: 280,
+maxWidth: 280,
+width: 280 }}
       >
         <div className="truncate text-sm text-surface-900 dark:text-white">
           {entity.title}
@@ -302,7 +338,9 @@ function EntityRow({
       {/* Image */}
       <div
         className="flex-shrink-0 flex items-center justify-center px-2"
-        style={{ minWidth: 120, maxWidth: 120, width: 120 }}
+        style={{ minWidth: 120,
+maxWidth: 120,
+width: 120 }}
       >
         {entity.image ? (
           <img
@@ -321,13 +359,15 @@ function EntityRow({
       {/* Status */}
       <div
         className={`flex-shrink-0 flex items-center px-2 transition-all duration-300 ${highlightedField === "status" ? "ring-2 ring-green-500 rounded-md" : ""}`}
-        style={{ minWidth: 140, maxWidth: 140, width: 140 }}
+        style={{ minWidth: 140,
+maxWidth: 140,
+width: 140 }}
       >
         <span
           className="rounded-lg inline-flex items-center px-2.5 py-0.5 text-xs font-normal whitespace-nowrap"
           style={{
             backgroundColor: statusColor.bg,
-            color: statusColor.text,
+            color: statusColor.text
           }}
         >
           {entity.status}
@@ -337,7 +377,9 @@ function EntityRow({
       {/* Author (relation cell) */}
       <div
         className="flex-shrink-0 flex items-center px-2"
-        style={{ minWidth: 200, maxWidth: 200, width: 200 }}
+        style={{ minWidth: 200,
+maxWidth: 200,
+width: 200 }}
       >
         {entity.author ? (
           <div className="min-h-[38px] py-1 px-2 w-full rounded-md text-sm flex items-center bg-surface-200/20 dark:bg-surface-800/30">
@@ -371,7 +413,9 @@ function EntityRow({
       {/* Tags (relation chips) */}
       <div
         className="flex-shrink-0 flex items-center px-2 overflow-hidden"
-        style={{ minWidth: 240, maxWidth: 240, width: 240 }}
+        style={{ minWidth: 240,
+maxWidth: 240,
+width: 240 }}
       >
         {entity.tags.length > 0 ? (
           <div className="min-h-[38px] py-1 px-2 w-full rounded-md text-sm flex items-center bg-surface-200/20 dark:bg-surface-800/30">
@@ -431,7 +475,8 @@ export function EntityViewDemo() {
   const [activeCollection, setActiveCollection] = useState<"posts" | "tags">("posts");
   // Kanban drag animation state
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [dragOffset, setDragOffset] = useState({ x: 0,
+y: 0 });
   const [kanbanHighlight, setKanbanHighlight] = useState<string | null>(null);
   // Which column the dragged card is hovering over (for spacer)
   const [dropTargetColumn, setDropTargetColumn] = useState<string | null>(null);
@@ -439,7 +484,8 @@ export function EntityViewDemo() {
   const [dragSourceColumn, setDragSourceColumn] = useState<string | null>(null);
 
   const flashCell = useCallback((entityId: number, field: string, durationMs = 1000) => {
-    setHighlightedCell({ entityId, field });
+    setHighlightedCell({ entityId,
+field });
     setTimeout(() => setHighlightedCell(null), durationMs);
   }, []);
 
@@ -460,7 +506,7 @@ export function EntityViewDemo() {
         image: entity.image,
         status: entity.status,
         author: entity.author,
-        tags: entity.tags,
+        tags: entity.tags
       });
       setFormDirty(false);
     }
@@ -488,7 +534,8 @@ export function EntityViewDemo() {
         const ease = 1 - Math.pow(1 - progress, 3);
         const x = ease * targetX;
         const y = ease * targetY + Math.sin(progress * Math.PI) * -8;
-        setDragOffset({ x, y });
+        setDragOffset({ x,
+y });
         await new Promise(r => { timer = setTimeout(r, 16); });
         if (!isMounted) return;
       }
@@ -506,7 +553,8 @@ export function EntityViewDemo() {
         await wait(300); if (!guard()) return;
 
         // Inline edit: change entity 40 status from Draft → In Review directly in table
-        setTableOverrides((prev) => ({ ...prev, 40: { status: "In Review" } }));
+        setTableOverrides((prev) => ({ ...prev,
+40: { status: "In Review" } }));
         flashCell(40, "status");
         await wait(700); if (!guard()) return;
 
@@ -522,7 +570,8 @@ export function EntityViewDemo() {
         await wait(700); if (!guard()) return;
 
         // Change status in form
-        setFormValues((prev) => ({ ...prev, status: "In Review" }));
+        setFormValues((prev) => ({ ...prev,
+status: "In Review" }));
         setFormDirty(true);
         flashFormField("status");
         await wait(500); if (!guard()) return;
@@ -574,14 +623,16 @@ export function EntityViewDemo() {
         // Drag card from "In Progress" to "Review" column
         setDragSourceColumn("in_progress");
         setDraggedCardId("870984");
-        setDragOffset({ x: 0, y: 0 });
+        setDragOffset({ x: 0,
+y: 0 });
         await wait(200); if (!guard()) return;
         setDropTargetColumn("review");
         await animateKanbanDrag(260, -60);
         if (!guard()) return;
         await wait(300); if (!guard()) return;
         setDraggedCardId(null);
-        setDragOffset({ x: 0, y: 0 });
+        setDragOffset({ x: 0,
+y: 0 });
         setDropTargetColumn(null);
         setDragSourceColumn(null);
         await wait(600); if (!guard()) return;
@@ -597,14 +648,16 @@ export function EntityViewDemo() {
         // Drag card from "Backlog" to "In Progress"
         setDragSourceColumn("backlog");
         setDraggedCardId("871388");
-        setDragOffset({ x: 0, y: 0 });
+        setDragOffset({ x: 0,
+y: 0 });
         await wait(200); if (!guard()) return;
         setDropTargetColumn("in_progress");
         await animateKanbanDrag(240, -30);
         if (!guard()) return;
         await wait(300); if (!guard()) return;
         setDraggedCardId(null);
-        setDragOffset({ x: 0, y: 0 });
+        setDragOffset({ x: 0,
+y: 0 });
         setDropTargetColumn(null);
         setDragSourceColumn(null);
         await wait(800); if (!guard()) return;
@@ -624,7 +677,8 @@ export function EntityViewDemo() {
         await wait(350); if (!guard()) return;
 
         // Inline table edit: change 43 Published → Draft
-        setTableOverrides((prev) => ({ ...prev, 43: { status: "Draft" } }));
+        setTableOverrides((prev) => ({ ...prev,
+43: { status: "Draft" } }));
         flashCell(43, "status");
         await wait(600); if (!guard()) return;
 
@@ -634,7 +688,8 @@ export function EntityViewDemo() {
         await wait(500); if (!guard()) return;
 
         // Revert status in form
-        setFormValues((prev) => ({ ...prev, status: "Published" }));
+        setFormValues((prev) => ({ ...prev,
+status: "Published" }));
         setFormDirty(true);
         flashFormField("status");
         await wait(400); if (!guard()) return;
@@ -644,7 +699,8 @@ export function EntityViewDemo() {
         await wait(450); if (!guard()) return;
         setIsSaving(false);
         setFormDirty(false);
-        setTableOverrides((prev) => ({ ...prev, 43: { status: "Published" } }));
+        setTableOverrides((prev) => ({ ...prev,
+43: { status: "Published" } }));
         await wait(350); if (!guard()) return;
 
         // Close
@@ -667,16 +723,26 @@ export function EntityViewDemo() {
 
   /* ── Drawer nav items (production-identical: DrawerNavigationItem.tsx) ── */
   const NAV_ITEMS = [
-    { icon: "folder", label: "POSTS", key: "posts" as const, active: activeCollection === "posts" },
-    { icon: "person", label: "AUTHORS", key: "authors" as const, active: false },
-    { icon: "sell", label: "TAGS", key: "tags" as const, active: activeCollection === "tags" },
+    { icon: "folder",
+label: "POSTS",
+key: "posts" as const,
+active: activeCollection === "posts" },
+    { icon: "person",
+label: "AUTHORS",
+key: "authors" as const,
+active: false },
+    { icon: "sell",
+label: "TAGS",
+key: "tags" as const,
+active: activeCollection === "tags" }
   ];
 
   return (
     /* ── Scaffold root: exact Scaffold.tsx line 106 ── */
     <div
       className="flex overflow-hidden bg-surface-50 dark:bg-surface-900 text-surface-900 dark:text-white pointer-events-none select-none relative"
-      style={{ height: 600, width: "100%" }}
+      style={{ height: 600,
+width: "100%" }}
     >
       {/* ═══ AppBar — exact DefaultAppBar.tsx: absolute top-0, h-16, pl-24 ═══ */}
       <div
@@ -701,7 +767,7 @@ export function EntityViewDemo() {
           </div>
         </div>
 
-        <div className="grow" />
+        <div className="grow"/>
 
         {/* Content / Studio toggle — exact DefaultAppBar.tsx line 214-234 */}
         <div className="mr-2 hidden sm:flex bg-surface-100 dark:bg-surface-800 rounded-lg p-0.5 border border-surface-200 dark:border-surface-700">
@@ -736,7 +802,7 @@ export function EntityViewDemo() {
         style={{
           width: 72,
           transition:
-            "left 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms, opacity 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms, width 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms",
+            "left 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms, opacity 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms, width 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms"
         }}
       >
         {/* Inner drawer — exact DrawerWrapper innerDrawer, relative mode */}
@@ -749,10 +815,10 @@ export function EntityViewDemo() {
             <div className="flex flex-row items-center shrink-0 pt-4 pb-0 px-2">
               {/* Logo — always visible, shrink-0 w-[56px] h-[40px] centered */}
               <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px]">
-                <img src="/img/rebase_logo.svg" alt="Rebase" className="w-[28px] h-[28px] object-contain" />
+                <img src="/img/rebase_logo.svg" alt="Rebase" className="w-[28px] h-[28px] object-contain"/>
               </div>
               {/* Title — hidden when collapsed: opacity-0 w-0 */}
-              <div className="flex flex-row items-center overflow-hidden transition-all duration-200 ease-in-out opacity-0 w-0 ml-0" />
+              <div className="flex flex-row items-center overflow-hidden transition-all duration-200 ease-in-out opacity-0 w-0 ml-0"/>
             </div>
 
             {/* ─ DrawerNavigationGroup — exact DrawerNavigationGroup.tsx ─ */}
@@ -799,7 +865,7 @@ export function EntityViewDemo() {
                   <MI size={18}>keyboard_double_arrow_right</MI>
                 </div>
                 {/* Label hidden when collapsed */}
-                <div className="overflow-hidden transition-all duration-200 ease-in-out opacity-0 w-0" />
+                <div className="overflow-hidden transition-all duration-200 ease-in-out opacity-0 w-0"/>
               </div>
             </div>
           </div>
@@ -809,7 +875,7 @@ export function EntityViewDemo() {
       {/* ═══ Main — exact Scaffold.tsx line 131-148 ═══ */}
       <main className="flex flex-col grow overflow-auto">
         {/* DrawerHeader spacer — exact Scaffold.tsx line 157: min-h-16 */}
-        <div className="flex flex-col min-h-16" />
+        <div className="flex flex-col min-h-16"/>
 
         {/* Collection container — exact Scaffold.tsx line 137 */}
         <div className="border-surface-200/20 dark:border-surface-700/30 bg-surface-50 dark:bg-surface-900 grow overflow-auto m-0 mt-1 lg:m-0 lg:mx-2 lg:mb-2 lg:rounded-lg lg:border flex flex-col">
@@ -853,12 +919,12 @@ export function EntityViewDemo() {
                 className="sticky top-0 z-10 flex min-w-fit border-b border-surface-200/20 dark:border-surface-700/30 bg-surface-50 dark:bg-surface-900"
                 style={{ height: 44 }}
               >
-                <ColHeader label="" width={138} showFilter={false} align="center" />
-                <ColHeader icon="short_text" label="Title" width={280} />
-                <ColHeader icon="image" label="Image" width={120} showFilter={false} align="center" />
-                <ColHeader icon="list" label="Status" width={140} />
-                <ColHeader icon="add_link" label="Author" width={200} />
-                <ColHeader icon="add_link" label="Tags" width={240} />
+                <ColHeader label="" width={138} showFilter={false} align="center"/>
+                <ColHeader icon="short_text" label="Title" width={280}/>
+                <ColHeader icon="image" label="Image" width={120} showFilter={false} align="center"/>
+                <ColHeader icon="list" label="Status" width={140}/>
+                <ColHeader icon="add_link" label="Author" width={200}/>
+                <ColHeader icon="add_link" label="Tags" width={240}/>
                 <div className="flex items-center justify-center w-16 text-surface-400">
                   <MI size={22}>add</MI>
                 </div>
@@ -867,7 +933,8 @@ export function EntityViewDemo() {
               {/* Table body */}
               <div className="flex-1">
                 {MOCK_ENTITIES.map((entity) => {
-                  const merged = { ...entity, ...tableOverrides[entity.id] } as Entity;
+                  const merged = { ...entity,
+...tableOverrides[entity.id] } as Entity;
                   return (
                     <EntityRow
                       key={entity.id}
@@ -923,7 +990,7 @@ export function EntityViewDemo() {
                             return (
                               <div key={card.id} className="py-1">
                                 {/* Ghost placeholder */}
-                                <div className="h-[56px] rounded-lg border-2 border-dashed border-surface-300/40 dark:border-surface-700/50 bg-surface-100/30 dark:bg-surface-800/10 transition-all duration-200" />
+                                <div className="h-[56px] rounded-lg border-2 border-dashed border-surface-300/40 dark:border-surface-700/50 bg-surface-100/30 dark:bg-surface-800/10 transition-all duration-200"/>
                               </div>
                             );
                           }
@@ -939,7 +1006,7 @@ export function EntityViewDemo() {
                               >
                                 {card.image ? (
                                   <div className="w-10 h-10 rounded-md overflow-hidden shrink-0 mr-2">
-                                    <img src={card.image} alt={card.title} className="w-full h-full object-cover" loading="lazy" />
+                                    <img src={card.image} alt={card.title} className="w-full h-full object-cover" loading="lazy"/>
                                   </div>
                                 ) : (
                                   <div className="w-10 h-10 rounded-md bg-surface-100 dark:bg-surface-800 shrink-0 mr-2 flex items-center justify-center">
@@ -958,7 +1025,7 @@ export function EntityViewDemo() {
                         {/* Drop target spacer — shows "make room" in target column */}
                         {dropTargetColumn === col.id && !colHasDraggedCard && (
                           <div className="py-1">
-                            <div className="h-[56px] rounded-lg border-2 border-dashed border-primary/40 bg-primary/5 dark:bg-primary/10 transition-all duration-300" />
+                            <div className="h-[56px] rounded-lg border-2 border-dashed border-primary/40 bg-primary/5 dark:bg-primary/10 transition-all duration-300"/>
                           </div>
                         )}
                       </div>
@@ -997,19 +1064,19 @@ export function EntityViewDemo() {
                       left: colLeft,
                       top: cardTop,
                       transform: `translate(${dragOffset.x}px, ${dragOffset.y}px) rotate(3deg)`,
-                      transition: "none",
+                      transition: "none"
                     }}
                   >
                     <div
                       className="p-2 flex items-start border rounded-lg ring-2 ring-primary bg-white dark:bg-surface-900 border-surface-200 dark:border-surface-700/50"
                       style={{
                         boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
-                        opacity: 0.95,
+                        opacity: 0.95
                       }}
                     >
                       {draggedCard.image ? (
                         <div className="w-10 h-10 rounded-md overflow-hidden shrink-0 mr-2">
-                          <img src={draggedCard.image} alt={draggedCard.title} className="w-full h-full object-cover" />
+                          <img src={draggedCard.image} alt={draggedCard.title} className="w-full h-full object-cover"/>
                         </div>
                       ) : (
                         <div className="w-10 h-10 rounded-md bg-surface-100 dark:bg-surface-800 shrink-0 mr-2 flex items-center justify-center">
@@ -1033,15 +1100,15 @@ export function EntityViewDemo() {
       <div
         className="absolute inset-0 z-30 transition-opacity duration-200"
         style={{
-          backgroundColor: panelOpen ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0)',
-          pointerEvents: panelOpen ? 'auto' : 'none',
+          backgroundColor: panelOpen ? "rgba(0,0,0,0.4)" : "rgba(0,0,0,0)",
+          pointerEvents: panelOpen ? "auto" : "none"
         }}
         onClick={closePanel}
       />
       {/* ═══ Side Panel — always rendered, slides in/out ═══ */}
       <div
         className="absolute top-0 right-0 h-full w-[55%] max-w-[680px] min-w-[340px] z-40 bg-white dark:bg-surface-900 border-l border-surface-200/20 dark:border-surface-700/30 flex flex-col shadow-2xl transition-transform duration-300 ease-out"
-        style={{ transform: panelOpen ? 'translateX(0)' : 'translateX(100%)' }}
+        style={{ transform: panelOpen ? "translateX(0)" : "translateX(100%)" }}
       >
         {selectedEntity && (
           <>
@@ -1053,7 +1120,7 @@ export function EntityViewDemo() {
               <button className="p-1.5 rounded text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800">
                 <MI size={16}>open_in_full</MI>
               </button>
-              <div className="flex-1" />
+              <div className="flex-1"/>
               <button className="px-3 py-2 text-xs text-surface-500">
                 <MI size={16}>code</MI>
               </button>
@@ -1109,7 +1176,7 @@ export function EntityViewDemo() {
                     </span>
                     <div className="px-3 pt-6 pb-2">
                       {formValues.image ? (
-                        <img src={formValues.image} alt="" className="w-[100px] h-[100px] object-cover rounded-md" />
+                        <img src={formValues.image} alt="" className="w-[100px] h-[100px] object-cover rounded-md"/>
                       ) : (
                         <div className="w-[100px] h-[100px] rounded-md bg-surface-200/40 dark:bg-surface-700/50 flex items-center justify-center">
                           <MI size={24} className="text-surface-400">image</MI>
@@ -1130,7 +1197,7 @@ export function EntityViewDemo() {
                           style={{
                             backgroundColor:
                               STATUS_COLORS[formValues.status]?.bg,
-                            color: STATUS_COLORS[formValues.status]?.text,
+                            color: STATUS_COLORS[formValues.status]?.text
                           }}
                         >
                           {formValues.status}

@@ -3,7 +3,7 @@ import { Transport } from "./transport";
 
 export function createStorage(transport: Transport): StorageSource {
     const urlsCache = new Map<string, DownloadConfig>();
-    
+
     // We expect the transport to point to /api, and storage endpoints handle /api/storage internally if they are relative?
     // Wait, useBackendStorageSource uses `${apiUrl}/api/storage` directly.
     // Transport has `.request` which hits `${config.baseUrl}${config.apiPath}${path}`.
@@ -38,7 +38,7 @@ export function createStorage(transport: Transport): StorageSource {
             method: "POST",
             body: formData,
             headers: {
-                // transport.request merges headers, so to prevent it setting application/json we can delete it 
+                // transport.request merges headers, so to prevent it setting application/json we can delete it
                 // in transport if body is FormData, or we can explicitly set it to an empty string.
                 // Let's rely on standard behaviour for now and adjust transport if it fails.
             }
@@ -65,15 +65,16 @@ export function createStorage(transport: Transport): StorageSource {
             filePath = `${bucket}/${filePath}`;
         }
 
-        if (!filePath || filePath.trim() === '' || filePath === '/') {
-            return { url: null, fileNotFound: true };
+        if (!filePath || filePath.trim() === "" || filePath === "/") {
+            return { url: null,
+fileNotFound: true };
         }
 
         try {
             const result = await transport.request<{ data: DownloadMetadata }>(`/storage/metadata/${filePath}`);
-            
+
             const activeToken = await transport.resolveToken();
-            const tokenQuery = activeToken ? `?token=${activeToken}` : '';
+            const tokenQuery = activeToken ? `?token=${activeToken}` : "";
 
             const downloadConfig: DownloadConfig = {
                 url: `${transport.baseUrl}${transport.apiPath}/storage/file/${filePath}${tokenQuery}`,
@@ -83,8 +84,9 @@ export function createStorage(transport: Transport): StorageSource {
             urlsCache.set(cacheKey, downloadConfig);
             return downloadConfig;
         } catch (e: unknown) {
-            if (e instanceof Error && 'status' in e && (e as { status: number }).status === 404) {
-                return { url: null, fileNotFound: true };
+            if (e instanceof Error && "status" in e && (e as { status: number }).status === 404) {
+                return { url: null,
+fileNotFound: true };
             }
             throw e;
         }
@@ -104,13 +106,13 @@ export function createStorage(transport: Transport): StorageSource {
             filePath = `${bucket}/${filePath}`;
         }
 
-        if (!filePath || filePath.trim() === '' || filePath === '/') {
+        if (!filePath || filePath.trim() === "" || filePath === "/") {
             return null;
         }
 
         // We must use plain fetch because transport.request expects JSON response, but here we want a Blob.
         const url = `${transport.baseUrl}${transport.apiPath}/storage/file/${filePath}`;
-        
+
         // This is a bit manual, but necessary for blob handling
         const response = await transport.fetchFn(url, {
             headers: transport.getHeaders ? transport.getHeaders() : {}
@@ -138,14 +140,14 @@ export function createStorage(transport: Transport): StorageSource {
             filePath = `${bucket}/${filePath}`;
         }
 
-        if (!filePath || filePath.trim() === '' || filePath === '/') {
+        if (!filePath || filePath.trim() === "" || filePath === "/") {
             return;
         }
 
         try {
             await transport.request(`/storage/file/${filePath}`, { method: "DELETE" });
         } catch (e: unknown) {
-            if (!(e instanceof Error && 'status' in e && (e as { status: number }).status === 404)) throw e;
+            if (!(e instanceof Error && "status" in e && (e as { status: number }).status === 404)) throw e;
         }
 
         urlsCache.delete(bucket ? `${bucket}/${key}` : key);

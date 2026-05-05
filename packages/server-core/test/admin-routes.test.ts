@@ -34,12 +34,17 @@ function mockUser(overrides: Partial<{ id: string; email: string; displayName: s
         emailVerificationToken: null,
         emailVerificationSentAt: null,
         createdAt: new Date("2024-01-01"),
-        updatedAt: new Date("2024-01-01"),
+        updatedAt: new Date("2024-01-01")
     };
 }
 
 function mockRole(id: string, isAdmin = false) {
-    return { id, name: id.charAt(0).toUpperCase() + id.slice(1), isAdmin, defaultPermissions: null, collectionPermissions: null, config: null };
+    return { id,
+name: id.charAt(0).toUpperCase() + id.slice(1),
+isAdmin,
+defaultPermissions: null,
+collectionPermissions: null,
+config: null };
 }
 
 
@@ -53,7 +58,9 @@ function createApp(opts: { defaultRole?: string } = {}) {
         getUserIdentities: jest.fn().mockResolvedValue([]),
         getUserById: jest.fn().mockResolvedValue(null),
         createUser: jest.fn().mockImplementation((data) =>
-            Promise.resolve(mockUser({ email: data.email, displayName: data.displayName, passwordHash: data.passwordHash }))
+            Promise.resolve(mockUser({ email: data.email,
+displayName: data.displayName,
+passwordHash: data.passwordHash }))
         ),
         listUsers: jest.fn().mockResolvedValue([]),
         getUserRoles: jest.fn().mockResolvedValue([mockRole("editor")]),
@@ -61,7 +68,8 @@ function createApp(opts: { defaultRole?: string } = {}) {
         assignDefaultRole: jest.fn().mockResolvedValue(undefined),
         setUserRoles: jest.fn().mockResolvedValue(undefined),
         updateUser: jest.fn().mockImplementation((id, data) =>
-            Promise.resolve(mockUser({ id, ...data }))
+            Promise.resolve(mockUser({ id,
+...data }))
         ),
         deleteUser: jest.fn().mockResolvedValue(undefined),
         updatePassword: jest.fn().mockResolvedValue(undefined),
@@ -70,7 +78,8 @@ function createApp(opts: { defaultRole?: string } = {}) {
         getUserByVerificationToken: jest.fn().mockResolvedValue(null),
         getUserWithRoles: jest.fn().mockImplementation(async (userId) => {
             const user = mockUser({ id: userId });
-            return { user, roles: [mockRole("editor")] };
+            return { user,
+roles: [mockRole("editor")] };
         }),
         createRefreshToken: jest.fn().mockResolvedValue(undefined),
         findRefreshTokenByHash: jest.fn().mockResolvedValue(null),
@@ -84,19 +93,30 @@ function createApp(opts: { defaultRole?: string } = {}) {
         deleteExpiredPasswordResetTokens: jest.fn().mockResolvedValue(undefined),
         listRoles: jest.fn().mockResolvedValue([]),
         getRoleById: jest.fn().mockResolvedValue(null),
-        createRole: jest.fn().mockImplementation(r => Promise.resolve({ id: r.id, name: r.name, isAdmin: r.isAdmin || false, defaultPermissions: null, collectionPermissions: null, config: null })),
-        updateRole: jest.fn().mockImplementation((id, r) => Promise.resolve({ id, name: r.name, isAdmin: r.isAdmin || false, defaultPermissions: null, collectionPermissions: null, config: null })),
+        createRole: jest.fn().mockImplementation(r => Promise.resolve({ id: r.id,
+name: r.name,
+isAdmin: r.isAdmin || false,
+defaultPermissions: null,
+collectionPermissions: null,
+config: null })),
+        updateRole: jest.fn().mockImplementation((id, r) => Promise.resolve({ id,
+name: r.name,
+isAdmin: r.isAdmin || false,
+defaultPermissions: null,
+collectionPermissions: null,
+config: null })),
         deleteRole: jest.fn().mockResolvedValue(undefined)
     } as unknown as jest.Mocked<AuthRepository>;
-    
+
 
     // Password mocks
-    (validatePasswordStrength as jest.Mock).mockReturnValue({ valid: true, errors: [] });
+    (validatePasswordStrength as jest.Mock).mockReturnValue({ valid: true,
+errors: [] });
     (hashPassword as jest.Mock).mockResolvedValue("hashed-pw");
 
     const config: AuthModuleConfig = {
         authRepo: mockAuthRepo,
-        defaultRole: opts.defaultRole,
+        defaultRole: opts.defaultRole
     };
 
     const app = new Hono<HonoEnv>();
@@ -117,7 +137,7 @@ function json(body: Record<string, unknown>) {
     return {
         method: "POST" as const,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(body)
     };
 }
 
@@ -127,7 +147,8 @@ function json(body: Record<string, unknown>) {
 
 describe("Admin Routes (Integration)", () => {
     beforeAll(() => {
-        configureJwt({ secret: TEST_SECRET, accessExpiresIn: "1h" });
+        configureJwt({ secret: TEST_SECRET,
+accessExpiresIn: "1h" });
     });
 
     beforeEach(() => {
@@ -145,7 +166,7 @@ describe("Admin Routes (Integration)", () => {
         it("returns 403 for non-admin users on admin-only endpoints", async () => {
             const app = createApp();
             const res = await app.request("/admin/users", {
-                headers: { ...editorAuth() },
+                headers: { ...editorAuth() }
             });
             expect(res.status).toBe(403);
         });
@@ -153,7 +174,7 @@ describe("Admin Routes (Integration)", () => {
         it("allows admin users through", async () => {
             const app = createApp();
             const res = await app.request("/admin/users", {
-                headers: { ...adminAuth() },
+                headers: { ...adminAuth() }
             });
             expect(res.status).toBe(200);
         });
@@ -161,7 +182,7 @@ describe("Admin Routes (Integration)", () => {
         it("allows schema-admin users through", async () => {
             const app = createApp();
             const res = await app.request("/admin/users", {
-                headers: { Authorization: `Bearer ${generateAccessToken("sa-1", ["schema-admin"])}` },
+                headers: { Authorization: `Bearer ${generateAccessToken("sa-1", ["schema-admin"])}` }
             });
             expect(res.status).toBe(200);
         });
@@ -176,7 +197,7 @@ describe("Admin Routes (Integration)", () => {
 
             const res = await app.request("/admin/bootstrap", {
                 method: "POST",
-                headers: { ...adminAuth("user-1") },
+                headers: { ...adminAuth("user-1") }
             });
             expect(res.status).toBe(200);
             const body = await res.json() as any;
@@ -192,7 +213,7 @@ describe("Admin Routes (Integration)", () => {
 
             const res = await app.request("/admin/bootstrap", {
                 method: "POST",
-                headers: { ...adminAuth("user-1") },
+                headers: { ...adminAuth("user-1") }
             });
             expect(res.status).toBe(403);
             const body = await res.json() as any;
@@ -206,8 +227,10 @@ describe("Admin Routes (Integration)", () => {
             it("returns list of users with roles", async () => {
                 const app = createApp();
                 mockAuthRepo.listUsers.mockResolvedValueOnce([
-                    mockUser({ id: "u1", email: "a@test.com" }),
-                    mockUser({ id: "u2", email: "b@test.com" }),
+                    mockUser({ id: "u1",
+email: "a@test.com" }),
+                    mockUser({ id: "u2",
+email: "b@test.com" })
                 ]);
                 mockAuthRepo.getUserRoleIds
                     .mockResolvedValueOnce(["admin"])
@@ -227,7 +250,7 @@ describe("Admin Routes (Integration)", () => {
                 const app = createApp();
                 mockAuthRepo.getUserWithRoles.mockResolvedValueOnce({
                     user: mockUser({ id: "u1" }),
-                    roles: [mockRole("editor"), mockRole("viewer")],
+                    roles: [mockRole("editor"), mockRole("viewer")]
                 });
 
                 const res = await app.request("/admin/users/u1", { headers: { ...adminAuth() } });
@@ -251,14 +274,18 @@ describe("Admin Routes (Integration)", () => {
                 const app = createApp();
 
                 const res = await app.request("/admin/users", {
-                    ...json({ email: "new@test.com", displayName: "New", password: "StrongPass1", roles: ["editor"] }),
-                    headers: { ...json({}).headers, ...adminAuth() },
+                    ...json({ email: "new@test.com",
+displayName: "New",
+password: "StrongPass1",
+roles: ["editor"] }),
+                    headers: { ...json({}).headers,
+...adminAuth() }
                 });
                 expect(res.status).toBe(201);
                 const body = await res.json() as any;
                 expect(body.user.email).toBe("new@test.com");
                 expect(mockAuthRepo.createUser).toHaveBeenCalledWith(expect.objectContaining({
-                    email: "new@test.com",
+                    email: "new@test.com"
                 }));
             });
 
@@ -266,8 +293,10 @@ describe("Admin Routes (Integration)", () => {
                 const app = createApp();
 
                 await app.request("/admin/users", {
-                    ...json({ email: "pw@test.com", password: "StrongPass1" }),
-                    headers: { ...json({}).headers, ...adminAuth() },
+                    ...json({ email: "pw@test.com",
+password: "StrongPass1" }),
+                    headers: { ...json({}).headers,
+...adminAuth() }
                 });
                 expect(hashPassword).toHaveBeenCalledWith("StrongPass1");
             });
@@ -277,7 +306,8 @@ describe("Admin Routes (Integration)", () => {
 
                 const res = await app.request("/admin/users", {
                     ...json({ displayName: "No Email" }),
-                    headers: { ...json({}).headers, ...adminAuth() },
+                    headers: { ...json({}).headers,
+...adminAuth() }
                 });
                 expect(res.status).toBe(400);
             });
@@ -288,7 +318,8 @@ describe("Admin Routes (Integration)", () => {
 
                 const res = await app.request("/admin/users", {
                     ...json({ email: "existing@test.com" }),
-                    headers: { ...json({}).headers, ...adminAuth() },
+                    headers: { ...json({}).headers,
+...adminAuth() }
                 });
                 expect(res.status).toBe(409);
                 const body = await res.json() as any;
@@ -297,11 +328,14 @@ describe("Admin Routes (Integration)", () => {
 
             it("returns 400 for weak password", async () => {
                 const app = createApp();
-                (validatePasswordStrength as jest.Mock).mockReturnValueOnce({ valid: false, errors: ["Too short"] });
+                (validatePasswordStrength as jest.Mock).mockReturnValueOnce({ valid: false,
+errors: ["Too short"] });
 
                 const res = await app.request("/admin/users", {
-                    ...json({ email: "weak@test.com", password: "weak" }),
-                    headers: { ...json({}).headers, ...adminAuth() },
+                    ...json({ email: "weak@test.com",
+password: "weak" }),
+                    headers: { ...json({}).headers,
+...adminAuth() }
                 });
                 expect(res.status).toBe(400);
                 const body = await res.json() as any;
@@ -313,7 +347,8 @@ describe("Admin Routes (Integration)", () => {
 
                 await app.request("/admin/users", {
                     ...json({ email: "norole@test.com" }),
-                    headers: { ...json({}).headers, ...adminAuth() },
+                    headers: { ...json({}).headers,
+...adminAuth() }
                 });
                 expect(mockAuthRepo.assignDefaultRole).toHaveBeenCalledWith(expect.any(String), "editor");
             });
@@ -323,7 +358,8 @@ describe("Admin Routes (Integration)", () => {
 
                 await app.request("/admin/users", {
                     ...json({ email: "nodefault@test.com" }),
-                    headers: { ...json({}).headers, ...adminAuth() },
+                    headers: { ...json({}).headers,
+...adminAuth() }
                 });
                 expect(mockAuthRepo.assignDefaultRole).not.toHaveBeenCalled();
             });
@@ -332,8 +368,10 @@ describe("Admin Routes (Integration)", () => {
                 const app = createApp();
 
                 await app.request("/admin/users", {
-                    ...json({ email: "withroles@test.com", roles: ["admin", "editor"] }),
-                    headers: { ...json({}).headers, ...adminAuth() },
+                    ...json({ email: "withroles@test.com",
+roles: ["admin", "editor"] }),
+                    headers: { ...json({}).headers,
+...adminAuth() }
                 });
                 expect(mockAuthRepo.setUserRoles).toHaveBeenCalledWith(expect.any(String), ["admin", "editor"]);
             });
@@ -344,14 +382,16 @@ describe("Admin Routes (Integration)", () => {
                 const app = createApp();
                 mockAuthRepo.getUserById.mockResolvedValueOnce(mockUser({ id: "u1" }));
                 mockAuthRepo.getUserWithRoles.mockResolvedValueOnce({
-                    user: mockUser({ id: "u1", displayName: "Updated" }),
-                    roles: [mockRole("editor")],
+                    user: mockUser({ id: "u1",
+displayName: "Updated" }),
+                    roles: [mockRole("editor")]
                 });
 
                 const res = await app.request("/admin/users/u1", {
                     method: "PUT",
-                    headers: { "Content-Type": "application/json", ...adminAuth() },
-                    body: JSON.stringify({ displayName: "Updated" }),
+                    headers: { "Content-Type": "application/json",
+...adminAuth() },
+                    body: JSON.stringify({ displayName: "Updated" })
                 });
                 expect(res.status).toBe(200);
                 const body = await res.json() as any;
@@ -363,13 +403,14 @@ describe("Admin Routes (Integration)", () => {
                 mockAuthRepo.getUserById.mockResolvedValueOnce(mockUser({ id: "u1" }));
                 mockAuthRepo.getUserWithRoles.mockResolvedValueOnce({
                     user: mockUser({ id: "u1" }),
-                    roles: [mockRole("admin")],
+                    roles: [mockRole("admin")]
                 });
 
                 await app.request("/admin/users/u1", {
                     method: "PUT",
-                    headers: { "Content-Type": "application/json", ...adminAuth() },
-                    body: JSON.stringify({ roles: ["admin"] }),
+                    headers: { "Content-Type": "application/json",
+...adminAuth() },
+                    body: JSON.stringify({ roles: ["admin"] })
                 });
                 expect(mockAuthRepo.setUserRoles).toHaveBeenCalledWith("u1", ["admin"]);
             });
@@ -380,8 +421,9 @@ describe("Admin Routes (Integration)", () => {
 
                 const res = await app.request("/admin/users/missing", {
                     method: "PUT",
-                    headers: { "Content-Type": "application/json", ...adminAuth() },
-                    body: JSON.stringify({ displayName: "Updated" }),
+                    headers: { "Content-Type": "application/json",
+...adminAuth() },
+                    body: JSON.stringify({ displayName: "Updated" })
                 });
                 expect(res.status).toBe(404);
             });
@@ -394,7 +436,7 @@ describe("Admin Routes (Integration)", () => {
 
                 const res = await app.request("/admin/users/u1", {
                     method: "DELETE",
-                    headers: { ...adminAuth("admin-1") },
+                    headers: { ...adminAuth("admin-1") }
                 });
                 expect(res.status).toBe(200);
                 expect(mockAuthRepo.deleteUser).toHaveBeenCalledWith("u1");
@@ -405,7 +447,7 @@ describe("Admin Routes (Integration)", () => {
 
                 const res = await app.request("/admin/users/admin-1", {
                     method: "DELETE",
-                    headers: { ...adminAuth("admin-1") },
+                    headers: { ...adminAuth("admin-1") }
                 });
                 expect(res.status).toBe(400);
                 const body = await res.json() as any;
@@ -418,7 +460,7 @@ describe("Admin Routes (Integration)", () => {
 
                 const res = await app.request("/admin/users/missing", {
                     method: "DELETE",
-                    headers: { ...adminAuth() },
+                    headers: { ...adminAuth() }
                 });
                 expect(res.status).toBe(404);
             });
@@ -433,7 +475,7 @@ describe("Admin Routes (Integration)", () => {
                 mockAuthRepo.listRoles.mockResolvedValueOnce([
                     mockRole("admin", true),
                     mockRole("editor"),
-                    mockRole("viewer"),
+                    mockRole("viewer")
                 ]);
 
                 const res = await app.request("/admin/roles", { headers: { ...adminAuth() } });
@@ -470,8 +512,10 @@ describe("Admin Routes (Integration)", () => {
                 const app = createApp();
 
                 const res = await app.request("/admin/roles", {
-                    ...json({ id: "custom", name: "Custom Role" }),
-                    headers: { ...json({}).headers, ...adminAuth() },
+                    ...json({ id: "custom",
+name: "Custom Role" }),
+                    headers: { ...json({}).headers,
+...adminAuth() }
                 });
                 expect(res.status).toBe(201);
                 const body = await res.json() as any;
@@ -483,7 +527,8 @@ describe("Admin Routes (Integration)", () => {
 
                 const res = await app.request("/admin/roles", {
                     ...json({ id: "nope" }),
-                    headers: { ...json({}).headers, ...adminAuth() },
+                    headers: { ...json({}).headers,
+...adminAuth() }
                 });
                 expect(res.status).toBe(400);
             });
@@ -493,8 +538,10 @@ describe("Admin Routes (Integration)", () => {
                 mockAuthRepo.getRoleById.mockResolvedValueOnce(mockRole("custom"));
 
                 const res = await app.request("/admin/roles", {
-                    ...json({ id: "custom", name: "Dup" }),
-                    headers: { ...json({}).headers, ...adminAuth() },
+                    ...json({ id: "custom",
+name: "Dup" }),
+                    headers: { ...json({}).headers,
+...adminAuth() }
                 });
                 expect(res.status).toBe(409);
                 const body = await res.json() as any;
@@ -509,12 +556,13 @@ describe("Admin Routes (Integration)", () => {
 
                 const res = await app.request("/admin/roles/editor", {
                     method: "PUT",
-                    headers: { "Content-Type": "application/json", ...adminAuth() },
-                    body: JSON.stringify({ name: "Super Editor" }),
+                    headers: { "Content-Type": "application/json",
+...adminAuth() },
+                    body: JSON.stringify({ name: "Super Editor" })
                 });
                 expect(res.status).toBe(200);
                 expect(mockAuthRepo.updateRole).toHaveBeenCalledWith("editor", expect.objectContaining({
-                    name: "Super Editor",
+                    name: "Super Editor"
                 }));
             });
 
@@ -524,8 +572,9 @@ describe("Admin Routes (Integration)", () => {
 
                 const res = await app.request("/admin/roles/missing", {
                     method: "PUT",
-                    headers: { "Content-Type": "application/json", ...adminAuth() },
-                    body: JSON.stringify({ name: "Nope" }),
+                    headers: { "Content-Type": "application/json",
+...adminAuth() },
+                    body: JSON.stringify({ name: "Nope" })
                 });
                 expect(res.status).toBe(404);
             });
@@ -538,7 +587,7 @@ describe("Admin Routes (Integration)", () => {
 
                 const res = await app.request("/admin/roles/custom", {
                     method: "DELETE",
-                    headers: { ...adminAuth() },
+                    headers: { ...adminAuth() }
                 });
                 expect(res.status).toBe(200);
                 expect(mockAuthRepo.deleteRole).toHaveBeenCalledWith("custom");
@@ -549,7 +598,7 @@ describe("Admin Routes (Integration)", () => {
 
                 const res = await app.request("/admin/roles/admin", {
                     method: "DELETE",
-                    headers: { ...adminAuth() },
+                    headers: { ...adminAuth() }
                 });
                 expect(res.status).toBe(400);
                 const body = await res.json() as any;
@@ -561,7 +610,7 @@ describe("Admin Routes (Integration)", () => {
 
                 const res = await app.request("/admin/roles/editor", {
                     method: "DELETE",
-                    headers: { ...adminAuth() },
+                    headers: { ...adminAuth() }
                 });
                 expect(res.status).toBe(400);
             });
@@ -571,7 +620,7 @@ describe("Admin Routes (Integration)", () => {
 
                 const res = await app.request("/admin/roles/viewer", {
                     method: "DELETE",
-                    headers: { ...adminAuth() },
+                    headers: { ...adminAuth() }
                 });
                 expect(res.status).toBe(400);
             });
@@ -582,7 +631,7 @@ describe("Admin Routes (Integration)", () => {
 
                 const res = await app.request("/admin/roles/ghost", {
                     method: "DELETE",
-                    headers: { ...adminAuth() },
+                    headers: { ...adminAuth() }
                 });
                 expect(res.status).toBe(404);
             });

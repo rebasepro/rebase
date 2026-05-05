@@ -29,7 +29,8 @@ export function parseReferenceString(value: string): { path: string; database?: 
     // Extract the collection path (everything before the last slash)
     const path = fullPath.substring(0, fullPath.lastIndexOf("/"));
 
-    return { path, database };
+    return { path,
+database };
 }
 
 /**

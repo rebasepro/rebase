@@ -52,17 +52,17 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
             await execa(tsxBin, [pluginCli, ...rawArgs.slice(2)], {
                 cwd: backendDir,
                 stdio: "inherit",
-                env,
+                env
             });
         } else {
             await execa("node", [pluginCli, ...rawArgs.slice(2)], {
                 cwd: backendDir,
                 stdio: "inherit",
-                env,
+                env
             });
         }
     } catch (err: unknown) {
-        // If the process exits with an error code, execa will throw, 
+        // If the process exits with an error code, execa will throw,
         // but inherit stdio means the user already saw the output.
         process.exit(1);
     }

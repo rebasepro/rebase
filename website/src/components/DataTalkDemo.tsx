@@ -207,7 +207,7 @@ const categoryColors = [
     "bg-green-950 text-green-200",
     "bg-yellow-950 text-yellow-200",
     "bg-purple-950 text-purple-200",
-    "bg-indigo-950 text-indigo-200",
+    "bg-indigo-950 text-indigo-200"
 ];
 
 export function ProductsDemoTable() {
@@ -222,9 +222,12 @@ export function ProductsDemoTable() {
                     {/* Header Row */}
                     <div className="flex items-stretch text-xs font-semibold text-surface-400 tracking-wider uppercase bg-surface-950 border-b border-surface-800">
                         <div className="flex items-center justify-center px-4 py-3 border-r border-surface-800 flex-shrink-0" style={{ width: "140px" }}>ID</div>
-                        <div className="flex items-center px-4 py-3 border-r border-surface-800 flex-shrink-0" style={{ width: "240px", textAlign: "left" }}>Name</div>
-                        <div className="flex items-center px-4 py-3 border-r border-surface-800 flex-shrink-0" style={{ width: "220px", textAlign: "left" }}>Category</div>
-                        <div className="flex items-center justify-end px-4 py-3 border-r border-surface-800 flex-shrink-0" style={{ width: "160px", textAlign: "right" }}>Price</div>
+                        <div className="flex items-center px-4 py-3 border-r border-surface-800 flex-shrink-0" style={{ width: "240px",
+textAlign: "left" }}>Name</div>
+                        <div className="flex items-center px-4 py-3 border-r border-surface-800 flex-shrink-0" style={{ width: "220px",
+textAlign: "left" }}>Category</div>
+                        <div className="flex items-center justify-end px-4 py-3 border-r border-surface-800 flex-shrink-0" style={{ width: "160px",
+textAlign: "right" }}>Price</div>
                     </div>
                     {productsData.map((row, index) => (
                         <div key={row[0]}

@@ -18,7 +18,6 @@ export type Role = {
     isAdmin?: boolean;
 
 
-
     /**
      * Permissions related to editing the collections
      */

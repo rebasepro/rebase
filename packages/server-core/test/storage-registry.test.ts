@@ -9,13 +9,14 @@ import { StorageController } from "../src/storage/types";
 /**
  * Mock StorageController for testing
  */
-function createMockStorageController(type: 'local' | 's3'): StorageController {
+function createMockStorageController(type: "local" | "s3"): StorageController {
     return {
         putObject: vi.fn().mockResolvedValue({ path: "test/file.txt" }),
         getSignedUrl: vi.fn().mockResolvedValue({ url: "http://example.com/file.txt" }),
         getObject: vi.fn().mockResolvedValue(null),
         deleteObject: vi.fn().mockResolvedValue(undefined),
-        listObjects: vi.fn().mockResolvedValue({ items: [], prefixes: [] }),
+        listObjects: vi.fn().mockResolvedValue({ items: [],
+prefixes: [] }),
         getType: vi.fn().mockReturnValue(type)
     };
 }
@@ -37,7 +38,7 @@ describe("StorageRegistry", () => {
 
             it("should register a storage controller", () => {
                 const registry = new DefaultStorageRegistry();
-                const mockController = createMockStorageController('local');
+                const mockController = createMockStorageController("local");
 
                 registry.register("test-storage", mockController);
 
@@ -48,7 +49,7 @@ describe("StorageRegistry", () => {
 
             it("should get a registered storage controller", () => {
                 const registry = new DefaultStorageRegistry();
-                const mockController = createMockStorageController('s3');
+                const mockController = createMockStorageController("s3");
 
                 registry.register("my-storage", mockController);
 
@@ -65,7 +66,7 @@ describe("StorageRegistry", () => {
         describe("default storage handling", () => {
             it("should get default storage with get(undefined)", () => {
                 const registry = new DefaultStorageRegistry();
-                const mockController = createMockStorageController('local');
+                const mockController = createMockStorageController("local");
 
                 registry.register(DEFAULT_STORAGE_ID, mockController);
 
@@ -75,7 +76,7 @@ describe("StorageRegistry", () => {
 
             it("should get default storage with getDefault()", () => {
                 const registry = new DefaultStorageRegistry();
-                const mockController = createMockStorageController('local');
+                const mockController = createMockStorageController("local");
 
                 registry.register(DEFAULT_STORAGE_ID, mockController);
 
@@ -86,7 +87,7 @@ describe("StorageRegistry", () => {
                 const registry = new DefaultStorageRegistry();
 
                 expect(() => registry.getDefault()).toThrow(
-                    `[StorageRegistry] No default storage registered.`
+                    "[StorageRegistry] No default storage registered."
                 );
             });
         });
@@ -98,8 +99,8 @@ describe("StorageRegistry", () => {
 
             beforeEach(() => {
                 registry = new DefaultStorageRegistry();
-                defaultController = createMockStorageController('local');
-                mediaController = createMockStorageController('s3');
+                defaultController = createMockStorageController("local");
+                mediaController = createMockStorageController("s3");
 
                 registry.register(DEFAULT_STORAGE_ID, defaultController);
                 registry.register("media", mediaController);
@@ -138,8 +139,8 @@ describe("StorageRegistry", () => {
         describe("overwriting storages", () => {
             it("should overwrite existing storage with same id", () => {
                 const registry = new DefaultStorageRegistry();
-                const original = createMockStorageController('local');
-                const replacement = createMockStorageController('s3');
+                const original = createMockStorageController("local");
+                const replacement = createMockStorageController("s3");
 
                 const consoleSpy = vi.spyOn(console, "warn").mockImplementation();
 
@@ -159,9 +160,9 @@ describe("StorageRegistry", () => {
             it("should list all registered storages", () => {
                 const registry = new DefaultStorageRegistry();
 
-                registry.register("storage-1", createMockStorageController('local'));
-                registry.register("storage-2", createMockStorageController('s3'));
-                registry.register(DEFAULT_STORAGE_ID, createMockStorageController('local'));
+                registry.register("storage-1", createMockStorageController("local"));
+                registry.register("storage-2", createMockStorageController("s3"));
+                registry.register(DEFAULT_STORAGE_ID, createMockStorageController("local"));
 
                 const list = registry.list();
                 expect(list).toHaveLength(3);
@@ -175,10 +176,10 @@ describe("StorageRegistry", () => {
 
                 expect(registry.size()).toBe(0);
 
-                registry.register("storage-1", createMockStorageController('local'));
+                registry.register("storage-1", createMockStorageController("local"));
                 expect(registry.size()).toBe(1);
 
-                registry.register("storage-2", createMockStorageController('s3'));
+                registry.register("storage-2", createMockStorageController("s3"));
                 expect(registry.size()).toBe(2);
             });
         });
@@ -187,7 +188,7 @@ describe("StorageRegistry", () => {
     describe("DefaultStorageRegistry.create() factory", () => {
         describe("with single StorageController", () => {
             it('should register single controller as "(default)"', () => {
-                const mockController = createMockStorageController('local');
+                const mockController = createMockStorageController("local");
 
                 const registry = DefaultStorageRegistry.create(mockController);
 
@@ -199,8 +200,8 @@ describe("StorageRegistry", () => {
 
         describe("with map of StorageControllers", () => {
             it("should register all controllers from map", () => {
-                const defaultController = createMockStorageController('local');
-                const mediaController = createMockStorageController('s3');
+                const defaultController = createMockStorageController("local");
+                const mediaController = createMockStorageController("s3");
 
                 const registry = DefaultStorageRegistry.create({
                     [DEFAULT_STORAGE_ID]: defaultController,
@@ -213,8 +214,8 @@ describe("StorageRegistry", () => {
             });
 
             it("should use first entry as default if no explicit default provided", () => {
-                const local = createMockStorageController('local');
-                const s3 = createMockStorageController('s3');
+                const local = createMockStorageController("local");
+                const s3 = createMockStorageController("s3");
 
                 const consoleSpy = vi.spyOn(console, "warn").mockImplementation();
 
@@ -244,7 +245,7 @@ describe("StorageRegistry", () => {
 
     describe("type detection (isStorageController)", () => {
         it("should correctly identify a StorageController", () => {
-            const mockController = createMockStorageController('local');
+            const mockController = createMockStorageController("local");
 
             // The factory should recognize it as a single controller
             const registry = DefaultStorageRegistry.create(mockController);
@@ -254,8 +255,8 @@ describe("StorageRegistry", () => {
 
         it("should correctly identify a map of StorageControllers", () => {
             const controllers = {
-                [DEFAULT_STORAGE_ID]: createMockStorageController('local'),
-                "other": createMockStorageController('s3')
+                [DEFAULT_STORAGE_ID]: createMockStorageController("local"),
+                "other": createMockStorageController("s3")
             };
 
             // The factory should recognize it as a map
@@ -266,16 +267,16 @@ describe("StorageRegistry", () => {
 
     describe("integration with storage types", () => {
         it("should correctly report storage types", () => {
-            const localController = createMockStorageController('local');
-            const s3Controller = createMockStorageController('s3');
+            const localController = createMockStorageController("local");
+            const s3Controller = createMockStorageController("s3");
 
             const registry = DefaultStorageRegistry.create({
                 [DEFAULT_STORAGE_ID]: localController,
                 "media": s3Controller
             });
 
-            expect(registry.getDefault().getType()).toBe('local');
-            expect(registry.get("media")?.getType()).toBe('s3');
+            expect(registry.getDefault().getType()).toBe("local");
+            expect(registry.get("media")?.getType()).toBe("s3");
         });
     });
 });

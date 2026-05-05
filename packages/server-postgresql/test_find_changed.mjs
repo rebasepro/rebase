@@ -27,4 +27,6 @@ function findChangedFields(oldValues, newValues) {
     return changed;
 }
 
-console.log(findChangedFields({ title: "old", tags: [{ id: 1 }] }, { title: "new", tags: [{ id: 2 }] }));
+console.log(findChangedFields({ title: "old",
+tags: [{ id: 1 }] }, { title: "new",
+tags: [{ id: 2 }] }));

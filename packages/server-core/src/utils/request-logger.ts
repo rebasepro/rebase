@@ -42,7 +42,7 @@ export function requestLogger(options?: RequestLoggerOptions): MiddlewareHandler
             method,
             path,
             status,
-            latencyMs,
+            latencyMs
         };
 
         if (contentLength) {

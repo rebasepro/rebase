@@ -2,15 +2,15 @@
 // Do not edit manually. Re-run "rebase generate-sdk" to regenerate.
 // ────────────────────────────────────────────────────────────────────
 
-import { createTransport, RebaseApiError, buildQueryString } from './client.js';
-import { createAuthorsClient } from './authors.js';
-import { createProfilesClient } from './profiles.js';
-import { createPostsClient } from './posts.js';
-import { createTagsClient } from './tags.js';
+import { createTransport, RebaseApiError, buildQueryString } from "./client.js";
+import { createAuthorsClient } from "./authors.js";
+import { createProfilesClient } from "./profiles.js";
+import { createPostsClient } from "./posts.js";
+import { createTagsClient } from "./tags.js";
 
-import { createTestEntitiesClient } from './test_entities.js';
-import { createAuth, createMemoryStorage } from './auth.js';
-import { createAdmin } from './admin.js';
+import { createTestEntitiesClient } from "./test_entities.js";
+import { createAuth, createMemoryStorage } from "./auth.js";
+import { createAdmin } from "./admin.js";
 
 /**
  * @typedef {Object} CreateRebaseClientConfig
@@ -106,19 +106,19 @@ export function createRebaseClient(config) {
         /** @type {ReturnType<typeof createTestEntitiesClient>} */
         testEntities: createTestEntitiesClient(transport),
         /** Update the auth token at runtime */
-        setToken: transport.setToken,
+        setToken: transport.setToken
     };
 }
 
 // Re-export individual collection clients for tree-shaking
-export { createAuthorsClient } from './authors.js';
-export { createProfilesClient } from './profiles.js';
-export { createPostsClient } from './posts.js';
-export { createTagsClient } from './tags.js';
+export { createAuthorsClient } from "./authors.js";
+export { createProfilesClient } from "./profiles.js";
+export { createPostsClient } from "./posts.js";
+export { createTagsClient } from "./tags.js";
 
-export { createTestEntitiesClient } from './test_entities.js';
+export { createTestEntitiesClient } from "./test_entities.js";
 
 // Re-export utilities
-export { RebaseApiError, buildQueryString } from './client.js';
-export { createAuth, createMemoryStorage } from './auth.js';
-export { createAdmin } from './admin.js';
+export { RebaseApiError, buildQueryString } from "./client.js";
+export { createAuth, createMemoryStorage } from "./auth.js";
+export { createAdmin } from "./admin.js";

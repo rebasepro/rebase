@@ -67,6 +67,6 @@ export const productCollection: EntityCollection = {
             },
             // Preview: PriceTextPreview
             description: "Price with range validation"
-        }),
+        })
     }
 };

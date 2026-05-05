@@ -52,13 +52,13 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
             await execa(tsxBin, [pluginCli, ...rawArgs.slice(2)], {
                 cwd: backendDir,
                 stdio: "inherit",
-                env,
+                env
             });
         } else {
             await execa("node", [pluginCli, ...rawArgs.slice(2)], {
                 cwd: backendDir,
                 stdio: "inherit",
-                env,
+                env
             });
         }
     } catch (err: unknown) {

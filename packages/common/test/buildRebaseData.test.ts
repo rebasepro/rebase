@@ -9,11 +9,11 @@ function createMockDriver(overrides: Partial<DataDriver> = {}): DataDriver {
         saveEntity: jest.fn().mockImplementation(async ({ path, values, entityId, status }) => ({
             id: entityId ?? "new-id",
             path,
-            values,
+            values
         })),
         deleteEntity: jest.fn().mockResolvedValue(undefined),
         countEntities: jest.fn().mockResolvedValue(0),
-        ...overrides,
+        ...overrides
     };
 }
 
@@ -68,9 +68,9 @@ describe("buildRebaseData", () => {
 
         const companyMembers = (data as any).companyMembers;
         const manualCollection = data.collection("company_members");
-        
+
         expect(companyMembers).toBe(manualCollection);
-        
+
         // Let's also verify that creating uses the correct path
         companyMembers.create({ name: "Test" });
         expect(driver.saveEntity).toHaveBeenCalledWith(
@@ -84,17 +84,20 @@ describe("buildRebaseData", () => {
     describe("CollectionAccessor.find", () => {
         it("delegates to driver.fetchCollection", async () => {
             const mockEntities: Entity[] = [
-                { id: "1", path: "products", values: { name: "Camera" } },
+                { id: "1",
+path: "products",
+values: { name: "Camera" } }
             ];
             const driver = createMockDriver({
-                fetchCollection: jest.fn().mockResolvedValue(mockEntities),
+                fetchCollection: jest.fn().mockResolvedValue(mockEntities)
             });
             const data = buildRebaseData(driver);
 
             const result = await data.products.find({ limit: 10 });
 
             expect(driver.fetchCollection).toHaveBeenCalledWith(
-                expect.objectContaining({ path: "products", limit: 10 })
+                expect.objectContaining({ path: "products",
+limit: 10 })
             );
             expect(result.data).toEqual(mockEntities);
             expect(result.meta.limit).toBe(10);
@@ -102,46 +105,47 @@ describe("buildRebaseData", () => {
 
         it("converts PostgREST where filters", async () => {
             const driver = createMockDriver({
-                fetchCollection: jest.fn().mockResolvedValue([]),
+                fetchCollection: jest.fn().mockResolvedValue([])
             });
             const data = buildRebaseData(driver);
 
             await data.products.find({
-                where: { status: "eq.published", price: "gte.100" },
+                where: { status: "eq.published",
+price: "gte.100" }
             });
 
             expect(driver.fetchCollection).toHaveBeenCalledWith(
                 expect.objectContaining({
                     filter: {
                         status: ["==", "published"],
-                        price: [">=", 100],
-                    },
+                        price: [">=", 100]
+                    }
                 })
             );
         });
 
         it("parses comma-separated list values", async () => {
             const driver = createMockDriver({
-                fetchCollection: jest.fn().mockResolvedValue([]),
+                fetchCollection: jest.fn().mockResolvedValue([])
             });
             const data = buildRebaseData(driver);
 
             await data.products.find({
-                where: { role: "in.(admin,editor)" },
+                where: { role: "in.(admin,editor)" }
             });
 
             expect(driver.fetchCollection).toHaveBeenCalledWith(
                 expect.objectContaining({
                     filter: {
-                        role: ["in", ["admin", "editor"]],
-                    },
+                        role: ["in", ["admin", "editor"]]
+                    }
                 })
             );
         });
 
         it("parses orderBy string", async () => {
             const driver = createMockDriver({
-                fetchCollection: jest.fn().mockResolvedValue([]),
+                fetchCollection: jest.fn().mockResolvedValue([])
             });
             const data = buildRebaseData(driver);
 
@@ -150,7 +154,7 @@ describe("buildRebaseData", () => {
             expect(driver.fetchCollection).toHaveBeenCalledWith(
                 expect.objectContaining({
                     orderBy: "created_at",
-                    order: "desc",
+                    order: "desc"
                 })
             );
         });
@@ -159,10 +163,10 @@ describe("buildRebaseData", () => {
             const entities = Array.from({ length: 20 }, (_, i) => ({
                 id: String(i),
                 path: "products",
-                values: {},
+                values: {}
             }));
             const driver = createMockDriver({
-                fetchCollection: jest.fn().mockResolvedValue(entities),
+                fetchCollection: jest.fn().mockResolvedValue(entities)
             });
             const data = buildRebaseData(driver);
 
@@ -179,15 +183,18 @@ describe("buildRebaseData", () => {
     // ── findById ────────────────────────────────────────────
     describe("CollectionAccessor.findById", () => {
         it("delegates to driver.fetchEntity", async () => {
-            const entity: Entity = { id: "abc", path: "products", values: { name: "Camera" } };
+            const entity: Entity = { id: "abc",
+path: "products",
+values: { name: "Camera" } };
             const driver = createMockDriver({
-                fetchEntity: jest.fn().mockResolvedValue(entity),
+                fetchEntity: jest.fn().mockResolvedValue(entity)
             });
             const data = buildRebaseData(driver);
 
             const result = await data.products.findById("abc");
             expect(result).toEqual(entity);
-            expect(driver.fetchEntity).toHaveBeenCalledWith({ path: "products", entityId: "abc" });
+            expect(driver.fetchEntity).toHaveBeenCalledWith({ path: "products",
+entityId: "abc" });
         });
     });
 
@@ -197,13 +204,15 @@ describe("buildRebaseData", () => {
             const driver = createMockDriver();
             const data = buildRebaseData(driver);
 
-            await data.products.create({ name: "Camera", price: 299 });
+            await data.products.create({ name: "Camera",
+price: 299 });
 
             expect(driver.saveEntity).toHaveBeenCalledWith(
                 expect.objectContaining({
                     path: "products",
-                    values: { name: "Camera", price: 299 },
-                    status: "new",
+                    values: { name: "Camera",
+price: 299 },
+                    status: "new"
                 })
             );
         });
@@ -217,7 +226,7 @@ describe("buildRebaseData", () => {
             expect(driver.saveEntity).toHaveBeenCalledWith(
                 expect.objectContaining({
                     entityId: "custom-id",
-                    status: "new",
+                    status: "new"
                 })
             );
         });
@@ -236,7 +245,7 @@ describe("buildRebaseData", () => {
                     path: "products",
                     entityId: "prod-1",
                     values: { price: 399 },
-                    status: "existing",
+                    status: "existing"
                 })
             );
         });
@@ -252,7 +261,8 @@ describe("buildRebaseData", () => {
 
             expect(driver.deleteEntity).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    entity: expect.objectContaining({ id: "prod-1", path: "products" }),
+                    entity: expect.objectContaining({ id: "prod-1",
+path: "products" })
                 })
             );
         });

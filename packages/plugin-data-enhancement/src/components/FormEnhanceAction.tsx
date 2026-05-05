@@ -120,8 +120,8 @@ export function FormEnhanceAction({
                 fullWidth={largeLayout && openEntityMode === "full_screen"}
                 size={"small"}
                 disabled={loading || disabled}>
-                {!loading && <AIIcon size={"small"} />}
-                {loading && <CircularProgress size={"small"} />}
+                {!loading && <AIIcon size={"small"}/>}
+                {loading && <CircularProgress size={"small"}/>}
                 Autofill
             </Button>}>
 
@@ -129,11 +129,11 @@ export function FormEnhanceAction({
                 onClick={() => {
                     enhance();
                 }}>
-                <AIIcon size={"small"} />
+                <AIIcon size={"small"}/>
                 Autofill based on the current content
             </MenuItem>
 
-            <Separator orientation={"horizontal"} className={"mt-2"} />
+            <Separator orientation={"horizontal"} className={"mt-2"}/>
 
             {samplePrompts?.map((samplePrompt, index) => {
                 return <MenuItem
@@ -156,13 +156,13 @@ export function FormEnhanceAction({
                         }}
                         size={"smallest"}
                     >
-                        <CloseIcon size="smallest" />
+                        <CloseIcon size="smallest"/>
                     </IconButton>
                     }
                 </MenuItem>;
             })}
 
-            <Separator orientation={"horizontal"} />
+            <Separator orientation={"horizontal"}/>
 
             <div
                 className={cls(
@@ -198,7 +198,7 @@ export function FormEnhanceAction({
                     }}
                     color={!instructions ? "primary" : undefined}
                     disabled={loading || !instructions}>
-                    <CloseIcon size={"small"} />
+                    <CloseIcon size={"small"}/>
                 </IconButton>
 
                 <IconButton
@@ -207,9 +207,9 @@ export function FormEnhanceAction({
                     color={!instructions ? "primary" : undefined}
                     disabled={loading || !instructions}>
                     {loading &&
-                        <CircularProgress size={"smallest"} />}
+                        <CircularProgress size={"smallest"}/>}
                     {!loading &&
-                        <SendIcon color={"primary"} />}
+                        <SendIcon color={"primary"}/>}
                 </IconButton>
 
             </div>
@@ -253,7 +253,7 @@ function getPromptsForExistingEntities(properties: Properties): SamplePrompt[] {
     }));
 }
 
-const createLocalStorageKey = (path: string, status: EntityStatus,) => {
+const createLocalStorageKey = (path: string, status: EntityStatus) => {
     const statusString = status === "new" ? "new" : "existing";
     return `data_enhancement::${statusString}::${stripCollectionPath(path)}`;
 };

@@ -12,7 +12,9 @@ import * as util from "util";
 import { DataType } from "@rebasepro/types";
 
 buildEntityPropertiesFromData(usage, getType)
-    .then((res) => console.log(util.inspect(res, { showHidden: false, depth: null, colors: true })));
+    .then((res) => console.log(util.inspect(res, { showHidden: false,
+depth: null,
+colors: true })));
 
 
 function getType(value: any): DataType {

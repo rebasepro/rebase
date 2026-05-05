@@ -42,7 +42,7 @@ export function configureJwt(config: JwtConfig): void {
         "example-secret",
         "please-change-me",
         "replace-this-with-a-real-secret",
-        "default-secret",
+        "default-secret"
     ]);
 
     if (!config.secret || config.secret.length < 32) {
@@ -73,7 +73,8 @@ export function generateAccessToken(userId: string, roles: string[]): string {
         throw new Error("JWT secret not configured. Call configureJwt() first.");
     }
 
-    const payload: AccessTokenPayload = { userId, roles };
+    const payload: AccessTokenPayload = { userId,
+roles };
 
     return jwt.sign(payload, jwtConfig.secret, {
         expiresIn: jwtConfig.accessExpiresIn as jwt.SignOptions["expiresIn"],
@@ -127,7 +128,7 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
             console.error("[JWT] Verification failed: missing id in payload", decoded);
             return null;
         }
-        
+
         return {
             userId: id,
             roles: decoded.roles || []

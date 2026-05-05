@@ -42,12 +42,12 @@ interface StoredAuthData {
  */
 function saveAuthToStorage(tokens: AuthTokens, user: UserInfo): void {
     try {
-        const data: StoredAuthData = { tokens, user };
+        const data: StoredAuthData = { tokens,
+user };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         const expiryDate = new Date(tokens.accessTokenExpiresAt);
         const expiryStr = Number.isFinite(tokens.accessTokenExpiresAt) ? expiryDate.toISOString() : "invalid";
-    } catch (e) {
-    }
+    } catch (e) { /* ignore */ }
 }
 
 /**
@@ -87,7 +87,7 @@ function isTokenExpiredOrNearExpiry(expiresAt: number, bufferMs: number = TOKEN_
 /**
  * Auth controller hook for JWT-based authentication
  * with @rebasepro/server-core
- * 
+ *
  * @param props Configuration options
  * @returns RebaseAuthController instance
  */
@@ -264,7 +264,7 @@ export function useRebaseAuthController(
                 }
                 return newTokens.accessToken;
             } catch (error: unknown) {
-                // If the error was a network error during refresh, just re-throw it 
+                // If the error was a network error during refresh, just re-throw it
                 // so the user isn't logged out locally and the network request fails naturally.
                 if (error instanceof Error && (error as { code?: string }).code === "NETWORK_ERROR") {
                     throw error;
@@ -313,7 +313,8 @@ export function useRebaseAuthController(
         if (defineRolesFor) {
             const customRoles = await defineRolesFor(convertedUser);
             if (customRoles) {
-                convertedUser = { ...convertedUser, roles: customRoles.map(r => r.id) };
+                convertedUser = { ...convertedUser,
+roles: customRoles.map(r => r.id) };
             }
         }
 
@@ -476,7 +477,8 @@ export function useRebaseAuthController(
             if (defineRolesFor) {
                 const customRoles = await defineRolesFor(convertedUser);
                 if (customRoles) {
-                    convertedUser = { ...convertedUser, roles: customRoles.map(r => r.id) };
+                    convertedUser = { ...convertedUser,
+roles: customRoles.map(r => r.id) };
                 }
             }
 
@@ -537,8 +539,7 @@ export function useRebaseAuthController(
                 if (isMountedRef.current) {
                     setAuthConfig(config);
                 }
-            } catch (e) {
-            }
+            } catch (e) { /* ignore */ }
 
             const stored = loadAuthFromStorage();
 
@@ -572,7 +573,8 @@ export function useRebaseAuthController(
                 if (defineRolesFor) {
                     const customRoles = await defineRolesFor(userToSet);
                     if (customRoles) {
-                        userToSet = { ...userToSet, roles: customRoles.map(r => r.id) };
+                        userToSet = { ...userToSet,
+roles: customRoles.map(r => r.id) };
                     }
                 }
 
@@ -615,7 +617,8 @@ export function useRebaseAuthController(
                         const customRoles = await defineRolesFor(userToSet);
                         if (!isMountedRef.current) return;
                         if (customRoles) {
-                            userToSet = { ...userToSet, roles: customRoles.map(r => r.id) };
+                            userToSet = { ...userToSet,
+roles: customRoles.map(r => r.id) };
                         }
                     }
                 } catch (meError: unknown) {
@@ -665,8 +668,7 @@ export function useRebaseAuthController(
                         } else if (!newTokens && isMountedRef.current) {
                             clearSessionAndSignOut();
                         }
-                    } catch (error) {
-                    }
+                    } catch (e) { /* ignore */ }
                 }
             }
         };

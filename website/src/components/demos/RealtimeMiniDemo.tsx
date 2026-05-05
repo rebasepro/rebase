@@ -36,8 +36,8 @@ export function RealtimeMiniDemo() {
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
                 <svg className="w-full h-full text-primary/20" preserveAspectRatio="none" viewBox="0 0 100 100">
                     <path d="M25,50 Q50,50 75,50" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="2,2">
-                        {syncState === 3 && <animate attributeName="stroke-dashoffset" from="10" to="0" dur="0.5s" fill="freeze" />}
-                        {syncState === 5 && <animate attributeName="stroke-dashoffset" from="-10" to="0" dur="0.5s" fill="freeze" />}
+                        {syncState === 3 && <animate attributeName="stroke-dashoffset" from="10" to="0" dur="0.5s" fill="freeze"/>}
+                        {syncState === 5 && <animate attributeName="stroke-dashoffset" from="-10" to="0" dur="0.5s" fill="freeze"/>}
                     </path>
                 </svg>
             </div>

@@ -3,7 +3,7 @@ import {
     DefaultSelectedViewParams,
     EntityCollection,
     Properties,
-    Property,
+    Property
 } from "@rebasepro/types";
 import { isPropertyBuilder } from "./entities";
 
@@ -26,7 +26,8 @@ export function sortProperties<M extends Record<string, unknown>>(properties: Pr
                         return ({ [key]: property });
                     }
                 })
-                .reduce((a: Properties, b: Properties) => ({ ...a, ...b }), {}) as Properties;
+                .reduce((a: Properties, b: Properties) => ({ ...a,
+...b }), {}) as Properties;
         }
 
         // Filter propertiesOrder to only include TOP-LEVEL property keys that exist
@@ -54,7 +55,8 @@ export function sortProperties<M extends Record<string, unknown>>(properties: Pr
                     return ({ [key]: property });
                 }
             })
-            .reduce((a: Properties, b: Properties) => ({ ...a, ...b }), {}) as Properties;
+            .reduce((a: Properties, b: Properties) => ({ ...a,
+...b }), {}) as Properties;
 
         // Append any properties that were NOT in propertiesOrder (so they don't disappear!)
         const missingProperties = propertiesKeys
@@ -72,9 +74,11 @@ export function sortProperties<M extends Record<string, unknown>>(properties: Pr
                     return ({ [key]: property });
                 }
             })
-            .reduce((a: Properties, b: Properties) => ({ ...a, ...b }), {}) as Properties;
+            .reduce((a: Properties, b: Properties) => ({ ...a,
+...b }), {}) as Properties;
 
-        return { ...orderedResult, ...missingProperties };
+        return { ...orderedResult,
+...missingProperties };
     } catch (e) {
         console.error("Error sorting properties", e);
         return properties;
@@ -93,7 +97,6 @@ export function resolveDefaultSelectedView(
         return defaultSelectedView(params);
     }
 }
-
 
 
 export function getLocalChangesBackup(collection: EntityCollection) {

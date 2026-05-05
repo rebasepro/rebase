@@ -24,7 +24,7 @@ import {
     findBackendDir,
     findFrontendDir,
     findEnvFile,
-    resolveTsx,
+    resolveTsx
 } from "../utils/project";
 
 /** Well-known filename the backend writes its actual port to. */
@@ -80,11 +80,11 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             "-b": "--backend-only",
             "-f": "--frontend-only",
             "-p": "--port",
-            "-h": "--help",
+            "-h": "--help"
         },
         {
             argv: rawArgs.slice(3), // skip "node rebase dev"
-            permissive: true,
+            permissive: true
         }
     );
 
@@ -118,7 +118,8 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     let resolvedBackendPort: number | null = null;
 
     // Use regex to strip ANSI codes before matching
-    const stripAnsi = (str: string) => str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+    // eslint-disable-next-line no-control-regex
+    const stripAnsi = (str: string) => str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, "");
 
     function printSummary() {
         if (!frontendUrl || !backendUrl) return;
@@ -131,7 +132,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             console.log(chalk.cyan("│   ✨ Rebase Admin App is ready!                            │"));
             const cleanUrl = stripAnsi(frontendUrl);
             const paddedUrl = cleanUrl.padEnd(40);
-            console.log(chalk.cyan(`│   👉 Frontend URL: `) + chalk.white(paddedUrl) + chalk.cyan(`│`));
+            console.log(chalk.cyan("│   👉 Frontend URL: ") + chalk.white(paddedUrl) + chalk.cyan("│"));
             console.log(chalk.cyan("│                                                            │"));
             console.log(chalk.cyan("└────────────────────────────────────────────────────────────┘"));
             console.log("");
@@ -145,7 +146,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         try {
             const portFile = path.join(projectRoot, DEV_PORT_FILENAME);
             if (fs.existsSync(portFile)) fs.unlinkSync(portFile);
-            
+
             const urlFile = path.join(projectRoot, ".rebase-dev-url");
             if (fs.existsSync(urlFile)) fs.unlinkSync(urlFile);
         } catch { /* ignore */ }

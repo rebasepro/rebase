@@ -64,26 +64,27 @@ export async function entry(args: string[]) {
             await createRebaseApp(args);
             break;
 
-        case "generate-sdk":
+        case "generate-sdk": {
             // Legacy command — kept for backward compatibility
             const sdkArgs = arg(
                 {
                     "--collections-dir": String,
                     "--output": String,
                     "-c": "--collections-dir",
-                    "-o": "--output",
+                    "-o": "--output"
                 },
                 {
                     argv: args.slice(3),
-                    permissive: true,
+                    permissive: true
                 }
             );
             await generateSdkCommand({
                 collectionsDir: sdkArgs["--collections-dir"] || "./config/collections",
                 output: sdkArgs["--output"] || "./generated/sdk",
-                cwd: process.cwd(),
+                cwd: process.cwd()
             });
             break;
+        }
 
         case "schema":
             await schemaCommand(effectiveSubcommand, args);

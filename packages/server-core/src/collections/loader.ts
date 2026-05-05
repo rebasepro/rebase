@@ -17,19 +17,19 @@ export async function loadCollectionsFromDirectory(directory: string): Promise<E
         const files = fs.readdirSync(directory);
         for (const file of files) {
             // Only load .ts and .js files, ignore test files and declaration files
-            if ((file.endsWith('.ts') || file.endsWith('.js')) &&
-                !file.includes('.test.') &&
-                !file.endsWith('.d.ts') &&
-                file !== 'index.ts' && file !== 'index.js') {
+            if ((file.endsWith(".ts") || file.endsWith(".js")) &&
+                !file.includes(".test.") &&
+                !file.endsWith(".d.ts") &&
+                file !== "index.ts" && file !== "index.js") {
 
                 const filePath = path.join(directory, file);
                 try {
                     const fileUrl = pathToFileURL(filePath).href;
 
                     // Use new Function to compile dynamic import natively and bypass tsc converting import() to require()
-                    const dynamicImport = new Function('url', 'return import(url)');
+                    const dynamicImport = new Function("url", "return import(url)");
                     const module = await dynamicImport(fileUrl);
-                    
+
                     // Expect the collection to be the default export
                     if (module && module.default) {
                         collections.push(module.default);

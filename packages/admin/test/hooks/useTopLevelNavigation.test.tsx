@@ -15,17 +15,21 @@ describe("useTopLevelNavigation", () => {
         buildUrlCollectionPath: (path: string) => `/c/${path}`,
         buildAppUrlPath: (path: string) => `/${path}`,
         basePath: "/",
-        baseCollectionPath: "/c",
+        baseCollectionPath: "/c"
     } as Partial<UrlController> as UrlController;
 
     const mockCollectionRegistryController = {
         collectionRegistryRef: { current: new CollectionRegistry() },
         getCollection: jest.fn(),
-        getCollections: jest.fn(),
+        getCollections: jest.fn()
     } as Partial<CollectionRegistryController> as CollectionRegistryController & { collectionRegistryRef: React.MutableRefObject<CollectionRegistry> };
 
     const collections: EntityCollection[] = [
-        { id: "test", name: "Test Collection", path: "test", slug: "test", group: "My Group" }
+        { id: "test",
+name: "Test Collection",
+path: "test",
+slug: "test",
+group: "My Group" }
     ];
 
     it("should return undefined if collections and views are not resolved", () => {
@@ -61,7 +65,11 @@ describe("useTopLevelNavigation", () => {
         const { result } = renderHook(() => useTopLevelNavigation({
             collections: [
                 ...collections,
-                { id: "hidden", name: "Hidden", path: "hidden", slug: "hidden", hideFromNavigation: true }
+                { id: "hidden",
+name: "Hidden",
+path: "hidden",
+slug: "hidden",
+hideFromNavigation: true }
             ],
             views: [],
             adminViews: [],
@@ -100,7 +108,7 @@ describe("useTopLevelNavigation", () => {
     });
 
     it("should break deep equality when computed result actually changes", () => {
-        let currentCollections = [...collections];
+        const currentCollections = [...collections];
 
         const { result, rerender } = renderHook((props) => useTopLevelNavigation(props), {
             initialProps: {
@@ -108,7 +116,7 @@ describe("useTopLevelNavigation", () => {
                 views: [],
                 adminViews: [],
                 urlController: mockCmsUrlController,
-                collectionRegistryController: mockCollectionRegistryController,
+                collectionRegistryController: mockCollectionRegistryController
             }
         });
 
@@ -116,11 +124,14 @@ describe("useTopLevelNavigation", () => {
 
         // Force a re-render with functionally different props
         rerender({
-            collections: [...collections, { id: "new", name: "New", path: "new", slug: "new" }],
+            collections: [...collections, { id: "new",
+name: "New",
+path: "new",
+slug: "new" }],
             views: [],
             adminViews: [],
             urlController: mockCmsUrlController,
-            collectionRegistryController: mockCollectionRegistryController,
+            collectionRegistryController: mockCollectionRegistryController
         });
 
         const nav2 = result.current.topLevelNavigation;
@@ -132,8 +143,12 @@ describe("useTopLevelNavigation", () => {
     it("should map views and adminViews into the navigation", () => {
         const { result } = renderHook(() => useTopLevelNavigation({
             collections: [],
-            views: [{ name: "My View", slug: "my-view", view: null! }],
-            adminViews: [{ name: "Admin Setup", slug: "setup", view: null! }],
+            views: [{ name: "My View",
+slug: "my-view",
+view: null! }],
+            adminViews: [{ name: "Admin Setup",
+slug: "setup",
+view: null! }],
             urlController: mockCmsUrlController,
             collectionRegistryController: mockCollectionRegistryController
         }));

@@ -54,14 +54,14 @@ export function App() {
             userManagement={userManagement}
             plugins={plugins}
         >
-            <RebaseAuth />
+            <RebaseAuth/>
             <RebaseCMS
                 collections={collections}
                 collectionEditor={collectionEditor}
                 entityViews={entityViews}
             />
-            <RebaseStudio />
-            <RebaseShell title="Rebase" />
+            <RebaseStudio/>
+            <RebaseShell title="Rebase"/>
         </Rebase>
     );
 }

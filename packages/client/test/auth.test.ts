@@ -25,7 +25,9 @@ function createMockTransport(mockFetch?: MockFetch) {
         getHeaders: jest.fn().mockReturnValue({}),
         resolveToken: jest.fn().mockResolvedValue(null)
     };
-    return { transport, mockRequest, mockFetch: fetchFn as MockFetch };
+    return { transport,
+mockRequest,
+mockFetch: fetchFn as MockFetch };
 }
 
 const mockUser: RebaseUser = {
@@ -35,14 +37,14 @@ const mockUser: RebaseUser = {
     roles: ["user"],
     photoURL: null,
     providerId: "local",
-    isAnonymous: false,
+    isAnonymous: false
 };
 
 function mockTokens(expiresAt?: number) {
     return {
         accessToken: "fake-jwt",
         refreshToken: "fake-refresh",
-        accessTokenExpiresAt: expiresAt ?? Date.now() + 3600000,
+        accessTokenExpiresAt: expiresAt ?? Date.now() + 3600000
     };
 }
 
@@ -51,7 +53,7 @@ function mockSessionObj(expiresAt?: number): RebaseSession {
         accessToken: "fake-jwt",
         refreshToken: "fake-refresh",
         expiresAt: expiresAt ?? Date.now() + 3600000,
-        user: mockUser,
+        user: mockUser
     };
 }
 
@@ -98,8 +100,8 @@ describe("createAuth", () => {
             mockFetch.mockResolvedValueOnce({
                 ok: true,
                 json: async () => ({
-                    tokens: mockTokens(Date.now() + 3600000),
-                }),
+                    tokens: mockTokens(Date.now() + 3600000)
+                })
             });
 
             const auth = createAuth(transport, { storage });
@@ -111,7 +113,8 @@ describe("createAuth", () => {
             const storage = createMemoryStorage();
             storage.setItem("rebase_auth", JSON.stringify(mockSessionObj()));
 
-            const auth = createAuth(transport, { storage, persistSession: false });
+            const auth = createAuth(transport, { storage,
+persistSession: false });
             expect(auth.getSession()).toBeNull();
         });
 
@@ -125,7 +128,8 @@ describe("createAuth", () => {
 
         it("does not restore session without accessToken", () => {
             const storage = createMemoryStorage();
-            storage.setItem("rebase_auth", JSON.stringify({ refreshToken: "rt", expiresAt: Date.now() + 100000 }));
+            storage.setItem("rebase_auth", JSON.stringify({ refreshToken: "rt",
+expiresAt: Date.now() + 100000 }));
 
             const auth = createAuth(transport, { storage });
             expect(auth.getSession()).toBeNull();
@@ -155,7 +159,8 @@ describe("createAuth", () => {
             expect(mockFetch).toHaveBeenCalledWith("http://localhost/api/v1/auth/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: "test@example.com", password: "password123" })
+                body: JSON.stringify({ email: "test@example.com",
+password: "password123" })
             });
             expect(auth.getSession()?.accessToken).toEqual(session.accessToken);
             expect(transport.setToken).toHaveBeenCalledWith(session.accessToken);
@@ -166,7 +171,8 @@ describe("createAuth", () => {
                 ok: false,
                 status: 401,
                 statusText: "Unauthorized",
-                json: async () => ({ error: { message: "Invalid credentials", code: "INVALID_CREDENTIALS" } })
+                json: async () => ({ error: { message: "Invalid credentials",
+code: "INVALID_CREDENTIALS" } })
             });
 
             const auth = createAuth(transport, { storage: createMemoryStorage() });
@@ -176,7 +182,8 @@ describe("createAuth", () => {
         it("emits SIGNED_IN event", async () => {
             mockFetch.mockResolvedValueOnce({
                 ok: true,
-                json: async () => ({ tokens: mockTokens(), user: mockUser })
+                json: async () => ({ tokens: mockTokens(),
+user: mockUser })
             });
 
             const auth = createAuth(transport, { storage: createMemoryStorage() });
@@ -195,7 +202,8 @@ describe("createAuth", () => {
         it("creates a user and initiates session", async () => {
             mockFetch.mockResolvedValueOnce({
                 ok: true,
-                json: async () => ({ tokens: mockTokens(), user: mockUser })
+                json: async () => ({ tokens: mockTokens(),
+user: mockUser })
             });
 
             const auth = createAuth(transport, { storage: createMemoryStorage() });
@@ -205,14 +213,17 @@ describe("createAuth", () => {
             expect(mockFetch).toHaveBeenCalledWith("http://localhost/api/v1/auth/register", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: "test@example.com", password: "password123", displayName: "Test User" })
+                body: JSON.stringify({ email: "test@example.com",
+password: "password123",
+displayName: "Test User" })
             });
         });
 
         it("sends without displayName when not provided", async () => {
             mockFetch.mockResolvedValueOnce({
                 ok: true,
-                json: async () => ({ tokens: mockTokens(), user: mockUser })
+                json: async () => ({ tokens: mockTokens(),
+user: mockUser })
             });
 
             const auth = createAuth(transport, { storage: createMemoryStorage() });
@@ -242,7 +253,8 @@ describe("createAuth", () => {
         it("sends Google ID token and initiates session", async () => {
             mockFetch.mockResolvedValueOnce({
                 ok: true,
-                json: async () => ({ tokens: mockTokens(), user: mockUser })
+                json: async () => ({ tokens: mockTokens(),
+user: mockUser })
             });
 
             const auth = createAuth(transport, { storage: createMemoryStorage() });
@@ -283,7 +295,8 @@ describe("createAuth", () => {
             const listener = jest.fn();
             auth.onAuthStateChange(listener);
 
-            mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+            mockFetch.mockResolvedValueOnce({ ok: true,
+json: async () => ({}) });
             await auth.signOut();
 
             expect(auth.getSession()).toBeNull();
@@ -423,7 +436,8 @@ describe("createAuth", () => {
             storage.setItem("rebase_auth", JSON.stringify(mockSessionObj()));
             const auth = createAuth(transport, { storage });
 
-            const updatedUser = { ...mockUser, displayName: "New Name" };
+            const updatedUser = { ...mockUser,
+displayName: "New Name" };
             mockRequest.mockResolvedValueOnce({ user: updatedUser });
 
             const listener = jest.fn();
@@ -442,7 +456,8 @@ describe("createAuth", () => {
 
         it("updateUser does not emit event when no active session", async () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
-            const updatedUser = { ...mockUser, displayName: "New Name" };
+            const updatedUser = { ...mockUser,
+displayName: "New Name" };
             mockRequest.mockResolvedValueOnce({ user: updatedUser });
 
             const listener = jest.fn();
@@ -461,7 +476,8 @@ describe("createAuth", () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
             mockFetch.mockResolvedValueOnce({
                 ok: true,
-                json: async () => ({ success: true, message: "Reset email sent" })
+                json: async () => ({ success: true,
+message: "Reset email sent" })
             });
 
             const result = await auth.resetPasswordForEmail("user@test.com");
@@ -477,7 +493,8 @@ describe("createAuth", () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
             mockFetch.mockResolvedValueOnce({
                 ok: true,
-                json: async () => ({ success: true, message: "Password reset" })
+                json: async () => ({ success: true,
+message: "Password reset" })
             });
 
             const result = await auth.resetPassword("reset-token-123", "newPass");
@@ -485,19 +502,22 @@ describe("createAuth", () => {
             expect(mockFetch).toHaveBeenCalledWith("http://localhost/api/v1/auth/reset-password", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ token: "reset-token-123", password: "newPass" })
+                body: JSON.stringify({ token: "reset-token-123",
+password: "newPass" })
             });
         });
 
         it("changePassword calls transport", async () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
-            mockRequest.mockResolvedValueOnce({ success: true, message: "Changed" });
+            mockRequest.mockResolvedValueOnce({ success: true,
+message: "Changed" });
 
             const result = await auth.changePassword("oldPass", "newPass");
             expect(result.success).toBe(true);
             expect(mockRequest).toHaveBeenCalledWith("/auth/change-password", {
                 method: "POST",
-                body: JSON.stringify({ oldPassword: "oldPass", newPassword: "newPass" })
+                body: JSON.stringify({ oldPassword: "oldPass",
+newPassword: "newPass" })
             });
         });
     });
@@ -508,7 +528,8 @@ describe("createAuth", () => {
     describe("Email verification", () => {
         it("sendVerificationEmail calls transport", async () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
-            mockRequest.mockResolvedValueOnce({ success: true, message: "Sent" });
+            mockRequest.mockResolvedValueOnce({ success: true,
+message: "Sent" });
 
             const result = await auth.sendVerificationEmail();
             expect(result.success).toBe(true);
@@ -519,7 +540,8 @@ describe("createAuth", () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
             mockFetch.mockResolvedValueOnce({
                 ok: true,
-                json: async () => ({ success: true, message: "Verified" })
+                json: async () => ({ success: true,
+message: "Verified" })
             });
 
             const result = await auth.verifyEmail("verification-token");
@@ -534,7 +556,8 @@ describe("createAuth", () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
             mockFetch.mockResolvedValueOnce({
                 ok: true,
-                json: async () => ({ success: true, message: "Verified" })
+                json: async () => ({ success: true,
+message: "Verified" })
             });
 
             await auth.verifyEmail("token with spaces&special=chars");
@@ -624,7 +647,8 @@ describe("createAuth", () => {
         it("returns an unsubscribe function that removes the listener", async () => {
             mockFetch.mockResolvedValueOnce({
                 ok: true,
-                json: async () => ({ tokens: mockTokens(), user: mockUser })
+                json: async () => ({ tokens: mockTokens(),
+user: mockUser })
             });
 
             const auth = createAuth(transport, { storage: createMemoryStorage() });
@@ -638,7 +662,8 @@ describe("createAuth", () => {
             unsubscribe();
 
             // Log out should NOT call the listener again
-            mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+            mockFetch.mockResolvedValueOnce({ ok: true,
+json: async () => ({}) });
             await auth.signOut();
             expect(listener).toHaveBeenCalledTimes(1); // Still 1
         });
@@ -646,7 +671,8 @@ describe("createAuth", () => {
         it("supports multiple listeners", async () => {
             mockFetch.mockResolvedValueOnce({
                 ok: true,
-                json: async () => ({ tokens: mockTokens(), user: mockUser })
+                json: async () => ({ tokens: mockTokens(),
+user: mockUser })
             });
 
             const auth = createAuth(transport, { storage: createMemoryStorage() });
@@ -663,7 +689,8 @@ describe("createAuth", () => {
         it("catches errors in listeners and does not propagate", async () => {
             mockFetch.mockResolvedValueOnce({
                 ok: true,
-                json: async () => ({ tokens: mockTokens(), user: mockUser })
+                json: async () => ({ tokens: mockTokens(),
+user: mockUser })
             });
 
             const auth = createAuth(transport, { storage: createMemoryStorage() });
@@ -692,7 +719,8 @@ describe("createAuth", () => {
                 })
             });
 
-            const auth = createAuth(transport, { storage: createMemoryStorage(), autoRefresh: true });
+            const auth = createAuth(transport, { storage: createMemoryStorage(),
+autoRefresh: true });
             await auth.signInWithEmail("test@example.com", "pass");
 
             // The refresh should be scheduled. Mock the refresh call.
@@ -719,7 +747,8 @@ describe("createAuth", () => {
                 })
             });
 
-            const auth = createAuth(transport, { storage: createMemoryStorage(), autoRefresh: false });
+            const auth = createAuth(transport, { storage: createMemoryStorage(),
+autoRefresh: false });
             await auth.signInWithEmail("test@example.com", "pass");
 
             // Advance past expiry - should not try to refresh
@@ -741,7 +770,8 @@ describe("createAuth", () => {
 
             mockFetch.mockResolvedValueOnce({
                 ok: true,
-                json: async () => ({ tokens: mockTokens(), user: mockUser })
+                json: async () => ({ tokens: mockTokens(),
+user: mockUser })
             });
 
             await auth.signInWithEmail("test@example.com", "pass");

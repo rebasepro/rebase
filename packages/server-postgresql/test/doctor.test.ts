@@ -40,7 +40,7 @@ describe("Rebase Schema Doctor", () => {
                 name: "Products",
                 properties: {
                     name: { type: "string" },
-                    price: { type: "number" },
+                    price: { type: "number" }
                 }
             }];
 
@@ -71,7 +71,7 @@ describe("Rebase Schema Doctor", () => {
                 name: "Products",
                 properties: {
                     name: { type: "string" },
-                    price: { type: "number" },  // New field added
+                    price: { type: "number" } // New field added
                 }
             }];
 
@@ -102,16 +102,22 @@ describe("Rebase Schema Doctor", () => {
 
         it("should map string types correctly", () => {
             expect(getExpectedColumnType({ type: "string" })).toBe("character varying");
-            expect(getExpectedColumnType({ type: "string", columnType: "text" } as StringProperty)).toBe("text");
-            expect(getExpectedColumnType({ type: "string", columnType: "char" } as StringProperty)).toBe("character");
+            expect(getExpectedColumnType({ type: "string",
+columnType: "text" } as StringProperty)).toBe("text");
+            expect(getExpectedColumnType({ type: "string",
+columnType: "char" } as StringProperty)).toBe("character");
         });
 
         it("should map number types correctly", () => {
             expect(getExpectedColumnType({ type: "number" })).toBe("numeric");
-            expect(getExpectedColumnType({ type: "number", validation: { integer: true } } as NumberProperty)).toBe("integer");
-            expect(getExpectedColumnType({ type: "number", columnType: "real" } as NumberProperty)).toBe("real");
-            expect(getExpectedColumnType({ type: "number", columnType: "double precision" } as NumberProperty)).toBe("double precision");
-            expect(getExpectedColumnType({ type: "number", columnType: "bigint" } as NumberProperty)).toBe("bigint");
+            expect(getExpectedColumnType({ type: "number",
+validation: { integer: true } } as NumberProperty)).toBe("integer");
+            expect(getExpectedColumnType({ type: "number",
+columnType: "real" } as NumberProperty)).toBe("real");
+            expect(getExpectedColumnType({ type: "number",
+columnType: "double precision" } as NumberProperty)).toBe("double precision");
+            expect(getExpectedColumnType({ type: "number",
+columnType: "bigint" } as NumberProperty)).toBe("bigint");
         });
 
         it("should map boolean type correctly", () => {
@@ -120,20 +126,24 @@ describe("Rebase Schema Doctor", () => {
 
         it("should map date types correctly", () => {
             expect(getExpectedColumnType({ type: "date" })).toBe("timestamp with time zone");
-            expect(getExpectedColumnType({ type: "date", columnType: "date" } as DateProperty)).toBe("date");
-            expect(getExpectedColumnType({ type: "date", columnType: "time" } as DateProperty)).toBe("time without time zone");
+            expect(getExpectedColumnType({ type: "date",
+columnType: "date" } as DateProperty)).toBe("date");
+            expect(getExpectedColumnType({ type: "date",
+columnType: "time" } as DateProperty)).toBe("time without time zone");
         });
 
         it("should map json types correctly", () => {
             expect(getExpectedColumnType({ type: "map" })).toBe("jsonb");
             expect(getExpectedColumnType({ type: "array" })).toBe("jsonb");
-            expect(getExpectedColumnType({ type: "array", columnType: "json" } as ArrayProperty)).toBe("json");
+            expect(getExpectedColumnType({ type: "array",
+columnType: "json" } as ArrayProperty)).toBe("json");
         });
 
         it("should map enum string to USER-DEFINED", () => {
             expect(getExpectedColumnType({
                 type: "string",
-                enum: { active: "Active", inactive: "Inactive" }
+                enum: { active: "Active",
+inactive: "Inactive" }
             } as StringProperty)).toBe("USER-DEFINED");
         });
 
@@ -145,9 +155,21 @@ describe("Rebase Schema Doctor", () => {
     describe("report generation", () => {
         it("should correctly count errors and warnings in summary", () => {
             const issues = [
-                { severity: "error" as const, category: "missing_table" as const, table: "t1", message: "m", fix: "f" },
-                { severity: "warning" as const, category: "type_mismatch" as const, table: "t2", message: "m", fix: "f" },
-                { severity: "error" as const, category: "missing_column" as const, table: "t3", message: "m", fix: "f" },
+                { severity: "error" as const,
+category: "missing_table" as const,
+table: "t1",
+message: "m",
+fix: "f" },
+                { severity: "warning" as const,
+category: "type_mismatch" as const,
+table: "t2",
+message: "m",
+fix: "f" },
+                { severity: "error" as const,
+category: "missing_column" as const,
+table: "t3",
+message: "m",
+fix: "f" }
             ];
 
             const errors = issues.filter(i => i.severity === "error").length;

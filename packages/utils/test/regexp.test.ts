@@ -40,7 +40,7 @@ describe("regexp utils", () => {
             expect(isValidRegExp("/^[a-z]+$/g")).toBe(true);
             expect(isValidRegExp("/foo/")).toBe(true);
             expect(isValidRegExp("foo")).toBe(true);
-            
+
             // Incomplete or invalid regexp
             expect(isValidRegExp("/[a-z/g")).toBe(true); // well, isValidRegExp fallback treats it as simple text
         });

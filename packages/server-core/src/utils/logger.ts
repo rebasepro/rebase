@@ -17,14 +17,14 @@ const GCP_SEVERITY: Record<LogLevel, string> = {
     debug: "DEBUG",
     info: "INFO",
     warn: "WARNING",
-    error: "ERROR",
+    error: "ERROR"
 };
 
 const LOG_PRIORITY: Record<LogLevel, number> = {
     debug: 0,
     info: 1,
     warn: 2,
-    error: 3,
+    error: 3
 };
 
 export interface LogEntry {
@@ -61,7 +61,7 @@ function serialiseError(value: unknown): Record<string, unknown> {
         return {
             name: value.name,
             message: value.message,
-            stack: value.stack,
+            stack: value.stack
         };
     }
     return { value: String(value) };
@@ -86,7 +86,8 @@ function createLogger(defaultFields: Record<string, unknown> = {}): Logger {
     function emit(level: LogLevel, message: string, data?: Record<string, unknown>): void {
         if (LOG_PRIORITY[level] < LOG_PRIORITY[minLevel]) return;
 
-        const merged = { ...defaultFields, ...formatData(data) };
+        const merged = { ...defaultFields,
+...formatData(data) };
 
         if (isProduction()) {
             // Structured JSON for Cloud Logging
@@ -94,7 +95,7 @@ function createLogger(defaultFields: Record<string, unknown> = {}): Logger {
                 severity: GCP_SEVERITY[level],
                 message,
                 timestamp: new Date().toISOString(),
-                ...merged,
+                ...merged
             };
             const line = JSON.stringify(entry);
 
@@ -128,8 +129,9 @@ function createLogger(defaultFields: Record<string, unknown> = {}): Logger {
         warn: (msg, data) => emit("warn", msg, data),
         error: (msg, data) => emit("error", msg, data),
         child(fields: Record<string, unknown>): Logger {
-            return createLogger({ ...defaultFields, ...fields });
-        },
+            return createLogger({ ...defaultFields,
+...fields });
+        }
     };
 }
 

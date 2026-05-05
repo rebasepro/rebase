@@ -79,7 +79,8 @@ export function getCurrentTrackingParams() {
     const storedParams = getStoredTrackingParams();
 
     // URL params override stored params
-    return { ...storedParams, ...urlParams };
+    return { ...storedParams,
+...urlParams };
 }
 
 /**
@@ -91,7 +92,8 @@ export function captureTrackingParams() {
     if (Object.keys(urlParams).length > 0) {
         // Merge with existing stored params (new params override old ones)
         const storedParams = getStoredTrackingParams();
-        const mergedParams = { ...storedParams, ...urlParams };
+        const mergedParams = { ...storedParams,
+...urlParams };
         setStoredTrackingParams(mergedParams);
     }
 }

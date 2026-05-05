@@ -89,7 +89,7 @@ export function App() {
                 >
                     {({ loading }) => {
                         if (loading || authController.initialLoading) {
-                            return <CircularProgressCenter />;
+                            return <CircularProgressCenter/>;
                         }
 
                         if (!authController.user) {
@@ -106,15 +106,15 @@ export function App() {
                             <RebaseRoutes>
                                 <Route element={
                                     <Scaffold autoOpenDrawer={false}>
-                                        <AppBar />
-                                        <Drawer />
-                                        <Outlet />
-                                        <SideDialogs />
+                                        <AppBar/>
+                                        <Drawer/>
+                                        <Outlet/>
+                                        <SideDialogs/>
                                     </Scaffold>
                                 }>
-                                    <Route path={"/"} element={<ContentHomePage />} />
-                                    <Route path={"/c/*"} element={<RebaseRoute />} />
-                                    <Route path={"*"} element={<NotFoundPage />} />
+                                    <Route path={"/"} element={<ContentHomePage/>}/>
+                                    <Route path={"/c/*"} element={<RebaseRoute/>}/>
+                                    <Route path={"*"} element={<NotFoundPage/>}/>
                                 </Route>
                             </RebaseRoutes>
                         );

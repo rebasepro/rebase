@@ -57,7 +57,7 @@ export function DataEnhancementControllerProvider({
     host,
     path,
     collection,
-    formContext,
+    formContext
 }: PropsWithChildren<DataEnhancementControllerProviderProps & PluginFormActionProps<any>>) {
 
     const [enabled, setEnabled] = useState(false);

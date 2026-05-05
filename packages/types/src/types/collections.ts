@@ -56,7 +56,6 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
     childCollections?: () => EntityCollection<Record<string, unknown>>[];
 
 
-
     /**
      * Which driver handles this collection.
      * Use this to route collections to different backends:
@@ -635,7 +634,6 @@ export interface AdditionalFieldDelegate<M extends Record<string, unknown> = Rec
      * Builder for the custom field
      */
     Builder?(props: { entity: Entity<M>, context: RebaseContext<USER> }): React.ReactNode;
-
 
 
     /**

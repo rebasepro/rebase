@@ -5,7 +5,7 @@ import {
   spring,
   useCurrentFrame,
   useVideoConfig,
-  Sequence,
+  Sequence
 } from "remotion";
 
 const STEPS = [
@@ -15,7 +15,7 @@ const STEPS = [
     description:
       "Point Rebase at any existing Postgres database. It introspects your schema — tables, types, relations — instantly.",
     code: "$ npx rebase init",
-    icon: "🔌",
+    icon: "🔌"
   },
   {
     number: "2",
@@ -23,7 +23,7 @@ const STEPS = [
     description:
       "Admin panel, entity forms, REST & GraphQL APIs, typed SDK, and real-time subscriptions — all generated from your schema.",
     code: null,
-    icon: "⚡",
+    icon: "⚡"
   },
   {
     number: "3",
@@ -31,8 +31,8 @@ const STEPS = [
     description:
       "Customize with TypeScript. Add callbacks, custom views, business logic, and granular permissions — all version-controlled.",
     code: null,
-    icon: "🔧",
-  },
+    icon: "🔧"
+  }
 ] as const;
 
 /**
@@ -50,7 +50,8 @@ const StepCard: React.FC<{
   const progress = spring({
     frame: frame - enterDelay,
     fps,
-    config: { damping: 14, mass: 0.7 },
+    config: { damping: 14,
+mass: 0.7 }
   });
 
   const opacity = interpolate(progress, [0, 1], [0, 1]);
@@ -62,7 +63,8 @@ const StepCard: React.FC<{
     spring({
       frame: frame - enterDelay - 5,
       fps,
-      config: { damping: 20, mass: 1 },
+      config: { damping: 20,
+mass: 1 }
     }),
     [0, 1],
     [0, 0.4]
@@ -79,11 +81,12 @@ const StepCard: React.FC<{
         alignItems: "center",
         textAlign: "center" as const,
         padding: "0 24px",
-        position: "relative",
+        position: "relative"
       }}
     >
       {/* Step number circle */}
-      <div style={{ position: "relative", marginBottom: 24 }}>
+      <div style={{ position: "relative",
+marginBottom: 24 }}>
         <div
           style={{
             position: "absolute",
@@ -91,7 +94,7 @@ const StepCard: React.FC<{
             borderRadius: "50%",
             background:
               "radial-gradient(circle, rgba(0,112,244,0.3) 0%, transparent 70%)",
-            opacity: glowOpacity,
+            opacity: glowOpacity
           }}
         />
         <div
@@ -107,7 +110,7 @@ const StepCard: React.FC<{
             fontSize: 22,
             fontWeight: 700,
             color: "#0070F4",
-            position: "relative",
+            position: "relative"
           }}
         >
           {step.number}
@@ -115,7 +118,8 @@ const StepCard: React.FC<{
       </div>
 
       {/* Icon */}
-      <div style={{ fontSize: 32, marginBottom: 12 }}>{step.icon}</div>
+      <div style={{ fontSize: 32,
+marginBottom: 12 }}>{step.icon}</div>
 
       {/* Title */}
       <h3
@@ -124,7 +128,7 @@ const StepCard: React.FC<{
           fontSize: 24,
           fontWeight: 700,
           color: "#fff",
-          marginBottom: 12,
+          marginBottom: 12
         }}
       >
         {step.title}
@@ -138,7 +142,7 @@ const StepCard: React.FC<{
           fontWeight: 400,
           color: "rgba(255,255,255,0.5)",
           lineHeight: 1.6,
-          maxWidth: 320,
+          maxWidth: 320
         }}
       >
         {step.description}
@@ -155,7 +159,7 @@ const StepCard: React.FC<{
             border: "1px solid rgba(255,255,255,0.08)",
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: 13,
-            color: "rgba(255,255,255,0.5)",
+            color: "rgba(255,255,255,0.5)"
           }}
         >
           {step.code}
@@ -175,7 +179,8 @@ const ConnectingLine: React.FC = () => {
   const lineProgress = spring({
     frame: frame - 10,
     fps,
-    config: { damping: 30, mass: 1.2 },
+    config: { damping: 30,
+mass: 1.2 }
   });
 
   const width = interpolate(lineProgress, [0, 1], [0, 100]);
@@ -188,8 +193,8 @@ const ConnectingLine: React.FC = () => {
         left: "22%",
         right: "22%",
         height: 1,
-        background: `linear-gradient(90deg, rgba(0,112,244,0.4) 0%, rgba(0,112,244,0.15) 50%, rgba(0,112,244,0.4) 100%)`,
-        clipPath: `inset(0 ${100 - width}% 0 0)`,
+        background: "linear-gradient(90deg, rgba(0,112,244,0.4) 0%, rgba(0,112,244,0.15) 50%, rgba(0,112,244,0.4) 100%)",
+        clipPath: `inset(0 ${100 - width}% 0 0)`
       }}
     />
   );
@@ -207,7 +212,8 @@ export const HowItWorks: React.FC = () => {
   const titleProgress = spring({
     frame,
     fps,
-    config: { damping: 16, mass: 0.7 },
+    config: { damping: 16,
+mass: 0.7 }
   });
   const titleOpacity = interpolate(titleProgress, [0, 1], [0, 1]);
   const titleY = interpolate(titleProgress, [0, 1], [30, 0]);
@@ -217,7 +223,8 @@ export const HowItWorks: React.FC = () => {
     frame,
     [durationInFrames - 15, durationInFrames],
     [1, 0],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+    { extrapolateLeft: "clamp",
+extrapolateRight: "clamp" }
   );
 
   return (
@@ -229,7 +236,7 @@ export const HowItWorks: React.FC = () => {
         alignItems: "center",
         justifyContent: "center",
         opacity: fadeOut,
-        padding: "0 80px",
+        padding: "0 80px"
       }}
     >
       {/* Section title */}
@@ -242,7 +249,7 @@ export const HowItWorks: React.FC = () => {
           textAlign: "center" as const,
           marginBottom: 60,
           opacity: titleOpacity,
-          transform: `translateY(${titleY}px)`,
+          transform: `translateY(${titleY}px)`
         }}
       >
         From zero to admin panel in{" "}
@@ -258,12 +265,12 @@ export const HowItWorks: React.FC = () => {
           gap: 40,
           width: "100%",
           maxWidth: 1200,
-          position: "relative",
+          position: "relative"
         }}
       >
-        <ConnectingLine />
+        <ConnectingLine/>
         {STEPS.map((step, i) => (
-          <StepCard key={i} step={step} index={i} />
+          <StepCard key={i} step={step} index={i}/>
         ))}
       </div>
     </AbsoluteFill>

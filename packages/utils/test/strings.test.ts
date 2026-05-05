@@ -25,7 +25,7 @@ describe("strings utils", () => {
         it("should generate random string of given length", () => {
             const str1 = randomString(5);
             expect(str1.length).toBe(5);
-            
+
             const str2 = randomString(10);
             expect(str2.length).toBe(10);
 
@@ -37,10 +37,10 @@ describe("strings utils", () => {
         it("should generate random hex color", () => {
             const tempMathRandom = Math.random;
             Math.random = jest.fn(() => 0.5);
-            
+
             const color = randomColor();
             expect(color).toBe("7fffff");
-            
+
             Math.random = tempMathRandom;
         });
     });

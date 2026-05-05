@@ -37,11 +37,14 @@ function convertWhereToFilter(where?: Record<string, WhereFieldValue>): FilterVa
         "not-in": "not-in",
         "cs": "array-contains",
         "csa": "array-contains-any",
-        "==": "==", "!=": "!=",
-        ">": ">", ">=": ">=",
-        "<": "<", "<=": "<=",
+        "==": "==",
+"!=": "!=",
+        ">": ">",
+">=": ">=",
+        "<": "<",
+"<=": "<=",
         "array-contains": "array-contains",
-        "array-contains-any": "array-contains-any",
+        "array-contains-any": "array-contains-any"
     };
 
     const filter: FilterValues<string> = {};
@@ -143,7 +146,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                 filter: convertWhereToFilter(params?.where),
                 orderBy: orderParsed?.[0],
                 order: orderParsed?.[1],
-                searchString: params?.searchString,
+                searchString: params?.searchString
             });
             const limit = params?.limit ?? 20;
             const offset = params?.offset ?? 0;
@@ -159,7 +162,8 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
         },
 
         async findById(id: string | number): Promise<Entity<M> | undefined> {
-            return driver.fetchEntity<M>({ path: slug, entityId: id });
+            return driver.fetchEntity<M>({ path: slug,
+entityId: id });
         },
 
         async create(data: Partial<EntityValues<M>>, id?: string | number): Promise<Entity<M>> {
@@ -182,7 +186,9 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
 
         async delete(id: string | number): Promise<void> {
             return driver.deleteEntity({
-                entity: { id, path: slug, values: {} as Record<string, unknown> }
+                entity: { id,
+path: slug,
+values: {} as Record<string, unknown> }
             });
         },
 
@@ -190,7 +196,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
             ? async (params?: FindParams): Promise<number> => {
                 return driver.countEntities!({
                     path: slug,
-                    filter: convertWhereToFilter(params?.where),
+                    filter: convertWhereToFilter(params?.where)
                 });
             }
             : undefined,
@@ -270,7 +276,7 @@ export function buildRebaseData(driver: DataDriver): RebaseData {
             if (typeof prop === "symbol") return undefined;
             // Ignore internal JS properties
             if (prop === "then" || prop === "toJSON" || prop === "$$typeof") return undefined;
-            
+
             // Convert camelCase property names to snake_case slugs
             const slug = toSnakeCase(prop);
             return getAccessor(slug);

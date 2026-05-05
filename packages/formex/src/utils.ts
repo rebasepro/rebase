@@ -16,7 +16,7 @@ export const isInteger = (obj: unknown): boolean =>
     String(Math.floor(Number(obj))) === obj;
 
 /** @private is the given object a NaN? */
-// eslint-disable-next-line no-self-compare
+
 export const isNaN = (obj: unknown): boolean => obj !== obj;
 
 /**

@@ -6,7 +6,8 @@ import { getIn, setIn, clone } from "../src/utils";
 // ─────────────────────────────────────────────────────────────
 describe("clone", () => {
     test("shallow clones plain objects", () => {
-        const obj = { a: 1, b: 2 };
+        const obj = { a: 1,
+b: 2 };
         const cloned = clone(obj);
         expect(cloned).toEqual(obj);
         expect(cloned).not.toBe(obj);
@@ -114,7 +115,8 @@ describe("setIn", () => {
     test("sets a top-level property immutably", () => {
         const obj = { a: 1 };
         const result = setIn(obj, "b", 2);
-        expect(result).toEqual({ a: 1, b: 2 });
+        expect(result).toEqual({ a: 1,
+b: 2 });
         expect(obj).toEqual({ a: 1 }); // original not mutated
     });
 
@@ -138,14 +140,16 @@ describe("setIn", () => {
     });
 
     test("deletes key when value is undefined (top-level)", () => {
-        const obj = { a: 1, b: 2 };
+        const obj = { a: 1,
+b: 2 };
         const result = setIn(obj, "a", undefined);
         expect(result).toEqual({ b: 2 });
         expect(result).not.toHaveProperty("a");
     });
 
     test("deletes key when value is undefined (nested)", () => {
-        const obj = { a: { b: 1, c: 2 } };
+        const obj = { a: { b: 1,
+c: 2 } };
         const result = setIn(obj, "a.b", undefined);
         expect(result.a).toEqual({ c: 2 });
     });
@@ -159,13 +163,15 @@ describe("setIn", () => {
     test("preserves false values correctly", () => {
         const obj = { name: "John" };
         const result = setIn(obj, "active", false);
-        expect(result).toEqual({ name: "John", active: false });
+        expect(result).toEqual({ name: "John",
+active: false });
     });
 
     test("preserves null values correctly", () => {
         const obj = { name: "John" };
         const result = setIn(obj, "deletedAt", null);
-        expect(result).toEqual({ name: "John", deletedAt: null });
+        expect(result).toEqual({ name: "John",
+deletedAt: null });
     });
 
     test("sets value inside existing arrays", () => {

@@ -13,19 +13,19 @@ const ProductVideo: React.FC = () => {
   return (
     <Series>
       <Series.Sequence durationInFrames={150}>
-        <HeroIntro />
+        <HeroIntro/>
       </Series.Sequence>
       <Series.Sequence durationInFrames={300}>
-        <RealProductVideo />
+        <RealProductVideo/>
       </Series.Sequence>
       <Series.Sequence durationInFrames={150}>
-        <ProductUIReveal />
+        <ProductUIReveal/>
       </Series.Sequence>
       <Series.Sequence durationInFrames={120}>
-        <HowItWorks />
+        <HowItWorks/>
       </Series.Sequence>
       <Series.Sequence durationInFrames={120}>
-        <FeatureShowcase />
+        <FeatureShowcase/>
       </Series.Sequence>
     </Series>
   );

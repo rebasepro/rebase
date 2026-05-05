@@ -1,10 +1,10 @@
 /**
  * Example: Rebase app wired to Firebase as the backend.
- * 
+ *
  * This demonstrates the backend-agnostic architecture —
  * the same <Rebase>, <RebaseCMS>, <RebaseShell> component tree
  * works with both the Rebase custom backend and Firebase.
- * 
+ *
  * To use: rename this file to App.tsx and configure your Firebase project.
  */
 import React from "react";
@@ -50,9 +50,9 @@ export function App() {
             driver={driver}
             storageSource={storageSource}
         >
-            <RebaseAuth />
-            <RebaseCMS collections={collections} />
-            <RebaseShell title="My Firebase App" />
+            <RebaseAuth/>
+            <RebaseCMS collections={collections}/>
+            <RebaseShell title="My Firebase App"/>
         </Rebase>
     );
 }

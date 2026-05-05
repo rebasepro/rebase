@@ -11,13 +11,13 @@ import {
     HeadObjectCommand,
     _Object,
     CommonPrefix
-} from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import {
     StorageController,
     S3StorageConfig,
     DEFAULT_MAX_FILE_SIZE
-} from './types';
+} from "./types";
 import {
     UploadFileProps,
     UploadFileResult,
@@ -25,7 +25,7 @@ import {
     DownloadMetadata,
     StorageListResult,
     StorageReference
-} from '@rebasepro/types';
+} from "@rebasepro/types";
 
 /**
  * S3-compatible storage implementation
@@ -38,7 +38,7 @@ export class S3StorageController implements StorageController {
     constructor(config: S3StorageConfig) {
         this.config = config;
         this.client = new S3Client({
-            region: config.region || 'us-east-1',
+            region: config.region || "us-east-1",
             endpoint: config.endpoint,
             forcePathStyle: config.forcePathStyle ?? !!config.endpoint, // Auto-enable for custom endpoints (MinIO)
             credentials: {
@@ -48,8 +48,8 @@ export class S3StorageController implements StorageController {
         });
     }
 
-    getType(): 's3' {
-        return 's3';
+    getType(): "s3" {
+        return "s3";
     }
 
     /**
@@ -63,7 +63,7 @@ export class S3StorageController implements StorageController {
 
         if (this.config.allowedMimeTypes && this.config.allowedMimeTypes.length > 0) {
             if (!this.config.allowedMimeTypes.includes(file.type)) {
-                throw new Error(`File type ${file.type} is not allowed. Allowed types: ${this.config.allowedMimeTypes.join(', ')}`);
+                throw new Error(`File type ${file.type} is not allowed. Allowed types: ${this.config.allowedMimeTypes.join(", ")}`);
             }
         }
     }
@@ -112,7 +112,7 @@ export class S3StorageController implements StorageController {
     private flattenMetadata(metadata: Record<string, unknown>): Record<string, string> {
         const flattened: Record<string, string> = {};
         for (const [key, value] of Object.entries(metadata)) {
-            if (typeof value === 'string') {
+            if (typeof value === "string") {
                 flattened[key] = value;
             } else if (value !== undefined && value !== null) {
                 flattened[key] = JSON.stringify(value);
@@ -130,7 +130,7 @@ export class S3StorageController implements StorageController {
         if (match) {
             const protocolLength = match[0].length;
             const withoutProtocol = key.substring(protocolLength);
-            const firstSlash = withoutProtocol.indexOf('/');
+            const firstSlash = withoutProtocol.indexOf("/");
             if (firstSlash > 0) {
                 resolvedBucket = withoutProtocol.substring(0, firstSlash);
                 resolvedPath = withoutProtocol.substring(firstSlash + 1);
@@ -158,9 +158,9 @@ export class S3StorageController implements StorageController {
             const metadata: DownloadMetadata = {
                 bucket: resolvedBucket,
                 fullPath: resolvedPath,
-                name: resolvedPath.split('/').pop() || resolvedPath,
+                name: resolvedPath.split("/").pop() || resolvedPath,
                 size: headResult.ContentLength || 0,
-                contentType: headResult.ContentType || 'application/octet-stream',
+                contentType: headResult.ContentType || "application/octet-stream",
                 customMetadata: headResult.Metadata || {}
             };
 
@@ -170,7 +170,7 @@ export class S3StorageController implements StorageController {
             };
         } catch (error: unknown) {
             const s3Error = error as { name?: string; $metadata?: { httpStatusCode?: number } };
-            if (s3Error.name === 'NotFound' || s3Error.$metadata?.httpStatusCode === 404) {
+            if (s3Error.name === "NotFound" || s3Error.$metadata?.httpStatusCode === 404) {
                 return {
                     url: null,
                     fileNotFound: true
@@ -189,7 +189,7 @@ export class S3StorageController implements StorageController {
         if (match) {
             const protocolLength = match[0].length;
             const withoutProtocol = key.substring(protocolLength);
-            const firstSlash = withoutProtocol.indexOf('/');
+            const firstSlash = withoutProtocol.indexOf("/");
             if (firstSlash > 0) {
                 resolvedBucket = withoutProtocol.substring(0, firstSlash);
                 resolvedPath = withoutProtocol.substring(firstSlash + 1);
@@ -216,14 +216,14 @@ export class S3StorageController implements StorageController {
             }
             const buffer = Buffer.concat(chunks);
 
-            const contentType = response.ContentType || 'application/octet-stream';
-            const fileName = resolvedPath.split('/').pop() || resolvedPath;
+            const contentType = response.ContentType || "application/octet-stream";
+            const fileName = resolvedPath.split("/").pop() || resolvedPath;
 
             const blob = new Blob([buffer], { type: contentType });
             return new File([blob], fileName, { type: contentType });
         } catch (error: unknown) {
             const s3Error = error as { name?: string; $metadata?: { httpStatusCode?: number } };
-            if (s3Error.name === 'NoSuchKey' || s3Error.$metadata?.httpStatusCode === 404) {
+            if (s3Error.name === "NoSuchKey" || s3Error.$metadata?.httpStatusCode === 404) {
                 return null;
             }
             throw error;
@@ -239,7 +239,7 @@ export class S3StorageController implements StorageController {
         if (match) {
             const protocolLength = match[0].length;
             const withoutProtocol = key.substring(protocolLength);
-            const firstSlash = withoutProtocol.indexOf('/');
+            const firstSlash = withoutProtocol.indexOf("/");
             if (firstSlash > 0) {
                 resolvedBucket = withoutProtocol.substring(0, firstSlash);
                 resolvedPath = withoutProtocol.substring(firstSlash + 1);
@@ -266,15 +266,15 @@ export class S3StorageController implements StorageController {
             Prefix: prefix || undefined,
             MaxKeys: options?.maxResults ?? 1000,
             ContinuationToken: options?.pageToken,
-            Delimiter: '/' // This gives us folder-like behavior
+            Delimiter: "/" // This gives us folder-like behavior
         });
 
         const response = await this.client.send(command);
 
         const items: StorageReference[] = (response.Contents || []).map(obj => ({
             bucket: resolvedBucket,
-            fullPath: obj.Key || '',
-            name: (obj.Key || '').split('/').pop() || '',
+            fullPath: obj.Key || "",
+            name: (obj.Key || "").split("/").pop() || "",
             parent: null as never,
             root: null as never,
             toString: () => `s3://${resolvedBucket}/${obj.Key}`
@@ -282,8 +282,8 @@ export class S3StorageController implements StorageController {
 
         const prefixes: StorageReference[] = (response.CommonPrefixes || []).map(prefix => ({
             bucket: resolvedBucket,
-            fullPath: prefix.Prefix || '',
-            name: (prefix.Prefix || '').replace(/\/$/, '').split('/').pop() || '',
+            fullPath: prefix.Prefix || "",
+            name: (prefix.Prefix || "").replace(/\/$/, "").split("/").pop() || "",
             parent: null as never,
             root: null as never,
             toString: () => `s3://${resolvedBucket}/${prefix.Prefix}`

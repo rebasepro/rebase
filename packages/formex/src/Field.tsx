@@ -79,10 +79,12 @@ export function Field<T, C extends React.ElementType | undefined = undefined>({
                                                                               }: FieldProps<T, C>) {
     const formex = useFormex();
 
-    const field = getFieldProps({ name, ...props }, formex);
+    const field = getFieldProps({ name,
+...props }, formex);
 
     if (isFunction(children)) {
-        return children({ field, form: formex });
+        return children({ field,
+form: formex });
     }
 
     // if (component) {
@@ -108,12 +110,17 @@ export function Field<T, C extends React.ElementType | undefined = undefined>({
         const { innerRef, ...rest } = props;
         return React.createElement(
             asElement,
-            { ref: innerRef, ...field, ...rest, className },
+            { ref: innerRef,
+...field,
+...rest,
+className },
             children
         );
     }
 
-    return React.createElement(asElement, { ...field, ...props, className }, children);
+    return React.createElement(asElement, { ...field,
+...props,
+className }, children);
 }
 
 const getFieldProps = (nameOrOptions: string | FieldConfig<unknown>, formex: FormexController<object>): FieldInputProps<unknown> => {
@@ -126,14 +133,14 @@ const getFieldProps = (nameOrOptions: string | FieldConfig<unknown>, formex: For
         name: name as string,
         value: valueState,
         onChange: formex.handleChange,
-        onBlur: formex.handleBlur,
+        onBlur: formex.handleBlur
     };
     if (typeof nameOrOptions !== "string") {
         const {
             type,
             value: valueProp, // value is special for checkboxes
             as: is,
-            multiple,
+            multiple
         } = nameOrOptions as FieldConfig<unknown>;
 
         if (type === "checkbox") {

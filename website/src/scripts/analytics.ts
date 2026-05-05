@@ -1,9 +1,9 @@
-const ANALYTICS_API_URL = 'https://api.rebase.pro/analytics';
+const ANALYTICS_API_URL = "https://api.rebase.pro/analytics";
 
 export class Analytics {
     private apiUrl: string;
     private sessionId: string | null = null;
-    private maxScroll: number = 0;
+    private maxScroll = 0;
     private pageLoadTime: number = Date.now();
 
     constructor(apiUrl: string) {
@@ -13,21 +13,21 @@ export class Analytics {
     }
 
     private getOrCreateSessionId(): string {
-        let sessionId = sessionStorage.getItem('analytics_session');
+        let sessionId = sessionStorage.getItem("analytics_session");
         if (!sessionId) {
-            sessionId = 'session_' + Math.random().toString(36).substring(2, 15);
-            sessionStorage.setItem('analytics_session', sessionId);
+            sessionId = "session_" + Math.random().toString(36).substring(2, 15);
+            sessionStorage.setItem("analytics_session", sessionId);
         }
         return sessionId;
     }
 
     private initGlobalListeners() {
         // Click tracking - global, doesn't need reset
-        document.addEventListener('click', (e) => {
+        document.addEventListener("click", (e) => {
             const target = e.target as HTMLElement;
-            const trackedElement = target.closest('[data-track]');
+            const trackedElement = target.closest("[data-track]");
             if (trackedElement) {
-                this.trackEvent('button_click', {
+                this.trackEvent("button_click", {
                     element_id: trackedElement.id,
                     element_text: trackedElement.textContent?.trim()
                 });
@@ -37,7 +37,7 @@ export class Analytics {
             if (link) {
                 const url = (link as HTMLAnchorElement).href;
                 if (!url.includes(window.location.hostname)) {
-                    this.trackEvent('outbound_link', {
+                    this.trackEvent("outbound_link", {
                         destination_url: url
                     });
                 }
@@ -45,7 +45,7 @@ export class Analytics {
         });
 
         // Scroll tracking - global listener, but we reset state
-        window.addEventListener('scroll', () => {
+        window.addEventListener("scroll", () => {
             const scrollPercent = (window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100;
             if (scrollPercent > this.maxScroll) {
                 this.maxScroll = Math.floor(scrollPercent / 25) * 25;
@@ -53,17 +53,17 @@ export class Analytics {
         });
 
         // Browser close/reload
-        window.addEventListener('beforeunload', () => {
+        window.addEventListener("beforeunload", () => {
             this.sendExitEvents();
         });
 
         // Astro navigation (SPA-like)
-        document.addEventListener('astro:before-swap', () => {
+        document.addEventListener("astro:before-swap", () => {
             this.sendExitEvents();
         });
 
         // Astro page load (New page ready)
-        document.addEventListener('astro:page-load', () => {
+        document.addEventListener("astro:page-load", () => {
             this.resetPageMetrics();
             this.trackPageView();
         });
@@ -78,13 +78,13 @@ export class Analytics {
         const timeOnPage = Math.floor((Date.now() - this.pageLoadTime) / 1000);
 
         if (this.maxScroll > 0) {
-            this.trackEvent('scroll_depth', { scroll_percentage: this.maxScroll }, true);
+            this.trackEvent("scroll_depth", { scroll_percentage: this.maxScroll }, true);
         }
 
-        this.trackEvent('time_on_page', { duration_seconds: timeOnPage }, true);
+        this.trackEvent("time_on_page", { duration_seconds: timeOnPage }, true);
     }
 
-    public async trackEvent(eventType: string, eventData: any = {}, useBeacon: boolean = false) {
+    public async trackEvent(eventType: string, eventData: any = {}, useBeacon = false) {
         try {
             const payload = {
                 event_type: eventType,
@@ -98,7 +98,7 @@ export class Analytics {
                 event_data: eventData
             };
 
-            console.debug('Analytics tracking:', eventType, payload);
+            console.debug("Analytics tracking:", eventType, payload);
 
             if (useBeacon) {
                 // Disabled custom beacon, using GA4
@@ -106,12 +106,12 @@ export class Analytics {
                 // Disabled custom fetch, using GA4
             }
         } catch (error) {
-            console.error('Analytics error:', error);
+            console.error("Analytics error:", error);
         }
     }
 
     public trackPageView() {
-        this.trackEvent('page_view');
+        this.trackEvent("page_view");
     }
 }
 

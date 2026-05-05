@@ -7,7 +7,7 @@ import { RebaseWebSocketClient, ApiError } from "../src/websocket";
 class MockWebSocket {
     static instances: MockWebSocket[] = [];
     url: string;
-    readyState: number = 0;
+    readyState = 0;
     onopen?: () => void;
     onmessage?: (event: any) => void;
     onclose?: () => void;
@@ -39,12 +39,16 @@ class MockWebSocket {
     }
 }
 
+let createdClients: RebaseWebSocketClient[] = [];
+
 function createClient(opts?: Partial<ConstructorParameters<typeof RebaseWebSocketClient>[0]>) {
-    return new RebaseWebSocketClient({
+    const client = new RebaseWebSocketClient({
         websocketUrl: "ws://localhost:1234",
         WebSocket: MockWebSocket as any,
-        ...opts,
+        ...opts
     });
+    createdClients.push(client);
+    return client;
 }
 
 function getWs(): MockWebSocket {
@@ -57,15 +61,29 @@ function getWs(): MockWebSocket {
 describe("RebaseWebSocketClient", () => {
     beforeEach(() => {
         MockWebSocket.instances = [];
+        createdClients = [];
         jest.useFakeTimers();
+        jest.spyOn(console, 'log').mockImplementation(() => {});
+        jest.spyOn(console, 'error').mockImplementation(() => {});
+        jest.spyOn(console, 'warn').mockImplementation(() => {});
     });
 
     afterEach(() => {
+        createdClients.forEach(c => c.disconnect());
+        createdClients = [];
+        MockWebSocket.instances.forEach(ws => {
+            ws.onclose = undefined;
+            ws.onerror = undefined;
+            ws.onmessage = undefined;
+            ws.onopen = undefined;
+            ws.close();
+        });
+        MockWebSocket.instances = [];
         // Clear all pending timers so reconnection/open callbacks don't fire
         // after the test is done.
         jest.clearAllTimers();
         jest.useRealTimers();
-        MockWebSocket.instances = [];
+        jest.restoreAllMocks();
     });
 
     // -----------------------------------------------------------------------
@@ -81,8 +99,9 @@ describe("RebaseWebSocketClient", () => {
         it("does not create connection if WebSocket is undefined", () => {
             const client = new RebaseWebSocketClient({
                 websocketUrl: "ws://localhost:1234",
-                WebSocket: undefined as any,
+                WebSocket: undefined as any
             });
+            createdClients.push(client);
             expect(MockWebSocket.instances).toHaveLength(0);
         });
 
@@ -158,7 +177,7 @@ describe("RebaseWebSocketClient", () => {
                 type: "AUTH_SUCCESS",
                 requestId: authMsg.requestId,
                 payload: {}
-            })});
+            }) });
 
             await authPromise;
             // Should not throw
@@ -175,8 +194,9 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 type: "AUTH_ERROR",
                 requestId: authMsg.requestId,
-                payload: { error: { message: "Invalid token", code: "AUTH_FAILED" } }
-            })});
+                payload: { error: { message: "Invalid token",
+code: "AUTH_FAILED" } }
+            }) });
 
             await expect(authPromise).rejects.toThrow("Invalid token");
         });
@@ -204,8 +224,9 @@ describe("RebaseWebSocketClient", () => {
         it("handles disconnect when no WebSocket exists", () => {
             const client = new RebaseWebSocketClient({
                 websocketUrl: "ws://localhost",
-                WebSocket: undefined as any,
+                WebSocket: undefined as any
             });
+            createdClients.push(client);
             // Should not throw
             client.disconnect();
         });
@@ -235,7 +256,7 @@ describe("RebaseWebSocketClient", () => {
                 type: "FETCH_COLLECTION",
                 requestId: sent.requestId,
                 payload: { entities: [{ id: "1" }] }
-            })});
+            }) });
 
             const result = await fetchPromise;
             expect(result).toEqual([{ id: "1" }]);
@@ -250,7 +271,8 @@ describe("RebaseWebSocketClient", () => {
             const client = createClient();
             jest.runAllTimers();
             await Promise.resolve();
-            return { client, ws: getWs() };
+            return { client,
+ws: getWs() };
         }
 
         it("fetchCollection sends correct message type", async () => {
@@ -264,7 +286,7 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: { entities: [] }
-            })});
+            }) });
 
             const result = await promise;
             expect(result).toEqual([]);
@@ -273,30 +295,34 @@ describe("RebaseWebSocketClient", () => {
         it("fetchEntity sends correct message type", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "posts", entityId: "123" });
+            const promise = client.fetchEntity({ path: "posts",
+entityId: "123" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
             expect(msg.type).toBe("FETCH_ENTITY");
             expect(msg.payload.entityId).toBe("123");
 
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
-                payload: { entity: { id: "123", values: {} } }
-            })});
+                payload: { entity: { id: "123",
+values: {} } }
+            }) });
 
             const result = await promise;
-            expect(result).toEqual({ id: "123", values: {} });
+            expect(result).toEqual({ id: "123",
+values: {} });
         });
 
         it("fetchEntity returns undefined when no entity in response", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "posts", entityId: "missing" });
+            const promise = client.fetchEntity({ path: "posts",
+entityId: "missing" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: {}
-            })});
+            }) });
 
             const result = await promise;
             expect(result).toBeUndefined();
@@ -305,15 +331,19 @@ describe("RebaseWebSocketClient", () => {
         it("saveEntity sends correct message type and returns entity", async () => {
             const { client, ws } = await setupConnected();
 
-            const entity = { id: "1", path: "posts", values: { title: "Hello" } };
-            const promise = client.saveEntity({ path: "posts", entityId: "1", values: { title: "Hello" } } as any);
+            const entity = { id: "1",
+path: "posts",
+values: { title: "Hello" } };
+            const promise = client.saveEntity({ path: "posts",
+entityId: "1",
+values: { title: "Hello" } } as any);
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
             expect(msg.type).toBe("SAVE_ENTITY");
 
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: { entity }
-            })});
+            }) });
 
             const result = await promise;
             expect(result).toEqual(entity);
@@ -322,14 +352,17 @@ describe("RebaseWebSocketClient", () => {
         it("deleteEntity sends correct message type", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.deleteEntity({ path: "posts", entity: { id: "1", path: "posts", values: {} } as any });
+            const promise = client.deleteEntity({ path: "posts",
+entity: { id: "1",
+path: "posts",
+values: {} } as any });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
             expect(msg.type).toBe("DELETE_ENTITY");
 
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: {}
-            })});
+            }) });
 
             await promise; // Should resolve without throwing
         });
@@ -337,16 +370,18 @@ describe("RebaseWebSocketClient", () => {
         it("executeSql sends SQL and returns results", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.executeSql("SELECT * FROM users", { database: "main", role: "admin" });
+            const promise = client.executeSql("SELECT * FROM users", { database: "main",
+role: "admin" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
             expect(msg.type).toBe("EXECUTE_SQL");
             expect(msg.payload.sql).toBe("SELECT * FROM users");
-            expect(msg.payload.options).toEqual({ database: "main", role: "admin" });
+            expect(msg.payload.options).toEqual({ database: "main",
+role: "admin" });
 
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: { result: [{ id: 1 }, { id: 2 }] }
-            })});
+            }) });
 
             const result = await promise;
             expect(result).toEqual([{ id: 1 }, { id: 2 }]);
@@ -361,7 +396,7 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: {}
-            })});
+            }) });
 
             const result = await promise;
             expect(result).toEqual([]);
@@ -377,7 +412,7 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: { count: 42 }
-            })});
+            }) });
 
             const result = await promise;
             expect(result).toBe(42);
@@ -399,7 +434,7 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: { isUnique: true }
-            })});
+            }) });
 
             const result = await promise;
             expect(result).toBe(true);
@@ -415,7 +450,7 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: { databases: ["main", "analytics"] }
-            })});
+            }) });
 
             const result = await promise;
             expect(result).toEqual(["main", "analytics"]);
@@ -431,7 +466,7 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: { roles: ["admin", "reader"] }
-            })});
+            }) });
 
             const result = await promise;
             expect(result).toEqual(["admin", "reader"]);
@@ -447,7 +482,7 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: { database: "production" }
-            })});
+            }) });
 
             const result = await promise;
             expect(result).toBe("production");
@@ -464,7 +499,7 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: { tables: ["orders", "products"] }
-            })});
+            }) });
 
             const result = await promise;
             expect(result).toEqual(["orders", "products"]);
@@ -481,10 +516,13 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: {}
-            })});
+            }) });
 
             const result = await promise;
-            expect(result).toEqual({ columns: [], foreignKeys: [], junctions: [], policies: [] });
+            expect(result).toEqual({ columns: [],
+foreignKeys: [],
+junctions: [],
+policies: [] });
         });
     });
 
@@ -496,7 +534,8 @@ describe("RebaseWebSocketClient", () => {
             const client = createClient();
             jest.runAllTimers();
             await Promise.resolve();
-            return { client, ws: getWs() };
+            return { client,
+ws: getWs() };
         }
 
         it("rejects pending request on ERROR type", async () => {
@@ -508,8 +547,9 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 type: "ERROR",
                 requestId: msg.requestId,
-                payload: { error: { message: "Forbidden", code: "FORBIDDEN" } }
-            })});
+                payload: { error: { message: "Forbidden",
+code: "FORBIDDEN" } }
+            }) });
 
             await expect(promise).rejects.toThrow("Forbidden");
 
@@ -524,13 +564,14 @@ describe("RebaseWebSocketClient", () => {
         it("rejects pending request when message has error field", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "x", entityId: "1" });
+            const promise = client.fetchEntity({ path: "x",
+entityId: "1" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 error: "Something went wrong"
-            })});
+            }) });
 
             await expect(promise).rejects.toThrow();
         });
@@ -544,8 +585,9 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 type: "ERROR",
                 requestId: msg.requestId,
-                payload: { error: { message: "Detailed error", code: "ERR_001" } }
-            })});
+                payload: { error: { message: "Detailed error",
+code: "ERR_001" } }
+            }) });
 
             try {
                 await promise;
@@ -567,7 +609,7 @@ describe("RebaseWebSocketClient", () => {
                 type: "ERROR",
                 requestId: msg.requestId,
                 payload: { error: "Simple error string" }
-            })});
+            }) });
 
             await expect(promise).rejects.toThrow("Simple error string");
         });
@@ -598,7 +640,7 @@ describe("RebaseWebSocketClient", () => {
                 type: "collection_update",
                 subscriptionId: sent.payload.subscriptionId,
                 entities: [{ id: "user1" }]
-            })});
+            }) });
 
             expect(onUpdate1).toHaveBeenCalledWith([{ id: "user1" }]);
             expect(onUpdate2).toHaveBeenCalledWith([{ id: "user1" }]);
@@ -609,8 +651,10 @@ describe("RebaseWebSocketClient", () => {
             jest.runAllTimers();
             const ws = getWs();
 
-            client.listenCollection({ path: "users", limit: 10 }, jest.fn());
-            client.listenCollection({ path: "users", limit: 20 }, jest.fn());
+            client.listenCollection({ path: "users",
+limit: 10 }, jest.fn());
+            client.listenCollection({ path: "users",
+limit: 20 }, jest.fn());
 
             expect(ws.sentMessages).toHaveLength(2);
         });
@@ -647,7 +691,7 @@ describe("RebaseWebSocketClient", () => {
                 type: "collection_update",
                 subscriptionId: subMsg.payload.subscriptionId,
                 entities: [{ id: "cached" }]
-            })});
+            }) });
 
             expect(onUpdate1).toHaveBeenCalledWith([{ id: "cached" }]);
 
@@ -668,7 +712,8 @@ describe("RebaseWebSocketClient", () => {
             const ws = getWs();
 
             const onUpdate = jest.fn();
-            client.listenEntity({ path: "posts", entityId: "1" }, onUpdate);
+            client.listenEntity({ path: "posts",
+entityId: "1" }, onUpdate);
 
             expect(ws.sentMessages).toHaveLength(1);
             const sent = JSON.parse(ws.sentMessages[0]);
@@ -685,8 +730,10 @@ describe("RebaseWebSocketClient", () => {
             const onUpdate1 = jest.fn();
             const onUpdate2 = jest.fn();
 
-            client.listenEntity({ path: "posts", entityId: "1" }, onUpdate1);
-            client.listenEntity({ path: "posts", entityId: "1" }, onUpdate2);
+            client.listenEntity({ path: "posts",
+entityId: "1" }, onUpdate1);
+            client.listenEntity({ path: "posts",
+entityId: "1" }, onUpdate2);
 
             expect(ws.sentMessages).toHaveLength(1);
 
@@ -695,11 +742,14 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 type: "entity_update",
                 subscriptionId: subMsg.payload.subscriptionId,
-                entity: { id: "1", values: { title: "Updated" } }
-            })});
+                entity: { id: "1",
+values: { title: "Updated" } }
+            }) });
 
-            expect(onUpdate1).toHaveBeenCalledWith({ id: "1", values: { title: "Updated" } });
-            expect(onUpdate2).toHaveBeenCalledWith({ id: "1", values: { title: "Updated" } });
+            expect(onUpdate1).toHaveBeenCalledWith({ id: "1",
+values: { title: "Updated" } });
+            expect(onUpdate2).toHaveBeenCalledWith({ id: "1",
+values: { title: "Updated" } });
         });
 
         it("handles null entity (deletion)", () => {
@@ -708,14 +758,15 @@ describe("RebaseWebSocketClient", () => {
             const ws = getWs();
 
             const onUpdate = jest.fn();
-            client.listenEntity({ path: "posts", entityId: "1" }, onUpdate);
+            client.listenEntity({ path: "posts",
+entityId: "1" }, onUpdate);
 
             const subMsg = JSON.parse(ws.sentMessages[0]);
             ws.onmessage!({ data: JSON.stringify({
                 type: "entity_update",
                 subscriptionId: subMsg.payload.subscriptionId,
                 entity: null
-            })});
+            }) });
 
             expect(onUpdate).toHaveBeenCalledWith(null);
         });
@@ -726,18 +777,22 @@ describe("RebaseWebSocketClient", () => {
             const ws = getWs();
 
             const onUpdate1 = jest.fn();
-            client.listenEntity({ path: "posts", entityId: "1" }, onUpdate1);
+            client.listenEntity({ path: "posts",
+entityId: "1" }, onUpdate1);
 
             const subMsg = JSON.parse(ws.sentMessages[0]);
             ws.onmessage!({ data: JSON.stringify({
                 type: "entity_update",
                 subscriptionId: subMsg.payload.subscriptionId,
-                entity: { id: "1", values: { title: "Cached" } }
-            })});
+                entity: { id: "1",
+values: { title: "Cached" } }
+            }) });
 
             const onUpdate2 = jest.fn();
-            client.listenEntity({ path: "posts", entityId: "1" }, onUpdate2);
-            expect(onUpdate2).toHaveBeenCalledWith({ id: "1", values: { title: "Cached" } });
+            client.listenEntity({ path: "posts",
+entityId: "1" }, onUpdate2);
+            expect(onUpdate2).toHaveBeenCalledWith({ id: "1",
+values: { title: "Cached" } });
         });
 
         it("unsubscribes entity when all callbacks removed", () => {
@@ -745,8 +800,10 @@ describe("RebaseWebSocketClient", () => {
             jest.runAllTimers();
             const ws = getWs();
 
-            const unsub1 = client.listenEntity({ path: "posts", entityId: "1" }, jest.fn());
-            const unsub2 = client.listenEntity({ path: "posts", entityId: "1" }, jest.fn());
+            const unsub1 = client.listenEntity({ path: "posts",
+entityId: "1" }, jest.fn());
+            const unsub2 = client.listenEntity({ path: "posts",
+entityId: "1" }, jest.fn());
 
             unsub1();
             expect(ws.sentMessages).toHaveLength(1); // Just subscribe
@@ -777,7 +834,9 @@ describe("RebaseWebSocketClient", () => {
                 path: "posts",
                 values: {
                     title: "Hello",
-                    author: { __type: "relation", id: "2", path: "users" }
+                    author: { __type: "relation",
+id: "2",
+path: "users" }
                 }
             };
 
@@ -785,7 +844,7 @@ describe("RebaseWebSocketClient", () => {
                 type: "collection_update",
                 subscriptionId: subId,
                 entities: [initialEntity]
-            })});
+            }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
             const firstUpdate = onUpdate.mock.calls[0][0] as any[];
@@ -795,15 +854,17 @@ describe("RebaseWebSocketClient", () => {
 
             // Next update contains EXACTLY the same relation, but WITH .data appended
             const refetchedEntity = {
-                id: "1", 
-                path: "posts", 
+                id: "1",
+                path: "posts",
                 values: {
                     title: "Hello",
-                    author: { 
-                        __type: "relation", 
-                        id: "2", 
-                        path: "users", 
-                        data: { id: "2", path: "users", values: { name: "Alice" } } 
+                    author: {
+                        __type: "relation",
+                        id: "2",
+                        path: "users",
+                        data: { id: "2",
+path: "users",
+values: { name: "Alice" } }
                     }
                 }
             };
@@ -812,12 +873,12 @@ describe("RebaseWebSocketClient", () => {
                 type: "collection_update",
                 subscriptionId: subId,
                 entities: [refetchedEntity]
-            })});
+            }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
             const secondUpdate = onUpdate.mock.calls[0][0] as any[];
 
-            // Because the .data is purely denormalized cache, the identity of the relation 
+            // Because the .data is purely denormalized cache, the identity of the relation
             // is the same, so it should have preserved the SAME object reference!
             expect(secondUpdate[0]).toBe(cachedEntityInstance);
         });
@@ -838,7 +899,9 @@ describe("RebaseWebSocketClient", () => {
                 path: "posts",
                 values: {
                     title: "Hello",
-                    author: { __type: "relation", id: "2", path: "users" }
+                    author: { __type: "relation",
+id: "2",
+path: "users" }
                 }
             };
 
@@ -846,7 +909,7 @@ describe("RebaseWebSocketClient", () => {
                 type: "collection_update",
                 subscriptionId: subId,
                 entities: [initialEntity]
-            })});
+            }) });
 
             const firstUpdate = onUpdate.mock.calls[0][0] as any[];
             const cachedEntityInstance = firstUpdate[0];
@@ -854,11 +917,13 @@ describe("RebaseWebSocketClient", () => {
 
             // Next update changes the author ID
             const newAuthorEntity = {
-                id: "1", 
-                path: "posts", 
+                id: "1",
+                path: "posts",
                 values: {
                     title: "Hello",
-                    author: { __type: "relation", id: "3", path: "users" }
+                    author: { __type: "relation",
+id: "3",
+path: "users" }
                 }
             };
 
@@ -866,7 +931,7 @@ describe("RebaseWebSocketClient", () => {
                 type: "collection_update",
                 subscriptionId: subId,
                 entities: [newAuthorEntity]
-            })});
+            }) });
 
             const secondUpdate = onUpdate.mock.calls[0][0] as any[];
             // It should be a new reference because the value is structurally different
@@ -883,32 +948,46 @@ describe("RebaseWebSocketClient", () => {
 
             const subId = JSON.parse(ws.sentMessages[0]).payload.subscriptionId;
 
-            const entity = { 
-                id: "1", 
-                path: "posts", 
-                values: { 
+            const entity = {
+                id: "1",
+                path: "posts",
+                values: {
                     tags: [
-                        { __type: "relation", id: "10", path: "tags" },
-                        { __type: "relation", id: "11", path: "tags" }
-                    ] 
-                } 
+                        { __type: "relation",
+id: "10",
+path: "tags" },
+                        { __type: "relation",
+id: "11",
+path: "tags" }
+                    ]
+                }
             };
-            ws.onmessage!({ data: JSON.stringify({ type: "collection_update", subscriptionId: subId, entities: [entity] }) });
-            
+            ws.onmessage!({ data: JSON.stringify({ type: "collection_update",
+subscriptionId: subId,
+entities: [entity] }) });
+
             const firstInstance = (onUpdate.mock.calls[0][0] as any[])[0];
             onUpdate.mockClear();
 
-            const entityWithData = { 
-                id: "1", 
-                path: "posts", 
-                values: { 
+            const entityWithData = {
+                id: "1",
+                path: "posts",
+                values: {
                     tags: [
-                        { __type: "relation", id: "10", path: "tags", data: { id: "10" } },
-                        { __type: "relation", id: "11", path: "tags", data: { id: "11" } }
-                    ] 
-                } 
+                        { __type: "relation",
+id: "10",
+path: "tags",
+data: { id: "10" } },
+                        { __type: "relation",
+id: "11",
+path: "tags",
+data: { id: "11" } }
+                    ]
+                }
             };
-            ws.onmessage!({ data: JSON.stringify({ type: "collection_update", subscriptionId: subId, entities: [entityWithData] }) });
+            ws.onmessage!({ data: JSON.stringify({ type: "collection_update",
+subscriptionId: subId,
+entities: [entityWithData] }) });
 
             const secondInstance = (onUpdate.mock.calls[0][0] as any[])[0];
             expect(secondInstance).toBe(firstInstance);
@@ -935,10 +1014,12 @@ describe("RebaseWebSocketClient", () => {
                 type: "collection_update",
                 subscriptionId: subId,
                 entities: [
-                    { id: "1", values: { title: "Old" } },
-                    { id: "2", values: { title: "Two" } }
+                    { id: "1",
+values: { title: "Old" } },
+                    { id: "2",
+values: { title: "Two" } }
                 ]
-            })});
+            }) });
 
             onUpdate.mockClear();
 
@@ -946,14 +1027,17 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_entity_patch",
                 subscriptionId: subId,
-                entity: { id: "1", values: { title: "New" } }
-            })});
+                entity: { id: "1",
+values: { title: "New" } }
+            }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
             const updatedEntities = onUpdate.mock.calls[0][0];
             expect(updatedEntities).toHaveLength(2);
-            expect(updatedEntities[0]).toEqual({ id: "1", values: { title: "New" } });
-            expect(updatedEntities[1]).toEqual({ id: "2", values: { title: "Two" } });
+            expect(updatedEntities[0]).toEqual({ id: "1",
+values: { title: "New" } });
+            expect(updatedEntities[1]).toEqual({ id: "2",
+values: { title: "Two" } });
         });
 
         it("adds new entity via patch (prepends)", () => {
@@ -971,16 +1055,18 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: subId,
-                entities: [{ id: "1", values: {} }]
-            })});
+                entities: [{ id: "1",
+values: {} }]
+            }) });
             onUpdate.mockClear();
 
             // New entity via patch
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_entity_patch",
                 subscriptionId: subId,
-                entity: { id: "new", values: { title: "Fresh" } }
-            })});
+                entity: { id: "new",
+values: { title: "Fresh" } }
+            }) });
 
             const result = onUpdate.mock.calls[0][0];
             expect(result).toHaveLength(2);
@@ -1003,10 +1089,12 @@ describe("RebaseWebSocketClient", () => {
                 type: "collection_update",
                 subscriptionId: subId,
                 entities: [
-                    { id: "1", values: {} },
-                    { id: "2", values: {} }
+                    { id: "1",
+values: {} },
+                    { id: "2",
+values: {} }
                 ]
-            })});
+            }) });
             onUpdate.mockClear();
 
             // Delete entity 1
@@ -1015,7 +1103,7 @@ describe("RebaseWebSocketClient", () => {
                 subscriptionId: subId,
                 entity: null,
                 entityId: "1"
-            })});
+            }) });
 
             const result = onUpdate.mock.calls[0][0];
             expect(result).toHaveLength(1);
@@ -1037,8 +1125,9 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_entity_patch",
                 subscriptionId: subId,
-                entity: { id: "1", values: {} }
-            })});
+                entity: { id: "1",
+values: {} }
+            }) });
 
             expect(onUpdate).not.toHaveBeenCalled();
         });
@@ -1061,8 +1150,9 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 type: "ERROR",
                 subscriptionId: subMsg.payload.subscriptionId,
-                payload: { error: { message: "Access denied", code: "FORBIDDEN" } }
-            })});
+                payload: { error: { message: "Access denied",
+code: "FORBIDDEN" } }
+            }) });
 
             expect(onError).toHaveBeenCalledTimes(1);
             expect(onError.mock.calls[0][0]).toBeInstanceOf(ApiError);
@@ -1076,14 +1166,15 @@ describe("RebaseWebSocketClient", () => {
 
             const onUpdate = jest.fn();
             const onError = jest.fn();
-            client.listenEntity({ path: "secret", entityId: "1" }, onUpdate, onError);
+            client.listenEntity({ path: "secret",
+entityId: "1" }, onUpdate, onError);
 
             const subMsg = JSON.parse(ws.sentMessages[0]);
             ws.onmessage!({ data: JSON.stringify({
                 type: "ERROR",
                 subscriptionId: subMsg.payload.subscriptionId,
                 payload: { error: { message: "Not found" } }
-            })});
+            }) });
 
             expect(onError).toHaveBeenCalledTimes(1);
         });
@@ -1102,7 +1193,7 @@ describe("RebaseWebSocketClient", () => {
                 type: "collection_update",
                 subscriptionId: subMsg.payload.subscriptionId,
                 entities: []
-            })});
+            }) });
 
             // Error should have been caught and reported to onError
             expect(onError).toHaveBeenCalledWith(expect.any(Error));
@@ -1116,7 +1207,7 @@ describe("RebaseWebSocketClient", () => {
         it("attempts reconnection on close with exponential backoff", () => {
             const client = createClient();
             jest.runAllTimers(); // connect
-            
+
             const ws = getWs();
             ws.close(); // Disconnect
 
@@ -1129,7 +1220,7 @@ describe("RebaseWebSocketClient", () => {
             const client = createClient();
             const reconnectCb = jest.fn();
             client.on("reconnect", reconnectCb);
-            
+
             jest.runAllTimers();
             getWs().close();
 
@@ -1202,8 +1293,8 @@ describe("RebaseWebSocketClient", () => {
         ) {
             // Create client WITHOUT a built-in getAuthToken so onopen doesn't auto-auth
             const client = createClient();
-            jest.runAllTimers();          // open the WS
-            await Promise.resolve();      // flush microtasks
+            jest.runAllTimers(); // open the WS
+            await Promise.resolve(); // flush microtasks
 
             // Now install the getter *after* connect (mimics useEffect ordering).
             // This fires an auto-auth attempt asynchronously via getAuthToken().then(...)
@@ -1216,7 +1307,8 @@ describe("RebaseWebSocketClient", () => {
             // Reset the mock so tests only count ensureAuthenticated calls
             getter.mockClear();
 
-            return { client, ws: getWs() };
+            return { client,
+ws: getWs() };
         }
 
         /** Drain pending microtasks by chaining multiple Promise.resolve() calls */
@@ -1272,7 +1364,7 @@ describe("RebaseWebSocketClient", () => {
                 type: "AUTH_SUCCESS",
                 requestId: parsed.requestId,
                 payload: {}
-            })});
+            }) });
 
             // Flush until the FETCH_COLLECTION is sent
             await flushMicrotasks();
@@ -1287,7 +1379,7 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 requestId: fetchParsed.requestId,
                 payload: { entities: [{ id: "1" }] }
-            })});
+            }) });
 
             const result = await fetchPromise;
             expect(result).toEqual([{ id: "1" }]);
@@ -1384,7 +1476,7 @@ describe("RebaseWebSocketClient", () => {
                     type: "AUTH_SUCCESS",
                     requestId: parsed.requestId,
                     payload: {}
-                })});
+                }) });
             }
             await Promise.resolve();
 
@@ -1400,7 +1492,7 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 requestId: fetchParsed.requestId,
                 payload: { entities: [] }
-            })});
+            }) });
 
             await fetchPromise;
             // Token getter should NOT have been called again since we're already authed
@@ -1423,7 +1515,7 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 requestId: fetchParsed.requestId,
                 payload: { entities: [{ id: "pub1" }] }
-            })});
+            }) });
 
             const result = await fetchPromise;
             expect(result).toEqual([{ id: "pub1" }]);
@@ -1470,7 +1562,7 @@ describe("RebaseWebSocketClient", () => {
                 type: "AUTH_SUCCESS",
                 requestId: parsed.requestId,
                 payload: {}
-            })});
+            }) });
             await flushMicrotasks();
 
             // Respond to fetch
@@ -1481,7 +1573,7 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 requestId: fetchParsed.requestId,
                 payload: { entities: [] }
-            })});
+            }) });
 
             const result = await fetchPromise;
             expect(result).toEqual([]);
@@ -1519,7 +1611,8 @@ describe("RebaseWebSocketClient", () => {
             const client = createClient();
             jest.runAllTimers();
             await Promise.resolve();
-            return { client, ws: getWs() };
+            return { client,
+ws: getWs() };
         }
 
         // -- fetchCollection path ------------------------------------------
@@ -1538,11 +1631,12 @@ describe("RebaseWebSocketClient", () => {
                         path: "posts",
                         values: {
                             title: "Hello",
-                            createdAt: { __type: "date", value: "2025-06-15T12:00:00.000Z" }
+                            createdAt: { __type: "date",
+value: "2025-06-15T12:00:00.000Z" }
                         }
                     }]
                 }
-            })});
+            }) });
 
             const result = await promise;
             expect(result).toHaveLength(1);
@@ -1563,11 +1657,12 @@ describe("RebaseWebSocketClient", () => {
                         id: "1",
                         path: "posts",
                         values: {
-                            badDate: { __type: "date", value: "not-a-date" }
+                            badDate: { __type: "date",
+value: "not-a-date" }
                         }
                     }]
                 }
-            })});
+            }) });
 
             const result = await promise;
             expect(result[0].values.badDate).toBeNull();
@@ -1583,11 +1678,17 @@ describe("RebaseWebSocketClient", () => {
                 requestId: msg.requestId,
                 payload: {
                     entities: [
-                        { id: "1", path: "posts", values: { publishedAt: { __type: "date", value: "2025-01-01T00:00:00.000Z" } } },
-                        { id: "2", path: "posts", values: { publishedAt: { __type: "date", value: "2025-12-31T23:59:59.999Z" } } }
+                        { id: "1",
+path: "posts",
+values: { publishedAt: { __type: "date",
+value: "2025-01-01T00:00:00.000Z" } } },
+                        { id: "2",
+path: "posts",
+values: { publishedAt: { __type: "date",
+value: "2025-12-31T23:59:59.999Z" } } }
                     ]
                 }
-            })});
+            }) });
 
             const result = await promise;
             expect(result[0].values.publishedAt).toBeInstanceOf(Date);
@@ -1600,7 +1701,8 @@ describe("RebaseWebSocketClient", () => {
         it("converts serialized dates in fetchEntity", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "posts", entityId: "1" });
+            const promise = client.fetchEntity({ path: "posts",
+entityId: "1" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
@@ -1610,12 +1712,13 @@ describe("RebaseWebSocketClient", () => {
                         id: "1",
                         path: "posts",
                         values: {
-                            updatedAt: { __type: "date", value: "2025-03-20T08:30:00.000Z" },
+                            updatedAt: { __type: "date",
+value: "2025-03-20T08:30:00.000Z" },
                             title: "Test"
                         }
                     }
                 }
-            })});
+            }) });
 
             const result = await promise;
             expect(result).toBeDefined();
@@ -1643,11 +1746,12 @@ describe("RebaseWebSocketClient", () => {
                         path: "posts",
                         values: {
                             title: "Updated",
-                            updatedAt: { __type: "date", value: "2025-07-01T00:00:00.000Z" }
+                            updatedAt: { __type: "date",
+value: "2025-07-01T00:00:00.000Z" }
                         }
                     }
                 }
-            })});
+            }) });
 
             const result = await promise;
             expect(result.values.updatedAt).toBeInstanceOf(Date);
@@ -1658,7 +1762,8 @@ describe("RebaseWebSocketClient", () => {
         it("converts dates nested inside plain objects (maps)", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "posts", entityId: "1" });
+            const promise = client.fetchEntity({ path: "posts",
+entityId: "1" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
@@ -1669,13 +1774,15 @@ describe("RebaseWebSocketClient", () => {
                         path: "posts",
                         values: {
                             metadata: {
-                                createdAt: { __type: "date", value: "2025-01-01T00:00:00.000Z" },
-                                editedAt: { __type: "date", value: "2025-06-01T00:00:00.000Z" }
+                                createdAt: { __type: "date",
+value: "2025-01-01T00:00:00.000Z" },
+                                editedAt: { __type: "date",
+value: "2025-06-01T00:00:00.000Z" }
                             }
                         }
                     }
                 }
-            })});
+            }) });
 
             const result = await promise;
             const metadata = result!.values.metadata as Record<string, unknown>;
@@ -1686,7 +1793,8 @@ describe("RebaseWebSocketClient", () => {
         it("converts dates inside arrays", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "events", entityId: "1" });
+            const promise = client.fetchEntity({ path: "events",
+entityId: "1" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
@@ -1697,13 +1805,15 @@ describe("RebaseWebSocketClient", () => {
                         path: "events",
                         values: {
                             dates: [
-                                { __type: "date", value: "2025-01-01T00:00:00.000Z" },
-                                { __type: "date", value: "2025-02-01T00:00:00.000Z" }
+                                { __type: "date",
+value: "2025-01-01T00:00:00.000Z" },
+                                { __type: "date",
+value: "2025-02-01T00:00:00.000Z" }
                             ]
                         }
                     }
                 }
-            })});
+            }) });
 
             const result = await promise;
             const dates = result!.values.dates as Date[];
@@ -1715,7 +1825,8 @@ describe("RebaseWebSocketClient", () => {
         it("converts dates inside array of objects", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "posts", entityId: "1" });
+            const promise = client.fetchEntity({ path: "posts",
+entityId: "1" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
@@ -1726,13 +1837,17 @@ describe("RebaseWebSocketClient", () => {
                         path: "posts",
                         values: {
                             revisions: [
-                                { author: "Alice", savedAt: { __type: "date", value: "2025-03-01T10:00:00.000Z" } },
-                                { author: "Bob", savedAt: { __type: "date", value: "2025-03-02T10:00:00.000Z" } }
+                                { author: "Alice",
+savedAt: { __type: "date",
+value: "2025-03-01T10:00:00.000Z" } },
+                                { author: "Bob",
+savedAt: { __type: "date",
+value: "2025-03-02T10:00:00.000Z" } }
                             ]
                         }
                     }
                 }
-            })});
+            }) });
 
             const result = await promise;
             const revisions = result!.values.revisions as Array<{ author: string; savedAt: Date }>;
@@ -1744,7 +1859,8 @@ describe("RebaseWebSocketClient", () => {
         it("preserves relation objects while converting sibling dates", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "posts", entityId: "1" });
+            const promise = client.fetchEntity({ path: "posts",
+entityId: "1" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
@@ -1754,12 +1870,15 @@ describe("RebaseWebSocketClient", () => {
                         id: "1",
                         path: "posts",
                         values: {
-                            author: { __type: "relation", id: "42", path: "users" },
-                            createdAt: { __type: "date", value: "2025-05-01T00:00:00.000Z" }
+                            author: { __type: "relation",
+id: "42",
+path: "users" },
+                            createdAt: { __type: "date",
+value: "2025-05-01T00:00:00.000Z" }
                         }
                     }
                 }
-            })});
+            }) });
 
             const result = await promise;
             // Date should be converted
@@ -1776,7 +1895,8 @@ describe("RebaseWebSocketClient", () => {
         it("passes through null and undefined values", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "posts", entityId: "1" });
+            const promise = client.fetchEntity({ path: "posts",
+entityId: "1" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
@@ -1793,7 +1913,7 @@ describe("RebaseWebSocketClient", () => {
                         }
                     }
                 }
-            })});
+            }) });
 
             const result = await promise;
             expect(result!.values.title).toBeNull();
@@ -1805,7 +1925,8 @@ describe("RebaseWebSocketClient", () => {
         it("does not mutate objects that have __type but not 'date'", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "posts", entityId: "1" });
+            const promise = client.fetchEntity({ path: "posts",
+entityId: "1" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
@@ -1815,12 +1936,14 @@ describe("RebaseWebSocketClient", () => {
                         id: "1",
                         path: "posts",
                         values: {
-                            ref: { __type: "reference", path: "some/path" },
-                            custom: { __type: "custom", data: 123 }
+                            ref: { __type: "reference",
+path: "some/path" },
+                            custom: { __type: "custom",
+data: 123 }
                         }
                     }
                 }
-            })});
+            }) });
 
             const result = await promise;
             const ref = result!.values.ref as Record<string, unknown>;
@@ -1834,7 +1957,8 @@ describe("RebaseWebSocketClient", () => {
         it("handles __type date with non-string value gracefully (treats as plain object)", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "posts", entityId: "1" });
+            const promise = client.fetchEntity({ path: "posts",
+entityId: "1" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             // __type is "date" but value is a number, not a string → should NOT match the date rehydration branch
@@ -1845,11 +1969,12 @@ describe("RebaseWebSocketClient", () => {
                         id: "1",
                         path: "posts",
                         values: {
-                            weird: { __type: "date", value: 12345 }
+                            weird: { __type: "date",
+value: 12345 }
                         }
                     }
                 }
-            })});
+            }) });
 
             const result = await promise;
             const weird = result!.values.weird as Record<string, unknown>;
@@ -1861,24 +1986,30 @@ describe("RebaseWebSocketClient", () => {
         it("handles empty entity values", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "posts", entityId: "1" });
+            const promise = client.fetchEntity({ path: "posts",
+entityId: "1" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: {
-                    entity: { id: "1", path: "posts", values: {} }
+                    entity: { id: "1",
+path: "posts",
+values: {} }
                 }
-            })});
+            }) });
 
             const result = await promise;
-            expect(result).toEqual({ id: "1", path: "posts", values: {} });
+            expect(result).toEqual({ id: "1",
+path: "posts",
+values: {} });
         });
 
         it("handles deeply nested date structures (3+ levels)", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "posts", entityId: "1" });
+            const promise = client.fetchEntity({ path: "posts",
+entityId: "1" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
@@ -1891,14 +2022,15 @@ describe("RebaseWebSocketClient", () => {
                             level1: {
                                 level2: {
                                     level3: {
-                                        deepDate: { __type: "date", value: "2024-12-25T00:00:00.000Z" }
+                                        deepDate: { __type: "date",
+value: "2024-12-25T00:00:00.000Z" }
                                     }
                                 }
                             }
                         }
                     }
                 }
-            })});
+            }) });
 
             const result = await promise;
             const deepDate = (result!.values as any).level1.level2.level3.deepDate;
@@ -1924,11 +2056,12 @@ describe("RebaseWebSocketClient", () => {
                     id: "1",
                     path: "posts",
                     values: {
-                        createdAt: { __type: "date", value: "2025-08-01T00:00:00.000Z" },
+                        createdAt: { __type: "date",
+value: "2025-08-01T00:00:00.000Z" },
                         title: "Sub Test"
                     }
                 }]
-            })});
+            }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
             const entities = onUpdate.mock.calls[0][0] as any[];
@@ -1942,7 +2075,8 @@ describe("RebaseWebSocketClient", () => {
             const ws = getWs();
 
             const onUpdate = jest.fn();
-            client.listenEntity({ path: "posts", entityId: "1" }, onUpdate);
+            client.listenEntity({ path: "posts",
+entityId: "1" }, onUpdate);
 
             const subMsg = JSON.parse(ws.sentMessages[0]);
             ws.onmessage!({ data: JSON.stringify({
@@ -1952,10 +2086,11 @@ describe("RebaseWebSocketClient", () => {
                     id: "1",
                     path: "posts",
                     values: {
-                        updatedAt: { __type: "date", value: "2025-09-15T18:30:00.000Z" }
+                        updatedAt: { __type: "date",
+value: "2025-09-15T18:30:00.000Z" }
                     }
                 }
-            })});
+            }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
             const entity = onUpdate.mock.calls[0][0] as any;
@@ -1978,8 +2113,10 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: subId,
-                entities: [{ id: "1", path: "posts", values: { title: "Original" } }]
-            })});
+                entities: [{ id: "1",
+path: "posts",
+values: { title: "Original" } }]
+            }) });
 
             onUpdate.mockClear();
 
@@ -1993,10 +2130,11 @@ describe("RebaseWebSocketClient", () => {
                     path: "posts",
                     values: {
                         title: "Patched",
-                        patchedAt: { __type: "date", value: "2025-10-01T00:00:00.000Z" }
+                        patchedAt: { __type: "date",
+value: "2025-10-01T00:00:00.000Z" }
                     }
                 }
-            })});
+            }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
             const entities = onUpdate.mock.calls[0][0] as any[];
@@ -2016,9 +2154,10 @@ describe("RebaseWebSocketClient", () => {
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: {
-                    entities: [{ id: "1", path: "posts" }]
+                    entities: [{ id: "1",
+path: "posts" }]
                 }
-            })});
+            }) });
 
             const result = await promise;
             // Should not throw, entity is returned as-is

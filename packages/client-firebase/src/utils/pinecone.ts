@@ -32,7 +32,7 @@ export async function performPineconeTextSearch({
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                Authorization: `Basic ${firebaseToken}`,
+                Authorization: `Basic ${firebaseToken}`
                 // "x-de-version": version
             },
             body: JSON.stringify({

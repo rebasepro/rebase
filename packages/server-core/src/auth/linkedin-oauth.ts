@@ -70,7 +70,7 @@ export function createLinkedinProvider(config: { clientId: string, clientSecret:
                     providerId: profileData.sub,
                     email: profileData.email,
                     displayName: profileData.name || null,
-                    photoUrl: profileData.picture || null,
+                    photoUrl: profileData.picture || null
                 };
             } catch (error) {
                 console.error("LinkedIn OAuth error:", error);

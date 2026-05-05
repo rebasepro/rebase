@@ -19,13 +19,13 @@ export * from "../interfaces";
 
 /**
  * EntityService - Facade for entity operations.
- * 
+ *
  * This class provides a unified API for entity CRUD operations by delegating
  * to specialized services:
  * - EntityFetchService: Read operations (fetch, search, count)
  * - EntityPersistService: Write operations (save, delete)
  * - RelationService: Relation operations (fetch related, update relations)
- * 
+ *
  * Implements the EntityRepository interface for database abstraction.
  */
 export class EntityService implements EntityRepository {
@@ -179,7 +179,7 @@ export class EntityService implements EntityRepository {
         const result = await this.db.execute(sql.raw(sqlText));
         const rows = result.rows;
         if (process.env.NODE_ENV !== "production") {
-            console.debug(`SQL executed successfully. Returned ${Array.isArray(rows) ? rows.length : 'non-array'} rows.`);
+            console.debug(`SQL executed successfully. Returned ${Array.isArray(rows) ? rows.length : "non-array"} rows.`);
         }
         return rows as Record<string, unknown>[];
     }

@@ -49,9 +49,9 @@ export function SchemaBuilderMiniDemo() {
                     </div>
                     <span className="text-surface-500 text-[8px] bg-surface-800 px-1 rounded">text</span>
                 </div>
-                
-                {step === 0 && <div className="h-6" />}
-                
+
+                {step === 0 && <div className="h-6"/>}
+
                 {step >= 1 && (
                     <div className="flex justify-between items-center bg-primary/10 p-1.5 rounded border border-primary/30 ring-1 ring-primary/10 transition-all shadow-sm">
                         <div className="flex items-center gap-1.5">

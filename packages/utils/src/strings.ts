@@ -32,7 +32,7 @@ export function camelCase(str: string): string {
         // Transform remaining parts to have first letter uppercase
         parts.slice(1)
             .map(part => part.charAt(0).toUpperCase() + part.substring(1).toLowerCase())
-            .join('');
+            .join("");
 }
 
 export function randomString(strLength = 5) {
@@ -96,6 +96,7 @@ export function prettifyIdentifier(input: string) {
     const s = text
         .trim()
         .replace(/\b\w/g, (char) => char.toUpperCase());
-    console.log("Prettified identifier:", { input,s });
+    console.log("Prettified identifier:", { input,
+s });
     return s;
 }

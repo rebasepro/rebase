@@ -1,6 +1,6 @@
 /**
  * MongoEntityService Tests
- * 
+ *
  * Tests for MongoDB entity CRUD operations using mongodb-memory-server.
  */
 
@@ -55,7 +55,8 @@ describe("MongoEntityService", () => {
 
     describe("saveEntity", () => {
         it("should create a new entity without ID", async () => {
-            const values = { name: "Test User", email: "test@example.com" };
+            const values = { name: "Test User",
+email: "test@example.com" };
             const entity = await entityService.saveEntity("users", values);
 
             expect(entity.id).toBeDefined();
@@ -67,7 +68,8 @@ describe("MongoEntityService", () => {
 
         it("should create a new entity with provided ID", async () => {
             const id = new ObjectId().toString();
-            const values = { name: "Test User", email: "test@example.com" };
+            const values = { name: "Test User",
+email: "test@example.com" };
             const entity = await entityService.saveEntity("users", values, id);
 
             expect(entity.id).toBe(id);
@@ -76,13 +78,15 @@ describe("MongoEntityService", () => {
 
         it("should update an existing entity", async () => {
             // Create entity
-            const values = { name: "Original Name", email: "test@example.com" };
+            const values = { name: "Original Name",
+email: "test@example.com" };
             const created = await entityService.saveEntity("users", values);
 
             // Update entity
             const updated = await entityService.saveEntity(
                 "users",
-                { name: "Updated Name", email: "test@example.com" },
+                { name: "Updated Name",
+email: "test@example.com" },
                 created.id
             );
 
@@ -120,7 +124,8 @@ describe("MongoEntityService", () => {
 
         it("should handle Date values", async () => {
             const now = new Date();
-            const values = { name: "Test", createdAt: now };
+            const values = { name: "Test",
+createdAt: now };
             const entity = await entityService.saveEntity("items", values);
 
             expect(entity.values.createdAt).toEqual(now);
@@ -129,7 +134,8 @@ describe("MongoEntityService", () => {
 
     describe("fetchEntity", () => {
         it("should fetch an entity by ID", async () => {
-            const values = { name: "Test User", email: "test@example.com" };
+            const values = { name: "Test User",
+email: "test@example.com" };
             const created = await entityService.saveEntity("users", values);
 
             const fetched = await entityService.fetchEntity("users", created.id);
@@ -162,11 +168,21 @@ describe("MongoEntityService", () => {
         beforeEach(async () => {
             // Insert test data
             const users = [
-                { name: "Alice", age: 25, status: "active" },
-                { name: "Bob", age: 30, status: "active" },
-                { name: "Charlie", age: 35, status: "inactive" },
-                { name: "David", age: 40, status: "active" },
-                { name: "Eve", age: 28, status: "pending" }
+                { name: "Alice",
+age: 25,
+status: "active" },
+                { name: "Bob",
+age: 30,
+status: "active" },
+                { name: "Charlie",
+age: 35,
+status: "inactive" },
+                { name: "David",
+age: 40,
+status: "active" },
+                { name: "Eve",
+age: 28,
+status: "pending" }
             ];
             await db.collection("users").insertMany(users);
         });
@@ -269,7 +285,7 @@ describe("MongoEntityService", () => {
             await db.collection("users").insertMany([
                 { status: "active" },
                 { status: "active" },
-                { status: "inactive" },
+                { status: "inactive" }
             ]);
         });
 

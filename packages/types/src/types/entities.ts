@@ -62,14 +62,14 @@ export interface EntityReferenceProps {
 
 /**
  * Class used to create a reference to an entity in a different path.
- * 
+ *
  * @example
  * // Simple reference (most common case - single driver, single db)
  * new EntityReference({ id: "123", path: "users" })
- * 
+ *
  * // Reference to a different driver (e.g., Firestore)
  * new EntityReference({ id: "123", path: "analytics", driver: "firestore" })
- * 
+ *
  * // Reference to a specific database within a driver
  * new EntityReference({ id: "123", path: "orders", driver: "postgres", databaseId: "orders_db" })
  */
@@ -100,11 +100,11 @@ export class EntityReference {
 
     /**
      * Create a reference to an entity.
-     * 
+     *
      * @example
      * // Simple reference (most common case)
      * new EntityReference({ id: "123", path: "users" })
-     * 
+     *
      * // With driver
      * new EntityReference({ id: "123", path: "analytics", driver: "firestore" })
      */

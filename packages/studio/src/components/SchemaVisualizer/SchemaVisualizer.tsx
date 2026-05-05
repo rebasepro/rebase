@@ -8,7 +8,7 @@ import {
     useReactFlow,
     ReactFlowProvider,
     applyNodeChanges,
-    applyEdgeChanges,
+    applyEdgeChanges
 } from "@xyflow/react";
 import type { Node, Edge, NodeChange, EdgeChange } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -19,11 +19,11 @@ import {
     CircularProgress,
     ResizablePanels,
     Tooltip,
-    IconButton,
+    IconButton
 } from "@rebasepro/ui";
 import {
     useStudioCollectionRegistry,
-    IconForView,
+    IconForView
 } from "@rebasepro/core";
 import type { EntityCollection } from "@rebasepro/types";
 import { isPostgresCollection } from "@rebasepro/types";
@@ -36,17 +36,17 @@ import { RelationEdge } from "./RelationEdge";
 // ─── Custom node / edge type registrations ────────────────────────────
 
 const nodeTypes = {
-    tableNode: TableNode,
+    tableNode: TableNode
 };
 
 const edgeTypes = {
-    relationEdge: RelationEdge,
+    relationEdge: RelationEdge
 };
 
 // ─── Inner component (needs ReactFlowProvider) ─────────────────────────
 
 function SchemaVisualizerCanvas({
-    collections,
+    collections
 }: {
     collections: EntityCollection[];
 }) {
@@ -58,7 +58,7 @@ function SchemaVisualizerCanvas({
         setDirection,
         relayout,
         tableCount,
-        relationCount,
+        relationCount
     } = useSchemaGraph(collections);
 
     const [nodes, setNodes] = useState<Node[]>([]);
@@ -86,7 +86,8 @@ function SchemaVisualizerCanvas({
     useEffect(() => {
         if (nodes.length > 0 && !initialFitDone.current) {
             const timer = setTimeout(() => {
-                reactFlowInstance.fitView({ padding: 0.15, duration: 400 });
+                reactFlowInstance.fitView({ padding: 0.15,
+duration: 400 });
                 initialFitDone.current = true;
             }, 200);
             return () => clearTimeout(timer);
@@ -95,7 +96,8 @@ function SchemaVisualizerCanvas({
     }, [nodes.length, reactFlowInstance]);
 
     const handleFitView = useCallback(() => {
-        reactFlowInstance.fitView({ padding: 0.15, duration: 400 });
+        reactFlowInstance.fitView({ padding: 0.15,
+duration: 400 });
     }, [reactFlowInstance]);
 
     const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
@@ -115,7 +117,8 @@ function SchemaVisualizerCanvas({
                 reactFlowInstance.setCenter(
                     node.position.x + 140,
                     node.position.y + 60,
-                    { zoom: 1.2, duration: 400 }
+                    { zoom: 1.2,
+duration: 400 }
                 );
             }
         },
@@ -180,13 +183,13 @@ function SchemaVisualizerCanvas({
                     isPostgresCollection(c) &&
                     c.securityRules &&
                     c.securityRules.length > 0
-            ).length,
+            ).length
         }),
         [
             tableCount,
             relationCount,
             junctionNodes.length,
-            postgresCollections,
+            postgresCollections
         ]
     );
 
@@ -270,7 +273,7 @@ function SchemaVisualizerCanvas({
                                                         typeof collection.icon ===
                                                         "string"
                                                             ? collection.icon
-                                                            : undefined,
+                                                            : undefined
                                                 }}
                                                 size="smallest"
                                             />
@@ -297,12 +300,12 @@ function SchemaVisualizerCanvas({
                                                 collection.securityRules
                                                     .length > 0 && (
                                                     <Tooltip title="RLS enabled">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500"/>
                                                     </Tooltip>
                                                 )}
                                             {collection.history && (
                                                 <Tooltip title="History enabled">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400"/>
                                                 </Tooltip>
                                             )}
                                         </div>
@@ -411,7 +414,7 @@ function SchemaVisualizerCanvas({
                                 RLS protected
                             </Typography>
                             <div className="flex items-center gap-1">
-                                <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                                <div className="w-1.5 h-1.5 rounded-full bg-green-500"/>
                                 <Typography
                                     variant="caption"
                                     className="text-[10px] font-mono font-medium"
@@ -471,7 +474,7 @@ function SchemaVisualizerCanvas({
                                 </Tooltip>
                             </div>
 
-                            <div className="h-4 w-px bg-surface-200 dark:bg-surface-800 mx-0.5" />
+                            <div className="h-4 w-px bg-surface-200 dark:bg-surface-800 mx-0.5"/>
 
                             {/* Fit view */}
                             <Tooltip title="Fit to view">
@@ -568,7 +571,7 @@ function SchemaVisualizerCanvas({
                         {/* Legend overlay */}
                         <div className="absolute bottom-4 left-4 flex items-center gap-3 px-3 py-2 bg-white/90 dark:bg-surface-900/90 backdrop-blur-sm rounded-lg border border-surface-200/40 dark:border-surface-700/40 shadow-sm">
                             <div className="flex items-center gap-1.5">
-                                <div className="w-6 h-0.5 bg-indigo-500 rounded" />
+                                <div className="w-6 h-0.5 bg-indigo-500 rounded"/>
                                 <Typography
                                     variant="caption"
                                     className="text-[10px] text-text-disabled dark:text-text-disabled-dark"
@@ -577,7 +580,7 @@ function SchemaVisualizerCanvas({
                                 </Typography>
                             </div>
                             <div className="flex items-center gap-1.5">
-                                <div className="w-6 h-0.5 bg-violet-500 rounded" />
+                                <div className="w-6 h-0.5 bg-violet-500 rounded"/>
                                 <Typography
                                     variant="caption"
                                     className="text-[10px] text-text-disabled dark:text-text-disabled-dark"
@@ -590,7 +593,7 @@ function SchemaVisualizerCanvas({
                                     className="w-6 h-0.5 rounded"
                                     style={{
                                         backgroundImage:
-                                            "repeating-linear-gradient(90deg, #94a3b8, #94a3b8 4px, transparent 4px, transparent 7px)",
+                                            "repeating-linear-gradient(90deg, #94a3b8, #94a3b8 4px, transparent 4px, transparent 7px)"
                                     }}
                                 />
                                 <Typography
@@ -600,7 +603,7 @@ function SchemaVisualizerCanvas({
                                     Inverse
                                 </Typography>
                             </div>
-                            <div className="h-3 w-px bg-surface-200 dark:bg-surface-700" />
+                            <div className="h-3 w-px bg-surface-200 dark:bg-surface-700"/>
                             <div className="flex items-center gap-1">
                                 <span className="text-[9px]">🔑</span>
                                 <Typography
@@ -644,7 +647,7 @@ export const SchemaVisualizer = () => {
         return (
             <div className="flex items-center justify-center h-full w-full">
                 <div className="text-center space-y-3">
-                    <CircularProgress size="small" />
+                    <CircularProgress size="small"/>
                     <Typography
                         variant="body2"
                         color="secondary"
@@ -659,7 +662,7 @@ export const SchemaVisualizer = () => {
     return (
         <div className="flex h-full w-full bg-white dark:bg-surface-950 overflow-hidden text-text-primary dark:text-text-primary-dark">
             <ReactFlowProvider>
-                <SchemaVisualizerCanvas collections={collections} />
+                <SchemaVisualizerCanvas collections={collections}/>
             </ReactFlowProvider>
         </div>
     );

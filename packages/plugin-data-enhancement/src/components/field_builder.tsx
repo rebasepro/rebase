@@ -53,7 +53,7 @@ export function fieldBuilder(params: PluginFieldBuilderParams): React.ComponentT
             enoughData={enoughData}
             Field={params.Field as React.ComponentType<FieldProps>}
             enhance={enhance}
-            editorAIController={editorAIController} />
+            editorAIController={editorAIController}/>
 
     }, []);
 
@@ -113,7 +113,7 @@ const FieldInner = React.memo(function FieldInner<M extends Record<string, any> 
     const rightClass = props.partOfBlock ? "right-8" : (props.partOfArray ? "right-12" : "right-2");
 
     if (!enabled) {
-        return <Field {...props} />
+        return <Field {...props}/>
     }
 
     const showEnhanceIcon = !props.disabled && (
@@ -136,14 +136,14 @@ const FieldInner = React.memo(function FieldInner<M extends Record<string, any> 
             customProps={{
                 highlight: highlightRange,
                 editorProps: {
-                    aiController: editorAIController,
+                    aiController: editorAIController
                 }
-            }} />;
+            }}/>;
     } else if (property.type === "string" && !property.enum) {
         fieldBinding = <EnhanceTextFieldBinding {...props as any}
-            highlight={suggestedValue as string} />;
+            highlight={suggestedValue as string}/>;
     } else {
-        fieldBinding = <Field {...props as any} />;
+        fieldBinding = <Field {...props as any}/>;
     }
 
     const enhanceData = (instructions?: string) => {
@@ -199,12 +199,12 @@ const FieldInner = React.memo(function FieldInner<M extends Record<string, any> 
                                 }).finally(() => setDataLoading(false));
                             }}>
                             {dataLoading || loading
-                                ? <CircularProgress size={"smallest"} />
+                                ? <CircularProgress size={"smallest"}/>
                                 : <AutoAwesomeIcon
-                                    size={"smallest"} />}
+                                    size={"smallest"}/>}
                         </IconButton>}>
                     <MenuItem onClick={() => enhanceData()}>
-                        <AutoAwesomeIcon size="small" />
+                        <AutoAwesomeIcon size="small"/>
                         <div className={"flex flex-col"}>
                             <Typography
                                 variant={"body2"}> {`Autofill ${property.name ?? "this field"}`}</Typography>
@@ -228,7 +228,7 @@ const FieldInner = React.memo(function FieldInner<M extends Record<string, any> 
                                 size={"small"}
                                 onClick={() => enhanceData(propertyInstructions)}
                                 disabled={!propertyInstructions}>
-                                <SendIcon size={"small"} />
+                                <SendIcon size={"small"}/>
                             </IconButton>}>
                         </TextField>
                     </div>}

@@ -44,7 +44,9 @@ export function useLocalCollectionsConfigController(
                 let err: Record<string, unknown> = {};
                 try {
                     err = JSON.parse(text);
-                } catch (e) { }
+                } catch (e) {
+                    // ignore json parse error
+                }
 
                 if (Object.keys(err).length === 0) {
                     err = { message: text };

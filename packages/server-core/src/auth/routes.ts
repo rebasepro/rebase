@@ -215,7 +215,7 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         // Store refresh token
         const userAgent = c.req.header("user-agent") || "unknown";
         const ipAddress = c.req.header("x-forwarded-for") || "unknown";
-        
+
         await authRepo.createRefreshToken(
             user.id,
             hashRefreshToken(refreshToken),
@@ -225,7 +225,8 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         );
 
         // Send welcome email (fire-and-forget, don't block registration)
-        sendWelcomeEmail({ email: user.email, displayName: user.displayName });
+        sendWelcomeEmail({ email: user.email,
+displayName: user.displayName });
 
         return c.json(buildAuthResponse(user, roleIds, accessToken, refreshToken), 201);
     });
@@ -261,7 +262,7 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         // Store refresh token
         const userAgent = c.req.header("user-agent") || "unknown";
         const ipAddress = c.req.header("x-forwarded-for") || "unknown";
-        
+
         await authRepo.createRefreshToken(
             user.id,
             hashRefreshToken(refreshToken),
@@ -296,7 +297,7 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
                     if (user) {
                         // Link Provider to existing account
                         await authRepo.linkUserIdentity(user.id, provider.id, externalUser.providerId, { email: externalUser.email });
-                        
+
                         // Optional: Update profile info from external provider if empty
                         await authRepo.updateUser(user.id, {
                             displayName: user.displayName || externalUser.displayName || undefined,
@@ -309,9 +310,9 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
                             displayName: externalUser.displayName || undefined,
                             photoUrl: externalUser.photoUrl || undefined
                         });
-                        
+
                         await authRepo.linkUserIdentity(user.id, provider.id, externalUser.providerId, { email: externalUser.email });
-                        
+
                         // Check if this is the first user - make them admin
                         const allUsers = await authRepo.listUsers();
                         const isFirstUser = allUsers.length === 1;
@@ -322,7 +323,8 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
                         }
 
                         // Send welcome email for new OAuth users (fire-and-forget)
-                        sendWelcomeEmail({ email: user.email, displayName: user.displayName });
+                        sendWelcomeEmail({ email: user.email,
+displayName: user.displayName });
                     }
                 } else {
                     // Update profile info from external provider
@@ -341,7 +343,7 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
                 // Store refresh token
                 const userAgent = c.req.header("user-agent") || "unknown";
                 const ipAddress = c.req.header("x-forwarded-for") || "unknown";
-                
+
                 await authRepo.createRefreshToken(
                     user.id,
                     hashRefreshToken(refreshToken),
@@ -387,8 +389,10 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
             const appName = emailConfig?.appName || "Rebase";
             const templateFn = emailConfig?.templates?.passwordReset;
             const emailContent = templateFn
-                ? templateFn(resetUrl, { email: user.email, displayName: user.displayName })
-                : getPasswordResetTemplate(resetUrl, { email: user.email, displayName: user.displayName }, appName);
+                ? templateFn(resetUrl, { email: user.email,
+displayName: user.displayName })
+                : getPasswordResetTemplate(resetUrl, { email: user.email,
+displayName: user.displayName }, appName);
 
             // Send email
             try {
@@ -442,7 +446,8 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         // Invalidate all refresh tokens (security: log out all sessions)
         await authRepo.deleteAllRefreshTokensForUser(storedToken.userId);
 
-        return c.json({ success: true, message: "Password has been reset successfully" });
+        return c.json({ success: true,
+message: "Password has been reset successfully" });
     });
 
     /**
@@ -482,7 +487,8 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         // Invalidate all refresh tokens (security: log out all sessions)
         await authRepo.deleteAllRefreshTokensForUser(user.id);
 
-        return c.json({ success: true, message: "Password has been changed successfully" });
+        return c.json({ success: true,
+message: "Password has been changed successfully" });
     });
 
     /**
@@ -523,8 +529,10 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         const appName = emailConfig?.appName || "Rebase";
         const templateFn = emailConfig?.templates?.emailVerification;
         const emailContent = templateFn
-            ? templateFn(verifyUrl, { email: user.email, displayName: user.displayName })
-            : getEmailVerificationTemplate(verifyUrl, { email: user.email, displayName: user.displayName }, appName);
+            ? templateFn(verifyUrl, { email: user.email,
+displayName: user.displayName })
+            : getEmailVerificationTemplate(verifyUrl, { email: user.email,
+displayName: user.displayName }, appName);
 
         // Send email
         await emailService!.send({
@@ -534,7 +542,8 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
             text: emailContent.text
         });
 
-        return c.json({ success: true, message: "Verification email sent" });
+        return c.json({ success: true,
+message: "Verification email sent" });
     });
 
     /**
@@ -557,7 +566,8 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         // Mark email as verified
         await authRepo.setEmailVerified(user.id, true);
 
-        return c.json({ success: true, message: "Email verified successfully" });
+        return c.json({ success: true,
+message: "Email verified successfully" });
     });
 
     /**
@@ -589,7 +599,7 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         // Rotate refresh token (delete old, create new)
         const userAgent = c.req.header("user-agent") || "unknown";
         const ipAddress = c.req.header("x-forwarded-for") || "unknown";
-        
+
         await authRepo.deleteRefreshToken(tokenHash);
         await authRepo.createRefreshToken(
             storedToken.userId,
@@ -660,7 +670,8 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         }
 
         await authRepo.deleteAllRefreshTokensForUser(userCtx.userId);
-        return c.json({ success: true, message: "All sessions revoked successfully" });
+        return c.json({ success: true,
+message: "All sessions revoked successfully" });
     });
 
     /**
@@ -679,7 +690,8 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         }
 
         await authRepo.deleteRefreshTokenById(id, userCtx.userId);
-        return c.json({ success: true, message: "Session revoked successfully" });
+        return c.json({ success: true,
+message: "Session revoked successfully" });
     });
 
     /**
@@ -723,7 +735,7 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
 
         const updatedUser = await authRepo.updateUser(userCtx.userId, {
             displayName: displayName !== undefined ? displayName : undefined,
-            photoUrl: photoURL !== undefined ? photoURL : undefined,
+            photoUrl: photoURL !== undefined ? photoURL : undefined
         });
 
         if (!updatedUser) {

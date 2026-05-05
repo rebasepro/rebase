@@ -24,9 +24,12 @@ describe("getEntityPreviewKeys", () => {
             name: "Test",
             path: "test",
             properties: {
-                title: { type: "string", name: "Title" } as Property,
-                body: { type: "string", name: "Body" } as Property,
-                status: { type: "string", name: "Status" } as Property,
+                title: { type: "string",
+name: "Title" } as Property,
+                body: { type: "string",
+name: "Body" } as Property,
+                status: { type: "string",
+name: "Status" } as Property
             }
         } as EntityCollection;
 
@@ -41,8 +44,10 @@ describe("getEntityPreviewKeys", () => {
             path: "test",
             previewProperties: ["body"],
             properties: {
-                title: { type: "string", name: "Title" } as Property,
-                body: { type: "string", name: "Body" } as Property,
+                title: { type: "string",
+name: "Title" } as Property,
+                body: { type: "string",
+name: "Body" } as Property
             }
         } as EntityCollection;
 
@@ -56,10 +61,14 @@ describe("getEntityPreviewKeys", () => {
             name: "Test",
             path: "test",
             properties: {
-                title: { type: "string", name: "Title" } as Property,
-                body: { type: "string", name: "Body" } as Property,
-                count: { type: "number", name: "Count" } as Property,
-                extra: { type: "string", name: "Extra" } as Property,
+                title: { type: "string",
+name: "Title" } as Property,
+                body: { type: "string",
+name: "Body" } as Property,
+                count: { type: "number",
+name: "Count" } as Property,
+                extra: { type: "string",
+name: "Extra" } as Property
             }
         } as EntityCollection;
 
@@ -74,9 +83,13 @@ describe("getEntityPreviewKeys", () => {
             name: "Test",
             path: "test",
             properties: {
-                title: { type: "string", name: "Title" } as Property,
-                author: { type: "reference", name: "Author", path: "users" } as Property,
-                body: { type: "string", name: "Body" } as Property,
+                title: { type: "string",
+name: "Title" } as Property,
+                author: { type: "reference",
+name: "Author",
+path: "users" } as Property,
+                body: { type: "string",
+name: "Body" } as Property
             }
         } as EntityCollection;
 
@@ -90,8 +103,10 @@ describe("getEntityPreviewKeys", () => {
             name: "Test",
             path: "test",
             properties: {
-                title: { type: "string", name: "Title" } as Property,
-                tags: { type: "relation", name: "Tags" } as Property,
+                title: { type: "string",
+name: "Title" } as Property,
+                tags: { type: "relation",
+name: "Tags" } as Property
             }
         } as EntityCollection;
 
@@ -105,8 +120,11 @@ describe("getEntityPreviewKeys", () => {
             name: "Test",
             path: "test",
             properties: {
-                id: { type: "string", name: "ID", isId: true } as unknown as Property,
-                title: { type: "string", name: "Title" } as Property,
+                id: { type: "string",
+name: "ID",
+isId: true } as unknown as Property,
+                title: { type: "string",
+name: "Title" } as Property
             }
         } as EntityCollection;
 
@@ -120,10 +138,14 @@ describe("getEntityPreviewKeys", () => {
             name: "Test",
             path: "test",
             properties: {
-                a: { type: "string", name: "A" } as Property,
-                b: { type: "string", name: "B" } as Property,
-                c: { type: "string", name: "C" } as Property,
-                d: { type: "string", name: "D" } as Property,
+                a: { type: "string",
+name: "A" } as Property,
+                b: { type: "string",
+name: "B" } as Property,
+                c: { type: "string",
+name: "C" } as Property,
+                d: { type: "string",
+name: "D" } as Property
             }
         } as EntityCollection;
 
@@ -137,7 +159,8 @@ describe("getEntityPreviewKeys", () => {
             name: "Test",
             path: "test",
             properties: {
-                title: { type: "string", name: "Title" } as Property,
+                title: { type: "string",
+name: "Title" } as Property
             }
         } as EntityCollection;
 
@@ -157,8 +180,11 @@ describe("getEntityTitlePropertyKey", () => {
             path: "test",
             titleProperty: "name",
             properties: {
-                name: { type: "string", name: "Name" } as Property,
-                body: { type: "string", name: "Body", multiline: true } as Property,
+                name: { type: "string",
+name: "Name" } as Property,
+                body: { type: "string",
+name: "Body",
+multiline: true } as Property
             }
         } as EntityCollection;
 
@@ -171,9 +197,13 @@ describe("getEntityTitlePropertyKey", () => {
             name: "Test",
             path: "test",
             properties: {
-                count: { type: "number", name: "Count" } as Property,
-                title: { type: "string", name: "Title" } as Property,
-                body: { type: "string", name: "Body", multiline: true } as Property,
+                count: { type: "number",
+name: "Count" } as Property,
+                title: { type: "string",
+name: "Title" } as Property,
+                body: { type: "string",
+name: "Body",
+multiline: true } as Property
             }
         } as EntityCollection;
 
@@ -186,8 +216,11 @@ describe("getEntityTitlePropertyKey", () => {
             name: "Test",
             path: "test",
             properties: {
-                description: { type: "string", name: "Description", multiline: true } as Property,
-                name: { type: "string", name: "Name" } as Property,
+                description: { type: "string",
+name: "Description",
+multiline: true } as Property,
+                name: { type: "string",
+name: "Name" } as Property
             }
         } as EntityCollection;
 
@@ -200,8 +233,11 @@ describe("getEntityTitlePropertyKey", () => {
             name: "Test",
             path: "test",
             properties: {
-                content: { type: "string", name: "Content", markdown: true } as Property,
-                slug: { type: "string", name: "Slug" } as Property,
+                content: { type: "string",
+name: "Content",
+markdown: true } as Property,
+                slug: { type: "string",
+name: "Slug" } as Property
             }
         } as EntityCollection;
 
@@ -214,8 +250,11 @@ describe("getEntityTitlePropertyKey", () => {
             name: "Test",
             path: "test",
             properties: {
-                attachment: { type: "string", name: "File", storage: { bucket: "test" } } as unknown as Property,
-                label: { type: "string", name: "Label" } as Property,
+                attachment: { type: "string",
+name: "File",
+storage: { bucket: "test" } } as unknown as Property,
+                label: { type: "string",
+name: "Label" } as Property
             }
         } as EntityCollection;
 
@@ -228,8 +267,11 @@ describe("getEntityTitlePropertyKey", () => {
             name: "Test",
             path: "test",
             properties: {
-                id: { type: "string", name: "ID", isId: true } as unknown as Property,
-                name: { type: "string", name: "Name" } as Property,
+                id: { type: "string",
+name: "ID",
+isId: true } as unknown as Property,
+                name: { type: "string",
+name: "Name" } as Property
             }
         } as EntityCollection;
 
@@ -242,8 +284,10 @@ describe("getEntityTitlePropertyKey", () => {
             name: "Test",
             path: "test",
             properties: {
-                count: { type: "number", name: "Count" } as Property,
-                flag: { type: "boolean", name: "Flag" } as Property,
+                count: { type: "number",
+name: "Count" } as Property,
+                flag: { type: "boolean",
+name: "Flag" } as Property
             }
         } as EntityCollection;
 

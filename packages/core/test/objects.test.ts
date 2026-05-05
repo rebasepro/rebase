@@ -363,7 +363,8 @@ describe("mergeDeep", () => {
         const ref1 = new EntityReference("id1", "collection/path1");
         const ref2 = new EntityReference("id2", "collection/path2");
 
-        const target = { ref: ref1, other: "value" };
+        const target = { ref: ref1,
+other: "value" };
         const source = { ref: ref2 };
 
         const result = mergeDeep(target, source);
@@ -407,10 +408,12 @@ describe("mergeDeep", () => {
 
         const target = {
             ref: ref,
-            nested: { a: 1, b: 2 }
+            nested: { a: 1,
+b: 2 }
         };
         const source = {
-            nested: { b: 3, c: 4 }
+            nested: { b: 3,
+c: 4 }
         };
 
         const result = mergeDeep(target, source);
@@ -420,6 +423,8 @@ describe("mergeDeep", () => {
         expect(result.ref.isEntityReference()).toBe(true);
 
         // Plain object should be merged normally
-        expect(result.nested).toEqual({ a: 1, b: 3, c: 4 });
+        expect(result.nested).toEqual({ a: 1,
+b: 3,
+c: 4 });
     });
 });

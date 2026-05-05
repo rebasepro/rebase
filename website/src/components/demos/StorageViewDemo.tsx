@@ -13,32 +13,102 @@ interface StorageItem {
 // ─── Mock Data ───────────────────────────────────────────
 const MOCK_FILES: Record<string, StorageItem[]> = {
     "": [
-        { name: "uploads", fullPath: "uploads", isFolder: true },
-        { name: "avatars", fullPath: "avatars", isFolder: true },
-        { name: "exports", fullPath: "exports", isFolder: true },
-        { name: "README.md", fullPath: "README.md", isFolder: false, size: 2048, contentType: "text/markdown", updatedAt: "2025-03-15" },
+        { name: "uploads",
+fullPath: "uploads",
+isFolder: true },
+        { name: "avatars",
+fullPath: "avatars",
+isFolder: true },
+        { name: "exports",
+fullPath: "exports",
+isFolder: true },
+        { name: "README.md",
+fullPath: "README.md",
+isFolder: false,
+size: 2048,
+contentType: "text/markdown",
+updatedAt: "2025-03-15" }
     ],
     uploads: [
-        { name: "images", fullPath: "uploads/images", isFolder: true },
-        { name: "documents", fullPath: "uploads/documents", isFolder: true },
-        { name: "invoice-2025-001.pdf", fullPath: "uploads/invoice-2025-001.pdf", isFolder: false, size: 245760, contentType: "application/pdf", updatedAt: "2025-03-20" },
-        { name: "report-q1.xlsx", fullPath: "uploads/report-q1.xlsx", isFolder: false, size: 1048576, contentType: "application/vnd.ms-excel", updatedAt: "2025-03-18" },
+        { name: "images",
+fullPath: "uploads/images",
+isFolder: true },
+        { name: "documents",
+fullPath: "uploads/documents",
+isFolder: true },
+        { name: "invoice-2025-001.pdf",
+fullPath: "uploads/invoice-2025-001.pdf",
+isFolder: false,
+size: 245760,
+contentType: "application/pdf",
+updatedAt: "2025-03-20" },
+        { name: "report-q1.xlsx",
+fullPath: "uploads/report-q1.xlsx",
+isFolder: false,
+size: 1048576,
+contentType: "application/vnd.ms-excel",
+updatedAt: "2025-03-18" }
     ],
     "uploads/images": [
-        { name: "hero-banner.webp", fullPath: "uploads/images/hero-banner.webp", isFolder: false, size: 524288, contentType: "image/webp", updatedAt: "2025-01-10" },
-        { name: "product-shot.png", fullPath: "uploads/images/product-shot.png", isFolder: false, size: 2097152, contentType: "image/png", updatedAt: "2025-02-14" },
-        { name: "team-photo.jpg", fullPath: "uploads/images/team-photo.jpg", isFolder: false, size: 3145728, contentType: "image/jpeg", updatedAt: "2025-03-01" },
-        { name: "logo.svg", fullPath: "uploads/images/logo.svg", isFolder: false, size: 8192, contentType: "image/svg+xml", updatedAt: "2024-12-01" },
+        { name: "hero-banner.webp",
+fullPath: "uploads/images/hero-banner.webp",
+isFolder: false,
+size: 524288,
+contentType: "image/webp",
+updatedAt: "2025-01-10" },
+        { name: "product-shot.png",
+fullPath: "uploads/images/product-shot.png",
+isFolder: false,
+size: 2097152,
+contentType: "image/png",
+updatedAt: "2025-02-14" },
+        { name: "team-photo.jpg",
+fullPath: "uploads/images/team-photo.jpg",
+isFolder: false,
+size: 3145728,
+contentType: "image/jpeg",
+updatedAt: "2025-03-01" },
+        { name: "logo.svg",
+fullPath: "uploads/images/logo.svg",
+isFolder: false,
+size: 8192,
+contentType: "image/svg+xml",
+updatedAt: "2024-12-01" }
     ],
     avatars: [
-        { name: "alice.jpg", fullPath: "avatars/alice.jpg", isFolder: false, size: 51200, contentType: "image/jpeg", updatedAt: "2025-01-15" },
-        { name: "bob.jpg", fullPath: "avatars/bob.jpg", isFolder: false, size: 49152, contentType: "image/jpeg", updatedAt: "2025-02-20" },
-        { name: "eve.png", fullPath: "avatars/eve.png", isFolder: false, size: 65536, contentType: "image/png", updatedAt: "2025-03-10" },
+        { name: "alice.jpg",
+fullPath: "avatars/alice.jpg",
+isFolder: false,
+size: 51200,
+contentType: "image/jpeg",
+updatedAt: "2025-01-15" },
+        { name: "bob.jpg",
+fullPath: "avatars/bob.jpg",
+isFolder: false,
+size: 49152,
+contentType: "image/jpeg",
+updatedAt: "2025-02-20" },
+        { name: "eve.png",
+fullPath: "avatars/eve.png",
+isFolder: false,
+size: 65536,
+contentType: "image/png",
+updatedAt: "2025-03-10" }
     ],
     exports: [
-        { name: "users-export-20250315.csv", fullPath: "exports/users-export-20250315.csv", isFolder: false, size: 32768, contentType: "text/csv", updatedAt: "2025-03-15" },
-        { name: "orders-backup.json", fullPath: "exports/orders-backup.json", isFolder: false, size: 131072, contentType: "application/json", updatedAt: "2025-03-12" },
-    ],
+        { name: "users-export-20250315.csv",
+fullPath: "exports/users-export-20250315.csv",
+isFolder: false,
+size: 32768,
+contentType: "text/csv",
+updatedAt: "2025-03-15" },
+        { name: "orders-backup.json",
+fullPath: "exports/orders-backup.json",
+isFolder: false,
+size: 131072,
+contentType: "application/json",
+updatedAt: "2025-03-12" }
+    ]
 };
 
 function formatFileSize(bytes: number): string {
@@ -78,12 +148,14 @@ export function StorageViewDemo() {
     const files = items.filter(i => !i.isFolder);
 
     const breadcrumbs = [
-        { label: "Root", path: "" },
+        { label: "Root",
+path: "" },
         ...currentPath.split("/").filter(Boolean).reduce<{ label: string; path: string }[]>((acc, part) => {
             const prev = acc.length > 0 ? acc[acc.length - 1].path : "";
-            acc.push({ label: part, path: prev ? `${prev}/${part}` : part });
+            acc.push({ label: part,
+path: prev ? `${prev}/${part}` : part });
             return acc;
-        }, []),
+        }, [])
     ];
 
     const handleNavigate = useCallback((path: string) => {

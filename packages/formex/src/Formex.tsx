@@ -1,7 +1,7 @@
 import React, { useContext } from "react";
 import { FormexController } from "./types";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const FormexContext = React.createContext<FormexController<any> | null>(null);
 
 export const useFormex = <T = any>() => {

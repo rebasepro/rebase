@@ -1,14 +1,23 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
 import { useAuthController, useStorageSource } from "@rebasepro/core";
 import { getIconForProperty } from "../../util/property_utils";
 import type { FieldProps } from "../../types/fields";
 import type { ArrayProperty, StringProperty } from "@rebasepro/types";
-import { cls, fieldBackgroundDisabledMixin, fieldBackgroundHoverMixin, fieldBackgroundMixin, IconButton, CloseIcon } from "@rebasepro/ui";
-import { RebaseEditor, RebaseEditorProps } from "../../editor";
+import { cls, fieldBackgroundDisabledMixin, fieldBackgroundHoverMixin, fieldBackgroundMixin, IconButton, CloseIcon, Skeleton } from "@rebasepro/ui";
+import type { RebaseEditorProps } from "../../editor";
 import { resolveStorageFilenameString, resolveStoragePathString } from "@rebasepro/common";
 import { randomString } from "@rebasepro/utils";
-import { parser, serializer } from "../../editor/markdown";
+
+// Lazy-load ProseMirror editor + markdown parser/serializer (~300KB)
+// Only fetched when a markdown field is actually rendered.
+const RebaseEditor = lazy(() => import("../../editor").then(m => ({ default: m.RebaseEditor })));
+const loadMarkdownUtils = () => import("../../editor/markdown");
+let _markdownUtils: Awaited<ReturnType<typeof loadMarkdownUtils>> | null = null;
+const getMarkdownUtils = async () => {
+    if (!_markdownUtils) _markdownUtils = await loadMarkdownUtils();
+    return _markdownUtils;
+};
 
 interface MarkdownEditorFieldProps {
     highlight?: { from: number, to: number };
@@ -33,13 +42,16 @@ function normalizeMarkdown(md: string | null | undefined): string {
  * parse → serialize roundtrip through ProseMirror. This gives us
  * the exact output the editor will produce for a given input,
  * so we can compare against it to avoid false dirty states.
+ *
+ * Falls back to normalizeMarkdown if the ProseMirror module hasn't loaded yet.
  */
 function canonicalizeMarkdown(md: string | null | undefined): string {
     if (!md) return "";
+    if (!_markdownUtils) return normalizeMarkdown(md);
     try {
-        const doc = parser.parse(md);
+        const doc = _markdownUtils.parser.parse(md);
         if (!doc) return normalizeMarkdown(md);
-        return normalizeMarkdown(serializer.serialize(doc));
+        return normalizeMarkdown(_markdownUtils.serializer.serialize(doc));
     } catch {
         return normalizeMarkdown(md);
     }
@@ -73,6 +85,14 @@ export function MarkdownEditorFieldBinding({
 
     const [fieldVersion, setFieldVersion] = useState(0);
     const internalValue = useRef<string | null>(value);
+
+    // Eagerly load ProseMirror markdown utils when the field first mounts
+    useEffect(() => {
+        getMarkdownUtils().then(() => {
+            // Update canonical ref with the proper round-tripped value now that ProseMirror is loaded
+            canonicalRef.current = canonicalizeMarkdown(value);
+        });
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Compute the canonical (round-tripped) form of the initial value ONCE.
     // This is what ProseMirror will produce after parse → serialize, so any
@@ -143,7 +163,8 @@ export function MarkdownEditorFieldBinding({
         }) ?? "/";
     }, [entityId, entityValues, path, property, propertyKey, storage]);
 
-    const editor = <RebaseEditor
+    const editor = <Suspense fallback={<Skeleton height={200} className="w-full rounded-md"/>}>
+        <RebaseEditor
         content={value}
         onMarkdownContentChange={onContentChange}
         version={context.formex.version + fieldVersion}
@@ -165,7 +186,8 @@ export function MarkdownEditorFieldBinding({
             return url;
         }}
         {...editorProps}
-    />;
+    />
+    </Suspense>;
 
     if (minimalistView)
         return editor;

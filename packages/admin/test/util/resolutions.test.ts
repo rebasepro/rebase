@@ -12,8 +12,12 @@ import type { EntityCustomView, EntityAction, CustomizationController } from "@r
 // resolveEntityView
 // ---------------------------------------------------------------------------
 describe("resolveEntityView", () => {
-    const view1: EntityCustomView = { key: "overview", name: "Overview", Builder: jest.fn() } as unknown as EntityCustomView;
-    const view2: EntityCustomView = { key: "analytics", name: "Analytics", Builder: jest.fn() } as unknown as EntityCustomView;
+    const view1: EntityCustomView = { key: "overview",
+name: "Overview",
+Builder: jest.fn() } as unknown as EntityCustomView;
+    const view2: EntityCustomView = { key: "analytics",
+name: "Analytics",
+Builder: jest.fn() } as unknown as EntityCustomView;
     const contextViews = [view1, view2];
 
     it("returns the view object directly when not a string", () => {
@@ -37,8 +41,10 @@ describe("resolveEntityView", () => {
 // resolveEntityAction
 // ---------------------------------------------------------------------------
 describe("resolveEntityAction", () => {
-    const action1: EntityAction = { key: "publish", name: "Publish" } as EntityAction;
-    const action2: EntityAction = { key: "archive", name: "Archive" } as EntityAction;
+    const action1: EntityAction = { key: "publish",
+name: "Publish" } as EntityAction;
+    const action2: EntityAction = { key: "archive",
+name: "Archive" } as EntityAction;
     const contextActions = [action1, action2];
 
     it("returns the action object directly when not a string", () => {
@@ -77,7 +83,7 @@ describe("resolvedSelectedEntityView", () => {
     } as unknown as EntityCustomView;
 
     const mockCustomizationController = {
-        entityViews: [view1, view2],
+        entityViews: [view1, view2]
     } as unknown as CustomizationController;
 
     it("resolves all custom views", () => {

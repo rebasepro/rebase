@@ -225,7 +225,7 @@ export function RelationPropertyField({
                         placeholder={"e.g. author_id"}
                     />
                     <FieldCaption>
-                        Column on this table that references the target's primary key
+                        Column on this table that references the target&apos;s primary key
                     </FieldCaption>
                 </div>
             )}
@@ -243,7 +243,7 @@ export function RelationPropertyField({
                         placeholder={"e.g. post_id"}
                     />
                     <FieldCaption>
-                        Column on the target table that references this table's primary key
+                        Column on the target table that references this table&apos;s primary key
                     </FieldCaption>
                 </div>
             )}

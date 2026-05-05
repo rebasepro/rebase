@@ -22,7 +22,11 @@ describe("Property Conditions", () => {
                 path: "products",
                 entityId: "123",
                 isNew: false,
-                user: { uid: "user1", email: null, displayName: null, photoURL: null, roles: [] },
+                user: { uid: "user1",
+email: null,
+displayName: null,
+photoURL: null,
+roles: [] },
                 now: Date.now()
             };
 
@@ -37,7 +41,11 @@ describe("Property Conditions", () => {
                 propertyValue: undefined,
                 path: "orders",
                 isNew: false,
-                user: { uid: "user1", email: null, displayName: null, photoURL: null, roles: [] },
+                user: { uid: "user1",
+email: null,
+displayName: null,
+photoURL: null,
+roles: [] },
                 now: Date.now()
             };
 
@@ -52,7 +60,11 @@ describe("Property Conditions", () => {
                 propertyValue: undefined,
                 path: "products",
                 isNew: true,
-                user: { uid: "user1", email: null, displayName: null, photoURL: null, roles: [] },
+                user: { uid: "user1",
+email: null,
+displayName: null,
+photoURL: null,
+roles: [] },
                 now: Date.now()
             };
 
@@ -74,7 +86,11 @@ describe("Property Conditions", () => {
                 propertyValue: undefined,
                 path: "products",
                 isNew: false,
-                user: { uid: "user1", email: null, displayName: null, photoURL: null, roles: [] },
+                user: { uid: "user1",
+email: null,
+displayName: null,
+photoURL: null,
+roles: [] },
                 now: Date.now()
             };
 
@@ -82,23 +98,32 @@ describe("Property Conditions", () => {
             const rule = {
                 "if": [
                     { "==": [{ "var": "values.status" }, "active"] },
-                    { "0": "electronics", "1": "clothing" },
-                    { "0": "electronics", "1": "clothing", "2": "food" }
+                    { "0": "electronics",
+"1": "clothing" },
+                    { "0": "electronics",
+"1": "clothing",
+"2": "food" }
                 ]
             };
 
             const result = evaluateCondition(rule, context);
-            expect(result).toEqual({ "0": "electronics", "1": "clothing" });
+            expect(result).toEqual({ "0": "electronics",
+"1": "clothing" });
         });
 
         it("should evaluate truthy operator (!!)", () => {
             const context: ConditionContext = {
-                values: { name: "Product", emptyField: "" },
+                values: { name: "Product",
+emptyField: "" },
                 previousValues: {},
                 propertyValue: undefined,
                 path: "products",
                 isNew: false,
-                user: { uid: "user1", email: null, displayName: null, photoURL: null, roles: [] },
+                user: { uid: "user1",
+email: null,
+displayName: null,
+photoURL: null,
+roles: [] },
                 now: Date.now()
             };
 
@@ -108,12 +133,17 @@ describe("Property Conditions", () => {
 
         it("should evaluate falsy operator (!)", () => {
             const context: ConditionContext = {
-                values: { name: "Product", emptyField: "" },
+                values: { name: "Product",
+emptyField: "" },
                 previousValues: {},
                 propertyValue: undefined,
                 path: "products",
                 isNew: false,
-                user: { uid: "user1", email: null, displayName: null, photoURL: null, roles: [] },
+                user: { uid: "user1",
+email: null,
+displayName: null,
+photoURL: null,
+roles: [] },
                 now: Date.now()
             };
 
@@ -128,7 +158,11 @@ describe("Property Conditions", () => {
                 propertyValue: undefined,
                 path: "products",
                 isNew: false,
-                user: { uid: "user1", email: null, displayName: null, photoURL: null, roles: [] },
+                user: { uid: "user1",
+email: null,
+displayName: null,
+photoURL: null,
+roles: [] },
                 now: Date.now()
             };
 
@@ -143,7 +177,11 @@ describe("Property Conditions", () => {
                 propertyValue: undefined,
                 path: "products",
                 isNew: false,
-                user: { uid: "user1", email: null, displayName: null, photoURL: null, roles: [] },
+                user: { uid: "user1",
+email: null,
+displayName: null,
+photoURL: null,
+roles: [] },
                 now: Date.now()
             };
 
@@ -161,7 +199,11 @@ describe("Property Conditions", () => {
                 propertyValue: undefined,
                 path: "products",
                 isNew: false,
-                user: { uid: "user1", email: null, displayName: null, photoURL: null, roles: [] },
+                user: { uid: "user1",
+email: null,
+displayName: null,
+photoURL: null,
+roles: [] },
                 now: Date.now()
             };
 
@@ -179,7 +221,11 @@ describe("Property Conditions", () => {
                 propertyValue: undefined,
                 path: "products",
                 isNew: false,
-                user: { uid: "user1", email: null, displayName: null, photoURL: null, roles: [] },
+                user: { uid: "user1",
+email: null,
+displayName: null,
+photoURL: null,
+roles: [] },
                 now: Date.now()
             };
 
@@ -200,7 +246,11 @@ describe("Property Conditions", () => {
             path: "products",
             entityId: "123",
             isNew: false,
-            user: { uid: "user1", email: null, displayName: null, photoURL: null, roles: ["admin"] },
+            user: { uid: "user1",
+email: null,
+displayName: null,
+photoURL: null,
+roles: ["admin"] },
             now: Date.now()
         };
 
@@ -282,9 +332,12 @@ describe("Property Conditions", () => {
                 resolved: true,
                 fromBuilder: false,
                 enum: [
-                    { id: "electronics", label: "Electronics" },
-                    { id: "clothing", label: "Clothing" },
-                    { id: "food", label: "Food" }
+                    { id: "electronics",
+label: "Electronics" },
+                    { id: "clothing",
+label: "Clothing" },
+                    { id: "food",
+label: "Food" }
                 ],
                 conditions: {
                     allowedEnumValues: ["electronics", "clothing"]
@@ -293,8 +346,8 @@ describe("Property Conditions", () => {
 
             const result = applyPropertyConditions(property, baseContext);
 
-            expect((result as Record<string, unknown>)['enum']).toHaveLength(2);
-            expect(((result as Record<string, unknown>)['enum'] as EnumValueConfig[]).map((e) => e.id)).toEqual(["electronics", "clothing"]);
+            expect((result as Record<string, unknown>)["enum"]).toHaveLength(2);
+            expect(((result as Record<string, unknown>)["enum"] as EnumValueConfig[]).map((e) => e.id)).toEqual(["electronics", "clothing"]);
         });
 
         it("should apply enum conditions with object format (Firestore workaround)", () => {
@@ -304,16 +357,22 @@ describe("Property Conditions", () => {
                 resolved: true,
                 fromBuilder: false,
                 enum: [
-                    { id: "electronics", label: "Electronics" },
-                    { id: "clothing", label: "Clothing" },
-                    { id: "food", label: "Food" }
+                    { id: "electronics",
+label: "Electronics" },
+                    { id: "clothing",
+label: "Clothing" },
+                    { id: "food",
+label: "Food" }
                 ],
                 conditions: {
                     allowedEnumValues: {
                         "if": [
                             { "!!": { "var": "values.status" } },
-                            { "0": "electronics", "1": "clothing" },
-                            { "0": "electronics", "1": "clothing", "2": "food" }
+                            { "0": "electronics",
+"1": "clothing" },
+                            { "0": "electronics",
+"1": "clothing",
+"2": "food" }
                         ]
                     }
                 }
@@ -321,8 +380,8 @@ describe("Property Conditions", () => {
 
             const result = applyPropertyConditions(property, baseContext);
 
-            expect((result as Record<string, unknown>)['enum']).toHaveLength(2);
-            expect(((result as Record<string, unknown>)['enum'] as EnumValueConfig[]).map((e) => e.id)).toEqual(["electronics", "clothing"]);
+            expect((result as Record<string, unknown>)["enum"]).toHaveLength(2);
+            expect(((result as Record<string, unknown>)["enum"] as EnumValueConfig[]).map((e) => e.id)).toEqual(["electronics", "clothing"]);
         });
 
         it("should apply excludedEnumValues to remove specific values", () => {
@@ -332,9 +391,12 @@ describe("Property Conditions", () => {
                 resolved: true,
                 fromBuilder: false,
                 enum: [
-                    { id: "draft", label: "Draft" },
-                    { id: "published", label: "Published" },
-                    { id: "archived", label: "Archived" }
+                    { id: "draft",
+label: "Draft" },
+                    { id: "published",
+label: "Published" },
+                    { id: "archived",
+label: "Archived" }
                 ],
                 conditions: {
                     // Simple array of excluded values
@@ -344,8 +406,8 @@ describe("Property Conditions", () => {
 
             const result = applyPropertyConditions(property, baseContext);
 
-            expect((result as Record<string, unknown>)['enum']).toHaveLength(2);
-            expect(((result as Record<string, unknown>)['enum'] as EnumValueConfig[]).map((e) => e.id)).toEqual(["draft", "archived"]);
+            expect((result as Record<string, unknown>)["enum"]).toHaveLength(2);
+            expect(((result as Record<string, unknown>)["enum"] as EnumValueConfig[]).map((e) => e.id)).toEqual(["draft", "archived"]);
         });
 
         it("should apply enum conditions to disable specific values", () => {
@@ -355,9 +417,12 @@ describe("Property Conditions", () => {
                 resolved: true,
                 fromBuilder: false,
                 enum: [
-                    { id: "draft", label: "Draft" },
-                    { id: "published", label: "Published" },
-                    { id: "archived", label: "Archived" }
+                    { id: "draft",
+label: "Draft" },
+                    { id: "published",
+label: "Published" },
+                    { id: "archived",
+label: "Archived" }
                 ],
                 conditions: {
                     enumConditions: {
@@ -369,12 +434,13 @@ describe("Property Conditions", () => {
             } as unknown as Property;
 
             const result = applyPropertyConditions(property, baseContext);
-            const archivedOption = ((result as Record<string, unknown>)['enum'] as EnumValueConfig[]).find((e) => e.id === "archived");
+            const archivedOption = ((result as Record<string, unknown>)["enum"] as EnumValueConfig[]).find((e) => e.id === "archived");
             expect(archivedOption!.disabled).toBeFalsy();
 
-            const contextDraft = { ...baseContext, values: { status: "draft" } };
+            const contextDraft = { ...baseContext,
+values: { status: "draft" } };
             const resultDraft = applyPropertyConditions(property, contextDraft);
-            const archivedOptionDraft = ((resultDraft as Record<string, unknown>)['enum'] as EnumValueConfig[]).find((e) => e.id === "archived");
+            const archivedOptionDraft = ((resultDraft as Record<string, unknown>)["enum"] as EnumValueConfig[]).find((e) => e.id === "archived");
             expect(archivedOptionDraft!.disabled).toBe(true);
         });
 
@@ -395,7 +461,8 @@ describe("Property Conditions", () => {
             expect(resultArchived.disabled).toBeDefined();
             expect(resultArchived.validation?.required).toBeFalsy();
 
-            const contextPublished = { ...baseContext, values: { status: "published" } };
+            const contextPublished = { ...baseContext,
+values: { status: "published" } };
             const resultPublished = applyPropertyConditions(property, contextPublished);
             expect(resultPublished.disabled).toBeUndefined();
             expect(resultPublished.validation?.required).toBe(true);
@@ -429,7 +496,11 @@ describe("Property Conditions", () => {
             path: "products",
             entityId: "123",
             isNew: false,
-            user: { uid: "user1", email: null, displayName: null, photoURL: null, roles: ["admin"] },
+            user: { uid: "user1",
+email: null,
+displayName: null,
+photoURL: null,
+roles: ["admin"] },
             now: Date.now()
         };
 
@@ -440,7 +511,7 @@ describe("Property Conditions", () => {
                 resolved: true,
                 fromBuilder: false,
                 conditions: {
-                    readOnly: { "==": [{ "var": "values.status" }, "archived"] },
+                    readOnly: { "==": [{ "var": "values.status" }, "archived"] }
                 }
             } as ResolvedProperty<string>;
 
@@ -455,7 +526,7 @@ describe("Property Conditions", () => {
                 resolved: true,
                 fromBuilder: false,
                 conditions: {
-                    readOnly: { "==": [{ "var": "values.status" }, "draft"] },
+                    readOnly: { "==": [{ "var": "values.status" }, "draft"] }
                 }
             } as ResolvedProperty<string>;
 
@@ -472,7 +543,11 @@ describe("Property Conditions", () => {
                 propertyValue: undefined,
                 path: "products",
                 isNew: true,
-                user: { uid: "u1", email: null, displayName: null, photoURL: null, roles: [] },
+                user: { uid: "u1",
+email: null,
+displayName: null,
+photoURL: null,
+roles: [] },
                 now: Date.now()
             };
 
@@ -482,7 +557,7 @@ describe("Property Conditions", () => {
                 resolved: true,
                 fromBuilder: false,
                 conditions: {
-                    defaultValue: "draft",
+                    defaultValue: "draft"
                 }
             } as ResolvedProperty<string>;
 
@@ -498,7 +573,11 @@ describe("Property Conditions", () => {
                 path: "products",
                 entityId: "123",
                 isNew: false,
-                user: { uid: "u1", email: null, displayName: null, photoURL: null, roles: [] },
+                user: { uid: "u1",
+email: null,
+displayName: null,
+photoURL: null,
+roles: [] },
                 now: Date.now()
             };
 
@@ -508,7 +587,7 @@ describe("Property Conditions", () => {
                 resolved: true,
                 fromBuilder: false,
                 conditions: {
-                    defaultValue: "draft",
+                    defaultValue: "draft"
                 }
             } as ResolvedProperty<string>;
 
@@ -525,7 +604,11 @@ describe("Property Conditions", () => {
             path: "products",
             entityId: "123",
             isNew: false,
-            user: { uid: "u1", email: null, displayName: null, photoURL: null, roles: [] },
+            user: { uid: "u1",
+email: null,
+displayName: null,
+photoURL: null,
+roles: [] },
             now: Date.now()
         };
 
@@ -536,7 +619,7 @@ describe("Property Conditions", () => {
                 resolved: true,
                 fromBuilder: false,
                 conditions: {
-                    referencePath: { "var": "values.category" },
+                    referencePath: { "var": "values.category" }
                 }
             } as unknown as Property;
 
@@ -553,7 +636,11 @@ describe("Property Conditions", () => {
             path: "products",
             entityId: "123",
             isNew: false,
-            user: { uid: "u1", email: null, displayName: null, photoURL: null, roles: [] },
+            user: { uid: "u1",
+email: null,
+displayName: null,
+photoURL: null,
+roles: [] },
             now: Date.now()
         };
 
@@ -564,7 +651,7 @@ describe("Property Conditions", () => {
                 resolved: true,
                 fromBuilder: false,
                 conditions: {
-                    canAddElements: { "!=": [{ "var": "values.status" }, "locked"] },
+                    canAddElements: { "!=": [{ "var": "values.status" }, "locked"] }
                 }
             } as unknown as Property;
 
@@ -579,7 +666,7 @@ describe("Property Conditions", () => {
                 resolved: true,
                 fromBuilder: false,
                 conditions: {
-                    sortable: { "!=": [{ "var": "values.status" }, "locked"] },
+                    sortable: { "!=": [{ "var": "values.status" }, "locked"] }
                 }
             } as unknown as Property;
 
@@ -596,7 +683,11 @@ describe("Property Conditions", () => {
             path: "users",
             entityId: "123",
             isNew: false,
-            user: { uid: "u1", email: null, displayName: null, photoURL: null, roles: [] },
+            user: { uid: "u1",
+email: null,
+displayName: null,
+photoURL: null,
+roles: [] },
             now: Date.now()
         };
 
@@ -607,9 +698,12 @@ describe("Property Conditions", () => {
                 resolved: true,
                 fromBuilder: false,
                 enum: [
-                    { id: "admin", label: "Admin" },
-                    { id: "editor", label: "Editor" },
-                    { id: "viewer", label: "Viewer" },
+                    { id: "admin",
+label: "Admin" },
+                    { id: "editor",
+label: "Editor" },
+                    { id: "viewer",
+label: "Viewer" }
                 ],
                 conditions: {
                     enumConditions: {
@@ -662,7 +756,8 @@ describe("Property Conditions", () => {
 
             const context = buildConditionContext({
                 path: "products",
-                values: { meta: { created: now, updated: now } },
+                values: { meta: { created: now,
+updated: now } },
                 authController: mockAuthController as AuthController
             });
 
@@ -752,14 +847,17 @@ describe("Property Conditions", () => {
                     photoURL: null,
                     providerId: "google.com",
                     isAnonymous: false,
-                    roles: [{ id: "admin", name: "Admin" }, { id: "editor", name: "Editor" }]
+                    roles: [{ id: "admin",
+name: "Admin" }, { id: "editor",
+name: "Editor" }]
                 }
             };
 
             const now = new Date();
             const context = buildConditionContext({
                 propertyKey: "title",
-                values: { title: "Hello", createdAt: now },
+                values: { title: "Hello",
+createdAt: now },
                 path: "products",
                 entityId: "123",
                 authController: mockAuthController as AuthController
@@ -793,7 +891,9 @@ describe("Property Conditions", () => {
                     email: "test@example.com",
                     displayName: "Test User",
                     photoURL: null,
-                    roles: [{ id: "admin", name: "Admin" }, { id: "editor", name: "Editor" }]
+                    roles: [{ id: "admin",
+name: "Admin" }, { id: "editor",
+name: "Editor" }]
                 }
             };
 

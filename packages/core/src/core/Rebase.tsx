@@ -1,6 +1,6 @@
+"use client";
 import type { RebaseProps } from "./RebaseProps";
 import type { CustomizationController, RebasePlugin, SlotContribution } from "@rebasepro/types";
-"use client";
 
 import React, { useMemo } from "react";
 import { CenteredView, Typography } from "@rebasepro/ui";
@@ -80,7 +80,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
     // Merge direct slots with plugin slots
     const resolvedSlots: SlotContribution[] = useMemo(() => [
         ...directSlots,
-        ...((plugins ?? []).flatMap((p) => p.slots ?? [])),
+        ...((plugins ?? []).flatMap((p) => p.slots ?? []))
     ], [directSlots, plugins]);
 
     const userManagement = useMemo(() => plugins?.find((p) => p.userManagement)?.userManagement
@@ -94,7 +94,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
     // Auth fallback logic
     const clientAuthController = useAuthSubscription(authControllerProp ? undefined : client?.auth);
     const authController = authControllerProp ?? clientAuthController;
-    
+
     // Data fallback logic
     const resolvedData = useMemo(() => {
         if (dataProp) return dataProp;
@@ -121,7 +121,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
                     fetchAvailableRoles: driverProp.fetchAvailableRoles?.bind(driverProp),
                     fetchCurrentDatabase: driverProp.fetchCurrentDatabase?.bind(driverProp),
                     fetchUnmappedTables: driverProp.fetchUnmappedTables?.bind(driverProp),
-                    fetchTableMetadata: driverProp.fetchTableMetadata?.bind(driverProp),
+                    fetchTableMetadata: driverProp.fetchTableMetadata?.bind(driverProp)
                 } : {}),
                 ...driverProp.admin
             };
@@ -141,8 +141,8 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
                 ...(typeof ws.createBranch === "function" ? {
                     createBranch: ws.createBranch.bind(ws),
                     deleteBranch: ws.deleteBranch.bind(ws),
-                    listBranches: ws.listBranches.bind(ws),
-                } : {}),
+                    listBranches: ws.listBranches.bind(ws)
+                } : {})
             };
         }
 
@@ -154,7 +154,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
                 fetchAvailableRoles: driverProp.fetchAvailableRoles?.bind(driverProp),
                 fetchCurrentDatabase: driverProp.fetchCurrentDatabase?.bind(driverProp),
                 fetchUnmappedTables: driverProp.fetchUnmappedTables?.bind(driverProp),
-                fetchTableMetadata: driverProp.fetchTableMetadata?.bind(driverProp),
+                fetchTableMetadata: driverProp.fetchTableMetadata?.bind(driverProp)
             };
         }
         return undefined;
@@ -198,7 +198,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
             <CenteredView maxWidth={"md"}>
                 <ErrorView
                     title={"Error loading auth"}
-                    error={authController.authError as Error | string} />
+                    error={authController.authError as Error | string}/>
             </CenteredView>
         );
     }
@@ -284,7 +284,7 @@ function RebaseInternal({
                 plugins={plugins}
                 scope="root"
                 scopeProps={{ context }}>
-                <PluginLifecycleManager plugins={plugins} context={context} />
+                <PluginLifecycleManager plugins={plugins} context={context}/>
                 {childrenResult}
             </PluginProviderStack>
         );

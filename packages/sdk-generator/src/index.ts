@@ -26,7 +26,7 @@ export interface GenerateSDKOptions {
 
 export function generateSDK(
     collections: EntityCollection[],
-    options: GenerateSDKOptions = {},
+    options: GenerateSDKOptions = {}
 ): GeneratedFile[] {
     const files: GeneratedFile[] = [];
 

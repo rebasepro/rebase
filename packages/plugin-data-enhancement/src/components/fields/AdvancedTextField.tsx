@@ -95,7 +95,7 @@ export function AdvancedTextField({
     if (disabled) {
         return <TextField label={label}
             disabled={true}
-            value={internalValue} />
+            value={internalValue}/>
     }
 
     const additional: any = {
@@ -120,7 +120,7 @@ export function AdvancedTextField({
                 "min-h-[28px]": size === "smallest",
                 "min-h-[32px]": size === "small",
                 "min-h-[44px]": size === "medium",
-                "min-h-[64px]": size === "large",
+                "min-h-[64px]": size === "large"
             },
             className)}>
 
@@ -140,7 +140,7 @@ export function AdvancedTextField({
                 className={cls("inset-0 whitespace-pre-wrap overflow-x-auto select-none pb-2 px-3",
                     {
                         "pt-8": size === "large",
-                        "pt-4": size === "medium" || size === "small",
+                        "pt-4": size === "medium" || size === "small"
                     })}>
 
                 {addLineBreaks(originalValue, !endsWithHighlight && multiline)}
@@ -158,7 +158,7 @@ export function AdvancedTextField({
                         "min-h-[28px]": size === "smallest",
                         "min-h-[32px]": size === "small",
                         "min-h-[44px]": size === "medium",
-                        "min-h-[64px]": size === "large",
+                        "min-h-[64px]": size === "large"
                     },
                     "rounded-md resize-none w-full outline-hidden text-base bg-transparent ",
                     disabled && "border border-transparent outline-hidden opacity-50 text-surface-600 dark:text-surface-500",
@@ -174,7 +174,7 @@ export function AdvancedTextField({
                 sizeRef={ref}
                 onChange={onChange}
                 onScroll={onScroll}
-                {...additional} />
+                {...additional}/>
 
         </div>
     );
@@ -195,6 +195,6 @@ function addLineBreaks(value?: string | number, addLastBreak = false) {
     return lines.map((p, i) => <React.Fragment key={i}>
         <span className="break-words"
         >{p ?? " "}</span>
-        {(lines.length - 1 !== i || addLastBreak) && <br />}
+        {(lines.length - 1 !== i || addLastBreak) && <br/>}
     </React.Fragment>);
 }

@@ -2,7 +2,7 @@ import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 
 /**
  * Unit tests for useBoardDataController hook.
- * 
+ *
  * Note: Since this hook relies on React hooks and Firebase context,
  * we test the logic and type definitions here. Full integration testing
  * should be done in the browser with actual data sources.
@@ -50,8 +50,16 @@ describe("useBoardDataController types and logic", () => {
 
             const columnData: BoardColumnData<TaskEntity> = {
                 entities: [
-                    { id: "1", values: { title: "Task 1", status: "todo", order: 0 }, path: "tasks/1" },
-                    { id: "2", values: { title: "Task 2", status: "todo", order: 1 }, path: "tasks/2" }
+                    { id: "1",
+values: { title: "Task 1",
+status: "todo",
+order: 0 },
+path: "tasks/1" },
+                    { id: "2",
+values: { title: "Task 2",
+status: "todo",
+order: 1 },
+path: "tasks/2" }
                 ],
                 loading: false,
                 hasMore: false
@@ -84,9 +92,15 @@ describe("useBoardDataController types and logic", () => {
 
             const controller: BoardDataController<Record<string, unknown>, "todo" | "in_progress" | "done"> = {
                 columnData: {
-                    todo: { entities: [], loading: false, hasMore: true },
-                    in_progress: { entities: [], loading: true, hasMore: true },
-                    done: { entities: [], loading: false, hasMore: false }
+                    todo: { entities: [],
+loading: false,
+hasMore: true },
+                    in_progress: { entities: [],
+loading: true,
+hasMore: true },
+                    done: { entities: [],
+loading: false,
+hasMore: false }
                 },
                 loadMoreColumn: mockLoadMoreColumn,
                 refreshColumn: mockRefreshColumn,
@@ -111,9 +125,15 @@ describe("useBoardDataController types and logic", () => {
 
         it("should report aggregate loading state correctly", () => {
             const columnData = {
-                col1: { entities: [], loading: false, hasMore: false },
-                col2: { entities: [], loading: false, hasMore: false },
-                col3: { entities: [], loading: false, hasMore: false }
+                col1: { entities: [],
+loading: false,
+hasMore: false },
+                col2: { entities: [],
+loading: false,
+hasMore: false },
+                col3: { entities: [],
+loading: false,
+hasMore: false }
             };
 
             // Helper to compute loading state (mirrors hook logic)
@@ -131,8 +151,14 @@ describe("useBoardDataController types and logic", () => {
             const error2 = new Error("Error in column 2");
 
             const columnData = {
-                col1: { entities: [], loading: false, hasMore: false, error: error1 },
-                col2: { entities: [], loading: false, hasMore: false, error: error2 }
+                col1: { entities: [],
+loading: false,
+hasMore: false,
+error: error1 },
+                col2: { entities: [],
+loading: false,
+hasMore: false,
+error: error2 }
             };
 
             // Helper to get first error (mirrors hook logic)
@@ -179,7 +205,9 @@ describe("useBoardDataController types and logic", () => {
     describe("pagination logic", () => {
         it("should increase item count when loading more", () => {
             const pageSize = 30;
-            let columnItemCounts = { todo: 30, in_progress: 30, done: 30 };
+            let columnItemCounts = { todo: 30,
+in_progress: 30,
+done: 30 };
 
             // Simulate loadMoreColumn("todo")
             columnItemCounts = {
@@ -195,22 +223,27 @@ describe("useBoardDataController types and logic", () => {
             const pageSize = 30;
 
             // Scenario 1: Less items than limit = no more to load
-            const entities1 = Array(25).fill({ id: "test", values: {} });
+            const entities1 = Array(25).fill({ id: "test",
+values: {} });
             expect(entities1.length >= pageSize).toBe(false);
 
             // Scenario 2: Exactly limit items = might have more
-            const entities2 = Array(30).fill({ id: "test", values: {} });
+            const entities2 = Array(30).fill({ id: "test",
+values: {} });
             expect(entities2.length >= pageSize).toBe(true);
 
             // Scenario 3: More items (edge case) = definitely has more
-            const entities3 = Array(31).fill({ id: "test", values: {} });
+            const entities3 = Array(31).fill({ id: "test",
+values: {} });
             expect(entities3.length >= pageSize).toBe(true);
         });
     });
 
     describe("refresh logic", () => {
         it("should increment refresh counter for single column", () => {
-            let refreshCounters = { todo: 0, in_progress: 0, done: 0 };
+            let refreshCounters = { todo: 0,
+in_progress: 0,
+done: 0 };
 
             // Simulate refreshColumn("todo")
             refreshCounters = {
@@ -225,7 +258,9 @@ describe("useBoardDataController types and logic", () => {
 
         it("should increment all refresh counters for refreshAll", () => {
             const columns = ["todo", "in_progress", "done"];
-            let refreshCounters: Record<string, number> = { todo: 0, in_progress: 0, done: 0 };
+            let refreshCounters: Record<string, number> = { todo: 0,
+in_progress: 0,
+done: 0 };
 
             // Simulate refreshAll()
             const updated = { ...refreshCounters };
@@ -243,7 +278,8 @@ describe("useBoardDataController types and logic", () => {
     describe("column initialization", () => {
         it("should initialize new columns when columns array changes", () => {
             const pageSize = 30;
-            const existingCounts = { todo: 60, in_progress: 30 };
+            const existingCounts = { todo: 60,
+in_progress: 30 };
             const newColumns = ["todo", "in_progress", "done", "archived"];
 
             // Simulate initialization logic
@@ -262,7 +298,11 @@ describe("useBoardDataController types and logic", () => {
 
         it("should initialize column data state for new columns", () => {
             const existingData: Record<string, BoardColumnData> = {
-                todo: { entities: [{ id: "1", values: {}, path: "x" }], loading: false, hasMore: true }
+                todo: { entities: [{ id: "1",
+values: {},
+path: "x" }],
+loading: false,
+hasMore: true }
             };
             const newColumns = ["todo", "in_progress"];
 

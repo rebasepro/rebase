@@ -13,5 +13,5 @@ export function RebaseRouter({
             path: basePath ? `${removeInitialAndTrailingSlashes(basePath)}/*` : "/*",
             element: children
         }
-    ])} />;
+    ])}/>;
 }

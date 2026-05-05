@@ -23,14 +23,16 @@ export * from "./SearchIconsView";
 export * from "./FieldCaption";
 export * from "./EntityPreview";
 
-export * from "./history";
+// history is lazy-loaded by EntityEditView and resolutions.ts
+// export * from "./history";
 export * from "./common";
 export * from "./field_configs";
 
 export * from "./SideEntityProvider";
 export * from "./AdminModeSyncer";
-export * from "./admin/RolesView";
-export * from "./admin/UsersView";
+// Admin views are lazy-loaded by RebaseRouteDefs and useResolvedViews
+// export * from "./admin/RolesView";
+// export * from "./admin/UsersView";
 export * from "./app/AppBar";
 export * from "./app/Drawer";
 export * from "./app/Scaffold";
@@ -38,7 +40,8 @@ export * from "./DefaultAppBar";
 export * from "./DefaultDrawer";
 export * from "./DrawerNavigationItem";
 export * from "./DrawerNavigationGroup";
-export * from "./HomePage/ContentHomePage";
+// ContentHomePage is lazy-loaded by RebaseRouteDefs
+// export * from "./HomePage/ContentHomePage";
 export * from "./SideDialogs";
 
 export * from "./app/useApp";

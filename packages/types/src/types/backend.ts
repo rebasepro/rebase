@@ -77,10 +77,10 @@ export interface CountOptions<M extends Record<string, unknown> = Record<string,
 /**
  * Abstract condition builder interface.
  * Implementations translate Rebase filter conditions to database-specific queries.
- * 
+ *
  * Note: This interface can be implemented as instance methods or as a class with static methods.
  * For static implementations (like DrizzleConditionBuilder), use the ConditionBuilderStatic type.
- * 
+ *
  * @template T The type of condition returned by the builder (e.g., SQL for PostgreSQL, Filter<Document> for MongoDB)
  */
 export interface ConditionBuilder<T = unknown> {
@@ -116,7 +116,7 @@ export interface ConditionBuilder<T = unknown> {
 /**
  * Static condition builder type for implementations using static methods.
  * Use this type when the class provides static methods rather than instance methods.
- * 
+ *
  * @example
  * // DrizzleConditionBuilder satisfies this type
  * const builder: ConditionBuilderStatic<SQL> = DrizzleConditionBuilder;
@@ -142,7 +142,7 @@ export type ConditionBuilderStatic<T = unknown> = {
 /**
  * Abstract entity repository interface.
  * Handles all CRUD operations for entities in the database.
- * 
+ *
  * Implementations should handle:
  * - Entity serialization/deserialization
  * - Relation resolution
@@ -622,7 +622,7 @@ export type BackendFactory<TConfig extends BackendConfig = BackendConfig> =
  *   initializeDriver: async (config) => new MySQLDataDriver(config.connection),
  *   initializeRealtime: async (config) => new MySQLChangeStreamRealtime(config.connection),
  * };
- * 
+ *
  * initializeRebaseBackend({
  *   ...config,
  *   bootstrappers: [postgresBootstrapper, mysqlBootstrapper]

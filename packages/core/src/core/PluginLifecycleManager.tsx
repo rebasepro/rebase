@@ -15,7 +15,7 @@ import type { RebasePlugin, RebaseContext, User } from "@rebasepro/types";
  */
 export function PluginLifecycleManager({
     plugins,
-    context,
+    context
 }: {
     plugins: RebasePlugin[];
     context: RebaseContext;

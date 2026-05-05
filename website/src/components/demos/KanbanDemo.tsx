@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 
 export function KanbanDemo() {
     const [draggedCard, setDraggedCard] = useState<string | null>(null);
-    const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+    const [dragOffset, setDragOffset] = useState({ x: 0,
+y: 0 });
 
     useEffect(() => {
         let isMounted = true;
@@ -16,7 +17,8 @@ export function KanbanDemo() {
 
                 // Pick up a card
                 setDraggedCard("card-2");
-                setDragOffset({ x: 0, y: 0 });
+                setDragOffset({ x: 0,
+y: 0 });
 
                 // Animate dragging
                 const steps = 40;
@@ -24,9 +26,10 @@ export function KanbanDemo() {
                     const progress = i / steps;
                     const x = progress * 120; // Move right 120px
                     const y = Math.sin(progress * Math.PI) * -10; // Slight arc up
-                    
-                    setDragOffset({ x, y });
-                    
+
+                    setDragOffset({ x,
+y });
+
                     await new Promise(r => { timer = setTimeout(r, 16); }); // 60fps
                     if (!isMounted) return;
                 }
@@ -69,19 +72,19 @@ export function KanbanDemo() {
                         </div>
 
                         {draggedCard === "card-2" && (
-                            <div className="h-[76px] rounded-lg border-2 border-dashed border-surface-700/50 bg-surface-800/10" />
+                            <div className="h-[76px] rounded-lg border-2 border-dashed border-surface-700/50 bg-surface-800/10"/>
                         )}
 
-                        <div 
+                        <div
                             className={`bg-surface-800 rounded-lg p-2 ring-1 ring-surface-700/50 shadow-md ${draggedCard === "card-2" ? "absolute z-10 w-full" : "relative"}`}
-                            style={draggedCard === "card-2" ? { 
-                                transform: `translate(${dragOffset.x}px, ${dragOffset.y}px) rotate(3deg)`, 
-                                transition: 'none',
-                                top: '84px',
-                                boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)',
-                                borderColor: 'rgba(255,255,255,0.1)'
+                            style={draggedCard === "card-2" ? {
+                                transform: `translate(${dragOffset.x}px, ${dragOffset.y}px) rotate(3deg)`,
+                                transition: "none",
+                                top: "84px",
+                                boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)",
+                                borderColor: "rgba(255,255,255,0.1)"
                             } : {
-                                transition: 'transform 0.0s'
+                                transition: "transform 0.0s"
                             }}
                         >
                             <div className="text-xs text-white font-medium mb-1 line-clamp-2">Authentication flow API</div>
@@ -110,7 +113,7 @@ export function KanbanDemo() {
                                 <span className="text-[9px] text-surface-500 font-mono">legal-4</span>
                             </div>
                         </div>
-                        {draggedCard === null && <div className="h-4" />} {/* Spacer */}
+                        {draggedCard === null && <div className="h-4"/>} {/* Spacer */}
                     </div>
                 </div>
             </div>

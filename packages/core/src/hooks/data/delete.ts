@@ -54,7 +54,7 @@ export async function deleteEntityWithCallbacks<M extends Record<string, any>, U
     };
 
     return data.collection(entity.path).delete(entity.id).then(() => {
-        onDeleteSuccess && onDeleteSuccess(entity);
+        if (onDeleteSuccess) onDeleteSuccess(entity);
         return true;
     }).catch((e) => {
         if (onDeleteFailure) onDeleteFailure(entity, e);

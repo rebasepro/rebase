@@ -77,7 +77,7 @@ export function createMicrosoftProvider(config: {
                     providerId: profileData.id,
                     email,
                     displayName: profileData.displayName || null,
-                    photoUrl: null,
+                    photoUrl: null
                 };
             } catch (error) {
                 console.error("Microsoft OAuth error:", error);

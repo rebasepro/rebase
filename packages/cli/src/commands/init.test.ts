@@ -32,7 +32,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(tmpDir, { recursive: true,
+force: true });
 });
 
 /**
@@ -48,7 +49,7 @@ async function simulateInit(projectName: string): Promise<string> {
         filter: (source: string) => {
             const basename = path.basename(source);
             return basename !== "node_modules" && basename !== ".DS_Store";
-        },
+        }
     });
 
     // Replace placeholders
@@ -58,7 +59,7 @@ async function simulateInit(projectName: string): Promise<string> {
         "backend/package.json",
         "config/package.json",
         "frontend/index.html",
-        "README.md",
+        "README.md"
     ];
 
     for (const file of filesToProcess) {
@@ -162,7 +163,7 @@ describe("placeholder replacement", () => {
             "frontend/package.json",
             "backend/package.json",
             "config/package.json",
-            "README.md",
+            "README.md"
         ];
 
         for (const file of filesToCheck) {

@@ -50,13 +50,13 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
             await execa(tsxBin, [pluginCli, ...rawArgs.slice(2)], {
                 cwd: backendDir,
                 stdio: "inherit",
-                env,
+                env
             });
         } else {
             await execa("node", [pluginCli, ...rawArgs.slice(2)], {
                 cwd: backendDir,
                 stdio: "inherit",
-                env,
+                env
             });
         }
     } catch {

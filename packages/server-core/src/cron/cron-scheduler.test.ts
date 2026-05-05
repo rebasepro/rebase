@@ -21,8 +21,8 @@ function makeJob(
                 ctx.log("hello from", id);
                 return { ok: true };
             },
-            ...overrides,
-        },
+            ...overrides
+        }
     };
 }
 
@@ -30,7 +30,7 @@ function makeFailingJob(id: string, errorMsg = "boom"): LoadedCronJob {
     return makeJob(id, {
         handler: async () => {
             throw new Error(errorMsg);
-        },
+        }
     });
 }
 
@@ -38,7 +38,7 @@ function makeSlowJob(id: string, delayMs: number): LoadedCronJob {
     return makeJob(id, {
         timeoutSeconds: 1, // 1s timeout
         handler: () =>
-            new Promise((resolve) => setTimeout(() => resolve({ done: true }), delayMs)),
+            new Promise((resolve) => setTimeout(() => resolve({ done: true }), delayMs))
     });
 }
 
@@ -103,8 +103,8 @@ describe("CronScheduler", () => {
                 makeJob("meta", {
                     name: "My Job",
                     description: "Does stuff",
-                    schedule: "30 2 * * 1",
-                }),
+                    schedule: "30 2 * * 1"
+                })
             ]);
 
             const job = scheduler.getJob("meta");
@@ -184,15 +184,15 @@ describe("CronScheduler", () => {
                         ctx.log("line 1");
                         ctx.log("line 2", { nested: true });
                         ctx.log(42);
-                    },
-                }),
+                    }
+                })
             ]);
 
             const log = await scheduler.triggerJob("logger");
             expect(log!.logs).toEqual([
                 "line 1",
                 'line 2 {"nested":true}',
-                "42",
+                "42"
             ]);
         });
 
@@ -224,8 +224,8 @@ describe("CronScheduler", () => {
                 makeJob("void-handler", {
                     handler: async () => {
                         // returns void
-                    },
-                }),
+                    }
+                })
             ]);
 
             const log = await scheduler.triggerJob("void-handler");
@@ -239,8 +239,8 @@ describe("CronScheduler", () => {
                     handler: (ctx) => {
                         ctx.log("sync");
                         return { sync: true };
-                    },
-                }),
+                    }
+                })
             ]);
 
             const log = await scheduler.triggerJob("sync-handler");
@@ -260,8 +260,8 @@ describe("CronScheduler", () => {
                     handler: () =>
                         new Promise((resolve) =>
                             setTimeout(() => resolve("late"), 3000)
-                        ),
-                }),
+                        )
+                })
             ]);
 
             const log = await scheduler.triggerJob("slow");
@@ -286,8 +286,8 @@ describe("CronScheduler", () => {
                 makeJob("ordered", {
                     handler: async (ctx) => {
                         return { run: ctx.jobId };
-                    },
-                }),
+                    }
+                })
             ]);
 
             await scheduler.triggerJob("ordered");
@@ -389,8 +389,8 @@ describe("CronScheduler", () => {
                 makeJob("shape", {
                     name: "Shape Test",
                     description: "Desc",
-                    schedule: "15 3 * * *",
-                }),
+                    schedule: "15 3 * * *"
+                })
             ]);
 
             const job = scheduler.getJob("shape")!;
@@ -402,7 +402,7 @@ describe("CronScheduler", () => {
                 enabled: true,
                 state: "idle",
                 totalRuns: 0,
-                totalFailures: 0,
+                totalFailures: 0
             });
         });
 

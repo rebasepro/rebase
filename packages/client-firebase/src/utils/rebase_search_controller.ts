@@ -115,7 +115,7 @@ export function buildRebaseSearchController(
                     protocol: options.customConfig.protocol || "https",
                     apiKey: options.customConfig.apiKey,
                     path: options.customConfig.path,
-                    collectionsToIndex: ["*"],
+                    collectionsToIndex: ["*"]
                 };
             } else {
                 // Fetch config from extension
@@ -153,12 +153,12 @@ export function buildRebaseSearchController(
                     host: searchConfig.host,
                     port: searchConfig.port,
                     protocol: searchConfig.protocol,
-                    path: searchConfig.path || "",
+                    path: searchConfig.path || ""
                 }],
                 apiKey: searchConfig.apiKey,
                 connectionTimeoutSeconds: 5,
                 retryIntervalSeconds: 0.5,
-                numRetries: 2,
+                numRetries: 2
             });
         };
 
@@ -327,7 +327,7 @@ export function buildRebaseSearchController(
                     query_by: queryBy,
                     per_page: 100,
                     prefix: true, // Enable prefix matching
-                    typo_tokens_threshold: 1, // Allow some typos
+                    typo_tokens_threshold: 1 // Allow some typos
                 };
 
                 // Add filter for subcollection queries
@@ -351,6 +351,7 @@ export function buildRebaseSearchController(
             }
         };
 
-        return { init, search };
+        return { init,
+search };
     };
 }

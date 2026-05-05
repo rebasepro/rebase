@@ -6,7 +6,7 @@ import {
     EntityStatus,
     EntityValues,
     Properties,
-    Property,
+    Property
 } from "@rebasepro/types";
 import { DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "./common";
 import { mergeDeep } from "@rebasepro/utils";
@@ -40,7 +40,8 @@ export function getDefaultValuesFor<M extends Record<string, unknown>>(propertie
             const value = getDefaultValueFor(property);
             return value === undefined ? {} : { [key]: value };
         })
-        .reduce((a, b) => ({ ...a, ...b }), {}) as EntityValues<M>;
+        .reduce((a, b) => ({ ...a,
+...b }), {}) as EntityValues<M>;
 }
 
 export function getDefaultValueFor(property?: Property) {
@@ -187,7 +188,8 @@ export function traverseValuesProperties<M extends Record<string, unknown>>(
             if (updatedValue === undefined) return undefined;
             return ({ [key]: updatedValue });
         })
-        .reduce((a, b) => ({ ...a, ...b }), {}) as EntityValues<M>;
+        .reduce((a, b) => ({ ...a,
+...b }), {}) as EntityValues<M>;
     // Use mergeDeep to preserve class instances like EntityReference, GeoPoint
     const result = mergeDeep(safeInputValues, updatedValues);
     if (!result || Object.keys(result).length === 0) return undefined;

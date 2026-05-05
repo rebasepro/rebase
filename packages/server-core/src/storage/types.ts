@@ -8,7 +8,7 @@ import { StorageSource, UploadFileProps, UploadFileResult, DownloadConfig, Stora
  * Local filesystem storage configuration
  */
 export interface LocalStorageConfig {
-    type: 'local';
+    type: "local";
     /** Base directory for file storage (e.g., './uploads') */
     basePath: string;
     /** Maximum file size in bytes (default: 50MB) */
@@ -23,7 +23,7 @@ export interface LocalStorageConfig {
  * S3-compatible storage configuration (works with AWS S3 and MinIO)
  */
 export interface S3StorageConfig {
-    type: 's3';
+    type: "s3";
     /** S3 bucket name */
     bucket: string;
     /** AWS region (e.g., 'us-east-1') */
@@ -109,26 +109,26 @@ export const DEFAULT_MAX_FILE_SIZE = 50 * 1024 * 1024;
  * Common image MIME types
  */
 export const IMAGE_MIME_TYPES = [
-    'image/jpeg',
-    'image/png',
-    'image/gif',
-    'image/webp',
-    'image/svg+xml',
-    'image/bmp',
-    'image/tiff'
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "image/svg+xml",
+    "image/bmp",
+    "image/tiff"
 ];
 
 /**
  * Common document MIME types
  */
 export const DOCUMENT_MIME_TYPES = [
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'application/vnd.ms-powerpoint',
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    'text/plain',
-    'text/csv'
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "text/plain",
+    "text/csv"
 ];

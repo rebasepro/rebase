@@ -26,7 +26,8 @@ export function createCronRoutes(scheduler: CronScheduler): Hono<HonoEnv> {
         const id = c.req.param("id");
         const job = scheduler.getJob(id);
         if (!job) {
-            return c.json({ error: { message: `Cron job "${id}" not found`, code: "NOT_FOUND" } }, 404);
+            return c.json({ error: { message: `Cron job "${id}" not found`,
+code: "NOT_FOUND" } }, 404);
         }
         return c.json({ job });
     });
@@ -36,11 +37,13 @@ export function createCronRoutes(scheduler: CronScheduler): Hono<HonoEnv> {
         const id = c.req.param("id");
         const job = scheduler.getJob(id);
         if (!job) {
-            return c.json({ error: { message: `Cron job "${id}" not found`, code: "NOT_FOUND" } }, 404);
+            return c.json({ error: { message: `Cron job "${id}" not found`,
+code: "NOT_FOUND" } }, 404);
         }
 
         const log = await scheduler.triggerJob(id);
-        return c.json({ log, job: scheduler.getJob(id) });
+        return c.json({ log,
+job: scheduler.getJob(id) });
     });
 
     // Get job logs
@@ -51,7 +54,8 @@ export function createCronRoutes(scheduler: CronScheduler): Hono<HonoEnv> {
 
         const job = scheduler.getJob(id);
         if (!job) {
-            return c.json({ error: { message: `Cron job "${id}" not found`, code: "NOT_FOUND" } }, 404);
+            return c.json({ error: { message: `Cron job "${id}" not found`,
+code: "NOT_FOUND" } }, 404);
         }
 
         const logs = await scheduler.getJobLogsFromDb(id, limit);
@@ -64,12 +68,14 @@ export function createCronRoutes(scheduler: CronScheduler): Hono<HonoEnv> {
         const body = await c.req.json().catch(() => ({})) as { enabled: boolean };
 
         if (typeof body.enabled !== "boolean") {
-            return c.json({ error: { message: "Missing 'enabled' boolean in body", code: "BAD_REQUEST" } }, 400);
+            return c.json({ error: { message: "Missing 'enabled' boolean in body",
+code: "BAD_REQUEST" } }, 400);
         }
 
         const job = scheduler.setJobEnabled(id, body.enabled);
         if (!job) {
-            return c.json({ error: { message: `Cron job "${id}" not found`, code: "NOT_FOUND" } }, 404);
+            return c.json({ error: { message: `Cron job "${id}" not found`,
+code: "NOT_FOUND" } }, 404);
         }
 
         return c.json({ job });

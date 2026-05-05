@@ -108,10 +108,11 @@ function createTransport(config) {
         const headers = {
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            ...(init?.headers || {}),
+            ...(init?.headers || {})
         };
 
-        const res = await fetchFn(url, { ...init, headers });
+        const res = await fetchFn(url, { ...init,
+headers });
 
         // 204 No Content (e.g. DELETE)
         if (res.status === 204) return undefined;
@@ -125,9 +126,10 @@ function createTransport(config) {
                 const retryHeaders = {
                     "Content-Type": "application/json",
                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                    ...(init?.headers || {}),
+                    ...(init?.headers || {})
                 };
-                const retryRes = await fetchFn(url, { ...init, headers: retryHeaders });
+                const retryRes = await fetchFn(url, { ...init,
+headers: retryHeaders });
                 if (retryRes.status === 204) return undefined;
                 const retryBody = await retryRes.json().catch(() => ({}));
                 if (!retryRes.ok) {
@@ -135,7 +137,7 @@ function createTransport(config) {
                         retryRes.status,
                         retryBody?.error?.message || retryBody?.message || retryRes.statusText,
                         retryBody?.error?.code || retryBody?.code,
-                        retryBody?.error?.details || retryBody?.details,
+                        retryBody?.error?.details || retryBody?.details
                     );
                 }
                 return retryBody;
@@ -147,7 +149,7 @@ function createTransport(config) {
                 res.status,
                 body?.error?.message || body?.message || res.statusText,
                 body?.error?.code || body?.code,
-                body?.error?.details || body?.details,
+                body?.error?.details || body?.details
             );
         }
 
@@ -163,7 +165,7 @@ function createTransport(config) {
         /** @returns {string} The API path prefix */
         get apiPath() { return apiPath; },
         /** @returns {typeof globalThis.fetch} The fetch implementation */
-        get fetchFn() { return fetchFn; },
+        get fetchFn() { return fetchFn; }
     };
 }
 
@@ -205,7 +207,7 @@ function createCollectionClient(transport, slug) {
         async create(data) {
             return transport.request(basePath, {
                 method: "POST",
-                body: JSON.stringify(data),
+                body: JSON.stringify(data)
             });
         },
 
@@ -218,7 +220,7 @@ function createCollectionClient(transport, slug) {
         async update(id, data) {
             return transport.request(`${basePath}/${encodeURIComponent(String(id))}`, {
                 method: "PUT",
-                body: JSON.stringify(data),
+                body: JSON.stringify(data)
             });
         },
 
@@ -229,9 +231,9 @@ function createCollectionClient(transport, slug) {
          */
         async delete(id) {
             return transport.request(`${basePath}/${encodeURIComponent(String(id))}`, {
-                method: "DELETE",
+                method: "DELETE"
             });
-        },
+        }
     };
 }
 

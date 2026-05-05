@@ -1,49 +1,49 @@
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
 
-const dir = path.join(__dirname, 'src', 'pages');
-const files = ['rebase-vs-django.astro', 'rebase-vs-hasura.astro'];
+const dir = path.join(__dirname, "src", "pages");
+const files = ["rebase-vs-django.astro", "rebase-vs-hasura.astro"];
 
 for (const file of files) {
   const filePath = path.join(dir, file);
-  let content = fs.readFileSync(filePath, 'utf8');
+  let content = fs.readFileSync(filePath, "utf8");
 
   // We know these files only have TWO points originally, but Point 1 was successfully upgraded because `<!-- Point 2 -->` existed.
   // Wait! If Point 1 was upgraded, the file content HAS CHANGED.
   // The script writes after all points are processed. So Point 1 WAS upgraded, Point 2 was skipped.
   // Wait, if I run the regex on Point 2 now, the bounds for Point 2 start at `<!-- Point 2 -->` and end at `\n        </div>\n\n      </div>`.
-  
+
   for (let i = 2; i <= 2; i++) { // specifically target point 2
     const startStr = `<!-- Point ${i} -->`;
-    
+
     let startIndex = content.indexOf(startStr);
-    let endIndex = content.indexOf(`\n        </div>\n\n      </div>`, startIndex);
-    
+    let endIndex = content.indexOf("\n        </div>\n\n      </div>", startIndex);
+
     if (startIndex === -1 || endIndex === -1) {
         console.error(`Could not find bounds for Point ${i} in ${file}`);
         continue;
     }
-    
+
     let chunk = content.substring(startIndex, endIndex);
 
     const iconMatch = chunk.match(/<span class="material-symbols-rounded[^>]*>([^<]+)<\/span>/);
-    const iconSpanClose = chunk.indexOf('</span>', chunk.indexOf('material-symbols-rounded'));
-    const categoryDivClose = chunk.indexOf('</div>', iconSpanClose);
+    const iconSpanClose = chunk.indexOf("</span>", chunk.indexOf("material-symbols-rounded"));
+    const categoryDivClose = chunk.indexOf("</div>", iconSpanClose);
     const category = chunk.substring(iconSpanClose + 7, categoryDivClose).trim();
 
     const mainTitleMatch = chunk.match(/<h3 class="text-2xl font-bold text-white mb-4">([^<]+)<\/h3>/);
     const painTitleMatch = chunk.match(/<h4 class="text-white font-semibold mb-2">([^<]+)<\/h4>/);
     const painTextMatch = chunk.match(/<p class="text-surface-400 text-sm">([\s\S]*?)<\/p>/);
-    
+
     const solutionTitleMatch = chunk.match(/<h4 class="text-white font-semibold text-lg mb-3">([^<]+)<\/h4>/);
     const solutionSummaryMatch = chunk.match(/<p class="text-surface-300 leading-relaxed mb-4">\s*([\s\S]*?)\s*<\/p>/);
-    
+
     const ulMatch = chunk.match(/<ul class="text-surface-400 space-y-2 text-sm">\s*([\s\S]*?)<\/ul>/);
 
     if (iconMatch && mainTitleMatch && painTitleMatch && painTextMatch && solutionTitleMatch && solutionSummaryMatch && ulMatch) {
         let ulContent = ulMatch[1];
         ulContent = ulContent.replace(/<li><span class="text-primary mr-2">•<\/span>\s*([\s\S]*?)<\/li>/g, '<li class="flex items-start"><span class="material-symbols-rounded text-primary mr-2 mt-0.5" style="font-size:18px">done</span> <span class="leading-relaxed">$1</span></li>');
-        
+
         const newChunk = `<!-- Point ${i} -->
           <div class="p-8 rounded-2xl bg-surface-900/30 border border-surface-800/60 relative overflow-hidden group hover:border-surface-700 transition-colors">
             <!-- Subtle gradient background -->
@@ -95,7 +95,7 @@ for (const file of files) {
               </div>
             </div>
           </div>\n\n          `;
-          
+
           content = content.replace(chunk, newChunk);
     } else {
         console.error(`Regex failed to match all groups for Point ${i} in ${file}`);

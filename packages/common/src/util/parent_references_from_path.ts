@@ -11,7 +11,7 @@ export function getParentReferencesFromPath(props: {
     const {
         path,
         collections = [],
-        currentFullPath,
+        currentFullPath
     } = props;
 
     const subpaths = removeInitialAndTrailingSlashes(path).split("/");
@@ -34,7 +34,8 @@ export function getParentReferencesFromPath(props: {
             if (nextSegments.length > 0) {
                 const entityId = nextSegments[0];
                 const path = collectionPath + "/" + entityId;
-                result.push(new EntityReference({ id: entityId, path: collectionPath }));
+                result.push(new EntityReference({ id: entityId,
+path: collectionPath }));
                 if (nextSegments.length > 1) {
                     const newPath = nextSegments.slice(1).join("/");
                     if (!collection) {

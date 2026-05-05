@@ -21,7 +21,7 @@ export type VirtualTableRowProps<T> = {
     rowClassName?: (rowData: T) => string | undefined;
 };
 
-export type VirtualTableContextProps<T extends any> = {
+export type VirtualTableContextProps<T> = {
     data?: T[];
     rowHeight?: number,
     headerHeight?: number,
@@ -43,4 +43,5 @@ export type VirtualTableContextProps<T extends any> = {
     AddColumnComponent?: React.ComponentType;
     onColumnsOrderChange?: (columns: VirtualTableColumn[]) => void;
     draggingColumnId?: string | null;
+    extraData?: Record<string, any>;
 };

@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 
 export interface ActionProps<M> {
     collection: M;
@@ -10,6 +10,6 @@ export interface Collection {
 
 declare let specificAction: React.ComponentType<ActionProps<{ id: string }>>;
 
-let coll: Collection = {
+const coll: Collection = {
     Actions: [specificAction]
 };

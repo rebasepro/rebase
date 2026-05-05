@@ -190,7 +190,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     let activeCollections = config.collections || [];
     if (config.collectionsDir && activeCollections.length === 0) {
         activeCollections = await loadCollectionsFromDirectory(config.collectionsDir);
-        logger.info("Auto-discovered collections", { count: activeCollections.length, dir: config.collectionsDir });
+        logger.info("Auto-discovered collections", { count: activeCollections.length,
+dir: config.collectionsDir });
     }
 
     const realtimeServices: Record<string, RealtimeProvider> = {};
@@ -213,9 +214,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             defaultDriverId = b.id || bootstrapper.type;
         }
 
-        const driverResult = await bootstrapper.initializeDriver({ collections: activeCollections, collectionRegistry });
+        const driverResult = await bootstrapper.initializeDriver({ collections: activeCollections,
+collectionRegistry });
         delegates[b.id || bootstrapper.type] = driverResult.driver;
-        
+
         if ((b.id || bootstrapper.type) === defaultDriverId || !defaultDriverResult) {
             defaultDriverResult = driverResult;
         }
@@ -306,12 +308,12 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // Helper: resolve a single storage entry to a controller
         const toController = (entry: BackendStorageConfig | StorageController, label: string): StorageController => {
             // Duck-type: if it has putObject, it's already a controller instance
-            if (typeof (entry as StorageController).putObject === 'function') {
+            if (typeof (entry as StorageController).putObject === "function") {
                 return entry as StorageController;
             }
             // Otherwise it's a config object — use the built-in factory
             const conf = entry as BackendStorageConfig;
-            if (isProduction && conf.type === 'local') {
+            if (isProduction && conf.type === "local") {
                 logger.warn(`Storage backend "${label}" uses local filesystem in production. ` +
                     "Files will be lost on container restart. " +
                     "Configure S3-compatible storage or a custom StorageController.");
@@ -319,7 +321,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             return createStorageController(conf);
         };
 
-        if (typeof config.storage === 'object' && ('type' in config.storage || typeof (config.storage as StorageController).putObject === 'function')) {
+        if (typeof config.storage === "object" && ("type" in config.storage || typeof (config.storage as StorageController).putObject === "function")) {
             // Single storage config or controller
             controllers[DEFAULT_STORAGE_ID] = toController(config.storage as BackendStorageConfig | StorageController, DEFAULT_STORAGE_ID);
         } else {
@@ -341,7 +343,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // 4. Mount API Routes
     if (config.auth && authConfigResult) {
         const oauthProviders: OAuthProvider[] = [...(config.auth.providers || [])];
-        
+
         if (config.auth.google?.clientId) {
             const { createGoogleProvider } = await import("./auth");
             oauthProviders.push(createGoogleProvider(config.auth.google.clientId));
@@ -412,11 +414,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         });
         config.app.route(`${basePath}/auth`, authRoutes);
 
-        const adminRoutes = createAdminRoutes({ 
+        const adminRoutes = createAdminRoutes({
             authRepo: authConfigResult.authRepository as import("./auth/interfaces").AuthRepository ?? authConfigResult.userService as import("./auth/interfaces").AuthRepository,
             emailService: authConfigResult.emailService as import("./email").EmailService,
             emailConfig: config.auth.email,
-            serviceKey,
+            serviceKey
         });
         config.app.route(`${basePath}/admin`, adminRoutes);
     }
@@ -425,11 +427,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         if (process.env.NODE_ENV !== "production") {
             const { createSchemaEditorRoutes } = await import("./api/schema-editor-routes");
             const schemaEditorRoutes = createSchemaEditorRoutes(config.collectionsDir);
-            
+
             if (config.auth?.requireAuth !== false && !!config.auth?.jwtSecret) {
                 schemaEditorRoutes.use("/*", requireAuth, requireAdmin);
             }
-            
+
             config.app.route(`${basePath}/schema-editor`, schemaEditorRoutes);
             logger.info("Schema Editor mounted", { path: `${basePath}/schema-editor` });
         }
@@ -450,7 +452,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         });
 
         // Apply a permissive body limit specifically for the upload endpoint
-        storageRoutes.use('/upload', bodyLimit({
+        storageRoutes.use("/upload", bodyLimit({
             maxSize: storageMaxSize,
             onError: (c) => {
                 return c.json({
@@ -594,7 +596,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             const fnRoutes = createFunctionRoutes(loadedFunctions);
             functionsRouter.route("/", fnRoutes);
             config.app.route(`${basePath}/functions`, functionsRouter);
-            logger.info("Mounted custom functions", { count: loadedFunctions.length, path: `${basePath}/functions` });
+            logger.info("Mounted custom functions", { count: loadedFunctions.length,
+path: `${basePath}/functions` });
         }
     }
 
@@ -637,7 +640,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             // Start the scheduler
             cronScheduler.start();
 
-            logger.info("Mounted cron jobs", { count: loadedCronJobs.length, path: `${basePath}/cron` });
+            logger.info("Mounted cron jobs", { count: loadedCronJobs.length,
+path: `${basePath}/cron` });
         }
     }
 
@@ -656,10 +660,12 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 await defaultDriver.executeSql("SELECT 1");
             } else {
                 // Fallback: try a lightweight fetch to confirm driver is responsive
-                await defaultDriver.fetchCollection({ path: "__health_check_nonexistent__", limit: 1 });
+                await defaultDriver.fetchCollection({ path: "__health_check_nonexistent__",
+limit: 1 });
             }
             const latencyMs = Math.round(performance.now() - start);
-            return { healthy: true, latencyMs };
+            return { healthy: true,
+latencyMs };
         } catch (error: unknown) {
             const latencyMs = Math.round(performance.now() - start);
             logger.error("Health check failed", {

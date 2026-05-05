@@ -81,7 +81,7 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
             if (value && Array.isArray(value)) {
                 const [op, val] = value;
                 const postgrestOp = op === "==" ? "eq" : op === "!=" ? "neq" : op === ">" ? "gt" : op === ">=" ? "gte" : op === "<" ? "lt" : op === "<=" ? "lte" : op === "in" ? "in" : op === "not-in" ? "nin" : op === "array-contains" ? "cs" : op === "array-contains-any" ? "csa" : "eq";
-                
+
                 let stringVal: string;
                 if (Array.isArray(val)) {
                     stringVal = `(${val.join(",")})`;
@@ -109,7 +109,7 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
             setDataLoading(false);
             setDataLoadingError(undefined);
             setData(entities.map(e => ({
-                ...e,
+                ...e
             })));
             setNoMoreToLoad(!res.meta.hasMore);
         };
@@ -122,7 +122,7 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
         };
 
         const accessor = dataClient.collection(path);
-        
+
         // Eagerly include relations to avoid N+1 fetches.
         const hasRelations = collection.properties && Object.values(collection.properties).some(
             (p: any) => p.type === "relation" || p.type === "reference"

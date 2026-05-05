@@ -20,7 +20,7 @@ const TableNodeInner = ({ data, selected }: NodeProps) => {
         isJunction,
         rlsEnabled,
         historyEnabled,
-        icon,
+        icon
     } = data as TableNodeData;
 
     // Build handles: every PK/FK column gets Left + Right handles
@@ -34,23 +34,53 @@ const TableNodeInner = ({ data, selected }: NodeProps) => {
 
             if (col.isForeignKey && !col.isPrimaryKey) {
                 // FK: source handles on both sides
-                result.push({ id: `source-${col.name}-right`, type: "source", position: Position.Right, top: y });
-                result.push({ id: `source-${col.name}-left`, type: "source", position: Position.Left, top: y });
+                result.push({ id: `source-${col.name}-right`,
+type: "source",
+position: Position.Right,
+top: y });
+                result.push({ id: `source-${col.name}-left`,
+type: "source",
+position: Position.Left,
+top: y });
             }
             if (col.isPrimaryKey) {
                 // PK: target + source handles on both sides
-                result.push({ id: `target-${col.name}-right`, type: "target", position: Position.Right, top: y });
-                result.push({ id: `target-${col.name}-left`, type: "target", position: Position.Left, top: y });
-                result.push({ id: `source-${col.name}-right`, type: "source", position: Position.Right, top: y });
-                result.push({ id: `source-${col.name}-left`, type: "source", position: Position.Left, top: y });
+                result.push({ id: `target-${col.name}-right`,
+type: "target",
+position: Position.Right,
+top: y });
+                result.push({ id: `target-${col.name}-left`,
+type: "target",
+position: Position.Left,
+top: y });
+                result.push({ id: `source-${col.name}-right`,
+type: "source",
+position: Position.Right,
+top: y });
+                result.push({ id: `source-${col.name}-left`,
+type: "source",
+position: Position.Left,
+top: y });
             }
         });
 
         // Default handles on both sides
-        result.push({ id: "target-default-right", type: "target", position: Position.Right, top: midY });
-        result.push({ id: "target-default-left", type: "target", position: Position.Left, top: midY });
-        result.push({ id: "source-default-right", type: "source", position: Position.Right, top: midY });
-        result.push({ id: "source-default-left", type: "source", position: Position.Left, top: midY });
+        result.push({ id: "target-default-right",
+type: "target",
+position: Position.Right,
+top: midY });
+        result.push({ id: "target-default-left",
+type: "target",
+position: Position.Left,
+top: midY });
+        result.push({ id: "source-default-right",
+type: "source",
+position: Position.Right,
+top: midY });
+        result.push({ id: "source-default-left",
+type: "source",
+position: Position.Left,
+top: midY });
 
         return result;
     }, [columns]);
@@ -77,7 +107,9 @@ const TableNodeInner = ({ data, selected }: NodeProps) => {
                 {icon && !isJunction && (
                     <div className="text-primary shrink-0">
                         <IconForView
-                            collectionOrView={{ slug: tableName, name: collectionName, icon }}
+                            collectionOrView={{ slug: tableName,
+name: collectionName,
+icon }}
                             size="smallest"
                         />
                     </div>
@@ -123,12 +155,12 @@ const TableNodeInner = ({ data, selected }: NodeProps) => {
                 <div className="ml-auto flex items-center gap-1 shrink-0">
                     {rlsEnabled && (
                         <Tooltip title="RLS enabled">
-                            <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-green-500"/>
                         </Tooltip>
                     )}
                     {historyEnabled && (
                         <Tooltip title="History enabled">
-                            <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-blue-400"/>
                         </Tooltip>
                     )}
                 </div>

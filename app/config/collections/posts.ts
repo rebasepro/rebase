@@ -169,13 +169,13 @@ const postsCollection: PostgresCollection = {
             relationName: "author",
             target: () => authorsCollection,
             cardinality: "one",
-            direction: "owning",
+            direction: "owning"
         },
         {
             relationName: "tags",
             target: () => tagsCollection,
             cardinality: "many",
-            direction: "owning",
+            direction: "owning"
         }
     ],
     entityViews: [

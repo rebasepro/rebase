@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from "react";
 
 interface ClientOnlyDemoProps {
     path: string;
@@ -6,7 +6,7 @@ interface ClientOnlyDemoProps {
 }
 
 // Use import.meta.glob to pre-load all sample components at build time
-const modules = import.meta.glob('/src/content/docs/samples/**/*.tsx');
+const modules = import.meta.glob("/src/content/docs/samples/**/*.tsx");
 
 const ClientOnlyDemo: React.FC<ClientOnlyDemoProps> = ({ path, className }) => {
     const [Component, setComponent] = useState<React.ComponentType | null>(null);
@@ -18,7 +18,7 @@ const ClientOnlyDemo: React.FC<ClientOnlyDemoProps> = ({ path, className }) => {
                 const moduleLoader = modules[path];
                 if (!moduleLoader) {
                     console.error(`Component not found at path: ${path}`);
-                    console.error('Available paths:', Object.keys(modules));
+                    console.error("Available paths:", Object.keys(modules));
                     setError(`Component ${path} not found`);
                     return;
                 }
@@ -39,7 +39,7 @@ const ClientOnlyDemo: React.FC<ClientOnlyDemoProps> = ({ path, className }) => {
             {error && <div>{error}</div>}
             {Component ? (
                 <Suspense fallback={<div>Loading component...</div>}>
-                    <Component />
+                    <Component/>
                 </Suspense>
             ) : (
                 // Render a fallback if the component is not yet set, to avoid Suspense issues

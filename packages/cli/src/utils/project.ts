@@ -66,8 +66,9 @@ export function getActiveBackendPlugin(backendDir: string): string | null {
 
     try {
         const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-        const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-        
+        const deps = { ...pkg.dependencies,
+...pkg.devDependencies };
+
         // Find the first dependency that matches @rebasepro/server-* (database driver plugins),
         // but not @rebasepro/server-core which is the framework itself
         for (const dep of Object.keys(deps)) {
@@ -90,7 +91,7 @@ export function resolvePluginCliScript(backendDir: string, pluginName: string): 
         path.join(backendDir, "node_modules", pluginName, "dist", "cli.js"),
         // For monorepo dev mode:
         path.resolve(backendDir, "..", "..", "packages", pluginName.replace("@rebasepro/", ""), "src", "cli.ts"),
-        path.resolve(backendDir, "..", "packages", pluginName.replace("@rebasepro/", ""), "src", "cli.ts"),
+        path.resolve(backendDir, "..", "packages", pluginName.replace("@rebasepro/", ""), "src", "cli.ts")
     ];
 
     for (const candidate of candidates) {
@@ -113,7 +114,7 @@ export function findFrontendDir(projectRoot: string): string | null {
 export function findEnvFile(projectRoot: string): string | null {
     const candidates = [
         path.join(projectRoot, ".env"),
-        path.join(projectRoot, "backend", ".env"),
+        path.join(projectRoot, "backend", ".env")
     ];
 
     for (const candidate of candidates) {
@@ -130,7 +131,7 @@ export function findEnvFile(projectRoot: string): string | null {
 export function resolveLocalBin(projectRoot: string, binName: string): string | null {
     const candidates = [
         path.join(projectRoot, "backend", "node_modules", ".bin", binName),
-        path.join(projectRoot, "node_modules", ".bin", binName),
+        path.join(projectRoot, "node_modules", ".bin", binName)
     ];
 
     // Also check parent directories (for monorepo setups where app/ is nested)

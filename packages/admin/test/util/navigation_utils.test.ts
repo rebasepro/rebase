@@ -271,7 +271,7 @@ describe("navigateToEntity", () => {
     const mockSideEntityController = {
         open: jest.fn(),
         close: jest.fn(),
-        replace: jest.fn(),
+        replace: jest.fn()
     } as unknown as SideEntityController;
 
     beforeEach(() => {
@@ -291,7 +291,7 @@ describe("navigateToEntity", () => {
             expect.objectContaining({
                 entityId: "abc",
                 path: "products",
-                updateUrl: true,
+                updateUrl: true
             })
         );
         expect(mockNavigate).not.toHaveBeenCalled();

@@ -144,15 +144,17 @@ export async function checkCollectionsVsSchema(
             severity: "error",
             category: "schema_stale",
             message: "Generated schema file does not exist.",
-            fix: "Run `rebase schema generate`",
+            fix: "Run `rebase schema generate`"
         });
-        return { passed: false, issues };
+        return { passed: false,
+issues };
     }
 
     // Re-generate schema in-memory and compare with file on disk
     const postgresCollections = collections.filter(isPostgresCollection);
     if (postgresCollections.length === 0) {
-        return { passed: true, issues };
+        return { passed: true,
+issues };
     }
 
     try {
@@ -172,7 +174,7 @@ export async function checkCollectionsVsSchema(
                 severity: "warning",
                 category: "schema_stale",
                 message: "Generated schema is out of date — collection definitions have changed since last generation.",
-                fix: "Run `rebase schema generate`",
+                fix: "Run `rebase schema generate`"
             });
         }
     } catch (err: unknown) {
@@ -181,11 +183,12 @@ export async function checkCollectionsVsSchema(
             severity: "warning",
             category: "schema_stale",
             message: `Could not regenerate schema for comparison: ${message}`,
-            fix: "Run `rebase schema generate` to verify",
+            fix: "Run `rebase schema generate` to verify"
         });
     }
 
-    return { passed: issues.length === 0, issues };
+    return { passed: issues.length === 0,
+issues };
 }
 
 // ── Phase 2: Collections ↔ Database ──────────────────────────────────────
@@ -217,7 +220,7 @@ export async function checkCollectionsVsDatabase(
     try {
         // Fetch all tables in the public schema
         const tablesResult = await pool.query<{ table_name: string }>(
-            `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
         );
         const existingTables = new Set(tablesResult.rows.map((r) => r.table_name));
 
@@ -295,7 +298,7 @@ export async function checkCollectionsVsDatabase(
                     category: "missing_table",
                     table: tableName,
                     message: `Table "${tableName}" does not exist in the database.`,
-                    fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`",
+                    fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`"
                 });
                 continue; // Skip column checks for missing tables
             }
@@ -321,7 +324,7 @@ export async function checkCollectionsVsDatabase(
                                 table: tableName,
                                 column: fkColName,
                                 message: `Foreign key column "${fkColName}" for relation "${propName}" is missing from table "${tableName}".`,
-                                fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`",
+                                fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`"
                             });
                         }
 
@@ -339,7 +342,7 @@ export async function checkCollectionsVsDatabase(
                                 table: tableName,
                                 column: fkColName,
                                 message: `Column "${fkColName}" exists but has no FOREIGN KEY constraint referencing "${targetTableName}".`,
-                                fix: "Run `rebase db push` or add the constraint manually",
+                                fix: "Run `rebase db push` or add the constraint manually"
                             });
                         }
                     }
@@ -359,7 +362,7 @@ export async function checkCollectionsVsDatabase(
                         table: tableName,
                         column: colName,
                         message: `Column "${colName}" is defined in collection "${collection.slug}" but missing from table "${tableName}".`,
-                        fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`",
+                        fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`"
                     });
                     continue;
                 }
@@ -377,7 +380,7 @@ export async function checkCollectionsVsDatabase(
                             expected: expectedType,
                             actual: actualType,
                             message: `Column "${colName}" in table "${tableName}": expected type "${expectedType}" but found "${actualType}".`,
-                            fix: "Review collection property type or run a migration",
+                            fix: "Review collection property type or run a migration"
                         });
                     }
                 }
@@ -396,7 +399,7 @@ export async function checkCollectionsVsDatabase(
                                 column: colName,
                                 expected: enumName,
                                 message: `Enum type "${enumName}" is defined in collection but not found in the database.`,
-                                fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`",
+                                fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`"
                             });
                         } else {
                             // Compare enum values
@@ -419,7 +422,7 @@ export async function checkCollectionsVsDatabase(
                                     expected: expectedValues.join(", "),
                                     actual: dbEnumValues.join(", "),
                                     message: `Enum values for "${colName}" in table "${tableName}" are out of sync (${parts.join("; ")}).`,
-                                    fix: "Run `rebase db push` to update the enum",
+                                    fix: "Run `rebase db push` to update the enum"
                                 });
                             }
                         }
@@ -438,7 +441,7 @@ export async function checkCollectionsVsDatabase(
                             category: "missing_table",
                             table: junctionTable,
                             message: `Junction table "${junctionTable}" for many-to-many relation "${relation.relationName}" is missing.`,
-                            fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`",
+                            fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`"
                         });
                     }
                 }
@@ -448,7 +451,8 @@ export async function checkCollectionsVsDatabase(
         await pool.end();
     }
 
-    return { passed: issues.length === 0, issues };
+    return { passed: issues.length === 0,
+issues };
 }
 
 // ── Report Rendering ─────────────────────────────────────────────────────
@@ -538,7 +542,7 @@ function formatCategory(cat: DoctorIssue["category"]): string {
         schema_stale: "Stale Schema",
         missing_enum: "Missing Enum",
         enum_value_mismatch: "Enum Value Mismatch",
-        missing_foreign_key: "Missing Foreign Key",
+        missing_foreign_key: "Missing Foreign Key"
     };
     return labels[cat];
 }
@@ -565,7 +569,8 @@ export async function runDoctor(options: {
     const collectionsToSchema = await checkCollectionsVsSchema(collections, options.schemaPath);
 
     // Phase 2: Collections ↔ Database (only if we have a DATABASE_URL)
-    let schemaToDatabase: { passed: boolean; issues: DoctorIssue[] } = { passed: true, issues: [] };
+    let schemaToDatabase: { passed: boolean; issues: DoctorIssue[] } = { passed: true,
+issues: [] };
     if (options.databaseUrl) {
         console.log(chalk.gray("  Checking Collections → Database..."));
         schemaToDatabase = await checkCollectionsVsDatabase(collections, options.databaseUrl);
@@ -578,10 +583,12 @@ export async function runDoctor(options: {
     const summary = {
         passed: [collectionsToSchema, schemaToDatabase].filter((p) => p.passed).length,
         warnings: allIssues.filter((i) => i.severity === "warning").length,
-        errors: allIssues.filter((i) => i.severity === "error").length,
+        errors: allIssues.filter((i) => i.severity === "error").length
     };
 
-    const report: DoctorReport = { collectionsToSchema, schemaToDatabase, summary };
+    const report: DoctorReport = { collectionsToSchema,
+schemaToDatabase,
+summary };
     renderReport(report);
 
     return report;

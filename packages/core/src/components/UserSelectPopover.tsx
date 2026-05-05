@@ -8,7 +8,7 @@ import {
     AccountCircleIcon,
     SearchIcon,
     CloseIcon,
-    IconButton,
+    IconButton
 } from "@rebasepro/ui";
 import { User } from "@rebasepro/types";
 
@@ -87,7 +87,7 @@ export function UserSelectPopover({
     defaultLabel = "Current user",
     renderLimit = 100,
     className,
-    size = "small",
+    size = "small"
 }: UserSelectPopoverProps) {
     const [open, setOpen] = useState(false);
     const [searchText, setSearchText] = useState("");
@@ -209,7 +209,7 @@ export function UserSelectPopover({
                         </span>
                     )}
                     <svg className="w-3 h-3 opacity-50 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
                     </svg>
                 </button>
             }
@@ -266,7 +266,7 @@ export function UserSelectPopover({
                                 }}
                                 className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-surface-200 dark:hover:bg-surface-700 text-text-disabled"
                             >
-                                <CloseIcon size="smallest" />
+                                <CloseIcon size="smallest"/>
                             </button>
                         )}
                     </div>
@@ -291,7 +291,7 @@ export function UserSelectPopover({
                     {/* Loading state */}
                     {loading && (
                         <div className="flex items-center justify-center py-6">
-                            <CircularProgress size="small" />
+                            <CircularProgress size="small"/>
                         </div>
                     )}
 
@@ -404,7 +404,7 @@ function UserRow({ user, isSelected, isSelf, onClick }: UserRowProps) {
                     stroke="currentColor"
                     viewBox="0 0 24 24"
                 >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/>
                 </svg>
             )}
         </button>

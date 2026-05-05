@@ -4,7 +4,7 @@ import { UnsavedChangesDialogProps } from "../components/UnsavedChangesDialog";
 
 /**
  * A single, unified hook to prevent navigation when there are unsaved changes.
- * 
+ *
  * It automatically handles:
  * 1. Internal React Router navigation using `useBlocker`.
  * 2. External browser navigation (page refresh, tab close) using `beforeunload`.
@@ -25,12 +25,12 @@ export function useUnsavedChangesDialog(
 
     useEffect(() => {
         if (!when) return;
-        
+
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
             e.preventDefault();
-            e.returnValue = ""; 
+            e.returnValue = "";
         };
-        
+
         window.addEventListener("beforeunload", handleBeforeUnload);
         return () => window.removeEventListener("beforeunload", handleBeforeUnload);
     }, [when]);

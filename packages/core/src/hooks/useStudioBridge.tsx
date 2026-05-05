@@ -3,7 +3,7 @@ import type {
     CollectionRegistryController,
     SideEntityController,
     UrlController,
-    NavigationStateController,
+    NavigationStateController
 } from "@rebasepro/types";
 
 // ─── Breadcrumbs (defined here so studio doesn't need CMS) ──────────
@@ -44,13 +44,13 @@ const NOOP_COLLECTION_REGISTRY: CollectionRegistryController = {
     getParentReferencesFromPath: () => [],
     getParentCollectionIds: () => [],
     convertIdsToPaths: () => [],
-    initialised: false,
+    initialised: false
 };
 
 const NOOP_SIDE_ENTITY: SideEntityController = {
     open: () => {},
     replace: () => {},
-    close: () => {},
+    close: () => {}
 };
 
 const NOOP_URL_CONTROLLER: UrlController = {
@@ -62,18 +62,18 @@ const NOOP_URL_CONTROLLER: UrlController = {
     buildUrlCollectionPath: () => "",
     buildAppUrlPath: () => "",
     resolveDatabasePathsFrom: () => "",
-    navigate: () => {},
+    navigate: () => {}
 };
 
 const NOOP_NAVIGATION_STATE: NavigationStateController = {
     loading: false,
-    refreshNavigation: () => {},
+    refreshNavigation: () => {}
 };
 
 const NOOP_BREADCRUMBS: BreadcrumbsController = {
     breadcrumbs: [],
     set: () => {},
-    updateCount: () => {},
+    updateCount: () => {}
 };
 
 const NOOP_BRIDGE: StudioBridge = {
@@ -81,7 +81,7 @@ const NOOP_BRIDGE: StudioBridge = {
     sideEntityController: NOOP_SIDE_ENTITY,
     urlController: NOOP_URL_CONTROLLER,
     navigationState: NOOP_NAVIGATION_STATE,
-    breadcrumbs: NOOP_BREADCRUMBS,
+    breadcrumbs: NOOP_BREADCRUMBS
 };
 
 // ─── Context & Provider ─────────────────────────────────────────────
@@ -107,13 +107,14 @@ export const StudioBridgeContext = createContext<StudioBridge>(NOOP_BRIDGE);
  */
 export function StudioBridgeProvider({
     value,
-    children,
+    children
 }: {
     value: Partial<StudioBridge>;
     children: React.ReactNode;
 }) {
     const merged = React.useMemo(
-        () => ({ ...NOOP_BRIDGE, ...value }),
+        () => ({ ...NOOP_BRIDGE,
+...value }),
         [value]
     );
     return (
@@ -197,11 +198,12 @@ export function StudioBridgeRegistryProvider({ children }: { children: React.Rea
         setVersion(v => v + 1);
     }, []);
 
-    const registry = useMemo<StudioBridgeRegistry>(() => ({ register, unregister }), [register, unregister]);
+    const registry = useMemo<StudioBridgeRegistry>(() => ({ register,
+unregister }), [register, unregister]);
 
     const bridgeValue = useMemo<StudioBridge>(() => ({
         ...NOOP_BRIDGE,
-        ...slicesRef.current,
+        ...slicesRef.current
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }), [version]);
 

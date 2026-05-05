@@ -1,3 +1,4 @@
+
 const fs = require("fs");
 const path = require("path");
 const { EOL } = require("os");
@@ -27,7 +28,8 @@ function readFilesRecursively(folderPath, outputFile, allowedExtensions, exclude
                             console.error(err);
                             return;
                         }
-                        const formattedContent = JSON.stringify({ messages: [{ role: 'system', content }] }) + EOL;
+                        const formattedContent = JSON.stringify({ messages: [{ role: "system",
+content }] }) + EOL;
 
                         if (!filePath.endsWith("index.d.ts"))
                         fs.appendFileSync(outputFile, formattedContent);

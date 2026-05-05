@@ -35,7 +35,7 @@ export function ErrorView({
         <div
             className="flex flex-col m-2">
             <div className="flex items-start">
-                <WarningIcon className="mx-2 mt-0.5" size={"small"} color={"warning"} />
+                <WarningIcon className="mx-2 mt-0.5" size={"small"} color={"warning"}/>
                 <div className="pl-2">
                     {title && <Typography
                         variant={"body2"}

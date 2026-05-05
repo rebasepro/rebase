@@ -43,7 +43,7 @@ export class GraphQLSchemaGenerator {
 
         return new GraphQLSchema({
             query: queryType,
-            mutation: mutationType,
+            mutation: mutationType
         });
     }
 
@@ -192,8 +192,10 @@ export class GraphQLSchemaGenerator {
             fields[this.getListQueryName(collection)] = {
                 type: new GraphQLList(entityType),
                 args: {
-                    limit: { type: GraphQLInt, defaultValue: 20 },
-                    offset: { type: GraphQLInt, defaultValue: 0 },
+                    limit: { type: GraphQLInt,
+defaultValue: 20 },
+                    offset: { type: GraphQLInt,
+defaultValue: 0 },
                     where: { type: GraphQLString },
                     orderBy: { type: GraphQLString }
                 },

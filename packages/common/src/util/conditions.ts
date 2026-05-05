@@ -17,7 +17,7 @@ import {
  */
 function getIn(obj: Record<string, unknown> | unknown, path: string): unknown {
     if (!obj || !path) return undefined;
-    return path.split('.').reduce((acc: unknown, part: string) => acc && (acc as Record<string, unknown>)[part], obj);
+    return path.split(".").reduce((acc: unknown, part: string) => acc && (acc as Record<string, unknown>)[part], obj);
 }
 
 let operationsRegistered = false;
@@ -168,7 +168,7 @@ export function applyPropertyConditions(
     const { conditions } = property;
     if (!conditions) return property;
 
-    let result = { ...property };
+    const result = { ...property };
 
     // ═══════════════════════════════════════════════════════════════════════
     // FIELD STATE CONDITIONS

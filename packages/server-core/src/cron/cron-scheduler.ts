@@ -3,7 +3,7 @@ import type {
     CronJobStatus,
     CronJobLogEntry,
     CronJobRunState,
-    CronJobContext,
+    CronJobContext
 } from "@rebasepro/types";
 import type { RebaseClient } from "@rebasepro/client";
 import type { LoadedCronJob } from "./cron-loader";
@@ -161,7 +161,7 @@ export class CronScheduler {
                 state: loaded.definition.enabled !== false ? "idle" : "disabled",
                 totalRuns: 0,
                 totalFailures: 0,
-                logs: [],
+                logs: []
             });
         }
     }
@@ -327,7 +327,7 @@ export class CronScheduler {
                 ).join(" ");
                 capturedLogs.push(line);
             },
-            client: this.client!,
+            client: this.client!
         };
 
         job.state = "running";
@@ -369,7 +369,7 @@ export class CronScheduler {
             error,
             result: result !== undefined ? result : undefined,
             logs: capturedLogs,
-            manual,
+            manual
         };
 
         // Push to ring buffer
@@ -407,7 +407,7 @@ export class CronScheduler {
             lastDurationMs: job.lastDurationMs,
             lastError: job.lastError,
             totalRuns: job.totalRuns,
-            totalFailures: job.totalFailures,
+            totalFailures: job.totalFailures
         };
     }
 }

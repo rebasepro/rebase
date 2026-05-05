@@ -53,7 +53,7 @@ export const ExplainVisualizer: React.FC<ExplainVisualizerProps> = ({ plan, isRo
                 >
                     <div className="flex items-center space-x-2">
                         {hasChildren ? (
-                            <svg className={cls("w-4 h-4 text-text-secondary transition-transform", !expanded ? "-rotate-90" : "")} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            <svg className={cls("w-4 h-4 text-text-secondary transition-transform", !expanded ? "-rotate-90" : "")} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/></svg>
                         ) : (
                             <div className="w-4 h-4"></div>
                         )}
@@ -119,7 +119,7 @@ export const ExplainVisualizer: React.FC<ExplainVisualizerProps> = ({ plan, isRo
             {expanded && hasChildren && (
                 <div className="flex flex-col space-y-2 mt-[-4px]">
                     {plan.Plans!.map((childPlan, idx) => (
-                        <ExplainVisualizer key={idx} plan={childPlan} isRoot={false} />
+                        <ExplainVisualizer key={idx} plan={childPlan} isRoot={false}/>
                     ))}
                 </div>
             )}

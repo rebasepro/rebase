@@ -33,7 +33,7 @@ export class QueryBuilder<M extends Record<string, unknown> = Record<string, unk
 
     /**
      * Add a filter condition to your query.
-     * @example 
+     * @example
      * client.collection('users').where('age', '>=', 18).find()
      */
     where(column: keyof M & string, operator: FilterOperator, value: unknown): this {
@@ -43,7 +43,7 @@ export class QueryBuilder<M extends Record<string, unknown> = Record<string, unk
 
         const mappedOp = mapOperator(operator);
         let formattedValue = value;
-        
+
         // Handle arrays for in, nin, cs, csa
         if (Array.isArray(value) && ["in", "nin", "cs", "csa"].includes(mappedOp)) {
             formattedValue = `(${value.join(",")})`;
@@ -57,7 +57,7 @@ export class QueryBuilder<M extends Record<string, unknown> = Record<string, unk
 
     /**
      * Order the results by a specific column.
-     * @example 
+     * @example
      * client.collection('users').orderBy('createdAt', 'desc').find()
      */
     orderBy(column: keyof M & string, ascending: "asc" | "desc" = "asc"): this {

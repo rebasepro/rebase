@@ -14,7 +14,8 @@ function createMockTransport() {
         getHeaders: jest.fn().mockReturnValue({}),
         resolveToken: jest.fn().mockResolvedValue(null)
     };
-    return { transport, mockRequest };
+    return { transport,
+mockRequest };
 }
 
 describe("createAdmin", () => {
@@ -31,7 +32,10 @@ describe("createAdmin", () => {
     describe("bootstrap", () => {
         it("calls POST /admin/bootstrap", async () => {
             const admin = createAdmin(transport);
-            mockRequest.mockResolvedValueOnce({ success: true, message: "Bootstrapped", user: { uid: "u1", roles: ["admin"] } });
+            mockRequest.mockResolvedValueOnce({ success: true,
+message: "Bootstrapped",
+user: { uid: "u1",
+roles: ["admin"] } });
 
             const result = await admin.bootstrap();
             expect(result.success).toBe(true);
@@ -41,7 +45,10 @@ describe("createAdmin", () => {
 
         it("uses custom adminPath", async () => {
             const admin = createAdmin(transport, { adminPath: "/custom-admin" });
-            mockRequest.mockResolvedValueOnce({ success: true, message: "ok", user: { uid: "u1", roles: [] } });
+            mockRequest.mockResolvedValueOnce({ success: true,
+message: "ok",
+user: { uid: "u1",
+roles: [] } });
 
             await admin.bootstrap();
             expect(mockRequest).toHaveBeenCalledWith("/custom-admin/bootstrap", { method: "POST" });
@@ -55,7 +62,14 @@ describe("createAdmin", () => {
         it("listUsers calls GET /admin/users", async () => {
             const admin = createAdmin(transport);
             const users: AdminUser[] = [
-                { uid: "u1", email: "a@b.com", displayName: null, photoURL: null, provider: "local", roles: [], createdAt: "", updatedAt: "" }
+                { uid: "u1",
+email: "a@b.com",
+displayName: null,
+photoURL: null,
+provider: "local",
+roles: [],
+createdAt: "",
+updatedAt: "" }
             ];
             mockRequest.mockResolvedValueOnce({ users });
 
@@ -86,10 +100,14 @@ describe("createAdmin", () => {
             const admin = createAdmin(transport);
             mockRequest.mockResolvedValueOnce({ user: { uid: "usr_new" } });
 
-            const data = { email: "admin@example.com", displayName: "Admin", password: "secure123", roles: ["admin"] };
+            const data = { email: "admin@example.com",
+displayName: "Admin",
+password: "secure123",
+roles: ["admin"] };
             await admin.createUser(data);
 
-            expect(mockRequest).toHaveBeenCalledWith("/admin/users", { method: "POST", body: JSON.stringify(data) });
+            expect(mockRequest).toHaveBeenCalledWith("/admin/users", { method: "POST",
+body: JSON.stringify(data) });
         });
 
         it("createUser with minimal payload (email only)", async () => {
@@ -107,9 +125,11 @@ describe("createAdmin", () => {
 
         it("updateUser calls PUT /admin/users/:id", async () => {
             const admin = createAdmin(transport);
-            mockRequest.mockResolvedValueOnce({ user: { uid: "usr_1", roles: ["editor"] } });
+            mockRequest.mockResolvedValueOnce({ user: { uid: "usr_1",
+roles: ["editor"] } });
 
-            const patch = { roles: ["editor"], displayName: "New Name" };
+            const patch = { roles: ["editor"],
+displayName: "New Name" };
             await admin.updateUser("usr_1", patch);
 
             expect(mockRequest).toHaveBeenCalledWith("/admin/users/usr_1", {
@@ -135,7 +155,11 @@ describe("createAdmin", () => {
         it("listRoles calls GET /admin/roles", async () => {
             const admin = createAdmin(transport);
             const roles: RebaseRole[] = [
-                { id: "admin", name: "Admin", isAdmin: true, defaultPermissions: null, config: null }
+                { id: "admin",
+name: "Admin",
+isAdmin: true,
+defaultPermissions: null,
+config: null }
             ];
             mockRequest.mockResolvedValueOnce({ roles });
 
@@ -147,7 +171,8 @@ describe("createAdmin", () => {
 
         it("getRole calls GET /admin/roles/:id", async () => {
             const admin = createAdmin(transport);
-            mockRequest.mockResolvedValueOnce({ role: { id: "admin", name: "Admin" } });
+            mockRequest.mockResolvedValueOnce({ role: { id: "admin",
+name: "Admin" } });
 
             const result = await admin.getRole("admin");
             expect(result.role.id).toBe("admin");
@@ -167,30 +192,36 @@ describe("createAdmin", () => {
             };
             await admin.createRole(data);
 
-            expect(mockRequest).toHaveBeenCalledWith("/admin/roles", { method: "POST", body: JSON.stringify(data) });
+            expect(mockRequest).toHaveBeenCalledWith("/admin/roles", { method: "POST",
+body: JSON.stringify(data) });
         });
 
         it("createRole with minimal payload", async () => {
             const admin = createAdmin(transport);
             mockRequest.mockResolvedValueOnce({ role: { id: "viewer" } });
 
-            const data = { id: "viewer", name: "Viewer" };
+            const data = { id: "viewer",
+name: "Viewer" };
             await admin.createRole(data);
 
             expect(mockRequest).toHaveBeenCalledWith("/admin/roles", {
                 method: "POST",
-                body: JSON.stringify({ id: "viewer", name: "Viewer" })
+                body: JSON.stringify({ id: "viewer",
+name: "Viewer" })
             });
         });
 
         it("updateRole calls PUT /admin/roles/:id with partial data", async () => {
             const admin = createAdmin(transport);
-            mockRequest.mockResolvedValueOnce({ role: { id: "editor", name: "Senior Editor" } });
+            mockRequest.mockResolvedValueOnce({ role: { id: "editor",
+name: "Senior Editor" } });
 
-            const patch = { name: "Senior Editor", isAdmin: true };
+            const patch = { name: "Senior Editor",
+isAdmin: true };
             await admin.updateRole("editor", patch);
 
-            expect(mockRequest).toHaveBeenCalledWith("/admin/roles/editor", { method: "PUT", body: JSON.stringify(patch) });
+            expect(mockRequest).toHaveBeenCalledWith("/admin/roles/editor", { method: "PUT",
+body: JSON.stringify(patch) });
         });
 
         it("deleteRole calls DELETE /admin/roles/:id", async () => {

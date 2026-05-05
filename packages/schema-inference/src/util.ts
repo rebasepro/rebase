@@ -71,7 +71,7 @@ export function resolveEnumValues(input: EnumValues): EnumValueConfig[] | undefi
     }
 }
 
-export function mergeDeep<T extends Record<any, any>, U extends Record<any, any>>(target: T, source: U, ignoreUndefined: boolean = false): T & U {
+export function mergeDeep<T extends Record<any, any>, U extends Record<any, any>>(target: T, source: U, ignoreUndefined = false): T & U {
     const targetIsObject = isObject(target);
     const output = targetIsObject ? { ...target } : target;
     if (targetIsObject && isObject(source)) {

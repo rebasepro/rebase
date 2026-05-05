@@ -69,13 +69,16 @@ function getExtension(name: string): string {
 }
 
 function breadcrumbSegments(path: string): { label: string; path: string }[] {
-    if (!path || path === "/") return [{ label: "Root", path: "" }];
+    if (!path || path === "/") return [{ label: "Root",
+path: "" }];
     const parts = path.split("/").filter(Boolean);
-    const segments = [{ label: "Root", path: "" }];
+    const segments = [{ label: "Root",
+path: "" }];
     let accumulated = "";
     for (const part of parts) {
         accumulated = accumulated ? `${accumulated}/${part}` : part;
-        segments.push({ label: part, path: accumulated });
+        segments.push({ label: part,
+path: accumulated });
     }
     return segments;
 }
@@ -148,7 +151,7 @@ function UploadDialog({
                         size="large"
                         uploadDescription={
                             <div className="flex flex-col items-center justify-center pointer-events-none mt-2">
-                                <CloudUploadIcon className="text-surface-accent-400 mb-2 w-8 h-8" />
+                                <CloudUploadIcon className="text-surface-accent-400 mb-2 w-8 h-8"/>
                                 <Typography variant="h6" className="font-bold">
                                     Drop files here or click to browse
                                 </Typography>
@@ -217,7 +220,7 @@ function UploadDialog({
                 >
                     {uploading ? (
                         <>
-                            <CircularProgress size="smallest" />
+                            <CircularProgress size="smallest"/>
                             Uploading...
                         </>
                     ) : (
@@ -269,7 +272,7 @@ function FilePreviewPanel({
                                     size="small"
                                     onClick={() => window.open(downloadUrl, "_blank")}
                                 >
-                                    <DownloadIcon size="smallest" />
+                                    <DownloadIcon size="smallest"/>
                                 </IconButton>
                             </Tooltip>
                         )}
@@ -279,11 +282,11 @@ function FilePreviewPanel({
                                 onClick={() => setDeleteDialogOpen(true)}
                                 className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
                             >
-                                <DeleteIcon size="smallest" />
+                                <DeleteIcon size="smallest"/>
                             </IconButton>
                         </Tooltip>
                         <IconButton size="small" onClick={onClose}>
-                            <CloseIcon size="smallest" />
+                            <CloseIcon size="smallest"/>
                         </IconButton>
                     </div>
                 </div>
@@ -317,14 +320,14 @@ function FilePreviewPanel({
                             } else if (isAudio && downloadUrl) {
                                 return (
                                     <div className="flex flex-col items-center gap-4">
-                                        <AudiotrackIcon className="text-surface-accent-400 w-10 h-10" />
-                                        <audio src={downloadUrl} controls className="w-full max-w-xs" />
+                                        <AudiotrackIcon className="text-surface-accent-400 w-10 h-10"/>
+                                        <audio src={downloadUrl} controls className="w-full max-w-xs"/>
                                     </div>
                                 );
                             } else {
                                 return (
                                     <div className="flex flex-col items-center gap-3 text-surface-accent-400">
-                                        <FileIconComponent className="w-10 h-10" />
+                                        <FileIconComponent className="w-10 h-10"/>
                                         <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark">
                                             No preview available
                                         </Typography>
@@ -477,13 +480,13 @@ function StorageSidebar({
                     )}
                     onClick={() => onNavigate("")}
                 >
-                    <Icon iconKey="home" size="smallest" className="mr-1.5 shrink-0" />
+                    <Icon iconKey="home" size="smallest" className="mr-1.5 shrink-0"/>
                     <Typography variant="body2" className="text-xs truncate">Root</Typography>
                 </div>
 
                 {loading && folders.length === 0 ? (
                     <div className="flex justify-center p-4">
-                        <CircularProgress size="small" />
+                        <CircularProgress size="small"/>
                     </div>
                 ) : (
                     <div className="mt-1 space-y-0.5">
@@ -500,7 +503,7 @@ function StorageSidebar({
                                     )}
                                     onClick={() => onNavigate(folder.fullPath)}
                                 >
-                                    <FolderIcon size="smallest" className="mr-1.5 shrink-0 text-amber-500 dark:text-amber-400" />
+                                    <FolderIcon size="smallest" className="mr-1.5 shrink-0 text-amber-500 dark:text-amber-400"/>
                                     <Typography variant="body2" className="text-xs truncate flex-1 min-w-0">
                                         {folder.name}
                                     </Typography>
@@ -658,12 +661,14 @@ export const StorageView = () => {
     const handleDeleteFile = useCallback(async (file: StorageFile) => {
         try {
             await storageSource.deleteObject(file.fullPath);
-            snackbarController.open({ type: "success", message: `"${file.name}" deleted` });
+            snackbarController.open({ type: "success",
+message: `"${file.name}" deleted` });
             setSelectedFile(null);
             setSelectedDownloadUrl(null);
             fetchContents(currentPath);
         } catch (e) {
-            snackbarController.open({ type: "error", message: e instanceof Error ? e.message : String(e) });
+            snackbarController.open({ type: "error",
+message: e instanceof Error ? e.message : String(e) });
         }
     }, [storageSource, currentPath, snackbarController, fetchContents]);
 
@@ -680,7 +685,7 @@ export const StorageView = () => {
             return (
                 <div className="flex-grow flex items-center justify-center">
                     <div className="text-center">
-                        <CircularProgress size="medium" />
+                        <CircularProgress size="medium"/>
                         <Typography variant="body2" className="mt-4 text-text-secondary dark:text-text-secondary-dark font-mono tracking-tight animate-pulse">
                             Loading...
                         </Typography>
@@ -692,7 +697,7 @@ export const StorageView = () => {
         if (error) {
             return (
                 <div className="flex-grow flex items-center justify-center p-6 overflow-auto">
-                    <ErrorView title="Error loading storage" error={error} onRetry={handleRefresh} />
+                    <ErrorView title="Error loading storage" error={error} onRetry={handleRefresh}/>
                 </div>
             );
         }
@@ -704,13 +709,13 @@ export const StorageView = () => {
                 <div className="flex-grow flex items-center justify-center text-text-disabled dark:text-text-disabled-dark">
                     <div className="text-center">
                         <svg className="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
                         </svg>
                         <Typography variant="body2">
                             This folder is empty
                         </Typography>
                         <Button className="mt-3" onClick={() => setUploadDialogOpen(true)}>
-                            <AddIcon size="small" />
+                            <AddIcon size="small"/>
                             Upload files
                         </Button>
                     </div>
@@ -738,7 +743,7 @@ export const StorageView = () => {
                                 >
                                     <td className="px-4 py-2.5">
                                         <div className="flex items-center gap-2">
-                                            <FolderIcon size="smallest" className="text-amber-500 dark:text-amber-400 shrink-0" />
+                                            <FolderIcon size="smallest" className="text-amber-500 dark:text-amber-400 shrink-0"/>
                                             <Typography variant="body2" className="text-[13px] font-medium truncate">
                                                 {folder.name}
                                             </Typography>
@@ -772,7 +777,7 @@ export const StorageView = () => {
                                     >
                                         <td className="px-4 py-2.5">
                                             <div className="flex items-center gap-2">
-                                                <FileIconComp size="smallest" className="text-surface-accent-400 shrink-0" />
+                                                <FileIconComp size="smallest" className="text-surface-accent-400 shrink-0"/>
                                                 <Typography variant="body2" className="text-[13px] truncate">
                                                     {file.name}
                                                 </Typography>
@@ -818,7 +823,7 @@ export const StorageView = () => {
                                     )}
                                     onClick={() => handleNavigate(folder.fullPath)}
                                 >
-                                    <FolderIcon size="small" className="text-amber-500 dark:text-amber-400 shrink-0" />
+                                    <FolderIcon size="small" className="text-amber-500 dark:text-amber-400 shrink-0"/>
                                     <Typography variant="body2" className="text-[13px] font-medium truncate">
                                         {folder.name}
                                     </Typography>
@@ -862,7 +867,7 @@ export const StorageView = () => {
                                                     loading="lazy"
                                                 />
                                             ) : (
-                                                <FileIconComp className="text-surface-accent-400 dark:text-surface-accent-500 w-8 h-8" />
+                                                <FileIconComp className="text-surface-accent-400 dark:text-surface-accent-500 w-8 h-8"/>
                                             )}
 
                                             {/* Extension badge */}
@@ -876,7 +881,7 @@ export const StorageView = () => {
                                             <div className={cls(
                                                 "absolute inset-0 bg-black/0 group-hover:bg-black/10",
                                                 "transition-colors duration-200"
-                                            )} />
+                                            )}/>
                                         </div>
 
                                         {/* Name & size */}
@@ -924,7 +929,7 @@ export const StorageView = () => {
                                     {currentPath && (
                                         <Tooltip title="Go up">
                                             <IconButton size="small" onClick={handleNavigateUp}>
-                                                <ArrowBackIcon size="smallest" />
+                                                <ArrowBackIcon size="smallest"/>
                                             </IconButton>
                                         </Tooltip>
                                     )}
@@ -951,7 +956,7 @@ export const StorageView = () => {
                                         ))}
                                     </div>
 
-                                    <div className="flex-1" />
+                                    <div className="flex-1"/>
 
                                     {/* File count */}
                                     {!loading && (
@@ -970,7 +975,7 @@ export const StorageView = () => {
                                             onClick={() => setViewMode("grid")}
                                             className={cls(viewMode === "grid" && "bg-surface-100 dark:bg-surface-800")}
                                         >
-                                            <Icon iconKey="apps" size="smallest" />
+                                            <Icon iconKey="apps" size="smallest"/>
                                         </IconButton>
                                     </Tooltip>
                                     <Tooltip title="List view">
@@ -979,15 +984,15 @@ export const StorageView = () => {
                                             onClick={() => setViewMode("list")}
                                             className={cls(viewMode === "list" && "bg-surface-100 dark:bg-surface-800")}
                                         >
-                                            <Icon iconKey="list" size="smallest" />
+                                            <Icon iconKey="list" size="smallest"/>
                                         </IconButton>
                                     </Tooltip>
 
-                                    <div className="h-4 w-px bg-surface-200 dark:bg-surface-800 mx-0.5" />
+                                    <div className="h-4 w-px bg-surface-200 dark:bg-surface-800 mx-0.5"/>
 
                                     <Tooltip title="Refresh">
                                         <IconButton size="small" onClick={handleRefresh} disabled={loading}>
-                                            <RefreshIcon size="smallest" />
+                                            <RefreshIcon size="smallest"/>
                                         </IconButton>
                                     </Tooltip>
 
@@ -996,7 +1001,7 @@ export const StorageView = () => {
                                         color="primary"
                                         onClick={() => setUploadDialogOpen(true)}
                                     >
-                                        <CloudUploadIcon size="smallest" className="mr-1" />
+                                        <CloudUploadIcon size="smallest" className="mr-1"/>
                                         Upload
                                     </Button>
                                 </div>

@@ -77,7 +77,7 @@ const styles = {
 export function getPasswordResetTemplate(
     resetUrl: string,
     user: TemplateUser,
-    appName: string = "Rebase"
+    appName = "Rebase"
 ): { subject: string; html: string; text: string } {
     const greeting = getGreeting(user);
 
@@ -148,7 +148,9 @@ If you didn't request a password reset, you can safely ignore this email.
 Your password will remain unchanged.
     `.trim();
 
-    return { subject, html, text };
+    return { subject,
+html,
+text };
 }
 
 /**
@@ -157,7 +159,7 @@ Your password will remain unchanged.
 export function getEmailVerificationTemplate(
     verifyUrl: string,
     user: TemplateUser,
-    appName: string = "Rebase"
+    appName = "Rebase"
 ): { subject: string; html: string; text: string } {
     const greeting = getGreeting(user);
 
@@ -218,7 +220,9 @@ ${verifyUrl}
 If you didn't create an account with ${appName}, you can safely ignore this email.
     `.trim();
 
-    return { subject, html, text };
+    return { subject,
+html,
+text };
 }
 
 /**
@@ -228,7 +232,7 @@ If you didn't create an account with ${appName}, you can safely ignore this emai
 export function getUserInvitationTemplate(
     setPasswordUrl: string,
     user: TemplateUser,
-    appName: string = "Rebase"
+    appName = "Rebase"
 ): { subject: string; html: string; text: string } {
     const greeting = getGreeting(user);
 
@@ -297,7 +301,9 @@ This link will expire in 1 hour for security reasons.
 If you weren't expecting this invitation, you can safely ignore this email.
     `.trim();
 
-    return { subject, html, text };
+    return { subject,
+html,
+text };
 }
 
 /**
@@ -306,7 +312,7 @@ If you weren't expecting this invitation, you can safely ignore this email.
  */
 export function getWelcomeEmailTemplate(
     user: TemplateUser,
-    appName: string = "Rebase",
+    appName = "Rebase",
     loginUrl?: string
 ): { subject: string; html: string; text: string } {
     const greeting = getGreeting(user);
@@ -376,5 +382,7 @@ ${url ? `Ir a mi panel: ${url}` : ""}
 Si tienes alguna pregunta, no dudes en contactarnos respondiendo a este correo.
     `.trim();
 
-    return { subject, html, text };
+    return { subject,
+html,
+text };
 }

@@ -23,7 +23,7 @@ jest.mock("../src/auth/rate-limiter", () => {
     return {
         createRateLimiter: () => passthrough,
         defaultAuthLimiter: passthrough,
-        strictAuthLimiter: passthrough,
+        strictAuthLimiter: passthrough
     };
 });
 
@@ -45,12 +45,17 @@ function mockUser(overrides: Partial<{ id: string; email: string; passwordHash: 
         emailVerificationToken: overrides.emailVerificationToken ?? null,
         emailVerificationSentAt: null,
         createdAt: new Date(),
-        updatedAt: new Date(),
+        updatedAt: new Date()
     };
 }
 
 function mockRole(id: string, isAdmin = false) {
-    return { id, name: id.charAt(0).toUpperCase() + id.slice(1), isAdmin, defaultPermissions: null, collectionPermissions: null, config: null };
+    return { id,
+name: id.charAt(0).toUpperCase() + id.slice(1),
+isAdmin,
+defaultPermissions: null,
+collectionPermissions: null,
+config: null };
 }
 
 let mockAuthRepo: jest.Mocked<AuthRepository>;
@@ -58,11 +63,11 @@ let mockEmailService: { send: jest.Mock; isConfigured: jest.Mock };
 
 function createApp(opts: { allowRegistration?: boolean; withEmail?: boolean; defaultRole?: string } = {}) {
     // Re-create mocked service instances each time
-                
+
     // Wire constructor mocks to return our instances
-                
+
     // Default returns for mocked services
-    
+
     mockAuthRepo = {
         getUserByEmail: jest.fn().mockResolvedValue(null),
         getUserByIdentity: jest.fn().mockResolvedValue(null),
@@ -70,7 +75,9 @@ function createApp(opts: { allowRegistration?: boolean; withEmail?: boolean; def
         getUserIdentities: jest.fn().mockResolvedValue([]),
         getUserById: jest.fn().mockResolvedValue(null),
         createUser: jest.fn().mockImplementation((data) =>
-            Promise.resolve(mockUser({ email: data.email, displayName: data.displayName, passwordHash: data.passwordHash }))
+            Promise.resolve(mockUser({ email: data.email,
+displayName: data.displayName,
+passwordHash: data.passwordHash }))
         ),
         listUsers: jest.fn().mockResolvedValue([]),
         getUserRoles: jest.fn().mockResolvedValue([mockRole("editor")]),
@@ -78,7 +85,8 @@ function createApp(opts: { allowRegistration?: boolean; withEmail?: boolean; def
         assignDefaultRole: jest.fn().mockResolvedValue(undefined),
         setUserRoles: jest.fn().mockResolvedValue(undefined),
         updateUser: jest.fn().mockImplementation((id, data) =>
-            Promise.resolve(mockUser({ id, ...data }))
+            Promise.resolve(mockUser({ id,
+...data }))
         ),
         deleteUser: jest.fn().mockResolvedValue(undefined),
         updatePassword: jest.fn().mockResolvedValue(undefined),
@@ -87,7 +95,8 @@ function createApp(opts: { allowRegistration?: boolean; withEmail?: boolean; def
         getUserByVerificationToken: jest.fn().mockResolvedValue(null),
         getUserWithRoles: jest.fn().mockImplementation(async (userId) => {
             const user = mockUser({ id: userId });
-            return { user, roles: [mockRole("editor")] };
+            return { user,
+roles: [mockRole("editor")] };
         }),
         createRefreshToken: jest.fn().mockResolvedValue(undefined),
         findRefreshTokenByHash: jest.fn().mockResolvedValue(null),
@@ -100,22 +109,27 @@ function createApp(opts: { allowRegistration?: boolean; withEmail?: boolean; def
         markPasswordResetTokenUsed: jest.fn().mockResolvedValue(undefined),
         deleteExpiredPasswordResetTokens: jest.fn().mockResolvedValue(undefined)
     } as unknown as jest.Mocked<AuthRepository>;
-    
+
 
     // Password mocks
-    (validatePasswordStrength as jest.Mock).mockReturnValue({ valid: true, errors: [] });
+    (validatePasswordStrength as jest.Mock).mockReturnValue({ valid: true,
+errors: [] });
     (hashPassword as jest.Mock).mockResolvedValue("hashed-pw");
     (verifyPassword as jest.Mock).mockResolvedValue(true);
 
     // Email mock
-    mockEmailService = { send: jest.fn().mockResolvedValue(undefined), isConfigured: jest.fn().mockReturnValue(opts.withEmail ?? false) };
+    mockEmailService = { send: jest.fn().mockResolvedValue(undefined),
+isConfigured: jest.fn().mockReturnValue(opts.withEmail ?? false) };
 
     const config: AuthModuleConfig = {
         authRepo: mockAuthRepo,
         allowRegistration: opts.allowRegistration ?? true,
         defaultRole: opts.defaultRole,
         emailService: opts.withEmail ? mockEmailService as any : undefined,
-        emailConfig: opts.withEmail ? { from: "test@test.com", appName: "TestApp", resetPasswordUrl: "https://app.test", verifyEmailUrl: "https://app.test" } : undefined,
+        emailConfig: opts.withEmail ? { from: "test@test.com",
+appName: "TestApp",
+resetPasswordUrl: "https://app.test",
+verifyEmailUrl: "https://app.test" } : undefined,
         oauthProviders: opts.withEmail === false && opts.allowRegistration === false ? [] : [
             {
                 id: "google",
@@ -123,9 +137,18 @@ function createApp(opts: { allowRegistration?: boolean; withEmail?: boolean; def
                 verify: async (payload: any) => {
                     const idToken = payload.idToken;
                     if (idToken === "bad-token") return null;
-                    if (idToken === "link-token") return { providerId: "g-456", email: "existing@test.com", displayName: "Existing", photoUrl: null };
-                    if (idToken === "returning-token") return { providerId: "g-789", email: "returning@test.com", displayName: "Updated Name", photoUrl: "https://new-photo.url" };
-                    if (idToken === "valid-token") return { providerId: "g-123", email: "google@test.com", displayName: "Google User", photoUrl: "https://photo.url" };
+                    if (idToken === "link-token") return { providerId: "g-456",
+email: "existing@test.com",
+displayName: "Existing",
+photoUrl: null };
+                    if (idToken === "returning-token") return { providerId: "g-789",
+email: "returning@test.com",
+displayName: "Updated Name",
+photoUrl: "https://new-photo.url" };
+                    if (idToken === "valid-token") return { providerId: "g-123",
+email: "google@test.com",
+displayName: "Google User",
+photoUrl: "https://photo.url" };
                     return null;
                 }
             }
@@ -142,7 +165,7 @@ function json(body: Record<string, unknown>) {
     return {
         method: "POST" as const,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(body)
     };
 }
 
@@ -156,7 +179,8 @@ function authHeader(userId = "user-1", roles = ["editor"]) {
 
 describe("Auth Routes (Integration)", () => {
     beforeAll(() => {
-        configureJwt({ secret: TEST_SECRET, accessExpiresIn: "1h" });
+        configureJwt({ secret: TEST_SECRET,
+accessExpiresIn: "1h" });
     });
 
     beforeEach(() => {
@@ -172,7 +196,8 @@ describe("Auth Routes (Integration)", () => {
             mockAuthRepo.listUsers
                 .mockResolvedValueOnce([mockUser()]); // isFirstUser check
 
-            const res = await app.request("/auth/register", json({ email: "new@test.com", password: "StrongPass1" }));
+            const res = await app.request("/auth/register", json({ email: "new@test.com",
+password: "StrongPass1" }));
             expect(res.status).toBe(201);
             const body = await res.json() as any;
             expect(body.tokens.accessToken).toBeTruthy();
@@ -187,7 +212,8 @@ describe("Auth Routes (Integration)", () => {
             mockAuthRepo.listUsers
                 .mockResolvedValueOnce([mockUser()]); // allUsers.length === 1 → isFirstUser
 
-            await app.request("/auth/register", json({ email: "first@test.com", password: "StrongPass1" }));
+            await app.request("/auth/register", json({ email: "first@test.com",
+password: "StrongPass1" }));
             expect(mockAuthRepo.assignDefaultRole).toHaveBeenCalledWith(expect.any(String), "admin");
         });
 
@@ -198,7 +224,8 @@ describe("Auth Routes (Integration)", () => {
             mockAuthRepo.listUsers
                 .mockResolvedValueOnce([mockUser(), mockUser({ id: "user-2" })]);
 
-            await app.request("/auth/register", json({ email: "second@test.com", password: "StrongPass1" }));
+            await app.request("/auth/register", json({ email: "second@test.com",
+password: "StrongPass1" }));
             expect(mockAuthRepo.assignDefaultRole).toHaveBeenCalledWith(expect.any(String), "editor");
         });
 
@@ -207,7 +234,8 @@ describe("Auth Routes (Integration)", () => {
             mockAuthRepo.listUsers
                 .mockResolvedValueOnce([mockUser(), mockUser({ id: "user-2" })]);
 
-            await app.request("/auth/register", json({ email: "third@test.com", password: "StrongPass1" }));
+            await app.request("/auth/register", json({ email: "third@test.com",
+password: "StrongPass1" }));
             expect(mockAuthRepo.assignDefaultRole).not.toHaveBeenCalled();
         });
 
@@ -215,7 +243,8 @@ describe("Auth Routes (Integration)", () => {
             const app = createApp();
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(mockUser());
 
-            const res = await app.request("/auth/register", json({ email: "existing@test.com", password: "StrongPass1" }));
+            const res = await app.request("/auth/register", json({ email: "existing@test.com",
+password: "StrongPass1" }));
             expect(res.status).toBe(409);
             const body = await res.json() as any;
             expect(body.error.code).toBe("EMAIL_EXISTS");
@@ -223,9 +252,11 @@ describe("Auth Routes (Integration)", () => {
 
         it("returns 400 for weak password", async () => {
             const app = createApp();
-            (validatePasswordStrength as jest.Mock).mockReturnValueOnce({ valid: false, errors: ["Too short"] });
+            (validatePasswordStrength as jest.Mock).mockReturnValueOnce({ valid: false,
+errors: ["Too short"] });
 
-            const res = await app.request("/auth/register", json({ email: "new@test.com", password: "weak" }));
+            const res = await app.request("/auth/register", json({ email: "new@test.com",
+password: "weak" }));
             expect(res.status).toBe(400);
             const body = await res.json() as any;
             expect(body.error.code).toBe("WEAK_PASSWORD");
@@ -233,7 +264,8 @@ describe("Auth Routes (Integration)", () => {
 
         it("returns 400 for invalid email (Zod)", async () => {
             const app = createApp();
-            const res = await app.request("/auth/register", json({ email: "not-an-email", password: "StrongPass1" }));
+            const res = await app.request("/auth/register", json({ email: "not-an-email",
+password: "StrongPass1" }));
             expect(res.status).toBe(400);
             const body = await res.json() as any;
             expect(body.error.code).toBe("INVALID_INPUT");
@@ -249,7 +281,8 @@ describe("Auth Routes (Integration)", () => {
             const app = createApp({ allowRegistration: false });
             mockAuthRepo.listUsers.mockResolvedValueOnce([mockUser()]); // users exist
 
-            const res = await app.request("/auth/register", json({ email: "new@test.com", password: "StrongPass1" }));
+            const res = await app.request("/auth/register", json({ email: "new@test.com",
+password: "StrongPass1" }));
             expect(res.status).toBe(403);
             const body = await res.json() as any;
             expect(body.error.code).toBe("REGISTRATION_DISABLED");
@@ -258,10 +291,11 @@ describe("Auth Routes (Integration)", () => {
         it("allows first-user registration even when registration is disabled", async () => {
             const app = createApp({ allowRegistration: false });
             mockAuthRepo.listUsers
-                .mockResolvedValueOnce([])   // isRegistrationAllowed → empty = allow
+                .mockResolvedValueOnce([]) // isRegistrationAllowed → empty = allow
                 .mockResolvedValueOnce([mockUser()]); // isFirstUser
 
-            const res = await app.request("/auth/register", json({ email: "first@test.com", password: "StrongPass1" }));
+            const res = await app.request("/auth/register", json({ email: "first@test.com",
+password: "StrongPass1" }));
             expect(res.status).toBe(201);
         });
 
@@ -269,7 +303,8 @@ describe("Auth Routes (Integration)", () => {
             const app = createApp();
             mockAuthRepo.listUsers.mockResolvedValueOnce([mockUser()]);
 
-            await app.request("/auth/register", json({ email: "a@b.com", password: "StrongPass1" }));
+            await app.request("/auth/register", json({ email: "a@b.com",
+password: "StrongPass1" }));
             expect(mockAuthRepo.createRefreshToken).toHaveBeenCalledTimes(1);
         });
     });
@@ -281,7 +316,8 @@ describe("Auth Routes (Integration)", () => {
             const user = mockUser({ passwordHash: "salt:hash" });
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(user);
 
-            const res = await app.request("/auth/login", json({ email: "test@example.com", password: "ValidPass1" }));
+            const res = await app.request("/auth/login", json({ email: "test@example.com",
+password: "ValidPass1" }));
             expect(res.status).toBe(200);
             const body = await res.json() as any;
             expect(body.tokens.accessToken).toBeTruthy();
@@ -292,7 +328,8 @@ describe("Auth Routes (Integration)", () => {
             const app = createApp();
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(null);
 
-            const res = await app.request("/auth/login", json({ email: "nobody@test.com", password: "Any1" }));
+            const res = await app.request("/auth/login", json({ email: "nobody@test.com",
+password: "Any1" }));
             expect(res.status).toBe(401);
             const body = await res.json() as any;
             expect(body.error.code).toBe("INVALID_CREDENTIALS");
@@ -303,7 +340,8 @@ describe("Auth Routes (Integration)", () => {
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(mockUser());
             (verifyPassword as jest.Mock).mockResolvedValueOnce(false);
 
-            const res = await app.request("/auth/login", json({ email: "test@example.com", password: "Wrong1" }));
+            const res = await app.request("/auth/login", json({ email: "test@example.com",
+password: "Wrong1" }));
             expect(res.status).toBe(401);
         });
 
@@ -311,7 +349,8 @@ describe("Auth Routes (Integration)", () => {
             const app = createApp();
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(mockUser({ passwordHash: null }));
 
-            const res = await app.request("/auth/login", json({ email: "google@test.com", password: "Any1" }));
+            const res = await app.request("/auth/login", json({ email: "google@test.com",
+password: "Any1" }));
             expect(res.status).toBe(401);
         });
 
@@ -325,7 +364,8 @@ describe("Auth Routes (Integration)", () => {
             const app = createApp();
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(mockUser());
 
-            await app.request("/auth/login", json({ email: "test@example.com", password: "ValidPass1" }));
+            await app.request("/auth/login", json({ email: "test@example.com",
+password: "ValidPass1" }));
             expect(mockAuthRepo.createRefreshToken).toHaveBeenCalledTimes(1);
         });
     });
@@ -333,7 +373,8 @@ describe("Auth Routes (Integration)", () => {
     // ── Google OAuth ────────────────────────────────────────────────────
     describe("POST /auth/google", () => {
         it("returns 404 when OAuth provider is not injected", async () => {
-            const app = createApp({ allowRegistration: false, withEmail: false }); // Hack to pass empty list of providers
+            const app = createApp({ allowRegistration: false,
+withEmail: false }); // Hack to pass empty list of providers
             const res = await app.request("/auth/google", json({ idToken: "google-token" }));
             expect(res.status).toBe(404);
         });
@@ -381,7 +422,7 @@ describe("Auth Routes (Integration)", () => {
             expect(res.status).toBe(200);
             expect(mockAuthRepo.updateUser).toHaveBeenCalledWith(existingUser.id, expect.objectContaining({
                 displayName: "Updated Name",
-                photoUrl: "https://new-photo.url",
+                photoUrl: "https://new-photo.url"
             }));
         });
     });
@@ -397,7 +438,7 @@ describe("Auth Routes (Integration)", () => {
                 expiresAt: new Date(Date.now() + 86400000),
                 createdAt: new Date(),
                 userAgent: "",
-                ipAddress: "",
+                ipAddress: ""
             });
             mockAuthRepo.getUserRoles.mockResolvedValueOnce([mockRole("editor")]);
 
@@ -417,7 +458,7 @@ describe("Auth Routes (Integration)", () => {
                 expiresAt: new Date(Date.now() + 86400000),
                 createdAt: new Date(),
                 userAgent: "",
-                ipAddress: "",
+                ipAddress: ""
             });
 
             await app.request("/auth/refresh", json({ refreshToken: "the-token" }));
@@ -446,7 +487,7 @@ describe("Auth Routes (Integration)", () => {
                 expiresAt: new Date(Date.now() - 1000), // expired
                 createdAt: new Date(),
                 userAgent: "",
-                ipAddress: "",
+                ipAddress: ""
             });
 
             const res = await app.request("/auth/refresh", json({ refreshToken: "expired-token" }));
@@ -525,10 +566,11 @@ describe("Auth Routes (Integration)", () => {
             const app = createApp();
             mockAuthRepo.findValidPasswordResetToken.mockResolvedValueOnce({
                 userId: "user-1",
-                expiresAt: new Date(Date.now() + 3600000),
+                expiresAt: new Date(Date.now() + 3600000)
             });
 
-            const res = await app.request("/auth/reset-password", json({ token: "valid-reset-token", password: "NewStrong1" }));
+            const res = await app.request("/auth/reset-password", json({ token: "valid-reset-token",
+password: "NewStrong1" }));
             expect(res.status).toBe(200);
             expect(mockAuthRepo.updatePassword).toHaveBeenCalledWith("user-1", "hashed-pw");
             expect(mockAuthRepo.markPasswordResetTokenUsed).toHaveBeenCalled();
@@ -538,10 +580,11 @@ describe("Auth Routes (Integration)", () => {
             const app = createApp();
             mockAuthRepo.findValidPasswordResetToken.mockResolvedValueOnce({
                 userId: "user-1",
-                expiresAt: new Date(Date.now() + 3600000),
+                expiresAt: new Date(Date.now() + 3600000)
             });
 
-            await app.request("/auth/reset-password", json({ token: "token", password: "NewStrong1" }));
+            await app.request("/auth/reset-password", json({ token: "token",
+password: "NewStrong1" }));
             expect(mockAuthRepo.deleteAllRefreshTokensForUser).toHaveBeenCalledWith("user-1");
         });
 
@@ -549,7 +592,8 @@ describe("Auth Routes (Integration)", () => {
             const app = createApp();
             mockAuthRepo.findValidPasswordResetToken.mockResolvedValueOnce(null);
 
-            const res = await app.request("/auth/reset-password", json({ token: "expired", password: "NewStrong1" }));
+            const res = await app.request("/auth/reset-password", json({ token: "expired",
+password: "NewStrong1" }));
             expect(res.status).toBe(400);
             const body = await res.json() as any;
             expect(body.error.code).toBe("INVALID_TOKEN");
@@ -557,9 +601,11 @@ describe("Auth Routes (Integration)", () => {
 
         it("returns 400 for weak new password", async () => {
             const app = createApp();
-            (validatePasswordStrength as jest.Mock).mockReturnValueOnce({ valid: false, errors: ["Too weak"] });
+            (validatePasswordStrength as jest.Mock).mockReturnValueOnce({ valid: false,
+errors: ["Too weak"] });
 
-            const res = await app.request("/auth/reset-password", json({ token: "token", password: "weak" }));
+            const res = await app.request("/auth/reset-password", json({ token: "token",
+password: "weak" }));
             expect(res.status).toBe(400);
             const body = await res.json() as any;
             expect(body.error.code).toBe("WEAK_PASSWORD");
@@ -573,8 +619,10 @@ describe("Auth Routes (Integration)", () => {
             mockAuthRepo.getUserById.mockResolvedValue(mockUser());
 
             const res = await app.request("/auth/change-password", {
-                ...json({ oldPassword: "OldPass1", newPassword: "NewPass1" }),
-                headers: { ...json({}).headers, ...authHeader() },
+                ...json({ oldPassword: "OldPass1",
+newPassword: "NewPass1" }),
+                headers: { ...json({}).headers,
+...authHeader() }
             });
             expect(res.status).toBe(200);
             expect(mockAuthRepo.updatePassword).toHaveBeenCalled();
@@ -585,8 +633,10 @@ describe("Auth Routes (Integration)", () => {
             mockAuthRepo.getUserById.mockResolvedValue(mockUser());
 
             await app.request("/auth/change-password", {
-                ...json({ oldPassword: "Old1", newPassword: "New1Pass" }),
-                headers: { ...json({}).headers, ...authHeader() },
+                ...json({ oldPassword: "Old1",
+newPassword: "New1Pass" }),
+                headers: { ...json({}).headers,
+...authHeader() }
             });
             expect(mockAuthRepo.deleteAllRefreshTokensForUser).toHaveBeenCalledWith("user-1");
         });
@@ -597,8 +647,10 @@ describe("Auth Routes (Integration)", () => {
             (verifyPassword as jest.Mock).mockResolvedValueOnce(false);
 
             const res = await app.request("/auth/change-password", {
-                ...json({ oldPassword: "Wrong1", newPassword: "New1Pass" }),
-                headers: { ...json({}).headers, ...authHeader() },
+                ...json({ oldPassword: "Wrong1",
+newPassword: "New1Pass" }),
+                headers: { ...json({}).headers,
+...authHeader() }
             });
             expect(res.status).toBe(401);
         });
@@ -606,18 +658,22 @@ describe("Auth Routes (Integration)", () => {
         it("returns 400 for weak new password", async () => {
             const app = createApp();
             mockAuthRepo.getUserById.mockResolvedValue(mockUser());
-            (validatePasswordStrength as jest.Mock).mockReturnValueOnce({ valid: false, errors: ["Too short"] });
+            (validatePasswordStrength as jest.Mock).mockReturnValueOnce({ valid: false,
+errors: ["Too short"] });
 
             const res = await app.request("/auth/change-password", {
-                ...json({ oldPassword: "Old1", newPassword: "x" }),
-                headers: { ...json({}).headers, ...authHeader() },
+                ...json({ oldPassword: "Old1",
+newPassword: "x" }),
+                headers: { ...json({}).headers,
+...authHeader() }
             });
             expect(res.status).toBe(400);
         });
 
         it("returns 401 without auth", async () => {
             const app = createApp();
-            const res = await app.request("/auth/change-password", json({ oldPassword: "Old1", newPassword: "New1Pass" }));
+            const res = await app.request("/auth/change-password", json({ oldPassword: "Old1",
+newPassword: "New1Pass" }));
             expect(res.status).toBe(401);
         });
 
@@ -626,8 +682,10 @@ describe("Auth Routes (Integration)", () => {
             mockAuthRepo.getUserById.mockResolvedValue(mockUser({ passwordHash: null }));
 
             const res = await app.request("/auth/change-password", {
-                ...json({ oldPassword: "Old1", newPassword: "New1Pass" }),
-                headers: { ...json({}).headers, ...authHeader() },
+                ...json({ oldPassword: "Old1",
+newPassword: "New1Pass" }),
+                headers: { ...json({}).headers,
+...authHeader() }
             });
             expect(res.status).toBe(400);
             const body = await res.json() as any;
@@ -644,7 +702,7 @@ describe("Auth Routes (Integration)", () => {
 
                 const res = await app.request("/auth/send-verification", {
                     method: "POST",
-                    headers: { ...authHeader() },
+                    headers: { ...authHeader() }
                 });
                 expect(res.status).toBe(200);
                 expect(mockAuthRepo.setVerificationToken).toHaveBeenCalled();
@@ -657,7 +715,7 @@ describe("Auth Routes (Integration)", () => {
 
                 const res = await app.request("/auth/send-verification", {
                     method: "POST",
-                    headers: { ...authHeader() },
+                    headers: { ...authHeader() }
                 });
                 expect(res.status).toBe(400);
                 const body = await res.json() as any;
@@ -674,7 +732,7 @@ describe("Auth Routes (Integration)", () => {
                 const app = createApp({ withEmail: false });
                 const res = await app.request("/auth/send-verification", {
                     method: "POST",
-                    headers: { ...authHeader() },
+                    headers: { ...authHeader() }
                 });
                 expect(res.status).toBe(503);
             });
@@ -713,7 +771,7 @@ describe("Auth Routes (Integration)", () => {
         it("returns authenticated user with roles", async () => {
             const app = createApp();
             const res = await app.request("/auth/me", {
-                headers: { ...authHeader("user-1", ["admin"]) },
+                headers: { ...authHeader("user-1", ["admin"]) }
             });
             expect(res.status).toBe(200);
             const body = await res.json() as any;
@@ -732,7 +790,7 @@ describe("Auth Routes (Integration)", () => {
             mockAuthRepo.getUserWithRoles.mockResolvedValueOnce(null);
 
             const res = await app.request("/auth/me", {
-                headers: { ...authHeader() },
+                headers: { ...authHeader() }
             });
             expect(res.status).toBe(404);
         });
@@ -745,12 +803,13 @@ describe("Auth Routes (Integration)", () => {
 
             const res = await app.request("/auth/me", {
                 method: "PATCH",
-                headers: { "Content-Type": "application/json", ...authHeader() },
-                body: JSON.stringify({ displayName: "New Name" }),
+                headers: { "Content-Type": "application/json",
+...authHeader() },
+                body: JSON.stringify({ displayName: "New Name" })
             });
             expect(res.status).toBe(200);
             expect(mockAuthRepo.updateUser).toHaveBeenCalledWith("user-1", expect.objectContaining({
-                displayName: "New Name",
+                displayName: "New Name"
             }));
         });
 
@@ -759,7 +818,7 @@ describe("Auth Routes (Integration)", () => {
             const res = await app.request("/auth/me", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ displayName: "Name" }),
+                body: JSON.stringify({ displayName: "Name" })
             });
             expect(res.status).toBe(401);
         });
@@ -770,7 +829,13 @@ describe("Auth Routes (Integration)", () => {
         it("GET /auth/sessions lists active sessions", async () => {
             const app = createApp();
             mockAuthRepo.listRefreshTokensForUser.mockResolvedValueOnce([
-                { id: "s1", userId: "user-1", tokenHash: "h1", expiresAt: new Date(), createdAt: new Date(), userAgent: "Chrome", ipAddress: "1.2.3.4" },
+                { id: "s1",
+userId: "user-1",
+tokenHash: "h1",
+expiresAt: new Date(),
+createdAt: new Date(),
+userAgent: "Chrome",
+ipAddress: "1.2.3.4" }
             ]);
 
             const res = await app.request("/auth/sessions", { headers: { ...authHeader() } });
@@ -784,7 +849,7 @@ describe("Auth Routes (Integration)", () => {
             const app = createApp();
             const res = await app.request("/auth/sessions", {
                 method: "DELETE",
-                headers: { ...authHeader() },
+                headers: { ...authHeader() }
             });
             expect(res.status).toBe(200);
             expect(mockAuthRepo.deleteAllRefreshTokensForUser).toHaveBeenCalledWith("user-1");
@@ -794,7 +859,7 @@ describe("Auth Routes (Integration)", () => {
             const app = createApp();
             const res = await app.request("/auth/sessions/s123", {
                 method: "DELETE",
-                headers: { ...authHeader() },
+                headers: { ...authHeader() }
             });
             expect(res.status).toBe(200);
             expect(mockAuthRepo.deleteRefreshTokenById).toHaveBeenCalledWith("s123", "user-1");
@@ -824,7 +889,8 @@ describe("Auth Routes (Integration)", () => {
         });
 
         it("returns correct flags when users exist", async () => {
-            const app = createApp({ allowRegistration: false, withEmail: false });
+            const app = createApp({ allowRegistration: false,
+withEmail: false });
             mockAuthRepo.listUsers.mockResolvedValueOnce([mockUser()]);
 
             const res = await app.request("/auth/config");

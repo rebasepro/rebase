@@ -22,7 +22,7 @@ function createMockContext(opts: {
             query: (name: string) => {
                 if (name === "token") return opts.queryToken;
                 return undefined;
-            },
+            }
         },
         json: (body: any, status?: number) => {
             capturedBody = body;
@@ -30,14 +30,14 @@ function createMockContext(opts: {
             return new Response(JSON.stringify(body), { status: capturedStatus });
         },
         set: (key: string, value: any) => variables.set(key, value),
-        get: (key: string) => variables.get(key),
+        get: (key: string) => variables.get(key)
     } as any;
 
     return {
         c,
         getStatus: () => capturedStatus,
         getBody: () => capturedBody,
-        getUser: () => variables.get("user"),
+        getUser: () => variables.get("user")
     };
 }
 
@@ -217,7 +217,8 @@ describe("Auth Middleware", () => {
         });
 
         it("should return 403 if user has empty roles array", async () => {
-            const { c, getStatus } = createMockContext({ user: { userId: "user-123", roles: [] } });
+            const { c, getStatus } = createMockContext({ user: { userId: "user-123",
+roles: [] } });
 
             await requireAdmin(c, nextFn);
 
@@ -226,7 +227,8 @@ describe("Auth Middleware", () => {
         });
 
         it("should return 403 if user has standard roles (forbidden)", async () => {
-            const { c, getStatus } = createMockContext({ user: { userId: "user-123", roles: ["editor", "viewer"] } });
+            const { c, getStatus } = createMockContext({ user: { userId: "user-123",
+roles: ["editor", "viewer"] } });
 
             await requireAdmin(c, nextFn);
 
@@ -235,7 +237,8 @@ describe("Auth Middleware", () => {
         });
 
         it("should allow access if user has 'admin' role", async () => {
-            const { c, getStatus } = createMockContext({ user: { userId: "user-123", roles: ["editor", "admin"] } });
+            const { c, getStatus } = createMockContext({ user: { userId: "user-123",
+roles: ["editor", "admin"] } });
 
             await requireAdmin(c, nextFn);
 
@@ -244,7 +247,8 @@ describe("Auth Middleware", () => {
         });
 
         it("should allow access if user has 'schema-admin' role", async () => {
-            const { c } = createMockContext({ user: { userId: "user-123", roles: ["schema-admin"] } });
+            const { c } = createMockContext({ user: { userId: "user-123",
+roles: ["schema-admin"] } });
 
             await requireAdmin(c, nextFn);
 
@@ -252,7 +256,8 @@ describe("Auth Middleware", () => {
         });
 
         it("should block access for malformed spoofed string roles", async () => {
-            const { c, getStatus } = createMockContext({ user: { userId: "user-123", roles: ["schema-adminstration", "admins", "admin "] } });
+            const { c, getStatus } = createMockContext({ user: { userId: "user-123",
+roles: ["schema-adminstration", "admins", "admin "] } });
 
             await requireAdmin(c, nextFn);
 

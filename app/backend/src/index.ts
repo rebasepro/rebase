@@ -45,7 +45,7 @@ app.use("/*", secureHeaders({
 const { db, pool, connectionString } = createPostgresDatabaseConnection(env.DATABASE_URL, undefined, {
     max: env.DB_POOL_MAX,
     idleTimeoutMillis: env.DB_POOL_IDLE_TIMEOUT,
-    connectionTimeoutMillis: env.DB_POOL_CONNECT_TIMEOUT,
+    connectionTimeoutMillis: env.DB_POOL_CONNECT_TIMEOUT
 });
 
 // ─── Start ───────────────────────────────────────────────────────────
@@ -65,7 +65,9 @@ async function startServer() {
         bootstrappers: [
             createPostgresBootstrapper({
                 connection: db,
-                schema: { tables, enums, relations },
+                schema: { tables,
+enums,
+relations },
                 adminConnectionString: env.ADMIN_CONNECTION_STRING || env.DATABASE_URL,
                 connectionString
             })
@@ -82,7 +84,7 @@ async function startServer() {
             allowRegistration: env.ALLOW_REGISTRATION,
             serviceKey: env.REBASE_SERVICE_KEY
         },
-        storage: env.STORAGE_TYPE === "s3" 
+        storage: env.STORAGE_TYPE === "s3"
             ? {
                 type: "s3",
                 bucket: env.S3_BUCKET!,
@@ -99,7 +101,7 @@ async function startServer() {
         history: true,
         csrf: isProduction
             ? { origin: allowedOrigins }
-            : undefined, // dev defaults are applied by server-core
+            : undefined // dev defaults are applied by server-core
     });
 
     // ─── Health check ─────────────────────────────────────────────
@@ -141,9 +143,9 @@ async function startServer() {
     const gracefulShutdown = async (signal: string) => {
         if (isShuttingDown) return;
         isShuttingDown = true;
-        
+
         logger.info(`Received ${signal}, waiting for HTTP connections to drain...`);
-        
+
         // Stop accepting new connections
         server.close(async (err) => {
             if (err) {

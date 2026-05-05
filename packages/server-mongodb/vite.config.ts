@@ -11,7 +11,7 @@ import { defineConfig } from "vite";
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;
     // Inline all @rebasepro/* packages into the bundle
-    
+
     return true;
 };
 
@@ -43,7 +43,7 @@ export default defineConfig(() => ({
         alias: {
             "@rebasepro/server-core": path.resolve(__dirname, "../server-core/src"),
             "@rebasepro/core": path.resolve(__dirname, "../core/src"),
-            "@rebasepro/types": path.resolve(__dirname, "../types/src"),
+            "@rebasepro/types": path.resolve(__dirname, "../types/src")
         }
     }
 }));

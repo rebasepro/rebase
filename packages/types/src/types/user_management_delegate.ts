@@ -9,7 +9,7 @@ export interface UserCreationResult<USER extends User = User> {
     user: USER;
     /** Whether an invitation email was sent to the user */
     invitationSent: boolean;
-    /** 
+    /**
      * Temporary password (only present when email service is not configured).
      * This is returned one-time and should be shown to the admin to share manually.
      */
@@ -21,7 +21,7 @@ export interface UserCreationResult<USER extends User = User> {
  * Delegate to manage users, roles, and their permissions.
  * This interface allows the CMS to be completely agnostic of the underlying
  * authentication provider or backend.
- * 
+ *
  * @group Models
  */
 export interface UserManagementDelegate<USER extends User = User> {
@@ -44,7 +44,7 @@ export interface UserManagementDelegate<USER extends User = User> {
     /**
      * Function to get a user by its uid. This is used to show
      * user information when assigning ownership of an entity.
-     * @param uid 
+     * @param uid
      */
     getUser: (uid: string) => USER | null;
 
@@ -64,7 +64,7 @@ export interface UserManagementDelegate<USER extends User = User> {
 
     /**
      * Save a user (create or update)
-     * @param user 
+     * @param user
      */
     saveUser?: (user: USER) => Promise<USER>;
 
@@ -84,7 +84,7 @@ export interface UserManagementDelegate<USER extends User = User> {
 
     /**
      * Delete a user
-     * @param user 
+     * @param user
      */
     deleteUser?: (user: USER) => Promise<void>;
 
@@ -100,13 +100,13 @@ export interface UserManagementDelegate<USER extends User = User> {
 
     /**
      * Save a role (create or update)
-     * @param role 
+     * @param role
      */
     saveRole?: (role: Role) => Promise<void>;
 
     /**
      * Delete a role
-     * @param role 
+     * @param role
      */
     deleteRole?: (role: Role) => Promise<void>;
 
@@ -124,7 +124,6 @@ export interface UserManagementDelegate<USER extends User = User> {
      * Should collection config permissions be included?
      */
     includeCollectionConfigPermissions?: boolean;
-
 
 
     /**

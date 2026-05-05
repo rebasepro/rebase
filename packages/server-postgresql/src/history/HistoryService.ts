@@ -50,7 +50,8 @@ export class HistoryService {
         private db: NodePgDatabase,
         retention?: Partial<HistoryRetentionConfig>
     ) {
-        this.retention = { ...DEFAULT_RETENTION, ...retention };
+        this.retention = { ...DEFAULT_RETENTION,
+...retention };
     }
 
     /**

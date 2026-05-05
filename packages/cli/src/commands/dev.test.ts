@@ -28,7 +28,7 @@ describe("getProjectPort", () => {
             "/Users/dev/project-b",
             "/home/user/apps/my-rebase-app",
             "/tmp/test",
-            "C:\\Users\\dev\\my-app",
+            "C:\\Users\\dev\\my-app"
         ];
 
         for (const p of paths) {

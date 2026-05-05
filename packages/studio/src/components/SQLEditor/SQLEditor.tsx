@@ -34,12 +34,13 @@ import {
     NotesIcon,
     PlayArrowIcon,
     VirtualTable,
-    VirtualTableColumn,
+    VirtualTableColumn
 } from "@rebasepro/ui";
 // VirtualTableInput is conditionally loaded from CMS when available
 let VirtualTableInput: React.ComponentType<any> | null = null;
 try {
     // @ts-ignore — optional peer dependency
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const cms = require("@rebasepro/admin");
     VirtualTableInput = cms.VirtualTableInput;
 } catch { /* CMS not available */ }
@@ -76,7 +77,7 @@ const QueryLoadingView = () => {
     return (
         <div className="flex-grow flex items-center justify-center">
             <div className="text-center">
-                <CircularProgress size="medium" />
+                <CircularProgress size="medium"/>
                 <Typography variant="body2" className="mt-4 text-text-secondary dark:text-text-secondary-dark font-mono tracking-tight animate-pulse">
                     EXECUTING QUERY...
                 </Typography>
@@ -164,7 +165,8 @@ export const SQLEditor = () => {
 
     // Helper to update active tab state
     const updateActiveTab = useCallback((update: Partial<typeof activeTab>) => {
-        setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, ...update } : t));
+        setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t,
+...update } : t));
     }, [activeTabId]);
 
     const sql = activeTab.sql;
@@ -201,12 +203,12 @@ export const SQLEditor = () => {
                     const loadedDb = localStorage.getItem("rebase_sql_selected_db") || undefined;
                     const loadedRole = localStorage.getItem("rebase_sql_selected_role") || undefined;
 
-                    let initialActiveTabId = localStorage.getItem(STORAGE_KEY_ACTIVE_TAB) || "1";
+                    const initialActiveTabId = localStorage.getItem(STORAGE_KEY_ACTIVE_TAB) || "1";
                     let initialTabs: any[] = [];
                     try {
                         const savedTabs = localStorage.getItem(STORAGE_KEY_TABS);
                         if (savedTabs) initialTabs = JSON.parse(savedTabs);
-                    } catch (e) {}
+                    } catch (e) { /* ignore */ }
                     const currentActiveTab = initialTabs.find(t => t.id === initialActiveTabId);
 
                     let actualDb = currentActiveTab?.database || loadedDb;
@@ -218,7 +220,8 @@ export const SQLEditor = () => {
                     if (actualDb) {
                         setSelectedDatabase(actualDb);
                         localStorage.setItem("rebase_sql_selected_db", actualDb);
-                        setTabs(prev => prev.map(t => t.id === initialActiveTabId && !t.database ? { ...t, database: actualDb } : t));
+                        setTabs(prev => prev.map(t => t.id === initialActiveTabId && !t.database ? { ...t,
+database: actualDb } : t));
                     }
 
                     let actualRole = currentActiveTab?.role || loadedRole;
@@ -230,7 +233,8 @@ export const SQLEditor = () => {
                     if (actualRole) {
                         setSelectedRole(actualRole);
                         localStorage.setItem("rebase_sql_selected_role", actualRole);
-                        setTabs(prev => prev.map(t => t.id === initialActiveTabId && !t.role ? { ...t, role: actualRole } : t));
+                        setTabs(prev => prev.map(t => t.id === initialActiveTabId && !t.role ? { ...t,
+role: actualRole } : t));
                     }
                 }
             } catch (err: unknown) {
@@ -254,7 +258,8 @@ export const SQLEditor = () => {
     const handleDatabaseChange = (db: string, tabId?: string) => {
         setSelectedDatabase(db);
         localStorage.setItem("rebase_sql_selected_db", db);
-        setTabs(prev => prev.map(t => t.id === (tabId || activeTabId) ? { ...t, database: db } : t));
+        setTabs(prev => prev.map(t => t.id === (tabId || activeTabId) ? { ...t,
+database: db } : t));
         // Reset so the schema will be re-fetched for the new database
         schemaFetchedRef.current = false;
     };
@@ -262,7 +267,8 @@ export const SQLEditor = () => {
     const handleRoleChange = (role: string, tabId?: string) => {
         setSelectedRole(role);
         localStorage.setItem("rebase_sql_selected_role", role);
-        setTabs(prev => prev.map(t => t.id === (tabId || activeTabId) ? { ...t, role } : t));
+        setTabs(prev => prev.map(t => t.id === (tabId || activeTabId) ? { ...t,
+role } : t));
     };
 
     const handleTabChange = useCallback((newTabId: string) => {
@@ -274,14 +280,16 @@ export const SQLEditor = () => {
                 localStorage.setItem("rebase_sql_selected_db", newTab.database);
                 schemaFetchedRef.current = false;
             } else if (!newTab.database && selectedDatabase) {
-                setTabs(prev => prev.map(t => t.id === newTabId ? { ...t, database: selectedDatabase } : t));
+                setTabs(prev => prev.map(t => t.id === newTabId ? { ...t,
+database: selectedDatabase } : t));
             }
 
             if (newTab.role && newTab.role !== selectedRole) {
                 setSelectedRole(newTab.role);
                 localStorage.setItem("rebase_sql_selected_role", newTab.role);
             } else if (!newTab.role && selectedRole) {
-                setTabs(prev => prev.map(t => t.id === newTabId ? { ...t, role: selectedRole } : t));
+                setTabs(prev => prev.map(t => t.id === newTabId ? { ...t,
+role: selectedRole } : t));
             }
         }
     }, [tabs, selectedDatabase, selectedRole]);
@@ -333,10 +341,14 @@ export const SQLEditor = () => {
                     if (!acc[schema]) acc[schema] = [];
                     let tableInfo = acc[schema].find(t => t.tableName === table);
                     if (!tableInfo) {
-                        tableInfo = { schemaName: schema, tableName: table, columns: [] };
+                        tableInfo = { schemaName: schema,
+tableName: table,
+columns: [] };
                         acc[schema].push(tableInfo);
                     }
-                    tableInfo.columns.push({ name: column, dataType, isPrimaryKey });
+                    tableInfo.columns.push({ name: column,
+dataType,
+isPrimaryKey });
                     return acc;
                 }, {});
                 setSchemas(grouped);
@@ -372,7 +384,6 @@ export const SQLEditor = () => {
             fetchSchema();
         }
     }, [fetchSchema, isLoadingConfig, selectedDatabase]);
-
 
 
     const [autoLimit, setAutoLimit] = useState(true);
@@ -413,7 +424,9 @@ export const SQLEditor = () => {
             return;
         }
 
-        setEditingCell({ rowIndex, columnKey, initialValue });
+        setEditingCell({ rowIndex,
+columnKey,
+initialValue });
     }, [activeTab.lastExecutedSql, schemas, snackbarController]);
 
     const handleCellSave = useCallback(async (newValue: string | null, rowData: Record<string, unknown>, columnKey: string, rowIndex: number) => {
@@ -425,7 +438,8 @@ export const SQLEditor = () => {
 
         const resolution = determineTableAndPK(activeTab.lastExecutedSql, columnKey, schemas);
         if (resolution.error || !resolution.tableName || !resolution.primaryKeys || resolution.primaryKeys.length === 0) {
-            snackbarController.open({ type: "error", message: resolution.error || "Resolution failed." });
+            snackbarController.open({ type: "error",
+message: resolution.error || "Resolution failed." });
             return;
         }
 
@@ -469,11 +483,13 @@ export const SQLEditor = () => {
 
         try {
             if (databaseAdmin?.executeSql) {
-                await databaseAdmin.executeSql(updateSql, { database: selectedDatabase, role: selectedRole });
+                await databaseAdmin.executeSql(updateSql, { database: selectedDatabase,
+role: selectedRole });
 
                 const newResults = [...(activeTab.results || [])];
                 if (newResults[rowIndex]) {
-                    newResults[rowIndex] = { ...newResults[rowIndex], [columnKey]: newValue };
+                    newResults[rowIndex] = { ...newResults[rowIndex],
+[columnKey]: newValue };
                 }
                 updateActiveTab({ results: newResults });
 
@@ -515,7 +531,7 @@ export const SQLEditor = () => {
             name: t.name,
             sql: t.sql,
             database: t.database,
-            role: t.role,
+            role: t.role
         }));
         localStorage.setItem(STORAGE_KEY_TABS, JSON.stringify(sanitizedTabs));
     }, [tabs]);
@@ -609,12 +625,16 @@ export const SQLEditor = () => {
 
     const handleExplain = async () => {
         const explainSql = `EXPLAIN (FORMAT JSON, ANALYZE) ${activeTab.sql}`;
-        updateActiveTab({ loading: true, error: null, results: null });
+        updateActiveTab({ loading: true,
+error: null,
+results: null });
         const start = performance.now();
         try {
             if (databaseAdmin?.executeSql) {
-                const result = await databaseAdmin.executeSql(explainSql, { database: selectedDatabase, role: selectedRole });
-                updateActiveTab({ results: result, execTime: Math.round(performance.now() - start) });
+                const result = await databaseAdmin.executeSql(explainSql, { database: selectedDatabase,
+role: selectedRole });
+                updateActiveTab({ results: result,
+execTime: Math.round(performance.now() - start) });
             }
         } catch (e: unknown) {
             const message = e instanceof Error ? e.message : String(e);
@@ -626,16 +646,26 @@ export const SQLEditor = () => {
 
     const executeRun = useCallback(async (sqlOverride?: string) => {
         let sqlToRun = sqlOverride || activeTab.sql;
-        if (autoLimit && sqlToRun.toUpperCase().includes("SELECT") && !sqlToRun.toUpperCase().includes("LIMIT")) {
-            sqlToRun = `${sqlToRun.trim()} LIMIT 1000`;
+        const upperSql = sqlToRun.toUpperCase();
+        
+        const isAggregate = /\b(COUNT|SUM|AVG|MIN|MAX)\s*\(/i.test(sqlToRun);
+        const isExplain = /\bEXPLAIN\b/i.test(sqlToRun);
+
+        if (autoLimit && upperSql.includes("SELECT") && !upperSql.includes("LIMIT") && !isAggregate && !isExplain) {
+            // Remove trailing semicolon if present to safely append LIMIT
+            sqlToRun = sqlToRun.trim().replace(/;$/, "");
+            sqlToRun = `${sqlToRun} LIMIT 1000;`;
         }
 
-        updateActiveTab({ loading: true, error: null, results: null });
+        updateActiveTab({ loading: true,
+error: null,
+results: null });
         const start = performance.now();
 
         try {
             if (databaseAdmin?.executeSql) {
-                const result = await databaseAdmin.executeSql(sqlToRun, { database: selectedDatabase, role: selectedRole });
+                const result = await databaseAdmin.executeSql(sqlToRun, { database: selectedDatabase,
+role: selectedRole });
                 updateActiveTab({
                     results: result,
                     execTime: Math.round(performance.now() - start),
@@ -784,7 +814,7 @@ export const SQLEditor = () => {
             return (
                 <div className="flex-grow flex items-center justify-center">
                     <div className="text-center">
-                        <CircularProgress size="medium" />
+                        <CircularProgress size="medium"/>
                         <Typography variant="body2" className="mt-4 text-text-secondary dark:text-text-secondary-dark font-mono tracking-tight animate-pulse">{t("studio_sql_executing_query")}</Typography>
                     </div>
                 </div>
@@ -794,7 +824,7 @@ export const SQLEditor = () => {
         if (error) {
             return (
                 <div className="flex-grow flex items-center justify-center p-6 overflow-auto">
-                    <ErrorView title={t("studio_sql_query_error")} error={error} />
+                    <ErrorView title={t("studio_sql_query_error")} error={error}/>
                 </div>
             );
         }
@@ -803,7 +833,7 @@ export const SQLEditor = () => {
             return (
                 <div className="flex-grow flex items-center justify-center text-text-disabled dark:text-text-disabled-dark">
                     <div className="text-center">
-                        <svg className="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>
+                        <svg className="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>
                         <Typography variant="body2">{t("studio_sql_run_query_placeholder")}</Typography>
                     </div>
                 </div>
@@ -819,7 +849,7 @@ export const SQLEditor = () => {
                         <div className="flex-grow overflow-auto p-4 bg-surface-50 dark:bg-surface-900 flex flex-col items-start">
                             <Typography variant="caption" className="font-bold text-text-secondary mb-4 tracking-wider uppercase">{t("studio_sql_visual_execution_plan")}</Typography>
                             <div className="pb-12">
-                                <ExplainVisualizer plan={plan} />
+                                <ExplainVisualizer plan={plan}/>
                             </div>
                         </div>
                     );
@@ -875,7 +905,11 @@ export const SQLEditor = () => {
         }));
 
         const columns: VirtualTableColumn[] = actionableCollections.length > 0
-            ? [{ key: "__cms_action__", title: "", width: 36, sortable: false, resizable: false }, ...dataColumns]
+            ? [{ key: "__cms_action__",
+title: "",
+width: 36,
+sortable: false,
+resizable: false }, ...dataColumns]
             : dataColumns;
 
         return (
@@ -891,7 +925,7 @@ export const SQLEditor = () => {
                                 <Tooltip key={mc.tableName} title={`Table "${mc.tableName}" → ${mc.collection.name} (PK: ${mc.pkColumn})`}>
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-primary/10 dark:bg-primary-dark/15 text-primary dark:text-primary-dark whitespace-nowrap border border-primary/20 dark:border-primary-dark/20">
                                         {typeof mc.collection.icon === "string" && (
-                                            <IconForView collectionOrView={mc.collection} className="text-[12px]" />
+                                            <IconForView collectionOrView={mc.collection} className="text-[12px]"/>
                                         )}
                                         {mc.collection.name}
                                     </span>
@@ -906,19 +940,21 @@ export const SQLEditor = () => {
                         columns={columns}
                         rowHeight={32}
                         headerHeight={32}
+                        extraData={editingCell}
                         onColumnResizeEnd={handleColumnResize}
                         cellRenderer={({ rowData, column, rowIndex }) => {
                             // Dedicated collection action column
                             if (column.key === "__cms_action__") {
                                 const rowActions = getRowEntityActions(rowData);
                                 if (rowActions.length === 0) {
-                                    return <div className="h-full w-full" />;
+                                    return <div className="h-full w-full"/>;
                                 }
                                 if (rowActions.length === 1) {
                                     const ra = rowActions[0];
                                     return (
                                         <div className="h-full flex items-center justify-center">
-                                            <Tooltip title={t("studio_sql_edit_entity", { name: ra.collection.collection.name, id: String(ra.entityId) })}>
+                                            <Tooltip title={t("studio_sql_edit_entity", { name: ra.collection.collection.name,
+id: String(ra.entityId) })}>
                                                 <IconButton
                                                     size="small"
                                                     className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
@@ -932,7 +968,7 @@ export const SQLEditor = () => {
                                                         });
                                                     }}
                                                 >
-                                                    <EditIcon size="small" />
+                                                    <EditIcon size="small"/>
                                                 </IconButton>
                                             </Tooltip>
                                         </div>
@@ -948,7 +984,7 @@ export const SQLEditor = () => {
                                                     className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
                                                     onClick={(e) => e.stopPropagation()}
                                                 >
-                                                    <MoreVertIcon size="small" />
+                                                    <MoreVertIcon size="small"/>
                                                 </IconButton>
                                             }
                                         >
@@ -965,7 +1001,8 @@ export const SQLEditor = () => {
                                                         });
                                                     }}
                                                 >
-                                                    {t("studio_sql_edit_entity", { name: ra.collection.collection.name, id: String(ra.entityId) })}
+                                                    {t("studio_sql_edit_entity", { name: ra.collection.collection.name,
+id: String(ra.entityId) })}
                                                 </MenuItem>
                                             ))}
                                         </Menu>
@@ -980,37 +1017,39 @@ export const SQLEditor = () => {
 
                             if (isEditing) {
                                 return (
-                                    <div className="absolute inset-x-0 -inset-y-0.5 z-10 bg-surface-50 dark:bg-surface-900 border border-primary dark:border-primary-dark shadow-md overflow-y-auto max-h-[200px] flex px-2 py-1 items-start text-[13px] font-mono">
-                                        {VirtualTableInput ? (
-                                            <VirtualTableInput
-                                                error={undefined}
-                                                value={displayValue}
-                                                multiline={true}
-                                                focused={true}
-                                                disabled={false}
-                                                updateValue={(newValue: string | null) => {
-                                                    handleCellSave(newValue, rowData, column.key, rowIndex);
-                                                }}
-                                                onBlur={() => setEditingCell(null)}
-                                            />
-                                        ) : (
-                                            <input
-                                                className="w-full bg-transparent outline-none font-mono text-[13px]"
-                                                defaultValue={displayValue}
-                                                autoFocus
-                                                onBlur={(e) => {
-                                                    handleCellSave(e.target.value || null, rowData, column.key, rowIndex);
+                                    <div 
+                                        className="absolute top-[-2px] left-[-2px] z-20 bg-surface-50 dark:bg-surface-900 border-2 border-primary dark:border-primary-dark shadow-xl flex flex-col"
+                                        style={{ minWidth: 'max(100% + 4px, 250px)', minHeight: 'calc(100% + 4px)', maxWidth: '400px' }}
+                                    >
+                                        <textarea
+                                            className="w-full h-full bg-transparent outline-none border-none ring-0 font-mono text-[13px] px-4 py-1.5 resize-none overflow-y-auto"
+                                            defaultValue={displayValue}
+                                            autoFocus
+                                            style={{ minHeight: '32px' }}
+                                            onFocus={(e) => {
+                                                const val = e.target.value;
+                                                e.target.value = "";
+                                                e.target.value = val;
+                                                e.target.style.height = 'auto';
+                                                e.target.style.height = `${Math.min(e.target.scrollHeight, 300)}px`;
+                                            }}
+                                            onChange={(e) => {
+                                                e.target.style.height = 'auto';
+                                                e.target.style.height = `${Math.min(e.target.scrollHeight, 300)}px`;
+                                            }}
+                                            onBlur={(e) => {
+                                                handleCellSave(e.target.value || null, rowData, column.key, rowIndex);
+                                                setEditingCell(null);
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter" && !e.shiftKey) {
+                                                    e.preventDefault();
+                                                    handleCellSave((e.currentTarget as HTMLTextAreaElement).value || null, rowData, column.key, rowIndex);
                                                     setEditingCell(null);
-                                                }}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === "Enter") {
-                                                        handleCellSave((e.target as HTMLInputElement).value || null, rowData, column.key, rowIndex);
-                                                        setEditingCell(null);
-                                                    }
-                                                    if (e.key === "Escape") setEditingCell(null);
-                                                }}
-                                            />
-                                        )}
+                                                }
+                                                if (e.key === "Escape") setEditingCell(null);
+                                            }}
+                                        />
                                     </div>
                                 );
                             }
@@ -1091,13 +1130,13 @@ export const SQLEditor = () => {
     useEffect(() => {
         try {
             localStorage.setItem("rebase_sql_editor_sidebar_size", sidebarSize.toString());
-        } catch (e) { }
+        } catch (e) { /* ignore */ }
     }, [sidebarSize]);
 
     useEffect(() => {
         try {
             localStorage.setItem("rebase_sql_editor_height", editorHeight.toString());
-        } catch (e) { }
+        } catch (e) { /* ignore */ }
     }, [editorHeight]);
 
     const activeSnippet = snippets.find(s => s.sql === activeTab.sql);
@@ -1132,7 +1171,7 @@ export const SQLEditor = () => {
                                     <Tabs value={activeTabId} onValueChange={handleTabChange} variant="boxy" className="w-[unset] flex-shrink-0" innerClassName="bg-white dark:bg-surface-950">
                                         {tabs.map(tab => (
                                             <Tab key={tab.id} value={tab.id} className="flex items-center justify-between group max-w-[200px]">
-                                                <TerminalIcon size="smallest" className="text-blue-500 mr-1.5 flex-shrink-0" />
+                                                <TerminalIcon size="smallest" className="text-blue-500 mr-1.5 flex-shrink-0"/>
                                                 <span className="truncate">{tab.name}</span>
                                                 {tabs.length > 1 && (
                                                     <IconButton
@@ -1140,7 +1179,7 @@ export const SQLEditor = () => {
                                                         onClick={(e) => handleCloseTab(tab.id, e)}
                                                         className="ml-1 !p-0.5 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity"
                                                     >
-                                                        <CloseIcon size="smallest" />
+                                                        <CloseIcon size="smallest"/>
                                                     </IconButton>
                                                 )}
                                             </Tab>
@@ -1151,14 +1190,14 @@ export const SQLEditor = () => {
                                         onClick={handleAddTab}
                                         className="ml-2 flex-shrink-0"
                                     >
-                                        <AddIcon size="small" />
+                                        <AddIcon size="small"/>
                                     </IconButton>
                                 </div>
                             </div>
                             <div className="flex shrink-0 items-center justify-end pr-2 gap-1.5">
                                 <Tooltip title={t("studio_sql_format_sql")}>
                                     <IconButton size="small" onClick={handlePrettify} className="text-text-secondary hover:text-text-primary transition-colors">
-                                        <NotesIcon size="small" />
+                                        <NotesIcon size="small"/>
                                     </IconButton>
                                 </Tooltip>
 
@@ -1197,10 +1236,11 @@ export const SQLEditor = () => {
                                                 });
                                                 return;
                                             }
-                                            saveSnippets(snippets.map(s => s.id === activeSnippet.id ? { ...s, isFavorite: !s.isFavorite } : s));
+                                            saveSnippets(snippets.map(s => s.id === activeSnippet.id ? { ...s,
+isFavorite: !s.isFavorite } : s));
                                         }}
                                     >
-                                        <svg className={`w-4 h-4 ${isFavorite ? 'text-red-500 fill-current' : 'text-text-disabled dark:text-text-disabled-dark hover:text-text-primary'}`} fill={isFavorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
+                                        <svg className={`w-4 h-4 ${isFavorite ? "text-red-500 fill-current" : "text-text-disabled dark:text-text-disabled-dark hover:text-text-primary"}`} fill={isFavorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                                     </IconButton>
                                 </Tooltip>
 
@@ -1221,7 +1261,7 @@ export const SQLEditor = () => {
                                             variant="outlined"
                                             className="text-text-secondary dark:text-text-secondary-dark font-medium mr-2"
                                         >
-                                            <StorageIcon size="small" className="mr-1.5 text-text-disabled dark:text-text-disabled-dark" />
+                                            <StorageIcon size="small" className="mr-1.5 text-text-disabled dark:text-text-disabled-dark"/>
                                             <span className="max-w-[80px] truncate">{isLoadingConfig ? "..." : (selectedDatabase || t("studio_sql_select_db"))}</span>
                                         </Button>
                                     }
@@ -1232,7 +1272,7 @@ export const SQLEditor = () => {
                                         </div>
                                         {isLoadingConfig ? (
                                             <div className="flex items-center justify-center p-4">
-                                                <CircularProgress size="small" />
+                                                <CircularProgress size="small"/>
                                             </div>
                                         ) : connectionConfigError ? (
                                             <div className="px-3 py-2 text-xs text-red-500 dark:text-red-400 max-w-[200px] break-words">
@@ -1265,7 +1305,7 @@ export const SQLEditor = () => {
                                     size="small"
                                     color="primary"
                                 >
-                                    {loading ? <CircularProgress size="smallest" className="mr-2" /> : <PlayArrowIcon size="small" className="mr-2" />}
+                                    {loading ? <CircularProgress size="smallest" className="mr-2"/> : <PlayArrowIcon size="small" className="mr-2"/>}
                                     {t("studio_sql_run")}
                                 </Button>
                             </div>
@@ -1313,7 +1353,7 @@ export const SQLEditor = () => {
                             value={newSnippetName}
                             onChange={(e) => setNewSnippetName(e.target.value)}
                             onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
+                                if (e.key === "Enter") {
                                     e.preventDefault();
                                     handleSaveSnippet();
                                 }

@@ -80,7 +80,9 @@ export async function register(
     const response = await fetchWithHandling(`${baseApiUrl}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, displayName })
+        body: JSON.stringify({ email,
+password,
+displayName })
     });
 
     return handleResponse<AuthResponse>(response);
@@ -93,7 +95,8 @@ export async function login(email: string, password: string): Promise<AuthRespon
     const response = await fetchWithHandling(`${baseApiUrl}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email,
+password })
     });
 
     return handleResponse<AuthResponse>(response);
@@ -119,7 +122,8 @@ export async function linkedinLogin(code: string, redirectUri: string): Promise<
     const response = await fetchWithHandling(`${baseApiUrl}/api/auth/linkedin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, redirectUri })
+        body: JSON.stringify({ code,
+redirectUri })
     });
 
     return handleResponse<AuthResponse>(response);
@@ -201,7 +205,8 @@ export async function resetPassword(token: string, password: string): Promise<{ 
     const response = await fetchWithHandling(`${baseApiUrl}/api/auth/reset-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, password })
+        body: JSON.stringify({ token,
+password })
     });
 
     return handleResponse<{ success: boolean; message: string }>(response);
@@ -221,7 +226,8 @@ export async function changePassword(
             "Content-Type": "application/json",
             "Authorization": `Bearer ${accessToken}`
         },
-        body: JSON.stringify({ oldPassword, newPassword })
+        body: JSON.stringify({ oldPassword,
+newPassword })
     });
 
     return handleResponse<{ success: boolean; message: string }>(response);
@@ -268,7 +274,8 @@ export async function updateProfile(
             "Content-Type": "application/json",
             "Authorization": `Bearer ${accessToken}`
         },
-        body: JSON.stringify({ displayName, photoURL })
+        body: JSON.stringify({ displayName,
+photoURL })
     });
 
     return handleResponse<{ user: UserInfo }>(response);

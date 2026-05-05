@@ -18,7 +18,7 @@ describe("useResolvedCollections", () => {
     const mockCollectionRegistryController = {
         collectionRegistryRef: { current: mockCollectionRegistry },
         getCollection: jest.fn(),
-        getCollections: jest.fn(),
+        getCollections: jest.fn()
     } as Partial<CollectionRegistryController> as CollectionRegistryController & { collectionRegistryRef: React.MutableRefObject<CollectionRegistry> };
 
     it("should resolve a static array of collections and register them", async () => {
@@ -28,14 +28,16 @@ describe("useResolvedCollections", () => {
         } as unknown as AuthController;
 
         const mockCollections: EntityCollection[] = [
-            { id: "test", name: "Test Collection", path: "test" }
+            { id: "test",
+name: "Test Collection",
+path: "test" }
         ];
 
         const { result } = renderHook(() => useResolvedCollections({
             authController: mockAuthController,
             collections: mockCollections,
             data: mockData,
-            collectionRegistryController: mockCollectionRegistryController,
+            collectionRegistryController: mockCollectionRegistryController
         }));
 
         expect(result.current.loading).toBe(true);
@@ -56,7 +58,9 @@ describe("useResolvedCollections", () => {
         } as unknown as AuthController;
 
         const mockCollections: EntityCollection[] = [
-            { id: "dynamic", name: "Dynamic", path: "dynamic" }
+            { id: "dynamic",
+name: "Dynamic",
+path: "dynamic" }
         ];
 
         const builder = jest.fn().mockResolvedValue(mockCollections);
@@ -65,7 +69,7 @@ describe("useResolvedCollections", () => {
             authController: mockAuthController,
             collections: builder,
             data: mockData,
-            collectionRegistryController: mockCollectionRegistryController,
+            collectionRegistryController: mockCollectionRegistryController
         }));
 
         await waitFor(() => {
@@ -87,13 +91,15 @@ describe("useResolvedCollections", () => {
             user: null
         };
 
-        const mockCollections: EntityCollection[] = [{ id: "test", name: "Test", path: "test" }];
+        const mockCollections: EntityCollection[] = [{ id: "test",
+name: "Test",
+path: "test" }];
 
         const { result, rerender } = renderHook(() => useResolvedCollections({
             authController: mockAuthController,
             collections: mockCollections,
             data: mockData,
-            collectionRegistryController: mockCollectionRegistryController,
+            collectionRegistryController: mockCollectionRegistryController
         }));
 
         // While authLoading is true, it should exit early and loading should be true
@@ -136,7 +142,7 @@ describe("useResolvedCollections", () => {
             authController: mockAuthController,
             collections: builder,
             data: mockData,
-            collectionRegistryController: mockCollectionRegistryController,
+            collectionRegistryController: mockCollectionRegistryController
         }));
 
         await waitFor(() => {

@@ -1,7 +1,7 @@
-import { 
-  Entity, 
-  EntityCollection, 
-  EntityStatus, 
+import {
+  Entity,
+  EntityCollection,
+  EntityStatus,
   FilterValues,
   FetchCollectionProps,
   FetchEntityProps,

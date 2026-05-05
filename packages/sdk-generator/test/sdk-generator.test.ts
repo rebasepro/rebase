@@ -12,10 +12,16 @@ const authorsCollection = {
     slug: "authors",
     table: "authors",
     properties: {
-        id: { name: "ID", type: "number", isId: "increment", validation: { required: true } },
-        name: { name: "Name", type: "string", validation: { required: true } },
-        email: { name: "Email", type: "string" },
-    },
+        id: { name: "ID",
+type: "number",
+isId: "increment",
+validation: { required: true } },
+        name: { name: "Name",
+type: "string",
+validation: { required: true } },
+        email: { name: "Email",
+type: "string" }
+    }
 } as unknown as EntityCollection;
 
 describe("Utils", () => {
@@ -44,16 +50,16 @@ describe("Utils", () => {
 describe("generateTypedefs", () => {
     it("generates a typescript interface for a collection", () => {
         const ts = generateTypedefs([authorsCollection]);
-        
+
         expect(ts).toContain("export interface Database {");
         expect(ts).toContain("authors: {");
-        
+
         // Row Type
         expect(ts).toContain("Row: {");
         expect(ts).toContain("id: number;");
         expect(ts).toContain("name: string;");
         expect(ts).toContain("email?: string;");
-        
+
         // Insert Type
         expect(ts).toContain("Insert: {");
         expect(ts).toContain("id?: number;");

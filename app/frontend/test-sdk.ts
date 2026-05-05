@@ -3,8 +3,8 @@ import { createRebaseClient } from "@rebasepro/client";
 async function main() {
     console.log("Initializing Rebase SDK client...");
     // Assume backend is on port 3001 or 3070, we'll try 3070
-    const client = createRebaseClient({ 
-        baseUrl: "http://localhost:3070",
+    const client = createRebaseClient({
+        baseUrl: "http://localhost:3070"
         // In a real app we'd pass auth, but test-email is public
     });
 
@@ -16,7 +16,7 @@ async function main() {
     } catch (err: any) {
         console.error("❌ Failed to call function:");
         console.error(err.message);
-        
+
         // Try 3001 as fallback
         console.log("\nTrying port 3001 instead...");
         const client2 = createRebaseClient({ baseUrl: "http://localhost:3001" });

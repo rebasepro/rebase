@@ -23,7 +23,7 @@ const job: CronJobDefinition = {
         ctx.log(`Cleaned up ${simulatedCount} expired sessions`);
 
         return { deletedSessions: simulatedCount };
-    },
+    }
 };
 
 export default job;

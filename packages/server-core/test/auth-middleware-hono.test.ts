@@ -10,7 +10,8 @@ const TEST_SECRET = "test-secret-key-for-hono-middleware-testing-1234567890";
 describe("Auth Middleware (Hono)", () => {
 
     beforeAll(() => {
-        configureJwt({ secret: TEST_SECRET, accessExpiresIn: "1h" });
+        configureJwt({ secret: TEST_SECRET,
+accessExpiresIn: "1h" });
     });
 
     // ── requireAuth ─────────────────────────────────────────
@@ -29,7 +30,7 @@ describe("Auth Middleware (Hono)", () => {
             const app = createApp();
             const token = generateAccessToken("user-1", ["admin"]);
             const res = await app.request("/protected/resource", {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { Authorization: `Bearer ${token}` }
             });
             expect(res.status).toBe(200);
             const body = await res.json() as any;
@@ -48,7 +49,7 @@ describe("Auth Middleware (Hono)", () => {
         it("returns 401 for non-Bearer prefix", async () => {
             const app = createApp();
             const res = await app.request("/protected/resource", {
-                headers: { Authorization: "Basic abc123" },
+                headers: { Authorization: "Basic abc123" }
             });
             expect(res.status).toBe(401);
         });
@@ -56,7 +57,7 @@ describe("Auth Middleware (Hono)", () => {
         it("returns 401 for invalid/expired token", async () => {
             const app = createApp();
             const res = await app.request("/protected/resource", {
-                headers: { Authorization: "Bearer invalid.token.here" },
+                headers: { Authorization: "Bearer invalid.token.here" }
             });
             expect(res.status).toBe(401);
             const body = await res.json() as any;
@@ -77,7 +78,7 @@ describe("Auth Middleware (Hono)", () => {
             const bearerToken = generateAccessToken("bearer-user", ["admin"]);
             const queryToken = generateAccessToken("query-user", ["viewer"]);
             const res = await app.request(`/protected/resource?token=${queryToken}`, {
-                headers: { Authorization: `Bearer ${bearerToken}` },
+                headers: { Authorization: `Bearer ${bearerToken}` }
             });
             expect(res.status).toBe(200);
             const body = await res.json() as any;
@@ -98,7 +99,7 @@ describe("Auth Middleware (Hono)", () => {
             const app = createApp();
             const token = generateAccessToken("admin-1", ["admin"]);
             const res = await app.request("/admin/dashboard", {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { Authorization: `Bearer ${token}` }
             });
             expect(res.status).toBe(200);
         });
@@ -107,7 +108,7 @@ describe("Auth Middleware (Hono)", () => {
             const app = createApp();
             const token = generateAccessToken("schema-admin-1", ["schema-admin"]);
             const res = await app.request("/admin/dashboard", {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { Authorization: `Bearer ${token}` }
             });
             expect(res.status).toBe(200);
         });
@@ -116,7 +117,7 @@ describe("Auth Middleware (Hono)", () => {
             const app = createApp();
             const token = generateAccessToken("user-1", ["editor"]);
             const res = await app.request("/admin/dashboard", {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { Authorization: `Bearer ${token}` }
             });
             expect(res.status).toBe(403);
             const body = await res.json() as any;
@@ -140,7 +141,8 @@ describe("Auth Middleware (Hono)", () => {
             app.use("/public/*", optionalAuth);
             app.get("/public/feed", (c: Context<HonoEnv>) => {
                 const user = c.get("user");
-                return c.json({ authenticated: !!user, user: user ?? null });
+                return c.json({ authenticated: !!user,
+user: user ?? null });
             });
             return app;
         }
@@ -149,7 +151,7 @@ describe("Auth Middleware (Hono)", () => {
             const app = createApp();
             const token = generateAccessToken("opt-user", ["viewer"]);
             const res = await app.request("/public/feed", {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { Authorization: `Bearer ${token}` }
             });
             const body = await res.json() as any;
             expect(res.status).toBe(200);
@@ -169,7 +171,7 @@ describe("Auth Middleware (Hono)", () => {
         it("proceeds without user when token is invalid", async () => {
             const app = createApp();
             const res = await app.request("/public/feed", {
-                headers: { Authorization: "Bearer garbage.token.value" },
+                headers: { Authorization: "Bearer garbage.token.value" }
             });
             const body = await res.json() as any;
             expect(res.status).toBe(200);
@@ -183,12 +185,13 @@ describe("Auth Middleware (Hono)", () => {
             fetchCollection: jest.fn() as any,
             fetchEntity: jest.fn() as any,
             saveEntity: jest.fn() as any,
-            deleteEntity: jest.fn() as any,
+            deleteEntity: jest.fn() as any
         };
 
         it("sets driver in context (requireAuth: false)", async () => {
             const app = new Hono<HonoEnv>();
-            app.use("/*", createAuthMiddleware({ driver: mockDriver, requireAuth: false }));
+            app.use("/*", createAuthMiddleware({ driver: mockDriver,
+requireAuth: false }));
             app.get("/test", (c) => {
                 const driver = c.get("driver");
                 return c.json({ hasDriver: !!driver });
@@ -211,7 +214,8 @@ describe("Auth Middleware (Hono)", () => {
 
         it("enforces auth when requireAuth is true", async () => {
             const app = new Hono<HonoEnv>();
-            app.use("/*", createAuthMiddleware({ driver: mockDriver, requireAuth: true }));
+            app.use("/*", createAuthMiddleware({ driver: mockDriver,
+requireAuth: true }));
             app.get("/test", (c) => c.json({ ok: true }));
 
             const res = await app.request("/test");
@@ -220,7 +224,8 @@ describe("Auth Middleware (Hono)", () => {
 
         it("allows anonymous when requireAuth is false", async () => {
             const app = new Hono<HonoEnv>();
-            app.use("/*", createAuthMiddleware({ driver: mockDriver, requireAuth: false }));
+            app.use("/*", createAuthMiddleware({ driver: mockDriver,
+requireAuth: false }));
             app.get("/test", (c) => c.json({ ok: true }));
 
             const res = await app.request("/test");
@@ -238,7 +243,7 @@ describe("Auth Middleware (Hono)", () => {
 
             const token = generateAccessToken("jwt-user", ["admin"]);
             const res = await app.request("/test", {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { Authorization: `Bearer ${token}` }
             });
             const body = await res.json() as any;
             expect(body.user.userId).toBe("jwt-user");
@@ -247,11 +252,12 @@ describe("Auth Middleware (Hono)", () => {
 
         it("rejects invalid tokens even with requireAuth: false (fail closed)", async () => {
             const app = new Hono<HonoEnv>();
-            app.use("/*", createAuthMiddleware({ driver: mockDriver, requireAuth: false }));
+            app.use("/*", createAuthMiddleware({ driver: mockDriver,
+requireAuth: false }));
             app.get("/test", (c) => c.json({ ok: true }));
 
             const res = await app.request("/test", {
-                headers: { Authorization: "Bearer invalid.garbage.token" },
+                headers: { Authorization: "Bearer invalid.garbage.token" }
             });
             expect(res.status).toBe(401);
             const body = await res.json() as any;
@@ -265,10 +271,11 @@ describe("Auth Middleware (Hono)", () => {
                 validator: async (c: Context<HonoEnv>) => {
                     const apiKey = c.req.header("x-api-key");
                     if (apiKey === "valid-key") {
-                        return { userId: "api-user", roles: ["api"] };
+                        return { userId: "api-user",
+roles: ["api"] };
                     }
                     return false;
-                },
+                }
             }));
             app.get("/test", (c) => {
                 const user = c.get("user");
@@ -277,7 +284,7 @@ describe("Auth Middleware (Hono)", () => {
 
             // Valid API key
             const res = await app.request("/test", {
-                headers: { "x-api-key": "valid-key" },
+                headers: { "x-api-key": "valid-key" }
             });
             const body = await res.json() as any;
             expect(body.user.userId).toBe("api-user");
@@ -285,7 +292,7 @@ describe("Auth Middleware (Hono)", () => {
             // Invalid API key — requireAuth not set, defaults to true,
             // so unauthenticated requests are rejected
             const res2 = await app.request("/test", {
-                headers: { "x-api-key": "bad-key" },
+                headers: { "x-api-key": "bad-key" }
             });
             expect(res2.status).toBe(401); // Secure by default
         });
@@ -294,7 +301,7 @@ describe("Auth Middleware (Hono)", () => {
             const app = new Hono<HonoEnv>();
             app.use("/*", createAuthMiddleware({
                 driver: mockDriver,
-                validator: async () => { throw new Error("auth failed"); },
+                validator: async () => { throw new Error("auth failed"); }
             }));
             app.get("/test", (c) => c.json({ ok: true }));
 
@@ -303,10 +310,11 @@ describe("Auth Middleware (Hono)", () => {
         });
 
         it("calls withAuth on driver when available", async () => {
-            const scopedDriver = { ...mockDriver, isScopedDriver: true };
+            const scopedDriver = { ...mockDriver,
+isScopedDriver: true };
             const driverWithAuth = {
                 ...mockDriver,
-                withAuth: jest.fn().mockResolvedValue(scopedDriver),
+                withAuth: jest.fn().mockResolvedValue(scopedDriver)
             };
 
             const app = new Hono<HonoEnv>();
@@ -318,12 +326,13 @@ describe("Auth Middleware (Hono)", () => {
 
             const token = generateAccessToken("rls-user", ["editor"]);
             const res = await app.request("/test", {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { Authorization: `Bearer ${token}` }
             });
             const body = await res.json() as any;
             expect(body.scoped).toBe(true);
             expect(driverWithAuth.withAuth).toHaveBeenCalledWith(
-                expect.objectContaining({ uid: "rls-user", roles: ["editor"] })
+                expect.objectContaining({ uid: "rls-user",
+roles: ["editor"] })
             );
         });
 
@@ -332,7 +341,7 @@ describe("Auth Middleware (Hono)", () => {
             app.use("/*", createAuthMiddleware({
                 driver: mockDriver,
                 requireAuth: false, // Explicit opt-out for this test
-                validator: async () => true,
+                validator: async () => true
             }));
             app.get("/test", (c) => {
                 const user = c.get("user");
@@ -351,7 +360,7 @@ describe("Auth Middleware (Hono)", () => {
             fetchCollection: jest.fn() as any,
             fetchEntity: jest.fn() as any,
             saveEntity: jest.fn() as any,
-            deleteEntity: jest.fn() as any,
+            deleteEntity: jest.fn() as any
         };
 
         it("grants admin access when Bearer token matches the service key", async () => {
@@ -367,7 +376,7 @@ describe("Auth Middleware (Hono)", () => {
             });
 
             const res = await app.request("/test", {
-                headers: { Authorization: `Bearer ${SERVICE_KEY}` },
+                headers: { Authorization: `Bearer ${SERVICE_KEY}` }
             });
             expect(res.status).toBe(200);
             const body = await res.json() as any;
@@ -385,7 +394,7 @@ describe("Auth Middleware (Hono)", () => {
             app.get("/test", (c) => c.json({ ok: true }));
 
             const res = await app.request("/test", {
-                headers: { Authorization: "Bearer wrong-key-that-is-definitely-not-correct" },
+                headers: { Authorization: "Bearer wrong-key-that-is-definitely-not-correct" }
             });
             // Wrong key is not a valid service key, and also not a valid JWT → 401
             expect(res.status).toBe(401);
@@ -405,7 +414,7 @@ describe("Auth Middleware (Hono)", () => {
             });
 
             const res = await app.request("/test", {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { Authorization: `Bearer ${token}` }
             });
             expect(res.status).toBe(200);
             const body = await res.json() as any;
@@ -416,7 +425,7 @@ describe("Auth Middleware (Hono)", () => {
         it("scopes driver via withAuth with service identity", async () => {
             const scopedDriver = { scoped: true } as unknown as DataDriver;
             const driverWithAuth = {
-                withAuth: jest.fn().mockResolvedValue(scopedDriver),
+                withAuth: jest.fn().mockResolvedValue(scopedDriver)
             } as unknown as DataDriver;
 
             const app = new Hono<HonoEnv>();
@@ -431,12 +440,13 @@ describe("Auth Middleware (Hono)", () => {
             });
 
             const res = await app.request("/test", {
-                headers: { Authorization: `Bearer ${SERVICE_KEY}` },
+                headers: { Authorization: `Bearer ${SERVICE_KEY}` }
             });
             const body = await res.json() as any;
             expect(body.scoped).toBe(true);
             expect((driverWithAuth as any).withAuth).toHaveBeenCalledWith(
-                expect.objectContaining({ uid: "service", roles: ["admin"] })
+                expect.objectContaining({ uid: "service",
+roles: ["admin"] })
             );
         });
 
@@ -444,14 +454,14 @@ describe("Auth Middleware (Hono)", () => {
             const app = new Hono<HonoEnv>();
             app.use("/*", createAuthMiddleware({
                 driver: mockDriver,
-                requireAuth: true,
+                requireAuth: true
                 // No serviceKey configured
             }));
             app.get("/test", (c) => c.json({ ok: true }));
 
             // Sending a random string should fail as invalid JWT
             const res = await app.request("/test", {
-                headers: { Authorization: `Bearer ${SERVICE_KEY}` },
+                headers: { Authorization: `Bearer ${SERVICE_KEY}` }
             });
             expect(res.status).toBe(401);
         });
@@ -476,11 +486,12 @@ describe("Auth Middleware (Hono)", () => {
             app.use("/*", createRequireAuth({ serviceKey: SERVICE_KEY }));
             app.get("/admin/users", (c) => {
                 const user = c.get("user");
-                return c.json({ userId: user?.userId, roles: user?.roles });
+                return c.json({ userId: user?.userId,
+roles: user?.roles });
             });
 
             const res = await app.request("/admin/users", {
-                headers: { Authorization: `Bearer ${SERVICE_KEY}` },
+                headers: { Authorization: `Bearer ${SERVICE_KEY}` }
             });
             expect(res.status).toBe(200);
             const body = await res.json() as any;
@@ -494,7 +505,7 @@ describe("Auth Middleware (Hono)", () => {
             app.get("/admin/users", (c) => c.json({ ok: true }));
 
             const res = await app.request("/admin/users", {
-                headers: { Authorization: "Bearer wrong-key" },
+                headers: { Authorization: "Bearer wrong-key" }
             });
             expect(res.status).toBe(401);
         });
@@ -505,11 +516,12 @@ describe("Auth Middleware (Hono)", () => {
             app.use("/*", createRequireAuth({ serviceKey: SERVICE_KEY }));
             app.get("/admin/users", (c) => {
                 const user = c.get("user");
-                return c.json({ userId: user?.userId, roles: user?.roles });
+                return c.json({ userId: user?.userId,
+roles: user?.roles });
             });
 
             const res = await app.request("/admin/users", {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { Authorization: `Bearer ${token}` }
             });
             expect(res.status).toBe(200);
             const body = await res.json() as any;
@@ -534,7 +546,7 @@ describe("Auth Middleware (Hono)", () => {
             });
 
             const res = await app.request("/admin/users", {
-                headers: { Authorization: `Bearer ${SERVICE_KEY}` },
+                headers: { Authorization: `Bearer ${SERVICE_KEY}` }
             });
             expect(res.status).toBe(200);
             const body = await res.json() as any;

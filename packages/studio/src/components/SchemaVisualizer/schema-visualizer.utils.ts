@@ -39,7 +39,7 @@ export const getLayoutedElements = (
         ranksep: 180,
         edgesep: 60,
         marginx: 60,
-        marginy: 60,
+        marginy: 60
     });
     g.setDefaultEdgeLabel(() => ({}));
 
@@ -51,7 +51,7 @@ export const getLayoutedElements = (
         nodeHeights.set(node.id, h);
         g.setNode(node.id, {
             width: NODE_WIDTH,
-            height: h,
+            height: h
         });
     });
 
@@ -68,16 +68,17 @@ export const getLayoutedElements = (
             ...node,
             data: {
                 ...node.data,
-                layoutDirection: direction,
+                layoutDirection: direction
             },
             position: {
                 x: nodeWithPosition.x - NODE_WIDTH / 2,
-                y: nodeWithPosition.y - h / 2,
-            },
+                y: nodeWithPosition.y - h / 2
+            }
         };
     });
 
-    return { nodes: layoutedNodes, edges };
+    return { nodes: layoutedNodes,
+edges };
 };
 
 // ─── Column type → display label ──────────────────────────────────────
@@ -89,7 +90,7 @@ const TYPE_LABELS: Record<string, string> = {
     date: "timestamp",
     map: "jsonb",
     array: "jsonb",
-    relation: "FK",
+    relation: "FK"
 };
 
 export const getTypeLabel = (type: string): string =>

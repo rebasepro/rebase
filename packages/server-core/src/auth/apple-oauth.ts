@@ -35,7 +35,8 @@ export function createAppleProvider(config: {
         const now = Math.floor(Date.now() / 1000);
 
         return new SignJWT({})
-            .setProtectedHeader({ alg: "ES256", kid: config.keyId })
+            .setProtectedHeader({ alg: "ES256",
+kid: config.keyId })
             .setIssuer(config.teamId)
             .setIssuedAt(now)
             .setExpirationTime(now + 86400 * 180) // 6 months max
@@ -114,7 +115,7 @@ export function createAppleProvider(config: {
                     providerId: decoded.sub,
                     email,
                     displayName,
-                    photoUrl: null, // Apple does not provide a profile photo
+                    photoUrl: null // Apple does not provide a profile photo
                 };
             } catch (error) {
                 console.error("Apple OAuth error:", error);

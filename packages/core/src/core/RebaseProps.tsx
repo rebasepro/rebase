@@ -11,7 +11,6 @@ export interface EffectiveRoleController {
 }
 
 
-
 /**
  * @group Models
  */
@@ -46,7 +45,6 @@ export type RebaseProps<USER extends User> = {
      * in the tree, reducing repetitive `apiUrl` threading.
      */
     apiUrl?: string;
-
 
 
     /**

@@ -8,7 +8,7 @@ import {
     TextField,
     Typography,
     IconButton,
-    DeleteIcon,
+    DeleteIcon
 } from "@rebasepro/ui";
 import { useAuthController, useTranslation } from "../hooks";
 
@@ -167,7 +167,7 @@ export function UserSettingsView() {
             {activeTab === "sessions" && (
                 <div className="flex flex-col gap-4 max-w-3xl">
                     {loadingSessions ? (
-                        <div className="flex justify-center p-8"><CircularProgress /></div>
+                        <div className="flex justify-center p-8"><CircularProgress/></div>
                     ) : sessionsError ? (
                         <Typography color="error">{sessionsError}</Typography>
                     ) : sessions.length === 0 ? (
@@ -203,10 +203,10 @@ export function UserSettingsView() {
                                     </div>
                                     <div className="ml-4">
                                         {revokingSessionId === session.id ? (
-                                            <CircularProgress size="small" />
+                                            <CircularProgress size="small"/>
                                         ) : (
                                             <IconButton onClick={() => handleRevokeSession(session.id, session.isCurrentSession)} aria-label="Revoke Session">
-                                                <DeleteIcon />
+                                                <DeleteIcon/>
                                             </IconButton>
                                         )}
                                     </div>

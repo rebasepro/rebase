@@ -67,7 +67,7 @@ export const POSTGRES_CAPABILITIES: DataSourceCapabilities = {
     supportsRealtime: true,
     supportsSQLAdmin: true,
     supportsDocumentAdmin: false,
-    supportsSchemaAdmin: true,
+    supportsSchemaAdmin: true
 };
 
 /** @group Models */
@@ -82,7 +82,7 @@ export const FIREBASE_CAPABILITIES: DataSourceCapabilities = {
     supportsRealtime: true,
     supportsSQLAdmin: false,
     supportsDocumentAdmin: false,
-    supportsSchemaAdmin: false,
+    supportsSchemaAdmin: false
 };
 
 /** @group Models */
@@ -97,7 +97,7 @@ export const MONGODB_CAPABILITIES: DataSourceCapabilities = {
     supportsRealtime: false,
     supportsSQLAdmin: false,
     supportsDocumentAdmin: true,
-    supportsSchemaAdmin: true,
+    supportsSchemaAdmin: true
 };
 
 /**
@@ -116,14 +116,14 @@ export const DEFAULT_CAPABILITIES: DataSourceCapabilities = {
     supportsRealtime: true,
     supportsSQLAdmin: true,
     supportsDocumentAdmin: true,
-    supportsSchemaAdmin: true,
+    supportsSchemaAdmin: true
 };
 
 const CAPABILITIES_REGISTRY: Record<string, DataSourceCapabilities> = {
     postgres: POSTGRES_CAPABILITIES,
     firestore: FIREBASE_CAPABILITIES,
     mongodb: MONGODB_CAPABILITIES,
-    "(default)": DEFAULT_CAPABILITIES,
+    "(default)": DEFAULT_CAPABILITIES
 };
 
 /**

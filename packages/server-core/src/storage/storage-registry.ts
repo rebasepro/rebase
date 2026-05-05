@@ -121,7 +121,7 @@ export class DefaultStorageRegistry implements StorageRegistry {
         const controller = this.controllers.get(DEFAULT_STORAGE_ID);
         if (!controller) {
             throw new Error(
-                `[StorageRegistry] No default storage registered. ` +
+                "[StorageRegistry] No default storage registered. " +
                 `Register one with id "${DEFAULT_STORAGE_ID}" or pass a single StorageController.`
             );
         }

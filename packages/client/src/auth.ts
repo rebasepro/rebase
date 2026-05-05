@@ -24,7 +24,7 @@ export interface RebaseSession {
     user: RebaseUser;
 }
 
-export type AuthChangeEvent = 'SIGNED_IN' | 'SIGNED_OUT' | 'TOKEN_REFRESHED' | 'USER_UPDATED';
+export type AuthChangeEvent = "SIGNED_IN" | "SIGNED_OUT" | "TOKEN_REFRESHED" | "USER_UPDATED";
 
 export interface AuthConfig {
     needsSetup: boolean;
@@ -44,7 +44,7 @@ export function createMemoryStorage(): AuthStorage {
     return {
         getItem(key) { return store[key] ?? null; },
         setItem(key, value) { store[key] = value; },
-        removeItem(key) { delete store[key]; },
+        removeItem(key) { delete store[key]; }
     };
 }
 
@@ -93,7 +93,7 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
             status,
             body?.error?.message || body?.message || statusText,
             body?.error?.code || body?.code,
-            body?.error?.details || body?.details,
+            body?.error?.details || body?.details
         );
     }
 
@@ -149,7 +149,7 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
             accessToken: data.tokens.accessToken,
             refreshToken: data.tokens.refreshToken,
             expiresAt: data.tokens.accessTokenExpiresAt,
-            user: data.user,
+            user: data.user
         };
         currentSession = session;
         saveSession(session);
@@ -164,27 +164,33 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         const res = await fetchFn(authUrl("/login"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password }),
+            body: JSON.stringify({ email,
+password })
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
         const session = handleAuthResponse(body, "SIGNED_IN");
-        return { user: session.user, accessToken: session.accessToken, refreshToken: session.refreshToken };
+        return { user: session.user,
+accessToken: session.accessToken,
+refreshToken: session.refreshToken };
     }
 
     async function signUp(email: string, password: string, displayName?: string) {
         const fetchFn = getFetch();
-        const payload: Record<string, string> = { email, password };
+        const payload: Record<string, string> = { email,
+password };
         if (displayName !== undefined) payload.displayName = displayName;
         const res = await fetchFn(authUrl("/register"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
+            body: JSON.stringify(payload)
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
         const session = handleAuthResponse(body, "SIGNED_IN");
-        return { user: session.user, accessToken: session.accessToken, refreshToken: session.refreshToken };
+        return { user: session.user,
+accessToken: session.accessToken,
+refreshToken: session.refreshToken };
     }
 
     async function signInWithGoogle(idToken: string) {
@@ -192,12 +198,14 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         const res = await fetchFn(authUrl("/google"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ idToken }),
+            body: JSON.stringify({ idToken })
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
         const session = handleAuthResponse(body, "SIGNED_IN");
-        return { user: session.user, accessToken: session.accessToken, refreshToken: session.refreshToken };
+        return { user: session.user,
+accessToken: session.accessToken,
+refreshToken: session.refreshToken };
     }
 
     async function signInWithLinkedin(code: string, redirectUri: string) {
@@ -205,12 +213,15 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         const res = await fetchFn(authUrl("/linkedin"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ code, redirectUri }),
+            body: JSON.stringify({ code,
+redirectUri })
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
         const session = handleAuthResponse(body, "SIGNED_IN");
-        return { user: session.user, accessToken: session.accessToken, refreshToken: session.refreshToken };
+        return { user: session.user,
+accessToken: session.accessToken,
+refreshToken: session.refreshToken };
     }
 
     /**
@@ -222,54 +233,68 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         const res = await fetchFn(authUrl(`/${providerId}`), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
+            body: JSON.stringify(payload)
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
         const session = handleAuthResponse(body, "SIGNED_IN");
-        return { user: session.user, accessToken: session.accessToken, refreshToken: session.refreshToken };
+        return { user: session.user,
+accessToken: session.accessToken,
+refreshToken: session.refreshToken };
     }
 
     // Convenience wrappers for all supported OAuth providers
 
     async function signInWithGitHub(code: string, redirectUri: string) {
-        return signInWithOAuth("github", { code, redirectUri });
+        return signInWithOAuth("github", { code,
+redirectUri });
     }
 
     async function signInWithMicrosoft(code: string, redirectUri: string) {
-        return signInWithOAuth("microsoft", { code, redirectUri });
+        return signInWithOAuth("microsoft", { code,
+redirectUri });
     }
 
     async function signInWithApple(code: string, redirectUri: string, user?: { name?: { firstName?: string; lastName?: string }; email?: string }) {
-        return signInWithOAuth("apple", { code, redirectUri, user });
+        return signInWithOAuth("apple", { code,
+redirectUri,
+user });
     }
 
     async function signInWithFacebook(code: string, redirectUri: string) {
-        return signInWithOAuth("facebook", { code, redirectUri });
+        return signInWithOAuth("facebook", { code,
+redirectUri });
     }
 
     async function signInWithTwitter(code: string, redirectUri: string, codeVerifier: string) {
-        return signInWithOAuth("twitter", { code, redirectUri, codeVerifier });
+        return signInWithOAuth("twitter", { code,
+redirectUri,
+codeVerifier });
     }
 
     async function signInWithDiscord(code: string, redirectUri: string) {
-        return signInWithOAuth("discord", { code, redirectUri });
+        return signInWithOAuth("discord", { code,
+redirectUri });
     }
 
     async function signInWithGitLab(code: string, redirectUri: string) {
-        return signInWithOAuth("gitlab", { code, redirectUri });
+        return signInWithOAuth("gitlab", { code,
+redirectUri });
     }
 
     async function signInWithBitbucket(code: string, redirectUri: string) {
-        return signInWithOAuth("bitbucket", { code, redirectUri });
+        return signInWithOAuth("bitbucket", { code,
+redirectUri });
     }
 
     async function signInWithSlack(code: string, redirectUri: string) {
-        return signInWithOAuth("slack", { code, redirectUri });
+        return signInWithOAuth("slack", { code,
+redirectUri });
     }
 
     async function signInWithSpotify(code: string, redirectUri: string) {
-        return signInWithOAuth("spotify", { code, redirectUri });
+        return signInWithOAuth("spotify", { code,
+redirectUri });
     }
 
     async function signOut() {
@@ -279,7 +304,7 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
                 await fetchFn(authUrl("/logout"), {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ refreshToken: currentSession.refreshToken }),
+                    body: JSON.stringify({ refreshToken: currentSession.refreshToken })
                 });
             }
         } catch (e) { /* ignore */ }
@@ -301,7 +326,7 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         const res = await fetchFn(authUrl("/refresh"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ refreshToken: currentSession.refreshToken }),
+            body: JSON.stringify({ refreshToken: currentSession.refreshToken })
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
@@ -309,7 +334,7 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
             accessToken: body.tokens.accessToken,
             refreshToken: body.tokens.refreshToken,
             expiresAt: body.tokens.accessTokenExpiresAt,
-            user: currentSession.user,
+            user: currentSession.user
         };
         currentSession = session;
         saveSession(session);
@@ -327,10 +352,11 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
     async function updateUser(updates: { displayName?: string, photoURL?: string }) {
         const data = await transport.request<{ user: RebaseUser }>(authPath + "/me", {
             method: "PATCH",
-            body: JSON.stringify(updates),
+            body: JSON.stringify(updates)
         });
         if (currentSession) {
-            currentSession = { ...currentSession, user: data.user };
+            currentSession = { ...currentSession,
+user: data.user };
             saveSession(currentSession);
             emit("USER_UPDATED", currentSession);
         }
@@ -342,7 +368,7 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         const res = await fetchFn(authUrl("/forgot-password"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email }),
+            body: JSON.stringify({ email })
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
@@ -354,7 +380,8 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         const res = await fetchFn(authUrl("/reset-password"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token, password }),
+            body: JSON.stringify({ token,
+password })
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
@@ -364,13 +391,14 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
     async function changePassword(oldPassword: string, newPassword: string) {
         return transport.request<{ success: boolean; message: string; }>(authPath + "/change-password", {
             method: "POST",
-            body: JSON.stringify({ oldPassword, newPassword }),
+            body: JSON.stringify({ oldPassword,
+newPassword })
         });
     }
 
     async function sendVerificationEmail() {
         return transport.request<{ success: boolean; message: string; }>(authPath + "/send-verification", {
-            method: "POST",
+            method: "POST"
         });
     }
 
@@ -378,7 +406,7 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         const fetchFn = getFetch();
         const res = await fetchFn(authUrl("/verify-email?token=" + encodeURIComponent(token)), {
             method: "GET",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json" }
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
@@ -392,13 +420,13 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
 
     async function revokeSession(sessionId: string) {
         return transport.request<{ success: boolean }>(authPath + "/sessions/" + encodeURIComponent(sessionId), {
-            method: "DELETE",
+            method: "DELETE"
         });
     }
 
     async function revokeAllSessions() {
         const result = await transport.request<{ success: boolean }>(authPath + "/sessions", {
-            method: "DELETE",
+            method: "DELETE"
         });
         currentSession = null;
         clearStoredSession();
@@ -415,7 +443,7 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         const fetchFn = getFetch();
         const res = await fetchFn(authUrl("/config"), {
             method: "GET",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json" }
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
@@ -479,6 +507,6 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         revokeAllSessions,
         getAuthConfig,
         getSession,
-        onAuthStateChange,
+        onAuthStateChange
     };
 }

@@ -62,8 +62,8 @@ export function useDataEnhancementPlugin(props?: DataEnhancementPluginProps): Re
             {
                 slot: "form.actions",
                 Component: FormEnhanceAction,
-                order: 40,
-            },
+                order: 40
+            }
         ],
         providers: [
             {
@@ -79,7 +79,7 @@ export function useDataEnhancementPlugin(props?: DataEnhancementPluginProps): Re
         fieldBuilder: {
             wrap: fieldBuilder,
             enabled: fieldBuilderEnabled
-        },
+        }
         // loading: configController.loading,
     }), [apiKey, getConfigForPath, props?.host, fieldBuilderEnabled]);
 }

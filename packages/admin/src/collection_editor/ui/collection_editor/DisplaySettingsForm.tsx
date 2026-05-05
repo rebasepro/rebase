@@ -187,7 +187,7 @@ export function DisplaySettingsForm({
                                             className="ml-3.5 mt-2"
                                             onClick={() => setOrderPropertyDialogOpen(true)}
                                         >
-                                            + Create "{dialogPropertyKey}" property
+                                            + Create &quot;{dialogPropertyKey}&quot; property
                                         </Button>
                                         <PropertyFormDialog
                                             open={orderPropertyDialogOpen}

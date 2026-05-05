@@ -11,16 +11,22 @@ const getPrimaryKeyProp = (collection: EntityCollection): { name: string, type: 
         if (idPropEntry) {
             const prop = idPropEntry[1] as Property;
             const isUuid = prop.type === "string" && "isId" in prop && (prop as StringProperty).isId === "uuid";
-            return { name: idPropEntry[0], type: prop.type === "number" ? "number" : "string", isUuid };
+            return { name: idPropEntry[0],
+type: prop.type === "number" ? "number" : "string",
+isUuid };
         }
     }
     // Fallback
     const idProp = collection.properties?.["id"] as Property | undefined;
     if (idProp?.type === "number") {
-        return { name: "id", type: "number", isUuid: false };
+        return { name: "id",
+type: "number",
+isUuid: false };
     }
     const isUuid = idProp?.type === "string" && "isId" in idProp && (idProp as StringProperty).isId === "uuid";
-    return { name: "id", type: "string", isUuid: isUuid ?? false };
+    return { name: "id",
+type: "string",
+isUuid: isUuid ?? false };
 };
 
 const isNumericId = (collection: EntityCollection): boolean => {
@@ -59,13 +65,13 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
                 columnDefinition = `varchar("${colName}")`;
             }
             if (isIdProperty(propName, prop, collection)) {
-                columnDefinition += `.primaryKey()`;
+                columnDefinition += ".primaryKey()";
             }
             if ("isId" in stringProp && stringProp.isId !== "manual" && stringProp.isId !== true) {
                 if (stringProp.isId === "uuid") {
-                    columnDefinition += `.defaultRandom()`;
+                    columnDefinition += ".defaultRandom()";
                 } else if (stringProp.isId === "cuid") {
-                    columnDefinition += `.default(sql\`cuid()\`)`;
+                    columnDefinition += ".default(sql`cuid()`)";
                 } else if (typeof stringProp.isId === "string") {
                     const sqlContent = stringProp.isId.startsWith("sql`") && stringProp.isId.endsWith("`")
                         ? stringProp.isId.substring(4, stringProp.isId.length - 1)
@@ -74,7 +80,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
                 }
             }
             if (stringProp.validation?.unique) {
-                columnDefinition += `.unique()`;
+                columnDefinition += ".unique()";
             }
             break;
         }
@@ -101,10 +107,10 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
             }
 
             if (isId) {
-                columnDefinition += `.primaryKey()`;
+                columnDefinition += ".primaryKey()";
             }
             if (numProp.validation?.unique) {
-                columnDefinition += `.unique()`;
+                columnDefinition += ".unique()";
             }
             break;
         }
@@ -190,7 +196,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
                 columnDefinition = `varchar("${colName}")`;
                 break;
             }
-            
+
             const pkProp = getPrimaryKeyProp(targetCollection);
             const targetTableVar = getTableVarName(getTableName(targetCollection));
             const targetIdField = pkProp.name;
@@ -199,7 +205,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
             const required = prop.validation?.required;
             const onDelete = required ? "cascade" : "set null";
             const refOptions = `{ onDelete: "${onDelete}" }`;
-            
+
             columnDefinition = `${baseColumn}.references(() => ${targetTableVar}.${targetIdField}, ${refOptions})`;
             if (required) {
                 columnDefinition += ".notNull()";
@@ -233,7 +239,7 @@ const resolveRawSql = (expression: string): string => {
  * Generates: `(<clause>) AND (string_to_array(auth.roles(), ',') && ARRAY['<role1>','<role2>'])`
  */
 const wrapWithRoleCheck = (clause: string, roles: string[]): string => {
-    const rolesArrayString = `ARRAY[${roles.map(r => `'${r}'`).join(',')}]`;
+    const rolesArrayString = `ARRAY[${roles.map(r => `'${r}'`).join(",")}]`;
     const roleCondition = `string_to_array(auth.roles(), ',') @> ${rolesArrayString}`;
     return `sql\`(${unwrapSql(clause)}) AND (${roleCondition})\``;
 };
@@ -254,7 +260,7 @@ const buildUsingClause = (rule: SecurityRule): string | null => {
         return resolveRawSql(rule.using);
     }
     if (rule.access === "public") {
-        return `sql\`true\``;
+        return "sql`true`";
     }
     if (rule.ownerField) {
         return `sql\`\${table.${rule.ownerField}} = auth.uid()\``;
@@ -344,23 +350,23 @@ const generateSinglePolicyCode = (tableName: string, rule: SecurityRule, operati
             usingClause = wrapWithRoleCheck(usingClause, roles);
         } else if (needsUsing) {
             // Roles-only rule (e.g. { operation: "select", roles: ["admin"] })
-            const rolesArrayString = `ARRAY[${roles.map(r => `'${r}'`).join(',')}]`;
+            const rolesArrayString = `ARRAY[${roles.map(r => `'${r}'`).join(",")}]`;
             usingClause = `sql\`string_to_array(auth.roles(), ',') @> ${rolesArrayString}\``;
         }
         if (withCheckClause) {
             withCheckClause = wrapWithRoleCheck(withCheckClause, roles);
         } else if (needsWithCheck) {
-            const rolesArrayString = `ARRAY[${roles.map(r => `'${r}'`).join(',')}]`;
+            const rolesArrayString = `ARRAY[${roles.map(r => `'${r}'`).join(",")}]`;
             withCheckClause = `sql\`string_to_array(auth.roles(), ',') @> ${rolesArrayString}\``;
         }
     }
 
     // Fallback: if we still have no clauses, deny all (safety net)
     if (!usingClause && needsUsing) {
-        usingClause = `sql\`false\``;
+        usingClause = "sql`false`";
     }
     if (!withCheckClause && needsWithCheck) {
-        withCheckClause = `sql\`false\``;
+        withCheckClause = "sql`false`";
     }
 
     // Build the policy options object
@@ -452,7 +458,7 @@ const computeSharedRelationName = (
 };
 
 // --- Main Schema Generation Logic ---
-export const generateSchema = async (collections: EntityCollection[], stripPolicies: boolean = false): Promise<string> => {
+export const generateSchema = async (collections: EntityCollection[], stripPolicies = false): Promise<string> => {
     let schemaContent = "// This file is auto-generated by the Rebase Drizzle generator. Do not edit manually.\n\n";
 
     const hasUuid = collections.some(c =>
@@ -471,7 +477,7 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
     const pgCoreImports = ["primaryKey", "pgTable", "integer", "varchar", "text", "char", "boolean", "timestamp", "date", "time", "jsonb", "json", "pgEnum", "numeric", "real", "doublePrecision", "bigint", "serial", "bigserial", "pgPolicy"];
     if (hasUuid) pgCoreImports.push("uuid");
     schemaContent += `import { ${pgCoreImports.join(", ")} } from 'drizzle-orm/pg-core';\n`;
-    schemaContent += `import { relations as drizzleRelations, sql } from 'drizzle-orm';\n\n`;
+    schemaContent += "import { relations as drizzleRelations, sql } from 'drizzle-orm';\n\n";
 
     const exportedTableVars: string[] = [];
     const exportedEnumVars: string[] = [];
@@ -556,9 +562,9 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
             schemaContent += `export const ${tableVarName} = pgTable(\"${tableName}\", {\n`;
             schemaContent += `    ${sourceColumn}: ${sourceColType}(\"${toSnakeCase(sourceColumn)}\").notNull().references(() => ${getTableVarName(getTableName(sourceCollection))}.${sourceId}, ${refOptions}),\n`;
             schemaContent += `    ${targetColumn}: ${targetColType}(\"${toSnakeCase(targetColumn)}\").notNull().references(() => ${getTableVarName(getTableName(targetCollection))}.${targetId}, ${refOptions}),\n`;
-            schemaContent += `}, (table) => ({\n`;
+            schemaContent += "}, (table) => ({\n";
             schemaContent += `    pk: primaryKey({ columns: [table.${sourceColumn}, table.${targetColumn}] })\n`;
-            schemaContent += `}));\n\n`;
+            schemaContent += "}));\n\n";
         } else if (!isJunction) {
             schemaContent += `export const ${tableVarName} = pgTable(\"${tableName}\", {\n`;
             const columns = new Set<string>();
@@ -571,7 +577,7 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
             // We should generate a basic id column if one was completely omitted.
             const hasIdColumn = Array.from(columns).some(col => col.includes(".primaryKey()"));
             if (!hasIdColumn) {
-                columns.add(`    id: varchar(\"id\").primaryKey()`);
+                columns.add("    id: varchar(\"id\").primaryKey()");
             }
 
             schemaContent += `${Array.from(columns).join(",\n")}`;

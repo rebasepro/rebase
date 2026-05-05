@@ -6,7 +6,8 @@ const collections1 = [{
     name: "Test",
     properties: { data: { type: "string" } },
     securityRules: [
-        { operation: "select", roles: ["admin", "user"] }
+        { operation: "select",
+roles: ["admin", "user"] }
     ]
 }];
 

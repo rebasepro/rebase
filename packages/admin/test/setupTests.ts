@@ -3,7 +3,8 @@
 // Add any global test setup logic here.
 
 import { TextEncoder, TextDecoder } from "util";
-Object.assign(global, { TextDecoder, TextEncoder });
+Object.assign(global, { TextDecoder,
+TextEncoder });
 
 // Mock window.matchMedia for jsdom environment (used by useLargeLayout in @rebasepro/core)
 Object.defineProperty(window, "matchMedia", {
@@ -16,6 +17,6 @@ Object.defineProperty(window, "matchMedia", {
         removeListener: jest.fn(),
         addEventListener: jest.fn(),
         removeEventListener: jest.fn(),
-        dispatchEvent: jest.fn(),
-    })),
+        dispatchEvent: jest.fn()
+    }))
 });

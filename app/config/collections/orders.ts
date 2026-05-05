@@ -51,13 +51,27 @@ const ordersCollection: PostgresCollection = {
             },
             defaultValue: "pending",
             enum: [
-                { id: "pending", label: "Pending", color: "orange" },
-                { id: "confirmed", label: "Confirmed", color: "blue" },
-                { id: "processing", label: "Processing", color: "cyan" },
-                { id: "shipped", label: "Shipped", color: "purple" },
-                { id: "delivered", label: "Delivered", color: "green" },
-                { id: "cancelled", label: "Cancelled", color: "red" },
-                { id: "refunded", label: "Refunded", color: "gray" }
+                { id: "pending",
+label: "Pending",
+color: "orange" },
+                { id: "confirmed",
+label: "Confirmed",
+color: "blue" },
+                { id: "processing",
+label: "Processing",
+color: "cyan" },
+                { id: "shipped",
+label: "Shipped",
+color: "purple" },
+                { id: "delivered",
+label: "Delivered",
+color: "green" },
+                { id: "cancelled",
+label: "Cancelled",
+color: "red" },
+                { id: "refunded",
+label: "Refunded",
+color: "gray" }
             ]
         },
         payment_status: {
@@ -68,10 +82,18 @@ const ordersCollection: PostgresCollection = {
             },
             defaultValue: "unpaid",
             enum: [
-                { id: "unpaid", label: "Unpaid", color: "red" },
-                { id: "paid", label: "Paid", color: "green" },
-                { id: "partially_refunded", label: "Partially Refunded", color: "orange" },
-                { id: "refunded", label: "Refunded", color: "gray" }
+                { id: "unpaid",
+label: "Unpaid",
+color: "red" },
+                { id: "paid",
+label: "Paid",
+color: "green" },
+                { id: "partially_refunded",
+label: "Partially Refunded",
+color: "orange" },
+                { id: "refunded",
+label: "Refunded",
+color: "gray" }
             ]
         },
         subtotal: {
@@ -108,11 +130,16 @@ const ordersCollection: PostgresCollection = {
             type: "string",
             defaultValue: "USD",
             enum: [
-                { id: "USD", label: "USD ($)" },
-                { id: "EUR", label: "EUR (€)" },
-                { id: "GBP", label: "GBP (£)" },
-                { id: "CAD", label: "CAD (C$)" },
-                { id: "AUD", label: "AUD (A$)" }
+                { id: "USD",
+label: "USD ($)" },
+                { id: "EUR",
+label: "EUR (€)" },
+                { id: "GBP",
+label: "GBP (£)" },
+                { id: "CAD",
+label: "CAD (C$)" },
+                { id: "AUD",
+label: "AUD (A$)" }
             ]
         },
         shipping_address: {
@@ -192,7 +219,7 @@ const ordersCollection: PostgresCollection = {
             relationName: "customer",
             target: () => customersCollection,
             cardinality: "one",
-            direction: "owning",
+            direction: "owning"
         },
         {
             relationName: "order_items",

@@ -12,7 +12,7 @@ const ReactCompilerConfig = {
 
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;
-    
+
     return true;
 };
 
@@ -42,7 +42,7 @@ export default defineConfig(() => ({
     },
     resolve: {
         alias: {
-            "@rebasepro/types": path.resolve(__dirname, "../types/src"),
+            "@rebasepro/types": path.resolve(__dirname, "../types/src")
         }
     },
     plugins: [
@@ -50,8 +50,8 @@ export default defineConfig(() => ({
         react({
             babel: {
                 plugins: [
-                    ["babel-plugin-react-compiler", ReactCompilerConfig],
-                ],
+                    ["babel-plugin-react-compiler", ReactCompilerConfig]
+                ]
             }
         }),
         viteStaticCopy({
@@ -61,13 +61,13 @@ export default defineConfig(() => ({
                     dest: ""
                 }
             ]
-        }),
+        })
     ],
     css: {
         preprocessorOptions: {
             scss: {
-                api: 'modern-compiler',
-                silenceDeprecations: ['mixed-decls', 'color-functions', 'global-builtin', 'import', 'legacy-js-api', 'slash-div']
+                api: "modern-compiler",
+                silenceDeprecations: ["mixed-decls", "color-functions", "global-builtin", "import", "legacy-js-api", "slash-div"]
             }
         }
     }

@@ -9,7 +9,7 @@ describe("Rate Limiter", () => {
         const limiter = createRateLimiter({
             windowMs: options.windowMs ?? 60 * 1000, // 1 minute
             limit: options.limit ?? 3,
-            keyGenerator: (c) => c.req.header("x-forwarded-for") || "test-ip",
+            keyGenerator: (c) => c.req.header("x-forwarded-for") || "test-ip"
         });
         app.use("/api/*", limiter);
         app.get("/api/test", (c) => c.json({ ok: true }));
@@ -20,7 +20,7 @@ describe("Rate Limiter", () => {
         const app = createTestApp({ limit: 5 });
 
         const res = await app.request("/api/test", {
-            headers: { "x-forwarded-for": "1.2.3.4" },
+            headers: { "x-forwarded-for": "1.2.3.4" }
         });
 
         expect(res.status).toBe(200);
@@ -37,7 +37,7 @@ describe("Rate Limiter", () => {
 
         // Third should be rate limited
         const res = await app.request("/api/test", {
-            headers: { "x-forwarded-for": "10.0.0.1" },
+            headers: { "x-forwarded-for": "10.0.0.1" }
         });
 
         expect(res.status).toBe(429);
@@ -50,7 +50,7 @@ describe("Rate Limiter", () => {
 
         await app.request("/api/test", { headers: { "x-forwarded-for": "10.0.0.2" } });
         const res = await app.request("/api/test", {
-            headers: { "x-forwarded-for": "10.0.0.2" },
+            headers: { "x-forwarded-for": "10.0.0.2" }
         });
 
         expect(res.headers.get("Retry-After")).toBeDefined();
@@ -61,10 +61,10 @@ describe("Rate Limiter", () => {
         const app = createTestApp({ limit: 1 });
 
         const res1 = await app.request("/api/test", {
-            headers: { "x-forwarded-for": "ip-a" },
+            headers: { "x-forwarded-for": "ip-a" }
         });
         const res2 = await app.request("/api/test", {
-            headers: { "x-forwarded-for": "ip-b" },
+            headers: { "x-forwarded-for": "ip-b" }
         });
 
         expect(res1.status).toBe(200);
@@ -90,7 +90,7 @@ describe("Rate Limiter", () => {
         const limiter = createRateLimiter({
             limit: 0,
             message: "Slow down!",
-            keyGenerator: () => "always-same",
+            keyGenerator: () => "always-same"
         });
         app.use("/api/*", limiter);
         app.get("/api/test", (c) => c.json({ ok: true }));

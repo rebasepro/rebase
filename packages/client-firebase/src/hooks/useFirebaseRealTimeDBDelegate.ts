@@ -48,7 +48,7 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
             return Object.entries(snapshot.val()).map(([id, values]) => ({
                 id,
                 path: path,
-                values: delegateToCMSModel(values) as M,
+                values: delegateToCMSModel(values) as M
             }));
         }
         return [];
@@ -56,7 +56,7 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
 
     const listenCollection = useCallback(<M extends Record<string, any>>({
         path,
-        onUpdate,
+        onUpdate
         // Realtime Database does not directly support onError in onValue
     }: ListenCollectionProps<M>): () => void => {
         if (!firebaseApp) {
@@ -70,7 +70,7 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
                 const result: Entity<M>[] = Object.entries(snapshot.val()).map(([id, values]) => ({
                     id,
                     path: path,
-                    values: delegateToCMSModel(values) as M,
+                    values: delegateToCMSModel(values) as M
                 }));
                 onUpdate(result);
             } else {
@@ -83,7 +83,7 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
 
     const fetchEntity = useCallback(async <M extends Record<string, any>>({
         path,
-        entityId,
+        entityId
     }: FetchEntityProps<M>): Promise<Entity<M> | undefined> => {
         if (!firebaseApp) {
             throw new Error("Firebase app not provided");
@@ -131,7 +131,7 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
     const saveEntity = useCallback(async <M extends Record<string, any>>({
         path,
         entityId,
-        values,
+        values
     }: SaveEntityProps<M>): Promise<Entity<M>> => {
         if (!firebaseApp) {
             throw new Error("Firebase app not provided");
@@ -156,7 +156,7 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
     }, [firebaseApp]);
 
     const deleteEntity = useCallback(async <M extends Record<string, any>>({
-        entity,
+        entity
     }: DeleteEntityProps<M>): Promise<void> => {
         if (!firebaseApp) {
             throw new Error("Firebase app not provided");
@@ -213,7 +213,6 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
 }
 
 
-
 /**
  * Transform data from RTDB format back to CMS format
  * This is used internally when fetching/listening to data
@@ -263,7 +262,8 @@ function cmsToRTDBModel(data: any, database: Database): any {
                 else
                     return {};
             })
-            .reduce((a, b) => ({ ...a, ...b }), {});
+            .reduce((a, b) => ({ ...a,
+...b }), {});
     }
     return data;
 }

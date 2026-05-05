@@ -53,14 +53,14 @@ title: "${title}"
 
     // Remove .md extensions from all markdown links
     // Match patterns like [text](path.md) or [text](../path.md) or [text](./path.md)
-    content = content.replace(/(\[.*?\]\((?:\.\.\/)*(?:\.\/)*[^)]+)\.md(\))/g, '$1$2');
+    content = content.replace(/(\[.*?\]\((?:\.\.\/)*(?:\.\/)*[^)]+)\.md(\))/g, "$1$2");
 
     // Fix GitHub links to remove commit hashes and line numbers
     // Pattern: https://github.com/rebasepro/rebase/blob/{commit-hash}/packages/... -> https://github.com/rebasepro/rebase/blob/main/packages/...
-    content = content.replace(/https:\/\/github\.com\/Rebaseco\/rebase\/blob\/[a-f0-9]+\//gi, 'https://github.com/rebasepro/rebase/blob/main/');
+    content = content.replace(/https:\/\/github\.com\/Rebaseco\/rebase\/blob\/[a-f0-9]+\//gi, "https://github.com/rebasepro/rebase/blob/main/");
 
     // Remove line numbers from GitHub links (e.g., #L42 or :42)
-    content = content.replace(/(https:\/\/github\.com\/[^)]+\.ts)(#L\d+|:\d+)/g, '$1');
+    content = content.replace(/(https:\/\/github\.com\/[^)]+\.ts)(#L\d+|:\d+)/g, "$1");
 
     const updatedContent = content;
 

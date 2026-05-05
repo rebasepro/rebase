@@ -321,11 +321,11 @@ async function resizeImage(
             success: (result) => {
                 const compressedFile = new File([result], file.name, {
                     type: result.type,
-                    lastModified: Date.now(),
+                    lastModified: Date.now()
                 });
                 resolve(compressedFile);
             },
-            error: reject,
+            error: reject
         });
     });
 }

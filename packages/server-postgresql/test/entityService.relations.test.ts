@@ -55,8 +55,10 @@ describe("EntityService - Relation Types Tests", () => {
             id: { type: "number" },
             name: { type: "string" },
             email: { type: "string" },
-            orders: { type: "relation", relationName: "orders" },
-            profile: { type: "relation", relationName: "profile" }
+            orders: { type: "relation",
+relationName: "orders" },
+            profile: { type: "relation",
+relationName: "profile" }
         },
         relations: [
             {
@@ -84,8 +86,10 @@ describe("EntityService - Relation Types Tests", () => {
         properties: {
             id: { type: "number" },
             total: { type: "number" },
-            customer: { type: "relation", relationName: "customer" },
-            products: { type: "relation", relationName: "products" }
+            customer: { type: "relation",
+relationName: "customer" },
+            products: { type: "relation",
+relationName: "products" }
         },
         relations: [
             {
@@ -129,7 +133,8 @@ describe("EntityService - Relation Types Tests", () => {
         properties: {
             id: { type: "number" },
             bio: { type: "string" },
-            user: { type: "relation", relationName: "user" }
+            user: { type: "relation",
+relationName: "user" }
         },
         relations: [
             {
@@ -192,8 +197,12 @@ describe("EntityService - Relation Types Tests", () => {
     describe("One-to-Many Relations (Inverse)", () => {
         it("should fetch related entities using foreign key where clause", async () => {
             const mockOrders = [
-                { id: 1, total: 100, customer_id: 1 },
-                { id: 2, total: 200, customer_id: 1 }
+                { id: 1,
+total: 100,
+customer_id: 1 },
+                { id: 2,
+total: 200,
+customer_id: 1 }
             ];
             // RelationService.fetchEntitiesUsingJoins ends query chain with where(), not orderBy()
             db.where.mockReturnValue({
@@ -224,7 +233,9 @@ describe("EntityService - Relation Types Tests", () => {
         it("should serialize owning relation correctly on create", async () => {
             const newOrder = {
                 total: 150,
-                customer: { id: "1", path: "customers", __type: "relation" }
+                customer: { id: "1",
+path: "customers",
+__type: "relation" }
             };
 
             db.returning.mockResolvedValue([{ id: 3 }]);
@@ -268,8 +279,12 @@ describe("EntityService - Relation Types Tests", () => {
     describe("Many-to-Many Relations (Through Table)", () => {
         it("should handle many-to-many relations with junction table", async () => {
             const mockProducts = [
-                { id: 1, name: "Product 1", price: 10 },
-                { id: 2, name: "Product 2", price: 20 }
+                { id: 1,
+name: "Product 1",
+price: 10 },
+                { id: 2,
+name: "Product 2",
+price: 20 }
             ];
             // For many-to-many with through table, the query uses innerJoin and ends with where()
             db.where.mockReturnValue({
@@ -290,7 +305,9 @@ describe("EntityService - Relation Types Tests", () => {
         it("should create many-to-many relations correctly", async () => {
             const newOrder = {
                 total: 300,
-                customer: { id: "1", path: "customers", __type: "relation" }
+                customer: { id: "1",
+path: "customers",
+__type: "relation" }
             };
 
             db.returning.mockResolvedValue([{ id: 4 }]);
@@ -312,7 +329,9 @@ describe("EntityService - Relation Types Tests", () => {
     describe("One-to-One Relations", () => {
         it("should handle one-to-one relations correctly", async () => {
             const mockProfile = [
-                { id: 1, bio: "User bio", user_id: 1 }
+                { id: 1,
+bio: "User bio",
+user_id: 1 }
             ];
             // RelationService ends query chain with where()
             db.where.mockReturnValue({
@@ -331,7 +350,9 @@ describe("EntityService - Relation Types Tests", () => {
         it("should create one-to-one relations correctly", async () => {
             const newProfile = {
                 bio: "New user bio",
-                user: { id: "1", path: "customers", __type: "relation" }
+                user: { id: "1",
+path: "customers",
+__type: "relation" }
             };
 
             db.returning.mockResolvedValue([{ id: 1 }]);
@@ -382,7 +403,8 @@ describe("EntityService - Relation Types Tests", () => {
     describe("Complex Relation Queries", () => {
         it("should handle deep nested relation paths", async () => {
             const mockProducts = [
-                { id: 1, name: "Product 1" }
+                { id: 1,
+name: "Product 1" }
             ];
             // RelationService ends query chain with where()
             db.where.mockReturnValue({
@@ -400,7 +422,9 @@ describe("EntityService - Relation Types Tests", () => {
 
         it("should apply filters on related entities", async () => {
             const mockOrders = [
-                { id: 1, total: 100, customer_id: 1 }
+                { id: 1,
+total: 100,
+customer_id: 1 }
             ];
             // RelationService ends query chain with where()
             db.where.mockReturnValue({
@@ -420,8 +444,12 @@ describe("EntityService - Relation Types Tests", () => {
 
         it("should order related entities correctly", async () => {
             const mockOrders = [
-                { id: 2, total: 200, customer_id: 1 },
-                { id: 1, total: 100, customer_id: 1 }
+                { id: 2,
+total: 200,
+customer_id: 1 },
+                { id: 1,
+total: 100,
+customer_id: 1 }
             ];
             // RelationService ends query chain with where()
             db.where.mockReturnValue({
@@ -445,7 +473,9 @@ describe("EntityService - Relation Types Tests", () => {
     describe("Relation Updates", () => {
         it("should update owning relations correctly", async () => {
             const updatedOrder = {
-                customer: { id: "2", path: "customers", __type: "relation" }
+                customer: { id: "2",
+path: "customers",
+__type: "relation" }
             };
 
             db.returning.mockResolvedValue([{ id: 1 }]);
@@ -526,7 +556,8 @@ describe("EntityService - Relation Types Tests", () => {
                 properties: {
                     id: { type: "number" },
                     title: { type: "string" },
-                    authorProfile: { type: "relation", relationName: "authorProfile" }
+                    authorProfile: { type: "relation",
+relationName: "authorProfile" }
                 },
                 relations: [
                     {
@@ -535,8 +566,12 @@ describe("EntityService - Relation Types Tests", () => {
                         cardinality: "one",
                         direction: "owning",
                         joinPath: [
-                            { table: "authors", on: { from: "posts.author_id", to: "authors.id" } },
-                            { table: "user_profiles", on: { from: "authors.id", to: "user_profiles.user_id" } }
+                            { table: "authors",
+on: { from: "posts.author_id",
+to: "authors.id" } },
+                            { table: "user_profiles",
+on: { from: "authors.id",
+to: "user_profiles.user_id" } }
                         ]
                     }
                 ],
@@ -554,11 +589,15 @@ describe("EntityService - Relation Types Tests", () => {
 
                 const newPost = {
                     title: "Test Post",
-                    authorProfile: { id: "1", path: "user_profiles", __type: "relation" }
+                    authorProfile: { id: "1",
+path: "user_profiles",
+__type: "relation" }
                 };
 
                 db.returning.mockResolvedValue([{ id: 1 }]);
-                db.limit.mockResolvedValue([{ id: 1, title: "Test Post", author_id: 1 }]);
+                db.limit.mockResolvedValue([{ id: 1,
+title: "Test Post",
+author_id: 1 }]);
 
                 const entity = await entityService.saveEntity("posts_jp", newPost);
 
@@ -577,11 +616,13 @@ describe("EntityService - Relation Types Tests", () => {
 
                 const postUpdate = {
                     title: "Test Post Updated",
-                    authorProfile: { id: "1", path: "user_profiles", __type: "relation" }
+                    authorProfile: { id: "1",
+path: "user_profiles",
+__type: "relation" }
                 };
 
                 const expectedOps: string[] = [];
-                
+
                 // Track updateJoinPathOneToOneRelations
                 const relationService = entityService.getPersistService().getRelationService();
                 const spyJoinPath = jest.spyOn(relationService, "updateJoinPathOneToOneRelations").mockImplementation(async () => {
@@ -597,7 +638,9 @@ describe("EntityService - Relation Types Tests", () => {
                     return originalUpdate.call(this, table);
                 }) as any;
 
-                db.limit.mockResolvedValue([{ id: 1, title: "Test Post Updated", author_id: 1 }]);
+                db.limit.mockResolvedValue([{ id: 1,
+title: "Test Post Updated",
+author_id: 1 }]);
 
                 try {
                     await entityService.saveEntity("posts_jp", postUpdate, 1);
@@ -614,11 +657,14 @@ describe("EntityService - Relation Types Tests", () => {
             it("should update inverse one-to-one relation", async () => {
                 const customerWithProfile = {
                     name: "John Doe",
-                    profile: { id: "1", path: "user_profiles", __type: "relation" }
+                    profile: { id: "1",
+path: "user_profiles",
+__type: "relation" }
                 };
 
                 db.returning.mockResolvedValue([{ id: 1 }]);
-                db.limit.mockResolvedValue([{ id: 1, name: "John Doe" }]);
+                db.limit.mockResolvedValue([{ id: 1,
+name: "John Doe" }]);
 
                 const entity = await entityService.saveEntity("customers", customerWithProfile);
 
@@ -635,7 +681,8 @@ describe("EntityService - Relation Types Tests", () => {
                 properties: {
                     id: { type: "number" },
                     name: { type: "string" },
-                    profile: { type: "relation", relationName: "profile" }
+                    profile: { type: "relation",
+relationName: "profile" }
                 },
                 relations: [
                     {
@@ -644,8 +691,12 @@ describe("EntityService - Relation Types Tests", () => {
                         cardinality: "one",
                         direction: "inverse",
                         joinPath: [
-                            { table: "customers", on: { from: "authors.id", to: "customers.id" } },
-                            { table: "user_profiles", on: { from: "customers.id", to: "user_profiles.user_id" } }
+                            { table: "customers",
+on: { from: "authors.id",
+to: "customers.id" } },
+                            { table: "user_profiles",
+on: { from: "customers.id",
+to: "user_profiles.user_id" } }
                         ]
                     }
                 ],
@@ -663,11 +714,14 @@ describe("EntityService - Relation Types Tests", () => {
 
                 const newAuthor = {
                     name: "Jane Author",
-                    profile: { id: "2", path: "user_profiles", __type: "relation" }
+                    profile: { id: "2",
+path: "user_profiles",
+__type: "relation" }
                 };
 
                 db.returning.mockResolvedValue([{ id: 1 }]);
-                db.limit.mockResolvedValue([{ id: 1, name: "Jane Author" }]);
+                db.limit.mockResolvedValue([{ id: 1,
+name: "Jane Author" }]);
 
                 const entity = await entityService.saveEntity("authors_jp", newAuthor);
 
@@ -682,13 +736,18 @@ describe("EntityService - Relation Types Tests", () => {
                 const orderWithProducts = {
                     total: 500,
                     products: [
-                        { id: "1", path: "products", __type: "relation" },
-                        { id: "2", path: "products", __type: "relation" }
+                        { id: "1",
+path: "products",
+__type: "relation" },
+                        { id: "2",
+path: "products",
+__type: "relation" }
                     ]
                 };
 
                 db.returning.mockResolvedValue([{ id: 1 }]);
-                db.limit.mockResolvedValue([{ id: 1, total: 500 }]);
+                db.limit.mockResolvedValue([{ id: 1,
+total: 500 }]);
 
                 const entity = await entityService.saveEntity("orders", orderWithProducts);
 
@@ -705,7 +764,8 @@ describe("EntityService - Relation Types Tests", () => {
                 properties: {
                     id: { type: "number" },
                     title: { type: "string" },
-                    tags: { type: "relation", relationName: "tags" }
+                    tags: { type: "relation",
+relationName: "tags" }
                 },
                 relations: [
                     {
@@ -714,14 +774,19 @@ describe("EntityService - Relation Types Tests", () => {
                             slug: "tags",
                             name: "Tags",
                             table: "tags",
-                            properties: { id: { type: "number" }, name: { type: "string" } },
+                            properties: { id: { type: "number" },
+name: { type: "string" } },
                             idField: "id"
                         }),
                         cardinality: "many",
                         direction: "owning",
                         joinPath: [
-                            { table: "post_tags", on: { from: "posts.id", to: "post_tags.post_id" } },
-                            { table: "tags", on: { from: "post_tags.tag_id", to: "tags.id" } }
+                            { table: "post_tags",
+on: { from: "posts.id",
+to: "post_tags.post_id" } },
+                            { table: "tags",
+on: { from: "post_tags.tag_id",
+to: "tags.id" } }
                         ]
                     }
                 ],
@@ -744,13 +809,18 @@ describe("EntityService - Relation Types Tests", () => {
                 const postWithTags = {
                     title: "Tagged Post",
                     tags: [
-                        { id: "1", path: "tags", __type: "relation" },
-                        { id: "2", path: "tags", __type: "relation" }
+                        { id: "1",
+path: "tags",
+__type: "relation" },
+                        { id: "2",
+path: "tags",
+__type: "relation" }
                     ]
                 };
 
                 db.returning.mockResolvedValue([{ id: 1 }]);
-                db.limit.mockResolvedValue([{ id: 1, title: "Tagged Post" }]);
+                db.limit.mockResolvedValue([{ id: 1,
+title: "Tagged Post" }]);
                 // Mock the fetch for tags relation - return empty array since we're testing write
                 db.orderBy.mockResolvedValue([]);
 
@@ -768,13 +838,18 @@ describe("EntityService - Relation Types Tests", () => {
                 const customerWithOrders = {
                     name: "Big Customer",
                     orders: [
-                        { id: "1", path: "orders", __type: "relation" },
-                        { id: "2", path: "orders", __type: "relation" }
+                        { id: "1",
+path: "orders",
+__type: "relation" },
+                        { id: "2",
+path: "orders",
+__type: "relation" }
                     ]
                 };
 
                 db.returning.mockResolvedValue([{ id: 1 }]);
-                db.limit.mockResolvedValue([{ id: 1, name: "Big Customer" }]);
+                db.limit.mockResolvedValue([{ id: 1,
+name: "Big Customer" }]);
 
                 const entity = await entityService.saveEntity("customers", customerWithOrders);
 
@@ -791,7 +866,8 @@ describe("EntityService - Relation Types Tests", () => {
                 properties: {
                     id: { type: "number" },
                     name: { type: "string" },
-                    orders: { type: "relation", relationName: "orders" }
+                    orders: { type: "relation",
+relationName: "orders" }
                 },
                 relations: [
                     {
@@ -802,8 +878,12 @@ describe("EntityService - Relation Types Tests", () => {
                         inverseRelationName: "products",
                         // Add joinPath to satisfy the validation
                         joinPath: [
-                            { table: "order_items", on: { from: "products.id", to: "order_items.product_id" } },
-                            { table: "orders", on: { from: "order_items.order_id", to: "orders.id" } }
+                            { table: "order_items",
+on: { from: "products.id",
+to: "order_items.product_id" } },
+                            { table: "orders",
+on: { from: "order_items.order_id",
+to: "orders.id" } }
                         ]
                     }
                 ],
@@ -826,13 +906,18 @@ describe("EntityService - Relation Types Tests", () => {
                 const productWithOrders = {
                     name: "Popular Product",
                     orders: [
-                        { id: "1", path: "orders", __type: "relation" },
-                        { id: "2", path: "orders", __type: "relation" }
+                        { id: "1",
+path: "orders",
+__type: "relation" },
+                        { id: "2",
+path: "orders",
+__type: "relation" }
                     ]
                 };
 
                 db.returning.mockResolvedValue([{ id: 1 }]);
-                db.limit.mockResolvedValue([{ id: 1, name: "Popular Product" }]);
+                db.limit.mockResolvedValue([{ id: 1,
+name: "Popular Product" }]);
                 // Mock the fetch for orders relation - return empty array
                 db.orderBy.mockResolvedValue([]);
 
@@ -852,7 +937,8 @@ describe("EntityService - Relation Types Tests", () => {
                 properties: {
                     id: { type: "number" },
                     name: { type: "string" },
-                    posts: { type: "relation", relationName: "posts" }
+                    posts: { type: "relation",
+relationName: "posts" }
                 },
                 relations: [
                     {
@@ -861,14 +947,19 @@ describe("EntityService - Relation Types Tests", () => {
                             slug: "posts",
                             name: "Posts",
                             table: "posts",
-                            properties: { id: { type: "number" }, title: { type: "string" } },
+                            properties: { id: { type: "number" },
+title: { type: "string" } },
                             idField: "id"
                         }),
                         cardinality: "many",
                         direction: "inverse",
                         joinPath: [
-                            { table: "post_tags", on: { from: "tags.id", to: "post_tags.tag_id" } },
-                            { table: "posts", on: { from: "post_tags.post_id", to: "posts.id" } }
+                            { table: "post_tags",
+on: { from: "tags.id",
+to: "post_tags.tag_id" } },
+                            { table: "posts",
+on: { from: "post_tags.post_id",
+to: "posts.id" } }
                         ]
                     }
                 ],
@@ -891,13 +982,18 @@ describe("EntityService - Relation Types Tests", () => {
                 const tagWithPosts = {
                     name: "Popular Tag",
                     posts: [
-                        { id: "1", path: "posts", __type: "relation" },
-                        { id: "2", path: "posts", __type: "relation" }
+                        { id: "1",
+path: "posts",
+__type: "relation" },
+                        { id: "2",
+path: "posts",
+__type: "relation" }
                     ]
                 };
 
                 db.returning.mockResolvedValue([{ id: 1 }]);
-                db.limit.mockResolvedValue([{ id: 1, name: "Popular Tag" }]);
+                db.limit.mockResolvedValue([{ id: 1,
+name: "Popular Tag" }]);
                 // Mock the fetch for posts relation - return empty array since we're testing write
                 db.orderBy.mockResolvedValue([]);
 

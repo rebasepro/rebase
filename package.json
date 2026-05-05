@@ -43,7 +43,8 @@
         "build:stream": "lerna run build --stream --loglevel=info",
         "clean": "lerna run clean",
         "release": "git push origin main:release",
-        "e2e": "npx tsx e2e/runner.ts"
+        "e2e": "npx tsx e2e/runner.ts",
+        "kill": "pkill -f 'rebase.*dev' || true; pkill -f 'tsx watch' || true; pkill -f vite || true"
     },
     "devDependencies": {
         "@eslint/js": "^9.24.0",

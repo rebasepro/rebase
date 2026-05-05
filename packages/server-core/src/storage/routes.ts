@@ -2,13 +2,13 @@
  * Storage REST API routes using Hono
  */
 
-import { Hono } from 'hono';
-import * as fs from 'fs';
-import { StorageController } from './types';
-import { LocalStorageController } from './LocalStorageController';
-import { requireAuth as jwtRequireAuth, optionalAuth } from '../auth/middleware';
-import { ApiError, errorHandler } from '../api/errors';
-import { HonoEnv } from '../api/types';
+import { Hono } from "hono";
+import * as fs from "fs";
+import { StorageController } from "./types";
+import { LocalStorageController } from "./LocalStorageController";
+import { requireAuth as jwtRequireAuth, optionalAuth } from "../auth/middleware";
+import { ApiError, errorHandler } from "../api/errors";
+import { HonoEnv } from "../api/types";
 
 export interface StorageRoutesConfig {
     controller: StorageController;
@@ -34,11 +34,11 @@ export interface StorageRoutesConfig {
  * plus one character for the trailing `/` to obtain `default/file.jpg`.
  */
 export function extractWildcardPath(c: { req: { path: string; routePath: string } }): string {
-    const routePath = c.req.routePath;           // e.g. "/api/storage/metadata/*"
-    const prefix = routePath.replace('/*', '');   // e.g. "/api/storage/metadata"
-    const fullPath = c.req.path;                  // e.g. "/api/storage/metadata/default/file.jpg"
+    const routePath = c.req.routePath; // e.g. "/api/storage/metadata/*"
+    const prefix = routePath.replace("/*", ""); // e.g. "/api/storage/metadata"
+    const fullPath = c.req.path; // e.g. "/api/storage/metadata/default/file.jpg"
     const idx = fullPath.indexOf(prefix);
-    if (idx < 0) return '';
+    if (idx < 0) return "";
     // +1 to skip the '/' after the prefix
     return fullPath.substring(idx + prefix.length + 1);
 }
@@ -61,19 +61,19 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
      * Parse bucket and path from a combined file path.
      */
     const parseBucketAndPath = (filePath: string): { bucket: string; resolvedPath: string } => {
-        const parts = filePath.split('/');
+        const parts = filePath.split("/");
 
         // Only recognize 'default' as an explicit bucket prefix
-        if (parts.length > 1 && parts[0].toLowerCase() === 'default') {
+        if (parts.length > 1 && parts[0].toLowerCase() === "default") {
             return {
-                bucket: 'default',
-                resolvedPath: parts.slice(1).join('/')
+                bucket: "default",
+                resolvedPath: parts.slice(1).join("/")
             };
         }
 
         // All other paths use 'default' bucket with the full path
         return {
-            bucket: 'default',
+            bucket: "default",
             resolvedPath: filePath
         };
     };
@@ -83,21 +83,21 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
      * Body: multipart/form-data with 'file' field
      * Request body can also contain metadata keys 'metadata_*'
      */
-    router.post('/upload', writeAuthMiddleware, async (c) => {
+    router.post("/upload", writeAuthMiddleware, async (c) => {
         const body = await c.req.parseBody();
-        const uploadedFile = body['file'];
+        const uploadedFile = body["file"];
 
-        if (!uploadedFile || typeof uploadedFile === 'string') {
-            throw ApiError.badRequest('No file provided');
+        if (!uploadedFile || typeof uploadedFile === "string") {
+            throw ApiError.badRequest("No file provided");
         }
 
-        const key = typeof body['key'] === 'string' ? body['key'] : '';
-        const bucket = typeof body['bucket'] === 'string' ? body['bucket'] : undefined;
+        const key = typeof body["key"] === "string" ? body["key"] : "";
+        const bucket = typeof body["bucket"] === "string" ? body["bucket"] : undefined;
 
         // Backward compatibility support for older clients sending path and fileName
-        const legacyPath = typeof body['path'] === 'string' ? body['path'] : '';
-        const legacyFileName = typeof body['fileName'] === 'string' ? body['fileName'] : undefined;
-        
+        const legacyPath = typeof body["path"] === "string" ? body["path"] : "";
+        const legacyFileName = typeof body["fileName"] === "string" ? body["fileName"] : undefined;
+
         let finalKey = key;
         if (!finalKey) {
             if (legacyPath || legacyFileName) {
@@ -106,19 +106,19 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                 if (legacyFileName) {
                     parts.push(legacyFileName);
                 } else {
-                    parts.push(uploadedFile.name || 'unnamed');
+                    parts.push(uploadedFile.name || "unnamed");
                 }
-                finalKey = parts.join('/');
+                finalKey = parts.join("/");
             } else {
-                finalKey = uploadedFile.name || 'unnamed';
+                finalKey = uploadedFile.name || "unnamed";
             }
         }
 
         // Extract custom metadata from request body
         const metadata: Record<string, unknown> = {};
         for (const [k, value] of Object.entries(body)) {
-            if (k.startsWith('metadata_')) {
-                metadata[k.replace('metadata_', '')] = value;
+            if (k.startsWith("metadata_")) {
+                metadata[k.replace("metadata_", "")] = value;
             }
         }
 
@@ -139,16 +139,16 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
      * GET /file/* - Download/serve a file
      * Path: /file/{bucket}/{path} or /file/{path}
      */
-    router.get('/file/*', readAuthMiddleware, async (c) => {
+    router.get("/file/*", readAuthMiddleware, async (c) => {
         const rawPath = extractWildcardPath(c);
         if (!rawPath) {
-            throw ApiError.notFound('File not found');
+            throw ApiError.notFound("File not found");
         }
 
         const filePath = decodeURIComponent(rawPath);
 
         // For local storage, serve the file directly from disk
-        if (controller.getType() === 'local') {
+        if (controller.getType() === "local") {
             const localController = controller as LocalStorageController;
             const { bucket, resolvedPath } = parseBucketAndPath(filePath);
 
@@ -156,31 +156,31 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
 
             // Check if file exists
             if (!fs.existsSync(absolutePath)) {
-                throw ApiError.notFound('File not found');
+                throw ApiError.notFound("File not found");
             }
 
             // Get content type from metadata or infer from extension
-            let contentType = 'application/octet-stream';
+            let contentType = "application/octet-stream";
             const metadataPath = `${absolutePath}.metadata.json`;
             if (fs.existsSync(metadataPath)) {
                 try {
-                    const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+                    const metadata = JSON.parse(fs.readFileSync(metadataPath, "utf-8"));
                     contentType = metadata.contentType || contentType;
                 } catch {
                     // Ignore metadata errors
                 }
             }
 
-            c.header('Content-Type', contentType);
+            c.header("Content-Type", contentType);
             // In a better scenario, we should pipe the stream instead of reading whole file
             const fileContent = fs.readFileSync(absolutePath);
-            return c.body(new Uint8Array(fileContent)); 
+            return c.body(new Uint8Array(fileContent));
         }
 
         // For remote storage (S3, GCS, etc.), redirect to a signed URL
         const downloadConfig = await controller.getSignedUrl(filePath);
         if (downloadConfig.fileNotFound || !downloadConfig.url) {
-            throw ApiError.notFound('File not found');
+            throw ApiError.notFound("File not found");
         }
 
         return c.redirect(downloadConfig.url);
@@ -189,7 +189,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
     /**
      * GET /metadata/* - Get file metadata
      */
-    router.get('/metadata/*', readAuthMiddleware, async (c) => {
+    router.get("/metadata/*", readAuthMiddleware, async (c) => {
         const rawPath = extractWildcardPath(c);
         if (!rawPath) {
             return c.json({
@@ -205,7 +205,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         const downloadConfig = await controller.getSignedUrl(resolvedPath, bucket);
 
         if (downloadConfig.fileNotFound) {
-            throw ApiError.notFound('File not found');
+            throw ApiError.notFound("File not found");
         }
 
         return c.json({
@@ -217,10 +217,11 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
     /**
      * DELETE /file/* - Delete a file
      */
-    router.delete('/file/*', writeAuthMiddleware, async (c) => {
+    router.delete("/file/*", writeAuthMiddleware, async (c) => {
         const rawPath = extractWildcardPath(c);
         if (!rawPath) {
-            return c.json({ success: true, message: 'No file to delete' });
+            return c.json({ success: true,
+message: "No file to delete" });
         }
 
         const filePath = decodeURIComponent(rawPath);
@@ -230,19 +231,19 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
 
         return c.json({
             success: true,
-            message: 'File deleted'
+            message: "File deleted"
         });
     });
 
     /**
      * GET /list - List files in a path
      */
-    router.get('/list', writeAuthMiddleware, async (c) => {
+    router.get("/list", writeAuthMiddleware, async (c) => {
         // Fallback to path for backward compatibility
-        const storagePrefix = c.req.query('prefix') || c.req.query('path') || '';
-        const bucket = c.req.query('bucket');
-        const maxResults = c.req.query('maxResults');
-        const pageToken = c.req.query('pageToken');
+        const storagePrefix = c.req.query("prefix") || c.req.query("path") || "";
+        const bucket = c.req.query("bucket");
+        const maxResults = c.req.query("maxResults");
+        const pageToken = c.req.query("pageToken");
 
         const result = await controller.listObjects(
             storagePrefix,

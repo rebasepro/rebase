@@ -50,9 +50,9 @@ function AuthScreen({ onAuth }: { onAuth: () => void }) {
       <div className="auth-container">
         {/* Left branded panel */}
         <div className="auth-hero">
-          <div className="auth-hero-orb auth-hero-orb-1" />
-          <div className="auth-hero-orb auth-hero-orb-2" />
-          <div className="auth-hero-orb auth-hero-orb-3" />
+          <div className="auth-hero-orb auth-hero-orb-1"/>
+          <div className="auth-hero-orb auth-hero-orb-2"/>
+          <div className="auth-hero-orb auth-hero-orb-3"/>
           <div className="auth-hero-content">
             <div className="auth-hero-logo">
               <div className="auth-hero-logo-icon">R</div>
@@ -189,7 +189,7 @@ function AuthScreen({ onAuth }: { onAuth: () => void }) {
                 disabled={loading}
               >
                 {loading ? (
-                  <span className="spinner spinner-sm" />
+                  <span className="spinner spinner-sm"/>
                 ) : mode === "login" ? (
                   <>
                     Sign In
@@ -206,7 +206,7 @@ function AuthScreen({ onAuth }: { onAuth: () => void }) {
 
             <div className="auth-footer">
               {mode === "login" ? (
-                <>Don't have an account?{" "}<a onClick={() => setMode("register")}>Create one</a></>
+                <>Don&apos;t have an account?{" "}<a onClick={() => setMode("register")}>Create one</a></>
               ) : (
                 <>Already have an account?{" "}<a onClick={() => setMode("login")}>Sign in</a></>
               )}
@@ -221,14 +221,17 @@ function AuthScreen({ onAuth }: { onAuth: () => void }) {
 // ===== Collection Table =====
 function CollectionView({ slug, label }: { slug: string; label: string }) {
   const [page, setPage] = useState(1);
-  const { data, meta, loading, refetch } = useCollection(slug, { limit: 15, page });
+  const { data, meta, loading, refetch } = useCollection(slug, { limit: 15,
+page });
   const [editingEntity, setEditingEntity] = useState<any>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [toasts, setToasts] = useState<{ id: number; message: string; type: "success" | "error" }[]>([]);
 
   const toast = useCallback((message: string, type: "success" | "error" = "success") => {
     const id = Date.now();
-    setToasts((t) => [...t, { id, message, type }]);
+    setToasts((t) => [...t, { id,
+message,
+type }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3000);
   }, []);
 
@@ -290,14 +293,14 @@ function CollectionView({ slug, label }: { slug: string; label: string }) {
             {loading && (
               <tr>
                 <td colSpan={columns.length + 2}>
-                  <div className="loading-center"><span className="spinner" /> Loading…</div>
+                  <div className="loading-center"><span className="spinner"/> Loading…</div>
                 </td>
               </tr>
             )}
             {!loading && data.length === 0 && (
               <tr>
                 <td colSpan={columns.length + 2}>
-                  <div className="table-empty">No records found. Click "Add" to create one.</div>
+                  <div className="table-empty">No records found. Click &quot;Add&quot; to create one.</div>
                 </td>
               </tr>
             )}
@@ -337,7 +340,7 @@ function CollectionView({ slug, label }: { slug: string; label: string }) {
         />
       )}
 
-      <ToastContainer toasts={toasts} />
+      <ToastContainer toasts={toasts}/>
     </>
   );
 }
@@ -359,7 +362,7 @@ function EntityDialog({
   slug,
   columns,
   onSave,
-  onClose,
+  onClose
 }: {
   entity: any | null;
   slug: string;
@@ -393,7 +396,8 @@ function EntityDialog({
                   <select
                     className="form-select"
                     value={String(values[col] ?? "")}
-                    onChange={(e) => setValues({ ...values, [col]: e.target.value === "true" })}
+                    onChange={(e) => setValues({ ...values,
+[col]: e.target.value === "true" })}
                   >
                     <option value="true">Yes</option>
                     <option value="false">No</option>
@@ -402,7 +406,8 @@ function EntityDialog({
                   <textarea
                     className="form-textarea"
                     value={values[col] ?? ""}
-                    onChange={(e) => setValues({ ...values, [col]: e.target.value })}
+                    onChange={(e) => setValues({ ...values,
+[col]: e.target.value })}
                     rows={4}
                   />
                 ) : (
@@ -410,7 +415,8 @@ function EntityDialog({
                     className="form-input"
                     type="text"
                     value={values[col] ?? ""}
-                    onChange={(e) => setValues({ ...values, [col]: e.target.value })}
+                    onChange={(e) => setValues({ ...values,
+[col]: e.target.value })}
                     placeholder={col}
                   />
                 )}
@@ -420,7 +426,7 @@ function EntityDialog({
           <div className="dialog-footer">
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? <span className="spinner" /> : entity ? "Save Changes" : "Create"}
+              {saving ? <span className="spinner"/> : entity ? "Save Changes" : "Create"}
             </button>
           </div>
         </form>
@@ -431,10 +437,18 @@ function EntityDialog({
 
 // ===== Main App =====
 const COLLECTIONS = [
-  { slug: "authors", label: "Authors", icon: "👤" },
-  { slug: "posts", label: "Posts", icon: "📝" },
-  { slug: "tags", label: "Tags", icon: "🏷️" },
-  { slug: "profiles", label: "Profiles", icon: "📋" },
+  { slug: "authors",
+label: "Authors",
+icon: "👤" },
+  { slug: "posts",
+label: "Posts",
+icon: "📝" },
+  { slug: "tags",
+label: "Tags",
+icon: "🏷️" },
+  { slug: "profiles",
+label: "Profiles",
+icon: "📋" }
 ];
 
 export default function App() {
@@ -449,13 +463,13 @@ export default function App() {
   if (loading) {
     return (
       <div className="auth-page">
-        <div className="loading-center"><span className="spinner" /> Initializing…</div>
+        <div className="loading-center"><span className="spinner"/> Initializing…</div>
       </div>
     );
   }
 
   if (!authenticated) {
-    return <AuthScreen onAuth={() => setAuthenticated(true)} />;
+    return <AuthScreen onAuth={() => setAuthenticated(true)}/>;
   }
 
   const activeCollection = COLLECTIONS.find((c) => c.slug === activeSlug)!;
@@ -486,7 +500,7 @@ export default function App() {
           ))}
         </div>
 
-        <div className="sidebar-spacer" />
+        <div className="sidebar-spacer"/>
 
         {user && (
           <div className="sidebar-user">
@@ -499,7 +513,8 @@ export default function App() {
             </div>
           </div>
         )}
-        <button className="sidebar-item" onClick={signOut} style={{ marginTop: 8, color: "var(--danger)" }}>
+        <button className="sidebar-item" onClick={signOut} style={{ marginTop: 8,
+color: "var(--danger)" }}>
           <span className="sidebar-item-icon">↳</span>
           Sign Out
         </button>
@@ -507,7 +522,7 @@ export default function App() {
 
       {/* Main Content */}
       <main className="main-content">
-        <CollectionView key={activeSlug} slug={activeCollection.slug} label={activeCollection.label} />
+        <CollectionView key={activeSlug} slug={activeCollection.slug} label={activeCollection.label}/>
       </main>
     </div>
   );

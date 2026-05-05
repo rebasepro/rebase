@@ -40,12 +40,13 @@ app.post("/", async (c) => {
 
     return c.json({
         message: `Hello, ${body.name || "World"}!`,
-        user: userId,
+        user: userId
     });
 });
 
 app.get("/", (c) => {
-    return c.json({ status: "ok", endpoint: "hello" });
+    return c.json({ status: "ok",
+endpoint: "hello" });
 });
 
 export default app;

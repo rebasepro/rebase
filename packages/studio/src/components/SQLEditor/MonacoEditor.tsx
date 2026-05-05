@@ -51,7 +51,7 @@ export const MonacoEditor = ({
                     }
                     onRunRef.current(selectedText || undefined);
                 }
-            },
+            }
         });
 
         // Register custom autocomplete for tables, columns, and SQL keywords
@@ -73,7 +73,7 @@ export const MonacoEditor = ({
                     startLineNumber: position.lineNumber,
                     endLineNumber: position.lineNumber,
                     startColumn: word.startColumn,
-                    endColumn: word.endColumn,
+                    endColumn: word.endColumn
                 };
 
                 const textUntilPosition = model.getValueInRange({
@@ -101,7 +101,7 @@ export const MonacoEditor = ({
                                     kind: monaco.languages.CompletionItemKind.Field,
                                     insertText: col.name,
                                     range,
-                                    detail: `Column`,
+                                    detail: "Column",
                                     sortText: "1"
                                 });
                             });
@@ -139,7 +139,7 @@ export const MonacoEditor = ({
                     const activeTables = new Set<string>();
                     for (const [, tables] of Object.entries(allSchemas)) {
                         tables.forEach(table => {
-                            const regex = new RegExp(`\\b${table.tableName}\\b`, 'i');
+                            const regex = new RegExp(`\\b${table.tableName}\\b`, "i");
                             if (regex.test(fullText)) {
                                 activeTables.add(table.tableName);
                             }
@@ -195,7 +195,7 @@ export const MonacoEditor = ({
                     automaticLayout: true,
                     readOnly,
                     tabSize: 2,
-                    wordWrap: "on",
+                    wordWrap: "on"
                 }}
             />
         </div>

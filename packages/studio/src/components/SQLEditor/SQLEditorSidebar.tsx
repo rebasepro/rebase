@@ -84,7 +84,7 @@ export const SQLEditorSidebar = ({
                                         {favorites.length > 0 && (
                                             <div className="mb-4">
                                                 <Typography variant="caption" className="text-[10px] font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark mb-2 px-1 flex items-center">
-                                                    <svg className="w-3 h-3 mr-1 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" /></svg>
+                                                    <svg className="w-3 h-3 mr-1 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd"/></svg>
                                                     Favorites
                                                 </Typography>
                                                 <div className="space-y-2">
@@ -104,7 +104,7 @@ export const SQLEditorSidebar = ({
                                                                     onDeleteSnippet(snippet.id);
                                                                 }}
                                                             >
-                                                                <DeleteIcon size="smallest" />
+                                                                <DeleteIcon size="smallest"/>
                                                             </IconButton>
                                                         </div>
                                                     ))}
@@ -135,7 +135,7 @@ export const SQLEditorSidebar = ({
                                                                     onDeleteSnippet(snippet.id);
                                                                 }}
                                                             >
-                                                                <DeleteIcon size="smallest" />
+                                                                <DeleteIcon size="smallest"/>
                                                             </IconButton>
                                                         </div>
                                                     ))}
@@ -166,7 +166,7 @@ export const SQLEditorSidebar = ({
                                         className="p-2 py-1.5 rounded hover:bg-surface-100 dark:hover:bg-surface-800 cursor-pointer group transition-colors flex items-start"
                                         onClick={() => onSelectSnippet(sql)}
                                     >
-                                        <svg className="w-3 h-3 mt-1 mr-2 text-text-disabled dark:text-text-disabled-dark group-hover:text-primary transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                        <svg className="w-3 h-3 mt-1 mr-2 text-text-disabled dark:text-text-disabled-dark group-hover:text-primary transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                         <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark group-hover:text-text-primary dark:group-hover:text-text-primary-dark text-[11px] line-clamp-2 leading-tight flex-grow">{sql}</Typography>
                                     </div>
                                 ))

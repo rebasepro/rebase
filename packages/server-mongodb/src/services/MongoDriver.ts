@@ -43,7 +43,6 @@ export class MongoDriver implements DataDriver {
     }
 
 
-
     /**
      * Get the current timestamp
      */

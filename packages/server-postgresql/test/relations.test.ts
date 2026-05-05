@@ -213,9 +213,9 @@ describe("Comprehensive Relations Test Suite", () => {
 
     const cleanSchema = (schema: string) => {
         return schema
-            .replace(/\/\/.*$/gm, '')
-            .replace(/\/\*[\s\S]*?\*\//g, '')
-            .replace(/\n{2,}/g, '\n')
+            .replace(/\/\/.*$/gm, "")
+            .replace(/\/\*[\s\S]*?\*\//g, "")
+            .replace(/\n{2,}/g, "\n")
             .replace(/\s+/g, " ")
             .trim();
     };
@@ -228,7 +228,8 @@ describe("Comprehensive Relations Test Suite", () => {
                 name: "Authors",
                 properties: {
                     name: { type: "string" },
-                    books: { type: "relation", relationName: "books" }
+                    books: { type: "relation",
+relationName: "books" }
                 },
                 relations: [
                     {
@@ -258,10 +259,10 @@ describe("Comprehensive Relations Test Suite", () => {
             const cleanResult = cleanSchema(result);
 
             // Should create junction table
-            expect(cleanResult).toContain(`export const authorBooks = pgTable("author_books"`);
-            expect(cleanResult).toContain(`author_id: varchar("author_id").notNull().references(() => authors.id, { onDelete: "cascade" })`);
-            expect(cleanResult).toContain(`book_id: varchar("book_id").notNull().references(() => books.id, { onDelete: "cascade" })`);
-            expect(cleanResult).toContain(`export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({ "books": many(authorBooks, { relationName: "books" }) }));`);
+            expect(cleanResult).toContain("export const authorBooks = pgTable(\"author_books\"");
+            expect(cleanResult).toContain("author_id: varchar(\"author_id\").notNull().references(() => authors.id, { onDelete: \"cascade\" })");
+            expect(cleanResult).toContain("book_id: varchar(\"book_id\").notNull().references(() => books.id, { onDelete: \"cascade\" })");
+            expect(cleanResult).toContain("export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({ \"books\": many(authorBooks, { relationName: \"books\" }) }));");
         });
 
         it("should handle a 4-table many-to-many chain with joinPath", async () => {
@@ -271,7 +272,8 @@ describe("Comprehensive Relations Test Suite", () => {
                 name: "Users",
                 properties: {
                     name: { type: "string" },
-                    permissions: { type: "relation", relationName: "permissions" }
+                    permissions: { type: "relation",
+relationName: "permissions" }
                 },
                 relations: [
                     {
@@ -279,10 +281,18 @@ describe("Comprehensive Relations Test Suite", () => {
                         target: () => permissionsCollection,
                         cardinality: "many",
                         joinPath: [
-                            { table: "user_roles", on: { from: "id", to: "user_id" } },
-                            { table: "roles", on: { from: "role_id", to: "id" } },
-                            { table: "role_permissions", on: { from: "id", to: "role_id" } },
-                            { table: "permissions", on: { from: "permission_id", to: "id" } }
+                            { table: "user_roles",
+on: { from: "id",
+to: "user_id" } },
+                            { table: "roles",
+on: { from: "role_id",
+to: "id" } },
+                            { table: "role_permissions",
+on: { from: "id",
+to: "role_id" } },
+                            { table: "permissions",
+on: { from: "permission_id",
+to: "id" } }
                         ]
                     }
                 ]
@@ -331,7 +341,8 @@ describe("Comprehensive Relations Test Suite", () => {
                 name: "Authors",
                 properties: {
                     name: { type: "string" },
-                    profile: { type: "relation", relationName: "profile" }
+                    profile: { type: "relation",
+relationName: "profile" }
                 },
                 relations: [
                     {
@@ -350,7 +361,8 @@ describe("Comprehensive Relations Test Suite", () => {
                 name: "Profiles",
                 properties: {
                     bio: { type: "string" },
-                    author: { type: "relation", relationName: "author" }
+                    author: { type: "relation",
+relationName: "author" }
                 },
                 relations: [
                     {
@@ -366,13 +378,13 @@ describe("Comprehensive Relations Test Suite", () => {
             const cleanResult = cleanSchema(result);
 
             // Should create FK on profiles table
-            expect(cleanResult).toContain(`author_id: varchar("author_id").references(() => authors.id, { onDelete: "set null" })`);
+            expect(cleanResult).toContain("author_id: varchar(\"author_id\").references(() => authors.id, { onDelete: \"set null\" })");
 
             // Should create owning relation on profiles
-            expect(cleanResult).toContain(`export const profilesRelations = drizzleRelations(profiles, ({ one, many }) => ({ "author": one(authors, { fields: [profiles.author_id], references: [authors.id], relationName: "profiles_author_id" }) }));`);
+            expect(cleanResult).toContain("export const profilesRelations = drizzleRelations(profiles, ({ one, many }) => ({ \"author\": one(authors, { fields: [profiles.author_id], references: [authors.id], relationName: \"profiles_author_id\" }) }));");
 
             // Should create inverse relation on authors (this was previously missing)
-            expect(cleanResult).toContain(`export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({ "profile": one(profiles, { fields: [authors.id], references: [profiles.author_id], relationName: "profiles_author_id" }) }));`);
+            expect(cleanResult).toContain("export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({ \"profile\": one(profiles, { fields: [authors.id], references: [profiles.author_id], relationName: \"profiles_author_id\" }) }));");
         });
 
         it("should generate owning one-to-many relations", async () => {
@@ -381,7 +393,7 @@ describe("Comprehensive Relations Test Suite", () => {
                 table: "categories",
                 name: "Categories",
                 properties: {
-                    name: { type: "string" },
+                    name: { type: "string" }
                 }
             };
 
@@ -391,7 +403,8 @@ describe("Comprehensive Relations Test Suite", () => {
                 name: "Posts",
                 properties: {
                     title: { type: "string" },
-                    category: { type: "relation", relationName: "category" }
+                    category: { type: "relation",
+relationName: "category" }
                 },
                 relations: [
                     {
@@ -407,9 +420,9 @@ describe("Comprehensive Relations Test Suite", () => {
             const cleanResult = cleanSchema(result);
 
             // Should create FK on posts table
-            expect(cleanResult).toContain(`category_id: varchar("category_id").references(() => categories.id, { onDelete: "set null" })`);
+            expect(cleanResult).toContain("category_id: varchar(\"category_id\").references(() => categories.id, { onDelete: \"set null\" })");
             // Should create owning relation on posts
-            expect(cleanResult).toContain(`export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({ "category": one(categories, { fields: [posts.category_id], references: [categories.id], relationName: "posts_category_id" }) }));`);
+            expect(cleanResult).toContain("export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({ \"category\": one(categories, { fields: [posts.category_id], references: [categories.id], relationName: \"posts_category_id\" }) }));");
         });
     });
 
@@ -421,7 +434,8 @@ describe("Comprehensive Relations Test Suite", () => {
                 name: "Authors",
                 properties: {
                     name: { type: "string" },
-                    publisher: { type: "relation", relationName: "publisher" },
+                    publisher: { type: "relation",
+relationName: "publisher" }
                 },
                 relations: [
                     {
@@ -448,7 +462,8 @@ describe("Comprehensive Relations Test Suite", () => {
                 name: "Books",
                 properties: {
                     title: { type: "string" },
-                    author: { type: "relation", relationName: "author" }
+                    author: { type: "relation",
+relationName: "author" }
                 },
                 relations: [{
                     relationName: "author",
@@ -462,12 +477,12 @@ describe("Comprehensive Relations Test Suite", () => {
             const cleanResult = cleanSchema(result);
 
             // Check owning relation from author to publisher
-            expect(cleanResult).toContain(`publisher_id: varchar("publisher_id").references(() => publishers.id, { onDelete: "set null" })`);
-            expect(cleanResult).toContain(`"publisher": one(publishers, { fields: [authors.publisher_id], references: [publishers.id], relationName: "authors_publisher_id" })`);
+            expect(cleanResult).toContain("publisher_id: varchar(\"publisher_id\").references(() => publishers.id, { onDelete: \"set null\" })");
+            expect(cleanResult).toContain("\"publisher\": one(publishers, { fields: [authors.publisher_id], references: [publishers.id], relationName: \"authors_publisher_id\" })");
 
             // Check owning relation from book to author
-            expect(cleanResult).toContain(`author_id: varchar("author_id").references(() => authors.id, { onDelete: "set null" })`);
-            expect(cleanResult).toContain(`"author": one(authors, { fields: [books.author_id], references: [authors.id], relationName: "books_author_id" })`);
+            expect(cleanResult).toContain("author_id: varchar(\"author_id\").references(() => authors.id, { onDelete: \"set null\" })");
+            expect(cleanResult).toContain("\"author\": one(authors, { fields: [books.author_id], references: [authors.id], relationName: \"books_author_id\" })");
         });
     });
 
@@ -479,8 +494,10 @@ describe("Comprehensive Relations Test Suite", () => {
                 name: "Orders",
                 properties: {
                     customer_code: { type: "string" },
-                    region_id: { type: "number", validation: { integer: true } },
-                    customer: { type: "relation", relationName: "customer" }
+                    region_id: { type: "number",
+validation: { integer: true } },
+                    customer: { type: "relation",
+relationName: "customer" }
                 },
                 relations: [
                     {
@@ -488,7 +505,9 @@ describe("Comprehensive Relations Test Suite", () => {
                         target: () => customersCollection,
                         cardinality: "many",
                         joinPath: [
-                            { table: "customers", on: { from: ["customer_code", "region_id"], to: ["code", "region_id"] } }
+                            { table: "customers",
+on: { from: ["customer_code", "region_id"],
+to: ["code", "region_id"] } }
                         ]
                     }
                 ]
@@ -500,7 +519,8 @@ describe("Comprehensive Relations Test Suite", () => {
                 name: "Customers",
                 properties: {
                     code: { type: "string" },
-                    region_id: { type: "number", validation: { integer: true } },
+                    region_id: { type: "number",
+validation: { integer: true } },
                     name: { type: "string" }
                 }
             };
@@ -538,7 +558,8 @@ describe("Comprehensive Relations Test Suite", () => {
                 name: "Users",
                 properties: {
                     name: { type: "string" },
-                    friends: { type: "relation", relationName: "friends" }
+                    friends: { type: "relation",
+relationName: "friends" }
                 },
                 relations: [
                     {
@@ -570,9 +591,11 @@ describe("Comprehensive Relations Test Suite", () => {
                 table: "products",
                 name: "Products",
                 properties: {
-                    sku: { type: "string", isId: true },
+                    sku: { type: "string",
+isId: true },
                     name: { type: "string" },
-                    categories: { type: "relation", relationName: "categories" }
+                    categories: { type: "relation",
+relationName: "categories" }
                 },
                 relations: [
                     {
@@ -615,7 +638,8 @@ describe("Comprehensive Relations Test Suite", () => {
                 name: "A Entities",
                 properties: {
                     name: { type: "string" },
-                    b_entities: { type: "relation", relationName: "b_entities" }
+                    b_entities: { type: "relation",
+relationName: "b_entities" }
                 },
                 relations: [
                     {
@@ -634,7 +658,8 @@ describe("Comprehensive Relations Test Suite", () => {
                 name: "B Entities",
                 properties: {
                     name: { type: "string" },
-                    a_entity: { type: "relation", relationName: "a_entity" }
+                    a_entity: { type: "relation",
+relationName: "a_entity" }
                 },
                 relations: [
                     {
@@ -690,7 +715,7 @@ describe("Shared relationName regression", () => {
             table: "companies",
             name: "Companies",
             properties: {
-                name: { type: "string" },
+                name: { type: "string" }
             },
             relations: [
                 {
@@ -698,9 +723,9 @@ describe("Shared relationName regression", () => {
                     target: () => jobsCollection,
                     cardinality: "many",
                     direction: "inverse",
-                    foreignKeyOnTarget: "company_id",
-                },
-            ],
+                    foreignKeyOnTarget: "company_id"
+                }
+            ]
         };
 
         const jobsCollection: EntityCollection = {
@@ -709,7 +734,8 @@ describe("Shared relationName regression", () => {
             name: "Jobs",
             properties: {
                 title: { type: "string" },
-                company: { type: "relation", relationName: "company" },
+                company: { type: "relation",
+relationName: "company" }
             },
             relations: [
                 {
@@ -717,9 +743,9 @@ describe("Shared relationName regression", () => {
                     target: () => companiesCollection,
                     cardinality: "one",
                     direction: "owning",
-                    localKey: "company_id",
-                },
-            ],
+                    localKey: "company_id"
+                }
+            ]
         };
 
         const result = await generateSchema([companiesCollection, jobsCollection]);
@@ -750,7 +776,7 @@ describe("Shared relationName regression", () => {
             table: "users",
             name: "Users",
             properties: {
-                name: { type: "string" },
+                name: { type: "string" }
             },
             relations: [
                 {
@@ -758,9 +784,9 @@ describe("Shared relationName regression", () => {
                     target: () => profilesCollection,
                     cardinality: "one",
                     direction: "inverse",
-                    foreignKeyOnTarget: "user_id",
-                },
-            ],
+                    foreignKeyOnTarget: "user_id"
+                }
+            ]
         };
 
         const profilesCollection: EntityCollection = {
@@ -769,7 +795,8 @@ describe("Shared relationName regression", () => {
             name: "Profiles",
             properties: {
                 bio: { type: "string" },
-                user: { type: "relation", relationName: "user" },
+                user: { type: "relation",
+relationName: "user" }
             },
             relations: [
                 {
@@ -777,9 +804,9 @@ describe("Shared relationName regression", () => {
                     target: () => usersCollection,
                     cardinality: "one",
                     direction: "owning",
-                    localKey: "user_id",
-                },
-            ],
+                    localKey: "user_id"
+                }
+            ]
         };
 
         const result = await generateSchema([usersCollection, profilesCollection]);
@@ -815,16 +842,16 @@ describe("Shared relationName regression", () => {
                     target: () => peopleCollection,
                     cardinality: "many",
                     direction: "inverse",
-                    foreignKeyOnTarget: "employer_id",
+                    foreignKeyOnTarget: "employer_id"
                 },
                 {
                     relationName: "founders",
                     target: () => peopleCollection,
                     cardinality: "many",
                     direction: "inverse",
-                    foreignKeyOnTarget: "startup_id",
-                },
-            ],
+                    foreignKeyOnTarget: "startup_id"
+                }
+            ]
         };
 
         const peopleCollection: EntityCollection = {
@@ -833,8 +860,10 @@ describe("Shared relationName regression", () => {
             name: "People",
             properties: {
                 name: { type: "string" },
-                employer: { type: "relation", relationName: "employer" },
-                startup: { type: "relation", relationName: "startup" },
+                employer: { type: "relation",
+relationName: "employer" },
+                startup: { type: "relation",
+relationName: "startup" }
             },
             relations: [
                 {
@@ -842,16 +871,16 @@ describe("Shared relationName regression", () => {
                     target: () => companiesCollection,
                     cardinality: "one",
                     direction: "owning",
-                    localKey: "employer_id",
+                    localKey: "employer_id"
                 },
                 {
                     relationName: "startup",
                     target: () => companiesCollection,
                     cardinality: "one",
                     direction: "owning",
-                    localKey: "startup_id",
-                },
-            ],
+                    localKey: "startup_id"
+                }
+            ]
         };
 
         const result = await generateSchema([companiesCollection, peopleCollection]);
@@ -914,7 +943,7 @@ describe("Duplicate relation deduplication regression", () => {
             table: "companies",
             name: "Companies",
             properties: {
-                name: { type: "string" },
+                name: { type: "string" }
             },
             relations: [
                 {
@@ -922,9 +951,9 @@ describe("Duplicate relation deduplication regression", () => {
                     target: () => jobsCollection,
                     cardinality: "many",
                     direction: "inverse",
-                    foreignKeyOnTarget: "company_id",
-                },
-            ],
+                    foreignKeyOnTarget: "company_id"
+                }
+            ]
         };
 
         const jobsCollection: EntityCollection = {
@@ -936,8 +965,8 @@ describe("Duplicate relation deduplication regression", () => {
                 // Property referencing the same FK as the explicit relation
                 company: {
                     type: "relation",
-                    relationName: "company",
-                },
+                    relationName: "company"
+                }
             },
             relations: [
                 {
@@ -945,9 +974,9 @@ describe("Duplicate relation deduplication regression", () => {
                     target: () => companiesCollection,
                     cardinality: "one",
                     direction: "owning",
-                    localKey: "company_id",
-                },
-            ],
+                    localKey: "company_id"
+                }
+            ]
         };
 
         const result = await generateSchema([companiesCollection, jobsCollection]);
@@ -979,7 +1008,7 @@ describe("Duplicate relation deduplication regression", () => {
             table: "departments",
             name: "Departments",
             properties: {
-                name: { type: "string" },
+                name: { type: "string" }
             },
             relations: [
                 {
@@ -987,9 +1016,9 @@ describe("Duplicate relation deduplication regression", () => {
                     target: () => memberCollection,
                     cardinality: "many",
                     direction: "inverse",
-                    foreignKeyOnTarget: "department_id",
-                },
-            ],
+                    foreignKeyOnTarget: "department_id"
+                }
+            ]
         };
 
         const memberCollection: EntityCollection = {
@@ -1000,8 +1029,8 @@ describe("Duplicate relation deduplication regression", () => {
                 name: { type: "string" },
                 department: {
                     type: "relation",
-                    relationName: "department",
-                },
+                    relationName: "department"
+                }
             },
             relations: [
                 {
@@ -1009,9 +1038,9 @@ describe("Duplicate relation deduplication regression", () => {
                     target: () => parentCollection,
                     cardinality: "one",
                     direction: "owning",
-                    localKey: "department_id",
-                },
-            ],
+                    localKey: "department_id"
+                }
+            ]
         };
 
         const result = await generateSchema([parentCollection, memberCollection]);
@@ -1040,7 +1069,7 @@ describe("Duplicate relation deduplication regression", () => {
             table: "users",
             name: "Users",
             properties: { name: { type: "string" } },
-            relations: [],
+            relations: []
         };
 
         const messagesCollection: EntityCollection = {
@@ -1049,8 +1078,10 @@ describe("Duplicate relation deduplication regression", () => {
             name: "Messages",
             properties: {
                 content: { type: "string" },
-                sender: { type: "relation", relationName: "sender" },
-                recipient: { type: "relation", relationName: "recipient" },
+                sender: { type: "relation",
+relationName: "sender" },
+                recipient: { type: "relation",
+relationName: "recipient" }
             },
             relations: [
                 {
@@ -1058,16 +1089,16 @@ describe("Duplicate relation deduplication regression", () => {
                     target: () => usersCollection,
                     cardinality: "one",
                     direction: "owning",
-                    localKey: "sender_id",
+                    localKey: "sender_id"
                 },
                 {
                     relationName: "recipient",
                     target: () => usersCollection,
                     cardinality: "one",
                     direction: "owning",
-                    localKey: "recipient_id",
-                },
-            ],
+                    localKey: "recipient_id"
+                }
+            ]
         };
 
         const result = await generateSchema([usersCollection, messagesCollection]);

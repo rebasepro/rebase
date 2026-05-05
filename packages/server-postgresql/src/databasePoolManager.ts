@@ -1,6 +1,6 @@
-import { Pool } from 'pg';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { Pool } from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 export class DatabasePoolManager {
     private pools: Map<string, Pool> = new Map();
@@ -42,11 +42,11 @@ export class DatabasePoolManager {
             connectionString: url.toString(),
             max: 10, // Default sensible limit, can be tuned later
             idleTimeoutMillis: 10000, // Reduced from 30000 for aggressive cleanup
-            allowExitOnIdle: true, // Prevent idle clients from hanging the Node.js process
+            allowExitOnIdle: true // Prevent idle clients from hanging the Node.js process
         });
 
         // Prevent idle client errors from crashing the Node.js process
-        pool.on('error', (err) => {
+        pool.on("error", (err) => {
             console.error(`[DatabasePoolManager] Unexpected error on idle client for db ${databaseName}`, err);
         });
 

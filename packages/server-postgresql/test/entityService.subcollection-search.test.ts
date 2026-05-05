@@ -58,7 +58,8 @@ describe("EntityService - Subcollection Search Tests", () => {
             id: { type: "number" },
             name: { type: "string" },
             description: { type: "string" },
-            posts: { type: "relation", relationName: "posts" }
+            posts: { type: "relation",
+relationName: "posts" }
         },
         relations: [
             {
@@ -80,9 +81,12 @@ describe("EntityService - Subcollection Search Tests", () => {
             id: { type: "number" },
             title: { type: "string" },
             content: { type: "string" },
-            tag: { type: "relation", relationName: "tag" },
-            author: { type: "relation", relationName: "author" },
-            comments: { type: "relation", relationName: "comments" }
+            tag: { type: "relation",
+relationName: "tag" },
+            author: { type: "relation",
+relationName: "author" },
+            comments: { type: "relation",
+relationName: "comments" }
         },
         relations: [
             {
@@ -119,7 +123,8 @@ describe("EntityService - Subcollection Search Tests", () => {
             name: { type: "string" },
             email: { type: "string" },
             bio: { type: "string" },
-            posts: { type: "relation", relationName: "posts" }
+            posts: { type: "relation",
+relationName: "posts" }
         },
         relations: [
             {
@@ -141,7 +146,8 @@ describe("EntityService - Subcollection Search Tests", () => {
             id: { type: "number" },
             content: { type: "string" },
             author_name: { type: "string" },
-            post: { type: "relation", relationName: "post" }
+            post: { type: "relation",
+relationName: "post" }
         },
         relations: [
             {
@@ -185,32 +191,32 @@ describe("EntityService - Subcollection Search Tests", () => {
         entityService = new EntityService(db, collectionRegistry);
 
         // Mock collection registry
-        jest.spyOn(collectionRegistry, 'getCollectionByPath').mockImplementation((path: string) => {
+        jest.spyOn(collectionRegistry, "getCollectionByPath").mockImplementation((path: string) => {
             switch (path) {
-                case 'tags':
+                case "tags":
                     return tagsCollection;
-                case 'posts':
+                case "posts":
                     return postsCollection;
-                case 'authors':
+                case "authors":
                     return authorsCollection;
-                case 'comments':
+                case "comments":
                     return commentsCollection;
                 default:
                     throw new Error(`Collection not found: ${path}`);
             }
         });
 
-        jest.spyOn(collectionRegistry, 'getTable').mockImplementation((tableName: string) => {
+        jest.spyOn(collectionRegistry, "getTable").mockImplementation((tableName: string) => {
             switch (tableName) {
-                case 'tags':
+                case "tags":
                     return mockTagsTable;
-                case 'posts':
+                case "posts":
                     return mockPostsTable;
-                case 'authors':
+                case "authors":
                     return mockAuthorsTable;
-                case 'comments':
+                case "comments":
                     return mockCommentsTable;
-                case 'posts_tags':
+                case "posts_tags":
                     return mockPostsTagsTable;
                 default:
                     return null;
@@ -218,15 +224,19 @@ describe("EntityService - Subcollection Search Tests", () => {
         });
 
         // Mock DrizzleConditionBuilder with more realistic behavior
-        jest.spyOn(DrizzleConditionBuilder, 'buildSearchConditions').mockReturnValue([
-            { operator: 'ilike', column: 'title', value: '%searchterm%' },
-            { operator: 'ilike', column: 'content', value: '%searchterm%' }
+        jest.spyOn(DrizzleConditionBuilder, "buildSearchConditions").mockReturnValue([
+            { operator: "ilike",
+column: "title",
+value: "%searchterm%" },
+            { operator: "ilike",
+column: "content",
+value: "%searchterm%" }
         ] as unknown as SQL[]);
 
-        jest.spyOn(DrizzleConditionBuilder, 'combineConditionsWithOr').mockReturnValue({ combined: 'search_conditions' } as unknown as SQL);
-        jest.spyOn(DrizzleConditionBuilder, 'combineConditionsWithAnd').mockReturnValue({ combined: 'all_conditions' } as unknown as SQL);
-        jest.spyOn(DrizzleConditionBuilder, 'buildRelationQuery').mockImplementation((query) => query);
-        jest.spyOn(DrizzleConditionBuilder, 'buildFilterConditions').mockReturnValue([]);
+        jest.spyOn(DrizzleConditionBuilder, "combineConditionsWithOr").mockReturnValue({ combined: "search_conditions" } as unknown as SQL);
+        jest.spyOn(DrizzleConditionBuilder, "combineConditionsWithAnd").mockReturnValue({ combined: "all_conditions" } as unknown as SQL);
+        jest.spyOn(DrizzleConditionBuilder, "buildRelationQuery").mockImplementation((query) => query);
+        jest.spyOn(DrizzleConditionBuilder, "buildFilterConditions").mockReturnValue([]);
     });
 
     afterEach(() => {
@@ -237,8 +247,14 @@ describe("EntityService - Subcollection Search Tests", () => {
         it("should handle search in one-to-many inverse relation subcollection", async () => {
             // Scenario: Search posts under a specific tag (tags/19/posts)
             const mockResults = [
-                { id: 1, title: "Mental Health Tips", content: "Content about mental health", tag_id: 19 },
-                { id: 2, title: "Mental Wellness", content: "More mental health content", tag_id: 19 }
+                { id: 1,
+title: "Mental Health Tips",
+content: "Content about mental health",
+tag_id: 19 },
+                { id: 2,
+title: "Mental Wellness",
+content: "More mental health content",
+tag_id: 19 }
             ];
 
             const mockQueryBuilder = createMockQueryBuilder(mockResults);
@@ -266,8 +282,14 @@ describe("EntityService - Subcollection Search Tests", () => {
         it("should handle search in many-to-one owning relation subcollection", async () => {
             // Scenario: Search posts under a specific author (authors/5/posts)
             const mockResults = [
-                { id: 10, title: "Mental Strategies", content: "Author's take on mental health", author_id: 5 },
-                { id: 11, title: "Mindfulness Guide", content: "Mental wellness guide", author_id: 5 }
+                { id: 10,
+title: "Mental Strategies",
+content: "Author's take on mental health",
+author_id: 5 },
+                { id: 11,
+title: "Mindfulness Guide",
+content: "Mental wellness guide",
+author_id: 5 }
             ];
 
             const mockQueryBuilder = createMockQueryBuilder(mockResults);
@@ -291,8 +313,14 @@ describe("EntityService - Subcollection Search Tests", () => {
         it("should handle search in nested subcollection (posts/123/comments)", async () => {
             // Scenario: Search comments under a specific post (posts/123/comments)
             const mockResults = [
-                { id: 1, content: "Great mental health advice!", author_name: "John", post_id: 123 },
-                { id: 2, content: "Mental wellness is important", author_name: "Jane", post_id: 123 }
+                { id: 1,
+content: "Great mental health advice!",
+author_name: "John",
+post_id: 123 },
+                { id: 2,
+content: "Mental wellness is important",
+author_name: "Jane",
+post_id: 123 }
             ];
 
             const mockQueryBuilder = createMockQueryBuilder(mockResults);
@@ -314,15 +342,20 @@ describe("EntityService - Subcollection Search Tests", () => {
         it("should combine search conditions with existing filters", async () => {
             // Scenario: Search with both searchString and filter
             const mockResults = [
-                { id: 1, title: "Mental Health", content: "Published content", tag_id: 19 }
+                { id: 1,
+title: "Mental Health",
+content: "Published content",
+tag_id: 19 }
             ];
 
             const mockQueryBuilder = createMockQueryBuilder(mockResults);
             db.select.mockReturnValue(mockQueryBuilder as unknown as ReturnType<typeof db.select>);
 
             // Mock buildFilterConditions to return some filter conditions to ensure AND combination
-            const mockFilterConditions = [{ operator: 'eq', column: 'title', value: 'Mental Health' }] as unknown as SQL[];
-            jest.spyOn(DrizzleConditionBuilder, 'buildFilterConditions').mockReturnValue(mockFilterConditions);
+            const mockFilterConditions = [{ operator: "eq",
+column: "title",
+value: "Mental Health" }] as unknown as SQL[];
+            jest.spyOn(DrizzleConditionBuilder, "buildFilterConditions").mockReturnValue(mockFilterConditions);
 
             const result = await entityService.fetchCollection("tags/19/posts", {
                 searchString: "mental",
@@ -343,7 +376,7 @@ describe("EntityService - Subcollection Search Tests", () => {
 
         it("should handle empty search results gracefully", async () => {
             // When buildSearchConditions returns empty array, the query still runs without search conditions
-            jest.spyOn(DrizzleConditionBuilder, 'buildSearchConditions').mockReturnValue([]);
+            jest.spyOn(DrizzleConditionBuilder, "buildSearchConditions").mockReturnValue([]);
 
             // Still need to mock db.select to return a query builder that returns empty results
             const mockQueryBuilder = createMockQueryBuilder([]);
@@ -362,8 +395,14 @@ describe("EntityService - Subcollection Search Tests", () => {
 
         it("should handle search with ordering and pagination", async () => {
             const mockResults = [
-                { id: 3, title: "Mental Health Z", content: "Content Z", tag_id: 19 },
-                { id: 1, title: "Mental Health A", content: "Content A", tag_id: 19 }
+                { id: 3,
+title: "Mental Health Z",
+content: "Content Z",
+tag_id: 19 },
+                { id: 1,
+title: "Mental Health A",
+content: "Content A",
+tag_id: 19 }
             ];
 
             const mockQueryBuilder = createMockQueryBuilder(mockResults);
@@ -374,7 +413,8 @@ describe("EntityService - Subcollection Search Tests", () => {
                 orderBy: "title",
                 order: "asc",
                 limit: 10,
-                startAfter: { id: 5, title: "Mental Health B" }
+                startAfter: { id: 5,
+title: "Mental Health B" }
             });
 
             // Verify search was processed
@@ -389,7 +429,10 @@ describe("EntityService - Subcollection Search Tests", () => {
     describe("searchEntities with subcollection paths", () => {
         it("should handle direct search on subcollection using searchEntities method", async () => {
             const mockResults = [
-                { id: 1, title: "Mental Health Guide", content: "Comprehensive guide", tag_id: 19 }
+                { id: 1,
+title: "Mental Health Guide",
+content: "Comprehensive guide",
+tag_id: 19 }
             ];
 
             const mockQueryBuilder = createMockQueryBuilder(mockResults);
@@ -413,7 +456,10 @@ describe("EntityService - Subcollection Search Tests", () => {
     describe("fetchRelatedEntities with search", () => {
         it("should pass search parameters correctly to fetchEntitiesUsingJoins", async () => {
             const mockResults = [
-                { id: 1, title: "Mental Health Post", content: "Content", tag_id: 19 }
+                { id: 1,
+title: "Mental Health Post",
+content: "Content",
+tag_id: 19 }
             ];
 
             const mockQueryBuilder = createMockQueryBuilder(mockResults);
@@ -446,7 +492,7 @@ describe("EntityService - Subcollection Search Tests", () => {
             const mockCollection = { ...tagsCollection };
             mockCollection.relations = [];
 
-            jest.spyOn(collectionRegistry, 'getCollectionByPath').mockReturnValue(mockCollection);
+            jest.spyOn(collectionRegistry, "getCollectionByPath").mockReturnValue(mockCollection);
 
             await expect(entityService.fetchCollection("tags/19/nonexistent", {
                 searchString: "test"
@@ -455,7 +501,7 @@ describe("EntityService - Subcollection Search Tests", () => {
 
         it("should handle search in collection with no searchable properties", async () => {
             // Mock buildSearchConditions to return empty array
-            jest.spyOn(DrizzleConditionBuilder, 'buildSearchConditions').mockReturnValue([]);
+            jest.spyOn(DrizzleConditionBuilder, "buildSearchConditions").mockReturnValue([]);
 
             // Still need to mock db.select even though it might not be called, to avoid errors
             const mockQueryBuilder = createMockQueryBuilder([]);
@@ -478,7 +524,10 @@ describe("EntityService - Subcollection Search Tests", () => {
     describe("Performance and optimization", () => {
         it("should use proper limit when searching (default 50 for search)", async () => {
             const mockResults = [
-                { id: 1, title: "Mental Health", content: "Content", tag_id: 19 }
+                { id: 1,
+title: "Mental Health",
+content: "Content",
+tag_id: 19 }
             ];
 
             const mockLimit = jest.fn().mockReturnThis();

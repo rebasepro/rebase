@@ -60,7 +60,7 @@ async function processProperties(
 
         // 3. Property's own callback
         if (property.callbacks?.[callbackName]) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
             const cbRes = await Promise.resolve(property.callbacks[callbackName]({
                 ...(propsContext as Record<string, unknown>),
                 value: currentValue,
@@ -94,7 +94,8 @@ export const buildPropertyCallbacks = (properties: Properties): EntityCallbacks 
                 props as unknown,
                 "afterRead"
             );
-            return { ...props.entity, values: processedValues };
+            return { ...props.entity,
+values: processedValues };
         };
     }
 

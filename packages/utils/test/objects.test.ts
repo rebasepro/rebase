@@ -41,7 +41,8 @@ describe("objects utils", () => {
         it("should deeply set a value without mutating original object", () => {
             const obj = { a: { b: 1 } };
             const newObj = setIn(obj, "a.c", 2);
-            expect(newObj).toEqual({ a: { b: 1, c: 2 } });
+            expect(newObj).toEqual({ a: { b: 1,
+c: 2 } });
             expect(obj).toEqual({ a: { b: 1 } }); // check mutation
         });
 
@@ -52,7 +53,8 @@ describe("objects utils", () => {
         });
 
         it("should delete the key if value is undefined", () => {
-            const obj = { a: 1, b: 2 };
+            const obj = { a: 1,
+b: 2 };
             const newObj = setIn(obj, "a", undefined);
             expect(newObj).toEqual({ b: 2 });
             expect(newObj).not.toHaveProperty("a");
@@ -82,8 +84,11 @@ describe("objects utils", () => {
 
     describe("pick", () => {
         it("should pick specified fields from object", () => {
-            const obj = { a: 1, b: 2, c: 3 };
-            expect(pick(obj, "a", "c")).toEqual({ a: 1, c: 3 });
+            const obj = { a: 1,
+b: 2,
+c: 3 };
+            expect(pick(obj, "a", "c")).toEqual({ a: 1,
+c: 3 });
         });
     });
 
@@ -92,7 +97,7 @@ describe("objects utils", () => {
             expect(isPlainObject({})).toBe(true);
             expect(isPlainObject({ a: 1 })).toBe(true);
         });
-        
+
         it("should return false for arrays, instances, and primitives", () => {
             expect(isPlainObject([])).toBe(false);
             expect(isPlainObject(new Date())).toBe(false);
@@ -103,10 +108,16 @@ describe("objects utils", () => {
 
     describe("mergeDeep", () => {
         it("should recursively merge plain objects", () => {
-            const target = { a: { x: 1, y: 2 }, b: 3 };
-            const source = { a: { y: 99, z: 3 }, c: 4 };
+            const target = { a: { x: 1,
+y: 2 },
+b: 3 };
+            const source = { a: { y: 99,
+z: 3 },
+c: 4 };
             expect(mergeDeep(target, source)).toEqual({
-                a: { x: 1, y: 99, z: 3 },
+                a: { x: 1,
+y: 99,
+z: 3 },
                 b: 3,
                 c: 4
             });
@@ -119,9 +130,13 @@ describe("objects utils", () => {
         });
 
         it("should ignore undefined values if ignoreUndefined flag is true", () => {
-            const target = { a: 1, b: 2 };
-            const source = { a: undefined, c: 3 };
-            expect(mergeDeep(target, source, true)).toEqual({ a: 1, b: 2, c: 3 });
+            const target = { a: 1,
+b: 2 };
+            const source = { a: undefined,
+c: 3 };
+            expect(mergeDeep(target, source, true)).toEqual({ a: 1,
+b: 2,
+c: 3 });
         });
     });
 
@@ -134,7 +149,8 @@ describe("objects utils", () => {
 
     describe("removeInPath", () => {
         it("should delete a nested property without mutating original", () => {
-            const obj = { a: { b: 1, c: 2 } };
+            const obj = { a: { b: 1,
+c: 2 } };
             const result = removeInPath(obj, "a.b");
             // The method logic makes shallow copies but mutates `currentObject`
             expect(result).not.toHaveProperty("b");
@@ -149,26 +165,36 @@ describe("objects utils", () => {
                 c: [2, () => {}]
             };
             const result = removeFunctions(obj);
-            expect(result).toEqual({ a: 1, c: [2, expect.any(Function)] });
+            expect(result).toEqual({ a: 1,
+c: [2, expect.any(Function)] });
         });
     });
 
     describe("removeUndefined", () => {
         it("should recursively remove undefined values", () => {
-            const obj = { a: 1, b: undefined, c: { d: undefined, e: 2 } };
-            expect(removeUndefined(obj)).toEqual({ a: 1, c: { e: 2 } });
+            const obj = { a: 1,
+b: undefined,
+c: { d: undefined,
+e: 2 } };
+            expect(removeUndefined(obj)).toEqual({ a: 1,
+c: { e: 2 } });
         });
 
         it("should conditionally remove empty strings if flag passed", () => {
-            const obj = { a: 1, b: "" };
+            const obj = { a: 1,
+b: "" };
             expect(removeUndefined(obj, true)).toEqual({ a: 1 });
         });
     });
 
     describe("removeNulls", () => {
         it("should recursively remove null values", () => {
-            const obj = { a: 1, b: null, c: { d: null, e: 2 } };
-            expect(removeNulls(obj)).toEqual({ a: 1, c: { e: 2 } });
+            const obj = { a: 1,
+b: null,
+c: { d: null,
+e: 2 } };
+            expect(removeNulls(obj)).toEqual({ a: 1,
+c: { e: 2 } });
         });
     });
 

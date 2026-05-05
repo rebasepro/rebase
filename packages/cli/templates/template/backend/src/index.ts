@@ -57,7 +57,9 @@ async function startServer() {
         bootstrappers: [
             createPostgresBootstrapper({
                 connection: db,
-                schema: { tables, enums, relations },
+                schema: { tables,
+enums,
+relations },
                 adminConnectionString: env.ADMIN_CONNECTION_STRING || databaseUrl,
                 connectionString
             })
@@ -73,7 +75,7 @@ async function startServer() {
             seedDefaultRoles: true,
             allowRegistration: env.ALLOW_REGISTRATION
         },
-        storage: env.STORAGE_TYPE === "s3" 
+        storage: env.STORAGE_TYPE === "s3"
             ? {
                 type: "s3",
                 bucket: env.S3_BUCKET!,
@@ -87,7 +89,7 @@ async function startServer() {
                 type: "local",
                 basePath: env.STORAGE_PATH || path.resolve(__dirname, "../../uploads")
             },
-        history: true,
+        history: true
     });
 
     // ─── Health check ─────────────────────────────────────────────

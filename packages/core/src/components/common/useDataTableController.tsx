@@ -209,7 +209,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
             setDataLoading(false);
             setDataLoadingError(undefined);
             setRawData(entities.map(e => ({
-                ...e,
+                ...e
                 // values: sanitizeData(e.values, resolvedCollection.properties)
             })));
             setNoMoreToLoad(!itemCount || entities.length < itemCount);
@@ -223,7 +223,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         };
 
         const accessor = dataClient.collection(path);
-        
+
         // Convert filterValues to PostgREST where clause
         const whereMap: Record<string, string> = {};
         if (filterValues) {
@@ -231,7 +231,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
                 if (value && Array.isArray(value)) {
                     const [op, val] = value;
                     const postgrestOp = op === "==" ? "eq" : op === "!=" ? "neq" : op === ">" ? "gt" : op === ">=" ? "gte" : op === "<" ? "lt" : op === "<=" ? "lte" : op === "in" ? "in" : op === "not-in" ? "nin" : op === "array-contains" ? "cs" : op === "array-contains-any" ? "csa" : "eq";
-                    
+
                     let stringVal: string;
                     if (Array.isArray(val)) {
                         stringVal = `(${val.join(",")})`;
@@ -244,9 +244,9 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         }
         const whereParams = Object.keys(whereMap).length > 0 ? whereMap : undefined;
         const orderByParams = sortByProperty ? `${String(sortByProperty)}:${currentSort}` : undefined;
-        
+
         let unsubscribe: (() => void) | undefined;
-        
+
         if (accessor.listen) {
             unsubscribe = accessor.listen({
                 where: whereParams,
@@ -265,11 +265,11 @@ export function useDataTableController<M extends Record<string, any> = any, USER
                 .catch(onError);
             unsubscribe = () => undefined;
         }
-        
+
         return unsubscribe;
     }, [dataClient, path, itemCount, currentSort, sortByProperty, filterValues, searchString]);
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
     const orderedData = useDataOrder({
         data: rawData,
         entitiesDisplayedFirst
@@ -471,7 +471,8 @@ function decodeString(val: string): EntityReference | EntityRelation | Date | st
                 if (typeof value === "string") {
                     if (value.startsWith("ref::")) {
                         const [path, id] = value.substring(5).split("/");
-                        return new EntityReference({ id, path });
+                        return new EntityReference({ id,
+path });
                     }
                     if (value.startsWith("rel::")) {
                         const [path, id] = value.substring(5).split("/");
@@ -488,7 +489,8 @@ function decodeString(val: string): EntityReference | EntityRelation | Date | st
     if (typeof parsedFilterVal === "string") {
         if (parsedFilterVal.startsWith("ref::")) {
             const [path, id] = parsedFilterVal.substring(5).split("/");
-            return new EntityReference({ id, path });
+            return new EntityReference({ id,
+path });
         }
         if (parsedFilterVal.startsWith("rel::")) {
             const [path, id] = parsedFilterVal.substring(5).split("/");

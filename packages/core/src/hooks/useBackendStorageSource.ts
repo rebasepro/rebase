@@ -2,14 +2,14 @@
  * React hook for using backend storage API as a StorageSource
  */
 
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback } from "react";
 import {
     StorageSource,
     UploadFileProps,
     UploadFileResult,
     DownloadConfig,
     StorageListResult
-} from '@rebasepro/types';
+} from "@rebasepro/types";
 
 export interface BackendStorageSourceProps {
     /**
@@ -59,7 +59,7 @@ export function useBackendStorageSource({
             ...options,
             headers: {
                 ...options.headers,
-                'Authorization': `Bearer ${token}`
+                "Authorization": `Bearer ${token}`
             }
         });
     }, [getAuthToken]);
@@ -74,13 +74,13 @@ export function useBackendStorageSource({
         bucket
     }: UploadFileProps): Promise<UploadFileResult> => {
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append("file", file);
 
         if (key) {
-            formData.append('key', key);
+            formData.append("key", key);
         }
         if (bucket) {
-            formData.append('bucket', bucket);
+            formData.append("bucket", bucket);
         }
 
         // Add metadata fields with prefix
@@ -89,20 +89,20 @@ export function useBackendStorageSource({
                 if (value !== undefined && value !== null) {
                     formData.append(
                         `metadata_${key}`,
-                        typeof value === 'string' ? value : JSON.stringify(value)
+                        typeof value === "string" ? value : JSON.stringify(value)
                     );
                 }
             }
         }
 
         const response = await fetchWithAuth(`${storageBasePath}/upload`, {
-            method: 'POST',
+            method: "POST",
             body: formData
         });
 
         if (!response.ok) {
-            const error = await response.json().catch(() => ({ error: 'Upload failed' }));
-            throw new Error(error.error || 'Upload failed');
+            const error = await response.json().catch(() => ({ error: "Upload failed" }));
+            throw new Error(error.error || "Upload failed");
         }
 
         const result = await response.json();
@@ -127,8 +127,8 @@ export function useBackendStorageSource({
         let filePath = keyOrUrl;
 
         // Handle local:// and s3:// URLs
-        if (filePath && (filePath.startsWith('local://') || filePath.startsWith('s3://'))) {
-            const withoutProtocol = filePath.substring(filePath.indexOf('://') + 3);
+        if (filePath && (filePath.startsWith("local://") || filePath.startsWith("s3://"))) {
+            const withoutProtocol = filePath.substring(filePath.indexOf("://") + 3);
             filePath = withoutProtocol;
         }
 
@@ -137,8 +137,9 @@ export function useBackendStorageSource({
             filePath = `${bucket}/${filePath}`;
         }
 
-        if (!filePath || filePath.trim() === '' || filePath === '/') {
-            return { url: null, fileNotFound: true };
+        if (!filePath || filePath.trim() === "" || filePath === "/") {
+            return { url: null,
+fileNotFound: true };
         }
 
         const response = await fetchWithAuth(`${storageBasePath}/metadata/${filePath}`);
@@ -151,14 +152,14 @@ export function useBackendStorageSource({
         }
 
         if (!response.ok) {
-            const error = await response.json().catch(() => ({ error: 'Failed to get download URL' }));
-            throw new Error(error.error || 'Failed to get download URL');
+            const error = await response.json().catch(() => ({ error: "Failed to get download URL" }));
+            throw new Error(error.error || "Failed to get download URL");
         }
 
         const result = await response.json();
 
         const token = await getAuthToken();
-        const tokenQuery = token ? `?token=${token}` : '';
+        const tokenQuery = token ? `?token=${token}` : "";
 
         // The URL should point to the storage file endpoint
         const downloadConfig: DownloadConfig = {
@@ -182,8 +183,8 @@ export function useBackendStorageSource({
         let filePath = key;
 
         // Handle protocol URLs
-        if (filePath && (filePath.startsWith('local://') || filePath.startsWith('s3://'))) {
-            const withoutProtocol = filePath.substring(filePath.indexOf('://') + 3);
+        if (filePath && (filePath.startsWith("local://") || filePath.startsWith("s3://"))) {
+            const withoutProtocol = filePath.substring(filePath.indexOf("://") + 3);
             filePath = withoutProtocol;
         }
 
@@ -191,7 +192,7 @@ export function useBackendStorageSource({
             filePath = `${bucket}/${filePath}`;
         }
 
-        if (!filePath || filePath.trim() === '' || filePath === '/') {
+        if (!filePath || filePath.trim() === "" || filePath === "/") {
             return null;
         }
 
@@ -202,11 +203,11 @@ export function useBackendStorageSource({
         }
 
         if (!response.ok) {
-            throw new Error('Failed to get file');
+            throw new Error("Failed to get file");
         }
 
         const blob = await response.blob();
-        const fileName = filePath.split('/').pop() || 'file';
+        const fileName = filePath.split("/").pop() || "file";
         return new File([blob], fileName, { type: blob.type });
     }, [fetchWithAuth, storageBasePath]);
 
@@ -220,8 +221,8 @@ export function useBackendStorageSource({
         let filePath = key;
 
         // Handle protocol URLs
-        if (filePath && (filePath.startsWith('local://') || filePath.startsWith('s3://'))) {
-            const withoutProtocol = filePath.substring(filePath.indexOf('://') + 3);
+        if (filePath && (filePath.startsWith("local://") || filePath.startsWith("s3://"))) {
+            const withoutProtocol = filePath.substring(filePath.indexOf("://") + 3);
             filePath = withoutProtocol;
         }
 
@@ -229,17 +230,17 @@ export function useBackendStorageSource({
             filePath = `${bucket}/${filePath}`;
         }
 
-        if (!filePath || filePath.trim() === '' || filePath === '/') {
+        if (!filePath || filePath.trim() === "" || filePath === "/") {
             return;
         }
 
         const response = await fetchWithAuth(`${storageBasePath}/file/${filePath}`, {
-            method: 'DELETE'
+            method: "DELETE"
         });
 
         if (!response.ok && response.status !== 404) {
-            const error = await response.json().catch(() => ({ error: 'Failed to delete file' }));
-            throw new Error(error.error || 'Failed to delete file');
+            const error = await response.json().catch(() => ({ error: "Failed to delete file" }));
+            throw new Error(error.error || "Failed to delete file");
         }
 
         // Clear from cache
@@ -258,18 +259,18 @@ export function useBackendStorageSource({
         }
     ): Promise<StorageListResult> => {
         const params = new URLSearchParams();
-        if (prefix) params.set('prefix', prefix);
-        if (options?.bucket) params.set('bucket', options.bucket);
-        if (options?.maxResults) params.set('maxResults', String(options.maxResults));
-        if (options?.pageToken) params.set('pageToken', options.pageToken);
+        if (prefix) params.set("prefix", prefix);
+        if (options?.bucket) params.set("bucket", options.bucket);
+        if (options?.maxResults) params.set("maxResults", String(options.maxResults));
+        if (options?.pageToken) params.set("pageToken", options.pageToken);
 
         const response = await fetchWithAuth(
             `${storageBasePath}/list?${params.toString()}`
         );
 
         if (!response.ok) {
-            const error = await response.json().catch(() => ({ error: 'Failed to list files' }));
-            throw new Error(error.error || 'Failed to list files');
+            const error = await response.json().catch(() => ({ error: "Failed to list files" }));
+            throw new Error(error.error || "Failed to list files");
         }
 
         const result = await response.json();

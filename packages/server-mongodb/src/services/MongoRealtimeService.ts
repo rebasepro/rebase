@@ -11,7 +11,7 @@ import {
     FilterValues,
     RealtimeProvider,
     CollectionSubscriptionConfig,
-    EntitySubscriptionConfig,
+    EntitySubscriptionConfig
 } from "@rebasepro/types";
 import { MongoEntityService } from "../db/MongoEntityService";
 

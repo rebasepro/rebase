@@ -5,7 +5,7 @@ import {
     generateRefreshToken,
     hashRefreshToken,
     getAccessTokenExpiryMs,
-    getRefreshTokenExpiry,
+    getRefreshTokenExpiry
 } from "../src/auth/jwt";
 
 const STRONG_SECRET = "this-is-a-strong-secret-for-jwt-testing-at-least-32-chars-long";
@@ -13,7 +13,9 @@ const STRONG_SECRET = "this-is-a-strong-secret-for-jwt-testing-at-least-32-chars
 describe("JWT Security Hardening", () => {
 
     beforeEach(() => {
-        configureJwt({ secret: STRONG_SECRET, accessExpiresIn: "1h", refreshExpiresIn: "30d" });
+        configureJwt({ secret: STRONG_SECRET,
+accessExpiresIn: "1h",
+refreshExpiresIn: "30d" });
     });
 
     // ── Secret validation ───────────────────────────────────
@@ -37,7 +39,7 @@ describe("JWT Security Hardening", () => {
 
         it("accepts strong, random secrets", () => {
             expect(() => configureJwt({
-                secret: "aG7x!kL2$mP9#qR5+tU8*wZ0^bD3&fH6",
+                secret: "aG7x!kL2$mP9#qR5+tU8*wZ0^bD3&fH6"
             })).not.toThrow();
         });
     });
@@ -64,7 +66,9 @@ describe("JWT Security Hardening", () => {
 
         it("throws when secret is not configured", () => {
             // Force empty secret
-            Object.defineProperty(require("../src/auth/jwt"), "jwtConfig", { value: { secret: "" }, writable: true });
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            Object.defineProperty(require("../src/auth/jwt"), "jwtConfig", { value: { secret: "" },
+writable: true });
             // This won't work since jwtConfig is module-scoped, but generateAccessToken has its own check
             // We'll test via configureJwt + clearing
         });
@@ -142,27 +146,32 @@ describe("JWT Security Hardening", () => {
     // ── Expiry calculations ─────────────────────────────────
     describe("expiry calculations", () => {
         it("calculates 1h as 3600000ms", () => {
-            configureJwt({ secret: STRONG_SECRET, accessExpiresIn: "1h" });
+            configureJwt({ secret: STRONG_SECRET,
+accessExpiresIn: "1h" });
             expect(getAccessTokenExpiryMs()).toBe(3600000);
         });
 
         it("calculates 30m as 1800000ms", () => {
-            configureJwt({ secret: STRONG_SECRET, accessExpiresIn: "30m" });
+            configureJwt({ secret: STRONG_SECRET,
+accessExpiresIn: "30m" });
             expect(getAccessTokenExpiryMs()).toBe(1800000);
         });
 
         it("calculates 7d correctly", () => {
-            configureJwt({ secret: STRONG_SECRET, accessExpiresIn: "7d" });
+            configureJwt({ secret: STRONG_SECRET,
+accessExpiresIn: "7d" });
             expect(getAccessTokenExpiryMs()).toBe(7 * 24 * 60 * 60 * 1000);
         });
 
         it("defaults to 1h for unparseable duration", () => {
-            configureJwt({ secret: STRONG_SECRET, accessExpiresIn: "invalid" });
+            configureJwt({ secret: STRONG_SECRET,
+accessExpiresIn: "invalid" });
             expect(getAccessTokenExpiryMs()).toBe(3600000);
         });
 
         it("refresh expiry is in the future", () => {
-            configureJwt({ secret: STRONG_SECRET, refreshExpiresIn: "30d" });
+            configureJwt({ secret: STRONG_SECRET,
+refreshExpiresIn: "30d" });
             const expiry = getRefreshTokenExpiry();
             expect(expiry.getTime()).toBeGreaterThan(Date.now());
             // Should be approximately 30 days in the future

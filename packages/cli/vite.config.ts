@@ -4,7 +4,7 @@ import { defineConfig } from "vite";
 
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;
-    
+
     return true;
 };
 
@@ -20,7 +20,7 @@ export default defineConfig(() => ({
                 if (format === "es")
                     return `index.${format}.js`;
                 else if (format === "umd")
-                    return `index.cjs`;
+                    return "index.cjs";
                 throw new Error("Unexpected format");
             }
         },
@@ -42,7 +42,7 @@ export default defineConfig(() => ({
         alias: {
             "@rebasepro/server-core": path.resolve(__dirname, "../server-core/src"),
             "@rebasepro/sdk-generator": path.resolve(__dirname, "../sdk-generator/src"),
-            "@rebasepro/types": path.resolve(__dirname, "../types/src"),
+            "@rebasepro/types": path.resolve(__dirname, "../types/src")
         }
     },
     plugins: []

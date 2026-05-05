@@ -13,7 +13,8 @@ describe("AstSchemaEditor", () => {
     });
 
     afterEach(() => {
-        fs.rmSync(testDir, { recursive: true, force: true });
+        fs.rmSync(testDir, { recursive: true,
+force: true });
     });
 
     it("should merge properties while preserving existing functions when saving a collection", async () => {
@@ -43,7 +44,8 @@ export default productsCollection;
             slug: "products",
             properties: {
                 id: { type: "string" },
-                name: { type: "string", description: "Product name" },
+                name: { type: "string",
+description: "Product name" },
                 category: {
                     type: "reference"
                     // Notice target is dropped since the frontend REST payload wouldn't have it serialized
@@ -55,7 +57,7 @@ export default productsCollection;
 
         const newContent = fs.readFileSync(path.join(testDir, "products.ts"), "utf-8");
         expect(newContent).toContain('name: "Updated Products"');
-        expect(newContent).toContain('target: () => categoriesCollection');
+        expect(newContent).toContain("target: () => categoriesCollection");
         expect(newContent).toContain('description: "Product name"');
     });
 });

@@ -1,12 +1,12 @@
 /**
  * Database Abstraction Interfaces
- * 
+ *
  * These interfaces define the contracts that any database backend must implement
  * to be used with Rebase. This allows for pluggable database backends like
  * PostgreSQL, MongoDB, MySQL, etc.
  */
 
-import { 
+import {
     Entity,
     EntityCollection,
     FilterValues,
@@ -37,7 +37,7 @@ import { PgTransaction } from "drizzle-orm/pg-core";
  * Note: `any` is intentional here — it represents a Drizzle client with
  * a dynamic schema, enabling `db.query[tableName]` access without casts.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 export type DrizzleClient = NodePgDatabase<any> | PgTransaction<any, any, any>;
 
 export type {

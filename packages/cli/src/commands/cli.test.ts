@@ -11,22 +11,22 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock all command modules before importing the CLI
 vi.mock("./init", () => ({
-    createRebaseApp: vi.fn(),
+    createRebaseApp: vi.fn()
 }));
 vi.mock("./generate_sdk", () => ({
-    generateSdkCommand: vi.fn(),
+    generateSdkCommand: vi.fn()
 }));
 vi.mock("./schema", () => ({
-    schemaCommand: vi.fn(),
+    schemaCommand: vi.fn()
 }));
 vi.mock("./db", () => ({
-    dbCommand: vi.fn(),
+    dbCommand: vi.fn()
 }));
 vi.mock("./dev", () => ({
-    devCommand: vi.fn(),
+    devCommand: vi.fn()
 }));
 vi.mock("./auth", () => ({
-    authCommand: vi.fn(),
+    authCommand: vi.fn()
 }));
 
 import { entry } from "../cli";

@@ -8,7 +8,7 @@ import {
     getResolvedPropertyInPath,
     getBracketNotation,
     getPropertiesWithPropertiesOrder,
-    getDefaultPropertiesOrder,
+    getDefaultPropertiesOrder
 } from "../../src/util/property_utils";
 import type { Property, EntityCollection, Properties, MapProperty } from "@rebasepro/types";
 
@@ -17,13 +17,15 @@ import type { Property, EntityCollection, Properties, MapProperty } from "@rebas
 // ---------------------------------------------------------------------------
 describe("isReferenceProperty", () => {
     it("returns true for direct reference property", () => {
-        expect(isReferenceProperty({ type: "reference", path: "col" } as Property)).toBe(true);
+        expect(isReferenceProperty({ type: "reference",
+path: "col" } as Property)).toBe(true);
     });
 
     it("returns true for array of references", () => {
         const prop = {
             type: "array",
-            of: { type: "reference", path: "col" }
+            of: { type: "reference",
+path: "col" }
         } as Property;
         expect(isReferenceProperty(prop)).toBe(true);
     });
@@ -95,8 +97,10 @@ describe("isRelationProperty", () => {
 // getPropertyInPath
 // ---------------------------------------------------------------------------
 describe("getPropertyInPath", () => {
-    const nameProperty: Property = { type: "string", name: "Name" } as Property;
-    const streetProperty: Property = { type: "string", name: "Street" } as Property;
+    const nameProperty: Property = { type: "string",
+name: "Name" } as Property;
+    const streetProperty: Property = { type: "string",
+name: "Street" } as Property;
     const addressProperty: MapProperty = {
         type: "map",
         name: "Address",
@@ -105,7 +109,7 @@ describe("getPropertyInPath", () => {
 
     const properties: Properties = {
         name: nameProperty,
-        address: addressProperty,
+        address: addressProperty
     };
 
     it("finds a top-level property", () => {
@@ -129,7 +133,8 @@ describe("getPropertyInPath", () => {
     });
 
     it("handles deeply nested properties", () => {
-        const deepProp: Property = { type: "number", name: "ZIP" } as Property;
+        const deepProp: Property = { type: "number",
+name: "ZIP" } as Property;
         const deepMap: MapProperty = {
             type: "map",
             name: "Location",
@@ -150,15 +155,17 @@ describe("getPropertyInPath", () => {
 // getResolvedPropertyInPath
 // ---------------------------------------------------------------------------
 describe("getResolvedPropertyInPath", () => {
-    const streetProp: Property = { type: "string", name: "Street" } as Property;
+    const streetProp: Property = { type: "string",
+name: "Street" } as Property;
     const addressProp: MapProperty = {
         type: "map",
         properties: { street: streetProp }
     } as MapProperty;
 
     const properties: Record<string, Property> = {
-        title: { type: "string", name: "Title" } as Property,
-        address: addressProp as Property,
+        title: { type: "string",
+name: "Title" } as Property,
+        address: addressProp as Property
     };
 
     it("finds top-level property", () => {
@@ -196,9 +203,13 @@ describe("getBracketNotation", () => {
 // ---------------------------------------------------------------------------
 describe("getPropertiesWithPropertiesOrder", () => {
     const properties: Properties = {
-        title: { type: "string", name: "Title" } as Property,
-        body: { type: "string", name: "Body", multiline: true } as Property,
-        status: { type: "string", name: "Status" } as Property,
+        title: { type: "string",
+name: "Title" } as Property,
+        body: { type: "string",
+name: "Body",
+multiline: true } as Property,
+        status: { type: "string",
+name: "Status" } as Property
     };
 
     it("returns properties in specified order", () => {
@@ -236,17 +247,21 @@ describe("getPropertiesWithPropertiesOrder", () => {
 
     it("recursively orders nested map properties", () => {
         const mapProps: Properties = {
-            outerField: { type: "string", name: "Outer" } as Property,
+            outerField: { type: "string",
+name: "Outer" } as Property,
             nested: {
                 type: "map",
                 name: "Nested",
                 properties: {
-                    a: { type: "string", name: "A" } as Property,
-                    b: { type: "string", name: "B" } as Property,
-                    c: { type: "string", name: "C" } as Property,
+                    a: { type: "string",
+name: "A" } as Property,
+                    b: { type: "string",
+name: "B" } as Property,
+                    c: { type: "string",
+name: "C" } as Property
                 },
                 propertiesOrder: ["c", "a", "b"]
-            } as Property,
+            } as Property
         };
 
         const result = getPropertiesWithPropertiesOrder(mapProps, ["nested", "outerField"]);
@@ -265,7 +280,8 @@ describe("getDefaultPropertiesOrder", () => {
     it("returns explicit propertiesOrder when set", () => {
         const collection = {
             propertiesOrder: ["status", "title"],
-            properties: { title: {}, body: {} },
+            properties: { title: {},
+body: {} }
         } as unknown as EntityCollection;
 
         expect(getDefaultPropertiesOrder(collection)).toEqual(["status", "title"]);
@@ -273,8 +289,9 @@ describe("getDefaultPropertiesOrder", () => {
 
     it("falls back to property keys + additionalFields keys", () => {
         const collection = {
-            properties: { title: {}, body: {} },
-            additionalFields: [{ key: "computed" }],
+            properties: { title: {},
+body: {} },
+            additionalFields: [{ key: "computed" }]
         } as unknown as EntityCollection;
 
         expect(getDefaultPropertiesOrder(collection)).toEqual(["title", "body", "computed"]);
@@ -282,7 +299,8 @@ describe("getDefaultPropertiesOrder", () => {
 
     it("returns only property keys when no additionalFields", () => {
         const collection = {
-            properties: { x: {}, y: {} },
+            properties: { x: {},
+y: {} }
         } as unknown as EntityCollection;
 
         expect(getDefaultPropertiesOrder(collection)).toEqual(["x", "y"]);

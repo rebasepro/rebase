@@ -24,12 +24,12 @@ const CONSUMER_EXTERNALS = [
     "chokidar",
     "fsevents",
     "ws",
-    "ts-morph",
+    "ts-morph"
 ];
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;
     // Inline all @rebasepro/* packages
-    
+
     // Externalize only deps the consumer app explicitly installs
     if (CONSUMER_EXTERNALS.some(ext => id === ext || id.startsWith(ext + "/"))) return true;
     // Externalize Node built-ins
@@ -65,15 +65,15 @@ export default defineConfig(() => ({
     resolve: {
         alias: {
             "@rebasepro/common": path.resolve(__dirname, "../common/src"),
-            "@rebasepro/types": path.resolve(__dirname, "../types/src"),
+            "@rebasepro/types": path.resolve(__dirname, "../types/src")
         }
     },
     plugins: [
         react({
             babel: {
                 plugins: [
-                    ["babel-plugin-react-compiler", ReactCompilerConfig],
-                ],
+                    ["babel-plugin-react-compiler", ReactCompilerConfig]
+                ]
             }
         })
     ]

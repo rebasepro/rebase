@@ -12,11 +12,11 @@ export type {
     DocumentAdmin,
     SchemaAdmin,
     DatabaseAdmin,
-    HealthCheckResult,
+    HealthCheckResult
 } from "../types/backend";
 
 export {
     isSQLAdmin,
     isDocumentAdmin,
-    isSchemaAdmin,
+    isSchemaAdmin
 } from "../types/backend";

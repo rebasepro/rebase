@@ -7,12 +7,12 @@ function evaluateAST<USER extends User, M extends Record<string, unknown>>(sqlSt
 
     // 1. Clean outer parentheses
     let cleanedSQL = sqlString.trim();
-    while (cleanedSQL.startsWith('(') && cleanedSQL.endsWith(')')) {
+    while (cleanedSQL.startsWith("(") && cleanedSQL.endsWith(")")) {
         let openCount = 0;
         let isEnclosing = true;
         for (let i = 0; i < cleanedSQL.length - 1; i++) {
-            if (cleanedSQL[i] === '(') openCount++;
-            else if (cleanedSQL[i] === ')') openCount--;
+            if (cleanedSQL[i] === "(") openCount++;
+            else if (cleanedSQL[i] === ")") openCount--;
             if (openCount === 0) {
                 isEnclosing = false;
                 break;
@@ -32,9 +32,9 @@ function evaluateAST<USER extends User, M extends Record<string, unknown>>(sqlSt
         let openCount = 0;
         let i = 0;
         while (i < str.length) {
-            if (str[i] === '(') openCount++;
-            else if (str[i] === ')') openCount--;
-            
+            if (str[i] === "(") openCount++;
+            else if (str[i] === ")") openCount--;
+
             if (openCount === 0 && str.substring(i).toUpperCase().startsWith(delimiter)) {
                 parts.push(current);
                 current = "";
@@ -69,7 +69,7 @@ function evaluateAST<USER extends User, M extends Record<string, unknown>>(sqlSt
     // Pattern: `string_to_array(auth.roles(), ',') && ARRAY['admin', 'editor']`
     const roleIntersectMatch = cleanedSQL.match(/string_to_array\s*\(\s*auth\.roles\(\)\s*,\s*','\s*\)\s*&&\s*ARRAY\[(.*?)\]/i);
     if (roleIntersectMatch && roleIntersectMatch[1]) {
-        const requiredRoles = roleIntersectMatch[1].split(',').map(r => r.trim().replace(/'/g, ''));
+        const requiredRoles = roleIntersectMatch[1].split(",").map(r => r.trim().replace(/'/g, ""));
         const userRoles = auth.user?.roles || [];
         return requiredRoles.some(r => userRoles.includes(r));
     }
@@ -77,14 +77,14 @@ function evaluateAST<USER extends User, M extends Record<string, unknown>>(sqlSt
     // Pattern: `string_to_array(auth.roles(), ',') @> ARRAY['admin']`
     const roleContainMatch = cleanedSQL.match(/string_to_array\s*\(\s*auth\.roles\(\)\s*,\s*','\s*\)\s*@>\s*ARRAY\[(.*?)\]/i);
     if (roleContainMatch && roleContainMatch[1]) {
-        const requiredRoles = roleContainMatch[1].split(',').map(r => r.trim().replace(/'/g, ''));
+        const requiredRoles = roleContainMatch[1].split(",").map(r => r.trim().replace(/'/g, ""));
         const userRoles = auth.user?.roles || [];
         return requiredRoles.every(r => userRoles.includes(r));
     }
 
     // 5. Existing ID patterns
-    const pattern1 = new RegExp(`^\\{?([a-zA-Z0-9_]+)\\}?\\s*=\\s*(?:current_setting\\s*\\(\\s*'app\\.user_id'\\s*\\)|auth\\.uid\\(\\))`);
-    const pattern2 = new RegExp(`^(?:current_setting\\s*\\(\\s*'app\\.user_id'\\s*\\)|auth\\.uid\\(\\))\\s*=\\s*\\{?([a-zA-Z0-9_]+)\\}?`);
+    const pattern1 = new RegExp("^\\{?([a-zA-Z0-9_]+)\\}?\\s*=\\s*(?:current_setting\\s*\\(\\s*'app\\.user_id'\\s*\\)|auth\\.uid\\(\\))");
+    const pattern2 = new RegExp("^(?:current_setting\\s*\\(\\s*'app\\.user_id'\\s*\\)|auth\\.uid\\(\\))\\s*=\\s*\\{?([a-zA-Z0-9_]+)\\}?");
 
     const match1 = cleanedSQL.match(pattern1);
     if (match1 && match1[1]) {

@@ -16,8 +16,8 @@ export function useBuildModeController(): ModeController {
     }, []);
 
     const [mode, setMode] = useState<"light" | "dark">(() => {
-        const prefersDarkModeStorage = typeof window !== "undefined" && localStorage.getItem("prefers-dark-mode") != null 
-            ? localStorage.getItem("prefers-dark-mode") === "true" 
+        const prefersDarkModeStorage = typeof window !== "undefined" && localStorage.getItem("prefers-dark-mode") != null
+            ? localStorage.getItem("prefers-dark-mode") === "true"
             : null;
         const prefersDarkMode = prefersDarkModeStorage ?? prefersDarkModeQuery();
         return prefersDarkMode ? "dark" : "light";
@@ -31,7 +31,7 @@ export function useBuildModeController(): ModeController {
                 setDocumentMode(e.matches ? "dark" : "light");
             }
         };
-        
+
         // Initial setup
         setDocumentMode(mode);
 

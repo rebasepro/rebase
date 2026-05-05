@@ -4,6 +4,9 @@ import tseslint from "typescript-eslint";
 
 /** @type {import("eslint").Linter.Config[]} */
 export default [
+    {
+        ignores: ["**/node_modules/**", "**/dist/**", "**/build/**", "**/.next/**"]
+    },
     pluginJs.configs.recommended,
     ...tseslint.configs.recommended,
     pluginReact.configs.flat.recommended,
@@ -14,21 +17,21 @@ export default [
         languageOptions: {
             parserOptions: {
                 ecmaFeatures: {
-                    jsx: true,
-                },
+                    jsx: true
+                }
             },
             globals: {
                 // ...globals.browser,
             },
 
             ecmaVersion: "latest",
-            sourceType: "module",
+            sourceType: "module"
         },
 
         settings: {
             react: {
-                version: "18",
-            },
+                version: "detect"
+            }
         },
 
         rules: {
@@ -72,7 +75,7 @@ export default [
             indent: [0, 4],
 
             quotes: [1, "double", {
-                avoidEscape: true,
+                avoidEscape: true
             }],
 
             // "react-hooks/rules-of-hooks": "error",
@@ -85,7 +88,7 @@ export default [
             "@typescript-eslint/no-empty-function": "warn",
             "@typescript-eslint/no-inferrable-types": "warn",
             "@typescript-eslint/ban-ts-comment": "warn",
-            "@typescript-eslint/no-explicit-any": "off",
+            "@typescript-eslint/no-explicit-any": "off"
         }
     },
     {
@@ -97,6 +100,12 @@ export default [
         ],
         rules: {
             "@typescript-eslint/no-explicit-any": "error"
+        }
+    },
+    {
+        files: ["**/*.cjs", "**/*.js"],
+        rules: {
+            "@typescript-eslint/no-require-imports": "off"
         }
     }
 ];

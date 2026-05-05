@@ -9,14 +9,14 @@ export function buildCollectionId(idOrPath: string, parentCollectionIds?: string
 }
 
 
-
 export const docsToCollectionTree = (docs: DocumentSnapshot[]): EntityCollection[] => {
 
     const collectionsMap = docs.map((doc) => {
         const id: string = doc.id;
         const collection = docToCollection(doc);
         return { [id]: collection };
-    }).reduce((a, b) => ({ ...a, ...b }), {});
+    }).reduce((a, b) => ({ ...a,
+...b }), {});
 
     const orderedKeys = Object.keys(collectionsMap).sort((a, b) => b.split(COLLECTION_PATH_SEPARATOR).length - a.split(COLLECTION_PATH_SEPARATOR).length);
 
@@ -52,7 +52,6 @@ export const docToCollection = (doc: DocumentSnapshot): EntityCollection => {
 }
 
 
-
 /**
  * Converts enum values from object format to array format.
  * Firestore doesn't preserve object key order, so we must use arrays.
@@ -65,7 +64,7 @@ export const docToCollection = (doc: DocumentSnapshot): EntityCollection => {
  */
 function normalizeEnumValuesToArray(
     enumValues: unknown,
-    sortObjectFormat: boolean = false
+    sortObjectFormat = false
 ): unknown[] {
     if (Array.isArray(enumValues)) {
         // Already an array - preserve order! This order is intentional
@@ -103,7 +102,7 @@ function normalizeEnumValuesToArray(
  */
 function normalizePropertiesEnumValues(
     properties: Properties,
-    sortObjectFormat: boolean = false
+    sortObjectFormat = false
 ): Properties {
     const result: Properties = {};
     Object.entries(properties).forEach(([key, property]) => {

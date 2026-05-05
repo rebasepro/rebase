@@ -39,7 +39,7 @@ export class RebaseApiServer {
 
         this.app = new Hono<HonoEnv>();
         this.router = new Hono<HonoEnv>();
-        
+
         this.setupMiddleware();
     }
 
@@ -57,7 +57,7 @@ export class RebaseApiServer {
         server.setupRoutes();
         // Since we mount routes directly to router, we can let consumer attach it
         server.app.route("/", server.router);
-        
+
         // Hono global error handler on the root app
         server.app.onError(errorHandler);
         server.router.onError(errorHandler);
@@ -119,7 +119,7 @@ export class RebaseApiServer {
                 properties: Object.keys(col.properties),
                 relations: (col as EntityCollection & { relations?: Relation[] }).relations?.map((r: Relation) => ({
                     relationName: r.relationName,
-                    target: typeof r.target === 'function' ? r.target().slug : r.target,
+                    target: typeof r.target === "function" ? r.target().slug : r.target,
                     cardinality: r.cardinality,
                     direction: r.direction
                 })) || []
@@ -237,7 +237,7 @@ export class RebaseApiServer {
     /**
      * Start the server (standalone mode) via @hono/node-server
      */
-    listen(port: number = 3000, callback?: () => void): void {
+    listen(port = 3000, callback?: () => void): void {
         serve({
             fetch: this.app.fetch,
             port

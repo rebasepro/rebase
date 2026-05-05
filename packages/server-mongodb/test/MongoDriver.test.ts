@@ -1,6 +1,6 @@
 /**
  * MongoDataDriver Tests
- * 
+ *
  * Tests for the DataDriver implementation that integrates with Rebase.
  */
 
@@ -110,9 +110,12 @@ describe("MongoDriver", () => {
     describe("fetchCollection", () => {
         beforeEach(async () => {
             await db.collection("users").insertMany([
-                { name: "Alice", age: 25 },
-                { name: "Bob", age: 30 },
-                { name: "Charlie", age: 35 }
+                { name: "Alice",
+age: 25 },
+                { name: "Bob",
+age: 30 },
+                { name: "Charlie",
+age: 35 }
             ]);
         });
 
@@ -152,7 +155,8 @@ describe("MongoDriver", () => {
         it("should create a new entity", async () => {
             const entity = await delegate.saveEntity({
                 path: "users",
-                values: { name: "New User", email: "new@example.com" },
+                values: { name: "New User",
+email: "new@example.com" },
                 collection: mockCollection,
                 status: "new"
             });
@@ -173,7 +177,8 @@ describe("MongoDriver", () => {
             // Create first
             const created = await delegate.saveEntity({
                 path: "users",
-                values: { name: "Original", email: "test@example.com" },
+                values: { name: "Original",
+email: "test@example.com" },
                 collection: mockCollection,
                 status: "new"
             });
@@ -182,7 +187,8 @@ describe("MongoDriver", () => {
             const updated = await delegate.saveEntity({
                 path: "users",
                 entityId: created.id,
-                values: { name: "Updated", email: "test@example.com" },
+                values: { name: "Updated",
+email: "test@example.com" },
                 collection: mockCollection,
                 status: "existing"
             });

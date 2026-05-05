@@ -1,5 +1,5 @@
 import type { AppView, AppViewsBuilder, EffectiveRoleController, EntityCollection, RebasePlugin } from "@rebasepro/types";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { deepEqual as equal } from "fast-equals";
 
 import { AuthController, RebaseData, User } from "@rebasepro/types";
@@ -7,8 +7,10 @@ import { UserManagementDelegate } from "@rebasepro/types";
 
 import { resolveAppViews } from "./useNavigationResolution";
 import { NAVIGATION_ADMIN_GROUP_NAME } from "./utils";
-import { UsersView } from "../../components/admin/UsersView";
-import { RolesView } from "../../components/admin/RolesView";
+
+// Lazy-load admin views — only rendered when navigation reaches /users or /roles
+const UsersView = lazy(() => import("../../components/admin/UsersView").then(m => ({ default: m.UsersView })));
+const RolesView = lazy(() => import("../../components/admin/RolesView").then(m => ({ default: m.RolesView })));
 
 export type UseResolvedViewsProps<USER extends User> = {
     authController: AuthController<USER>;
@@ -97,11 +99,11 @@ export function useResolvedViews<USER extends User>(
 
     // Memoize JSX elements for injected admin views to ensure stable references.
     const usersViewElement = useMemo(() =>
-        userManagement ? <UsersView userManagement={userManagement as unknown as UserManagementDelegate<User>}/> : null,
+        userManagement ? <Suspense fallback={null}><UsersView userManagement={userManagement as unknown as UserManagementDelegate<User>}/></Suspense> : null,
         [userManagement]
     );
     const rolesViewElement = useMemo(() =>
-        userManagement?.roles ? <RolesView userManagement={userManagement as unknown as UserManagementDelegate<User>}/> : null,
+        userManagement?.roles ? <Suspense fallback={null}><RolesView userManagement={userManagement as unknown as UserManagementDelegate<User>}/></Suspense> : null,
         [userManagement]
     );
 

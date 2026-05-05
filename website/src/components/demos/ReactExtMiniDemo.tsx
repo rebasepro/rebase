@@ -22,13 +22,13 @@ export function ReactExtMiniDemo() {
         <div className="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex pointer-events-none select-none">
             {/* Editor Side */}
             <div className="w-1/2 border-r border-surface-800/60 bg-[#161618] p-3 font-mono text-[9px] flex flex-col gap-1.5 justify-center relative">
-                <div className="text-pink-400 flex"><span className="text-surface-500 mr-1">1</span><span>export</span> <span className="text-blue-400 ml-1">function</span> <span className="text-yellow-200 ml-1">Custom()</span> {'{'}</div>
+                <div className="text-pink-400 flex"><span className="text-surface-500 mr-1">1</span><span>export</span> <span className="text-blue-400 ml-1">function</span> <span className="text-yellow-200 ml-1">Custom()</span> {"{"}</div>
                 <div className="text-surface-300 flex"><span className="text-surface-500 mr-1">2</span>&nbsp;&nbsp;<span className="text-pink-400">return</span> (</div>
-                <div className="text-surface-300 flex"><span className="text-surface-500 mr-1">3</span>&nbsp;&nbsp;&nbsp;&nbsp;&lt;<span className="text-green-400">Button</span> <span className="text-blue-300">variant</span>=<span className="text-orange-300">"new"</span>&gt;</div>
+                <div className="text-surface-300 flex"><span className="text-surface-500 mr-1">3</span>&nbsp;&nbsp;&nbsp;&nbsp;&lt;<span className="text-green-400">Button</span> <span className="text-blue-300">variant</span>=<span className="text-orange-300">&quot;new&quot;</span>&gt;</div>
                 <div className="text-surface-300 flex"><span className="text-surface-500 mr-1">4</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Hello Rebase</div>
                 <div className="text-surface-300 flex"><span className="text-surface-500 mr-1">5</span>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/<span className="text-green-400">Button</span>&gt;</div>
                 <div className="text-surface-300 flex"><span className="text-surface-500 mr-1">6</span>&nbsp;&nbsp;);</div>
-                <div className="text-surface-300 flex"><span className="text-surface-500 mr-1">7</span>{'}'}</div>
+                <div className="text-surface-300 flex"><span className="text-surface-500 mr-1">7</span>{"}"}</div>
 
                 {/* Compilation sweeping laser effect */}
                 {isCompiled && (
@@ -38,7 +38,7 @@ export function ReactExtMiniDemo() {
             {/* Preview Side */}
             <div className="w-1/2 bg-surface-900/30 flex items-center justify-center relative overflow-hidden">
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-500/10 via-transparent to-transparent opacity-50"></div>
-                
+
                 <div className="relative">
                     {!isCompiled ? (
                         <div className="w-8 h-8 rounded-lg bg-surface-800 border border-surface-700/50 flex items-center justify-center opacity-50 shadow-sm transition-all duration-300">

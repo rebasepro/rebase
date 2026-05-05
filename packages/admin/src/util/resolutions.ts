@@ -1,7 +1,8 @@
-import React from "react";
+import React, { lazy } from "react";
 import type { EntityCustomView, EntityCollection } from "@rebasepro/types";
 import type { CustomizationController, EntityAction } from "@rebasepro/types";
-import { EntityHistoryView } from "../components/history";
+// Lazy-load: only resolved when History tab is visited
+const EntityHistoryView = lazy(() => import("../components/history").then(m => ({ default: m.EntityHistoryView })));
 import { HistoryIcon } from "@rebasepro/ui";
 
 /**

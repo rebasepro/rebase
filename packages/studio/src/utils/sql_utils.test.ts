@@ -10,44 +10,72 @@ const mockSchemas: Record<string, TableInfo[]> = {
             schemaName: "public",
             tableName: "users",
             columns: [
-                { name: "id", dataType: "integer", isPrimaryKey: true },
-                { name: "email", dataType: "text", isPrimaryKey: false },
-                { name: "created_at", dataType: "timestamp", isPrimaryKey: false }
+                { name: "id",
+dataType: "integer",
+isPrimaryKey: true },
+                { name: "email",
+dataType: "text",
+isPrimaryKey: false },
+                { name: "created_at",
+dataType: "timestamp",
+isPrimaryKey: false }
             ]
         },
         {
             schemaName: "public",
             tableName: "roles",
             columns: [
-                { name: "id", dataType: "integer", isPrimaryKey: true },
-                { name: "role_name", dataType: "text", isPrimaryKey: false },
-                { name: "created_at", dataType: "timestamp", isPrimaryKey: false }
+                { name: "id",
+dataType: "integer",
+isPrimaryKey: true },
+                { name: "role_name",
+dataType: "text",
+isPrimaryKey: false },
+                { name: "created_at",
+dataType: "timestamp",
+isPrimaryKey: false }
             ]
         },
         {
             schemaName: "public",
             tableName: "settings", // No primary key
             columns: [
-                { name: "key", dataType: "text", isPrimaryKey: false },
-                { name: "value", dataType: "text", isPrimaryKey: false }
+                { name: "key",
+dataType: "text",
+isPrimaryKey: false },
+                { name: "value",
+dataType: "text",
+isPrimaryKey: false }
             ]
         },
         {
             schemaName: "public",
             tableName: "blog_posts",
             columns: [
-                { name: "id", dataType: "integer", isPrimaryKey: true },
-                { name: "title", dataType: "text", isPrimaryKey: false },
-                { name: "author_id", dataType: "integer", isPrimaryKey: false }
+                { name: "id",
+dataType: "integer",
+isPrimaryKey: true },
+                { name: "title",
+dataType: "text",
+isPrimaryKey: false },
+                { name: "author_id",
+dataType: "integer",
+isPrimaryKey: false }
             ]
         },
         {
             schemaName: "public",
             tableName: "order_items", // Composite PK
             columns: [
-                { name: "order_id", dataType: "integer", isPrimaryKey: true },
-                { name: "item_id", dataType: "integer", isPrimaryKey: true },
-                { name: "quantity", dataType: "integer", isPrimaryKey: false }
+                { name: "order_id",
+dataType: "integer",
+isPrimaryKey: true },
+                { name: "item_id",
+dataType: "integer",
+isPrimaryKey: true },
+                { name: "quantity",
+dataType: "integer",
+isPrimaryKey: false }
             ]
         }
     ]
@@ -73,11 +101,11 @@ const mockCollections: EntityCollection[] = [
         properties: {}
     } as EntityCollection,
     {
-        slug: "blog-entries",   // slug with hyphen, no table → falls back to snake_case "blog_entries"
+        slug: "blog-entries", // slug with hyphen, no table → falls back to snake_case "blog_entries"
         name: "Blog Entries",
         table: "",
         properties: {}
-    } as EntityCollection,
+    } as EntityCollection
 ];
 
 describe("determineTableAndPK", () => {
@@ -85,36 +113,42 @@ describe("determineTableAndPK", () => {
         const sql = "SELECT * FROM users";
         const result = determineTableAndPK(sql, "email", mockSchemas);
         expect(result.tableName).toBe("users");
-        expect(result.primaryKeys).toEqual([{ dbColumn: "id", resultColumn: "id" }]);
+        expect(result.primaryKeys).toEqual([{ dbColumn: "id",
+resultColumn: "id" }]);
     });
 
     it("resolves aliased FROM", () => {
         const sql = "SELECT u.email FROM users u";
         const result = determineTableAndPK(sql, "email", mockSchemas);
         expect(result.tableName).toBe("users");
-        expect(result.primaryKeys).toEqual([{ dbColumn: "id", resultColumn: "id" }]);
+        expect(result.primaryKeys).toEqual([{ dbColumn: "id",
+resultColumn: "id" }]);
     });
 
     it("resolves simple unambiguous JOIN", () => {
         const sql = "SELECT * FROM users u JOIN roles r ON u.role_id = r.id";
         const result = determineTableAndPK(sql, "email", mockSchemas);
         expect(result.tableName).toBe("users");
-        expect(result.primaryKeys).toEqual([{ dbColumn: "id", resultColumn: "id" }]);
+        expect(result.primaryKeys).toEqual([{ dbColumn: "id",
+resultColumn: "id" }]);
 
         const result2 = determineTableAndPK(sql, "role_name", mockSchemas);
         expect(result2.tableName).toBe("roles");
-        expect(result2.primaryKeys).toEqual([{ dbColumn: "id", resultColumn: "id" }]);
+        expect(result2.primaryKeys).toEqual([{ dbColumn: "id",
+resultColumn: "id" }]);
     });
 
     it("resolves aliased PK columns in JOINs", () => {
         const sql = "SELECT u.id AS user_id, u.email, r.id AS role_id, r.role_name FROM users u JOIN roles r ON u.role_id = r.id";
         const result = determineTableAndPK(sql, "email", mockSchemas);
         expect(result.tableName).toBe("users");
-        expect(result.primaryKeys).toEqual([{ dbColumn: "id", resultColumn: "user_id" }]);
+        expect(result.primaryKeys).toEqual([{ dbColumn: "id",
+resultColumn: "user_id" }]);
 
         const result2 = determineTableAndPK(sql, "role_name", mockSchemas);
         expect(result2.tableName).toBe("roles");
-        expect(result2.primaryKeys).toEqual([{ dbColumn: "id", resultColumn: "role_id" }]);
+        expect(result2.primaryKeys).toEqual([{ dbColumn: "id",
+resultColumn: "role_id" }]);
     });
 
     it("resolves aliased edit columns back to DB names", () => {
@@ -148,8 +182,10 @@ describe("determineTableAndPK", () => {
         expect(result.tableName).toBe("order_items");
         expect(result.primaryKeys).toHaveLength(2);
         expect(result.primaryKeys).toEqual([
-            { dbColumn: "order_id", resultColumn: "order_id" },
-            { dbColumn: "item_id", resultColumn: "item_id" }
+            { dbColumn: "order_id",
+resultColumn: "order_id" },
+            { dbColumn: "item_id",
+resultColumn: "item_id" }
         ]);
     });
 });
@@ -157,12 +193,14 @@ describe("determineTableAndPK", () => {
 describe("extractTablesFromQuery", () => {
     it("extracts a single table", () => {
         const tables = extractTablesFromQuery("SELECT * FROM users");
-        expect(tables).toEqual([{ name: "users", alias: undefined }]);
+        expect(tables).toEqual([{ name: "users",
+alias: undefined }]);
     });
 
     it("extracts aliased tables", () => {
         const tables = extractTablesFromQuery("SELECT u.email FROM users u");
-        expect(tables).toEqual([{ name: "users", alias: "u" }]);
+        expect(tables).toEqual([{ name: "users",
+alias: "u" }]);
     });
 
     it("extracts multiple tables from JOINs", () => {

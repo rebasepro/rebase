@@ -54,10 +54,13 @@ export function StringNumberFilterField({
         ? ["array-contains"]
         : ["==", "!=", ">", "<", ">=", "<=", "is-null"];
 
-    if (enumValues)
-        isArray
-            ? possibleOperations.push("array-contains-any")
-            : possibleOperations.push("in", "not-in");
+    if (enumValues) {
+        if (isArray) {
+            possibleOperations.push("array-contains-any");
+        } else {
+            possibleOperations.push("in", "not-in");
+        }
+    }
 
     const [fieldOperation, fieldValue] = value || [possibleOperations[0], undefined];
     const [operation, setOperation] = useState<VirtualTableWhereFilterOp | "is-null">(fieldOperation === "==" && fieldValue === null ? "is-null" : fieldOperation);

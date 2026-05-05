@@ -8,5 +8,5 @@ const docs = defineCollection({
 });
 
 export const collections = {
-	docs,
+	docs
 };

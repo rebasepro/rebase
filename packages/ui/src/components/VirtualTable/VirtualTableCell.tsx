@@ -4,7 +4,7 @@ import { deepEqual as equal } from "fast-equals"
 
 import { CellRendererParams, VirtualTableColumn } from "./VirtualTableProps";
 
-type VirtualTableCellProps<T extends any> = {
+type VirtualTableCellProps<T> = {
     dataKey: string;
     column: VirtualTableColumn;
     columns: VirtualTableColumn[];
@@ -20,6 +20,7 @@ type VirtualTableCellProps<T extends any> = {
     isDragging?: boolean;
     isDraggable?: boolean;
     frozen?: boolean;
+    extraData?: any;
 };
 
 export const VirtualTableCell = React.memo<VirtualTableCellProps<any>>(
@@ -39,7 +40,8 @@ export const VirtualTableCell = React.memo<VirtualTableCellProps<any>>(
                 sortableAttributes: props.sortableAttributes,
                 isDragging: props.isDragging,
                 isDraggable: props.isDraggable,
-                frozen: props.frozen
+                frozen: props.frozen,
+                extraData: props.extraData
             } as CellRendererParams<T>
         ) : null;
     },
@@ -51,6 +53,7 @@ export const VirtualTableCell = React.memo<VirtualTableCellProps<any>>(
             a.columnIndex === b.columnIndex &&
             a.isDragging === b.isDragging &&
             a.isDraggable === b.isDraggable &&
-            a.frozen === b.frozen
+            a.frozen === b.frozen &&
+            equal(a.extraData, b.extraData)
     }
 );

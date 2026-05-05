@@ -5,7 +5,7 @@ import { User } from "@rebasepro/types";
  * Component to render a single user with name and email
  */
 export function UserDisplay({
-    user,
+    user
 }: { user: User | null }) {
     if (!user) {
         return <span className={cls("italic", "text-text-disabled dark:text-text-disabled-dark", "text-sm")}>Not set</span>;

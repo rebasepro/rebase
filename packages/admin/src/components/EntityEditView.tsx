@@ -1,7 +1,7 @@
 import type { EntityCollection, EntityCustomViewParams } from "@rebasepro/types";
 import type { FormContext } from "../types/fields";
 import type { PluginFormActionProps } from "@rebasepro/types";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Entity, EntityStatus } from "@rebasepro/types";
 import { PluginProviderStack } from "@rebasepro/core";
 
@@ -29,7 +29,8 @@ import { EntityForm } from "../form";
 import type { EntityFormProps, OnUpdateParams } from "../types/components/EntityFormProps";
 import { EntityEditViewFormActions } from "./EntityEditViewFormActions";
 import { EntityJsonPreview } from "../components/EntityJsonPreview";
-import { EntityHistoryView } from "../components/history";
+// Lazy-load history view — only loaded when user clicks the History tab
+const EntityHistoryView = lazy(() => import("../components/history").then(m => ({ default: m.EntityHistoryView })));
 import { createFormexStub, getEntityFromCache } from "@rebasepro/core";
 import { usePermissions } from "@rebasepro/core";
 import { useUrlController } from "../index";
@@ -302,12 +303,14 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
         key={"history_view"}
         role="tabpanel">
         <ErrorBoundary>
-            <EntityHistoryView
-                collection={collection}
-                entity={usedEntity}
-                formContext={formContext as FormContext<Record<string, unknown>>}
-                modifiedValues={formContext?.values ?? usedEntity?.values}
-            />
+            <Suspense fallback={<CircularProgressCenter/>}>
+                <EntityHistoryView
+                    collection={collection}
+                    entity={usedEntity}
+                    formContext={formContext as FormContext<Record<string, unknown>>}
+                    modifiedValues={formContext?.values ?? usedEntity?.values}
+                />
+            </Suspense>
         </ErrorBoundary>
     </div> : null;
 
@@ -488,21 +491,21 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
 
             {fullScreenButton}
 
-            {subcollectionContextTitle && (
-                <Typography
-                    variant="label"
-                    className="truncate ml-1 text-surface-600 dark:text-surface-400"
-                >
-                    {subcollectionContextTitle}
-                </Typography>
-            )}
-
             {barActions?.({
                 path,
                 entityId,
                 values: formContext?.values ?? usedEntity?.values ?? {},
                 status
             })}
+
+            {subcollectionContextTitle && (
+                <Typography
+                    variant="label"
+                    className="truncate ml-2 text-surface-600 dark:text-surface-400"
+                >
+                    {subcollectionContextTitle}
+                </Typography>
+            )}
 
             {pluginActionsTop}
 

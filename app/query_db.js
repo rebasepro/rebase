@@ -1,6 +1,6 @@
-import { Client } from 'pg';
+import { Client } from "pg";
 const client = new Client({
-  connectionString: 'postgresql://postgres:A%3FCl8L%5DpUHiO%3A%5COT@34.22.208.81:5432/firecms',
+  connectionString: "postgresql://postgres:A%3FCl8L%5DpUHiO%3A%5COT@34.22.208.81:5432/firecms"
 });
 client.connect().then(async () => {
   let hasData = false;

@@ -74,8 +74,8 @@ export function listenWithPortRetry(
         function tryNext(index: number) {
             if (index >= portsToTry.length) {
                 reject(new Error(
-                    `All attempted ports are in use. ` +
-                    `Stop other Rebase instances or specify a different port with --port.`
+                    "All attempted ports are in use. " +
+                    "Stop other Rebase instances or specify a different port with --port."
                 ));
                 return;
             }
@@ -167,7 +167,7 @@ function writeStateFile(projectRoot: string, port: number): void {
             port,
             baseUrl: `http://localhost:${port}`,
             pid: process.pid,
-            startedAt: new Date().toISOString(),
+            startedAt: new Date().toISOString()
         };
         fs.writeFileSync(stateFile, JSON.stringify(state, null, 2), "utf-8");
     } catch {

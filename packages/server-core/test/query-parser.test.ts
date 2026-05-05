@@ -39,7 +39,8 @@ describe("parseQueryOptions — pagination", () => {
     });
 
     it("calculates offset from page number", () => {
-        const result = parseQueryOptions({ page: "3", limit: "10" });
+        const result = parseQueryOptions({ page: "3",
+limit: "10" });
         expect(result.offset).toBe(20); // (3-1) * 10
     });
 
@@ -134,7 +135,7 @@ describe("parseQueryOptions — PostgREST filters", () => {
             limit: "10",
             offset: "0",
             orderBy: "name:asc",
-            status: "eq.active",
+            status: "eq.active"
         });
         // Only status should be in where
         expect(result.where?.status).toEqual(["==", "active"]);
@@ -161,14 +162,14 @@ describe("parseQueryOptions — PostgREST filters", () => {
 describe("parseQueryOptions — legacy JSON where", () => {
     it("parses JSON where string", () => {
         const result = parseQueryOptions({
-            where: JSON.stringify({ status: ["==", "published"] }),
+            where: JSON.stringify({ status: ["==", "published"] })
         });
         expect(result.where?.status).toEqual(["==", "published"]);
     });
 
     it("accepts object where directly", () => {
         const result = parseQueryOptions({
-            where: { status: ["==", "draft"] },
+            where: { status: ["==", "draft"] }
         });
         expect(result.where?.status).toEqual(["==", "draft"]);
     });
@@ -191,19 +192,23 @@ describe("parseQueryOptions — legacy JSON where", () => {
 // ─────────────────────────────────────────────────────────────
 describe("parseQueryOptions — sorting", () => {
     it("parses JSON orderBy", () => {
-        const orderBy = JSON.stringify([{ field: "name", direction: "asc" }]);
+        const orderBy = JSON.stringify([{ field: "name",
+direction: "asc" }]);
         const result = parseQueryOptions({ orderBy });
-        expect(result.orderBy).toEqual([{ field: "name", direction: "asc" }]);
+        expect(result.orderBy).toEqual([{ field: "name",
+direction: "asc" }]);
     });
 
     it("parses simple field:direction format", () => {
         const result = parseQueryOptions({ orderBy: "created_at:desc" });
-        expect(result.orderBy).toEqual([{ field: "created_at", direction: "desc" }]);
+        expect(result.orderBy).toEqual([{ field: "created_at",
+direction: "desc" }]);
     });
 
     it("defaults direction to asc", () => {
         const result = parseQueryOptions({ orderBy: "name" });
-        expect(result.orderBy).toEqual([{ field: "name", direction: "asc" }]);
+        expect(result.orderBy).toEqual([{ field: "name",
+direction: "asc" }]);
     });
 
     it("handles no orderBy", () => {

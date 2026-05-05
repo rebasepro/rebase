@@ -34,12 +34,15 @@ export class RebaseApiError extends Error {
  * Maps a short operator alias to the PostgREST-style short code.
  */
 const OP_MAP: Record<string, string> = {
-    "==": "eq", "!=": "neq",
-    ">": "gt", ">=": "gte",
-    "<": "lt", "<=": "lte",
+    "==": "eq",
+"!=": "neq",
+    ">": "gt",
+">=": "gte",
+    "<": "lt",
+"<=": "lte",
     "not-in": "nin",
     "array-contains": "cs",
-    "array-contains-any": "csa",
+    "array-contains-any": "csa"
 };
 
 /**
@@ -133,13 +136,13 @@ export function createTransport(config: RebaseClientConfig): Transport {
         return {
             "Content-Type": "application/json",
             ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
-            ...((init?.headers as Record<string, string>) || {}),
+            ...((init?.headers as Record<string, string>) || {})
         };
     }
 
     async function request<T = unknown>(path: string, init?: RequestInit): Promise<T> {
         const url = config.baseUrl.replace(/\/$/, "") + apiPath + path;
-        
+
         let activeToken = token;
         if (tokenGetter) {
             try {
@@ -151,7 +154,7 @@ export function createTransport(config: RebaseClientConfig): Transport {
                 // Ignore error, fallback to static token if any
             }
         }
-        
+
         const headers = getHeaders(activeToken, init);
 
         // If passing FormData, we MUST let fetch set the boundary, so remove Content-Type
@@ -159,7 +162,8 @@ export function createTransport(config: RebaseClientConfig): Transport {
             delete (headers as Record<string, string>)["Content-Type"];
         }
 
-        const res = await fetchFn(url, { ...init, headers });
+        const res = await fetchFn(url, { ...init,
+headers });
 
         if (res.status === 204) return undefined as unknown as T;
 
@@ -183,24 +187,25 @@ export function createTransport(config: RebaseClientConfig): Transport {
                         if (fetched !== null && fetched !== undefined) {
                             retryToken = fetched;
                         }
-                    } catch (e) {}
+                    } catch (e) { /* ignore */ }
                 }
                 const retryHeaders = getHeaders(retryToken, init) as Record<string, string>;
-                const retryRes = await fetchFn(url, { ...init, headers: retryHeaders });
+                const retryRes = await fetchFn(url, { ...init,
+headers: retryHeaders });
                 if (retryRes.status === 204) return undefined as unknown as T;
                 const retryText = await retryRes.text().catch(() => "");
                 let retryBody: any = {};
                 if (retryText) {
                     try {
                         retryBody = JSON.parse(retryText, rebaseReviver);
-                    } catch (e) {}
+                    } catch (e) { /* ignore */ }
                 }
                 if (!retryRes.ok) {
                     throw new RebaseApiError(
                         retryRes.status,
                         retryBody?.error?.message || retryBody?.message || retryRes.statusText,
                         retryBody?.error?.code || retryBody?.code,
-                        retryBody?.error?.details || retryBody?.details,
+                        retryBody?.error?.details || retryBody?.details
                     );
                 }
                 return retryBody as T;
@@ -212,7 +217,7 @@ export function createTransport(config: RebaseClientConfig): Transport {
                 res.status,
                 body?.error?.message || body?.message || res.statusText,
                 body?.error?.code || body?.code,
-                body?.error?.details || body?.details,
+                body?.error?.details || body?.details
             );
         }
 
@@ -235,7 +240,7 @@ export function createTransport(config: RebaseClientConfig): Transport {
                     if (fetched !== null && fetched !== undefined) {
                         return fetched;
                     }
-                } catch (e) {}
+                } catch (e) { /* ignore */ }
             }
             return token || null;
         }

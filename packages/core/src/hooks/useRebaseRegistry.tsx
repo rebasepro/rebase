@@ -30,7 +30,7 @@ const RegistryDispatchContext = createContext<RegistryDispatch | undefined>(unde
 const RegistryStateContext = createContext<RegistryState>({
     cmsConfig: null,
     studioConfig: null,
-    authConfig: null,
+    authConfig: null
 });
 
 export function RebaseRegistryProvider({ children }: { children: React.ReactNode }) {
@@ -45,11 +45,13 @@ export function RebaseRegistryProvider({ children }: { children: React.ReactNode
         registerStudio: (config: RebaseStudioConfig) => setStudioConfig(config),
         unregisterStudio: () => setStudioConfig(null),
         registerAuth: (config: RebaseAuthConfig) => setAuthConfig(config),
-        unregisterAuth: () => setAuthConfig(null),
+        unregisterAuth: () => setAuthConfig(null)
     }), []);
 
     const state = useMemo<RegistryState>(() => ({
-        cmsConfig, studioConfig, authConfig,
+        cmsConfig,
+studioConfig,
+authConfig
     }), [cmsConfig, studioConfig, authConfig]);
 
     return (
@@ -71,7 +73,8 @@ export function useRebaseRegistry(): RebaseRegistryController {
     if (!dispatch) {
         throw new Error("useRebaseRegistry must be used within RebaseRegistryProvider");
     }
-    return useMemo(() => ({ ...state, ...dispatch }), [state, dispatch]);
+    return useMemo(() => ({ ...state,
+...dispatch }), [state, dispatch]);
 }
 
 /**

@@ -14,7 +14,7 @@ export const isInteger = (obj: unknown): boolean =>
     String(Math.floor(Number(obj))) === String(obj);
 
 /** @private is the given object a NaN? */
-// eslint-disable-next-line no-self-compare
+
 export const isNaN = (obj: unknown): boolean => obj !== obj;
 
 /**
@@ -122,7 +122,7 @@ export function isPlainObject(obj: unknown): obj is Record<string, unknown> {
 export function mergeDeep<T extends object, U extends object>(
     target: T,
     source: U,
-    ignoreUndefined: boolean = false
+    ignoreUndefined = false
 ): T & U {
     // If target is not a true object (e.g., null, array, primitive), return target itself.
     if (!isObject(target)) {
@@ -264,7 +264,8 @@ export function removeFunctions(o: unknown): unknown {
                     return { [key]: removeFunctions(value) };
                 } else return { [key]: value };
             })
-            .reduce((a, b) => ({ ...a, ...b }), {});
+            .reduce((a, b) => ({ ...a,
+...b }), {});
     }
     return o;
 }

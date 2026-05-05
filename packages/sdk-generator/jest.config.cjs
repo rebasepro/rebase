@@ -8,6 +8,6 @@ module.exports = {
     ],
     moduleNameMapper: {
         "^@rebasepro/types$": "<rootDir>/../types/src",
-        "^@rebasepro/common$": "<rootDir>/../common/src",
+        "^@rebasepro/common$": "<rootDir>/../common/src"
     }
 };

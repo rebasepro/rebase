@@ -161,7 +161,7 @@ export const productsCollection = buildCollection({
             autoValue: "on_create"
         })
 
-    },
+    }
 });
 
 
@@ -322,5 +322,5 @@ export const siteConfig = {
                 slug: "p"
             })]
         })
-    ],
+    ]
 };

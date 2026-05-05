@@ -148,8 +148,8 @@ export function GeneralSettingsForm({
                                 <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800/30 rounded-md text-sm font-medium flex gap-2">
                                     <div className="mt-0.5"><WarningIcon size="smallest"/></div>
                                     <span>
-                                        The table <b>"{(values as any).table}"</b> does not exist in the database schema.
-                                        If you've recently created it, make sure to generate and run your database migrations.
+                                        The table <b>&quot;{(values as any).table}&quot;</b> does not exist in the database schema.
+                                        If you&apos;ve recently created it, make sure to generate and run your database migrations.
                                     </span>
                                 </div>
                             )}
@@ -207,7 +207,8 @@ export function GeneralSettingsForm({
                     </div>
 
                     {/* Advanced Settings */}
-                    {false && <ExpandablePanel
+                    {/* eslint-disable-next-line no-constant-condition */}
+                    {false ? <ExpandablePanel
                         title={<Typography variant="subtitle2">Advanced settings</Typography>}
                         initiallyExpanded={false}
                         className="mt-4"
@@ -231,7 +232,7 @@ export function GeneralSettingsForm({
                             </FieldCaption>
                         </div>
 
-                    </ExpandablePanel>}
+                    </ExpandablePanel> : null}
                 </fieldset>
 
                 <div style={{ height: "52px" }}/>

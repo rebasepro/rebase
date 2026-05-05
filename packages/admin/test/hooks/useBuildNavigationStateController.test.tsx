@@ -17,14 +17,14 @@ describe("useBuildNavigationStateController", () => {
     const mockCollectionRegistryController = {
         collectionRegistryRef: { current: mockCollectionRegistry },
         getCollection: jest.fn(),
-        getCollections: jest.fn(),
+        getCollections: jest.fn()
     } as Partial<CollectionRegistryController> as CollectionRegistryController & { collectionRegistryRef: React.MutableRefObject<CollectionRegistry> };
 
     const mockCmsUrlController = {
         buildUrlCollectionPath: (path: string) => `/c/${path}`,
         buildAppUrlPath: (path: string) => `/${path}`,
         basePath: "/",
-        baseCollectionPath: "/c",
+        baseCollectionPath: "/c"
     } as Partial<UrlController> as UrlController;
 
     it("should aggregate loading states from collections and views", async () => {

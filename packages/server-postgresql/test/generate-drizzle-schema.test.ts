@@ -20,9 +20,10 @@ describe("generateDrizzleSchema", () => {
                 table: "products",
                 name: "Products",
                 properties: {
-                    name: { type: "string", validation: { required: true } },
+                    name: { type: "string",
+validation: { required: true } },
                     price: { type: "number" },
-                    available: { type: "boolean" },
+                    available: { type: "boolean" }
                 }
             }
         ];
@@ -52,7 +53,8 @@ describe("generateDrizzleSchema", () => {
             name: "Posts",
             properties: {
                 title: { type: "string" },
-                author: { type: "relation", relationName: "author" }
+                author: { type: "relation",
+relationName: "author" }
             },
             relations: [
                 {
@@ -69,7 +71,7 @@ describe("generateDrizzleSchema", () => {
         const cleanResult = cleanSchema(result);
 
         expect(cleanResult).toContain("author_id: varchar(\"author_id\").references(() => users.id, { onDelete: \"set null\" })");
-        const expectedRelation = `export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({ "author": one(users, { fields: [posts.author_id], references: [users.id], relationName: \"posts_author_id\" }) }));`;
+        const expectedRelation = "export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({ \"author\": one(users, { fields: [posts.author_id], references: [users.id], relationName: \"posts_author_id\" }) }));";
         expect(cleanResult).toContain(cleanSchema(expectedRelation));
     });
 
@@ -80,7 +82,8 @@ describe("generateDrizzleSchema", () => {
             name: "Posts",
             properties: {
                 title: { type: "string" },
-                tags: { type: "relation", relationName: "tags" }
+                tags: { type: "relation",
+relationName: "tags" }
             },
             relations: [
                 {
@@ -116,11 +119,14 @@ describe("generateDrizzleSchema", () => {
     });
 
     describe("generateDrizzleSchema Column Types", () => {
-        
+
         describe("String Property", () => {
             it("should default to varchar if no columnType or isId is specified", async () => {
                 const collections: EntityCollection[] = [{
-                    slug: "texts", table: "texts", name: "Texts", properties: { t_default: { type: "string" } }
+                    slug: "texts",
+table: "texts",
+name: "Texts",
+properties: { t_default: { type: "string" } }
                 }];
                 const result = await generateSchema(collections);
                 expect(cleanSchema(result)).toContain("t_default: varchar(\"t_default\")");
@@ -132,9 +138,12 @@ describe("generateDrizzleSchema", () => {
                     table: "texts",
                     name: "Texts",
                     properties: {
-                        t_text: { type: "string", columnType: "text" },
-                        t_char: { type: "string", columnType: "char" },
-                        t_varchar: { type: "string", columnType: "varchar" },
+                        t_text: { type: "string",
+columnType: "text" },
+                        t_char: { type: "string",
+columnType: "char" },
+                        t_varchar: { type: "string",
+columnType: "varchar" }
                     }
                 }];
                 const result = await generateSchema(collections);
@@ -147,23 +156,37 @@ describe("generateDrizzleSchema", () => {
 
             it("should prioritize isId='uuid' over default varchar", async () => {
                 const collections: EntityCollection[] = [{
-                    slug: "texts", table: "texts", name: "Texts", properties: { t_uuid: { type: "string", isId: "uuid" } }
+                    slug: "texts",
+table: "texts",
+name: "Texts",
+properties: { t_uuid: { type: "string",
+isId: "uuid" } }
                 }];
                 const result = await generateSchema(collections);
                 expect(cleanSchema(result)).toContain("t_uuid: uuid(\"t_uuid\").primaryKey().defaultRandom()");
             });
-            
+
             it("should combine isId=true with columnType overrides", async () => {
                 const collections: EntityCollection[] = [{
-                    slug: "texts", table: "texts", name: "Texts", properties: { t_id: { type: "string", isId: true, columnType: "text" } }
+                    slug: "texts",
+table: "texts",
+name: "Texts",
+properties: { t_id: { type: "string",
+isId: true,
+columnType: "text" } }
                 }];
                 const result = await generateSchema(collections);
                 expect(cleanSchema(result)).toContain("t_id: text(\"t_id\").primaryKey()");
             });
-            
+
             it("should respect validation.unique along with columnType", async () => {
                 const collections: EntityCollection[] = [{
-                    slug: "texts", table: "texts", name: "Texts", properties: { t_unique: { type: "string", columnType: "char", validation: { unique: true } } }
+                    slug: "texts",
+table: "texts",
+name: "Texts",
+properties: { t_unique: { type: "string",
+columnType: "char",
+validation: { unique: true } } }
                 }];
                 const result = await generateSchema(collections);
                 expect(cleanSchema(result)).toContain("t_unique: char(\"t_unique\").unique()");
@@ -173,7 +196,10 @@ describe("generateDrizzleSchema", () => {
         describe("Number Property", () => {
             it("should default to numeric for normal numbers", async () => {
                 const collections: EntityCollection[] = [{
-                    slug: "nums", table: "nums", name: "Nums", properties: { n_def: { type: "number" } }
+                    slug: "nums",
+table: "nums",
+name: "Nums",
+properties: { n_def: { type: "number" } }
                 }];
                 const result = await generateSchema(collections);
                 expect(cleanSchema(result)).toContain("n_def: numeric(\"n_def\")");
@@ -181,7 +207,11 @@ describe("generateDrizzleSchema", () => {
 
             it("should default to integer if validation.integer is true", async () => {
                 const collections: EntityCollection[] = [{
-                    slug: "nums", table: "nums", name: "Nums", properties: { n_int: { type: "number", validation: { integer: true } } }
+                    slug: "nums",
+table: "nums",
+name: "Nums",
+properties: { n_int: { type: "number",
+validation: { integer: true } } }
                 }];
                 const result = await generateSchema(collections);
                 expect(cleanSchema(result)).toContain("n_int: integer(\"n_int\")");
@@ -189,7 +219,11 @@ describe("generateDrizzleSchema", () => {
 
             it("should default to integer if isId is true", async () => {
                 const collections: EntityCollection[] = [{
-                    slug: "nums", table: "nums", name: "Nums", properties: { n_id: { type: "number", isId: true } }
+                    slug: "nums",
+table: "nums",
+name: "Nums",
+properties: { n_id: { type: "number",
+isId: true } }
                 }];
                 const result = await generateSchema(collections);
                 expect(cleanSchema(result)).toContain("n_id: integer(\"n_id\").primaryKey()");
@@ -201,13 +235,20 @@ describe("generateDrizzleSchema", () => {
                     table: "numbers",
                     name: "Numbers",
                     properties: {
-                        n_int: { type: "number", columnType: "integer" },
-                        n_real: { type: "number", columnType: "real" },
-                        n_dp: { type: "number", columnType: "double precision" },
-                        n_num: { type: "number", columnType: "numeric" },
-                        n_bigint: { type: "number", columnType: "bigint" },
-                        n_serial: { type: "number", columnType: "serial" },
-                        n_bigserial: { type: "number", columnType: "bigserial" },
+                        n_int: { type: "number",
+columnType: "integer" },
+                        n_real: { type: "number",
+columnType: "real" },
+                        n_dp: { type: "number",
+columnType: "double precision" },
+                        n_num: { type: "number",
+columnType: "numeric" },
+                        n_bigint: { type: "number",
+columnType: "bigint" },
+                        n_serial: { type: "number",
+columnType: "serial" },
+                        n_bigserial: { type: "number",
+columnType: "bigserial" }
                     }
                 }];
                 const result = await generateSchema(collections);
@@ -224,15 +265,25 @@ describe("generateDrizzleSchema", () => {
 
             it("should combine isId='increment' with columnType overrides safely", async () => {
                 const collections: EntityCollection[] = [{
-                    slug: "nums", table: "nums", name: "Nums", properties: { n_inc: { type: "number", isId: "increment", columnType: "bigint" } }
+                    slug: "nums",
+table: "nums",
+name: "Nums",
+properties: { n_inc: { type: "number",
+isId: "increment",
+columnType: "bigint" } }
                 }];
                 const result = await generateSchema(collections);
                 expect(cleanSchema(result)).toContain("n_inc: bigint(\"n_inc\").generatedByDefaultAsIdentity().primaryKey()");
             });
-            
+
             it("should combine validation.unique with columnType override", async () => {
                 const collections: EntityCollection[] = [{
-                    slug: "nums", table: "nums", name: "Nums", properties: { n_uniq: { type: "number", columnType: "real", validation: { unique: true } } }
+                    slug: "nums",
+table: "nums",
+name: "Nums",
+properties: { n_uniq: { type: "number",
+columnType: "real",
+validation: { unique: true } } }
                 }];
                 const result = await generateSchema(collections);
                 expect(cleanSchema(result)).toContain("n_uniq: real(\"n_uniq\").unique()");
@@ -242,7 +293,10 @@ describe("generateDrizzleSchema", () => {
         describe("Date Property", () => {
             it("should default to timestamp with timezone", async () => {
                 const collections: EntityCollection[] = [{
-                    slug: "dates", table: "dates", name: "Dates", properties: { d_def: { type: "date" } }
+                    slug: "dates",
+table: "dates",
+name: "Dates",
+properties: { d_def: { type: "date" } }
                 }];
                 const result = await generateSchema(collections);
                 expect(cleanSchema(result)).toContain("d_def: timestamp(\"d_def\", { withTimezone: true, mode: 'string' })");
@@ -254,9 +308,12 @@ describe("generateDrizzleSchema", () => {
                     table: "dates",
                     name: "Dates",
                     properties: {
-                        d_date: { type: "date", columnType: "date" },
-                        d_time: { type: "date", columnType: "time" },
-                        d_ts: { type: "date", columnType: "timestamp" },
+                        d_date: { type: "date",
+columnType: "date" },
+                        d_time: { type: "date",
+columnType: "time" },
+                        d_ts: { type: "date",
+columnType: "timestamp" }
                     }
                 }];
                 const result = await generateSchema(collections);
@@ -267,11 +324,14 @@ describe("generateDrizzleSchema", () => {
                 expect(cleanResult).toContain("d_ts: timestamp(\"d_ts\", { withTimezone: true, mode: 'string' }),");
             });
         });
-        
+
         describe("Map & Array Properties", () => {
             it("should default to jsonb", async () => {
                 const collections: EntityCollection[] = [{
-                    slug: "json_data", table: "json_data", name: "JSON Data", properties: {
+                    slug: "json_data",
+table: "json_data",
+name: "JSON Data",
+properties: {
                         arr_def: { type: "array" },
                         map_def: { type: "map" }
                     }
@@ -287,10 +347,14 @@ describe("generateDrizzleSchema", () => {
                     table: "json_data",
                     name: "JSON Data",
                     properties: {
-                        a_json: { type: "array", columnType: "json" },
-                        a_jsonb: { type: "array", columnType: "jsonb" },
-                        m_json: { type: "map", columnType: "json" },
-                        m_jsonb: { type: "map", columnType: "jsonb" },
+                        a_json: { type: "array",
+columnType: "json" },
+                        a_jsonb: { type: "array",
+columnType: "jsonb" },
+                        m_json: { type: "map",
+columnType: "json" },
+                        m_jsonb: { type: "map",
+columnType: "jsonb" }
                     }
                 }];
                 const result = await generateSchema(collections);
@@ -314,10 +378,12 @@ describe("generateDrizzleSchema", () => {
                 name: "Notes",
                 properties: {
                     title: { type: "string" },
-                    user_id: { type: "string", validation: { required: true } }
+                    user_id: { type: "string",
+validation: { required: true } }
                 },
                 securityRules: [
-                    { operation: "all", ownerField: "user_id" }
+                    { operation: "all",
+ownerField: "user_id" }
                 ]
             }];
 
@@ -341,7 +407,8 @@ describe("generateDrizzleSchema", () => {
                     user_id: { type: "string" }
                 },
                 securityRules: [
-                    { operation: "select", ownerField: "user_id" }
+                    { operation: "select",
+ownerField: "user_id" }
                 ]
             }];
 
@@ -361,7 +428,8 @@ describe("generateDrizzleSchema", () => {
                     user_id: { type: "string" }
                 },
                 securityRules: [
-                    { operation: "insert", ownerField: "user_id" }
+                    { operation: "insert",
+ownerField: "user_id" }
                 ]
             }];
 
@@ -378,7 +446,8 @@ describe("generateDrizzleSchema", () => {
                 name: "Articles",
                 properties: { title: { type: "string" } },
                 securityRules: [
-                    { operation: "select", access: "public" }
+                    { operation: "select",
+access: "public" }
                 ]
             }];
 
@@ -394,7 +463,8 @@ describe("generateDrizzleSchema", () => {
                 name: "Admin Data",
                 properties: { data: { type: "string" } },
                 securityRules: [
-                    { operation: "select", roles: ["admin"] }
+                    { operation: "select",
+roles: ["admin"] }
                 ]
             }];
 
@@ -409,7 +479,8 @@ describe("generateDrizzleSchema", () => {
                 name: "Finance Data",
                 properties: { amount: { type: "number" } },
                 securityRules: [
-                    { operation: "select", roles: ["view"] } // Should not match 'viewer'
+                    { operation: "select",
+roles: ["view"] } // Should not match 'viewer'
                 ]
             }];
 
@@ -426,7 +497,8 @@ describe("generateDrizzleSchema", () => {
                 name: "Multi Role",
                 properties: { data: { type: "string" } },
                 securityRules: [
-                    { operation: "select", roles: ["admin", "editor", "super-admin"] }
+                    { operation: "select",
+roles: ["admin", "editor", "super-admin"] }
                 ]
             }];
 
@@ -441,7 +513,9 @@ describe("generateDrizzleSchema", () => {
                 name: "Reports",
                 properties: { title: { type: "string" } },
                 securityRules: [
-                    { operation: "select", roles: ["admin", "manager"], access: "public" }
+                    { operation: "select",
+roles: ["admin", "manager"],
+access: "public" }
                 ]
             }];
 
@@ -460,7 +534,9 @@ describe("generateDrizzleSchema", () => {
                     user_id: { type: "string" }
                 },
                 securityRules: [
-                    { operation: "select", roles: ["editor"], ownerField: "user_id" }
+                    { operation: "select",
+roles: ["editor"],
+ownerField: "user_id" }
                 ]
             }];
 
@@ -481,7 +557,9 @@ describe("generateDrizzleSchema", () => {
                     is_locked: { type: "boolean" }
                 },
                 securityRules: [
-                    { operation: "update", mode: "restrictive", using: "{is_locked} = false" }
+                    { operation: "update",
+mode: "restrictive",
+using: "{is_locked} = false" }
                 ]
             }];
 
@@ -500,7 +578,8 @@ describe("generateDrizzleSchema", () => {
                     published_at: { type: "date" }
                 },
                 securityRules: [
-                    { operation: "select", using: "{published_at} > now() - interval '30 days'" }
+                    { operation: "select",
+using: "{published_at} > now() - interval '30 days'" }
                 ]
             }];
 
@@ -541,7 +620,9 @@ describe("generateDrizzleSchema", () => {
                 name: "Data",
                 properties: { value: { type: "string" } },
                 securityRules: [
-                    { name: "my_custom_policy", operation: "select", access: "public" }
+                    { name: "my_custom_policy",
+operation: "select",
+access: "public" }
                 ]
             }];
 
@@ -560,10 +641,20 @@ describe("generateDrizzleSchema", () => {
                     is_locked: { type: "boolean" }
                 },
                 securityRules: [
-                    { name: "admin_read", operation: "select", roles: ["admin"], access: "public" },
-                    { name: "owner_read", operation: "select", ownerField: "user_id" },
-                    { name: "owner_write", operation: "insert", ownerField: "user_id" },
-                    { name: "no_locked_update", operation: "update", mode: "restrictive", using: "{is_locked} = false" }
+                    { name: "admin_read",
+operation: "select",
+roles: ["admin"],
+access: "public" },
+                    { name: "owner_read",
+operation: "select",
+ownerField: "user_id" },
+                    { name: "owner_write",
+operation: "insert",
+ownerField: "user_id" },
+                    { name: "no_locked_update",
+operation: "update",
+mode: "restrictive",
+using: "{is_locked} = false" }
                 ]
             }];
 
@@ -586,7 +677,8 @@ describe("generateDrizzleSchema V2 improvements", () => {
             name: "Admin Data",
             properties: { data: { type: "string" } },
             securityRules: [
-                { operation: "select", roles: ["admin"] }
+                { operation: "select",
+roles: ["admin"] }
             ]
         }];
         const result = await generateSchema(collections);
@@ -602,7 +694,9 @@ describe("generateDrizzleSchema V2 improvements", () => {
                 user_id: { type: "string" }
             },
             securityRules: [
-                { name: "owner_rw", operations: ["select", "update"], ownerField: "user_id" }
+                { name: "owner_rw",
+operations: ["select", "update"],
+ownerField: "user_id" }
             ]
         }];
         const result = await generateSchema(collections);
@@ -619,7 +713,8 @@ describe("generateDrizzleSchema V2 improvements", () => {
             name: "Items",
             properties: { data: { type: "string" } },
             securityRules: [
-                { operations: ["select", "delete"], access: "public" }
+                { operations: ["select", "delete"],
+access: "public" }
             ]
         }];
         const result = await generateSchema(collections);
@@ -633,7 +728,9 @@ describe("generateDrizzleSchema V2 improvements", () => {
             name: "Items",
             properties: { data: { type: "string" } },
             securityRules: [
-                { name: "my_policy", operations: ["select"], access: "public" }
+                { name: "my_policy",
+operations: ["select"],
+access: "public" }
             ]
         }];
         const result = await generateSchema(collections);
@@ -651,7 +748,9 @@ describe("generateDrizzleSchema V2 improvements", () => {
                 user_id: { type: "string" }
             },
             securityRules: [
-                { name: "owner", operations: ["select", "insert"], ownerField: "user_id" }
+                { name: "owner",
+operations: ["select", "insert"],
+ownerField: "user_id" }
             ]
         }];
         const result = await generateSchema(collections);
@@ -671,7 +770,10 @@ describe("generateDrizzleSchema V2 improvements", () => {
             name: "Items",
             properties: { data: { type: "string" } },
             securityRules: [
-                { name: "test", operation: "delete", operations: ["select", "insert"], access: "public" }
+                { name: "test",
+operation: "delete",
+operations: ["select", "insert"],
+access: "public" }
             ]
         }];
         const result = await generateSchema(collections);
@@ -687,7 +789,9 @@ describe("generateDrizzleSchema V2 improvements", () => {
             name: "Reports",
             properties: { title: { type: "string" } },
             securityRules: [
-                { operation: "select", roles: ["admin"], using: "true" }
+                { operation: "select",
+roles: ["admin"],
+using: "true" }
             ]
         }];
         const result = await generateSchema(collections);
@@ -701,7 +805,9 @@ describe("generateDrizzleSchema V2 improvements", () => {
             name: "Tenant Data",
             properties: { data: { type: "string" } },
             securityRules: [
-                { operation: "select", access: "public", pgRoles: ["app_role", "service_role"] }
+                { operation: "select",
+access: "public",
+pgRoles: ["app_role", "service_role"] }
             ]
         }];
         const result = await generateSchema(collections);
@@ -715,7 +821,8 @@ describe("generateDrizzleSchema V2 improvements", () => {
             name: "Default Data",
             properties: { data: { type: "string" } },
             securityRules: [
-                { operation: "select", access: "public" }
+                { operation: "select",
+access: "public" }
             ]
         }];
         const result = await generateSchema(collections);
@@ -731,7 +838,8 @@ describe("generateDrizzleSchema Deterministic Policies", () => {
             name: "Test",
             properties: { data: { type: "string" } },
             securityRules: [
-                { operation: "select", roles: ["admin", "user"] }
+                { operation: "select",
+roles: ["admin", "user"] }
             ]
         }];
 
@@ -741,7 +849,8 @@ describe("generateDrizzleSchema Deterministic Policies", () => {
             name: "Test",
             properties: { data: { type: "string" } },
             securityRules: [
-                { operation: "select", roles: ["admin", "user"] }
+                { operation: "select",
+roles: ["admin", "user"] }
             ]
         }];
 
@@ -764,10 +873,10 @@ describe("generateDrizzleSchema Deterministic Policies", () => {
             name: "Test",
             properties: { data: { type: "string" } },
             securityRules: [
-                { 
-                    operation: "select", 
+                {
+                    operation: "select",
                     roles: ["user", "admin", "manager"], // Unsorted roles
-                    pgRoles: ["service_role", "app_role"]  // Unsorted pgRoles
+                    pgRoles: ["service_role", "app_role"] // Unsorted pgRoles
                 }
             ]
         }];
@@ -778,10 +887,10 @@ describe("generateDrizzleSchema Deterministic Policies", () => {
             name: "Test",
             properties: { data: { type: "string" } },
             securityRules: [
-                { 
-                    operation: "select", 
+                {
+                    operation: "select",
                     roles: ["admin", "manager", "user"], // Sorted roles
-                    pgRoles: ["app_role", "service_role"]  // Sorted pgRoles
+                    pgRoles: ["app_role", "service_role"] // Sorted pgRoles
                 }
             ]
         }];
@@ -819,7 +928,8 @@ describe("generateDrizzleSchema ID Generation", () => {
             table: "items",
             name: "Items",
             properties: {
-                custom_id: { type: "string", isId: "uuid" }
+                custom_id: { type: "string",
+isId: "uuid" }
             }
         }];
         const result = await generateSchema(collections);
@@ -834,7 +944,8 @@ describe("generateDrizzleSchema ID Generation", () => {
             table: "tickets",
             name: "Tickets",
             properties: {
-                ticket_id: { type: "number", isId: "increment" }
+                ticket_id: { type: "number",
+isId: "increment" }
             }
         }];
         const result = await generateSchema(collections);
@@ -849,7 +960,8 @@ describe("generateDrizzleSchema ID Generation", () => {
             table: "events",
             name: "Events",
             properties: {
-                event_id: { type: "string", isId: "sql`gen_random_uuid()`" }
+                event_id: { type: "string",
+isId: "sql`gen_random_uuid()`" }
             }
         }];
         const result = await generateSchema(collections);
@@ -864,7 +976,8 @@ describe("generateDrizzleSchema ID Generation", () => {
             table: "users",
             name: "Users",
             properties: {
-                user_name: { type: "string", isId: true }
+                user_name: { type: "string",
+isId: true }
             }
         }];
         const result = await generateSchema(collections);

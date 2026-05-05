@@ -23,7 +23,8 @@ function createMockTransport(): { transport: Transport; mockRequest: jest.Mock<T
         getHeaders: jest.fn().mockReturnValue({}),
         resolveToken: jest.fn().mockResolvedValue(null)
     };
-    return { transport, mockRequest };
+    return { transport,
+mockRequest };
 }
 
 describe("createCollectionClient", () => {
@@ -59,20 +60,36 @@ describe("createCollectionClient", () => {
     describe("find", () => {
         it("calls GET /data/slug with correct query parameters and wraps into Entity", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
-            mockRequest.mockResolvedValueOnce({ data: [{ id: 1, title: "Hello" }], meta: { total: 1, limit: 10, offset: 20, hasMore: false } });
+            mockRequest.mockResolvedValueOnce({ data: [{ id: 1,
+title: "Hello" }],
+meta: { total: 1,
+limit: 10,
+offset: 20,
+hasMore: false } });
 
-            const result = await client.find({ limit: 10, offset: 20 });
+            const result = await client.find({ limit: 10,
+offset: 20 });
 
             expect(result).toEqual({
-                data: [{ id: 1, path: "posts", values: { id: 1, title: "Hello" } }],
-                meta: { total: 1, limit: 10, offset: 20, hasMore: false }
+                data: [{ id: 1,
+path: "posts",
+values: { id: 1,
+title: "Hello" } }],
+                meta: { total: 1,
+limit: 10,
+offset: 20,
+hasMore: false }
             });
             expect(mockRequest).toHaveBeenCalledWith("/data/posts?limit=10&offset=20", { method: "GET" });
         });
 
         it("calls GET /data/slug without query string if no params are passed", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
-            mockRequest.mockResolvedValueOnce({ data: [], meta: { total: 0, limit: 20, offset: 0, hasMore: false } });
+            mockRequest.mockResolvedValueOnce({ data: [],
+meta: { total: 0,
+limit: 20,
+offset: 0,
+hasMore: false } });
 
             const result = await client.find();
             expect(result.data).toEqual([]);
@@ -81,7 +98,8 @@ describe("createCollectionClient", () => {
 
         it("handles empty/missing data array gracefully", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
-            mockRequest.mockResolvedValueOnce({ data: undefined, meta: {} });
+            mockRequest.mockResolvedValueOnce({ data: undefined,
+meta: {} });
 
             const result = await client.find();
             expect(result.data).toEqual([]);
@@ -91,21 +109,34 @@ describe("createCollectionClient", () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({
                 data: [
-                    { id: "a", title: "First", status: "published" },
-                    { id: "b", title: "Second", status: "draft" }
+                    { id: "a",
+title: "First",
+status: "published" },
+                    { id: "b",
+title: "Second",
+status: "draft" }
                 ],
                 meta: { total: 2 }
             });
 
             const result = await client.find();
             expect(result.data).toHaveLength(2);
-            expect(result.data[0]).toEqual({ id: "a", path: "posts", values: { id: "a", title: "First", status: "published" } });
-            expect(result.data[1]).toEqual({ id: "b", path: "posts", values: { id: "b", title: "Second", status: "draft" } });
+            expect(result.data[0]).toEqual({ id: "a",
+path: "posts",
+values: { id: "a",
+title: "First",
+status: "published" } });
+            expect(result.data[1]).toEqual({ id: "b",
+path: "posts",
+values: { id: "b",
+title: "Second",
+status: "draft" } });
         });
 
         it("passes where filter parameters correctly", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
-            mockRequest.mockResolvedValueOnce({ data: [], meta: {} });
+            mockRequest.mockResolvedValueOnce({ data: [],
+meta: {} });
 
             await client.find({ where: { status: "eq.published" } });
             expect(mockRequest).toHaveBeenCalledWith("/data/posts?status=eq.published", { method: "GET" });
@@ -113,9 +144,11 @@ describe("createCollectionClient", () => {
 
         it("uses orderBy together with other params", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
-            mockRequest.mockResolvedValueOnce({ data: [], meta: {} });
+            mockRequest.mockResolvedValueOnce({ data: [],
+meta: {} });
 
-            await client.find({ limit: 5, orderBy: "title:asc" });
+            await client.find({ limit: 5,
+orderBy: "title:asc" });
             expect(mockRequest).toHaveBeenCalledWith("/data/posts?limit=5&orderBy=title%3Aasc", { method: "GET" });
         });
     });
@@ -126,10 +159,14 @@ describe("createCollectionClient", () => {
     describe("findById", () => {
         it("calls GET /data/slug/id and wraps into Entity", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
-            mockRequest.mockResolvedValueOnce({ id: "123", title: "Test" });
+            mockRequest.mockResolvedValueOnce({ id: "123",
+title: "Test" });
 
             const result = await client.findById("123");
-            expect(result).toEqual({ id: "123", path: "posts", values: { id: "123", title: "Test" } });
+            expect(result).toEqual({ id: "123",
+path: "posts",
+values: { id: "123",
+title: "Test" } });
             expect(mockRequest).toHaveBeenCalledWith("/data/posts/123", { method: "GET" });
         });
 
@@ -143,7 +180,8 @@ describe("createCollectionClient", () => {
 
         it("URI encodes the ID", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
-            mockRequest.mockResolvedValueOnce({ id: "a/b", title: "Encoded" });
+            mockRequest.mockResolvedValueOnce({ id: "a/b",
+title: "Encoded" });
 
             await client.findById("a/b");
             expect(mockRequest).toHaveBeenCalledWith("/data/posts/a%2Fb", { method: "GET" });
@@ -151,7 +189,8 @@ describe("createCollectionClient", () => {
 
         it("handles numeric IDs by converting to string", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
-            mockRequest.mockResolvedValueOnce({ id: 42, title: "Numeric" });
+            mockRequest.mockResolvedValueOnce({ id: 42,
+title: "Numeric" });
 
             await client.findById(42);
             expect(mockRequest).toHaveBeenCalledWith("/data/posts/42", { method: "GET" });
@@ -164,32 +203,43 @@ describe("createCollectionClient", () => {
     describe("create", () => {
         it("calls POST /data/slug with JSON body and wraps response into Entity", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
-            mockRequest.mockResolvedValueOnce({ id: 1, title: "New" });
+            mockRequest.mockResolvedValueOnce({ id: 1,
+title: "New" });
 
             const input: Partial<PostModel> = { title: "New" };
             const result = await client.create(input);
 
-            expect(result).toEqual({ id: 1, path: "posts", values: { id: 1, title: "New" } });
-            expect(mockRequest).toHaveBeenCalledWith("/data/posts", { method: "POST", body: JSON.stringify(input) });
+            expect(result).toEqual({ id: 1,
+path: "posts",
+values: { id: 1,
+title: "New" } });
+            expect(mockRequest).toHaveBeenCalledWith("/data/posts", { method: "POST",
+body: JSON.stringify(input) });
         });
 
         it("includes id in POST body when provided", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
-            mockRequest.mockResolvedValueOnce({ id: "custom-id", title: "Custom" });
+            mockRequest.mockResolvedValueOnce({ id: "custom-id",
+title: "Custom" });
 
             const input: Partial<PostModel> = { title: "Custom" };
             const result = await client.create(input, "custom-id");
 
-            expect(result).toEqual({ id: "custom-id", path: "posts", values: { id: "custom-id", title: "Custom" } });
+            expect(result).toEqual({ id: "custom-id",
+path: "posts",
+values: { id: "custom-id",
+title: "Custom" } });
             expect(mockRequest).toHaveBeenCalledWith("/data/posts", {
                 method: "POST",
-                body: JSON.stringify({ title: "Custom", id: "custom-id" })
+                body: JSON.stringify({ title: "Custom",
+id: "custom-id" })
             });
         });
 
         it("includes numeric id in POST body", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
-            mockRequest.mockResolvedValueOnce({ id: 7, title: "T" });
+            mockRequest.mockResolvedValueOnce({ id: 7,
+title: "T" });
 
             await client.create({ title: "T" }, 7);
             const body = JSON.parse(mockRequest.mock.calls[0][1]!.body as string);
@@ -203,18 +253,24 @@ describe("createCollectionClient", () => {
     describe("update", () => {
         it("calls PUT /data/slug/id with JSON body and wraps response into Entity", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
-            mockRequest.mockResolvedValueOnce({ id: 1, title: "Updated" });
+            mockRequest.mockResolvedValueOnce({ id: 1,
+title: "Updated" });
 
             const patch: Partial<PostModel> = { title: "Updated" };
             const result = await client.update(1, patch);
 
-            expect(result).toEqual({ id: 1, path: "posts", values: { id: 1, title: "Updated" } });
-            expect(mockRequest).toHaveBeenCalledWith("/data/posts/1", { method: "PUT", body: JSON.stringify(patch) });
+            expect(result).toEqual({ id: 1,
+path: "posts",
+values: { id: 1,
+title: "Updated" } });
+            expect(mockRequest).toHaveBeenCalledWith("/data/posts/1", { method: "PUT",
+body: JSON.stringify(patch) });
         });
 
         it("encodes special characters in update ID", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
-            mockRequest.mockResolvedValueOnce({ id: "x/y", title: "Updated" });
+            mockRequest.mockResolvedValueOnce({ id: "x/y",
+title: "Updated" });
 
             await client.update("x/y", { title: "Updated" });
             expect(mockRequest).toHaveBeenCalledWith("/data/posts/x%2Fy", expect.any(Object));
@@ -255,7 +311,7 @@ describe("createCollectionClient", () => {
         it("exposes listen/listenById when websocket is provided", () => {
             const mockWs = {
                 listenCollection: jest.fn().mockReturnValue(() => {}),
-                listenEntity: jest.fn().mockReturnValue(() => {}),
+                listenEntity: jest.fn().mockReturnValue(() => {})
             } as unknown as RebaseWebSocketClient;
 
             const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
@@ -267,21 +323,22 @@ describe("createCollectionClient", () => {
             const unsubFn = jest.fn();
             const mockWs = {
                 listenCollection: jest.fn().mockReturnValue(unsubFn),
-                listenEntity: jest.fn().mockReturnValue(() => {}),
+                listenEntity: jest.fn().mockReturnValue(() => {})
             } as unknown as RebaseWebSocketClient;
 
             const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
             const onUpdate = jest.fn();
             const onError = jest.fn();
 
-            const result = client.listen!({ limit: 10, orderBy: "title:desc" }, onUpdate, onError);
+            const result = client.listen!({ limit: 10,
+orderBy: "title:desc" }, onUpdate, onError);
 
             expect(mockWs.listenCollection).toHaveBeenCalledWith(
                 expect.objectContaining({
                     path: "posts",
                     limit: 10,
                     orderBy: "title",
-                    order: "desc",
+                    order: "desc"
                 }),
                 expect.any(Function),
                 onError
@@ -296,7 +353,7 @@ describe("createCollectionClient", () => {
                     capturedCallback = cb;
                     return () => {};
                 }),
-                listenEntity: jest.fn().mockReturnValue(() => {}),
+                listenEntity: jest.fn().mockReturnValue(() => {})
             } as unknown as RebaseWebSocketClient;
 
             const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
@@ -304,8 +361,12 @@ describe("createCollectionClient", () => {
             client.listen!(undefined, onUpdate);
 
             const entities: Entity[] = [
-                { id: "1", path: "posts", values: { title: "A" } },
-                { id: "2", path: "posts", values: { title: "B" } }
+                { id: "1",
+path: "posts",
+values: { title: "A" } },
+                { id: "2",
+path: "posts",
+values: { title: "B" } }
             ];
             capturedCallback!(entities);
 
@@ -324,7 +385,7 @@ describe("createCollectionClient", () => {
             const unsubFn = jest.fn();
             const mockWs = {
                 listenCollection: jest.fn().mockReturnValue(() => {}),
-                listenEntity: jest.fn().mockReturnValue(unsubFn),
+                listenEntity: jest.fn().mockReturnValue(unsubFn)
             } as unknown as RebaseWebSocketClient;
 
             const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
@@ -333,7 +394,8 @@ describe("createCollectionClient", () => {
             client.listenById!("abc", onUpdate);
 
             expect(mockWs.listenEntity).toHaveBeenCalledWith(
-                { path: "posts", entityId: "abc" },
+                { path: "posts",
+entityId: "abc" },
                 expect.any(Function),
                 undefined
             );
@@ -346,7 +408,7 @@ describe("createCollectionClient", () => {
                 listenEntity: jest.fn().mockImplementation((_props, cb: Function) => {
                     capturedCallback = cb;
                     return () => {};
-                }),
+                })
             } as unknown as RebaseWebSocketClient;
 
             const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
@@ -354,7 +416,9 @@ describe("createCollectionClient", () => {
             client.listenById!("abc", onUpdate);
 
             // Entity exists
-            const entity: Entity = { id: "abc", path: "posts", values: { title: "Test" } };
+            const entity: Entity = { id: "abc",
+path: "posts",
+values: { title: "Test" } };
             capturedCallback!(entity);
             expect(onUpdate).toHaveBeenCalledWith(entity);
 
@@ -367,12 +431,13 @@ describe("createCollectionClient", () => {
         it("listen parses where filter parameters", () => {
             const mockWs = {
                 listenCollection: jest.fn().mockReturnValue(() => {}),
-                listenEntity: jest.fn().mockReturnValue(() => {}),
+                listenEntity: jest.fn().mockReturnValue(() => {})
             } as unknown as RebaseWebSocketClient;
 
             const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
             client.listen!(
-                { where: { status: "eq.published" }, searchString: "test" },
+                { where: { status: "eq.published" },
+searchString: "test" },
                 jest.fn()
             );
 
@@ -396,7 +461,8 @@ describe("createCollectionClient", () => {
     describe("Fluent QueryBuilder integration", () => {
         it("where() returns a QueryBuilder that can call find()", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
-            mockRequest.mockResolvedValueOnce({ data: [], meta: {} });
+            mockRequest.mockResolvedValueOnce({ data: [],
+meta: {} });
 
             const qb = client.where("status", "==", "published");
             expect(qb).toBeDefined();
@@ -441,7 +507,9 @@ describe("createCollectionClient", () => {
 
         it("chains multiple fluent methods together", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
-            mockRequest.mockResolvedValueOnce({ data: [{ id: 1, title: "Match" }], meta: {} });
+            mockRequest.mockResolvedValueOnce({ data: [{ id: 1,
+title: "Match" }],
+meta: {} });
 
             const result = await client
                 .where("status", "==", "active")
@@ -460,7 +528,9 @@ describe("createCollectionClient", () => {
     describe("id preservation in values (regression)", () => {
         it("find keeps id inside entity values", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
-            mockRequest.mockResolvedValueOnce({ data: [{ id: "abc", title: "Test" }], meta: {} });
+            mockRequest.mockResolvedValueOnce({ data: [{ id: "abc",
+title: "Test" }],
+meta: {} });
 
             const result = await client.find();
             expect(result.data[0].values).toHaveProperty("id", "abc");
@@ -469,7 +539,8 @@ describe("createCollectionClient", () => {
 
         it("findById keeps id inside entity values", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
-            mockRequest.mockResolvedValueOnce({ id: 42, title: "Test" });
+            mockRequest.mockResolvedValueOnce({ id: 42,
+title: "Test" });
 
             const result = await client.findById(42);
             expect(result!.values).toHaveProperty("id", 42);
@@ -478,7 +549,8 @@ describe("createCollectionClient", () => {
 
         it("create keeps id inside entity values", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
-            mockRequest.mockResolvedValueOnce({ id: "new-id", title: "Created" });
+            mockRequest.mockResolvedValueOnce({ id: "new-id",
+title: "Created" });
 
             const result = await client.create({ title: "Created" });
             expect(result.values).toHaveProperty("id", "new-id");
@@ -487,7 +559,9 @@ describe("createCollectionClient", () => {
 
         it("update keeps id inside entity values", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
-            mockRequest.mockResolvedValueOnce({ id: "existing", title: "Updated", status: "published" });
+            mockRequest.mockResolvedValueOnce({ id: "existing",
+title: "Updated",
+status: "published" });
 
             const result = await client.update("existing", { title: "Updated" });
             expect(result.values).toHaveProperty("id", "existing");
@@ -498,10 +572,18 @@ describe("createCollectionClient", () => {
 
         it("preserves all fields from server response in values", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
-            mockRequest.mockResolvedValueOnce({ id: 1, title: "Full", status: "draft", tags: ["a", "b"], extra_field: "kept" });
+            mockRequest.mockResolvedValueOnce({ id: 1,
+title: "Full",
+status: "draft",
+tags: ["a", "b"],
+extra_field: "kept" });
 
             const result = await client.findById(1);
-            expect(result!.values).toEqual({ id: 1, title: "Full", status: "draft", tags: ["a", "b"], extra_field: "kept" });
+            expect(result!.values).toEqual({ id: 1,
+title: "Full",
+status: "draft",
+tags: ["a", "b"],
+extra_field: "kept" });
         });
     });
 });
@@ -522,9 +604,10 @@ describe("parseWhereFilter edge cases", () => {
     function createClientWithWs() {
         const mockWs = {
             listenCollection: jest.fn().mockReturnValue(() => {}),
-            listenEntity: jest.fn().mockReturnValue(() => {}),
+            listenEntity: jest.fn().mockReturnValue(() => {})
         } as unknown as RebaseWebSocketClient;
-        return { client: createCollectionClient<PostModel>(transport, "posts", mockWs), mockWs };
+        return { client: createCollectionClient<PostModel>(transport, "posts", mockWs),
+mockWs };
     }
 
     it("parses gt operator", () => {
@@ -544,7 +627,7 @@ describe("parseWhereFilter edge cases", () => {
     it("parses lt and lte operators", () => {
         const { client, mockWs } = createClientWithWs();
         client.listen!({ where: { count: "lt.3" } }, jest.fn());
-        let filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
+        const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
         expect(filter.count).toEqual(["<", 3]);
     });
 
@@ -632,7 +715,8 @@ function createMockTransport(): { transport: Transport; mockRequest: jest.Mock<T
         getHeaders: jest.fn().mockReturnValue({}),
         resolveToken: jest.fn().mockResolvedValue(null)
     };
-    return { transport, mockRequest };
+    return { transport,
+mockRequest };
 }
 
 // We need PostModel accessible at top level for the second describe block

@@ -37,7 +37,7 @@ import {
     useFirebaseAuthController,
     useFirebaseStorageSource,
     useFirestoreDriver,
-    useInitialiseFirebase,
+    useInitialiseFirebase
 } from "../hooks";
 
 import { FirebaseAuthController } from "../types";
@@ -100,7 +100,8 @@ export function RebaseFirebaseApp({
         .map(pc => ({
             [pc.key]: pc
         }))
-        .reduce((a, b) => ({ ...a, ...b }), {});
+        .reduce((a, b) => ({ ...a,
+...b }), {});
 
     const {
         firebaseApp,
@@ -192,7 +193,7 @@ export function RebaseFirebaseApp({
 
     if (firebaseConfigLoading || !firebaseApp || loading) {
         return <>
-            <CircularProgressCenter />
+            <CircularProgressCenter/>
         </>;
     }
 
@@ -227,7 +228,7 @@ export function RebaseFirebaseApp({
 
                             let component;
                             if (loading || authLoading) {
-                                component = <CircularProgressCenter size={"large"} />;
+                                component = <CircularProgressCenter size={"large"}/>;
                             } else {
                                 const usedLogo = modeController.mode === "dark" && logoDark ? logoDark : logo;
                                 if (!canAccessMainView) {
@@ -239,7 +240,7 @@ export function RebaseFirebaseApp({
                                             signInOptions={signInOptions ?? DEFAULT_SIGN_IN_OPTIONS}
                                             firebaseApp={firebaseApp}
                                             authController={authController}
-                                            notAllowedError={notAllowedError} />
+                                            notAllowedError={notAllowedError}/>
                                     );
                                 } else {
                                     component = (
@@ -248,14 +249,14 @@ export function RebaseFirebaseApp({
                                                 <Scaffold
                                                     logo={usedLogo}
                                                     autoOpenDrawer={autoOpenDrawer}>
-                                                    <AppBar title={name} logo={usedLogo} />
-                                                    <Drawer />
-                                                    <Outlet />
-                                                    <SideDialogs />
+                                                    <AppBar title={name} logo={usedLogo}/>
+                                                    <Drawer/>
+                                                    <Outlet/>
+                                                    <SideDialogs/>
                                                 </Scaffold>
                                             }>
-                                                {components?.HomePage && <Route path="/" element={<components.HomePage />} />}
-                                                <Route path="/c/*" element={<RebaseRoutes />} />
+                                                {components?.HomePage && <Route path="/" element={<components.HomePage/>}/>}
+                                                <Route path="/c/*" element={<RebaseRoutes/>}/>
                                             </Route>
                                         </Routes>
                                     );

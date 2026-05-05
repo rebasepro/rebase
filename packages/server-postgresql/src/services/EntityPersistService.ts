@@ -79,7 +79,7 @@ export class EntityPersistService {
                     const relation = findRelation(resolvedRelations, relationKey);
 
                     if (!relation) {
-                        const available = Object.keys(resolvedRelations).join(', ') || '(none)';
+                        const available = Object.keys(resolvedRelations).join(", ") || "(none)";
                         throw new Error(`Relation '${relationKey}' not found in collection '${currentCollection.slug}'. Available relations: [${available}]`);
                     }
 
@@ -212,7 +212,7 @@ export class EntityPersistService {
                     // empty after relation stripping and Drizzle throws "No values to set".
                     const scalarKeys = Object.keys(entityData as Record<string, unknown>);
                     if (scalarKeys.length > 0) {
-                        let updateQuery = tx.update(table).set(entityData as Record<string, unknown>);
+                        const updateQuery = tx.update(table).set(entityData as Record<string, unknown>);
                         const conditions = [];
                         for (const info of idInfoArray) {
                             const field = table[info.fieldName as keyof typeof table] as AnyPgColumn;

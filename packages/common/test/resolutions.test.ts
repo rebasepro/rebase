@@ -1,7 +1,7 @@
 import {
     resolvePropertyEnum,
     resolveEnumValues,
-    getSubcollections,
+    getSubcollections
 } from "../src/util/resolutions";
 import { EntityCollection, NumberProperty, StringProperty, EnumValueConfig } from "@rebasepro/types";
 
@@ -15,25 +15,29 @@ describe("resolvePropertyEnum", () => {
             name: "Status",
             enum: {
                 draft: "Draft",
-                published: "Published",
-            } as any,
+                published: "Published"
+            } as any
         };
         const result = resolvePropertyEnum(prop) as StringProperty;
         expect(result.enum).toEqual([
-            { id: "draft", label: "Draft" },
-            { id: "published", label: "Published" },
+            { id: "draft",
+label: "Draft" },
+            { id: "published",
+label: "Published" }
         ]);
     });
 
     it("preserves enum that is already in array format", () => {
         const enumValues: EnumValueConfig[] = [
-            { id: "a", label: "A" },
-            { id: "b", label: "B" },
+            { id: "a",
+label: "A" },
+            { id: "b",
+label: "B" }
         ];
         const prop: StringProperty = {
             type: "string",
             name: "Letter",
-            enum: enumValues,
+            enum: enumValues
         };
         const result = resolvePropertyEnum(prop) as StringProperty;
         expect(result.enum).toEqual(enumValues);
@@ -45,8 +49,8 @@ describe("resolvePropertyEnum", () => {
             name: "Test",
             enum: {
                 valid: "Valid",
-                "": "", // empty id and label
-            } as any,
+                "": "" // empty id and label
+            } as any
         };
         const result = resolvePropertyEnum(prop) as StringProperty;
         const enumArr = result.enum as EnumValueConfig[];
@@ -61,8 +65,8 @@ describe("resolvePropertyEnum", () => {
             enum: {
                 1: "Low",
                 2: "Medium",
-                3: "High",
-            } as any,
+                3: "High"
+            } as any
         };
         const result = resolvePropertyEnum(prop) as NumberProperty;
         expect(Array.isArray(result.enum)).toBe(true);
@@ -74,16 +78,21 @@ describe("resolvePropertyEnum", () => {
 // ─────────────────────────────────────────────────────────────
 describe("resolveEnumValues", () => {
     it("converts object format to EnumValueConfig array", () => {
-        const result = resolveEnumValues({ a: "Alpha", b: "Beta" });
+        const result = resolveEnumValues({ a: "Alpha",
+b: "Beta" });
         expect(result).toEqual([
-            { id: "a", label: "Alpha" },
-            { id: "b", label: "Beta" },
+            { id: "a",
+label: "Alpha" },
+            { id: "b",
+label: "Beta" }
         ]);
     });
 
     it("passes through EnumValueConfig objects", () => {
         const result = resolveEnumValues({
-            x: { id: "x", label: "X", color: "red" },
+            x: { id: "x",
+label: "X",
+color: "red" }
         } as any);
         // When value is not a string, it spreads the value and adds id
         expect(result?.[0].id).toBe("x");
@@ -97,7 +106,6 @@ describe("resolveEnumValues", () => {
 });
 
 
-
 // ─────────────────────────────────────────────────────────────
 // getSubcollections
 // ─────────────────────────────────────────────────────────────
@@ -107,14 +115,14 @@ describe("getSubcollections", () => {
             name: "Comments",
             slug: "comments",
             table: "comments",
-            properties: {},
+            properties: {}
         };
         const collection: EntityCollection = {
             name: "Posts",
             slug: "posts",
             table: "posts",
             properties: {},
-            childCollections: () => [subCol],
+            childCollections: () => [subCol]
         };
         const result = getSubcollections(collection);
         expect(result).toHaveLength(1);
@@ -126,7 +134,7 @@ describe("getSubcollections", () => {
             name: "Posts",
             slug: "posts",
             table: "posts",
-            properties: {},
+            properties: {}
         };
         const result = getSubcollections(collection);
         expect(result).toEqual([]);
@@ -138,7 +146,7 @@ describe("getSubcollections", () => {
             slug: "posts",
             table: "posts",
             properties: {},
-            childCollections: () => undefined as any,
+            childCollections: () => undefined as any
         };
         const result = getSubcollections(collection);
         expect(result).toEqual([]);

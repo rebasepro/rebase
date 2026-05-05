@@ -53,7 +53,7 @@ export class UserService implements UserRepository {
         `);
 
         if (result.rows.length === 0) return null;
-        
+
         const row = result.rows[0] as Record<string, unknown>;
         return {
             id: row.id as string,
@@ -99,7 +99,8 @@ export class UserService implements UserRepository {
     async updateUser(id: string, data: Partial<Omit<NewUser, "id">>): Promise<User | null> {
         const [user] = await this.db
             .update(users)
-            .set({ ...data, updatedAt: new Date() })
+            .set({ ...data,
+updatedAt: new Date() })
             .where(eq(users.id, id))
             .returning();
         return user || null;
@@ -176,7 +177,10 @@ export class UserService implements UserRepository {
             updatedAt: (row.updated_at ?? row.updatedAt) as Date
         })) as User[];
 
-        return { users: mappedUsers, total, limit, offset };
+        return { users: mappedUsers,
+total,
+limit,
+offset };
     }
 
     /**
@@ -185,7 +189,8 @@ export class UserService implements UserRepository {
     async updatePassword(id: string, passwordHash: string): Promise<void> {
         await this.db
             .update(users)
-            .set({ passwordHash, updatedAt: new Date() })
+            .set({ passwordHash,
+updatedAt: new Date() })
             .where(eq(users.id, id));
     }
 
@@ -293,7 +298,8 @@ export class UserService implements UserRepository {
         if (!user) return null;
 
         const roles = await this.getUserRoles(userId);
-        return { user, roles };
+        return { user,
+roles };
     }
 }
 

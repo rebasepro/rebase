@@ -9,21 +9,34 @@ const DEFAULT_ROLES = [
         id: "admin",
         name: "Admin",
         is_admin: true,
-        default_permissions: { read: true, create: true, edit: true, delete: true },
-        config: { createCollections: true, editCollections: "all", deleteCollections: "all" }
+        default_permissions: { read: true,
+create: true,
+edit: true,
+delete: true },
+        config: { createCollections: true,
+editCollections: "all",
+deleteCollections: "all" }
     },
     {
         id: "editor",
         name: "Editor",
         is_admin: false,
-        default_permissions: { read: true, create: true, edit: true, delete: true },
-        config: { createCollections: true, editCollections: "own", deleteCollections: "own" }
+        default_permissions: { read: true,
+create: true,
+edit: true,
+delete: true },
+        config: { createCollections: true,
+editCollections: "own",
+deleteCollections: "own" }
     },
     {
         id: "viewer",
         name: "Viewer",
         is_admin: false,
-        default_permissions: { read: true, create: false, edit: false, delete: false },
+        default_permissions: { read: true,
+create: false,
+edit: false,
+delete: false },
         config: null
     }
 ];
@@ -79,7 +92,6 @@ export async function ensureAuthTablesExist(db: NodePgDatabase): Promise<void> {
             CREATE INDEX IF NOT EXISTS idx_user_identities_user 
             ON rebase.user_identities(user_id)
         `);
-
 
 
         // Create roles table
@@ -180,7 +192,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase): Promise<void> {
         await db.execute(sql`CREATE SCHEMA IF NOT EXISTS auth`);
 
         // Use an advisory transaction lock to serialize function recreation during HMR
-        // This prevents the "tuple concurrently updated" race condition when multiple Node 
+        // This prevents the "tuple concurrently updated" race condition when multiple Node
         // workers or rapid restarts attempt to CREATE OR REPLACE FUNCTION simultaneously.
         await db.transaction(async (tx) => {
             await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'))`);
@@ -251,7 +263,7 @@ async function seedDefaultRoles(db: NodePgDatabase): Promise<void> {
 
 /**
  * Apply idempotent alterations for internal Rebase tables.
- * This runs after CREATE TABLE IF NOT EXISTS to ensure existing 
+ * This runs after CREATE TABLE IF NOT EXISTS to ensure existing
  * databases get new columns without needing external Drizzle migrations.
  */
 async function applyInternalMigrations(db: NodePgDatabase): Promise<void> {
@@ -265,7 +277,7 @@ async function applyInternalMigrations(db: NodePgDatabase): Promise<void> {
         `);
 
         // Migrate Old OAuth Data to user_identities table
-        
+
         // 1. Check if legacy columns exist
         const columnsCheck = await db.execute(sql`
             SELECT column_name 
@@ -274,7 +286,7 @@ async function applyInternalMigrations(db: NodePgDatabase): Promise<void> {
         `);
         const existingColumns = columnsCheck.rows.map(r => r.column_name);
 
-        if (existingColumns.includes('google_id')) {
+        if (existingColumns.includes("google_id")) {
             // Migrate google users
             await db.execute(sql`
                 INSERT INTO rebase.user_identities (user_id, provider, provider_id)
@@ -285,7 +297,7 @@ async function applyInternalMigrations(db: NodePgDatabase): Promise<void> {
             `);
         }
 
-        if (existingColumns.includes('linkedin_id')) {
+        if (existingColumns.includes("linkedin_id")) {
             // Migrate linkedin users
             await db.execute(sql`
                 INSERT INTO rebase.user_identities (user_id, provider, provider_id)
@@ -304,11 +316,11 @@ async function applyInternalMigrations(db: NodePgDatabase): Promise<void> {
                 DROP COLUMN IF EXISTS google_id,
                 DROP COLUMN IF EXISTS linkedin_id
             `);
-            
+
             // Drop legacy indexes
             await db.execute(sql`DROP INDEX IF EXISTS rebase.idx_users_google_id`);
             await db.execute(sql`DROP INDEX IF EXISTS rebase.idx_users_linkedin_id`);
-            
+
             console.log("✅ Migrated to user_identities and dropped legacy columns.");
         }
 
@@ -331,7 +343,7 @@ async function applyInternalMigrations(db: NodePgDatabase): Promise<void> {
             AND table_schema = 'rebase'
             AND table_name = 'refresh_tokens'
         `);
-        
+
         if (constraintCheck.rows.length === 0) {
             try {
                 await db.execute(sql`
@@ -341,7 +353,7 @@ async function applyInternalMigrations(db: NodePgDatabase): Promise<void> {
                 console.log("✅ Added unique_device_session constraint");
             } catch (e: unknown) {
                 const errorMessage = e instanceof Error ? e.message : String(e);
-                if (errorMessage.includes('could not create unique index')) {
+                if (errorMessage.includes("could not create unique index")) {
                     console.warn("⚠️ Duplicate sessions found, cleaning up before adding constraint...");
                     await db.execute(sql`
                         DELETE FROM rebase.refresh_tokens a

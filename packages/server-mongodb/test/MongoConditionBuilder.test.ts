@@ -1,6 +1,6 @@
 /**
  * MongoConditionBuilder Tests
- * 
+ *
  * Tests for the condition builder that translates Rebase filters to MongoDB queries.
  */
 

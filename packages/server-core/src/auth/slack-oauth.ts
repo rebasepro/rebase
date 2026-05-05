@@ -60,7 +60,7 @@ export function createSlackProvider(config: { clientId: string; clientSecret: st
                     providerId: p.sub,
                     email: p.email,
                     displayName: p.name || null,
-                    photoUrl: p.picture || null,
+                    photoUrl: p.picture || null
                 };
             } catch (error) {
                 console.error("Slack OAuth error:", error);

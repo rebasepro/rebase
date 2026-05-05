@@ -66,7 +66,9 @@ describe("RestApiGenerator", () => {
         it("list entities - GET /api/users", async () => {
             const app = createApp();
             mockDriver.fetchCollection.mockResolvedValue([
-                { id: "1", path: "users", values: { name: "Alice" } } as any
+                { id: "1",
+path: "users",
+values: { name: "Alice" } } as any
             ]);
             mockDriver.countEntities!.mockResolvedValue(1);
 
@@ -74,16 +76,20 @@ describe("RestApiGenerator", () => {
             expect(res.status).toBe(200);
 
             const body = await res.json() as any;
-            expect(body.data).toEqual([{ id: "1", name: "Alice" }]);
+            expect(body.data).toEqual([{ id: "1",
+name: "Alice" }]);
             expect(mockDriver.fetchCollection).toHaveBeenCalledWith(
-                expect.objectContaining({ path: "users", limit: 10 })
+                expect.objectContaining({ path: "users",
+limit: 10 })
             );
         });
 
         it("get entity - GET /api/users/123", async () => {
             const app = createApp();
             mockDriver.fetchEntity.mockResolvedValue(
-                { id: "123", path: "users", values: { name: "Alice" } } as any
+                { id: "123",
+path: "users",
+values: { name: "Alice" } } as any
             );
 
             const res = await app.request("/api/users/123");
@@ -93,14 +99,17 @@ describe("RestApiGenerator", () => {
             expect(body.id).toBe("123");
             expect(body.name).toBe("Alice");
             expect(mockDriver.fetchEntity).toHaveBeenCalledWith(
-                expect.objectContaining({ path: "users", entityId: "123" })
+                expect.objectContaining({ path: "users",
+entityId: "123" })
             );
         });
 
         it("create entity - POST /api/users", async () => {
             const app = createApp();
             mockDriver.saveEntity.mockResolvedValue(
-                { id: "new-1", path: "users", values: { name: "Bob" } } as any
+                { id: "new-1",
+path: "users",
+values: { name: "Bob" } } as any
             );
 
             const res = await app.request("/api/users", {
@@ -111,15 +120,21 @@ describe("RestApiGenerator", () => {
 
             expect(res.status).toBe(201);
             expect(mockDriver.saveEntity).toHaveBeenCalledWith(
-                expect.objectContaining({ path: "users", values: { name: "Bob" }, status: "new" })
+                expect.objectContaining({ path: "users",
+values: { name: "Bob" },
+status: "new" })
             );
         });
 
         it("update entity - PUT /api/users/123", async () => {
             const app = createApp();
-            mockDriver.fetchEntity.mockResolvedValue({ id: "123", path: "users", values: {} } as any);
+            mockDriver.fetchEntity.mockResolvedValue({ id: "123",
+path: "users",
+values: {} } as any);
             mockDriver.saveEntity.mockResolvedValue(
-                { id: "123", path: "users", values: { name: "Bob Jr" } } as any
+                { id: "123",
+path: "users",
+values: { name: "Bob Jr" } } as any
             );
 
             const res = await app.request("/api/users/123", {
@@ -130,13 +145,18 @@ describe("RestApiGenerator", () => {
 
             expect(res.status).toBe(200);
             expect(mockDriver.saveEntity).toHaveBeenCalledWith(
-                expect.objectContaining({ path: "users", entityId: "123", values: { name: "Bob Jr" }, status: "existing" })
+                expect.objectContaining({ path: "users",
+entityId: "123",
+values: { name: "Bob Jr" },
+status: "existing" })
             );
         });
 
         it("delete entity - DELETE /api/users/123", async () => {
             const app = createApp();
-            const existingEntity = { id: "123", path: "users", values: {} } as any;
+            const existingEntity = { id: "123",
+path: "users",
+values: {} } as any;
             mockDriver.fetchEntity.mockResolvedValue(existingEntity);
             mockDriver.deleteEntity.mockResolvedValue();
 
@@ -154,7 +174,7 @@ describe("RestApiGenerator", () => {
          * These tests use the flat app (no prefix nesting) to avoid
          * Hono sub-router routing quirks where `/:slug/:id` eats the request
          * before the `/:parent/:parentId/*` wildcard gets a chance.
-         * 
+         *
          * We use "authors" as the parent slug since it's NOT a registered
          * collection, so it can only match the wildcard catch-all.
          */
@@ -162,14 +182,17 @@ describe("RestApiGenerator", () => {
         it("list subcollection - GET /authors/123/posts", async () => {
             const app = createFlatApp();
             mockDriver.fetchCollection.mockResolvedValue([
-                { id: "post-1", path: "authors/123/posts", values: { title: "Hello" } } as any
+                { id: "post-1",
+path: "authors/123/posts",
+values: { title: "Hello" } } as any
             ]);
 
             const res = await app.request("/authors/123/posts");
             expect(res.status).toBe(200);
 
             const body = await res.json() as any;
-            expect(body.data).toEqual([{ id: "post-1", title: "Hello" }]);
+            expect(body.data).toEqual([{ id: "post-1",
+title: "Hello" }]);
             expect(mockDriver.fetchCollection).toHaveBeenCalledWith(
                 expect.objectContaining({ path: "authors/123/posts" })
             );
@@ -178,7 +201,9 @@ describe("RestApiGenerator", () => {
         it("get subcollection entity - GET /authors/123/posts/456", async () => {
             const app = createFlatApp();
             mockDriver.fetchEntity.mockResolvedValue(
-                { id: "456", path: "authors/123/posts", values: { title: "Hello" } } as any
+                { id: "456",
+path: "authors/123/posts",
+values: { title: "Hello" } } as any
             );
 
             const res = await app.request("/authors/123/posts/456");
@@ -188,14 +213,17 @@ describe("RestApiGenerator", () => {
             expect(body.id).toBe("456");
             expect(body.title).toBe("Hello");
             expect(mockDriver.fetchEntity).toHaveBeenCalledWith(
-                expect.objectContaining({ path: "authors/123/posts", entityId: "456" })
+                expect.objectContaining({ path: "authors/123/posts",
+entityId: "456" })
             );
         });
 
         it("create subcollection entity - POST /authors/123/posts", async () => {
             const app = createFlatApp();
             mockDriver.saveEntity.mockResolvedValue(
-                { id: "new-post", path: "authors/123/posts", values: { title: "New" } } as any
+                { id: "new-post",
+path: "authors/123/posts",
+values: { title: "New" } } as any
             );
 
             const res = await app.request("/authors/123/posts", {
@@ -206,14 +234,17 @@ describe("RestApiGenerator", () => {
 
             expect(res.status).toBe(201);
             expect(mockDriver.saveEntity).toHaveBeenCalledWith(
-                expect.objectContaining({ path: "authors/123/posts", status: "new" })
+                expect.objectContaining({ path: "authors/123/posts",
+status: "new" })
             );
         });
 
         it("update subcollection entity - PUT /authors/123/posts/456", async () => {
             const app = createFlatApp();
             mockDriver.saveEntity.mockResolvedValue(
-                { id: "456", path: "authors/123/posts", values: { title: "Updated" } } as any
+                { id: "456",
+path: "authors/123/posts",
+values: { title: "Updated" } } as any
             );
 
             const res = await app.request("/authors/123/posts/456", {
@@ -234,7 +265,9 @@ describe("RestApiGenerator", () => {
 
         it("delete subcollection entity - DELETE /authors/123/posts/456", async () => {
             const app = createFlatApp();
-            const existingEntity = { id: "456", path: "authors/123/posts", values: {} } as any;
+            const existingEntity = { id: "456",
+path: "authors/123/posts",
+values: {} } as any;
             mockDriver.fetchEntity.mockResolvedValue(existingEntity);
             mockDriver.deleteEntity.mockResolvedValue();
 
@@ -249,14 +282,17 @@ describe("RestApiGenerator", () => {
         it("deeply nested subcollection list - GET /authors/123/posts/456/comments", async () => {
             const app = createFlatApp();
             mockDriver.fetchCollection.mockResolvedValue([
-                { id: "c-1", path: "authors/123/posts/456/comments", values: { text: "Wow" } } as any
+                { id: "c-1",
+path: "authors/123/posts/456/comments",
+values: { text: "Wow" } } as any
             ]);
 
             const res = await app.request("/authors/123/posts/456/comments");
             expect(res.status).toBe(200);
 
             const body = await res.json() as any;
-            expect(body.data).toEqual([{ id: "c-1", text: "Wow" }]);
+            expect(body.data).toEqual([{ id: "c-1",
+text: "Wow" }]);
             expect(mockDriver.fetchCollection).toHaveBeenCalledWith(
                 expect.objectContaining({ path: "authors/123/posts/456/comments" })
             );
@@ -265,7 +301,9 @@ describe("RestApiGenerator", () => {
         it("deeply nested entity - GET /authors/123/posts/456/comments/789", async () => {
             const app = createFlatApp();
             mockDriver.fetchEntity.mockResolvedValue(
-                { id: "789", path: "authors/123/posts/456/comments", values: { text: "Wow" } } as any
+                { id: "789",
+path: "authors/123/posts/456/comments",
+values: { text: "Wow" } } as any
             );
 
             const res = await app.request("/authors/123/posts/456/comments/789");
@@ -378,13 +416,16 @@ describe("RestApiGenerator", () => {
         it("numeric IDs are correctly parsed as entityId", async () => {
             const app = createFlatApp();
             mockDriver.fetchEntity.mockResolvedValue(
-                { id: "999", path: "authors/42/books", values: { title: "Test" } } as any
+                { id: "999",
+path: "authors/42/books",
+values: { title: "Test" } } as any
             );
 
             const res = await app.request("/authors/42/books/999");
             expect(res.status).toBe(200);
             expect(mockDriver.fetchEntity).toHaveBeenCalledWith(
-                expect.objectContaining({ path: "authors/42/books", entityId: "999" })
+                expect.objectContaining({ path: "authors/42/books",
+entityId: "999" })
             );
         });
 
@@ -393,7 +434,9 @@ describe("RestApiGenerator", () => {
             const uuid1 = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
             const uuid2 = "ffffffff-ffff-ffff-ffff-ffffffffffff";
             mockDriver.fetchEntity.mockResolvedValue(
-                { id: uuid2, path: `authors/${uuid1}/posts`, values: { title: "UUID" } } as any
+                { id: uuid2,
+path: `authors/${uuid1}/posts`,
+values: { title: "UUID" } } as any
             );
 
             const res = await app.request(`/authors/${uuid1}/posts/${uuid2}`);

@@ -13,7 +13,7 @@ import {
     requireProjectRoot,
     requireBackendDir,
     findEnvFile,
-    resolveTsx,
+    resolveTsx
 } from "../utils/project";
 
 export async function authCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
@@ -40,11 +40,11 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
             "--email": String,
             "--password": String,
             "-e": "--email",
-            "-p": "--password",
+            "-p": "--password"
         },
         {
             argv: rawArgs.slice(4), // skip "node rebase auth reset-password"
-            permissive: true,
+            permissive: true
         }
     );
 
@@ -128,7 +128,7 @@ resetPassword().catch(console.error);
     const child = spawn(tsxBin, [tmpScriptPath], {
         cwd: backendDir,
         stdio: "inherit",
-        env,
+        env
     });
 
     return new Promise((resolve) => {

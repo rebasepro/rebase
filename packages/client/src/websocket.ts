@@ -36,7 +36,8 @@ function extractMessageError(message: WebSocketMessage): { errorMessage: string;
     const errorCode = typeof errPayload === "object"
         ? errPayload.code
         : payload?.code;
-    return { errorMessage, errorCode };
+    return { errorMessage,
+errorCode };
 }
 
 export interface RebaseWebSocketConfig {
@@ -116,7 +117,6 @@ export class RebaseWebSocketClient {
     private backendToEntityKey = new Map<string, string>();
 
 
-
     private pendingRequests = new Map<string, {
         resolve: (p: unknown) => void;
         reject: (p: Error) => void;
@@ -126,6 +126,7 @@ export class RebaseWebSocketClient {
     private maxReconnectAttempts = 5;
     private isConnected = false;
     private messageQueue: Record<string, unknown>[] = [];
+    private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
     private isAuthenticated = false;
     private authPromise: Promise<void> | null = null;
@@ -135,7 +136,7 @@ export class RebaseWebSocketClient {
         this.websocketUrl = config.websocketUrl;
         this.getAuthToken = config.getAuthToken;
         this.WebSocketConstructor = config.WebSocket || (typeof WebSocket !== "undefined" ? WebSocket : undefined);
-        
+
         if (!this.WebSocketConstructor) {
             console.warn("WebSocket is not defined in this environment. Realtime subscriptions will not work unless you provide a WebSocket implementation in the config.");
         } else {
@@ -191,11 +192,14 @@ export class RebaseWebSocketClient {
         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
             console.log("WebSocket auto-authenticating after token getter set");
             this.getAuthToken().then(token => {
+                if (!this.ws) return; // Prevent memory leaks / actions after disconnect
                 if (token) {
-                    this.authenticate(token).catch(e => console.warn("WebSocket auto-auth failed:", e));
+                    this.authenticate(token).catch(e => {
+                        if (this.ws) console.warn("WebSocket auto-auth failed:", e);
+                    });
                 }
             }).catch(e => {
-                console.warn("WebSocket auto-auth failed:", e);
+                if (this.ws) console.warn("WebSocket auto-auth failed:", e);
             });
         }
     }
@@ -203,7 +207,15 @@ export class RebaseWebSocketClient {
     public disconnect(): void {
         this.isAuthenticated = false;
         this.authPromise = null;
+        if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout);
+            this.reconnectTimeout = null;
+        }
         if (this.ws) {
+            this.ws.onclose = null; // Prevent reconnect on explicit disconnect
+            this.ws.onerror = null; // Prevent errors on explicit disconnect
+            this.ws.onopen = null;
+            this.ws.onmessage = null;
             this.ws.close();
             this.ws = null;
         }
@@ -308,7 +320,13 @@ export class RebaseWebSocketClient {
         const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
 
         console.log(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
-        setTimeout(() => {
+        
+        if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout);
+        }
+        
+        this.reconnectTimeout = setTimeout(() => {
+            this.reconnectTimeout = null;
             this.initWebSocket();
         }, delay);
     }
@@ -496,7 +514,7 @@ export class RebaseWebSocketClient {
         }
     }
 
-    private async ensureAuthenticated(retryCount: number = 3): Promise<void> {
+    private async ensureAuthenticated(retryCount = 3): Promise<void> {
         // If already authenticated or no token getter, skip
         if (this.isAuthenticated || !this.getAuthToken) return;
 
@@ -657,7 +675,8 @@ export class RebaseWebSocketClient {
     async executeSql(sql: string, options?: { database?: string, role?: string }): Promise<Record<string, unknown>[]> {
         const response = await this.sendMessage({
             type: "EXECUTE_SQL",
-            payload: { sql, options }
+            payload: { sql,
+options }
         }) as { result?: Record<string, unknown>[] };
         return response.result || [];
     }
@@ -719,14 +738,18 @@ export class RebaseWebSocketClient {
             type: "FETCH_TABLE_METADATA",
             payload: { tableName }
         }) as { metadata?: TableMetadata };
-        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-        return response.metadata || ({ columns: [], foreignKeys: [], junctions: [], policies: [] } as TableMetadata);
+
+        return response.metadata || ({ columns: [],
+foreignKeys: [],
+junctions: [],
+policies: [] } as TableMetadata);
     }
 
     async createBranch(name: string, options?: { source?: string }): Promise<BranchInfo> {
         const response = await this.sendMessage({
             type: "CREATE_BRANCH",
-            payload: { name, options }
+            payload: { name,
+options }
         }) as { branch: BranchInfo };
         return response.branch;
     }
@@ -807,28 +830,28 @@ export class RebaseWebSocketClient {
 
     private normalizeForComparison(val: unknown): unknown {
         if (!val) return val;
-        
+
         if (Array.isArray(val)) {
             return val.map(item => this.normalizeForComparison(item));
         }
-        
+
         if (typeof val === "object") {
             if (val instanceof Date) return val;
             if (val instanceof RegExp) return val;
-            
+
             const obj = val as Record<string, unknown>;
             if (obj.__type === "relation") {
                 const { data, ...rest } = obj;
                 return rest;
             }
-            
+
             const result: Record<string, unknown> = {};
             for (const [k, v] of Object.entries(obj)) {
                 result[k] = this.normalizeForComparison(v);
             }
             return result;
         }
-        
+
         return val;
     }
 
@@ -854,17 +877,18 @@ export class RebaseWebSocketClient {
             if (cachedEntity.path === incomingEntity.path) {
                 const normCached = this.normalizeForComparison(cachedEntity.values) as Record<string, unknown>;
                 const normIncoming = this.normalizeForComparison(incomingEntity.values) as Record<string, unknown>;
-                
+
                 if (this.deepEqual(normCached, normIncoming)) {
                     return cachedEntity;
                 } else {
-                    // Deep debug: Why did it fail? Let's check which exact property differs 
+                    // Deep debug: Why did it fail? Let's check which exact property differs
                     // so the user can see it in their browser console if flashing still occurs.
                     const mismatches: Record<string, { cached: unknown, incoming: unknown }> = {};
                     const allKeys = new Set([...Object.keys(normCached), ...Object.keys(normIncoming)]);
                     for (const key of allKeys) {
                         if (!this.deepEqual(normCached[key], normIncoming[key])) {
-                            mismatches[key] = { cached: normCached[key], incoming: normIncoming[key] };
+                            mismatches[key] = { cached: normCached[key],
+incoming: normIncoming[key] };
                         }
                     }
                     console.log(`[RebaseWS] Row ${incomingEntity.id} refetch mismatch:\n`, JSON.stringify(mismatches, null, 2));
@@ -892,7 +916,8 @@ export class RebaseWebSocketClient {
                 onUpdate: (entities: Entity[]) => void;
                 onError?: (error: Error) => void;
             }>;
-            callbackMap.set(callbackId, { onUpdate, onError });
+            callbackMap.set(callbackId, { onUpdate,
+onError });
 
             // Immediately fire the callback with cached data if available
             if (existingSubscription.latestData !== undefined && existingSubscription.isInitialDataReceived) {
@@ -929,7 +954,8 @@ export class RebaseWebSocketClient {
             onUpdate: (entities: Entity[]) => void;
             onError?: (error: Error) => void;
         }>();
-        callbackMap.set(callbackId, { onUpdate, onError });
+        callbackMap.set(callbackId, { onUpdate,
+onError });
 
         this.collectionSubscriptions.set(subscriptionKey, {
             backendSubscriptionId,
@@ -988,7 +1014,8 @@ export class RebaseWebSocketClient {
                 onUpdate: (entity: Entity | null) => void;
                 onError?: (error: Error) => void;
             }>;
-            callbackMap.set(callbackId, { onUpdate, onError });
+            callbackMap.set(callbackId, { onUpdate,
+onError });
 
             // Immediately fire the callback with cached data if available
             if (existingSubscription.latestData !== undefined && existingSubscription.isInitialDataReceived) {
@@ -1025,7 +1052,8 @@ export class RebaseWebSocketClient {
             onUpdate: (entity: Entity | null) => void;
             onError?: (error: Error) => void;
         }>();
-        callbackMap.set(callbackId, { onUpdate, onError });
+        callbackMap.set(callbackId, { onUpdate,
+onError });
 
         this.entitySubscriptions.set(subscriptionKey, {
             backendSubscriptionId,

@@ -6,8 +6,10 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
 describe("HistoryService - changedFields and history insertion logic", () => {
     describe("findChangedFields", () => {
         it("should return null when identical flat objects are compared", () => {
-            const oldValues = { title: "Hello", description: "World" };
-            const newValues = { title: "Hello", description: "World" };
+            const oldValues = { title: "Hello",
+description: "World" };
+            const newValues = { title: "Hello",
+description: "World" };
             const result = findChangedFields(oldValues, newValues);
             expect(result).toBeNull();
         });
@@ -20,19 +22,25 @@ describe("HistoryService - changedFields and history insertion logic", () => {
         });
 
         it("should skip properties starting with double underscore", () => {
-            const oldValues = { title: "Hello", __internal: 123 };
-            const newValues = { title: "Hello", __internal: 456 };
+            const oldValues = { title: "Hello",
+__internal: 123 };
+            const newValues = { title: "Hello",
+__internal: 456 };
             const result = findChangedFields(oldValues, newValues);
             expect(result).toBeNull();
         });
 
         it("should return null for deeply identical relations", () => {
             const oldValues = {
-                author: { id: "1", path: "authors", __type: "relation" },
+                author: { id: "1",
+path: "authors",
+__type: "relation" },
                 tags: [{ id: "1" }, { id: "2" }]
             };
             const newValues = {
-                author: { id: "1", path: "authors", __type: "relation" },
+                author: { id: "1",
+path: "authors",
+__type: "relation" },
                 tags: [{ id: "1" }, { id: "2" }]
             };
             const result = findChangedFields(oldValues as Record<string, unknown>, newValues as Record<string, unknown>);
@@ -41,15 +49,19 @@ describe("HistoryService - changedFields and history insertion logic", () => {
 
         it("should detect changes in relation properties when IDs differ", () => {
             const oldValues = {
-                author: { id: "1", path: "authors", __type: "relation" }
+                author: { id: "1",
+path: "authors",
+__type: "relation" }
             };
             const newValues = {
-                author: { id: "2", path: "authors", __type: "relation" }
+                author: { id: "2",
+path: "authors",
+__type: "relation" }
             };
             const result = findChangedFields(oldValues as Record<string, unknown>, newValues as Record<string, unknown>);
             expect(result).toEqual(["author"]);
         });
-        
+
         it("should detect differences in relation arrays", () => {
             const oldValues = {
                 tags: [{ id: "1" }]
@@ -71,7 +83,7 @@ describe("HistoryService - changedFields and history insertion logic", () => {
                 execute: jest.fn().mockResolvedValue({})
             } as unknown as jest.Mocked<NodePgDatabase>;
             historyService = new HistoryService(db as unknown as DrizzleClient, {} as unknown as PostgresCollectionRegistry);
-            jest.spyOn(console, 'error').mockImplementation(() => {});
+            jest.spyOn(console, "error").mockImplementation(() => {});
         });
 
         afterEach(() => {
@@ -84,7 +96,7 @@ describe("HistoryService - changedFields and history insertion logic", () => {
                 entityId: "1",
                 action: "update",
                 previousValues: { title: "same" },
-                values: { title: "same" },
+                values: { title: "same" }
             });
 
             // db.execute should not be called since there is no data to log
@@ -96,15 +108,17 @@ describe("HistoryService - changedFields and history insertion logic", () => {
                 tableName: "posts",
                 entityId: "1",
                 action: "update",
-                previousValues: { title: "old", tags: [{ id: 1 }] },
-                values: { title: "new", tags: [{ id: 2 }] }
+                previousValues: { title: "old",
+tags: [{ id: 1 }] },
+                values: { title: "new",
+tags: [{ id: 2 }] }
             });
 
             // Since it's a difference, db.execute should be called. (plus 2 prune calls)
             expect(db.execute.mock.calls.length).toBeGreaterThanOrEqual(1);
-            
+
             const executedSql = db.execute.mock.calls[0][0] as unknown as { query: string; sql?: string; strings?: string[]; values?: unknown[] };
-            
+
             // Drizzle wraps SQL in its own SQL type which contains sql strings and params.
             const serializedSql = JSON.stringify(executedSql);
             // The syntax we added is ARRAY[?]::text[] or similar

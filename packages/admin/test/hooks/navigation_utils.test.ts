@@ -7,7 +7,7 @@ import {
     areCollectionsEqual,
     areCollectionListsEqual,
     NAVIGATION_DEFAULT_GROUP_NAME,
-    NAVIGATION_ADMIN_GROUP_NAME,
+    NAVIGATION_ADMIN_GROUP_NAME
 } from "../../src/hooks/navigation/utils";
 import type { EntityCollection, AppView, RebasePlugin, NavigationGroupMapping } from "@rebasepro/types";
 
@@ -54,26 +54,26 @@ describe("computeNavigationGroups", () => {
         id: "products",
         slug: "products",
         group: "Content",
-        properties: {},
+        properties: {}
     } as unknown as EntityCollection;
 
     const collection2: EntityCollection = {
         id: "orders",
         slug: "orders",
         group: "Content",
-        properties: {},
+        properties: {}
     } as unknown as EntityCollection;
 
     const collection3: EntityCollection = {
         id: "settings",
         slug: "settings",
         group: "Admin",
-        properties: {},
+        properties: {}
     } as unknown as EntityCollection;
 
     it("creates groups from scratch when no existing mappings", () => {
         const result = computeNavigationGroups({
-            collections: [collection1, collection2, collection3],
+            collections: [collection1, collection2, collection3]
         });
 
         expect(result).toHaveLength(2);
@@ -87,12 +87,13 @@ describe("computeNavigationGroups", () => {
 
     it("preserves existing group mappings and adds unassigned entries", () => {
         const existingMappings: NavigationGroupMapping[] = [
-            { name: "Content", entries: ["products"] }
+            { name: "Content",
+entries: ["products"] }
         ];
 
         const result = computeNavigationGroups({
             navigationGroupMappings: existingMappings,
-            collections: [collection1, collection2, collection3],
+            collections: [collection1, collection2, collection3]
         });
 
         // products already in Content, orders should be added to Content too
@@ -110,12 +111,12 @@ describe("computeNavigationGroups", () => {
             name: "Dashboard",
             slug: "dashboard",
             group: "Main",
-            view: null!,
+            view: null!
         } as unknown as AppView;
 
         const result = computeNavigationGroups({
             collections: [collection1],
-            views: [view],
+            views: [view]
         });
 
         const mainGroup = result.find(g => g.name === "Main");
@@ -129,12 +130,13 @@ describe("computeNavigationGroups", () => {
 
     it("deduplicates entries within groups", () => {
         const existingMappings: NavigationGroupMapping[] = [
-            { name: "Content", entries: ["products", "products"] }
+            { name: "Content",
+entries: ["products", "products"] }
         ];
 
         const result = computeNavigationGroups({
             navigationGroupMappings: existingMappings,
-            collections: [collection1],
+            collections: [collection1]
         });
 
         const contentGroup = result.find(g => g.name === "Content");
@@ -156,7 +158,7 @@ describe("computeNavigationGroups", () => {
 
         const result = computeNavigationGroups({
             navigationGroupMappings: [],
-            plugins: [plugin],
+            plugins: [plugin]
         });
 
         const toolsGroup = result.find(g => g.name === "Tools");
@@ -166,13 +168,14 @@ describe("computeNavigationGroups", () => {
 
     it("does not mutate the original input mappings", () => {
         const existingMappings: NavigationGroupMapping[] = [
-            { name: "Content", entries: ["products"] }
+            { name: "Content",
+entries: ["products"] }
         ];
         const originalEntries = [...existingMappings[0].entries];
 
         const result = computeNavigationGroups({
             navigationGroupMappings: existingMappings,
-            collections: [collection1, collection2],
+            collections: [collection1, collection2]
         });
 
         // The result should contain both entries
@@ -194,7 +197,8 @@ describe("areCollectionsEqual", () => {
         name: "Products",
         path: "products",
         slug: "products",
-        properties: { title: { type: "string", name: "Title" } },
+        properties: { title: { type: "string",
+name: "Title" } }
     } as unknown as EntityCollection;
 
     const collB: EntityCollection = {
@@ -202,7 +206,8 @@ describe("areCollectionsEqual", () => {
         name: "Products",
         path: "products",
         slug: "products",
-        properties: { title: { type: "string", name: "Title" } },
+        properties: { title: { type: "string",
+name: "Title" } }
     } as unknown as EntityCollection;
 
     it("considers identical collections equal", () => {
@@ -210,14 +215,16 @@ describe("areCollectionsEqual", () => {
     });
 
     it("considers collections with different slugs unequal", () => {
-        const different = { ...collA, slug: "different" } as unknown as EntityCollection;
+        const different = { ...collA,
+slug: "different" } as unknown as EntityCollection;
         expect(areCollectionsEqual(collA, different)).toBe(false);
     });
 
     it("considers collections with different properties unequal", () => {
         const different = {
             ...collA,
-            properties: { body: { type: "string", name: "Body" } },
+            properties: { body: { type: "string",
+name: "Body" } }
         } as unknown as EntityCollection;
         expect(areCollectionsEqual(collA, different)).toBe(false);
     });
@@ -225,7 +232,7 @@ describe("areCollectionsEqual", () => {
     it("ignores function properties during comparison", () => {
         const withFn = {
             ...collA,
-            onSave: () => {},
+            onSave: () => {}
         } as unknown as EntityCollection;
         expect(areCollectionsEqual(collA, withFn)).toBe(true);
     });
@@ -236,11 +243,11 @@ describe("areCollectionsEqual", () => {
             name: "Self",
             path: "self",
             slug: "self",
-            properties: {},
+            properties: {}
         } as unknown as EntityCollection;
 
         const circularB: EntityCollection = {
-            ...circularA,
+            ...circularA
         } as unknown as EntityCollection;
 
         // Simulating that we already visited this slug
@@ -257,7 +264,7 @@ describe("areCollectionListsEqual", () => {
         name: "A",
         path: "a",
         slug: "a",
-        properties: {},
+        properties: {}
     } as unknown as EntityCollection;
 
     const col2: EntityCollection = {
@@ -265,7 +272,7 @@ describe("areCollectionListsEqual", () => {
         name: "B",
         path: "b",
         slug: "b",
-        properties: {},
+        properties: {}
     } as unknown as EntityCollection;
 
     it("returns true for identical lists", () => {
@@ -281,7 +288,8 @@ describe("areCollectionListsEqual", () => {
     });
 
     it("returns false for different collections", () => {
-        const col3 = { ...col1, slug: "c" } as unknown as EntityCollection;
+        const col3 = { ...col1,
+slug: "c" } as unknown as EntityCollection;
         expect(areCollectionListsEqual([col1], [col3])).toBe(false);
     });
 

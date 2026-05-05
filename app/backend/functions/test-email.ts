@@ -4,7 +4,7 @@ import { rebase } from "@rebasepro/server-core";
 
 /**
  * Test function to verify rebase.email works.
- * 
+ *
  * Call via: POST http://localhost:3001/api/functions/test-email
  * Or:      GET  http://localhost:3001/api/functions/test-email
  */
@@ -31,19 +31,19 @@ app.all("/", async (c) => {
                         Sent at: ${new Date().toISOString()}
                     </p>
                 </div>
-            `,
+            `
         });
 
-        return c.json({ 
-            success: true, 
+        return c.json({
+            success: true,
             message: "Email sent to francesco@firecms.co via rebase.email",
-            timestamp: new Date().toISOString(),
+            timestamp: new Date().toISOString()
         });
     } catch (err: any) {
-        return c.json({ 
-            error: "Failed to process request", 
+        return c.json({
+            error: "Failed to process request",
             details: err.message,
-            stack: err.stack 
+            stack: err.stack
         }, 500);
     }
 });

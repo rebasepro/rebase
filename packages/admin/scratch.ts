@@ -52,15 +52,19 @@ export function getChanges<T extends object>(source: Partial<T>, comparison: Par
 
 const source = {
   content: [
-    { type: "text", value: "hello" },
-    { type: "image", value: "test.png" }
+    { type: "text",
+value: "hello" },
+    { type: "image",
+value: "test.png" }
   ]
 };
 
 const comparison = {
   content: [
-    { type: "text", value: "hello" },
-    { type: "image", value: "old.png" }
+    { type: "text",
+value: "hello" },
+    { type: "image",
+value: "old.png" }
   ]
 };
 

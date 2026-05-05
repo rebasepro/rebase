@@ -113,7 +113,7 @@ export function sanitizeRelation(relation: Partial<Relation>, sourceCollection: 
             newRelation.through = {
                 table: newRelation.through?.table ?? [sourceTableName, targetTableName].sort().join("_"),
                 sourceColumn: newRelation.through?.sourceColumn ?? generateForeignKeyName(sourceName),
-                targetColumn: newRelation.through?.targetColumn ?? generateForeignKeyName(newRelation.relationName),
+                targetColumn: newRelation.through?.targetColumn ?? generateForeignKeyName(newRelation.relationName)
             };
         }
     }
@@ -133,7 +133,7 @@ export function sanitizeRelation(relation: Partial<Relation>, sourceCollection: 
 }
 
 export function resolveCollectionRelations(
-    collection: EntityCollection,
+    collection: EntityCollection
 ): Record<string, Relation> {
     if (!isPostgresCollection(collection)) return {};
     const relations: Record<string, Relation> = {};
@@ -251,11 +251,11 @@ export function findRelation(
     if (resolvedRelations[key]) return resolvedRelations[key];
 
     // Try slug form (e.g. "company_id" → "company-id")
-    const slugKey = key.replace(/_/g, '-');
+    const slugKey = key.replace(/_/g, "-");
     if (slugKey !== key && resolvedRelations[slugKey]) return resolvedRelations[slugKey];
 
     // Try snake_case form (e.g. "company-id" → "company_id")
-    const snakeKey = key.replace(/-/g, '_');
+    const snakeKey = key.replace(/-/g, "_");
     if (snakeKey !== key && resolvedRelations[snakeKey]) return resolvedRelations[snakeKey];
 
     return undefined;

@@ -46,7 +46,7 @@ async function loadCollections(collectionsDir: string): Promise<EntityCollection
 
     const jitiInstance = jiti(absDir, {
         interopDefault: true,
-        esmResolve: true,
+        esmResolve: true
     });
 
     // Look for index file
@@ -109,7 +109,7 @@ async function loadCollections(collectionsDir: string): Promise<EntityCollection
 
     throw new Error(
         `Could not extract collections from ${indexPath}.\n` +
-        `Expected a default export of EntityCollection[] or an object with named collection exports.`
+        "Expected a default export of EntityCollection[] or an object with named collection exports."
     );
 }
 
@@ -178,7 +178,7 @@ export async function generateSdkCommand(args: GenerateSDKArgs): Promise<void> {
     console.log(chalk.green.bold("  ✓ SDK generated successfully!"));
     console.log("");
     console.log(chalk.gray("  Usage:"));
-    console.log(chalk.gray(`    import { createRebaseClient } from '@rebasepro/client';`));
+    console.log(chalk.gray("    import { createRebaseClient } from '@rebasepro/client';"));
     console.log(chalk.gray(`    import type { Database } from './${path.relative(cwd, path.join(resolvedOutput, "database.types"))}';`));
     console.log("");
     console.log(chalk.gray("    const rebase = createRebaseClient<Database>({"));

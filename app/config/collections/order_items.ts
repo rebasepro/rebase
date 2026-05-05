@@ -87,13 +87,13 @@ const orderItemsCollection: PostgresCollection = {
             relationName: "order",
             target: () => ordersCollection,
             cardinality: "one",
-            direction: "owning",
+            direction: "owning"
         },
         {
             relationName: "product",
             target: () => productsCollection,
             cardinality: "one",
-            direction: "owning",
+            direction: "owning"
         }
     ]
 };

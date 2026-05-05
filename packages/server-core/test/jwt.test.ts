@@ -29,7 +29,8 @@ describe("JWT Utilities", () => {
         });
 
         it("should allow partial configuration updates", () => {
-            configureJwt({ secret: testSecret, accessExpiresIn: "2h" });
+            configureJwt({ secret: testSecret,
+accessExpiresIn: "2h" });
             // Token generation should still work
             const token = generateAccessToken("user-1", ["admin"]);
             expect(token).toBeTruthy();
@@ -138,27 +139,32 @@ describe("JWT Utilities", () => {
 
     describe("getAccessTokenExpiryMs", () => {
         it("should return correct milliseconds for hours", () => {
-            configureJwt({ secret: testSecret, accessExpiresIn: "2h" });
+            configureJwt({ secret: testSecret,
+accessExpiresIn: "2h" });
             expect(getAccessTokenExpiryMs()).toBe(2 * 60 * 60 * 1000);
         });
 
         it("should return correct milliseconds for days", () => {
-            configureJwt({ secret: testSecret, accessExpiresIn: "7d" });
+            configureJwt({ secret: testSecret,
+accessExpiresIn: "7d" });
             expect(getAccessTokenExpiryMs()).toBe(7 * 24 * 60 * 60 * 1000);
         });
 
         it("should return correct milliseconds for minutes", () => {
-            configureJwt({ secret: testSecret, accessExpiresIn: "30m" });
+            configureJwt({ secret: testSecret,
+accessExpiresIn: "30m" });
             expect(getAccessTokenExpiryMs()).toBe(30 * 60 * 1000);
         });
 
         it("should return correct milliseconds for seconds", () => {
-            configureJwt({ secret: testSecret, accessExpiresIn: "300s" });
+            configureJwt({ secret: testSecret,
+accessExpiresIn: "300s" });
             expect(getAccessTokenExpiryMs()).toBe(300 * 1000);
         });
 
         it("should default to 1 hour for invalid format", () => {
-            configureJwt({ secret: testSecret, accessExpiresIn: "invalid" });
+            configureJwt({ secret: testSecret,
+accessExpiresIn: "invalid" });
             expect(getAccessTokenExpiryMs()).toBe(60 * 60 * 1000);
         });
     });
@@ -171,7 +177,8 @@ describe("JWT Utilities", () => {
         });
 
         it("should match the configured expiry duration", () => {
-            configureJwt({ secret: testSecret, accessExpiresIn: "1h" });
+            configureJwt({ secret: testSecret,
+accessExpiresIn: "1h" });
             const now = Date.now();
             const expiry = getAccessTokenExpiry();
             // Should be approximately 1 hour from now (with small tolerance)
@@ -197,7 +204,8 @@ describe("JWT Utilities", () => {
         });
 
         it("should respect custom refresh expiry configuration", () => {
-            configureJwt({ secret: testSecret, refreshExpiresIn: "7d" });
+            configureJwt({ secret: testSecret,
+refreshExpiresIn: "7d" });
             const expiry = getRefreshTokenExpiry();
             const expected = Date.now() + (7 * 24 * 60 * 60 * 1000);
             expect(expiry.getTime()).toBeGreaterThanOrEqual(expected - 1000);
@@ -205,7 +213,8 @@ describe("JWT Utilities", () => {
         });
 
         it("should handle hour-based refresh expiry", () => {
-            configureJwt({ secret: testSecret, refreshExpiresIn: "24h" });
+            configureJwt({ secret: testSecret,
+refreshExpiresIn: "24h" });
             const expiry = getRefreshTokenExpiry();
             const expected = Date.now() + (24 * 60 * 60 * 1000);
             expect(expiry.getTime()).toBeGreaterThanOrEqual(expected - 1000);
@@ -213,7 +222,8 @@ describe("JWT Utilities", () => {
         });
 
         it("should handle minute-based refresh expiry", () => {
-            configureJwt({ secret: testSecret, refreshExpiresIn: "90m" });
+            configureJwt({ secret: testSecret,
+refreshExpiresIn: "90m" });
             const expiry = getRefreshTokenExpiry();
             const expected = Date.now() + (90 * 60 * 1000);
             expect(expiry.getTime()).toBeGreaterThanOrEqual(expected - 1000);
@@ -221,7 +231,8 @@ describe("JWT Utilities", () => {
         });
 
         it("should handle second-based refresh expiry", () => {
-            configureJwt({ secret: testSecret, refreshExpiresIn: "3600s" });
+            configureJwt({ secret: testSecret,
+refreshExpiresIn: "3600s" });
             const expiry = getRefreshTokenExpiry();
             const expected = Date.now() + (3600 * 1000);
             expect(expiry.getTime()).toBeGreaterThanOrEqual(expected - 1000);
@@ -229,7 +240,8 @@ describe("JWT Utilities", () => {
         });
 
         it("should default to 30 days for invalid refresh format", () => {
-            configureJwt({ secret: testSecret, refreshExpiresIn: "invalid" });
+            configureJwt({ secret: testSecret,
+refreshExpiresIn: "invalid" });
             const expiry = getRefreshTokenExpiry();
             const expected = Date.now() + (30 * 24 * 60 * 60 * 1000);
             expect(expiry.getTime()).toBeGreaterThanOrEqual(expected - 1000);
@@ -270,7 +282,8 @@ describe("JWT Utilities", () => {
     describe("expired token handling", () => {
         it("should return null for an expired token", () => {
             // Configure with 1 second expiry
-            configureJwt({ secret: testSecret, accessExpiresIn: "1s" });
+            configureJwt({ secret: testSecret,
+accessExpiresIn: "1s" });
             const token = generateAccessToken("user-1", ["admin"]);
 
             // Immediately verify should work

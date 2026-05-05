@@ -1,14 +1,19 @@
-import React, { useLayoutEffect, useMemo } from "react";
+import React, { lazy, Suspense, useLayoutEffect, useMemo } from "react";
 import { useRebaseRegistryDispatch } from "@rebasepro/core";
 import type { RebaseStudioConfig, AppView } from "@rebasepro/types";
+import { CircularProgressCenter } from "@rebasepro/ui";
 
-import { SQLEditor } from "./SQLEditor/SQLEditor";
-import { JSEditor } from "./JSEditor/JSEditor";
-import { RLSEditor } from "./RLSEditor/RLSEditor";
-import { StorageView } from "./StorageView/StorageView";
-import { CronJobsView } from "./CronJobs/CronJobsView";
-import { SchemaVisualizer } from "./SchemaVisualizer/SchemaVisualizer";
-import { BranchesView } from "./Branches/BranchesView";
+// Lazy-loaded studio tools — each fetched only when its route is visited.
+// This keeps Monaco, @xyflow/react, dagre, pgsql-ast-parser etc. out of the initial bundle.
+const SQLEditor = lazy(() => import("./SQLEditor/SQLEditor").then(m => ({ default: m.SQLEditor })));
+const JSEditor = lazy(() => import("./JSEditor/JSEditor").then(m => ({ default: m.JSEditor })));
+const RLSEditor = lazy(() => import("./RLSEditor/RLSEditor").then(m => ({ default: m.RLSEditor })));
+const StorageView = lazy(() => import("./StorageView/StorageView").then(m => ({ default: m.StorageView })));
+const CronJobsView = lazy(() => import("./CronJobs/CronJobsView").then(m => ({ default: m.CronJobsView })));
+const SchemaVisualizer = lazy(() => import("./SchemaVisualizer/SchemaVisualizer").then(m => ({ default: m.SchemaVisualizer })));
+const BranchesView = lazy(() => import("./Branches/BranchesView").then(m => ({ default: m.BranchesView })));
+const ApiExplorer = lazy(() => import("./ApiExplorer/ApiExplorer").then(m => ({ default: m.ApiExplorer })));
+
 import { StudioHomePage } from "./StudioHomePage";
 
 /**
@@ -19,37 +24,81 @@ import { StudioHomePage } from "./StudioHomePage";
  * When `<RebaseCMS collectionEditor={...}>` is used, the schema view is
  * automatically injected into Studio — no manual wiring needed.
  */
-const DEFAULT_HOME_PAGE = <StudioHomePage />;
+const DEFAULT_HOME_PAGE = <StudioHomePage/>;
 
 export function RebaseStudio({ tools, homePage }: RebaseStudioConfig) {
     const dispatch = useRebaseRegistryDispatch();
 
     const resolvedHomePage = homePage ?? DEFAULT_HOME_PAGE;
-    
+
     const devViews: AppView[] = useMemo(() => {
         const views: AppView[] = [];
-        const activeTools = tools ?? ["sql", "js", "rls", "storage", "cron", "schema-visualizer", "branches"];
-        
+        const activeTools = tools ?? ["sql", "js", "rls", "storage", "cron", "schema-visualizer", "branches", "api"];
+        const suspense = (el: React.ReactNode) => <Suspense fallback={<CircularProgressCenter/>}>{el}</Suspense>;
+
         if (activeTools.includes("sql")) {
-            views.push({ slug: "sql", name: "SQL Console", group: "Database", icon: "terminal", description: "Execute SQL queries", view: <SQLEditor /> });
+            views.push({ slug: "sql",
+name: "SQL Console",
+group: "Database",
+icon: "terminal",
+description: "Execute SQL queries",
+view: suspense(<SQLEditor/>) });
         }
         if (activeTools.includes("js")) {
-            views.push({ slug: "js", name: "JS Console", group: "Database", icon: "code", description: "Execute JavaScript", view: <JSEditor /> });
+            views.push({ slug: "js",
+name: "JS Console",
+group: "Compute",
+icon: "code",
+description: "Execute JavaScript",
+view: suspense(<JSEditor/>) });
         }
         if (activeTools.includes("rls")) {
-            views.push({ slug: "rls", name: "RLS Policies", group: "Database", icon: "security", description: "Row Level Security", view: <RLSEditor /> });
+            views.push({ slug: "rls",
+name: "RLS Policies",
+group: "Database",
+icon: "security",
+description: "Row Level Security",
+view: suspense(<RLSEditor/>) });
         }
         if (activeTools.includes("storage")) {
-            views.push({ slug: "storage", name: "Storage", group: "Storage", icon: "cloud", description: "Manage storage files", view: <StorageView /> });
+            views.push({ slug: "storage",
+name: "Storage",
+group: "Storage",
+icon: "cloud",
+description: "Manage storage files",
+view: suspense(<StorageView/>) });
         }
         if (activeTools.includes("cron")) {
-            views.push({ slug: "cron", name: "Cron Jobs", group: "Automation", icon: "schedule", description: "Manage scheduled tasks", view: <CronJobsView /> });
+            views.push({ slug: "cron",
+name: "Cron Jobs",
+group: "Compute",
+icon: "schedule",
+description: "Manage scheduled tasks",
+view: suspense(<CronJobsView/>) });
         }
         if (activeTools.includes("schema-visualizer")) {
-            views.push({ slug: "schema-visualizer", name: "Schema Visualizer", group: "Database", icon: "account_tree", description: "Interactive database ERD", view: <SchemaVisualizer /> });
+            views.push({ slug: "schema-visualizer",
+name: "Schema Visualizer",
+group: "Database",
+icon: "account_tree",
+description: "Interactive database ERD",
+view: suspense(<SchemaVisualizer/>) });
         }
         if (activeTools.includes("branches")) {
-            views.push({ slug: "branches", name: "Branches", group: "Database", icon: "fork_right", description: "Create and manage database branches", view: <BranchesView /> });
+            views.push({ slug: "branches",
+name: "Branches",
+group: "Database",
+icon: "fork_right",
+description: "Create and manage database branches",
+view: suspense(<BranchesView/>) });
+        }
+        if (activeTools.includes("api")) {
+            views.push({ slug: "api",
+name: "API Explorer",
+group: "API",
+icon: "auto_stories",
+description: "Interactive API documentation and testing",
+view: suspense(<ApiExplorer/>) });
         }
         // Note: "schema" tool is auto-injected by RebaseShell when collectionEditor is enabled.
         // It is NOT registered here anymore.
@@ -62,7 +111,9 @@ export function RebaseStudio({ tools, homePage }: RebaseStudioConfig) {
     homePageRef.current = resolvedHomePage;
 
     useLayoutEffect(() => {
-        dispatch.registerStudio({ tools, homePage: homePageRef.current, devViews });
+        dispatch.registerStudio({ tools,
+homePage: homePageRef.current,
+devViews });
         return () => dispatch.unregisterStudio();
     }, [dispatch, tools, devViews]);
 

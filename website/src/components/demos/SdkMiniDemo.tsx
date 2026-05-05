@@ -47,14 +47,14 @@ export function SdkMiniDemo() {
                 <div className="w-1.5 h-1.5 rounded-full bg-[#27c93f]"></div>
                 <span className="text-[#858585] text-[7px] ml-2">app.ts</span>
             </div>
-            
+
             <div className="p-3 relative flex-1 overflow-hidden">
                 {/* Line 1: const data = await client.data. */}
                 <div className="text-[#d4d4d4] flex flex-wrap">
                     <span className="text-[#569cd6]">const</span>&nbsp;data&nbsp;=&nbsp;<span className="text-[#c586c0]">await</span>&nbsp;<span className="text-[#9cdcfe]">client</span>.<span className="text-[#9cdcfe]">data</span>.
                     {step === 0 && cursor}
                 </div>
-                
+
                 {/* Line 2: posts (after autocomplete) */}
                 {step >= 1 && (
                     <div className="text-[#d4d4d4] ml-6 mt-1 relative">
@@ -109,7 +109,7 @@ export function SdkMiniDemo() {
                             </span>
                         )}
                         {step >= 5 && (
-                            <>(<span className="text-[#ce9178]">'status'</span>, <span className="text-[#ce9178]">'eq'</span>, <span className="text-[#ce9178]">'active'</span>)</>
+                            <>(<span className="text-[#ce9178]">&apos;status&apos;</span>, <span className="text-[#ce9178]">&apos;eq&apos;</span>, <span className="text-[#ce9178]">&apos;active&apos;</span>)</>
                         )}
                         {step === 5 && cursor}
                     </div>
@@ -118,7 +118,7 @@ export function SdkMiniDemo() {
                 {/* Line 3: .orderBy(...).find() */}
                 {step >= 6 && (
                     <div className="text-[#d4d4d4] ml-6 mt-1">
-                        .orderBy(<span className="text-[#ce9178]">'createdAt'</span>, <span className="text-[#ce9178]">'desc'</span>)
+                        .orderBy(<span className="text-[#ce9178]">&apos;createdAt&apos;</span>, <span className="text-[#ce9178]">&apos;desc&apos;</span>)
                         {step === 6 && cursor}
                     </div>
                 )}
@@ -132,7 +132,7 @@ export function SdkMiniDemo() {
                 {step >= 7 && (
                     <div className="mt-3 px-2 py-1.5 bg-[#252526] border border-[#454545] rounded-sm inline-block shadow-lg">
                         <div className="text-[8px] text-[#858585] mb-0.5">const data: FindResponse&lt;Post&gt;</div>
-                        <div className="text-[9px]"><span className="text-surface-500">{'{'}</span> <span className="text-[#9cdcfe]">data</span>: <span className="text-[#4ec9b0]">Entity&lt;Post&gt;</span>[], <span className="text-[#9cdcfe]">meta</span>: <span className="text-[#4ec9b0]">Meta</span> <span className="text-surface-500">{'}'}</span></div>
+                        <div className="text-[9px]"><span className="text-surface-500">{"{"}</span> <span className="text-[#9cdcfe]">data</span>: <span className="text-[#4ec9b0]">Entity&lt;Post&gt;</span>[], <span className="text-[#9cdcfe]">meta</span>: <span className="text-[#4ec9b0]">Meta</span> <span className="text-surface-500">{"}"}</span></div>
                     </div>
                 )}
             </div>

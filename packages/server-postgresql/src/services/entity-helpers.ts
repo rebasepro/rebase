@@ -54,7 +54,9 @@ export function getPrimaryKeys(collection: EntityCollection, registry: PostgresC
         if (col && typeof col === "object" && "primary" in col && col.primary) {
             const type = col.dataType === "number" || (col as unknown as Record<string, unknown>).columnType === "PgSerial" || (col as unknown as Record<string, unknown>).columnType === "PgInteger" ? "number" : "string";
             const isUUID = (col as unknown as Record<string, unknown>).columnType === "PgUUID";
-            keys.push({ fieldName: key, type, isUUID });
+            keys.push({ fieldName: key,
+type,
+isUUID });
         }
     }
 
@@ -64,7 +66,9 @@ export function getPrimaryKeys(collection: EntityCollection, registry: PostgresC
         const idCol = table["id" as keyof typeof table] as AnyPgColumn;
         const type = idCol.dataType === "number" || (idCol as unknown as Record<string, unknown>).columnType === "PgSerial" || (idCol as unknown as Record<string, unknown>).columnType === "PgInteger" ? "number" : "string";
         const isUUID = (idCol as unknown as Record<string, unknown>).columnType === "PgUUID";
-        keys.push({ fieldName: "id", type, isUUID });
+        keys.push({ fieldName: "id",
+type,
+isUUID });
     }
 
     return keys;

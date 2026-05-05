@@ -8,7 +8,8 @@ export interface Change {
 export function diffStrings(oldStr: string, newStr: string): Change[] {
     // Find the longest common substring
     function longestCommonSubstring(s1: string, s2: string): string {
-        const longest = { start: 0, length: 0 };
+        const longest = { start: 0,
+length: 0 };
         const matrix = new Array(s1.length + 1).fill(null).map(() => new Array(s2.length + 1).fill(0));
 
         for (let i = 1; i <= s1.length; i++) {
@@ -38,10 +39,12 @@ export function diffStrings(oldStr: string, newStr: string): Change[] {
         if (common.length === 0) {
             const changes: Change[] = [];
             if (s1.length > 0) {
-                changes.push({ type: "delete", value: s1 });
+                changes.push({ type: "delete",
+value: s1 });
             }
             if (s2.length > 0) {
-                changes.push({ type: "insert", value: s2 });
+                changes.push({ type: "insert",
+value: s2 });
             }
             return changes;
         }
@@ -56,7 +59,8 @@ export function diffStrings(oldStr: string, newStr: string): Change[] {
 
         return [
             ...changesBefore,
-            { type: "equal", value: common },
+            { type: "equal",
+value: common },
             ...changesAfter
         ];
     }

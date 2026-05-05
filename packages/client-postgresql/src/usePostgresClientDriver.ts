@@ -29,7 +29,7 @@ export function usePostgresClientDriver(config: PostgresDataDriverConfig): Postg
 
     return useMemo(() => {
         if (!client) throw new Error("RebaseWebSocketClient must be provided in config.wsClient");
-        
+
         return {
 
         key: "postgres",
@@ -41,12 +41,20 @@ export function usePostgresClientDriver(config: PostgresDataDriverConfig): Postg
         async fetchCollection<M extends Record<string, any>>(props: FetchCollectionProps<M>): Promise<Entity<M>[]> {
             // Pick only the fields the client needs, ignoring extra fields from the CMS layer
             const { path, filter, limit, startAfter, orderBy, searchString, order } = props;
-            return client.fetchCollection({ path, filter, limit, startAfter, orderBy, searchString, order }) as Promise<Entity<M>[]>;
+            return client.fetchCollection({ path,
+filter,
+limit,
+startAfter,
+orderBy,
+searchString,
+order }) as Promise<Entity<M>[]>;
         },
 
         async fetchEntity<M extends Record<string, any>>(props: FetchEntityProps<M>): Promise<Entity<M> | undefined> {
             const { path, entityId, databaseId } = props;
-            return client.fetchEntity({ path, entityId, databaseId }) as Promise<Entity<M> | undefined>;
+            return client.fetchEntity({ path,
+entityId,
+databaseId }) as Promise<Entity<M> | undefined>;
         },
 
         async saveEntity<M extends Record<string, any>>(props: SaveEntityProps<M>): Promise<Entity<M>> {
@@ -70,13 +78,25 @@ export function usePostgresClientDriver(config: PostgresDataDriverConfig): Postg
 
         async countEntities<M extends Record<string, any>>(props: FetchCollectionProps<M>): Promise<number> {
             const { path, filter, limit, startAfter, orderBy, searchString, order } = props;
-            return client.countEntities({ path, filter, limit, startAfter, orderBy, searchString, order });
+            return client.countEntities({ path,
+filter,
+limit,
+startAfter,
+orderBy,
+searchString,
+order });
         },
 
         listenCollection<M extends Record<string, any>>(props: ListenCollectionProps<M>): () => void {
             const { path, filter, limit, startAfter, orderBy, searchString, order, onUpdate, onError } = props;
             return client.listenCollection(
-                { path, filter, limit, startAfter, orderBy, searchString, order },
+                { path,
+filter,
+limit,
+startAfter,
+orderBy,
+searchString,
+order },
                 (entities: Entity[]) => props.onUpdate(entities as Entity<M>[]),
                 props.onError
             );
@@ -85,7 +105,9 @@ export function usePostgresClientDriver(config: PostgresDataDriverConfig): Postg
         listenEntity<M extends Record<string, any>>(props: ListenEntityProps<M>): () => void {
             const { path, entityId, databaseId, onUpdate, onError } = props;
             return client.listenEntity(
-                { path, entityId, databaseId },
+                { path,
+entityId,
+databaseId },
                 (entity: Entity | null) => {
                     props.onUpdate(entity as Entity<M> | null);
                 },

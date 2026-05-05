@@ -18,7 +18,8 @@ export function _setRebaseMock(mockInstance: Partial<RebaseClient>): void {
     if (process.env.NODE_ENV !== "test") {
         throw new Error("_setRebaseMock can only be called in a test environment (NODE_ENV=test).");
     }
-    _instance = { ...(_instance || {} as RebaseClient), ...mockInstance } as RebaseClient;
+    _instance = { ...(_instance || {} as RebaseClient),
+...mockInstance } as RebaseClient;
 }
 
 /**
@@ -65,5 +66,5 @@ export const rebase: RebaseClient = new Proxy({} as RebaseClient, {
             `Cannot set rebase.${String(prop)} directly. ` +
             "The singleton is read-only. Use _initRebase() during server startup."
         );
-    },
+    }
 });

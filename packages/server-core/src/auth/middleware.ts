@@ -114,7 +114,8 @@ export function createRequireAuth(options?: { serviceKey?: string }): Middleware
 
         // Check service key first (constant-time comparison)
         if (safeCompare(token, key)) {
-            c.set("user", { userId: "service", roles: ["admin"] } as AccessTokenPayload);
+            c.set("user", { userId: "service",
+roles: ["admin"] } as AccessTokenPayload);
             return next();
         }
 
@@ -278,24 +279,32 @@ export function createAuthMiddleware(options: AuthMiddlewareOptions): Middleware
                         || ("uid" in authResult ? authResult.uid : undefined);
                     if (id) {
                         const roles = authResult.roles || [];
-                        c.set("user", { userId: id, roles });
-                        const user = { uid: id, roles, ...authResult };
+                        c.set("user", { userId: id,
+roles });
+                        const user = { uid: id,
+roles,
+...authResult };
                         c.set("driver", await scopeDataDriver(driver, user));
                     } else {
                         // Validator returned an object but without an ID — scope as anon
-                        c.set("driver", await scopeDataDriver(driver, { uid: "anon", roles: ["anon"] }));
+                        c.set("driver", await scopeDataDriver(driver, { uid: "anon",
+roles: ["anon"] }));
                     }
                 } else if (authResult === true) {
-                    c.set("user", { userId: "default", roles: [] });
-                    c.set("driver", await scopeDataDriver(driver, { uid: "default", roles: [] }));
+                    c.set("user", { userId: "default",
+roles: [] });
+                    c.set("driver", await scopeDataDriver(driver, { uid: "default",
+roles: [] }));
                 } else {
                     // Not authenticated — scope as anon so RLS can evaluate.
                     // Fail closed: if anon scoping fails, reject instead of
                     // falling back to the raw driver.
-                    c.set("driver", await scopeDataDriver(driver, { uid: "anon", roles: ["anon"] }));
+                    c.set("driver", await scopeDataDriver(driver, { uid: "anon",
+roles: ["anon"] }));
                 }
             } catch (error) {
-                return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+                return c.json({ error: { message: "Unauthorized",
+code: "UNAUTHORIZED" } }, 401);
             }
         } else {
             // Default JWT path (with optional service key support)
@@ -323,7 +332,8 @@ export function createAuthMiddleware(options: AuthMiddlewareOptions): Middleware
                         }));
                     } catch (error) {
                         console.error("[AUTH] RLS scoping failed for service key:", error);
-                        return c.json({ error: { message: "Internal authentication error", code: "INTERNAL_ERROR" } }, 500);
+                        return c.json({ error: { message: "Internal authentication error",
+code: "INTERNAL_ERROR" } }, 500);
                     }
                 } else {
                     // ── JWT verification ───────────────────────────────────
@@ -332,18 +342,21 @@ export function createAuthMiddleware(options: AuthMiddlewareOptions): Middleware
                     if (payload) {
                         c.set("user", payload);
                         try {
-                            const user = { uid: payload.userId, roles: payload.roles };
+                            const user = { uid: payload.userId,
+roles: payload.roles };
                             c.set("driver", await scopeDataDriver(driver, user));
                         } catch (error) {
                             // withAuth() failed for a valid token — reject (fail closed)
                             console.error("[AUTH] RLS scoping failed for authenticated user:", error);
-                            return c.json({ error: { message: "Internal authentication error", code: "INTERNAL_ERROR" } }, 500);
+                            return c.json({ error: { message: "Internal authentication error",
+code: "INTERNAL_ERROR" } }, 500);
                         }
                     } else {
                         // Token present but invalid — always reject.
                         // Providing a malformed token should never grant access,
                         // regardless of requireAuth setting.
-                        return c.json({ error: { message: "Invalid or expired token", code: "UNAUTHORIZED" } }, 401);
+                        return c.json({ error: { message: "Invalid or expired token",
+code: "UNAUTHORIZED" } }, 401);
                     }
                 }
             } else {
@@ -351,16 +364,19 @@ export function createAuthMiddleware(options: AuthMiddlewareOptions): Middleware
                 // Fail closed: if anon scoping fails, return 500 rather
                 // than silently proceeding with an unscoped driver.
                 try {
-                    c.set("driver", await scopeDataDriver(driver, { uid: "anon", roles: ["anon"] }));
+                    c.set("driver", await scopeDataDriver(driver, { uid: "anon",
+roles: ["anon"] }));
                 } catch (error) {
                     console.error("[AUTH] Failed to create anon-scoped driver:", error);
-                    return c.json({ error: { message: "Server configuration error", code: "INTERNAL_ERROR" } }, 500);
+                    return c.json({ error: { message: "Server configuration error",
+code: "INTERNAL_ERROR" } }, 500);
                 }
             }
         }
 
         if (enforceAuth && !c.get("user")) {
-            return c.json({ error: { message: "Unauthorized: Authentication required", code: "UNAUTHORIZED" } }, 401);
+            return c.json({ error: { message: "Unauthorized: Authentication required",
+code: "UNAUTHORIZED" } }, 401);
         }
 
         return next();

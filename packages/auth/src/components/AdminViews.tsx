@@ -55,14 +55,14 @@ export function createUserManagementAdminViews({ userManagement, apiUrl, getAuth
             name: "CMS Users",
             group: "Admin",
             icon: "face",
-            view: <UsersView userManagement={userManagement} apiUrl={apiUrl} getAuthToken={getAuthToken} />
+            view: <UsersView userManagement={userManagement} apiUrl={apiUrl} getAuthToken={getAuthToken}/>
         },
         {
             slug: "dev/roles",
             name: "Roles",
             group: "Admin",
             icon: "gpp_good",
-            view: <RolesView userManagement={userManagement} collections={collections} />
+            view: <RolesView userManagement={userManagement} collections={collections}/>
         }
     ];
 }
@@ -127,11 +127,13 @@ export function UsersView({ userManagement, apiUrl, getAuthToken }: {
             if (!response.ok) {
                 throw new Error(data.error?.message || "Bootstrap failed");
             }
-            snackbarController.open({ type: "success", message: "You are now an admin! Refreshing..." });
+            snackbarController.open({ type: "success",
+message: "You are now an admin! Refreshing..." });
             // Reload to get new roles
             window.location.reload();
         } catch (error: unknown) {
-            snackbarController.open({ type: "error", message: error instanceof Error ? error.message : "Failed to bootstrap admin" });
+            snackbarController.open({ type: "error",
+message: error instanceof Error ? error.message : "Failed to bootstrap admin" });
         } finally {
             setBootstrapping(false);
         }
@@ -158,18 +160,20 @@ export function UsersView({ userManagement, apiUrl, getAuthToken }: {
         setDeleteInProgress(true);
         try {
             await deleteUser(userToDelete);
-            snackbarController.open({ type: "success", message: "User deleted successfully" });
+            snackbarController.open({ type: "success",
+message: "User deleted successfully" });
             setDeleteConfirmOpen(false);
             setUserToDelete(undefined);
         } catch (error: unknown) {
-            snackbarController.open({ type: "error", message: error instanceof Error ? error.message : "Error deleting user" });
+            snackbarController.open({ type: "error",
+message: error instanceof Error ? error.message : "Error deleting user" });
         } finally {
             setDeleteInProgress(false);
         }
     };
 
     if (loading) {
-        return <CenteredView><CircularProgress /></CenteredView>;
+        return <CenteredView><CircularProgress/></CenteredView>;
     }
 
     return (
@@ -186,7 +190,7 @@ export function UsersView({ userManagement, apiUrl, getAuthToken }: {
                         onClick={handleBootstrap}
                         disabled={bootstrapping}
                     >
-                        {bootstrapping ? <CircularProgress size="small" /> : "Make me admin"}
+                        {bootstrapping ? <CircularProgress size="small"/> : "Make me admin"}
                     </Button>
                 </div>
             )}
@@ -195,7 +199,7 @@ export function UsersView({ userManagement, apiUrl, getAuthToken }: {
                 <Typography gutterBottom variant="h4" className="grow" component="h4">
                     Users
                 </Typography>
-                <Button startIcon={<AddIcon />} onClick={handleAddUser}>
+                <Button startIcon={<AddIcon/>} onClick={handleAddUser}>
                     Add user
                 </Button>
             </div>
@@ -220,7 +224,7 @@ export function UsersView({ userManagement, apiUrl, getAuthToken }: {
                                                 setUserToDelete(user);
                                                 setDeleteConfirmOpen(true);
                                             }}>
-                                            <DeleteIcon />
+                                            <DeleteIcon/>
                                         </IconButton>
                                     </Tooltip>
                                 </TableCell>
@@ -230,7 +234,7 @@ export function UsersView({ userManagement, apiUrl, getAuthToken }: {
                                     <div className="flex flex-wrap gap-2">
                                         {user.roles?.map((roleId: string) => {
                                             const role = roles.find(r => r.id === roleId);
-                                            return role ? <RoleChip key={roleId} role={role} /> : <span key={roleId}>{roleId}</span>;
+                                            return role ? <RoleChip key={roleId} role={role}/> : <span key={roleId}>{roleId}</span>;
                                         })}
                                     </div>
                                 </TableCell>
@@ -333,7 +337,8 @@ function UserDetailsForm({
             await saveUser(userToSave);
             handleClose();
         } catch (error: unknown) {
-            snackbarController.open({ type: "error", message: error instanceof Error ? error.message : "Failed to save user" });
+            snackbarController.open({ type: "error",
+message: error instanceof Error ? error.message : "Failed to save user" });
         } finally {
             setIsSubmitting(false);
         }
@@ -347,7 +352,10 @@ function UserDetailsForm({
     return (
         <Dialog open={open} onOpenChange={(open) => !open ? handleClose() : undefined} maxWidth="4xl">
             <form onSubmit={handleSubmit} autoComplete="off" noValidate
-                style={{ display: "flex", flexDirection: "column", position: "relative", height: "100%" }}>
+                style={{ display: "flex",
+flexDirection: "column",
+position: "relative",
+height: "100%" }}>
 
                 <DialogTitle variant="h4" gutterBottom={false}>
                     User
@@ -393,7 +401,7 @@ function UserDetailsForm({
                             >
                                 {roles.map(role => (
                                     <MultiSelectItem key={role.id} value={role.id}>
-                                        <RoleChip role={role} />
+                                        <RoleChip role={role}/>
                                     </MultiSelectItem>
                                 ))}
                             </MultiSelect>
@@ -452,11 +460,13 @@ export function RolesView({ userManagement, collections = [] }: { userManagement
         setDeleteInProgress(true);
         try {
             await deleteRole(roleToDelete);
-            snackbarController.open({ type: "success", message: "Role deleted successfully" });
+            snackbarController.open({ type: "success",
+message: "Role deleted successfully" });
             setDeleteConfirmOpen(false);
             setRoleToDelete(undefined);
         } catch (error: unknown) {
-            snackbarController.open({ type: "error", message: error instanceof Error ? error.message : "Error deleting role" });
+            snackbarController.open({ type: "error",
+message: error instanceof Error ? error.message : "Error deleting role" });
         } finally {
             setDeleteInProgress(false);
         }
@@ -464,15 +474,21 @@ export function RolesView({ userManagement, collections = [] }: { userManagement
 
     const createDefaultRoles = () => {
         const defaultRoles: Role[] = [
-            { id: "admin", name: "Admin", isAdmin: true },
-            { id: "editor", name: "Editor", isAdmin: false },
-            { id: "viewer", name: "Viewer", isAdmin: false }
+            { id: "admin",
+name: "Admin",
+isAdmin: true },
+            { id: "editor",
+name: "Editor",
+isAdmin: false },
+            { id: "viewer",
+name: "Viewer",
+isAdmin: false }
         ];
         defaultRoles.forEach(role => saveRole(role));
     };
 
     if (loading) {
-        return <CenteredView><CircularProgress /></CenteredView>;
+        return <CenteredView><CircularProgress/></CenteredView>;
     }
 
     return (
@@ -481,7 +497,7 @@ export function RolesView({ userManagement, collections = [] }: { userManagement
                 <Typography gutterBottom variant="h4" className="grow" component="h4">
                     Roles
                 </Typography>
-                <Button startIcon={<AddIcon />} onClick={handleAddRole}>
+                <Button startIcon={<AddIcon/>} onClick={handleAddRole}>
                     Add role
                 </Button>
             </div>
@@ -507,16 +523,16 @@ export function RolesView({ userManagement, collections = [] }: { userManagement
                                                         setRoleToDelete(role);
                                                         setDeleteConfirmOpen(true);
                                                     }}>
-                                                    <DeleteIcon />
+                                                    <DeleteIcon/>
                                                 </IconButton>
                                             </Tooltip>
                                         )}
                                     </TableCell>
                                     <TableCell>
-                                        <RoleChip role={role} />
+                                        <RoleChip role={role}/>
                                     </TableCell>
                                     <TableCell className="items-center">
-                                        <Checkbox checked={role.isAdmin ?? false} />
+                                        <Checkbox checked={role.isAdmin ?? false}/>
                                     </TableCell>
                                 </TableRow>
                             );
@@ -527,7 +543,7 @@ export function RolesView({ userManagement, collections = [] }: { userManagement
                                 <TableCell colspan={4}>
                                     <CenteredView className="flex flex-col gap-4 my-8 items-center">
                                         <Typography variant="label">
-                                            You don't have any roles yet.
+                                            You don&apos;t have any roles yet.
                                         </Typography>
                                         {allowDefaultRolesCreation && (
                                             <Button onClick={createDefaultRoles}>
@@ -615,7 +631,8 @@ function RoleDetailsForm({
             });
             handleClose();
         } catch (error: unknown) {
-            snackbarController.open({ type: "error", message: error instanceof Error ? error.message : "Failed to save role" });
+            snackbarController.open({ type: "error",
+message: error instanceof Error ? error.message : "Failed to save role" });
         } finally {
             setIsSubmitting(false);
         }
@@ -624,7 +641,10 @@ function RoleDetailsForm({
     return (
         <Dialog open={open} onOpenChange={(open) => !open ? handleClose() : undefined} maxWidth="6xl">
             <form onSubmit={handleSubmit} autoComplete="off" noValidate
-                style={{ display: "flex", flexDirection: "column", position: "relative", height: "100%" }}>
+                style={{ display: "flex",
+flexDirection: "column",
+position: "relative",
+height: "100%" }}>
 
                 <DialogTitle variant="h4" gutterBottom={false}>
                     Role
@@ -673,7 +693,7 @@ function RoleDetailsForm({
 
                         {/* Permissions matrix */}
                         <div className="col-span-12">
-                            <CollectionPermissionsMatrix roleId={roleId} isAdmin={isAdmin} collections={collections} />
+                            <CollectionPermissionsMatrix roleId={roleId} isAdmin={isAdmin} collections={collections}/>
                         </div>
                     </div>
                 </DialogContent>
@@ -699,10 +719,14 @@ function RoleDetailsForm({
 // CollectionPermissionsMatrix Component
 // ============================================
 const CRUD_OPS = [
-    { op: "select" as const, label: "Read" },
-    { op: "insert" as const, label: "Create" },
-    { op: "update" as const, label: "Edit" },
-    { op: "delete" as const, label: "Delete" },
+    { op: "select" as const,
+label: "Read" },
+    { op: "insert" as const,
+label: "Create" },
+    { op: "update" as const,
+label: "Edit" },
+    { op: "delete" as const,
+label: "Delete" }
 ];
 
 /** Inline check: does roleId have access for this operation on these securityRules? */
@@ -784,7 +808,7 @@ function CollectionPermissionsMatrix({ roleId, isAdmin, collections }: { roleId:
                                     </TableCell>
                                     {CRUD_OPS.map(({ op }) => (
                                         <TableCell key={op} className="text-center">
-                                            <PermCell granted={isAdmin || hasRoleAccess(extCol.securityRules, roleId, op)} />
+                                            <PermCell granted={isAdmin || hasRoleAccess(extCol.securityRules, roleId, op)}/>
                                         </TableCell>
                                     ))}
                                 </TableRow>

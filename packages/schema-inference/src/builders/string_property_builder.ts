@@ -17,7 +17,7 @@ export function buildStringProperty({
 
     let stringProperty: Property = {
         name: name ?? "",
-        type: "string",
+        type: "string"
 
     };
 
@@ -91,7 +91,7 @@ function probableFileType(valuesCount: ValuesCountEntry, totalDocsCount: number)
     const isVideo = (value: string) => VIDEO_EXTENSIONS.some((extension) => value.toString().endsWith(extension));
 
     const stringValues = valuesCount.values.filter((v): v is string => typeof v === "string");
-    
+
     let imageCount = 0;
     let audioCount = 0;
     let videoCount = 0;

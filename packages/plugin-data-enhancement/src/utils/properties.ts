@@ -13,7 +13,8 @@ export function getSimplifiedProperties<M extends Record<string, any>>(propertie
             const valueInPath = getValueInPath(values, fullKey);
             return getSimplifiedProperty(property, fullKey, valueInPath)
         })
-        .reduce((a, b) => ({ ...a, ...b }), {});
+        .reduce((a, b) => ({ ...a,
+...b }), {});
 }
 
 function getSimpleProperty(property: Property): InputProperty {
@@ -82,7 +83,8 @@ function getSimplifiedProperty(property: Property, path: string, value?: any): R
                     valueField: property.oneOf.valueField,
                     properties: Object.entries(property.oneOf.properties)
                         .map(([key, prop]) => ({ [key]: getSimpleProperty(prop) }))
-                        .reduce((a, b) => ({ ...a, ...b }), {})
+                        .reduce((a, b) => ({ ...a,
+...b }), {})
                 }
             };
 
@@ -106,7 +108,8 @@ function getSimplifiedProperty(property: Property, path: string, value?: any): R
                     [`${path}.${i}.${typeKey}`]: oneOfType,
                     ...simplifiedProperty
                 };
-            }).reduce((a, b) => ({ ...a, ...b }), { [path]: arrayParentProperty });
+            }).reduce((a, b) => ({ ...a,
+...b }), { [path]: arrayParentProperty });
         }
     } else if (property.type === "map") {
         if (property.properties) {
@@ -116,7 +119,8 @@ function getSimplifiedProperty(property: Property, path: string, value?: any): R
                     return getSimplifiedProperty(childProperty, key, childValue);
                 })
                 .map(o => attachPathToKeys(o, path))
-                .reduce((a, b) => ({ ...a, ...b }), {});
+                .reduce((a, b) => ({ ...a,
+...b }), {});
 
             if (Object.keys(mapProperties).length === 0) return {};
             const mapParentProperty: InputProperty = {
@@ -151,7 +155,8 @@ function attachPathToKeys(obj: Record<string, any>, path = ""): Record<string, a
             const fullKey = path ? `${path}.${key}` : key;
             return { [fullKey]: value };
         })
-        .reduce((a, b) => ({ ...a, ...b }), {});
+        .reduce((a, b) => ({ ...a,
+...b }), {});
 }
 
 function getSimpleEnumValues(enumValues: EnumValues): string[] {

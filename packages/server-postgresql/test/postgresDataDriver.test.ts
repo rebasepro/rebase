@@ -1,11 +1,11 @@
 
-import { describe, it, expect, beforeEach } from '@jest/globals';
-import { PostgresBackendDriver } from '../src/PostgresBackendDriver';
-import { RealtimeService } from '../src/services/realtimeService';
-import { EntityService } from '../src/services/entityService';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { sql } from 'drizzle-orm';
-import type { EntityCollection, Entity } from '@rebasepro/types';
+import { describe, it, expect, beforeEach } from "@jest/globals";
+import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import { RealtimeService } from "../src/services/realtimeService";
+import { EntityService } from "../src/services/entityService";
+import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { sql } from "drizzle-orm";
+import type { EntityCollection, Entity } from "@rebasepro/types";
 
 type MockTx = { execute: jest.Mock };
 type MockUser = { uid: string; email?: string; roles?: unknown[] };
@@ -18,7 +18,7 @@ const mockDb = {
     from: jest.fn().mockReturnThis(),
     limit: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
-    orderBy: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis()
 } as unknown as NodePgDatabase;
 
 const mockRealtimeService = {
@@ -26,11 +26,11 @@ const mockRealtimeService = {
     addSubscriptionCallback: jest.fn(),
     removeSubscriptionCallback: jest.fn(),
     subscriptions: new Map(),
-    notifyEntityUpdate: jest.fn(),
+    notifyEntityUpdate: jest.fn()
 } as unknown as RealtimeService;
 
 
-describe('PostgresBackendDriver', () => {
+describe("PostgresBackendDriver", () => {
     let delegate: PostgresBackendDriver;
 
     beforeEach(() => {
@@ -38,22 +38,24 @@ describe('PostgresBackendDriver', () => {
         delegate = new PostgresBackendDriver(mockDb, mockRealtimeService);
     });
 
-    it('should initialize correctly', () => {
+    it("should initialize correctly", () => {
         expect(delegate).toBeDefined();
-        expect(delegate.key).toBe('postgres');
+        expect(delegate.key).toBe("postgres");
     });
 
-    describe('withAuth', () => {
-        it('should return a new delegate instance', async () => {
-            const user = { uid: 'test-user', email: 'test@example.com' };
+    describe("withAuth", () => {
+        it("should return a new delegate instance", async () => {
+            const user = { uid: "test-user",
+email: "test@example.com" };
             const authDelegate = await delegate.withAuth(user);
 
             expect(authDelegate).toBeDefined();
             expect(authDelegate).not.toBe(delegate);
         });
 
-        it('should wrap methods in a transaction', async () => {
-            const user = { uid: 'test-user', email: 'test@example.com' };
+        it("should wrap methods in a transaction", async () => {
+            const user = { uid: "test-user",
+email: "test@example.com" };
             const authDelegate = await delegate.withAuth(user);
 
             const mockTx = { execute: jest.fn() };
@@ -61,15 +63,18 @@ describe('PostgresBackendDriver', () => {
                 return await cb(mockTx);
             });
 
-            jest.spyOn(PostgresBackendDriver.prototype, 'fetchCollection').mockResolvedValueOnce([]);
+            jest.spyOn(PostgresBackendDriver.prototype, "fetchCollection").mockResolvedValueOnce([]);
 
-            await authDelegate.fetchCollection({ path: 'test_collection', collection: { slug: 'test', properties: {} } as unknown as EntityCollection });
+            await authDelegate.fetchCollection({ path: "test_collection",
+collection: { slug: "test",
+properties: {} } as unknown as EntityCollection });
 
             expect(mockDb.transaction).toHaveBeenCalled();
         });
 
-        it('should set app.user_id in the transaction for RLS', async () => {
-            const user = { uid: 'test-user-123', email: 'test@example.com' };
+        it("should set app.user_id in the transaction for RLS", async () => {
+            const user = { uid: "test-user-123",
+email: "test@example.com" };
             const authDelegate = await delegate.withAuth(user);
 
             const mockTx: MockTx = { execute: jest.fn() };
@@ -77,9 +82,11 @@ describe('PostgresBackendDriver', () => {
                 return await cb(mockTx);
             });
 
-            jest.spyOn(PostgresBackendDriver.prototype, 'fetchCollection').mockResolvedValueOnce([]);
+            jest.spyOn(PostgresBackendDriver.prototype, "fetchCollection").mockResolvedValueOnce([]);
 
-            await authDelegate.fetchCollection({ path: 'test', collection: { slug: 'test', properties: {} } as unknown as EntityCollection });
+            await authDelegate.fetchCollection({ path: "test",
+collection: { slug: "test",
+properties: {} } as unknown as EntityCollection });
 
             expect(mockDb.transaction).toHaveBeenCalled();
             expect(mockTx.execute).toHaveBeenCalled();
@@ -89,8 +96,10 @@ describe('PostgresBackendDriver', () => {
             expect(callString).toContain("test-user-123");
         });
 
-        it('should set app.user_roles handling array of strings correctly', async () => {
-            const user: MockUser = { uid: 'test-user-123', email: 'test@example.com', roles: ['admin', 'editor'] };
+        it("should set app.user_roles handling array of strings correctly", async () => {
+            const user: MockUser = { uid: "test-user-123",
+email: "test@example.com",
+roles: ["admin", "editor"] };
             const authDelegate = await delegate.withAuth(user);
 
             const mockTx: MockTx = { execute: jest.fn() };
@@ -98,9 +107,11 @@ describe('PostgresBackendDriver', () => {
                 return await cb(mockTx);
             });
 
-            jest.spyOn(PostgresBackendDriver.prototype, 'fetchCollection').mockResolvedValueOnce([]);
+            jest.spyOn(PostgresBackendDriver.prototype, "fetchCollection").mockResolvedValueOnce([]);
 
-            await authDelegate.fetchCollection({ path: 'test', collection: { slug: 'test', properties: {} } as unknown as EntityCollection });
+            await authDelegate.fetchCollection({ path: "test",
+collection: { slug: "test",
+properties: {} } as unknown as EntityCollection });
 
             expect(mockTx.execute).toHaveBeenCalledTimes(1);
             const sqlCall = mockTx.execute.mock.calls[0][0];
@@ -109,8 +120,10 @@ describe('PostgresBackendDriver', () => {
             expect(callString).toContain("admin,editor");
         });
 
-        it('should set app.user_roles handling array of objects correctly', async () => {
-            const user: MockUser = { uid: 'test-user-123', email: 'test@example.com', roles: [{ id: 'admin' }, { id: 'editor' }] };
+        it("should set app.user_roles handling array of objects correctly", async () => {
+            const user: MockUser = { uid: "test-user-123",
+email: "test@example.com",
+roles: [{ id: "admin" }, { id: "editor" }] };
             const authDelegate = await delegate.withAuth(user);
 
             const mockTx: MockTx = { execute: jest.fn() };
@@ -118,9 +131,11 @@ describe('PostgresBackendDriver', () => {
                 return await cb(mockTx);
             });
 
-            jest.spyOn(PostgresBackendDriver.prototype, 'fetchCollection').mockResolvedValueOnce([]);
+            jest.spyOn(PostgresBackendDriver.prototype, "fetchCollection").mockResolvedValueOnce([]);
 
-            await authDelegate.fetchCollection({ path: 'test', collection: { slug: 'test', properties: {} } as unknown as EntityCollection });
+            await authDelegate.fetchCollection({ path: "test",
+collection: { slug: "test",
+properties: {} } as unknown as EntityCollection });
 
             expect(mockTx.execute).toHaveBeenCalledTimes(1);
             const sqlCall = mockTx.execute.mock.calls[0][0];
@@ -129,7 +144,7 @@ describe('PostgresBackendDriver', () => {
             expect(callString).toContain("admin,editor");
         });
 
-        it('should fallback to anonymous and empty roles when missing from user', async () => {
+        it("should fallback to anonymous and empty roles when missing from user", async () => {
             const user = {} as unknown as MockUser; // Empty user object
             const authDelegate = await delegate.withAuth(user);
 
@@ -139,23 +154,25 @@ describe('PostgresBackendDriver', () => {
             });
 
             // We mock fetchCollection to just return something and not crash
-            jest.spyOn(PostgresBackendDriver.prototype, 'fetchCollection').mockResolvedValueOnce([]);
+            jest.spyOn(PostgresBackendDriver.prototype, "fetchCollection").mockResolvedValueOnce([]);
 
-            await authDelegate.fetchCollection({ path: 'test', collection: { slug: 'test', properties: {} } as unknown as EntityCollection });
+            await authDelegate.fetchCollection({ path: "test",
+collection: { slug: "test",
+properties: {} } as unknown as EntityCollection });
 
             expect(mockDb.transaction).toHaveBeenCalledTimes(1);
-            
+
             const transactionCallback = (mockDb.transaction as jest.Mock).mock.calls[0][0];
             const mockTx: MockTx = { execute: jest.fn() };
             await transactionCallback(mockTx).catch(() => {});
-            
+
             const sqlCall = mockTx.execute.mock.calls[0][0];
             const callString = JSON.stringify(sqlCall);
             expect(callString).toContain("set_config");
             expect(callString).toContain("anonymous");
         });
 
-        it('should gracefully handle completely null or undefined user objects', async () => {
+        it("should gracefully handle completely null or undefined user objects", async () => {
             const authDelegate = await delegate.withAuth(null as unknown as MockUser);
 
             (mockDb.transaction as jest.Mock).mockImplementation(async (cb: (tx: MockTx) => Promise<unknown>) => {
@@ -163,14 +180,16 @@ describe('PostgresBackendDriver', () => {
                 return cb(mockTx);
             });
 
-            jest.spyOn(PostgresBackendDriver.prototype, 'fetchCollection').mockResolvedValueOnce([]);
+            jest.spyOn(PostgresBackendDriver.prototype, "fetchCollection").mockResolvedValueOnce([]);
 
-            await authDelegate.fetchCollection({ path: 'test', collection: { slug: 'test', properties: {} } as unknown as EntityCollection });
+            await authDelegate.fetchCollection({ path: "test",
+collection: { slug: "test",
+properties: {} } as unknown as EntityCollection });
 
             const transactionCallback = (mockDb.transaction as jest.Mock).mock.calls[0][0];
             const mockTx: MockTx = { execute: jest.fn() };
             await transactionCallback(mockTx).catch(() => {});
-            
+
             const sqlCall = mockTx.execute.mock.calls[0][0];
             const callString = JSON.stringify(sqlCall);
             expect(callString).toContain("set_config");
@@ -178,14 +197,15 @@ describe('PostgresBackendDriver', () => {
         });
     });
 
-    describe('AuthenticatedPostgresBackendDriver Transactional Integrity', () => {
+    describe("AuthenticatedPostgresBackendDriver Transactional Integrity", () => {
         let authDelegate: Awaited<ReturnType<typeof delegate.withAuth>>;
 
         beforeEach(async () => {
-            authDelegate = await delegate.withAuth({ uid: 'test-user', email: 'test@example.com' });
+            authDelegate = await delegate.withAuth({ uid: "test-user",
+email: "test@example.com" });
         });
 
-        it('should execute operation and flush notifications on success', async () => {
+        it("should execute operation and flush notifications on success", async () => {
             const mockTx = {
                 execute: jest.fn()
             };
@@ -195,25 +215,29 @@ describe('PostgresBackendDriver', () => {
             });
 
             // Let's pretend the operation queues a notification
-            jest.spyOn(PostgresBackendDriver.prototype, 'saveEntity').mockImplementationOnce(async function(this: { _pendingNotifications?: Array<Record<string, unknown>> }) {
+            jest.spyOn(PostgresBackendDriver.prototype, "saveEntity").mockImplementationOnce(async function(this: { _pendingNotifications?: Array<Record<string, unknown>> }) {
                 this._pendingNotifications?.push({
-                    path: 'test',
-                    entityId: '123',
-                    entity: {} as unknown as Entity,
+                    path: "test",
+                    entityId: "123",
+                    entity: {} as unknown as Entity
                 });
                 return {} as unknown as Entity;
             });
 
-            await authDelegate.saveEntity({ path: 'test', entityId: '123', values: {}, collection: {} as unknown as EntityCollection, status: 'new' });
+            await authDelegate.saveEntity({ path: "test",
+entityId: "123",
+values: {},
+collection: {} as unknown as EntityCollection,
+status: "new" });
 
             // Ensure transaction was called
             expect(mockDb.transaction).toHaveBeenCalled();
 
             // Ensure notification was flushed after commit
-            expect(mockRealtimeService.notifyEntityUpdate).toHaveBeenCalledWith('test', '123', {}, undefined);
+            expect(mockRealtimeService.notifyEntityUpdate).toHaveBeenCalledWith("test", "123", {}, undefined);
         });
 
-        it('should NOT flush notifications if transaction throws an error', async () => {
+        it("should NOT flush notifications if transaction throws an error", async () => {
             const mockTx = {
                 execute: jest.fn()
             };
@@ -222,22 +246,26 @@ describe('PostgresBackendDriver', () => {
                 return await cb(mockTx);
             });
 
-            jest.spyOn(PostgresBackendDriver.prototype, 'saveEntity').mockImplementationOnce(async function(this: { _pendingNotifications?: Array<Record<string, unknown>> }) {
+            jest.spyOn(PostgresBackendDriver.prototype, "saveEntity").mockImplementationOnce(async function(this: { _pendingNotifications?: Array<Record<string, unknown>> }) {
                 this._pendingNotifications?.push({
-                    path: 'test',
-                    entityId: '123',
-                    entity: {} as unknown as Entity,
+                    path: "test",
+                    entityId: "123",
+                    entity: {} as unknown as Entity
                 });
                 throw new Error("Transaction failed");
             });
 
-            await expect(authDelegate.saveEntity({ path: 'test', entityId: '123', values: {}, collection: {} as unknown as EntityCollection, status: 'new' })).rejects.toThrow("Transaction failed");
+            await expect(authDelegate.saveEntity({ path: "test",
+entityId: "123",
+values: {},
+collection: {} as unknown as EntityCollection,
+status: "new" })).rejects.toThrow("Transaction failed");
 
             // Ensure notification was NOT flushed
             expect(mockRealtimeService.notifyEntityUpdate).not.toHaveBeenCalled();
         });
 
-        it('should return successfully even if a deferred notification throw an error (resilience)', async () => {
+        it("should return successfully even if a deferred notification throw an error (resilience)", async () => {
             const mockTx = {
                 execute: jest.fn()
             };
@@ -246,27 +274,31 @@ describe('PostgresBackendDriver', () => {
                 return await cb(mockTx);
             });
 
-            jest.spyOn(PostgresBackendDriver.prototype, 'saveEntity').mockImplementationOnce(async function(this: { _pendingNotifications?: Array<Record<string, unknown>> }) {
+            jest.spyOn(PostgresBackendDriver.prototype, "saveEntity").mockImplementationOnce(async function(this: { _pendingNotifications?: Array<Record<string, unknown>> }) {
                 this._pendingNotifications?.push({
-                    path: 'test',
-                    entityId: 'buggy-123',
-                    entity: {} as unknown as Entity,
+                    path: "test",
+                    entityId: "buggy-123",
+                    entity: {} as unknown as Entity
                 });
-                return { id: 'success' } as unknown as Entity;
+                return { id: "success" } as unknown as Entity;
             });
 
             // Mock the notification service intentionally crashing
             const notifySpy = mockRealtimeService.notifyEntityUpdate as jest.Mock;
             notifySpy.mockRejectedValueOnce(new Error("Network Failure on Notification"));
-            
+
             // Should still return the entity successfully despite the error
-            const result = await authDelegate.saveEntity({ path: 'test', entityId: 'buggy-123', values: {}, collection: {} as unknown as EntityCollection, status: 'new' });
-            
-            expect(result).toEqual({ id: 'success' });
-            expect(notifySpy).toHaveBeenCalledWith('test', 'buggy-123', {}, undefined);
+            const result = await authDelegate.saveEntity({ path: "test",
+entityId: "buggy-123",
+values: {},
+collection: {} as unknown as EntityCollection,
+status: "new" });
+
+            expect(result).toEqual({ id: "success" });
+            expect(notifySpy).toHaveBeenCalledWith("test", "buggy-123", {}, undefined);
         });
 
-        it('should safely isolate completely concurrent transaction notifications from leaking across scopes', async () => {
+        it("should safely isolate completely concurrent transaction notifications from leaking across scopes", async () => {
             const mockTx = {
                 execute: jest.fn()
             };
@@ -278,41 +310,54 @@ describe('PostgresBackendDriver', () => {
             });
 
             // Operation 1 flags a notification
-            const save1 = jest.spyOn(PostgresBackendDriver.prototype, 'saveEntity').mockImplementationOnce(async function(this: { _pendingNotifications?: Array<Record<string, unknown>> }) {
-                this._pendingNotifications?.push({ path: 'scope-1', entityId: '1', entity: {} as unknown as Entity });
+            const save1 = jest.spyOn(PostgresBackendDriver.prototype, "saveEntity").mockImplementationOnce(async function(this: { _pendingNotifications?: Array<Record<string, unknown>> }) {
+                this._pendingNotifications?.push({ path: "scope-1",
+entityId: "1",
+entity: {} as unknown as Entity });
                 return {} as unknown as Entity;
             });
 
             // Operation 2 flags a different notification
-            const save2 = jest.spyOn(PostgresBackendDriver.prototype, 'saveEntity').mockImplementationOnce(async function(this: { _pendingNotifications?: Array<Record<string, unknown>> }) {
-                this._pendingNotifications?.push({ path: 'scope-2', entityId: '2', entity: {} as unknown as Entity });
+            const save2 = jest.spyOn(PostgresBackendDriver.prototype, "saveEntity").mockImplementationOnce(async function(this: { _pendingNotifications?: Array<Record<string, unknown>> }) {
+                this._pendingNotifications?.push({ path: "scope-2",
+entityId: "2",
+entity: {} as unknown as Entity });
                 return {} as unknown as Entity;
             });
 
             // Fire simultaneously
             await Promise.all([
-                authDelegate.saveEntity({ path: 'scope-1', entityId: '1', values: {}, collection: {} as unknown as EntityCollection, status: 'new' }),
-                authDelegate.saveEntity({ path: 'scope-2', entityId: '2', values: {}, collection: {} as unknown as EntityCollection, status: 'new' })
+                authDelegate.saveEntity({ path: "scope-1",
+entityId: "1",
+values: {},
+collection: {} as unknown as EntityCollection,
+status: "new" }),
+                authDelegate.saveEntity({ path: "scope-2",
+entityId: "2",
+values: {},
+collection: {} as unknown as EntityCollection,
+status: "new" })
             ]);
 
             // Ensure our notify was called with both exact combinations, but NOT cross-pollinated
-            expect(mockRealtimeService.notifyEntityUpdate).toHaveBeenCalledWith('scope-1', '1', {}, undefined);
-            expect(mockRealtimeService.notifyEntityUpdate).toHaveBeenCalledWith('scope-2', '2', {}, undefined);
-            
+            expect(mockRealtimeService.notifyEntityUpdate).toHaveBeenCalledWith("scope-1", "1", {}, undefined);
+            expect(mockRealtimeService.notifyEntityUpdate).toHaveBeenCalledWith("scope-2", "2", {}, undefined);
+
             // Check count
             expect(mockRealtimeService.notifyEntityUpdate).toHaveBeenCalledTimes(2);
         });
     });
 
-    describe('AuthenticatedPostgresBackendDriver Delegation', () => {
+    describe("AuthenticatedPostgresBackendDriver Delegation", () => {
         let authDelegate: Awaited<ReturnType<typeof delegate.withAuth>>;
 
         beforeEach(async () => {
-            authDelegate = await delegate.withAuth({ uid: 'test-user', email: 'test@example.com' });
+            authDelegate = await delegate.withAuth({ uid: "test-user",
+email: "test@example.com" });
         });
 
-        it('should delegate executeSql directly without a transaction', async () => {
-            jest.spyOn(delegate, 'executeSql').mockResolvedValueOnce([{ id: 1 }] as unknown as Record<string, unknown>[]);
+        it("should delegate executeSql directly without a transaction", async () => {
+            jest.spyOn(delegate, "executeSql").mockResolvedValueOnce([{ id: 1 }] as unknown as Record<string, unknown>[]);
 
             const result = await authDelegate.executeSql("SELECT 1");
 
@@ -321,100 +366,117 @@ describe('PostgresBackendDriver', () => {
             expect(result).toEqual([{ id: 1 }]);
         });
 
-        it('should override listenCollection to inject auth context', () => {
+        it("should override listenCollection to inject auth context", () => {
             const mockUnsubscribe = jest.fn();
-            
+
             // Clear original map instead of reassigning
             mockRealtimeService.subscriptions.clear();
-            
+
             // The act of calling the delegated method should update the last subscription
-            jest.spyOn(delegate, 'listenCollection').mockImplementationOnce(() => {
-                mockRealtimeService.subscriptions.set('sub1', { clientId: 'driver', authContext: undefined });
+            jest.spyOn(delegate, "listenCollection").mockImplementationOnce(() => {
+                mockRealtimeService.subscriptions.set("sub1", { clientId: "driver",
+authContext: undefined });
                 return mockUnsubscribe;
             });
 
-            const unsub = authDelegate.listenCollection({ path: 'test', collection: {} as unknown as EntityCollection, callbacks: {} as unknown as Record<string, unknown> });
+            const unsub = authDelegate.listenCollection({ path: "test",
+collection: {} as unknown as EntityCollection,
+callbacks: {} as unknown as Record<string, unknown> });
 
             expect(unsub).toBe(mockUnsubscribe);
-            expect(mockRealtimeService.subscriptions.get('sub1').authContext).toEqual({ userId: 'test-user', roles: [] });
+            expect(mockRealtimeService.subscriptions.get("sub1").authContext).toEqual({ userId: "test-user",
+roles: [] });
         });
 
-        it('should override listenEntity to inject auth context', () => {
+        it("should override listenEntity to inject auth context", () => {
             const mockUnsubscribe = jest.fn();
-            
+
             mockRealtimeService.subscriptions.clear();
-            
-            jest.spyOn(delegate, 'listenEntity').mockImplementationOnce(() => {
-                mockRealtimeService.subscriptions.set('sub2', { clientId: 'driver', authContext: undefined });
+
+            jest.spyOn(delegate, "listenEntity").mockImplementationOnce(() => {
+                mockRealtimeService.subscriptions.set("sub2", { clientId: "driver",
+authContext: undefined });
                 return mockUnsubscribe;
             });
 
-            const unsub = authDelegate.listenEntity({ path: 'test', entityId: '123', collection: {} as unknown as EntityCollection, callbacks: {} as unknown as Record<string, unknown> });
+            const unsub = authDelegate.listenEntity({ path: "test",
+entityId: "123",
+collection: {} as unknown as EntityCollection,
+callbacks: {} as unknown as Record<string, unknown> });
 
             expect(unsub).toBe(mockUnsubscribe);
-            expect(mockRealtimeService.subscriptions.get('sub2').authContext).toEqual({ userId: 'test-user', roles: [] });
+            expect(mockRealtimeService.subscriptions.get("sub2").authContext).toEqual({ userId: "test-user",
+roles: [] });
         });
 
-        it('should handle listenCollection gracefully if delegate fails to add a subscription', () => {
+        it("should handle listenCollection gracefully if delegate fails to add a subscription", () => {
             const mockUnsubscribe = jest.fn();
             mockRealtimeService.subscriptions.clear();
-            jest.spyOn(delegate, 'listenCollection').mockImplementationOnce(() => mockUnsubscribe);
-            const unsub = authDelegate.listenCollection({ path: 'empty-test', collection: {} as unknown as EntityCollection, callbacks: {} as unknown as Record<string, unknown> });
+            jest.spyOn(delegate, "listenCollection").mockImplementationOnce(() => mockUnsubscribe);
+            const unsub = authDelegate.listenCollection({ path: "empty-test",
+collection: {} as unknown as EntityCollection,
+callbacks: {} as unknown as Record<string, unknown> });
             expect(unsub).toBe(mockUnsubscribe);
         });
 
-        it('should NOT skip authContext injection if subscription has a non-driver clientId', () => {
+        it("should NOT skip authContext injection if subscription has a non-driver clientId", () => {
             const mockUnsubscribe = jest.fn();
             mockRealtimeService.subscriptions.clear();
-            jest.spyOn(delegate, 'listenCollection').mockImplementationOnce(() => {
-                mockRealtimeService.subscriptions.set('sub-ext', { clientId: 'external-client', authContext: undefined });
+            jest.spyOn(delegate, "listenCollection").mockImplementationOnce(() => {
+                mockRealtimeService.subscriptions.set("sub-ext", { clientId: "external-client",
+authContext: undefined });
                 return mockUnsubscribe;
             });
-            authDelegate.listenCollection({ path: 'test', collection: {} as unknown as EntityCollection, callbacks: {} as unknown as Record<string, unknown> });
+            authDelegate.listenCollection({ path: "test",
+collection: {} as unknown as EntityCollection,
+callbacks: {} as unknown as Record<string, unknown> });
             // authContext should NOT be injected because clientId !== 'driver'
-            expect(mockRealtimeService.subscriptions.get('sub-ext').authContext).toBeUndefined();
+            expect(mockRealtimeService.subscriptions.get("sub-ext").authContext).toBeUndefined();
         });
 
-        it('should delegate fetchAvailableDatabases without a transaction', async () => {
-            jest.spyOn(delegate, 'fetchAvailableDatabases').mockResolvedValueOnce(['db1', 'db2']);
+        it("should delegate fetchAvailableDatabases without a transaction", async () => {
+            jest.spyOn(delegate, "fetchAvailableDatabases").mockResolvedValueOnce(["db1", "db2"]);
             const result = await authDelegate.fetchAvailableDatabases();
             expect(mockDb.transaction).not.toHaveBeenCalled();
-            expect(result).toEqual(['db1', 'db2']);
+            expect(result).toEqual(["db1", "db2"]);
         });
 
-        it('should delegate fetchAvailableRoles without a transaction', async () => {
-            jest.spyOn(delegate, 'fetchAvailableRoles').mockResolvedValueOnce(['admin', 'viewer']);
+        it("should delegate fetchAvailableRoles without a transaction", async () => {
+            jest.spyOn(delegate, "fetchAvailableRoles").mockResolvedValueOnce(["admin", "viewer"]);
             const result = await authDelegate.fetchAvailableRoles();
             expect(mockDb.transaction).not.toHaveBeenCalled();
-            expect(result).toEqual(['admin', 'viewer']);
+            expect(result).toEqual(["admin", "viewer"]);
         });
 
-        it('should delegate fetchCurrentDatabase without a transaction', async () => {
-            jest.spyOn(delegate, 'fetchCurrentDatabase').mockResolvedValueOnce('my_db');
+        it("should delegate fetchCurrentDatabase without a transaction", async () => {
+            jest.spyOn(delegate, "fetchCurrentDatabase").mockResolvedValueOnce("my_db");
             const result = await authDelegate.fetchCurrentDatabase();
             expect(mockDb.transaction).not.toHaveBeenCalled();
-            expect(result).toBe('my_db');
+            expect(result).toBe("my_db");
         });
 
-        it('should delegate fetchUnmappedTables without a transaction', async () => {
-            jest.spyOn(delegate, 'fetchUnmappedTables').mockResolvedValueOnce(['orphan_table']);
-            const result = await authDelegate.fetchUnmappedTables(['mapped']);
+        it("should delegate fetchUnmappedTables without a transaction", async () => {
+            jest.spyOn(delegate, "fetchUnmappedTables").mockResolvedValueOnce(["orphan_table"]);
+            const result = await authDelegate.fetchUnmappedTables(["mapped"]);
             expect(mockDb.transaction).not.toHaveBeenCalled();
-            expect(result).toEqual(['orphan_table']);
+            expect(result).toEqual(["orphan_table"]);
         });
 
-        it('should delegate fetchTableMetadata without a transaction', async () => {
-            jest.spyOn(delegate, 'fetchTableMetadata').mockResolvedValueOnce([{ name: 'id', type: 'int4' }] as unknown as Record<string, unknown>[]);
-            const result = await authDelegate.fetchTableMetadata('users');
+        it("should delegate fetchTableMetadata without a transaction", async () => {
+            jest.spyOn(delegate, "fetchTableMetadata").mockResolvedValueOnce([{ name: "id",
+type: "int4" }] as unknown as Record<string, unknown>[]);
+            const result = await authDelegate.fetchTableMetadata("users");
             expect(mockDb.transaction).not.toHaveBeenCalled();
-            expect(result).toEqual([{ name: 'id', type: 'int4' }]);
+            expect(result).toEqual([{ name: "id",
+type: "int4" }]);
         });
     });
 
-    describe('AuthenticatedPostgresBackendDriver Security & Contract', () => {
-        it('should use parameterized queries (drizzle sql``) NOT string interpolation for set_config', async () => {
+    describe("AuthenticatedPostgresBackendDriver Security & Contract", () => {
+        it("should use parameterized queries (drizzle sql``) NOT string interpolation for set_config", async () => {
             // A malicious uid should be passed as a parameter, not concatenated
-            const maliciousUser: MockUser = { uid: "admin'; DROP TABLE users; --", email: 'hacker@evil.com' };
+            const maliciousUser: MockUser = { uid: "admin'; DROP TABLE users; --",
+email: "hacker@evil.com" };
             const authDelegate = await delegate.withAuth(maliciousUser);
 
             const mockTx: MockTx = { execute: jest.fn() };
@@ -422,9 +484,11 @@ describe('PostgresBackendDriver', () => {
                 return await cb(mockTx);
             });
 
-            jest.spyOn(PostgresBackendDriver.prototype, 'fetchCollection').mockResolvedValueOnce([]);
+            jest.spyOn(PostgresBackendDriver.prototype, "fetchCollection").mockResolvedValueOnce([]);
 
-            await authDelegate.fetchCollection({ path: 'x', collection: { slug: 'x', properties: {} } as unknown as EntityCollection });
+            await authDelegate.fetchCollection({ path: "x",
+collection: { slug: "x",
+properties: {} } as unknown as EntityCollection });
 
             // The SQL template tag should have the userId as a parameter value, not embedded in the SQL string
             const sqlObj = mockTx.execute.mock.calls[0][0];
@@ -433,11 +497,12 @@ describe('PostgresBackendDriver', () => {
             // The malicious string should appear as a bound parameter, not as raw SQL
             expect(serialized).toContain("admin'; DROP TABLE users; --");
             // Verify it's using Drizzle's tagged template, which inherently parameterizes
-            expect(sqlObj).toHaveProperty('queryChunks');
+            expect(sqlObj).toHaveProperty("queryChunks");
         });
 
-        it('should produce a valid JWT payload in set_config even with exotic roles', async () => {
-            const user: MockUser = { uid: 'u1', roles: ['role"with"quotes', 'role,with,commas', 'rôle-spécial'] };
+        it("should produce a valid JWT payload in set_config even with exotic roles", async () => {
+            const user: MockUser = { uid: "u1",
+roles: ['role"with"quotes', "role,with,commas", "rôle-spécial"] };
             const authDelegate = await delegate.withAuth(user);
 
             const mockTx: MockTx = { execute: jest.fn() };
@@ -445,18 +510,21 @@ describe('PostgresBackendDriver', () => {
                 return await cb(mockTx);
             });
 
-            jest.spyOn(PostgresBackendDriver.prototype, 'fetchCollection').mockResolvedValueOnce([]);
+            jest.spyOn(PostgresBackendDriver.prototype, "fetchCollection").mockResolvedValueOnce([]);
 
-            await authDelegate.fetchCollection({ path: 'x', collection: { slug: 'x', properties: {} } as unknown as EntityCollection });
+            await authDelegate.fetchCollection({ path: "x",
+collection: { slug: "x",
+properties: {} } as unknown as EntityCollection });
 
             const serialized = JSON.stringify(mockTx.execute.mock.calls[0][0]);
             // The JWT should be valid JSON.stringify output containing the roles
             expect(serialized).toContain('role\\"with\\"quotes');
-            expect(serialized).toContain('rôle-spécial');
+            expect(serialized).toContain("rôle-spécial");
         });
 
-        it('should handle role objects missing the id field by falling back to String()', async () => {
-            const user: MockUser = { uid: 'u1', roles: [{ name: 'viewer' }, 42, null] };
+        it("should handle role objects missing the id field by falling back to String()", async () => {
+            const user: MockUser = { uid: "u1",
+roles: [{ name: "viewer" }, 42, null] };
             const authDelegate = await delegate.withAuth(user);
 
             const mockTx: MockTx = { execute: jest.fn() };
@@ -464,92 +532,116 @@ describe('PostgresBackendDriver', () => {
                 return await cb(mockTx);
             });
 
-            jest.spyOn(PostgresBackendDriver.prototype, 'fetchCollection').mockResolvedValueOnce([]);
+            jest.spyOn(PostgresBackendDriver.prototype, "fetchCollection").mockResolvedValueOnce([]);
 
-            await authDelegate.fetchCollection({ path: 'x', collection: { slug: 'x', properties: {} } as unknown as EntityCollection });
+            await authDelegate.fetchCollection({ path: "x",
+collection: { slug: "x",
+properties: {} } as unknown as EntityCollection });
 
             const serialized = JSON.stringify(mockTx.execute.mock.calls[0][0]);
             // Objects without id → String({name:'viewer'}) = "[object Object]", 42 → "42", null → "null"
-            expect(serialized).toContain('set_config');
+            expect(serialized).toContain("set_config");
         });
 
-        it('should wrap deleteEntity in a transaction with RLS', async () => {
+        it("should wrap deleteEntity in a transaction with RLS", async () => {
             (mockDb.transaction as jest.Mock).mockImplementation(async (cb) => {
                 return await cb({ execute: jest.fn() });
             });
-            jest.spyOn(PostgresBackendDriver.prototype, 'deleteEntity').mockResolvedValueOnce(undefined);
+            jest.spyOn(PostgresBackendDriver.prototype, "deleteEntity").mockResolvedValueOnce(undefined);
 
-            const authDelegate = await delegate.withAuth({ uid: 'deleter', email: 'del@test.com' } as MockUser);
-            await authDelegate.deleteEntity({ entity: { id: '1', path: 'x', values: {} } as unknown as Entity });
+            const authDelegate = await delegate.withAuth({ uid: "deleter",
+email: "del@test.com" } as MockUser);
+            await authDelegate.deleteEntity({ entity: { id: "1",
+path: "x",
+values: {} } as unknown as Entity });
 
             expect(mockDb.transaction).toHaveBeenCalled();
         });
 
-        it('should wrap checkUniqueField in a transaction with RLS', async () => {
+        it("should wrap checkUniqueField in a transaction with RLS", async () => {
             (mockDb.transaction as jest.Mock).mockImplementation(async (cb) => {
                 return await cb({ execute: jest.fn() });
             });
-            jest.spyOn(PostgresBackendDriver.prototype, 'checkUniqueField').mockResolvedValueOnce(true);
+            jest.spyOn(PostgresBackendDriver.prototype, "checkUniqueField").mockResolvedValueOnce(true);
 
-            const authDelegate = await delegate.withAuth({ uid: 'checker', email: 'c@test.com' } as MockUser);
-            const result = await authDelegate.checkUniqueField('path', 'email', 'test@x.com', '1');
+            const authDelegate = await delegate.withAuth({ uid: "checker",
+email: "c@test.com" } as MockUser);
+            const result = await authDelegate.checkUniqueField("path", "email", "test@x.com", "1");
 
             expect(mockDb.transaction).toHaveBeenCalled();
             expect(result).toBe(true);
         });
 
-        it('should wrap countEntities in a transaction with RLS', async () => {
+        it("should wrap countEntities in a transaction with RLS", async () => {
             (mockDb.transaction as jest.Mock).mockImplementation(async (cb) => {
                 return await cb({ execute: jest.fn() });
             });
-            jest.spyOn(PostgresBackendDriver.prototype, 'countEntities').mockResolvedValueOnce(42);
+            jest.spyOn(PostgresBackendDriver.prototype, "countEntities").mockResolvedValueOnce(42);
 
-            const authDelegate = await delegate.withAuth({ uid: 'counter', email: 'c@test.com' } as MockUser);
-            const result = await authDelegate.countEntities({ path: 'items', collection: {} as unknown as EntityCollection });
+            const authDelegate = await delegate.withAuth({ uid: "counter",
+email: "c@test.com" } as MockUser);
+            const result = await authDelegate.countEntities({ path: "items",
+collection: {} as unknown as EntityCollection });
 
             expect(mockDb.transaction).toHaveBeenCalled();
             expect(result).toBe(42);
         });
 
         it('should expose key="postgres" and initialised=true on the authenticated wrapper', async () => {
-            const authDelegate = await delegate.withAuth({ uid: 'u', email: 'u@t.com' } as MockUser);
-            expect(authDelegate.key).toBe('postgres');
+            const authDelegate = await delegate.withAuth({ uid: "u",
+email: "u@t.com" } as MockUser);
+            expect(authDelegate.key).toBe("postgres");
             expect(authDelegate.initialised).toBe(true);
         });
 
-        it('should NOT share user state if withAuth is called with different users', async () => {
-            const auth1 = await delegate.withAuth({ uid: 'alice', email: 'a@t.com' } as MockUser);
-            const auth2 = await delegate.withAuth({ uid: 'bob', email: 'b@t.com' } as MockUser);
+        it("should NOT share user state if withAuth is called with different users", async () => {
+            const auth1 = await delegate.withAuth({ uid: "alice",
+email: "a@t.com" } as MockUser);
+            const auth2 = await delegate.withAuth({ uid: "bob",
+email: "b@t.com" } as MockUser);
 
-            expect(auth1.user.uid).toBe('alice');
-            expect(auth2.user.uid).toBe('bob');
+            expect(auth1.user.uid).toBe("alice");
+            expect(auth2.user.uid).toBe("bob");
             // They share the same underlying delegate
             expect(auth1.delegate).toBe(auth2.delegate);
         });
 
-        it('should create a fresh pendingNotifications array per withTransaction call (no accumulation)', async () => {
-            const authDelegate = await delegate.withAuth({ uid: 'u1', email: 'u@t.com' } as MockUser);
+        it("should create a fresh pendingNotifications array per withTransaction call (no accumulation)", async () => {
+            const authDelegate = await delegate.withAuth({ uid: "u1",
+email: "u@t.com" } as MockUser);
             const mockTx = { execute: jest.fn() };
 
             (mockDb.transaction as jest.Mock).mockImplementation(async (cb) => await cb(mockTx));
 
-            jest.spyOn(PostgresBackendDriver.prototype, 'saveEntity')
+            jest.spyOn(PostgresBackendDriver.prototype, "saveEntity")
                 .mockImplementationOnce(async function(this: { _pendingNotifications?: Array<Record<string, unknown>> }) {
-                    this._pendingNotifications?.push({ path: 'call-1', entityId: '1', entity: {} as unknown as Entity });
+                    this._pendingNotifications?.push({ path: "call-1",
+entityId: "1",
+entity: {} as unknown as Entity });
                     return {} as unknown as Entity;
                 })
                 .mockImplementationOnce(async function(this: { _pendingNotifications?: Array<Record<string, unknown>> }) {
-                    this._pendingNotifications?.push({ path: 'call-2', entityId: '2', entity: {} as unknown as Entity });
+                    this._pendingNotifications?.push({ path: "call-2",
+entityId: "2",
+entity: {} as unknown as Entity });
                     return {} as unknown as Entity;
                 });
 
-            await authDelegate.saveEntity({ path: 'call-1', entityId: '1', values: {}, collection: {} as unknown as EntityCollection, status: 'new' });
-            await authDelegate.saveEntity({ path: 'call-2', entityId: '2', values: {}, collection: {} as unknown as EntityCollection, status: 'new' });
+            await authDelegate.saveEntity({ path: "call-1",
+entityId: "1",
+values: {},
+collection: {} as unknown as EntityCollection,
+status: "new" });
+            await authDelegate.saveEntity({ path: "call-2",
+entityId: "2",
+values: {},
+collection: {} as unknown as EntityCollection,
+status: "new" });
 
             // Each call should have flushed exactly 1 notification, not accumulated
             expect(mockRealtimeService.notifyEntityUpdate).toHaveBeenCalledTimes(2);
-            expect(mockRealtimeService.notifyEntityUpdate).toHaveBeenNthCalledWith(1, 'call-1', '1', {}, undefined);
-            expect(mockRealtimeService.notifyEntityUpdate).toHaveBeenNthCalledWith(2, 'call-2', '2', {}, undefined);
+            expect(mockRealtimeService.notifyEntityUpdate).toHaveBeenNthCalledWith(1, "call-1", "1", {}, undefined);
+            expect(mockRealtimeService.notifyEntityUpdate).toHaveBeenNthCalledWith(2, "call-2", "2", {}, undefined);
         });
     });
 });

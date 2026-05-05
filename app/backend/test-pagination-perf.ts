@@ -49,7 +49,9 @@ function printSummary(label: string) {
     for (const q of sqlQueries) {
         const fromMatch = q.sql.match(/from "(\w+)"/i);
         const key = fromMatch ? `FROM "${fromMatch[1]}"` : q.sql.slice(0, 60);
-        if (!groups[key]) groups[key] = { count: 0, totalMs: 0, samples: [] };
+        if (!groups[key]) groups[key] = { count: 0,
+totalMs: 0,
+samples: [] };
         groups[key].count++;
         groups[key].totalMs += q.durationMs;
         if (groups[key].samples.length < 1) groups[key].samples.push(q.sql.slice(0, 250));
@@ -67,7 +69,8 @@ function printSummary(label: string) {
 async function main() {
     console.log("🔌 Connecting to database...");
 
-    const pool = new pg.Pool({ connectionString: DATABASE_URL, max: 5 });
+    const pool = new pg.Pool({ connectionString: DATABASE_URL,
+max: 5 });
 
     // Monkey-patch pool.query for SQL tracing
     const _origQuery = pool.query.bind(pool);
@@ -82,12 +85,15 @@ async function main() {
         const resultPromise = _origQuery(...args);
         resultPromise.then(() => {
             const elapsed = performance.now() - start;
-            sqlQueries.push({ sql: sqlStr.slice(0, 500), durationMs: elapsed });
+            sqlQueries.push({ sql: sqlStr.slice(0, 500),
+durationMs: elapsed });
         }).catch(() => { /* ignore */ });
         return resultPromise;
     };
 
-    const fullSchema = { ...schema.tables, ...schema.enums, ...schema.relations };
+    const fullSchema = { ...schema.tables,
+...schema.enums,
+...schema.relations };
     const db = drizzle(pool, { schema: fullSchema });
 
     console.log(`📋 Collections: ${allCollections.map(c => c.slug).join(", ")}`);
@@ -112,7 +118,7 @@ async function main() {
     const { rows: [{ count: authorsCount }] } = await _origQuery("SELECT count(*) FROM authors");
     const { rows: [{ count: postsCount }] } = await _origQuery("SELECT count(*) FROM posts");
     const { rows: [{ count: profilesCount }] } = await _origQuery("SELECT count(*) FROM profiles");
-    console.log(`\n📊 Database stats:`);
+    console.log("\n📊 Database stats:");
     console.log(`  authors  : ${authorsCount}`);
     console.log(`  posts    : ${postsCount}`);
     console.log(`  profiles : ${profilesCount}`);
@@ -124,15 +130,17 @@ async function main() {
     const timings: { n: number; wallMs: number; sqlCount: number; sqlMs: number }[] = [];
 
     for (const limit of testSizes) {
-        console.log(`\n═══════════════════════════════════════════════════`);
+        console.log("\n═══════════════════════════════════════════════════");
         console.log(`TEST: fetchEntitiesWithConditions — ${limit} authors`);
-        console.log(`═══════════════════════════════════════════════════`);
+        console.log("═══════════════════════════════════════════════════");
 
         startTrace();
         const wallStart = performance.now();
         const results = await entityService.fetchEntitiesWithConditions(
             "authors",
-            { limit, orderBy: "email", order: "asc" }
+            { limit,
+orderBy: "email",
+order: "asc" }
         );
         const wallEnd = performance.now();
         stopTrace();
@@ -144,11 +152,14 @@ async function main() {
         console.log(`  Wall time  : ${wallMs.toFixed(0)} ms`);
         printSummary(`${limit} authors — SQL breakdown`);
 
-        timings.push({ n: limit, wallMs, sqlCount: sqlQueries.length, sqlMs });
+        timings.push({ n: limit,
+wallMs,
+sqlCount: sqlQueries.length,
+sqlMs });
 
         // Data correctness for first test
         if (limit === testSizes[0] && results.length > 0) {
-            console.log(`\n  ── Data Correctness ──`);
+            console.log("\n  ── Data Correctness ──");
             const first = results[0];
             const vals = first.values as Record<string, unknown>;
             console.log(`  ID: ${first.id}, name: ${vals.name}, email: ${vals.email}`);
@@ -171,9 +182,9 @@ async function main() {
     }
 
     // ──── Scaling analysis ────────────────────────────────────────
-    console.log(`\n═══════════════════════════════════════════════════`);
-    console.log(`SCALING ANALYSIS`);
-    console.log(`═══════════════════════════════════════════════════`);
+    console.log("\n═══════════════════════════════════════════════════");
+    console.log("SCALING ANALYSIS");
+    console.log("═══════════════════════════════════════════════════");
     console.log(`  ${"N".padStart(5)}  ${"Wall(ms)".padStart(10)}  ${"SQL#".padStart(6)}  ${"SQL(ms)".padStart(10)}  ${"ms/entity".padStart(10)}`);
     for (const t of timings) {
         console.log(`  ${String(t.n).padStart(5)}  ${t.wallMs.toFixed(0).padStart(10)}  ${String(t.sqlCount).padStart(6)}  ${t.sqlMs.toFixed(0).padStart(10)}  ${(t.wallMs / t.n).toFixed(2).padStart(10)}`);
@@ -190,11 +201,11 @@ async function main() {
     console.log(`  Wall time scale   : ${first.wallMs.toFixed(0)} → ${last.wallMs.toFixed(0)} ms (${wallScale.toFixed(2)}x)`);
 
     if (queryScale < 2) {
-        console.log(`\n  ✅ PASS: Query count is ~constant regardless of N — no N+1`);
+        console.log("\n  ✅ PASS: Query count is ~constant regardless of N — no N+1");
     } else if (queryScale < nScale * 0.5) {
-        console.log(`\n  ⚠️  WARN: Query count grows but sub-linearly`);
+        console.log("\n  ⚠️  WARN: Query count grows but sub-linearly");
     } else {
-        console.log(`\n  ❌ FAIL: N+1 detected — query count scales with entity count`);
+        console.log("\n  ❌ FAIL: N+1 detected — query count scales with entity count");
     }
 
     if (wallScale < nScale * 1.5) {
@@ -204,7 +215,7 @@ async function main() {
     }
 
     await pool.end();
-    console.log(`\n✅ Test complete.`);
+    console.log("\n✅ Test complete.");
 }
 
 main().catch(e => {

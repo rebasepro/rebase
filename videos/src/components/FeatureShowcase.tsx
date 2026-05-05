@@ -4,19 +4,35 @@ import {
   interpolate,
   spring,
   useCurrentFrame,
-  useVideoConfig,
+  useVideoConfig
 } from "remotion";
 import { RebaseLogo } from "./RebaseLogo";
 
 const FEATURES = [
-  { icon: "📊", label: "Admin Panel", color: "#0070F4" },
-  { icon: "🔌", label: "REST & GraphQL APIs", color: "#FF3773" },
-  { icon: "⌨️", label: "Typed TypeScript SDK", color: "#FFA400" },
-  { icon: "🔐", label: "Built-in Auth", color: "#0070F4" },
-  { icon: "⚡", label: "Real-time Subscriptions", color: "#FF3773" },
-  { icon: "📦", label: "Data Import / Export", color: "#FFA400" },
-  { icon: "📋", label: "Kanban Boards", color: "#0070F4" },
-  { icon: "🕐", label: "Data History & Audit", color: "#FF3773" },
+  { icon: "📊",
+label: "Admin Panel",
+color: "#0070F4" },
+  { icon: "🔌",
+label: "REST & GraphQL APIs",
+color: "#FF3773" },
+  { icon: "⌨️",
+label: "Typed TypeScript SDK",
+color: "#FFA400" },
+  { icon: "🔐",
+label: "Built-in Auth",
+color: "#0070F4" },
+  { icon: "⚡",
+label: "Real-time Subscriptions",
+color: "#FF3773" },
+  { icon: "📦",
+label: "Data Import / Export",
+color: "#FFA400" },
+  { icon: "📋",
+label: "Kanban Boards",
+color: "#0070F4" },
+  { icon: "🕐",
+label: "Data History & Audit",
+color: "#FF3773" }
 ];
 
 /**
@@ -31,7 +47,8 @@ export const FeatureShowcase: React.FC = () => {
   const logoProgress = spring({
     frame,
     fps,
-    config: { damping: 12, mass: 0.6 },
+    config: { damping: 12,
+mass: 0.6 }
   });
   const logoScale = interpolate(logoProgress, [0, 1], [0.5, 1]);
   const logoOpacity = interpolate(logoProgress, [0, 1], [0, 1]);
@@ -44,7 +61,8 @@ export const FeatureShowcase: React.FC = () => {
     frame,
     [durationInFrames - 15, durationInFrames],
     [1, 0],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+    { extrapolateLeft: "clamp",
+extrapolateRight: "clamp" }
   );
 
   const centerX = 720;
@@ -58,7 +76,7 @@ export const FeatureShowcase: React.FC = () => {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        opacity: fadeOut,
+        opacity: fadeOut
       }}
     >
       {/* Radial glow */}
@@ -73,7 +91,7 @@ export const FeatureShowcase: React.FC = () => {
           opacity: glowPulse,
           top: "50%",
           left: "50%",
-          transform: "translate(-50%, -50%)",
+          transform: "translate(-50%, -50%)"
         }}
       />
 
@@ -84,10 +102,10 @@ export const FeatureShowcase: React.FC = () => {
           left: centerX - 45,
           top: centerY - 45,
           transform: `scale(${logoScale})`,
-          opacity: logoOpacity,
+          opacity: logoOpacity
         }}
       >
-        <RebaseLogo size={90} />
+        <RebaseLogo size={90}/>
       </div>
 
       {/* Feature pills arranged in a circle */}
@@ -100,7 +118,8 @@ export const FeatureShowcase: React.FC = () => {
         const progress = spring({
           frame: frame - delay,
           fps,
-          config: { damping: 14, mass: 0.6 },
+          config: { damping: 14,
+mass: 0.6 }
         });
 
         const pillScale = interpolate(progress, [0, 1], [0.3, 1]);
@@ -122,7 +141,7 @@ export const FeatureShowcase: React.FC = () => {
                 left: 0,
                 width: 1440,
                 height: 810,
-                pointerEvents: "none",
+                pointerEvents: "none"
               }}
             >
               <line
@@ -158,7 +177,7 @@ export const FeatureShowcase: React.FC = () => {
                 fontWeight: 600,
                 fontFamily: "'Inter', sans-serif",
                 color: "#fff",
-                whiteSpace: "nowrap" as const,
+                whiteSpace: "nowrap" as const
               }}
             >
               <span style={{ fontSize: 16 }}>{feature.icon}</span>

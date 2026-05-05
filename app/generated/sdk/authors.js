@@ -3,7 +3,7 @@
 // Collection: Authors (slug: authors)
 // ────────────────────────────────────────────────────────────────────
 
-import { createCollectionClient } from './client.js';
+import { createCollectionClient } from "./client.js";
 
 // ─── Type Definitions ──────────────────────────────────────────────
 

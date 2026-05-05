@@ -2,7 +2,7 @@
 // Do not edit manually. Re-run "rebase generate-sdk" to regenerate.
 // ────────────────────────────────────────────────────────────────────
 
-import { RebaseApiError } from './client.js';
+import { RebaseApiError } from "./client.js";
 
 /**
  * @typedef {Object} RebaseUser
@@ -49,7 +49,7 @@ function createMemoryStorage() {
     return {
         getItem(key) { return store[key] ?? null; },
         setItem(key, value) { store[key] = value; },
-        removeItem(key) { delete store[key]; },
+        removeItem(key) { delete store[key]; }
     };
 }
 
@@ -113,7 +113,7 @@ function createAuth(transport, options) {
             status,
             body?.error?.message || body?.message || statusText,
             body?.error?.code || body?.code,
-            body?.error?.details || body?.details,
+            body?.error?.details || body?.details
         );
     }
 
@@ -179,7 +179,7 @@ function createAuth(transport, options) {
             accessToken: data.tokens.accessToken,
             refreshToken: data.tokens.refreshToken,
             expiresAt: data.tokens.accessTokenExpiresAt,
-            user: data.user,
+            user: data.user
         };
         currentSession = session;
         saveSession(session);
@@ -202,12 +202,15 @@ function createAuth(transport, options) {
         const res = await fetchFn(authUrl("/login"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password }),
+            body: JSON.stringify({ email,
+password })
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
         const session = handleAuthResponse(body, "SIGNED_IN");
-        return { user: session.user, accessToken: session.accessToken, refreshToken: session.refreshToken };
+        return { user: session.user,
+accessToken: session.accessToken,
+refreshToken: session.refreshToken };
     }
 
     /**
@@ -219,17 +222,20 @@ function createAuth(transport, options) {
      */
     async function signUp(email, password, displayName) {
         const fetchFn = getFetch();
-        const payload = { email, password };
+        const payload = { email,
+password };
         if (displayName !== undefined) payload.displayName = displayName;
         const res = await fetchFn(authUrl("/register"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
+            body: JSON.stringify(payload)
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
         const session = handleAuthResponse(body, "SIGNED_IN");
-        return { user: session.user, accessToken: session.accessToken, refreshToken: session.refreshToken };
+        return { user: session.user,
+accessToken: session.accessToken,
+refreshToken: session.refreshToken };
     }
 
     /**
@@ -243,12 +249,14 @@ function createAuth(transport, options) {
         const res = await fetchFn(authUrl("/google"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ idToken }),
+            body: JSON.stringify({ idToken })
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
         const session = handleAuthResponse(body, "SIGNED_IN");
-        return { user: session.user, accessToken: session.accessToken, refreshToken: session.refreshToken };
+        return { user: session.user,
+accessToken: session.accessToken,
+refreshToken: session.refreshToken };
     }
 
     /**
@@ -262,7 +270,7 @@ function createAuth(transport, options) {
                 await fetchFn(authUrl("/logout"), {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ refreshToken: currentSession.refreshToken }),
+                    body: JSON.stringify({ refreshToken: currentSession.refreshToken })
                 });
             }
         } catch (e) { /* best-effort logout */ }
@@ -289,7 +297,7 @@ function createAuth(transport, options) {
         const res = await fetchFn(authUrl("/refresh"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ refreshToken: currentSession.refreshToken }),
+            body: JSON.stringify({ refreshToken: currentSession.refreshToken })
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
@@ -297,7 +305,7 @@ function createAuth(transport, options) {
             accessToken: body.tokens.accessToken,
             refreshToken: body.tokens.refreshToken,
             expiresAt: body.tokens.accessTokenExpiresAt,
-            user: currentSession.user,
+            user: currentSession.user
         };
         currentSession = session;
         saveSession(session);
@@ -324,10 +332,11 @@ function createAuth(transport, options) {
     async function updateUser(updates) {
         const data = await transport.request(authPath + "/me", {
             method: "PATCH",
-            body: JSON.stringify(updates),
+            body: JSON.stringify(updates)
         });
         if (currentSession) {
-            currentSession = { ...currentSession, user: data.user };
+            currentSession = { ...currentSession,
+user: data.user };
             saveSession(currentSession);
             emit("USER_UPDATED", currentSession);
         }
@@ -344,7 +353,7 @@ function createAuth(transport, options) {
         const res = await fetchFn(authUrl("/forgot-password"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email }),
+            body: JSON.stringify({ email })
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
@@ -362,7 +371,8 @@ function createAuth(transport, options) {
         const res = await fetchFn(authUrl("/reset-password"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token, password }),
+            body: JSON.stringify({ token,
+password })
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
@@ -378,7 +388,8 @@ function createAuth(transport, options) {
     async function changePassword(oldPassword, newPassword) {
         return transport.request(authPath + "/change-password", {
             method: "POST",
-            body: JSON.stringify({ oldPassword, newPassword }),
+            body: JSON.stringify({ oldPassword,
+newPassword })
         });
     }
 
@@ -388,7 +399,7 @@ function createAuth(transport, options) {
      */
     async function sendVerificationEmail() {
         return transport.request(authPath + "/send-verification", {
-            method: "POST",
+            method: "POST"
         });
     }
 
@@ -401,7 +412,7 @@ function createAuth(transport, options) {
         const fetchFn = getFetch();
         const res = await fetchFn(authUrl("/verify-email?token=" + encodeURIComponent(token)), {
             method: "GET",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json" }
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
@@ -424,7 +435,7 @@ function createAuth(transport, options) {
      */
     async function revokeSession(sessionId) {
         return transport.request(authPath + "/sessions/" + encodeURIComponent(sessionId), {
-            method: "DELETE",
+            method: "DELETE"
         });
     }
 
@@ -434,7 +445,7 @@ function createAuth(transport, options) {
      */
     async function revokeAllSessions() {
         const result = await transport.request(authPath + "/sessions", {
-            method: "DELETE",
+            method: "DELETE"
         });
         // After revoking all sessions, sign out locally too
         currentSession = null;
@@ -457,7 +468,7 @@ function createAuth(transport, options) {
         const fetchFn = getFetch();
         const res = await fetchFn(authUrl("/config"), {
             method: "GET",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json" }
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
@@ -522,7 +533,7 @@ function createAuth(transport, options) {
         revokeAllSessions,
         getAuthConfig,
         getSession,
-        onAuthStateChange,
+        onAuthStateChange
     };
 }
 

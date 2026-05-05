@@ -30,9 +30,9 @@ try {
     // Write to destination
     fs.writeFileSync(destFile, contentWithFrontmatter, "utf-8");
 
-    console.log(`✓ Successfully copied CHANGELOG.md to docs with frontmatter`);
+    console.log("✓ Successfully copied CHANGELOG.md to docs with frontmatter");
 } catch (error) {
-    console.error(`Error copying CHANGELOG.md:`, error.message);
+    console.error("Error copying CHANGELOG.md:", error.message);
     process.exit(1);
 }
 

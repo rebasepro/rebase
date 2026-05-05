@@ -30,7 +30,7 @@ const tagsCollection: EntityCollection = {
             target: () => postsCollection,
             cardinality: "many",
             direction: "inverse",
-            inverseRelationName: "tags",
+            inverseRelationName: "tags"
         }
     ],
     entityViews: [

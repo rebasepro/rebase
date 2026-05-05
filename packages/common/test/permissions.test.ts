@@ -2,7 +2,7 @@ import {
     canReadCollection,
     canEditEntity,
     canCreateEntity,
-    canDeleteEntity,
+    canDeleteEntity
 } from "../src/util/permissions";
 import { AuthController, Entity, EntityCollection, SecurityRule, User } from "@rebasepro/types";
 
@@ -14,7 +14,7 @@ function makeAuthController(overrides: Partial<{ uid: string; roles: string[] }>
         email: "test@example.com",
         displayName: "Test",
         photoURL: null,
-        roles: overrides.roles ?? [],
+        roles: overrides.roles ?? []
     };
     return { user } as AuthController<User>;
 }
@@ -29,12 +29,14 @@ function makeCollection(securityRules?: SecurityRule[]): EntityCollection {
         slug: "products",
         table: "products",
         properties: {},
-        securityRules,
+        securityRules
     };
 }
 
 function makeEntity(values: Record<string, unknown> = {}): Entity<any> {
-    return { id: "ent-1", path: "products", values };
+    return { id: "ent-1",
+path: "products",
+values };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -66,14 +68,16 @@ describe("Permissions — Security Rule Evaluation", () => {
     describe("public access rules", () => {
         it("allows reads for public access rule", () => {
             const col = makeCollection([
-                { access: "public", operation: "select" } as SecurityRule,
+                { access: "public",
+operation: "select" } as SecurityRule
             ]);
             expect(canReadCollection(col, noUser())).toBe(true);
         });
 
         it("allows writes for public access rule", () => {
             const col = makeCollection([
-                { access: "public", operation: "all" } as SecurityRule,
+                { access: "public",
+operation: "all" } as SecurityRule
             ]);
             expect(canCreateEntity(col, noUser(), "products", null)).toBe(true);
         });
@@ -83,7 +87,9 @@ describe("Permissions — Security Rule Evaluation", () => {
     describe("role-based rules", () => {
         it("grants access when user has a matching role", () => {
             const col = makeCollection([
-                { roles: ["admin"], operation: "all", mode: "permissive" } as SecurityRule,
+                { roles: ["admin"],
+operation: "all",
+mode: "permissive" } as SecurityRule
             ]);
             const admin = makeAuthController({ roles: ["admin"] });
             expect(canReadCollection(col, admin)).toBe(true);
@@ -94,7 +100,9 @@ describe("Permissions — Security Rule Evaluation", () => {
 
         it("denies access when user lacks matching role", () => {
             const col = makeCollection([
-                { roles: ["admin"], operation: "all", mode: "permissive" } as SecurityRule,
+                { roles: ["admin"],
+operation: "all",
+mode: "permissive" } as SecurityRule
             ]);
             const viewer = makeAuthController({ roles: ["viewer"] });
             expect(canReadCollection(col, viewer)).toBe(false);
@@ -103,7 +111,9 @@ describe("Permissions — Security Rule Evaluation", () => {
 
         it("handles multiple roles — grants if user matches any", () => {
             const col = makeCollection([
-                { roles: ["admin", "editor"], operation: "all", mode: "permissive" } as SecurityRule,
+                { roles: ["admin", "editor"],
+operation: "all",
+mode: "permissive" } as SecurityRule
             ]);
             const editor = makeAuthController({ roles: ["editor"] });
             expect(canReadCollection(col, editor)).toBe(true);
@@ -111,7 +121,9 @@ describe("Permissions — Security Rule Evaluation", () => {
 
         it("handles multi-operation rules via operations array", () => {
             const col = makeCollection([
-                { roles: ["editor"], operations: ["select", "update"], mode: "permissive" } as SecurityRule,
+                { roles: ["editor"],
+operations: ["select", "update"],
+mode: "permissive" } as SecurityRule
             ]);
             const editor = makeAuthController({ roles: ["editor"] });
             expect(canReadCollection(col, editor)).toBe(true);
@@ -124,7 +136,9 @@ describe("Permissions — Security Rule Evaluation", () => {
     describe("owner-based rules", () => {
         it("allows when entity owner matches user", () => {
             const col = makeCollection([
-                { ownerField: "created_by", operation: "update", mode: "permissive" } as SecurityRule,
+                { ownerField: "created_by",
+operation: "update",
+mode: "permissive" } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "user-42" });
             const entity = makeEntity({ created_by: "user-42" });
@@ -133,7 +147,9 @@ describe("Permissions — Security Rule Evaluation", () => {
 
         it("denies when entity owner does not match user", () => {
             const col = makeCollection([
-                { ownerField: "created_by", operation: "update", mode: "permissive" } as SecurityRule,
+                { ownerField: "created_by",
+operation: "update",
+mode: "permissive" } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "user-42" });
             const entity = makeEntity({ created_by: "other-user" });
@@ -142,7 +158,9 @@ describe("Permissions — Security Rule Evaluation", () => {
 
         it("optimistically allows when entity is null (new entity)", () => {
             const col = makeCollection([
-                { ownerField: "created_by", operation: "select", mode: "permissive" } as SecurityRule,
+                { ownerField: "created_by",
+operation: "select",
+mode: "permissive" } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "user-42" });
             expect(canReadCollection(col, auth)).toBe(true);
@@ -154,21 +172,31 @@ describe("Permissions — Security Rule Evaluation", () => {
         it("denies when restrictive rule fails even if permissive passes", () => {
             const col = makeCollection([
                 // Permissive: admin can do anything
-                { roles: ["admin"], operation: "update", mode: "permissive" } as SecurityRule,
+                { roles: ["admin"],
+operation: "update",
+mode: "permissive" } as SecurityRule,
                 // Restrictive: but only owner can update
-                { ownerField: "created_by", operation: "update", mode: "restrictive" } as SecurityRule,
+                { ownerField: "created_by",
+operation: "update",
+mode: "restrictive" } as SecurityRule
             ]);
-            const admin = makeAuthController({ uid: "admin-1", roles: ["admin"] });
+            const admin = makeAuthController({ uid: "admin-1",
+roles: ["admin"] });
             const entity = makeEntity({ created_by: "someone-else" });
             expect(canEditEntity(col, admin, "products", entity)).toBe(false);
         });
 
         it("allows when both permissive AND restrictive pass", () => {
             const col = makeCollection([
-                { roles: ["admin"], operation: "update", mode: "permissive" } as SecurityRule,
-                { ownerField: "created_by", operation: "update", mode: "restrictive" } as SecurityRule,
+                { roles: ["admin"],
+operation: "update",
+mode: "permissive" } as SecurityRule,
+                { ownerField: "created_by",
+operation: "update",
+mode: "restrictive" } as SecurityRule
             ]);
-            const admin = makeAuthController({ uid: "admin-1", roles: ["admin"] });
+            const admin = makeAuthController({ uid: "admin-1",
+roles: ["admin"] });
             const entity = makeEntity({ created_by: "admin-1" });
             expect(canEditEntity(col, admin, "products", entity)).toBe(true);
         });
@@ -181,8 +209,8 @@ describe("Permissions — Security Rule Evaluation", () => {
                 {
                     operation: "update",
                     mode: "permissive",
-                    using: "user_id = auth.uid()",
-                } as SecurityRule,
+                    using: "user_id = auth.uid()"
+                } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "user-99" });
             const entity = makeEntity({ user_id: "user-99" });
@@ -194,8 +222,8 @@ describe("Permissions — Security Rule Evaluation", () => {
                 {
                     operation: "update",
                     mode: "permissive",
-                    using: "user_id = auth.uid()",
-                } as SecurityRule,
+                    using: "user_id = auth.uid()"
+                } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "user-99" });
             const entity = makeEntity({ user_id: "someone-else" });
@@ -207,8 +235,8 @@ describe("Permissions — Security Rule Evaluation", () => {
                 {
                     operation: "update",
                     mode: "permissive",
-                    using: "owner_id = current_setting('app.user_id')",
-                } as SecurityRule,
+                    using: "owner_id = current_setting('app.user_id')"
+                } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "usr-123" });
             const entity = makeEntity({ owner_id: "usr-123" });
@@ -220,8 +248,8 @@ describe("Permissions — Security Rule Evaluation", () => {
                 {
                     operation: "update",
                     mode: "permissive",
-                    using: "string_to_array(auth.roles(), ',') && ARRAY['admin', 'editor']",
-                } as SecurityRule,
+                    using: "string_to_array(auth.roles(), ',') && ARRAY['admin', 'editor']"
+                } as SecurityRule
             ]);
             const entity = makeEntity({ some: "data" });
             const editor = makeAuthController({ roles: ["editor"] });
@@ -236,8 +264,8 @@ describe("Permissions — Security Rule Evaluation", () => {
                 {
                     operation: "update",
                     mode: "permissive",
-                    using: "string_to_array(auth.roles(), ',') @> ARRAY['admin']",
-                } as SecurityRule,
+                    using: "string_to_array(auth.roles(), ',') @> ARRAY['admin']"
+                } as SecurityRule
             ]);
             const entity = makeEntity({ some: "data" });
             const admin = makeAuthController({ roles: ["admin", "editor"] });
@@ -252,14 +280,16 @@ describe("Permissions — Security Rule Evaluation", () => {
                 {
                     operation: "update",
                     mode: "permissive",
-                    using: "user_id = auth.uid() AND status = 'draft'",
-                } as SecurityRule,
+                    using: "user_id = auth.uid() AND status = 'draft'"
+                } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "u1" });
-            const draftEntity = makeEntity({ user_id: "u1", status: "draft" });
+            const draftEntity = makeEntity({ user_id: "u1",
+status: "draft" });
             expect(canEditEntity(col, auth, "products", draftEntity)).toBe(true);
 
-            const publishedEntity = makeEntity({ user_id: "u1", status: "published" });
+            const publishedEntity = makeEntity({ user_id: "u1",
+status: "published" });
             expect(canEditEntity(col, auth, "products", publishedEntity)).toBe(false);
         });
 
@@ -268,18 +298,21 @@ describe("Permissions — Security Rule Evaluation", () => {
                 {
                     operation: "update",
                     mode: "permissive",
-                    using: "status = 'published' OR user_id = auth.uid()",
-                } as SecurityRule,
+                    using: "status = 'published' OR user_id = auth.uid()"
+                } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "u1" });
             // Published — anyone can edit
-            const pub = makeEntity({ status: "published", user_id: "other" });
+            const pub = makeEntity({ status: "published",
+user_id: "other" });
             expect(canEditEntity(col, auth, "products", pub)).toBe(true);
             // Draft owned by user
-            const own = makeEntity({ status: "draft", user_id: "u1" });
+            const own = makeEntity({ status: "draft",
+user_id: "u1" });
             expect(canEditEntity(col, auth, "products", own)).toBe(true);
             // Draft not owned
-            const other = makeEntity({ status: "draft", user_id: "x" });
+            const other = makeEntity({ status: "draft",
+user_id: "x" });
             expect(canEditEntity(col, auth, "products", other)).toBe(false);
         });
 
@@ -288,8 +321,8 @@ describe("Permissions — Security Rule Evaluation", () => {
                 {
                     operation: "insert",
                     mode: "permissive",
-                    withCheck: "user_id = auth.uid()",
-                } as SecurityRule,
+                    withCheck: "user_id = auth.uid()"
+                } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "u1" });
             const entity = makeEntity({ user_id: "u1" });
@@ -304,7 +337,8 @@ describe("Permissions — Security Rule Evaluation", () => {
     describe("edge cases", () => {
         it("denies when rules exist for different operations", () => {
             const col = makeCollection([
-                { operation: "select", mode: "permissive" } as SecurityRule,
+                { operation: "select",
+mode: "permissive" } as SecurityRule
             ]);
             const auth = makeAuthController();
             // select should pass
@@ -315,7 +349,9 @@ describe("Permissions — Security Rule Evaluation", () => {
 
         it("handles user with no roles (falls back to 'public')", () => {
             const col = makeCollection([
-                { roles: ["public"], operation: "select", mode: "permissive" } as SecurityRule,
+                { roles: ["public"],
+operation: "select",
+mode: "permissive" } as SecurityRule
             ]);
             const auth = makeAuthController({ roles: [] });
             expect(canReadCollection(col, auth)).toBe(true);
@@ -326,8 +362,8 @@ describe("Permissions — Security Rule Evaluation", () => {
                 {
                     operation: "select",
                     mode: "permissive",
-                    using: "((status = 'published'))",
-                } as SecurityRule,
+                    using: "((status = 'published'))"
+                } as SecurityRule
             ]);
             const auth = makeAuthController();
             const entity = makeEntity({ status: "published" });
@@ -339,8 +375,8 @@ describe("Permissions — Security Rule Evaluation", () => {
                 {
                     operation: "select",
                     mode: "permissive",
-                    using: "id IN (SELECT product_id FROM featured_products)",
-                } as SecurityRule,
+                    using: "id IN (SELECT product_id FROM featured_products)"
+                } as SecurityRule
             ]);
             const auth = makeAuthController();
             // Should optimistically return true since we can't evaluate IN
@@ -355,8 +391,8 @@ describe("Permissions — Security Rule Evaluation", () => {
                 {
                     operation: "select",
                     mode: "permissive",
-                    using: "status != 'deleted'",
-                } as SecurityRule,
+                    using: "status != 'deleted'"
+                } as SecurityRule
             ]);
             const auth = makeAuthController();
             const entity = makeEntity({ status: "active" });
@@ -368,8 +404,8 @@ describe("Permissions — Security Rule Evaluation", () => {
                 {
                     operation: "update",
                     mode: "permissive",
-                    using: "status != 'deleted'",
-                } as SecurityRule,
+                    using: "status != 'deleted'"
+                } as SecurityRule
             ]);
             const auth = makeAuthController();
             const entity = makeEntity({ status: "deleted" });
@@ -385,12 +421,13 @@ describe("Permissions — Security Rule Evaluation", () => {
                     operation: "update",
                     mode: "permissive",
                     using: "user_id = auth.uid()",
-                    withCheck: "status = 'draft'",
-                } as SecurityRule,
+                    withCheck: "status = 'draft'"
+                } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "u1" });
             // USING passes (user_id matches), withCheck fails (status isn't 'draft')
-            const entity = makeEntity({ user_id: "u1", status: "published" });
+            const entity = makeEntity({ user_id: "u1",
+status: "published" });
             expect(canEditEntity(col, auth, "products", entity)).toBe(false);
         });
 
@@ -400,11 +437,12 @@ describe("Permissions — Security Rule Evaluation", () => {
                     operation: "update",
                     mode: "permissive",
                     using: "user_id = auth.uid()",
-                    withCheck: "status = 'draft'",
-                } as SecurityRule,
+                    withCheck: "status = 'draft'"
+                } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "u1" });
-            const entity = makeEntity({ user_id: "u1", status: "draft" });
+            const entity = makeEntity({ user_id: "u1",
+status: "draft" });
             expect(canEditEntity(col, auth, "products", entity)).toBe(true);
         });
     });
@@ -416,8 +454,8 @@ describe("Permissions — Security Rule Evaluation", () => {
                 {
                     operation: "update",
                     mode: "permissive",
-                    using: "auth.uid() = owner_id",
-                } as SecurityRule,
+                    using: "auth.uid() = owner_id"
+                } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "user-42" });
             const entity = makeEntity({ owner_id: "user-42" });
@@ -429,8 +467,8 @@ describe("Permissions — Security Rule Evaluation", () => {
                 {
                     operation: "update",
                     mode: "permissive",
-                    using: "auth.uid() = owner_id",
-                } as SecurityRule,
+                    using: "auth.uid() = owner_id"
+                } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "user-42" });
             const entity = makeEntity({ owner_id: "other-user" });
@@ -445,8 +483,8 @@ describe("Permissions — Security Rule Evaluation", () => {
                 {
                     operation: "update",
                     mode: "restrictive",
-                    using: "status = 'draft'",
-                } as SecurityRule,
+                    using: "status = 'draft'"
+                } as SecurityRule
             ]);
             const auth = makeAuthController();
             const entity = makeEntity({ status: "draft" });
@@ -462,17 +500,18 @@ describe("Permissions — Security Rule Evaluation", () => {
                 {
                     operation: "update",
                     mode: "permissive",
-                    using: "user_id = auth.uid()",
+                    using: "user_id = auth.uid()"
                 } as SecurityRule,
                 {
                     operation: "update",
                     mode: "permissive",
-                    using: "status = 'published'",
-                } as SecurityRule,
+                    using: "status = 'published'"
+                } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "u1" });
             // First rule fails (wrong user_id), but second passes (status is published)
-            const entity = makeEntity({ user_id: "other", status: "published" });
+            const entity = makeEntity({ user_id: "other",
+status: "published" });
             expect(canEditEntity(col, auth, "products", entity)).toBe(true);
         });
 
@@ -481,16 +520,17 @@ describe("Permissions — Security Rule Evaluation", () => {
                 {
                     operation: "update",
                     mode: "permissive",
-                    using: "user_id = auth.uid()",
+                    using: "user_id = auth.uid()"
                 } as SecurityRule,
                 {
                     operation: "update",
                     mode: "permissive",
-                    using: "status = 'published'",
-                } as SecurityRule,
+                    using: "status = 'published'"
+                } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "u1" });
-            const entity = makeEntity({ user_id: "other", status: "draft" });
+            const entity = makeEntity({ user_id: "other",
+status: "draft" });
             expect(canEditEntity(col, auth, "products", entity)).toBe(false);
         });
     });
@@ -502,8 +542,8 @@ describe("Permissions — Security Rule Evaluation", () => {
                 {
                     operation: "select",
                     mode: "permissive",
-                    using: "string_to_array(auth.roles(), ',') @> ARRAY['admin', 'superadmin']",
-                } as SecurityRule,
+                    using: "string_to_array(auth.roles(), ',') @> ARRAY['admin', 'superadmin']"
+                } as SecurityRule
             ]);
             const entity = makeEntity({});
             // User has both roles

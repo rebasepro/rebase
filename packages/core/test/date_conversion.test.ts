@@ -32,13 +32,13 @@ describe("Date-to-String Conversion Bug", () => {
             const inputValues = {
                 title: "Test Document",
                 created_on: null,
-                updated_on: null,
+                updated_on: null
             };
 
             const properties: Properties = {
                 title: { type: "string" as const },
                 created_on: createAutoDateProperty("on_create"),
-                updated_on: createAutoDateProperty("on_update"),
+                updated_on: createAutoDateProperty("on_update")
             };
 
             const timestampNow = new Date();
@@ -66,13 +66,13 @@ describe("Date-to-String Conversion Bug", () => {
             const inputValues = {
                 title: "Existing Document",
                 created_on: existingDate,
-                updated_on: existingDate,
+                updated_on: existingDate
             };
 
             const properties: Properties = {
                 title: { type: "string" as const },
                 created_on: createAutoDateProperty("on_create"),
-                updated_on: createAutoDateProperty("on_update"),
+                updated_on: createAutoDateProperty("on_update")
             };
 
             const timestampNow = new Date();
@@ -98,11 +98,11 @@ describe("Date-to-String Conversion Bug", () => {
         it("should not convert Date objects to strings", () => {
             const baseValues = {
                 title: "Document",
-                updated_on: new Date("2025-01-01T10:00:00Z"),
+                updated_on: new Date("2025-01-01T10:00:00Z")
             };
 
             const updates = {
-                title: "Updated Document",
+                title: "Updated Document"
             };
 
             const result = mergeDeep(baseValues, updates);
@@ -114,11 +114,11 @@ describe("Date-to-String Conversion Bug", () => {
         it("should preserve Date when source has a new Date", () => {
             const now = new Date();
             const baseValues = {
-                updated_on: null,
+                updated_on: null
             };
 
             const updates = {
-                updated_on: now,
+                updated_on: now
             };
 
             const result = mergeDeep(baseValues, updates);
@@ -133,7 +133,7 @@ describe("Date-to-String Conversion Bug", () => {
             const values = {
                 title: "Document",
                 updated_on: new Date("2025-01-01T10:00:00Z"),
-                callback: () => console.log("test"),
+                callback: () => console.log("test")
             };
 
             const result = removeFunctions(values);
@@ -149,7 +149,7 @@ describe("Date-to-String Conversion Bug", () => {
             const values = {
                 title: "Document",
                 updated_on: new Date("2025-01-01T10:00:00Z"),
-                empty: undefined,
+                empty: undefined
             };
 
             const result = removeUndefined(values);
@@ -167,13 +167,14 @@ describe("Date-to-String Conversion Bug", () => {
             const formValues = {
                 title: "My Document",
                 created_on: null,
-                updated_on: null,
+                updated_on: null
             };
 
             const properties: Properties = {
-                title: { type: "string" as const, name: "Title" },
+                title: { type: "string" as const,
+name: "Title" },
                 created_on: createAutoDateProperty("on_create"),
-                updated_on: createAutoDateProperty("on_update"),
+                updated_on: createAutoDateProperty("on_update")
             };
 
             // Step 2: Apply date auto values (simulates useBuildDataDriver)
@@ -212,19 +213,20 @@ describe("Date-to-String Conversion Bug", () => {
             const existingValues = {
                 title: "Existing Document",
                 created_on: existingCreatedOn,
-                updated_on: existingCreatedOn,
+                updated_on: existingCreatedOn
             };
 
             const properties: Properties = {
-                title: { type: "string" as const, name: "Title" },
+                title: { type: "string" as const,
+name: "Title" },
                 created_on: createAutoDateProperty("on_create"),
-                updated_on: createAutoDateProperty("on_update"),
+                updated_on: createAutoDateProperty("on_update")
             };
 
             // Form values with an update
             const formValues = {
                 ...existingValues,
-                title: "Updated Title",
+                title: "Updated Title"
             };
 
             // Apply date auto values for existing entity
@@ -249,7 +251,7 @@ describe("Date-to-String Conversion Bug", () => {
     describe("Potential conversion points", () => {
         it("JSON.stringify converts Date to ISO string (demonstration)", () => {
             const values = {
-                updated_on: new Date("2025-01-01T10:00:00Z"),
+                updated_on: new Date("2025-01-01T10:00:00Z")
             };
 
             // This demonstrates the issue - JSON.stringify converts Date to ISO string
@@ -264,7 +266,7 @@ describe("Date-to-String Conversion Bug", () => {
 
         it("Object spread should preserve Date objects", () => {
             const original = {
-                updated_on: new Date("2025-01-01T10:00:00Z"),
+                updated_on: new Date("2025-01-01T10:00:00Z")
             };
 
             const spread = { ...original };
@@ -275,7 +277,7 @@ describe("Date-to-String Conversion Bug", () => {
 
         it("Object.assign should preserve Date objects", () => {
             const original = {
-                updated_on: new Date("2025-01-01T10:00:00Z"),
+                updated_on: new Date("2025-01-01T10:00:00Z")
             };
 
             const assigned = Object.assign({}, original);

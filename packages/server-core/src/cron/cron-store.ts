@@ -133,14 +133,14 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
                     stats.set(row.job_id as string, {
                         totalRuns: row.total_runs as number,
                         totalFailures: row.total_failures as number,
-                        lastRunAt: row.last_run_at ? new Date(row.last_run_at as string).toISOString() : undefined,
+                        lastRunAt: row.last_run_at ? new Date(row.last_run_at as string).toISOString() : undefined
                     });
                 }
             } catch (err) {
                 console.error("[cron-store] Failed to fetch job stats:", err);
             }
             return stats;
-        },
+        }
     };
 }
 
@@ -156,6 +156,6 @@ function rowToLogEntry(row: Record<string, unknown>): CronJobLogEntry {
         error: (row.error as string) ?? undefined,
         result: row.result ?? undefined,
         logs: Array.isArray(row.logs) ? row.logs : (row.logs ? JSON.parse(row.logs as string) : []),
-        manual: row.manual as boolean,
+        manual: row.manual as boolean
     };
 }

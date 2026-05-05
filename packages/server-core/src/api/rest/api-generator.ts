@@ -76,7 +76,7 @@ export class RestApiGenerator {
                         offset: queryOptions.offset,
                         orderBy: queryOptions.orderBy?.[0]?.field,
                         order: queryOptions.orderBy?.[0]?.direction === "desc" ? "desc" : "asc",
-                        searchString,
+                        searchString
                     },
                     queryOptions.include
                 );
@@ -149,7 +149,7 @@ export class RestApiGenerator {
             try {
                 const driver = c.get("driver") || this.driver;
                 const path = collection.slug;
-                
+
                 const body = await c.req.json().catch(() => ({}));
 
                 const entity = await driver.saveEntity({
@@ -268,7 +268,8 @@ export class RestApiGenerator {
                 return { collectionPath: segments.join("/") };
             } else {
                 const entityId = segments.pop()!;
-                return { collectionPath: segments.join("/"), entityId };
+                return { collectionPath: segments.join("/"),
+entityId };
             }
         };
 
@@ -438,7 +439,7 @@ export class RestApiGenerator {
             orderBy: queryOptions.orderBy?.[0]?.field,
             order: queryOptions.orderBy?.[0]?.direction === "desc" ? "desc" : "asc",
             startAfter: queryOptions.offset ? String(queryOptions.offset) : undefined,
-            searchString,
+            searchString
         });
 
         return entities.map(entity => this.flattenEntity(entity));

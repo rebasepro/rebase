@@ -115,7 +115,7 @@ export function RebaseLoginView({
         if (authController.user != null) return null;
         return (
             <div className="w-full">
-                <ErrorView error={authController.authProviderError.message ?? authController.authProviderError} />
+                <ErrorView error={authController.authProviderError.message ?? authController.authProviderError}/>
             </div>
         );
     }
@@ -128,9 +128,9 @@ export function RebaseLoginView({
                 width: "100%",
                 objectFit: "cover"
             }}
-            alt={"Logo"} />;
+            alt={"Logo"}/>;
     } else {
-        logoComponent = <RebaseLogo />;
+        logoComponent = <RebaseLogo/>;
     }
 
     let notAllowedMessage: string | undefined;
@@ -161,7 +161,7 @@ export function RebaseLoginView({
 
                 {notAllowedMessage && (
                     <div className="p-4 w-full">
-                        <ErrorView error={notAllowedMessage} />
+                        <ErrorView error={notAllowedMessage}/>
                     </div>
                 )}
 
@@ -194,7 +194,7 @@ export function RebaseLoginView({
                                     <LoginButton
                                         disabled={disabled}
                                         text={"Sign in with email"}
-                                        icon={<MailIcon />}
+                                        icon={<MailIcon/>}
                                         onClick={() => switchMode("login")}
                                     />
                                     {googleEnabled && googleClientId && (
@@ -207,7 +207,7 @@ export function RebaseLoginView({
                                     {showRegistration && (
                                         <div className="mt-2 text-center">
                                             <Typography variant="body2" color="secondary">
-                                                Don't have an account?{" "}
+                                                Don&apos;t have an account?{" "}
                                                 <button
                                                     type="button"
                                                     className={cls(
@@ -334,13 +334,13 @@ function GoogleLoginButton({
             <div className="flex items-center justify-center w-full gap-3 py-1">
                 <svg viewBox="0 0 24 24" width="20" height="20">
                     <path fill="#4285F4"
-                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                     <path fill="#34A853"
-                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                     <path fill="#FBBC05"
-                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                     <path fill="#EA4335"
-                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                 </svg>
                 <Typography variant="button">Continue with Google</Typography>
             </div>
@@ -459,7 +459,7 @@ function LoginForm({
                         disabled={authController.initialLoading}
                         type="text"
                         size="medium"
-                        onChange={(event) => setDisplayName(event.target.value)} />
+                        onChange={(event) => setDisplayName(event.target.value)}/>
                 </div>
             )}
 
@@ -474,7 +474,7 @@ function LoginForm({
                     disabled={authController.initialLoading}
                     type="email"
                     size="medium"
-                    onChange={(event) => setEmail(event.target.value)} />
+                    onChange={(event) => setEmail(event.target.value)}/>
             </div>
 
             <div className="w-full mb-1">
@@ -488,7 +488,7 @@ function LoginForm({
                     inputRef={passwordRef}
                     type="password"
                     size="medium"
-                    onChange={(event) => setPassword(event.target.value)} />
+                    onChange={(event) => setPassword(event.target.value)}/>
             </div>
 
             {registrationMode && (
@@ -527,7 +527,7 @@ function LoginForm({
             {switchToRegister && (
                 <div className="mt-4 text-center">
                     <Typography variant="body2" color="secondary">
-                        Don't have an account?{" "}
+                        Don&apos;t have an account?{" "}
                         <button
                             type="button"
                             className={cls(
@@ -630,7 +630,7 @@ function ForgotPasswordForm({
                         Check your email
                     </Typography>
                     <Typography variant="body2" color="secondary">
-                        If an account exists for <strong>{email}</strong>, you'll receive a password reset link shortly.
+                        If an account exists for <strong>{email}</strong>, you&apos;ll receive a password reset link shortly.
                     </Typography>
                 </div>
 
@@ -653,12 +653,12 @@ function ForgotPasswordForm({
                 Reset password
             </Typography>
             <Typography variant="body2" color="secondary" className="mb-5">
-                Enter your email and we'll send you a reset link.
+                Enter your email and we&apos;ll send you a reset link.
             </Typography>
 
             {error && (
                 <div className="w-full mb-3">
-                    <ErrorView error={error} />
+                    <ErrorView error={error}/>
                 </div>
             )}
 

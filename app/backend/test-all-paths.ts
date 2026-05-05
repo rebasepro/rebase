@@ -32,14 +32,17 @@ function ok(l: string, c: boolean, d?: string) {
 }
 
 async function main() {
-    const pool = new pg.Pool({ connectionString: DB, max: 5 });
+    const pool = new pg.Pool({ connectionString: DB,
+max: 5 });
     const orig = pool.query.bind(pool);
     (pool as any).query = function (...a: any[]) {
         const s = typeof a[0] === "string" ? a[0] : a[0]?.text || "";
         if (tracing) sqlQ.push(s.slice(0, 300));
         return orig(...a);
     };
-    const db = drizzle(pool, { schema: { ...schema.tables, ...schema.enums, ...schema.relations } });
+    const db = drizzle(pool, { schema: { ...schema.tables,
+...schema.enums,
+...schema.relations } });
     const reg = new PostgresCollectionRegistry(all);
     for (const [n, t] of Object.entries(schema.tables as Record<string, PgTable>)) reg.registerTable(t, n);
     reg.registerEnums(schema.enums as any);
@@ -53,7 +56,9 @@ async function main() {
     // ─── 1. Authors batch — inverse 1:1 (profile) shape ───
     console.log("\n── 1. Authors: batch entity shape (inverse 1:1 profile) ──");
     trace();
-    const authors = await svc.fetchEntitiesWithConditions("authors", { limit: 20, orderBy: "email", order: "asc" });
+    const authors = await svc.fetchEntitiesWithConditions("authors", { limit: 20,
+orderBy: "email",
+order: "asc" });
     const q1 = stop();
     ok("1.1 got authors", authors.length > 0);
     ok("1.2 queries ≤ 4", q1 <= 4, `${q1}`);
@@ -94,7 +99,9 @@ async function main() {
     // ─── 3. Posts batch — owning FK (author) shape ───
     console.log("\n── 3. Posts: owning FK relation (author) ──");
     trace();
-    const posts = await svc.fetchEntitiesWithConditions("posts", { limit: 10, orderBy: "title", order: "asc" });
+    const posts = await svc.fetchEntitiesWithConditions("posts", { limit: 10,
+orderBy: "title",
+order: "asc" });
     const q3 = stop();
     ok("3.1 got posts", posts.length > 0);
     const p = posts[0], pv = p.values as any;
@@ -121,7 +128,9 @@ async function main() {
     // ─── 5. Products — no relations (pure scalar) ───
     console.log("\n── 5. Products: no relations (pure scalar collection) ──");
     trace();
-    const prods = await svc.fetchEntitiesWithConditions("products", { limit: 10, orderBy: "name", order: "asc" });
+    const prods = await svc.fetchEntitiesWithConditions("products", { limit: 10,
+orderBy: "name",
+order: "asc" });
     const q5 = stop();
     ok("5.1 got products", prods.length > 0);
     ok("5.2 single query", q5 === 1, `${q5}`);
@@ -134,7 +143,9 @@ async function main() {
     // ─── 6. Profiles — owning FK (author) ───
     console.log("\n── 6. Profiles: owning FK (author) ──");
     trace();
-    const profiles = await svc.fetchEntitiesWithConditions("profiles", { limit: 10, orderBy: "id", order: "asc" });
+    const profiles = await svc.fetchEntitiesWithConditions("profiles", { limit: 10,
+orderBy: "id",
+order: "asc" });
     const q6 = stop();
     ok("6.1 got profiles", profiles.length > 0);
     const prv = profiles[0].values as any;
@@ -143,7 +154,6 @@ async function main() {
         ok("6.3 author.__type=relation", prv.author.__type === "relation");
         ok("6.4 author.path=authors", prv.author.path === "authors");
     }
-
 
 
     // ─── 8. Single entity fetch (fetchEntity) ───
@@ -180,7 +190,9 @@ async function main() {
     // ─── 10. REST: fetchCollectionForRest with include ───
     console.log("\n── 10. REST: authors with include=[profile] ──");
     trace();
-    const rest1 = await svc.fetchCollectionForRest("authors", { limit: 10, orderBy: "email", order: "asc" }, ["profile"]);
+    const rest1 = await svc.fetchCollectionForRest("authors", { limit: 10,
+orderBy: "email",
+order: "asc" }, ["profile"]);
     const q10 = stop();
     ok("10.1 got results", rest1.length > 0);
     const r1 = rest1[0] as any;
@@ -195,7 +207,9 @@ async function main() {
     // ─── 11. REST: no includes ───
     console.log("\n── 11. REST: authors NO includes ──");
     trace();
-    const rest2 = await svc.fetchCollectionForRest("authors", { limit: 10, orderBy: "email", order: "asc" });
+    const rest2 = await svc.fetchCollectionForRest("authors", { limit: 10,
+orderBy: "email",
+order: "asc" });
     const q11 = stop();
     ok("11.1 got results", rest2.length > 0);
     ok("11.2 ≤ 2 queries", q11 <= 2, `${q11}`);
@@ -203,7 +217,9 @@ async function main() {
     // ─── 12. REST: products (no relations) ───
     console.log("\n── 12. REST: products (no relations) ──");
     trace();
-    const rest3 = await svc.fetchCollectionForRest("products", { limit: 10, orderBy: "name", order: "asc" });
+    const rest3 = await svc.fetchCollectionForRest("products", { limit: 10,
+orderBy: "name",
+order: "asc" });
     const q12 = stop();
     ok("12.1 got results", rest3.length > 0);
     ok("12.2 single query", q12 === 1, `${q12}`);
@@ -251,8 +267,14 @@ async function main() {
     // ─── 17. Pagination offset ───
     console.log("\n── 17. Pagination with offset ──");
     trace();
-    const page1 = await svc.fetchEntitiesWithConditions("authors", { limit: 10, offset: 0, orderBy: "email", order: "asc" });
-    const page2 = await svc.fetchEntitiesWithConditions("authors", { limit: 10, offset: 10, orderBy: "email", order: "asc" });
+    const page1 = await svc.fetchEntitiesWithConditions("authors", { limit: 10,
+offset: 0,
+orderBy: "email",
+order: "asc" });
+    const page2 = await svc.fetchEntitiesWithConditions("authors", { limit: 10,
+offset: 10,
+orderBy: "email",
+order: "asc" });
     stop();
     ok("17.1 page1 length", page1.length === 10);
     ok("17.2 page2 length", page2.length === 10);
@@ -263,7 +285,9 @@ async function main() {
     console.log("\n── 18. Orders: owning many relation (products) ──");
     try {
         trace();
-        const orders = await svc.fetchEntitiesWithConditions("orders", { limit: 5, orderBy: "id", order: "asc" });
+        const orders = await svc.fetchEntitiesWithConditions("orders", { limit: 5,
+orderBy: "id",
+order: "asc" });
         const q18 = stop();
         ok("18.1 got orders", orders.length > 0);
         if (orders.length > 0) {
@@ -297,8 +321,12 @@ async function main() {
     for (const n of [25, 100, 500]) {
         trace();
         const t = performance.now();
-        await svc.fetchEntitiesWithConditions("authors", { limit: n, orderBy: "email", order: "asc" });
-        scale.push({ n, q: stop(), ms: Math.round(performance.now() - t) });
+        await svc.fetchEntitiesWithConditions("authors", { limit: n,
+orderBy: "email",
+order: "asc" });
+        scale.push({ n,
+q: stop(),
+ms: Math.round(performance.now() - t) });
     }
     console.log(`  ${scale.map(s => `N=${s.n}: ${s.q}q ${s.ms}ms`).join(" | ")}`);
     ok("20.1 all same query count", scale.every(s => s.q === scale[0].q), scale.map(s => s.q).join(","));
@@ -307,7 +335,9 @@ async function main() {
     // ─── 21. Desc ordering ───
     console.log("\n── 21. Desc ordering ──");
     trace();
-    const descRes = await svc.fetchEntitiesWithConditions("authors", { limit: 5, orderBy: "email", order: "desc" });
+    const descRes = await svc.fetchEntitiesWithConditions("authors", { limit: 5,
+orderBy: "email",
+order: "desc" });
     stop();
     ok("21.1 got results", descRes.length > 0);
     if (descRes.length >= 2) {
@@ -341,7 +371,9 @@ async function main() {
     // ─── 25. Limit=1 edge case ───
     console.log("\n── 25. Edge case: limit=1 ──");
     trace();
-    const one = await svc.fetchEntitiesWithConditions("products", { limit: 1, orderBy: "name", order: "asc" });
+    const one = await svc.fetchEntitiesWithConditions("products", { limit: 1,
+orderBy: "name",
+order: "asc" });
     const q25 = stop();
     ok("25.1 got 1 result", one.length === 1);
     ok("25.2 single query", q25 === 1, `${q25}`);
@@ -349,7 +381,9 @@ async function main() {
     // ─── 26. Batch consistency: single vs batch for products ───
     console.log("\n── 26. Shape consistency: batch vs single (products) ──");
     trace();
-    const batchProds = await svc.fetchEntitiesWithConditions("products", { limit: 3, orderBy: "id", order: "asc" });
+    const batchProds = await svc.fetchEntitiesWithConditions("products", { limit: 3,
+orderBy: "id",
+order: "asc" });
     stop();
     for (const bp of batchProds) {
         trace();
@@ -365,7 +399,9 @@ async function main() {
     console.log("\n── 27. Large batch: 500 authors ──");
     trace();
     const t27 = performance.now();
-    const big = await svc.fetchEntitiesWithConditions("authors", { limit: 500, orderBy: "email", order: "asc" });
+    const big = await svc.fetchEntitiesWithConditions("authors", { limit: 500,
+orderBy: "email",
+order: "asc" });
     const q27 = stop();
     const ms27 = Math.round(performance.now() - t27);
     ok("27.1 got results", big.length > 0);

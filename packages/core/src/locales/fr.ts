@@ -482,7 +482,6 @@ export const fr: RebaseTranslations = {
     auth_sign_up: "S'inscrire",
 
 
-
     auto_setup_collections_button: "Configurer les collections automatiquement",
     auto_setup_collections_title: "Configurer les collections automatiquement ?",
     auto_setup_collections_desc: "Cela créera automatiquement des configurations de collection pour les collections qui ne sont <b>PAS</b> déjà mappées",
@@ -857,5 +856,5 @@ no_filter: "No filter",
     studio_home_collection_deleted: "Collection deleted",
     studio_kanban_configure: "Configure Kanban",
     studio_missing_reference_error: "No collection for path: {{path}}",
-    studio_new_collection_add: "Add new collection",
+    studio_new_collection_add: "Add new collection"
 };

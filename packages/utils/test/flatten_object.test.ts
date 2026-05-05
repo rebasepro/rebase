@@ -10,7 +10,8 @@ describe("flatten_object utils", () => {
         it("should flatten a simple nested object", () => {
             const obj = {
                 a: 1,
-                b: { c: 2, d: 3 }
+                b: { c: 2,
+d: 3 }
             };
             const result = flattenObject(obj);
             expect(result).toEqual({
@@ -24,8 +25,10 @@ describe("flatten_object utils", () => {
             const obj = {
                 a: 1,
                 items: [
-                    { id: 10, name: "foo" },
-                    { id: 20, name: "bar" }
+                    { id: 10,
+name: "foo" },
+                    { id: 20,
+name: "bar" }
                 ]
             };
             const result = flattenObject(obj);
@@ -56,21 +59,28 @@ describe("flatten_object utils", () => {
     describe("getArrayValuesCount", () => {
         it("should count array lengths and get the max for a specific key", () => {
             const array = [
-                { id: 1, tags: ["a", "b"] },
-                { id: 2, tags: ["a", "b", "c"] },
-                { id: 3, tags: ["a"] }
+                { id: 1,
+tags: ["a", "b"] },
+                { id: 2,
+tags: ["a", "b", "c"] },
+                { id: 3,
+tags: ["a"] }
             ];
-            
+
             const result = getArrayValuesCount(array);
             expect(result).toEqual({ tags: 3 });
         });
 
         it("should handle nested arrays inside nested objects", () => {
             const array = [
-                { id: 1, profile: { friends: [1, 2], settings: { keys: ["k1"] } } },
-                { id: 2, profile: { friends: [1, 2, 3], settings: { keys: ["k1", "k2", "k3", "k4"] } } }
+                { id: 1,
+profile: { friends: [1, 2],
+settings: { keys: ["k1"] } } },
+                { id: 2,
+profile: { friends: [1, 2, 3],
+settings: { keys: ["k1", "k2", "k3", "k4"] } } }
             ];
-            
+
             const result = getArrayValuesCount(array);
             expect(result).toEqual({
                 "profile.friends": 3,
@@ -80,8 +90,10 @@ describe("flatten_object utils", () => {
 
         it("should return empty object if no arrays exist", () => {
             const array = [
-                { id: 1, name: "foo" },
-                { id: 2, name: "bar" }
+                { id: 1,
+name: "foo" },
+                { id: 2,
+name: "bar" }
             ];
             const result = getArrayValuesCount(array);
             expect(result).toEqual({});

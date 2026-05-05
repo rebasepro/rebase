@@ -126,7 +126,8 @@ async function branchCommand(rawArgs: string[]): Promise<void> {
     const { drizzle } = await import("drizzle-orm/node-postgres");
     const { Pool } = await import("pg");
 
-    const pool = new Pool({ connectionString: databaseUrl, max: 3 });
+    const pool = new Pool({ connectionString: databaseUrl,
+max: 3 });
     const db = drizzle(pool);
     const poolManager = new DatabasePoolManager(databaseUrl);
     const branchService = new BranchService(db, poolManager);
@@ -298,7 +299,7 @@ async function fixMigrationStatementOrder(): Promise<void> {
         .filter(f => f.endsWith(".sql"))
         .map(f => ({
             name: f,
-            mtime: fs.statSync(path.join(drizzleDir, f)).mtimeMs,
+            mtime: fs.statSync(path.join(drizzleDir, f)).mtimeMs
         }))
         .sort((a, b) => b.mtime - a.mtime);
 
@@ -351,7 +352,8 @@ async function fixMigrationStatementOrder(): Promise<void> {
 
     // Reorder: move DROP POLICY statements for affected tables before their ALTER TABLE
     // Strategy: stable sort — DROP POLICY on table X gets priority over ALTER on table X
-    const stmtEntries = parts.map((stmt, idx) => ({ stmt, idx }));
+    const stmtEntries = parts.map((stmt, idx) => ({ stmt,
+idx }));
 
     stmtEntries.sort((a, b) => {
         const aDropMatch = a.stmt.trim().match(dropPolicyRe);
@@ -411,21 +413,22 @@ async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> 
             await execa(drizzleKitBin, [action], {
                 cwd: process.cwd(),
                 stdio: "inherit",
-                env,
+                env
             });
         } else {
             const child = execa(drizzleKitBin, [action], {
                 cwd: process.cwd(),
                 env,
-                reject: false,
+                reject: false
             });
-            
+
             // Natively stream output while still capturing it for error parsing
             child.stdout?.pipe(process.stdout);
             child.stderr?.pipe(process.stderr);
-            
+
             const result = await child;
 
+            // eslint-disable-next-line no-control-regex
             const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").replace(/\[?[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣷⣯⣟⡿⢿⣻⣽]+\]\s*/g, "");
             const stdout = stripAnsi(result.stdout || "").trim();
             const stderr = stripAnsi(result.stderr || "").trim();
@@ -447,6 +450,7 @@ async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> 
         }
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
+        // eslint-disable-next-line no-control-regex
         const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").replace(/\[?[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣷⣯⣟⡿⢿⣻⣽]+\]\s*/g, "");
         const cleaned = stripAnsi(msg).trim();
         console.error(chalk.red(`\n✗ drizzle-kit ${action} failed.\n`));
@@ -473,11 +477,11 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
                 "--watch": Boolean,
                 "-c": "--collections",
                 "-o": "--output",
-                "-w": "--watch",
+                "-w": "--watch"
             },
             {
                 argv: rawArgs.slice(2), // db generate ... or schema generate ...
-                permissive: true,
+                permissive: true
             }
         );
 
@@ -488,7 +492,7 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
             console.error(chalk.red(`✗ Could not find generate-drizzle-schema.ts at ${generatorScript}`));
             process.exit(1);
         }
-        
+
         const tsxBin = resolveLocalBin("tsx");
         if (!tsxBin) {
             console.error(chalk.red("✗ Could not find tsx binary."));
@@ -502,12 +506,12 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
         console.log("");
         console.log(chalk.bold("  🔧 Rebase Schema Generator"));
         console.log("");
-        
+
         const cmdParts = [
             tsxBin,
             generatorScript,
             `--collections=${collectionsPath}`,
-            `--output=${outputPath}`,
+            `--output=${outputPath}`
         ];
         if (watch) {
             cmdParts.push("--watch");
@@ -517,14 +521,14 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
             await execa(cmdParts[0], cmdParts.slice(1), {
                 cwd: process.cwd(),
                 stdio: "inherit",
-                env: { ...process.env as Record<string, string> },
+                env: { ...process.env as Record<string, string> }
             });
         } catch (err: unknown) {
             console.error(chalk.red(`✗ Failed to run schema generator: ${err instanceof Error ? err.message : String(err)}`));
             process.exit(1);
         }
     } else {
-        console.error(chalk.red(`Unknown schema command.`));
+        console.error(chalk.red("Unknown schema command."));
         process.exit(1);
     }
 }
@@ -535,11 +539,11 @@ async function doctorPluginCommand(rawArgs: string[]): Promise<void> {
             "--collections": String,
             "--schema": String,
             "-c": "--collections",
-            "-s": "--schema",
+            "-s": "--schema"
         },
         {
             argv: rawArgs.slice(1), // skip "doctor"
-            permissive: true,
+            permissive: true
         }
     );
 
@@ -562,20 +566,19 @@ async function doctorPluginCommand(rawArgs: string[]): Promise<void> {
         tsxBin,
         doctorScript,
         `--collections=${collectionsPath}`,
-        `--schema=${schemaPath}`,
+        `--schema=${schemaPath}`
     ];
 
     try {
         await execa(cmdParts[0], cmdParts.slice(1), {
             cwd: process.cwd(),
             stdio: "inherit",
-            env: { ...process.env as Record<string, string> },
+            env: { ...process.env as Record<string, string> }
         });
     } catch {
         process.exit(1);
     }
 }
-
 
 
 // Entry point when called directly

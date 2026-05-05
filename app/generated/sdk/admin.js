@@ -66,7 +66,7 @@ function createAdmin(transport, options) {
     async function createUser(data) {
         return transport.request(adminPath + "/users", {
             method: "POST",
-            body: JSON.stringify(data),
+            body: JSON.stringify(data)
         });
     }
 
@@ -80,7 +80,7 @@ function createAdmin(transport, options) {
     async function updateUser(userId, data) {
         return transport.request(adminPath + "/users/" + encodeURIComponent(userId), {
             method: "PUT",
-            body: JSON.stringify(data),
+            body: JSON.stringify(data)
         });
     }
 
@@ -92,7 +92,7 @@ function createAdmin(transport, options) {
      */
     async function deleteUser(userId) {
         return transport.request(adminPath + "/users/" + encodeURIComponent(userId), {
-            method: "DELETE",
+            method: "DELETE"
         });
     }
 
@@ -124,7 +124,7 @@ function createAdmin(transport, options) {
     async function createRole(data) {
         return transport.request(adminPath + "/roles", {
             method: "POST",
-            body: JSON.stringify(data),
+            body: JSON.stringify(data)
         });
     }
 
@@ -138,7 +138,7 @@ function createAdmin(transport, options) {
     async function updateRole(roleId, data) {
         return transport.request(adminPath + "/roles/" + encodeURIComponent(roleId), {
             method: "PUT",
-            body: JSON.stringify(data),
+            body: JSON.stringify(data)
         });
     }
 
@@ -150,7 +150,7 @@ function createAdmin(transport, options) {
      */
     async function deleteRole(roleId) {
         return transport.request(adminPath + "/roles/" + encodeURIComponent(roleId), {
-            method: "DELETE",
+            method: "DELETE"
         });
     }
 
@@ -164,7 +164,7 @@ function createAdmin(transport, options) {
      */
     async function bootstrap() {
         return transport.request(adminPath + "/bootstrap", {
-            method: "POST",
+            method: "POST"
         });
     }
 
@@ -179,7 +179,7 @@ function createAdmin(transport, options) {
         createRole,
         updateRole,
         deleteRole,
-        bootstrap,
+        bootstrap
     };
 }
 

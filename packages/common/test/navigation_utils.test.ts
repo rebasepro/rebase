@@ -4,7 +4,7 @@ import {
     removeTrailingSlash,
     addInitialSlash,
     getLastSegment,
-    getCollectionPathsCombinations,
+    getCollectionPathsCombinations
 } from "../src/util/navigation_utils";
 
 // ─────────────────────────────────────────────────────────────

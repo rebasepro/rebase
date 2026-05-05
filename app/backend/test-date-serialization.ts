@@ -83,8 +83,11 @@ function cacheReviver(_key: string, value: unknown): unknown {
 }
 
 async function main() {
-    const pool = new pg.Pool({ connectionString: DATABASE_URL, max: 5 });
-    const fullSchema = { ...schema.tables, ...schema.enums, ...schema.relations };
+    const pool = new pg.Pool({ connectionString: DATABASE_URL,
+max: 5 });
+    const fullSchema = { ...schema.tables,
+...schema.enums,
+...schema.relations };
     const db = drizzle(pool, { schema: fullSchema });
 
     const registry = new PostgresCollectionRegistry(allCollections);
@@ -106,7 +109,9 @@ async function main() {
     console.log("TEST 1: parsePropertyFromServer → date marker objects");
     console.log("═══════════════════════════════════════════════════");
 
-    const dateProperty = { type: "date" as const, mode: "date_time" as const, name: "Test Date" };
+    const dateProperty = { type: "date" as const,
+mode: "date_time" as const,
+name: "Test Date" };
     const nativeDate = new Date("2025-08-02T11:09:15.234Z");
 
     // Case 1: native Date → marker
@@ -138,10 +143,14 @@ async function main() {
         id: "42",
         title: "Test Post",
         status: "published",
-        publish_date: { __type: "date", value: "2025-08-02T11:09:15.234Z" },
-        created_at: { __type: "date", value: "2025-01-15T08:30:00.000Z" },
+        publish_date: { __type: "date",
+value: "2025-08-02T11:09:15.234Z" },
+        created_at: { __type: "date",
+value: "2025-01-15T08:30:00.000Z" },
         updated_at: null,
-        author: { id: "7", path: "authors", __type: "relation" },
+        author: { id: "7",
+path: "authors",
+__type: "relation" }
     };
 
     // Simulate c.json() on server side
@@ -177,19 +186,24 @@ async function main() {
             path: "posts",
             values: {
                 title: "Test Post",
-                publish_date: { __type: "date", value: "2025-08-02T11:09:15.234Z" },
-                created_at: { __type: "date", value: "2025-01-15T08:30:00.000Z" },
+                publish_date: { __type: "date",
+value: "2025-08-02T11:09:15.234Z" },
+                created_at: { __type: "date",
+value: "2025-01-15T08:30:00.000Z" },
                 updated_at: null,
                 content: [
                     {
                         type: "text",
                         value: {
-                            created_at: { __type: "date", value: "2025-06-01T00:00:00.000Z" },
+                            created_at: { __type: "date",
+value: "2025-06-01T00:00:00.000Z" },
                             body: "Hello world"
                         }
                     }
                 ],
-                author: { id: "7", path: "authors", __type: "relation" },
+                author: { id: "7",
+path: "authors",
+__type: "relation" }
             }
         }
     };
@@ -273,7 +287,9 @@ async function main() {
 
     // Server's parsePropertyFromServer should handle ISO strings
     const serverDate = parsePropertyFromServer(serverReceived.publish_date,
-        { type: "date", mode: "date_time", name: "Publish Date" } as any, postsCollection);
+        { type: "date",
+mode: "date_time",
+name: "Publish Date" } as any, postsCollection);
     assert("Server parse: ISO string → marker", (serverDate as any).__type === "date");
     assert("Server parse: marker value correct", (serverDate as any).value === "2025-08-02T11:09:15.234Z");
 
@@ -286,7 +302,9 @@ async function main() {
 
     // Fetch a real post from the database
     const realPosts = await entityFetchService.fetchEntitiesWithConditions("posts", {
-        limit: 5, orderBy: "id", order: "asc"
+        limit: 5,
+orderBy: "id",
+order: "asc"
     });
 
     assert("E2E: Got posts from DB", realPosts.length > 0);
@@ -318,7 +336,8 @@ async function main() {
 
         // Simulate the FULL REST response path:
         // 1. Server: flattenEntity → c.json() → JSON.stringify
-        const flatEntity = { id: realPost.id, ...rv };
+        const flatEntity = { id: realPost.id,
+...rv };
         const restJson = JSON.stringify(flatEntity);
 
         // 2. Client: JSON.parse(text, rebaseReviver)
@@ -388,7 +407,7 @@ async function main() {
         // The client converts Date objects to ISO strings via JSON.stringify
         const clientFormValues: Record<string, any> = {
             title: postValues.title,
-            status: postValues.status,
+            status: postValues.status
         };
 
         // Simulate the client setting a date through the form
@@ -424,7 +443,8 @@ async function main() {
         }
 
         // Simulate REST response: server → client
-        const saveResponseJson = JSON.stringify({ id: savedEntity.id, ...savedValues });
+        const saveResponseJson = JSON.stringify({ id: savedEntity.id,
+...savedValues });
         const clientSaveResult = JSON.parse(saveResponseJson, rebaseReviver);
 
         assert("Save REST response: publish_date is Date on client",
@@ -438,7 +458,8 @@ async function main() {
         }
 
         // Restore original value
-        const restoreValues: Record<string, any> = { title: postValues.title, status: postValues.status };
+        const restoreValues: Record<string, any> = { title: postValues.title,
+status: postValues.status };
         if (postValues.publish_date) {
             // The original value is a marker object
             restoreValues.publish_date = postValues.publish_date.value || postValues.publish_date;
@@ -455,7 +476,8 @@ async function main() {
     console.log("═══════════════════════════════════════════════════");
 
     // Edge case: uppercase "Date" type (legacy format)
-    const legacyMarker = { __type: "Date", value: "2025-08-02T11:09:15.234Z" };
+    const legacyMarker = { __type: "Date",
+value: "2025-08-02T11:09:15.234Z" };
     const legacyJson = JSON.stringify(legacyMarker);
     const legacyParsed = JSON.parse(legacyJson, rebaseReviver);
     assert("Legacy 'Date' marker revived by rebaseReviver", legacyParsed instanceof Date);
@@ -466,8 +488,11 @@ async function main() {
     // Edge case: deeply nested date in array of objects
     const deepNested = {
         blocks: [
-            { type: "quote", data: { date: { __type: "date", value: "2025-01-01T00:00:00.000Z" } } },
-            { type: "text", data: { date: null } }
+            { type: "quote",
+data: { date: { __type: "date",
+value: "2025-01-01T00:00:00.000Z" } } },
+            { type: "text",
+data: { date: null } }
         ]
     };
     const deepJson = JSON.stringify(deepNested);
@@ -478,7 +503,8 @@ async function main() {
         deepParsed.blocks[1].data.date === null);
 
     // Edge case: empty object with __type but wrong type value
-    const wrongType = { __type: "timestamp", value: "2025-01-01" };
+    const wrongType = { __type: "timestamp",
+value: "2025-01-01" };
     const wrongJson = JSON.stringify(wrongType);
     const wrongParsed = JSON.parse(wrongJson, rebaseReviver);
     assert("Unknown __type is passed through", !(wrongParsed instanceof Date) && wrongParsed.__type === "timestamp");

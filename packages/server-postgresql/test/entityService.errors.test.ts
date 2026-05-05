@@ -9,7 +9,8 @@ describe("EntityService - Error Handling & Edge Cases", () => {
     let db: jest.Mocked<NodePgDatabase<any>>;
 
     const mockTable = {
-        id: { name: "id", dataType: "number" },
+        id: { name: "id",
+dataType: "number" },
         name: { name: "name" },
         _def: { tableName: "test_table" }
     };
@@ -52,7 +53,7 @@ describe("EntityService - Error Handling & Edge Cases", () => {
             update: jest.fn().mockReturnThis(),
             set: jest.fn().mockReturnThis(),
             delete: jest.fn().mockReturnThis(),
-            transaction: jest.fn((callback) => callback(db)),
+            transaction: jest.fn((callback) => callback(db))
         } as any;
 
         // Add a then method to make the db object awaitable when the query chain ends
@@ -81,7 +82,8 @@ describe("EntityService - Error Handling & Edge Cases", () => {
 
     describe("ID Type Validation", () => {
         it("should handle valid numeric ID strings", async () => {
-            const mockEntity = { id: 123, name: "Test" };
+            const mockEntity = { id: 123,
+name: "Test" };
             db.limit.mockResolvedValue([mockEntity]);
 
             const entity = await entityService.fetchEntity("test", "123");
@@ -95,7 +97,8 @@ describe("EntityService - Error Handling & Edge Cases", () => {
         });
 
         it("should handle zero as valid ID", async () => {
-            const mockEntity = { id: 0, name: "Test" };
+            const mockEntity = { id: 0,
+name: "Test" };
             db.limit.mockResolvedValue([mockEntity]);
 
             const entity = await entityService.fetchEntity("test", 0);
@@ -103,7 +106,8 @@ describe("EntityService - Error Handling & Edge Cases", () => {
         });
 
         it("should handle negative numbers as valid ID", async () => {
-            const mockEntity = { id: -1, name: "Test" };
+            const mockEntity = { id: -1,
+name: "Test" };
             db.limit.mockResolvedValue([mockEntity]);
 
             const entity = await entityService.fetchEntity("test", -1);
@@ -176,7 +180,8 @@ describe("EntityService - Error Handling & Edge Cases", () => {
 
     describe("Concurrent Operations", () => {
         it("should handle multiple simultaneous reads", async () => {
-            const mockEntity = { id: 1, name: "Test" };
+            const mockEntity = { id: 1,
+name: "Test" };
             db.limit.mockResolvedValue([mockEntity]);
 
             const promises = Array(10).fill(0).map(() =>
@@ -193,7 +198,8 @@ describe("EntityService - Error Handling & Edge Cases", () => {
 
         it("should handle race conditions in write operations", async () => {
             db.returning.mockResolvedValue([{ id: 1 }]);
-            db.limit.mockResolvedValue([{ id: 1, name: "Updated" }]);
+            db.limit.mockResolvedValue([{ id: 1,
+name: "Updated" }]);
 
             const promises = Array(5).fill(0).map((_, i) =>
                 entityService.saveEntity("test", { name: `Update ${i}` }, 1)
@@ -243,7 +249,8 @@ describe("EntityService - Error Handling & Edge Cases", () => {
             const incompleteEntity = {}; // Missing required fields
 
             db.returning.mockResolvedValue([{ id: 1 }]);
-            db.limit.mockResolvedValue([{ id: 1, name: null }]);
+            db.limit.mockResolvedValue([{ id: 1,
+name: null }]);
 
             // The service should handle validation at the collection level
             // This test verifies the service doesn't crash with incomplete data
@@ -252,7 +259,8 @@ describe("EntityService - Error Handling & Edge Cases", () => {
         });
 
         it("should handle NULL values in database correctly", async () => {
-            const mockEntity = { id: 1, name: null };
+            const mockEntity = { id: 1,
+name: null };
             db.limit.mockResolvedValue([mockEntity]);
 
             const entity = await entityService.fetchEntity("test", 1);
@@ -263,7 +271,8 @@ describe("EntityService - Error Handling & Edge Cases", () => {
             const entityWithUndefined = { name: undefined };
 
             db.returning.mockResolvedValue([{ id: 1 }]);
-            db.limit.mockResolvedValue([{ id: 1, name: null }]);
+            db.limit.mockResolvedValue([{ id: 1,
+name: null }]);
 
             const entity = await entityService.saveEntity("test", entityWithUndefined);
             expect(entity.id).toBe("1");
@@ -276,7 +285,8 @@ describe("EntityService - Error Handling & Edge Cases", () => {
 
             // The service should handle this safely through parameterized queries
             // This test should not throw an error because of proper parameterization
-            const mockEntity = { id: 1, name: "Safe" };
+            const mockEntity = { id: 1,
+name: "Safe" };
             db.limit.mockResolvedValue([mockEntity]);
 
             const entity = await entityService.fetchEntity("test", maliciousId);
@@ -288,7 +298,8 @@ describe("EntityService - Error Handling & Edge Cases", () => {
             const entityWithLongValue = { name: veryLongString };
 
             db.returning.mockResolvedValue([{ id: 1 }]);
-            db.limit.mockResolvedValue([{ id: 1, name: veryLongString }]);
+            db.limit.mockResolvedValue([{ id: 1,
+name: veryLongString }]);
 
             const entity = await entityService.saveEntity("test", entityWithLongValue);
             expect(entity.values.name).toBe(veryLongString);
@@ -299,7 +310,8 @@ describe("EntityService - Error Handling & Edge Cases", () => {
             const entityWithSpecialChars = { name: specialChars };
 
             db.returning.mockResolvedValue([{ id: 1 }]);
-            db.limit.mockResolvedValue([{ id: 1, name: specialChars }]);
+            db.limit.mockResolvedValue([{ id: 1,
+name: specialChars }]);
 
             const entity = await entityService.saveEntity("test", entityWithSpecialChars);
             expect(entity.values.name).toBe(specialChars);
@@ -317,7 +329,8 @@ describe("EntityService - Error Handling & Edge Cases", () => {
             };
             jest.spyOn(collectionRegistry, "getCollectionByPath").mockReturnValue(booleanCollection);
 
-            const mockEntity = { id: 1, active: false };
+            const mockEntity = { id: 1,
+active: false };
             db.limit.mockResolvedValue([mockEntity]);
 
             const entity = await entityService.fetchEntity("test", 1);
@@ -334,7 +347,8 @@ describe("EntityService - Error Handling & Edge Cases", () => {
             };
             jest.spyOn(collectionRegistry, "getCollectionByPath").mockReturnValue(numericCollection);
 
-            const mockEntity = { id: 1, count: 0 };
+            const mockEntity = { id: 1,
+count: 0 };
             db.limit.mockResolvedValue([mockEntity]);
 
             const entity = await entityService.fetchEntity("test", 1);
@@ -342,7 +356,8 @@ describe("EntityService - Error Handling & Edge Cases", () => {
         });
 
         it("should handle empty string values correctly", async () => {
-            const mockEntity = { id: 1, name: "" };
+            const mockEntity = { id: 1,
+name: "" };
             db.limit.mockResolvedValue([mockEntity]);
 
             const entity = await entityService.fetchEntity("test", 1);

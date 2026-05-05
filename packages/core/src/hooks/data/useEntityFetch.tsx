@@ -80,7 +80,7 @@ export function useEntityFetch<M extends Record<string, any>, USER extends User 
             };
         } else if (entityId && path && collection) {
             const accessor = dataClient.collection(path);
-            
+
             if (accessor.listenById) {
                 return accessor.listenById(entityId, onEntityUpdate as any, onError);
             } else {

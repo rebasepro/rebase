@@ -58,15 +58,15 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
         if (stats.isDirectory()) {
             const files = fs.readdirSync(resolvedPath);
             for (const file of files) {
-                if ((file.endsWith('.ts') || file.endsWith('.js')) &&
-                    !file.includes('.test.') &&
-                    !file.endsWith('.d.ts') &&
-                    file !== 'index.ts' && file !== 'index.js') {
+                if ((file.endsWith(".ts") || file.endsWith(".js")) &&
+                    !file.includes(".test.") &&
+                    !file.endsWith(".d.ts") &&
+                    file !== "index.ts" && file !== "index.js") {
 
                     const filePath = path.join(resolvedPath, file);
                     try {
                         const fileUrl = pathToFileURL(filePath).href;
-                        const dynamicImport = new Function('url', 'return import(url)');
+                        const dynamicImport = new Function("url", "return import(url)");
                         const module = await dynamicImport(fileUrl);
                         if (module && module.default) {
                             collections.push(module.default);
@@ -79,7 +79,7 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
             }
         } else {
             const fileUrl = pathToFileURL(resolvedPath).href + `?t=${Date.now()}`;
-            const dynamicImport = new Function('url', 'return import(url)');
+            const dynamicImport = new Function("url", "return import(url)");
             const imported = await dynamicImport(fileUrl);
             collections = imported.backendCollections || imported.collections;
         }

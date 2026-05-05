@@ -25,7 +25,7 @@ export interface InitializeAppCheckResult {
  */
 export function useAppCheck({
                                 firebaseApp,
-                                options,
+                                options
                             }: InitializeAppCheckProps): InitializeAppCheckResult {
     if (options?.debugToken) {
         Object.assign(window, {

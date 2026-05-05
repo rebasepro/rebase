@@ -117,7 +117,7 @@ export class DefaultDriverRegistry implements DriverRegistry {
         const delegate = this.delegates.get(DEFAULT_DRIVER_ID);
         if (!delegate) {
             throw new Error(
-                `[DriverRegistry] No default driver registered. ` +
+                "[DriverRegistry] No default driver registered. " +
                 `Register one with id "${DEFAULT_DRIVER_ID}" or pass a single DataDriver.`
             );
         }

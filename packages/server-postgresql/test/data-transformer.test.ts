@@ -7,7 +7,9 @@ describe("serializePropertyToServer", () => {
         const relationProp: Property = { type: "relation" } as Property;
 
         it("should extract id from a relation object", () => {
-            const value = { id: "abc-123", path: "authors", __type: "relation" };
+            const value = { id: "abc-123",
+path: "authors",
+__type: "relation" };
             expect(serializePropertyToServer(value, relationProp)).toBe("abc-123");
         });
 
@@ -33,8 +35,10 @@ describe("serializePropertyToServer", () => {
 
         it("should serialize an array of relation objects to array of IDs", () => {
             const value = [
-                { id: "id-1", path: "authors" },
-                { id: "id-2", path: "authors" }
+                { id: "id-1",
+path: "authors" },
+                { id: "id-2",
+path: "authors" }
             ];
             expect(serializePropertyToServer(value, relationProp)).toEqual(["id-1", "id-2"]);
         });
@@ -46,7 +50,8 @@ describe("serializePropertyToServer", () => {
 
         it("should handle mixed array of objects and strings", () => {
             const value = [
-                { id: "id-1", path: "authors" },
+                { id: "id-1",
+path: "authors" },
                 "raw-id-2",
                 ""
             ];
@@ -95,7 +100,7 @@ describe("serializePropertyToServer", () => {
             properties: {
                 name: { type: "string" } as Property,
                 age: { type: "number" } as Property,
-                author: { type: "relation" } as Property,
+                author: { type: "relation" } as Property
             }
         } as unknown as Property;
 
@@ -103,7 +108,8 @@ describe("serializePropertyToServer", () => {
             const value = {
                 name: "Alice",
                 age: 30,
-                author: { id: "author-1", path: "authors" }
+                author: { id: "author-1",
+path: "authors" }
             };
             expect(serializePropertyToServer(value, mapProp)).toEqual({
                 name: "Alice",

@@ -8,7 +8,7 @@ import { FirestoreTextSearchController, FirestoreTextSearchControllerBuilder } f
 const MAX_SEARCH_RESULTS = 80;
 
 export const localSearchControllerBuilder: FirestoreTextSearchControllerBuilder = ({
-    firebaseApp,
+    firebaseApp
 }: {
 
     firebaseApp: FirebaseApp,
@@ -95,9 +95,9 @@ export const localSearchControllerBuilder: FirestoreTextSearchControllerBuilder 
             const bExactMatch = b.item.id === searchString;
 
             if (aExactMatch && !bExactMatch) {
-                return -1;  // Prioritize item A
+                return -1; // Prioritize item A
             } else if (!aExactMatch && bExactMatch) {
-                return 1;   // Prioritize item B
+                return 1; // Prioritize item B
             } else {
                 // If both are exact matches or both are not, sort by Fuse's original score
                 return (a.score ?? 0) - (b.score ?? 0);
@@ -108,7 +108,7 @@ export const localSearchControllerBuilder: FirestoreTextSearchControllerBuilder 
 
     return {
         init,
-        search,
+        search
     }
 }
 

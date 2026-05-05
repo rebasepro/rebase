@@ -105,7 +105,7 @@ export function createTwitterProvider(config: { clientId: string; clientSecret: 
                     providerId: profileData.id,
                     email,
                     displayName: profileData.name || profileData.username || null,
-                    photoUrl: profileData.profile_image_url?.replace("_normal", "_400x400") || null,
+                    photoUrl: profileData.profile_image_url?.replace("_normal", "_400x400") || null
                 };
             } catch (error) {
                 console.error("Twitter OAuth error:", error);

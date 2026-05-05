@@ -1,20 +1,20 @@
 /**
  * Example Rebase Script
- * 
+ *
  * Scripts run OUTSIDE the server and need explicit authentication.
  * Use a Service Key (set in .env as REBASE_SERVICE_KEY) to get admin
  * access — similar to a Firebase Service Account credential.
- * 
+ *
  * Usage:
  *   # With local dev server running (`pnpm dev` in another terminal):
  *   npx tsx scripts/example.ts
- * 
+ *
  *   # With remote backend:
  *   REBASE_URL=https://api.yourdomain.com npx tsx scripts/example.ts
- * 
+ *
  *   # Service key can also be passed as env var:
  *   REBASE_SERVICE_KEY=<key> REBASE_URL=https://api.yourdomain.com npx tsx scripts/example.ts
- * 
+ *
  * Generate a service key:
  *   node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"
  */
@@ -72,7 +72,7 @@ const rebase = createRebaseClient({
 
 async function run() {
     console.log("🚀 Starting script...");
-    
+
     try {
         // Example: Check backend health
         const health = await fetch(`${baseUrl}/api/health`).then(res => res.json());

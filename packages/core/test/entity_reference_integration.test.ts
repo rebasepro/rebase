@@ -12,7 +12,8 @@ import { mergeDeep } from "@rebasepro/utils";
 // Real EntityReference class for testing
 class TestEntityReference extends EntityReference {
     constructor(id: string, path: string) {
-        super({ id, path });
+        super({ id,
+path });
     }
 }
 
@@ -34,12 +35,12 @@ describe("EntityReference Preservation - Integration Tests", () => {
             const baseValues = {
                 title: "Original Title",
                 author: new TestEntityReference("author123", "users"),
-                tags: ["tag1"],
+                tags: ["tag1"]
             };
 
             const cachedChanges = {
                 title: "Modified Title",
-                author: new TestEntityReference("author456", "users"), // User selected different author
+                author: new TestEntityReference("author456", "users") // User selected different author
             };
 
             const result = mergeDeep(baseValues, cachedChanges);
@@ -55,11 +56,11 @@ describe("EntityReference Preservation - Integration Tests", () => {
         it("should preserve GeoPoint when merging location data", () => {
             const baseValues = {
                 name: "Office",
-                location: new TestGeoPoint(40.7128, -74.0060),
+                location: new TestGeoPoint(40.7128, -74.0060)
             };
 
             const updates = {
-                location: new TestGeoPoint(51.5074, -0.1278), // Updated location
+                location: new TestGeoPoint(51.5074, -0.1278) // Updated location
             };
 
             const result = mergeDeep(baseValues, updates);
@@ -73,14 +74,14 @@ describe("EntityReference Preservation - Integration Tests", () => {
             const baseValues = {
                 metadata: {
                     createdBy: new TestEntityReference("user1", "users"),
-                    updatedBy: new TestEntityReference("user1", "users"),
-                },
+                    updatedBy: new TestEntityReference("user1", "users")
+                }
             };
 
             const updates = {
                 metadata: {
-                    updatedBy: new TestEntityReference("user2", "users"),
-                },
+                    updatedBy: new TestEntityReference("user2", "users")
+                }
             };
 
             const result = mergeDeep(baseValues, updates);
@@ -97,12 +98,12 @@ describe("EntityReference Preservation - Integration Tests", () => {
             const baseValues = {
                 authors: [
                     new TestEntityReference("author1", "users"),
-                    new TestEntityReference("author2", "users"),
-                ],
+                    new TestEntityReference("author2", "users")
+                ]
             };
 
             const updates = {
-                authors: [sourceRef],
+                authors: [sourceRef]
             };
 
             const result = mergeDeep(baseValues, updates);
@@ -125,7 +126,7 @@ describe("EntityReference Preservation - Integration Tests", () => {
                 author: new TestEntityReference("author123", "users"),
                 category: new TestEntityReference("cat1", "categories"),
                 created_at: null,
-                updated_at: null,
+                updated_at: null
             };
 
             const properties = {
@@ -145,7 +146,7 @@ describe("EntityReference Preservation - Integration Tests", () => {
                 updated_at: {
                     type: "date" as const,
                     autoValue: "on_update" as const
-                },
+                }
             };
 
             const timestampNow = new Date();
@@ -172,7 +173,7 @@ describe("EntityReference Preservation - Integration Tests", () => {
             const inputValues = {
                 name: "Store",
                 location: new TestGeoPoint(40.7128, -74.0060),
-                updated_at: null,
+                updated_at: null
             };
 
             const properties = {
@@ -181,7 +182,7 @@ describe("EntityReference Preservation - Integration Tests", () => {
                 updated_at: {
                     type: "date" as const,
                     autoValue: "on_update" as const
-                },
+                }
             };
 
             const timestampNow = new Date();
@@ -211,12 +212,12 @@ describe("EntityReference Preservation - Integration Tests", () => {
                 author: new TestEntityReference("author123", "users"),
                 location: new TestGeoPoint(40.7128, -74.0060),
                 created_at: null,
-                updated_at: null,
+                updated_at: null
             };
 
             // Step 2: Merge with cached local changes (simulates EntityForm)
             const cachedChanges = {
-                title: "My Updated Article",
+                title: "My Updated Article"
             };
             const mergedValues = mergeDeep(formValues, cachedChanges);
 
@@ -235,7 +236,7 @@ describe("EntityReference Preservation - Integration Tests", () => {
                 updated_at: {
                     type: "date" as const,
                     autoValue: "on_update" as const
-                },
+                }
             };
 
             const timestampNow = new Date();
@@ -267,8 +268,8 @@ describe("EntityReference Preservation - Integration Tests", () => {
                 title: "My Article",
                 relatedPosts: [
                     new TestEntityReference("post1", "posts"),
-                    new TestEntityReference("post2", "posts"),
-                ],
+                    new TestEntityReference("post2", "posts")
+                ]
             };
 
             // Just properties without date fields to isolate array handling
@@ -280,7 +281,7 @@ describe("EntityReference Preservation - Integration Tests", () => {
                         type: "reference" as const,
                         path: "posts"
                     }
-                },
+                }
             };
 
             const result = updateDateAutoValues({

@@ -64,7 +64,7 @@ export const EnhanceTextFieldBinding = React.memo(function EnhanceTextFieldBindi
                 showError={showError}
                 error={error}
                 disabled={disabled}
-                property={property} />
+                property={property}/>
         </>
     );
 

@@ -5,8 +5,13 @@ export function rebaseReviver(_key: string, value: unknown): unknown {
         const record = value as Record<string, unknown>;
         switch (record.__type) {
             case "date":
-            case "Date":
-                return new Date(record.value as string);
+            case "Date": {
+                if (typeof record.value !== "string") {
+                    return value;
+                }
+                const date = new Date(record.value);
+                return isNaN(date.getTime()) ? null : date;
+            }
             case "reference":
             case "EntityReference":
                 return new EntityReference({

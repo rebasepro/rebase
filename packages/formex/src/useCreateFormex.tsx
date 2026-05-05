@@ -15,7 +15,7 @@ export function useCreateFormex<T = any>({
     onSubmit,
     onReset,
     onValuesChangeDeferred,
-    debugId,
+    debugId
 }: {
     initialValues: T;
     initialErrors?: Record<string, string>;
@@ -130,7 +130,7 @@ export function useCreateFormex<T = any>({
         (key: string, touched: boolean, shouldValidate?: boolean) => {
             setTouchedState((prev: Record<string, boolean>) => ({
                 ...prev,
-                [key]: touched,
+                [key]: touched
             }));
             if (shouldValidate) {
                 validate();
@@ -257,7 +257,7 @@ export function useCreateFormex<T = any>({
             undo,
             redo,
             canUndo: historyIndexRef.current > 0,
-            canRedo: historyIndexRef.current < historyRef.current.length - 1,
+            canRedo: historyIndexRef.current < historyRef.current.length - 1
         }),
         [
             values,
@@ -279,7 +279,7 @@ export function useCreateFormex<T = any>({
             submit,
             resetForm,
             undo,
-            redo,
+            redo
         ]
     );
 

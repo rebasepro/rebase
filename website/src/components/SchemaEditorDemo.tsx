@@ -258,7 +258,7 @@ export function SchemaEditorDemo() {
             dataType: "string",
             icon: "http",
             iconColor: "rgb(21, 79, 179)"
-        },
+        }
     ];
 
     const publisherSubfields = [
@@ -277,7 +277,7 @@ export function SchemaEditorDemo() {
             icon: "short_text",
             iconColor: "rgb(45, 127, 249)",
             indent: 1
-        },
+        }
     ];
 
     const moreProperties = [
@@ -338,7 +338,7 @@ export function SchemaEditorDemo() {
             dataType: "map",
             icon: "ballot",
             iconColor: "rgb(255, 148, 8)"
-        },
+        }
     ];
 
     return (
@@ -386,7 +386,7 @@ export function SchemaEditorDemo() {
                 {/* Properties List */}
                 <div className="pl-8">
                     {properties.map((prop, index) => (
-                        <PropertyField key={index} {...prop} />
+                        <PropertyField key={index} {...prop}/>
                     ))}
 
                     {/* Publisher Group with Children */}
@@ -433,14 +433,14 @@ export function SchemaEditorDemo() {
                             </div>
                             <div className="ml-16">
                                 {publisherSubfields.map((prop, index) => (
-                                    <PropertyField key={`sub-${index}`} {...prop} />
+                                    <PropertyField key={`sub-${index}`} {...prop}/>
                                 ))}
                             </div>
                         </div>
                     </div>
 
                     {moreProperties.map((prop, index) => (
-                        <PropertyField key={`more-${index}`} {...prop} />
+                        <PropertyField key={`more-${index}`} {...prop}/>
                     ))}
                 </div>
 

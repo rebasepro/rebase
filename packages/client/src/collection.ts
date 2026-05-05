@@ -30,15 +30,25 @@ function parseWhereFilter(where?: Record<string, WhereFieldValue>): FilterValues
         if (Array.isArray(rawValue) && rawValue.length === 2) {
             const [rawOp, val] = rawValue;
             const OP_TO_FILTER: Record<string, WhereFilterOp> = {
-                "eq": "==", "neq": "!=",
-                "gt": ">", "gte": ">=",
-                "lt": "<", "lte": "<=",
-                "==": "==", "!=": "!=",
-                ">": ">", ">=": ">=",
-                "<": "<", "<=": "<=",
-                "in": "in", "nin": "not-in", "not-in": "not-in",
-                "cs": "array-contains", "csa": "array-contains-any",
-                "array-contains": "array-contains", "array-contains-any": "array-contains-any",
+                "eq": "==",
+"neq": "!=",
+                "gt": ">",
+"gte": ">=",
+                "lt": "<",
+"lte": "<=",
+                "==": "==",
+"!=": "!=",
+                ">": ">",
+">=": ">=",
+                "<": "<",
+"<=": "<=",
+                "in": "in",
+"nin": "not-in",
+"not-in": "not-in",
+                "cs": "array-contains",
+"csa": "array-contains-any",
+                "array-contains": "array-contains",
+"array-contains-any": "array-contains-any"
             };
             filters[key] = [OP_TO_FILTER[rawOp] ?? "==", val];
             continue;
@@ -52,7 +62,7 @@ function parseWhereFilter(where?: Record<string, WhereFieldValue>): FilterValues
             const valStr = value.substring(dotIndex + 1);
             let op: WhereFilterOp = "==";
             let val: string | number | boolean | null | string[] = valStr;
-            
+
             switch (opStr) {
                 case "eq": op = "=="; break;
                 case "neq": op = "!="; break;
@@ -60,22 +70,22 @@ function parseWhereFilter(where?: Record<string, WhereFieldValue>): FilterValues
                 case "gte": op = ">="; break;
                 case "lt": op = "<"; break;
                 case "lte": op = "<="; break;
-                case "in": 
+                case "in":
                     op = "in";
-                    val = valStr.startsWith("(") && valStr.endsWith(")") 
+                    val = valStr.startsWith("(") && valStr.endsWith(")")
                         ? valStr.slice(1, -1).split(",").map(v => v.trim())
                         : valStr.split(",");
                     break;
-                case "nin": 
+                case "nin":
                     op = "not-in";
-                    val = valStr.startsWith("(") && valStr.endsWith(")") 
+                    val = valStr.startsWith("(") && valStr.endsWith(")")
                         ? valStr.slice(1, -1).split(",").map(v => v.trim())
                         : valStr.split(",");
                     break;
                 case "cs": op = "array-contains"; break;
-                case "csa": 
+                case "csa":
                     op = "array-contains-any";
-                    val = valStr.startsWith("(") && valStr.endsWith(")") 
+                    val = valStr.startsWith("(") && valStr.endsWith(")")
                         ? valStr.slice(1, -1).split(",").map(v => v.trim())
                         : valStr.split(",");
                     break;
@@ -86,7 +96,7 @@ function parseWhereFilter(where?: Record<string, WhereFieldValue>): FilterValues
             else if (val === "false") val = false;
             else if (val === "null") val = null;
             else if (typeof val === "string" && /^[0-9]+(\.[0-9]+)?$/.test(val) && key !== "id" && !key.endsWith("_id")) val = Number(val);
-            
+
             filters[key] = [op, val];
         } else {
             filters[key] = ["==", value];
@@ -151,7 +161,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             }
             const raw = await transport.request<Record<string, unknown>>(basePath, {
                 method: "POST",
-                body: JSON.stringify(body),
+                body: JSON.stringify(body)
             });
             return rowToEntity<M>(raw, slug);
         },
@@ -159,14 +169,14 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
         async update(id: string | number, data: Partial<M>) {
             const raw = await transport.request<Record<string, unknown>>(`${basePath}/${encodeURIComponent(String(id))}`, {
                 method: "PUT",
-                body: JSON.stringify(data),
+                body: JSON.stringify(data)
             });
             return rowToEntity<M>(raw, slug);
         },
 
         async delete(id: string | number) {
             return transport.request<void>(`${basePath}/${encodeURIComponent(String(id))}`, {
-                method: "DELETE",
+                method: "DELETE"
             });
         },
 
@@ -221,7 +231,8 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
 
         client.listenById = (id: string | number, onUpdate: (data: Entity<M> | undefined) => void, onError?: (error: Error) => void) => {
             return ws.listenEntity(
-                { path: slug, entityId: String(id) },
+                { path: slug,
+entityId: String(id) },
                 (entity: Entity | null) => {
                     if (entity) {
                         onUpdate(entity as Entity<M>);

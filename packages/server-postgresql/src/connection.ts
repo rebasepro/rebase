@@ -28,7 +28,7 @@ const DEFAULT_POOL: Required<PostgresPoolConfig> = {
     connectionTimeoutMillis: 10_000,
     queryTimeout: 30_000,
     statementTimeout: 30_000,
-    keepAlive: true,
+    keepAlive: true
 };
 
 /**
@@ -46,9 +46,10 @@ const DEFAULT_POOL: Required<PostgresPoolConfig> = {
 export function createPostgresDatabaseConnection(
     connectionString: string,
     schema?: Record<string, unknown>,
-    poolConfig?: PostgresPoolConfig,
+    poolConfig?: PostgresPoolConfig
 ) {
-    const opts = { ...DEFAULT_POOL, ...poolConfig };
+    const opts = { ...DEFAULT_POOL,
+...poolConfig };
 
     const pgPoolConfig: PoolConfig = {
         connectionString,
@@ -58,7 +59,7 @@ export function createPostgresDatabaseConnection(
         query_timeout: opts.queryTimeout,
         statement_timeout: opts.statementTimeout,
         keepAlive: opts.keepAlive,
-        keepAliveInitialDelayMillis: 0,
+        keepAliveInitialDelayMillis: 0
     };
 
     const pool = new Pool(pgPoolConfig);
@@ -77,5 +78,7 @@ export function createPostgresDatabaseConnection(
     // Create drizzle instance — pass schema when available to enable db.query relational API
     const db = schema ? drizzle(pool, { schema }) : drizzle(pool);
 
-    return { db, pool, connectionString };
+    return { db,
+pool,
+connectionString };
 }

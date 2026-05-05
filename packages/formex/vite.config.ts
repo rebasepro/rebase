@@ -10,7 +10,7 @@ const ReactCompilerConfig = {
 
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;
-    
+
     return true;
 };
 
@@ -43,8 +43,8 @@ export default defineConfig(() => ({
     plugins: [react({
             babel: {
                 plugins: [
-                    ["babel-plugin-react-compiler", ReactCompilerConfig],
-                ],
+                    ["babel-plugin-react-compiler", ReactCompilerConfig]
+                ]
             }
         })]
 }));

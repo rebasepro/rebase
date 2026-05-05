@@ -10,7 +10,7 @@ const ReactCompilerConfig = {
 
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;
-    
+
     return true;
 };
 
@@ -46,15 +46,15 @@ export default defineConfig(() => ({
             "@rebasepro/schema-inference": path.resolve(__dirname, "../schema-inference/src"),
             "@rebasepro/studio": path.resolve(__dirname, "../studio/src"),
             "@rebasepro/types": path.resolve(__dirname, "../types/src"),
-            "@rebasepro/ui": path.resolve(__dirname, "../ui/src"),
+            "@rebasepro/ui": path.resolve(__dirname, "../ui/src")
         }
     },
     plugins: [
         ...react({
             babel: {
                 plugins: [
-                    ["babel-plugin-react-compiler", ReactCompilerConfig],
-                ],
+                    ["babel-plugin-react-compiler", ReactCompilerConfig]
+                ]
             }
         })
     ]

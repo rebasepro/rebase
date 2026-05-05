@@ -28,5 +28,6 @@ export function useTranslation() {
     const typedT = useCallback((key: string, vars?: Record<string, string>): string =>
         t(key, vars) as string, [t]);
 
-    return useMemo(() => ({ t: typedT, i18n }), [typedT, i18n]);
+    return useMemo(() => ({ t: typedT,
+i18n }), [typedT, i18n]);
 }

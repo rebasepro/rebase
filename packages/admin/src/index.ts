@@ -1,6 +1,8 @@
 // CMS-specific types take priority over base types when names conflict
 export * from "./types";
-export * from "./editor";
+// Editor types only — the full ProseMirror editor is a heavy import (~300 KB)
+// and is available as a separate entry point: @rebasepro/admin/editor
+export type { RebaseEditorProps, JSONContent, EditorAIController } from "./editor";
 export * from "./form";
 export * from "./preview";
 export * from "./routes";
@@ -40,9 +42,7 @@ export {
     AppBar,
     Drawer,
     AdminModeSyncer,
-    ContentHomePage,
-    UsersView,
-    RolesView,
+    // ContentHomePage, UsersView, RolesView are lazy-loaded — not re-exported here
     RebaseCMS,
     RebaseShell,
     RebaseAuthGate,

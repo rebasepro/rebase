@@ -244,8 +244,10 @@ export function createAdminRoutes(config: AdminRouteOptions): Hono<HonoEnv> {
                 const appName = emailConfig?.appName || "Rebase";
                 const templateFn = emailConfig?.templates?.userInvitation;
                 const emailContent = templateFn
-                    ? templateFn(setPasswordUrl, { email: user.email, displayName: user.displayName })
-                    : getUserInvitationTemplate(setPasswordUrl, { email: user.email, displayName: user.displayName }, appName);
+                    ? templateFn(setPasswordUrl, { email: user.email,
+displayName: user.displayName })
+                    : getUserInvitationTemplate(setPasswordUrl, { email: user.email,
+displayName: user.displayName }, appName);
 
                 await emailService!.send({
                     to: user.email,
@@ -302,8 +304,10 @@ export function createAdminRoutes(config: AdminRouteOptions): Hono<HonoEnv> {
                 const appName = emailConfig?.appName || "Rebase";
                 const templateFn = emailConfig?.templates?.passwordReset;
                 const emailContent = templateFn
-                    ? templateFn(setPasswordUrl, { email: existing.email, displayName: existing.displayName })
-                    : getPasswordResetTemplate(setPasswordUrl, { email: existing.email, displayName: existing.displayName }, appName);
+                    ? templateFn(setPasswordUrl, { email: existing.email,
+displayName: existing.displayName })
+                    : getPasswordResetTemplate(setPasswordUrl, { email: existing.email,
+displayName: existing.displayName }, appName);
 
                 await emailService!.send({
                     to: existing.email,

@@ -1,4 +1,4 @@
-import { RebaseEditor } from "@rebasepro/admin";
+import { RebaseEditor } from "@rebasepro/admin/editor";
 
 const sampleContent = `# Getting Started with Rebase
 

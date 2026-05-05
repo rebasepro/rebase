@@ -3,7 +3,7 @@
 // Collection: Tags (slug: tags)
 // ────────────────────────────────────────────────────────────────────
 
-import { createCollectionClient } from './client.js';
+import { createCollectionClient } from "./client.js";
 
 // ─── Type Definitions ──────────────────────────────────────────────
 

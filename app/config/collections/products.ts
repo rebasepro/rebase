@@ -52,14 +52,30 @@ const productsCollection: EntityCollection = {
                 required: true
             },
             enum: [
-                { id: "electronics", label: "Electronics", color: "blue" },
-                { id: "clothing", label: "Clothing", color: "pink" },
-                { id: "home_garden", label: "Home & Garden", color: "green" },
-                { id: "sports", label: "Sports & Outdoors", color: "orange" },
-                { id: "books", label: "Books & Media", color: "purple" },
-                { id: "food_beverage", label: "Food & Beverage", color: "yellow" },
-                { id: "health_beauty", label: "Health & Beauty", color: "red" },
-                { id: "toys", label: "Toys & Games", color: "cyan" }
+                { id: "electronics",
+label: "Electronics",
+color: "blue" },
+                { id: "clothing",
+label: "Clothing",
+color: "pink" },
+                { id: "home_garden",
+label: "Home & Garden",
+color: "green" },
+                { id: "sports",
+label: "Sports & Outdoors",
+color: "orange" },
+                { id: "books",
+label: "Books & Media",
+color: "purple" },
+                { id: "food_beverage",
+label: "Food & Beverage",
+color: "yellow" },
+                { id: "health_beauty",
+label: "Health & Beauty",
+color: "red" },
+                { id: "toys",
+label: "Toys & Games",
+color: "cyan" }
             ]
         },
         price: {
@@ -109,9 +125,15 @@ const productsCollection: EntityCollection = {
             },
             defaultValue: "draft",
             enum: [
-                { id: "draft", label: "Draft", color: "gray" },
-                { id: "active", label: "Active", color: "green" },
-                { id: "archived", label: "Archived", color: "red" }
+                { id: "draft",
+label: "Draft",
+color: "gray" },
+                { id: "active",
+label: "Active",
+color: "green" },
+                { id: "archived",
+label: "Archived",
+color: "red" }
             ]
         },
         is_featured: {

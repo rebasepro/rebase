@@ -37,7 +37,7 @@ export function createGoogleProvider(clientId: string): OAuthProvider {
                     providerId: content.sub,
                     email: content.email || "",
                     displayName: content.name || null,
-                    photoUrl: content.picture || null,
+                    photoUrl: content.picture || null
                 };
             } catch (error) {
                 console.error("Failed to verify Google ID token:", error);

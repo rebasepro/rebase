@@ -55,7 +55,7 @@ describe("plurals utils", () => {
             expect(plural("life")).toBe("lives");
             expect(plural("thief")).toBe("thieves");
         });
-        
+
         it("should handle o endings", () => {
             expect(plural("tomato")).toBe("tomatoes");
             expect(plural("potato")).toBe("potatoes");

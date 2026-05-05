@@ -8,7 +8,7 @@ import { getTableName } from "@rebasepro/common";
 /**
  * PostgreSQL-specific collection registry.
  * Extends the base CollectionRegistry with support for Drizzle ORM tables, enums, and relations.
- * 
+ *
  * Satisfies CollectionRegistryInterface through inheritance from CollectionRegistry.
  */
 export class PostgresCollectionRegistry extends CollectionRegistry implements CollectionRegistryInterface {
@@ -35,7 +35,7 @@ export class PostgresCollectionRegistry extends CollectionRegistry implements Co
     /**
      * Finds collections assigned to a specific driver that do not have a registered table.
      */
-    getCollectionsWithoutTables(driverId: string = "(default)"): EntityCollection[] {
+    getCollectionsWithoutTables(driverId = "(default)"): EntityCollection[] {
         const collections = this.getCollections().filter(
             c => c.driver === driverId || (!c.driver && driverId === "(default)")
         );

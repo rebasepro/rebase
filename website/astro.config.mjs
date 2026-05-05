@@ -5,8 +5,8 @@ import react from "@astrojs/react";
 import sitemap from "@astrojs/sitemap";
 import path from "node:path";
 import starlight from "@astrojs/starlight";
-import mdx from '@astrojs/mdx';
-import yaml from '@rollup/plugin-yaml';
+import mdx from "@astrojs/mdx";
+import yaml from "@rollup/plugin-yaml";
 
 // https://astro.build/config
 export default defineConfig({
@@ -34,14 +34,14 @@ export default defineConfig({
                     borderRadius: "0.5rem",
                     codeFontFamily: "var(--font-mono)",
                     codeFontSize: "0.875rem",
-                    codeBackground: "var(--color-surface-900)",
+                    codeBackground: "var(--color-surface-900)"
                 },
                 frames: {
-                    showCopyToClipboardButton: true,
+                    showCopyToClipboardButton: true
                 },
                 defaultProps: {
-                    frame: "none",
-                },
+                    frame: "none"
+                }
             },
             sidebar: [
                 {
@@ -63,21 +63,29 @@ export default defineConfig({
                         {
                             label: "Configuration",
                             slug: "docs/getting-started/configuration"
-                        },
-                    ],
+                        }
+                    ]
                 },
                 {
                     label: "Deployment",
                     collapsed: false,
                     items: [
-                        { label: "Overview", slug: "docs/getting-started/deployment" },
-                        { label: "AWS", slug: "docs/deployment/aws" },
-                        { label: "Google Cloud", slug: "docs/deployment/gcp" },
-                        { label: "Azure", slug: "docs/deployment/azure" },
-                        { label: "Hetzner Cloud (EU)", slug: "docs/deployment/hetzner" },
-                        { label: "Scaleway (EU)", slug: "docs/deployment/scaleway" },
-                        { label: "Railway", slug: "docs/deployment/railway" },
-                        { label: "Fly.io", slug: "docs/deployment/flyio" }
+                        { label: "Overview",
+slug: "docs/getting-started/deployment" },
+                        { label: "AWS",
+slug: "docs/deployment/aws" },
+                        { label: "Google Cloud",
+slug: "docs/deployment/gcp" },
+                        { label: "Azure",
+slug: "docs/deployment/azure" },
+                        { label: "Hetzner Cloud (EU)",
+slug: "docs/deployment/hetzner" },
+                        { label: "Scaleway (EU)",
+slug: "docs/deployment/scaleway" },
+                        { label: "Railway",
+slug: "docs/deployment/railway" },
+                        { label: "Fly.io",
+slug: "docs/deployment/flyio" }
                     ]
                 },
                 {
@@ -91,8 +99,8 @@ export default defineConfig({
                         {
                             label: "Schema as Code",
                             slug: "docs/architecture/schema-as-code"
-                        },
-                    ],
+                        }
+                    ]
                 },
                 {
                     label: "Collections",
@@ -117,8 +125,8 @@ export default defineConfig({
                         {
                             label: "Entity Callbacks",
                             slug: "docs/collections/callbacks"
-                        },
-                    ],
+                        }
+                    ]
                 },
                 {
                     label: "Backend",
@@ -135,8 +143,8 @@ export default defineConfig({
                         {
                             label: "Cron Jobs",
                             slug: "docs/backend/cron-jobs"
-                        },
-                    ],
+                        }
+                    ]
                 },
                 {
                     label: "Authentication",
@@ -145,8 +153,8 @@ export default defineConfig({
                         {
                             label: "Overview",
                             slug: "docs/auth"
-                        },
-                    ],
+                        }
+                    ]
                 },
                 {
                     label: "Storage",
@@ -155,8 +163,8 @@ export default defineConfig({
                         {
                             label: "Overview",
                             slug: "docs/storage"
-                        },
-                    ],
+                        }
+                    ]
                 },
                 {
                     label: "Client SDK",
@@ -165,8 +173,8 @@ export default defineConfig({
                         {
                             label: "Overview",
                             slug: "docs/sdk"
-                        },
-                    ],
+                        }
+                    ]
                 },
                 {
                     label: "Frontend (React)",
@@ -195,8 +203,8 @@ export default defineConfig({
                         {
                             label: "Additional Columns",
                             slug: "docs/frontend/additional-columns"
-                        },
-                    ],
+                        }
+                    ]
                 },
                 {
                     label: "Hooks Reference",
@@ -205,8 +213,8 @@ export default defineConfig({
                         {
                             label: "All Hooks",
                             slug: "docs/hooks"
-                        },
-                    ],
+                        }
+                    ]
                 },
                 {
                     label: "Plugins",
@@ -215,8 +223,8 @@ export default defineConfig({
                         {
                             label: "Plugin System",
                             slug: "docs/plugins"
-                        },
-                    ],
+                        }
+                    ]
                 },
                 {
                     label: "Studio Tools",
@@ -225,8 +233,8 @@ export default defineConfig({
                         {
                             label: "Overview",
                             slug: "docs/studio"
-                        },
-                    ],
+                        }
+                    ]
                 },
                 {
                     label: "CLI",
@@ -235,8 +243,8 @@ export default defineConfig({
                         {
                             label: "Commands",
                             slug: "docs/cli"
-                        },
-                    ],
+                        }
+                    ]
                 },
                 {
                     label: "Features",
@@ -249,8 +257,8 @@ export default defineConfig({
                         {
                             label: "Data Export",
                             slug: "docs/features/data-export"
-                        },
-                    ],
+                        }
+                    ]
                 },
                 {
                     label: "Recipes",
@@ -267,16 +275,16 @@ export default defineConfig({
                         {
                             label: "Webhook Integration",
                             slug: "docs/recipes/webhooks"
-                        },
-                    ],
-                },
+                        }
+                    ]
+                }
             ],
             components: {
                 PageFrame: "./src/components/starlight/PageFrame.astro",
                 Header: "./src/components/starlight/Header.astro",
                 SiteTitle: "./src/components/starlight/SiteTitle.astro",
-                Head: "./src/components/starlight/Head.astro",
-            },
+                Head: "./src/components/starlight/Head.astro"
+            }
         }),
         mdx(),
         sitemap()
@@ -287,20 +295,20 @@ export default defineConfig({
             yaml()
         ],
         resolve: {
-            dedupe: ['react', 'react-dom'],
+            dedupe: ["react", "react-dom"],
             alias: {
                 "@rebasepro/ui": path.resolve(new URL(".", import.meta.url).pathname, "../packages/ui/src"),
                 "@rebasepro/editor": path.resolve(new URL(".", import.meta.url).pathname, "../packages/editor/src"),
-                "@rebasepro/admin": path.resolve(new URL(".", import.meta.url).pathname, "../packages/admin/src"),
+                "@rebasepro/admin": path.resolve(new URL(".", import.meta.url).pathname, "../packages/admin/src")
             }
         },
         ssr: {
-            noExternal: ['lucide-react']
+            noExternal: ["lucide-react"]
         },
         server: {
             fs: {
                 allow: [path.resolve(new URL(".", import.meta.url).pathname, ".."), path.resolve(new URL(".", import.meta.url).pathname, ".")]
             }
         }
-    },
+    }
 });

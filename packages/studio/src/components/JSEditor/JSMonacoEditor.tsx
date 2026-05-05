@@ -290,7 +290,7 @@ export const JSMonacoEditor = ({
                     }
                     onRunRef.current(selectedText || undefined);
                 }
-            },
+            }
         });
 
         // Configure TypeScript/JavaScript defaults for richer completion
@@ -309,14 +309,14 @@ export const JSMonacoEditor = ({
                 checkJs: false,
                 strict: false,
                 noEmit: true,
-                allowNonTsExtensions: true,
+                allowNonTsExtensions: true
             });
 
             // Suppress diagnostics that don't apply to our script context.
             // Scripts are executed inside `new AsyncFunction(...)` at runtime,
             // so top-level `await` (1375) and `return` (1108) are valid.
             ts.typescriptDefaults.setDiagnosticsOptions({
-                diagnosticCodesToIgnore: [1375, 1108],
+                diagnosticCodesToIgnore: [1375, 1108]
             });
 
             // Inject the Rebase Client SDK type definitions
@@ -330,26 +330,26 @@ export const JSMonacoEditor = ({
                 const lines: string[] = [];
                 for (const col of collections) {
                     // Generate a typed interface for each collection
-                    const ifaceName = col.slug.replace(/[^a-zA-Z0-9_]/g, '_');
+                    const ifaceName = col.slug.replace(/[^a-zA-Z0-9_]/g, "_");
                     const propsType = col.properties.length > 0
-                        ? `{ ${col.properties.map(p => `${p}: any`).join('; ')} }`
-                        : 'Record<string, any>';
+                        ? `{ ${col.properties.map(p => `${p}: any`).join("; ")} }`
+                        : "Record<string, any>";
                     lines.push(`/** Collection: ${col.name} (${col.slug}) */`);
                     lines.push(`interface ${ifaceName}_Row ${propsType}`);
                     lines.push(`declare namespace client.data { const ${col.slug}: CollectionClient<${ifaceName}_Row>; }`);
                 }
                 ts.typescriptDefaults.addExtraLib(
-                    lines.join('\n'),
-                    'ts:rebase-collections.d.ts'
+                    lines.join("\n"),
+                    "ts:rebase-collections.d.ts"
                 );
             } else if (collectionSlugs.length > 0) {
                 // Fallback: just slug names without property info
                 const collectionHints = collectionSlugs.map(slug =>
                     `/** Collection: ${slug} */\ndeclare namespace client.data { const ${slug}: CollectionClient; }`
-                ).join('\n');
+                ).join("\n");
                 ts.typescriptDefaults.addExtraLib(
                     collectionHints,
-                    'ts:rebase-collections.d.ts'
+                    "ts:rebase-collections.d.ts"
                 );
             }
         }
@@ -380,7 +380,7 @@ export const JSMonacoEditor = ({
                     wordWrap: "on",
                     suggestOnTriggerCharacters: true,
                     quickSuggestions: true,
-                    parameterHints: { enabled: true },
+                    parameterHints: { enabled: true }
                 }}
             />
         </div>

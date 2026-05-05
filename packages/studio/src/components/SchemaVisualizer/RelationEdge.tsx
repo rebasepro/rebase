@@ -22,7 +22,7 @@ const RelationEdgeInner = ({
     sourcePosition,
     targetPosition,
     data,
-    selected,
+    selected
 }: EdgeProps) => {
     const edgeData = data as RelationEdgeData | undefined;
 
@@ -33,7 +33,7 @@ const RelationEdgeInner = ({
         targetX,
         targetY,
         targetPosition,
-        borderRadius: 8,
+        borderRadius: 8
     });
 
     const isInverse = edgeData?.direction === "inverse";
@@ -68,7 +68,7 @@ const RelationEdgeInner = ({
                 style={{
                     stroke: strokeColor,
                     strokeWidth,
-                    strokeDasharray,
+                    strokeDasharray
                 }}
             />
             {edgeData?.label && (
@@ -77,7 +77,7 @@ const RelationEdgeInner = ({
                         style={{
                             position: "absolute",
                             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-                            pointerEvents: "all",
+                            pointerEvents: "all"
                         }}
                         className={cls(
                             "px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold leading-none",

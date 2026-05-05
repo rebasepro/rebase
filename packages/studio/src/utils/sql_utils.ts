@@ -42,7 +42,8 @@ export function extractTablesFromQuery(sqlString: string): ExtractedTable[] {
         const processFrom = (fromItems: FromNode[]) => {
             for (const item of fromItems) {
                 if (item.type === "table" && item.name) {
-                    tables.push({ name: item.name.name, alias: item.name.alias });
+                    tables.push({ name: item.name.name,
+alias: item.name.alias });
                 }
                 if (item.type === "join") {
                     if (item.left) processFrom([item.left]);
@@ -83,7 +84,7 @@ export function resolveQueryCollections(
     if (tables.length === 0) return [];
 
     // Parse the AST to resolve SELECT column aliases
-    let selectColumns: { table?: string; column: string; alias?: string }[] = [];
+    const selectColumns: { table?: string; column: string; alias?: string }[] = [];
     try {
         const ast = parseFirst(sqlString);
         if (ast.type === "select" && ast.columns) {
@@ -280,7 +281,8 @@ export function determineTableAndPK(sqlString: string, columnKey: string, schema
             };
         });
 
-        return { tableName: resolvedTableName, primaryKeys };
+        return { tableName: resolvedTableName,
+primaryKeys };
     } catch (e: unknown) {
         console.warn("Failed to parse SQL AST:", e);
         const message = e instanceof Error ? e.message : String(e);

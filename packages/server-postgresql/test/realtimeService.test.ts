@@ -5,9 +5,11 @@ import { EntityCollection } from "@rebasepro/types";
 
 jest.mock("../src/services/entityService", () => ({
     EntityService: jest.fn().mockImplementation(() => ({
-        fetchCollection: jest.fn().mockResolvedValue([{ id: 1, _rebase_invalidated: false }]),
-        fetchEntity: jest.fn().mockResolvedValue({ id: 1, _rebase_invalidated: false }),
-        searchEntities: jest.fn().mockResolvedValue([]),
+        fetchCollection: jest.fn().mockResolvedValue([{ id: 1,
+_rebase_invalidated: false }]),
+        fetchEntity: jest.fn().mockResolvedValue({ id: 1,
+_rebase_invalidated: false }),
+        searchEntities: jest.fn().mockResolvedValue([])
     }))
 }));
 
@@ -25,9 +27,9 @@ const mockPostsCollection: EntityCollection = {
     table: "posts",
     properties: {
         id: { type: "number" },
-        title: { type: "string" },
+        title: { type: "string" }
     },
-    idField: "id",
+    idField: "id"
 };
 
 describe("RealtimeService", () => {
@@ -45,7 +47,7 @@ describe("RealtimeService", () => {
             select: jest.fn().mockReturnThis(),
             from: jest.fn().mockReturnThis(),
             where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockReturnThis()
         } as unknown as jest.Mocked<NodePgDatabase<any>>;
         (db as any).then = jest.fn((resolve) => resolve([]));
 
@@ -53,14 +55,18 @@ describe("RealtimeService", () => {
         jest.spyOn(registry, "getCollectionByPath").mockReturnValue(mockPostsCollection);
 
         mockDriver = {
-            fetchCollection: jest.fn().mockResolvedValue([{ id: 1, path: "posts", values: { title: "Refetched Title" } }]),
-            fetchEntity: jest.fn().mockResolvedValue({ id: 1, path: "posts", values: { title: "Refetched Entity Title" } }),
+            fetchCollection: jest.fn().mockResolvedValue([{ id: 1,
+path: "posts",
+values: { title: "Refetched Title" } }]),
+            fetchEntity: jest.fn().mockResolvedValue({ id: 1,
+path: "posts",
+values: { title: "Refetched Entity Title" } })
         };
 
         const mockPoolManager = {
             defaultDatabaseName: "main"
         };
-        
+
         const mockAuthSettings = {
             accessTokenSecret: "secret"
         };
@@ -90,9 +96,10 @@ describe("RealtimeService", () => {
             realtimeService.addClient("client-1", ws);
             await realtimeService.handleClientMessage("client-1", {
                 type: "subscribe_collection",
-                payload: { path: "posts", subscriptionId: "sub-1" },
+                payload: { path: "posts",
+subscriptionId: "sub-1" }
             });
-            
+
             expect(realtimeService.subscriptions.has("sub-1")).toBe(true);
             realtimeService.removeClient("client-1");
             expect(realtimeService.subscriptions.has("sub-1")).toBe(false);
@@ -103,14 +110,17 @@ describe("RealtimeService", () => {
         it("triggers debounced refetch and omits dummy entities on PG_NOTIFY invalidation", async () => {
             const ws = new MockWebSocket() as any;
             realtimeService.addClient("client-1", ws);
-            
+
             await realtimeService.handleClientMessage("client-1", {
                 type: "subscribe_collection",
-                payload: { path: "posts", subscriptionId: "sub-1" },
+                payload: { path: "posts",
+subscriptionId: "sub-1" }
             });
 
             // Simulate PG_NOTIFY listener receiving cross-instance payload
-            const dummyEntity = { id: "1", path: "posts", values: { _rebase_invalidated: true } } as any;
+            const dummyEntity = { id: "1",
+path: "posts",
+values: { _rebase_invalidated: true } } as any;
             await realtimeService.notifyEntityUpdate("posts", "1", dummyEntity, undefined, false);
 
             // Phase 1: sendCollectionEntityPatch SHOULD NOT SEND for dummy
@@ -118,7 +128,7 @@ describe("RealtimeService", () => {
 
             // Phase 2: Debounced refetch should kick in after 300ms
             jest.advanceTimersByTime(350);
-            
+
             // Wait for async promises to drain
             await Promise.resolve();
             await Promise.resolve();
@@ -130,7 +140,7 @@ describe("RealtimeService", () => {
             expect(ws.send).toHaveBeenCalled();
             const lastCall = ws.send.mock.calls[ws.send.mock.calls.length - 1][0];
             const parsed = JSON.parse(lastCall);
-            
+
             expect(parsed.type).toBe("collection_update");
             expect(parsed.subscriptionId).toBe("sub-1");
             expect(parsed.entities[0].values.title).toBe("Refetched Title");
@@ -139,14 +149,17 @@ describe("RealtimeService", () => {
         it("sends instant entity patch for valid entity updates without _rebase_invalidated", async () => {
              const ws = new MockWebSocket() as any;
             realtimeService.addClient("client-1", ws);
-            
+
             await realtimeService.handleClientMessage("client-1", {
                 type: "subscribe_collection",
-                payload: { path: "posts", subscriptionId: "sub-1" },
+                payload: { path: "posts",
+subscriptionId: "sub-1" }
             });
 
             // Simulated normal Local update
-            const freshEntity = { id: "1", path: "posts", values: { title: "Immediate Patch" } } as any;
+            const freshEntity = { id: "1",
+path: "posts",
+values: { title: "Immediate Patch" } } as any;
             await realtimeService.notifyEntityUpdate("posts", "1", freshEntity, undefined, false);
 
             // Phase 1: It SHOULD send immediate patch
@@ -171,14 +184,18 @@ describe("RealtimeService", () => {
         it("triggers debounced refetch and omits dummy entity update for single entity subscriptions", async () => {
             const ws = new MockWebSocket() as any;
             realtimeService.addClient("client-2", ws);
-            
+
             await realtimeService.handleClientMessage("client-2", {
                 type: "subscribe_entity",
-                payload: { path: "posts", entityId: "1", subscriptionId: "sub-2" },
+                payload: { path: "posts",
+entityId: "1",
+subscriptionId: "sub-2" }
             });
 
             // Need to mock sendEntityUpdate
-            const dummyEntity = { id: "1", path: "posts", values: { _rebase_invalidated: true } } as any;
+            const dummyEntity = { id: "1",
+path: "posts",
+values: { _rebase_invalidated: true } } as any;
             await realtimeService.notifyEntityUpdate("posts", "1", dummyEntity, undefined, false);
 
             // Important: we patched notifyPathUpdate to NOT send entity_update directly if invalidated
@@ -190,13 +207,14 @@ describe("RealtimeService", () => {
             await Promise.resolve();
 
             // It should fetch the single entity
-            expect(mockDriver.fetchEntity).toHaveBeenCalledWith(expect.objectContaining({ path: "posts", entityId: "1" }));
+            expect(mockDriver.fetchEntity).toHaveBeenCalledWith(expect.objectContaining({ path: "posts",
+entityId: "1" }));
 
             // It should send entity update
             expect(ws.send).toHaveBeenCalled();
             const lastCall = ws.send.mock.calls[ws.send.mock.calls.length - 1][0];
             const parsed = JSON.parse(lastCall);
-            
+
             expect(parsed.type).toBe("entity_update");
             expect(parsed.subscriptionId).toBe("sub-2");
             expect(parsed.entity.values.title).toBe("Refetched Entity Title");
@@ -205,19 +223,23 @@ describe("RealtimeService", () => {
         it("sends instant entity update if valid payload (local mutation)", async () => {
              const ws = new MockWebSocket() as any;
             realtimeService.addClient("client-2", ws);
-            
+
             await realtimeService.handleClientMessage("client-2", {
                 type: "subscribe_entity",
-                payload: { path: "posts", entityId: "1", subscriptionId: "sub-2" },
+                payload: { path: "posts",
+entityId: "1",
+subscriptionId: "sub-2" }
             });
 
-            const freshEntity = { id: "1", path: "posts", values: { title: "Pure Patch" } } as any;
+            const freshEntity = { id: "1",
+path: "posts",
+values: { title: "Pure Patch" } } as any;
             await realtimeService.notifyEntityUpdate("posts", "1", freshEntity, undefined, false);
 
             expect(ws.send).toHaveBeenCalled();
             const lastCall = ws.send.mock.calls[ws.send.mock.calls.length - 1][0];
             const parsed = JSON.parse(lastCall);
-            
+
             expect(parsed.type).toBe("entity_update");
             expect(parsed.entity.values.title).toBe("Pure Patch");
         });
@@ -227,14 +249,18 @@ describe("RealtimeService", () => {
         it("applies auth context correctly on debounced collection refetches", async () => {
             const ws = new MockWebSocket() as any;
             realtimeService.addClient("client-rls", ws);
-             
+
             await realtimeService.handleClientMessage("client-rls", {
                 type: "subscribe_collection",
-                payload: { path: "posts", subscriptionId: "sub-rls" },
-            }, { userId: "user123", roles: ["admin", "editor"] });
+                payload: { path: "posts",
+subscriptionId: "sub-rls" }
+            }, { userId: "user123",
+roles: ["admin", "editor"] });
 
             // Simulate PG_NOTIFY invalidation
-            const dummyEntity = { id: "1", path: "posts", values: { _rebase_invalidated: true } } as any;
+            const dummyEntity = { id: "1",
+path: "posts",
+values: { _rebase_invalidated: true } } as any;
             await realtimeService.notifyEntityUpdate("posts", "1", dummyEntity, undefined, false);
 
             jest.advanceTimersByTime(350);
@@ -243,7 +269,7 @@ describe("RealtimeService", () => {
 
             expect(db.execute).toHaveBeenCalled();
             const executeCalls = db.execute.mock.calls.map(c => JSON.stringify(c[0]));
-            
+
             expect(executeCalls.some(sql => sql.includes("set_config('app.user_id'"))).toBe(true);
             expect(executeCalls.some(sql => sql.includes("set_config('app.user_roles'"))).toBe(true);
         });
@@ -251,13 +277,18 @@ describe("RealtimeService", () => {
         it("applies auth context correctly on debounced entity refetches", async () => {
             const ws = new MockWebSocket() as any;
             realtimeService.addClient("client-rls-ent", ws);
-             
+
             await realtimeService.handleClientMessage("client-rls-ent", {
                 type: "subscribe_entity",
-                payload: { path: "posts", entityId: "1", subscriptionId: "sub-rls-ent" },
-            }, { userId: "user456", roles: ["viewer"] });
+                payload: { path: "posts",
+entityId: "1",
+subscriptionId: "sub-rls-ent" }
+            }, { userId: "user456",
+roles: ["viewer"] });
 
-            const dummyEntity = { id: "1", path: "posts", values: { _rebase_invalidated: true } } as any;
+            const dummyEntity = { id: "1",
+path: "posts",
+values: { _rebase_invalidated: true } } as any;
             await realtimeService.notifyEntityUpdate("posts", "1", dummyEntity, undefined, false);
 
             jest.advanceTimersByTime(350);
@@ -266,7 +297,7 @@ describe("RealtimeService", () => {
 
             expect(db.execute).toHaveBeenCalled();
             const executeCalls = db.execute.mock.calls.map(c => JSON.stringify(c[0]));
-            
+
             expect(executeCalls.some(sql => sql.includes("set_config('app.user_id'"))).toBe(true);
             expect(executeCalls.some(sql => sql.includes("set_config('app.user_roles'"))).toBe(true);
         });

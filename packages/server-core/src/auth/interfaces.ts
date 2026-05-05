@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /**
  * Authentication Abstraction Interfaces
- * 
+ *
  * These interfaces define the contracts for authentication-related operations.
  * Implementations can use different databases (PostgreSQL, MongoDB, etc.) to
  * store user, role, and token data.
@@ -64,10 +64,10 @@ export interface OAuthProviderProfile {
 export interface OAuthProvider {
     /** The identifier of the provider (e.g. "github", "google") */
     id: string;
-    
+
     /** Zod schema validating the expected request payload (e.g. { code: string }) */
     schema: z.ZodSchema<any>;
-    
+
     /** Verify external tokens/codes and return a standardized user profile */
     verify: (payload: any) => Promise<OAuthProviderProfile | null>;
 }

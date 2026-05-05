@@ -6,11 +6,11 @@ const STORAGE_KEY_PREFIX = "rebase-collapsed-groups";
  * Custom hook for managing collapsed/expanded state of navigation groups
  * with localStorage persistence. Automatically cleans up stale group entries
  * when groups are removed from the navigation.
- * 
+ *
  * @param groupNames - Array of group names to track
  * @param namespace - Namespace for localStorage key (e.g., "home", "drawer") to allow independent state
  */
-export function useCollapsedGroups(groupNames: string[], namespace: string = "default") {
+export function useCollapsedGroups(groupNames: string[], namespace = "default") {
     const storageKey = `${STORAGE_KEY_PREFIX}-${namespace}`;
 
     // Load collapsed groups from localStorage on mount
@@ -61,7 +61,8 @@ export function useCollapsedGroups(groupNames: string[], namespace: string = "de
     }, [collapsedGroups]);
 
     const toggleGroupCollapsed = useCallback((name: string) => {
-        setCollapsedGroups(prev => ({ ...prev, [name]: !prev[name] }));
+        setCollapsedGroups(prev => ({ ...prev,
+[name]: !prev[name] }));
     }, []);
 
     return useMemo(() => ({

@@ -33,7 +33,7 @@ const profilesCollection: EntityCollection = {
         {
             relationName: "author",
             target: () => authorsCollection,
-            cardinality: "one",
+            cardinality: "one"
         }
     ]
 };

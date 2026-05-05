@@ -6,18 +6,19 @@ function createMockContext(method = "GET", path = "/test") {
     let capturedBody: any;
 
     const c = {
-        req: { method, path },
+        req: { method,
+path },
         json: (body: any, status?: number) => {
             capturedBody = body;
             capturedStatus = status ?? 200;
             return new Response(JSON.stringify(body), { status: capturedStatus });
-        },
+        }
     } as any;
 
     return {
         c,
         getStatus: () => capturedStatus,
-        getBody: () => capturedBody,
+        getBody: () => capturedBody
     };
 }
 
@@ -100,7 +101,8 @@ describe("errorHandler", () => {
 
         expect(getStatus()).toBe(404);
         expect(getBody()).toEqual({
-            error: { message: "User not found", code: "NOT_FOUND" }
+            error: { message: "User not found",
+code: "NOT_FOUND" }
         });
     });
 
@@ -125,7 +127,8 @@ describe("errorHandler", () => {
 
         expect(getStatus()).toBe(404);
         expect(getBody()).toEqual({
-            error: { message: "Not found", code: "NOT_FOUND" }
+            error: { message: "Not found",
+code: "NOT_FOUND" }
         });
     });
 
@@ -136,13 +139,15 @@ describe("errorHandler", () => {
 
         expect(getStatus()).toBe(500);
         expect(getBody()).toEqual({
-            error: { message: "Internal Server Error", code: "INTERNAL_ERROR" }
+            error: { message: "Internal Server Error",
+code: "INTERNAL_ERROR" }
         });
     });
 
     it("should use statusCode from error if present", () => {
         const { c, getStatus } = createMockContext();
-        const err = Object.assign(new Error("Rate limited"), { statusCode: 429, code: "RATE_LIMITED" });
+        const err = Object.assign(new Error("Rate limited"), { statusCode: 429,
+code: "RATE_LIMITED" });
         errorHandler(err, c);
 
         expect(getStatus()).toBe(429);
