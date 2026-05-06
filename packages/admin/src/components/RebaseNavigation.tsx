@@ -118,7 +118,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
             slug: "schema",
             name: "Edit collections",
             group: "Database",
-            icon: "view_list",
+            icon: "LayoutList",
             nestedRoutes: true,
             view: (
                 <Suspense fallback={<CircularProgressCenter/>}>

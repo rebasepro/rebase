@@ -5,7 +5,7 @@ export const blogCollectionTemplate = {
     table: "blog",
     name: "Blog",
     singularName: "Blog entry",
-    icon: "article",
+    icon: "FileText",
     description: "A collection of blog entries",
     defaultSize: "l",
     properties: {

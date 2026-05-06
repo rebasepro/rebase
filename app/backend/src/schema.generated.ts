@@ -175,7 +175,8 @@ export const tickets = pgTable("tickets", {
     created_at: timestamp("created_at", { withTimezone: true,
 mode: "string" }),
     updated_at: timestamp("updated_at", { withTimezone: true,
-mode: "string" })
+mode: "string" }),
+    __order: varchar("__order")
 }, (table) => ([
     pgPolicy("test_policy", { as: "permissive",
 for: "all",

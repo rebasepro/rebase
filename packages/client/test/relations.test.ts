@@ -100,19 +100,19 @@ describe("find() — include passthrough", () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.find({ include: ["author"] });
-        expect(mockRequest).toHaveBeenCalledWith("/data/posts?include=author", { method: "GET" });
+        expect(mockRequest).toHaveBeenCalledWith("/posts?include=author", { method: "GET" });
     });
     it("multiple includes", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.find({ include: ["author", "tags", "category"] });
-        expect(mockRequest).toHaveBeenCalledWith("/data/posts?include=author%2Ctags%2Ccategory", { method: "GET" });
+        expect(mockRequest).toHaveBeenCalledWith("/posts?include=author%2Ctags%2Ccategory", { method: "GET" });
     });
     it("wildcard include", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.find({ include: ["*"] });
-        expect(mockRequest).toHaveBeenCalledWith("/data/posts?include=*", { method: "GET" });
+        expect(mockRequest).toHaveBeenCalledWith("/posts?include=*", { method: "GET" });
     });
     it("no include omits param", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -124,7 +124,7 @@ describe("find() — include passthrough", () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.find();
-        expect(mockRequest).toHaveBeenCalledWith("/data/posts", { method: "GET" });
+        expect(mockRequest).toHaveBeenCalledWith("/posts", { method: "GET" });
     });
     it("include + limit + offset + orderBy + where combined", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -450,14 +450,14 @@ author: null });
         mockRequest.mockResolvedValueOnce({ id: "a/b",
 title: "E" });
         await c.findById("a/b");
-        expect(mockRequest).toHaveBeenCalledWith("/data/posts/a%2Fb", { method: "GET" });
+        expect(mockRequest).toHaveBeenCalledWith("/posts/a%2Fb", { method: "GET" });
     });
     it("BUG: no include support on findById", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce({ id: 1,
 title: "T" });
         await c.findById(1);
-        expect((mockRequest.mock.calls[0][0] as string)).toBe("/data/posts/1");
+        expect((mockRequest.mock.calls[0][0] as string)).toBe("/posts/1");
         expect((mockRequest.mock.calls[0][0] as string)).not.toContain("include");
     });
 });
@@ -480,7 +480,7 @@ name: "A" } });
 author_id: 5 });
         expect(r.values.author_id).toBe(5); expect(r.values.author).toEqual({ id: 5,
 name: "A" });
-        expect(mockRequest).toHaveBeenCalledWith("/data/posts", { method: "POST",
+        expect(mockRequest).toHaveBeenCalledWith("/posts", { method: "POST",
 body: JSON.stringify({ title: "New",
 author_id: 5 }) });
     });
@@ -507,13 +507,13 @@ name: "B" });
         mockRequest.mockResolvedValueOnce({ id: "x/y",
 title: "U" });
         await c.update("x/y", { title: "U" });
-        expect(mockRequest).toHaveBeenCalledWith("/data/posts/x%2Fy", expect.any(Object));
+        expect(mockRequest).toHaveBeenCalledWith("/posts/x%2Fy", expect.any(Object));
     });
     it("delete calls correct endpoint", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(undefined);
         await c.delete(42);
-        expect(mockRequest).toHaveBeenCalledWith("/data/posts/42", { method: "DELETE" });
+        expect(mockRequest).toHaveBeenCalledWith("/posts/42", { method: "DELETE" });
     });
 });
 
@@ -799,7 +799,7 @@ describe("Collection slug handling", () => {
         const c = createCollectionClient<any>(transport, "my_collection");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.find();
-        expect(mockRequest).toHaveBeenCalledWith("/data/my_collection", { method: "GET" });
+        expect(mockRequest).toHaveBeenCalledWith("/my_collection", { method: "GET" });
     });
     it("slug appears in entity path", async () => {
         const c = createCollectionClient<any>(transport, "orders");
@@ -813,8 +813,8 @@ total: 100 }]));
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c1.find(); await c2.find();
-        expect(mockRequest.mock.calls[0][0]).toContain("/data/posts");
-        expect(mockRequest.mock.calls[1][0]).toContain("/data/users");
+        expect(mockRequest.mock.calls[0][0]).toContain("/posts");
+        expect(mockRequest.mock.calls[1][0]).toContain("/users");
     });
 });
 

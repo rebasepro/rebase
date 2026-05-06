@@ -9,12 +9,13 @@ const ticketsCollection: PostgresCollection = {
     icon: "Ticket",
     group: "Support",
     history: true,
-    openEntityMode: "split",
     defaultViewMode: "kanban",
     enabledViews: ["table", "kanban"],
     kanban: {
         columnProperty: "status"
     },
+    orderProperty: "__order",
+    titleProperty: "subject",
     properties: {
         id: {
             name: "ID",
@@ -115,6 +116,12 @@ const ticketsCollection: PostgresCollection = {
             autoValue: "on_update",
             readOnly: true,
             hideFromCollection: true
+        },
+        __order: {
+            name: "Order",
+            type: "string",
+            disabled: true,
+            hideFromCollection: true
         }
     },
     propertiesOrder: [
@@ -127,7 +134,8 @@ const ticketsCollection: PostgresCollection = {
         "assigned_to",
         "description",
         "created_at",
-        "updated_at"
+        "updated_at",
+        "__order"
     ],
     relations: [
         {

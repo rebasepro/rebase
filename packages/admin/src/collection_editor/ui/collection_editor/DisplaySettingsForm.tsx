@@ -2,7 +2,8 @@
 import { FieldCaption } from "../../_cms_internals";
 import React, { useMemo, useState } from "react";
 import { useAuthController, useCustomizationController } from "@rebasepro/core";
-import { getFieldConfig, PropertyConfigBadge } from "../../_cms_internals";
+import { getFieldConfig } from "../../../components/field_configs";
+import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
 import { EntityCollection, Property } from "@rebasepro/types";
 import { BooleanSwitchWithLabel, Container, IconButton, Select, SelectItem, TextField, Typography, Button , iconSize } from "@rebasepro/ui";
 import { XIcon } from "lucide-react";
@@ -34,13 +35,13 @@ export function DisplaySettingsForm({
     const customizationController = useCustomizationController();
     const configController = useCollectionsConfigController();
 
-    // Get number properties (for orderProperty)
-    const numberProperties = useMemo(() => {
+    // Get text properties (for orderProperty - uses string fractional indexing keys)
+    const textProperties = useMemo(() => {
         const result: { key: string; label: string; property: Property; }[] = [];
         if (!values.properties) return result;
 
         Object.entries(values.properties).forEach(([key, prop]) => {
-            if (prop && "type" in prop && prop.type === "number") {
+            if (prop && "type" in prop && prop.type === "string") {
                 result.push({
                     key,
                     label: (prop as Property).name || key,
@@ -85,17 +86,17 @@ export function DisplaySettingsForm({
                         <div className={"col-span-12 mt-4"}>
                             {(() => {
                                 const orderPropertyMissing = Boolean(values.orderProperty) &&
-                                    !numberProperties.some(p => p.key === values.orderProperty);
+                                    !textProperties.some(p => p.key === values.orderProperty);
 
                                 return (
                                     <>
                                         <Select
-                                            key={`order-select-${numberProperties.length}`}
+                                            key={`order-select-${textProperties.length}`}
                                             name="orderProperty"
                                             label="Order Property"
                                             fullWidth={true}
                                             position={"item-aligned"}
-                                            disabled={numberProperties.length === 0}
+                                            disabled={textProperties.length === 0}
                                             error={orderPropertyMissing}
                                             value={values.orderProperty ?? ""}
                                             onValueChange={(v) => {
@@ -105,7 +106,7 @@ export function DisplaySettingsForm({
                                                 if (orderPropertyMissing) {
                                                     return <span className="text-red-500">{value} (not found)</span>;
                                                 }
-                                                const prop = numberProperties.find(p => p.key === value);
+                                                const prop = textProperties.find(p => p.key === value);
                                                 if (!prop) return "Select a property";
                                                 const fieldConfig = getFieldConfig(prop.property, customizationController.propertyConfigs);
                                                 return (
@@ -127,7 +128,7 @@ export function DisplaySettingsForm({
                                                 </IconButton>
                                             ) : undefined}
                                         >
-                                            {numberProperties.map((prop) => {
+                                            {textProperties.map((prop) => {
                                                 const fieldConfig = getFieldConfig(prop.property, customizationController.propertyConfigs);
                                                 return (
                                                     <SelectItem key={prop.key} value={prop.key}>
@@ -136,7 +137,7 @@ export function DisplaySettingsForm({
                                                             <div>
                                                                 <div>{prop.label}</div>
                                                                 <Typography variant="caption" color="secondary">
-                                                                    {fieldConfig?.name || "Number"}
+                                                                    {fieldConfig?.name || "Text"}
                                                                 </Typography>
                                                             </div>
                                                         </div>
@@ -146,10 +147,10 @@ export function DisplaySettingsForm({
                                         </Select>
                                         <FieldCaption error={orderPropertyMissing}>
                                             {orderPropertyMissing
-                                                ? `Property "${values.orderProperty}" does not exist or is not a number property. Please select a valid property or clear the selection.`
-                                                : numberProperties.length === 0
-                                                    ? "No number properties found. Add a number property to enable ordering."
-                                                    : "Select a number property to persist the order of items"
+                                                ? `Property "${values.orderProperty}" does not exist or is not a text property. Please select a valid property or clear the selection.`
+                                                : textProperties.length === 0
+                                                    ? "No text properties found. Add a text property to enable ordering."
+                                                    : "Select a text property to persist the order of items"
                                             }
                                         </FieldCaption>
                                     </>
@@ -157,7 +158,7 @@ export function DisplaySettingsForm({
                             })()}
                             {(() => {
                                 const orderPropertyMissing = Boolean(values.orderProperty) &&
-                                    !numberProperties.some(p => p.key === values.orderProperty);
+                                    !textProperties.some(p => p.key === values.orderProperty);
                                 const showCreateButton = !values.orderProperty || orderPropertyMissing;
 
                                 const dialogPropertyKey = orderPropertyMissing && values.orderProperty
@@ -183,7 +184,7 @@ export function DisplaySettingsForm({
                                             open={orderPropertyDialogOpen}
                                             onCancel={() => setOrderPropertyDialogOpen(false)}
                                             property={{
-                                                type: "number",
+                                                type: "string",
                                                 name: dialogPropertyName,
                                                 disabled: true,
                                                 hideFromCollection: true

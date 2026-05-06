@@ -1,6 +1,6 @@
 import { ViewMode } from "@rebasepro/types";
 import { cls, ToggleButtonGroup, Typography } from "@rebasepro/ui";
-import { KanbanIcon, LayoutGridIcon, ListIcon } from "lucide-react";
+import { KanbanIcon, LayoutGridIcon, ListIcon, TableIcon } from "lucide-react";
 
 export function ViewModeSwitch({
     value,
@@ -20,9 +20,14 @@ export function ViewModeSwitch({
                 onValueChange={onChange}
                 options={[
                     {
+                        value: "list",
+                        label: "List",
+                        icon: <ListIcon/>
+                    },
+                    {
                         value: "table",
                         label: "Table",
-                        icon: <ListIcon/>
+                        icon: <TableIcon/>
                     },
                     {
                         value: "cards",

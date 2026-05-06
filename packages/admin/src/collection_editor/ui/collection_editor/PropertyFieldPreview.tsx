@@ -1,5 +1,6 @@
 import { useCustomizationController } from "@rebasepro/core";
-import { getFieldConfig, PropertyConfigBadge } from "../../_cms_internals";
+import { getFieldConfig } from "../../../components/field_configs";
+import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { Property } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";

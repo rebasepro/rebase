@@ -419,6 +419,7 @@ export const pt: RebaseTranslations = {
     kanban_view_requires_enum: "A vista Kanban requer uma propriedade de string com valores enum para agrupar entidades em colunas. Adicione uma propriedade enum ao esquema da sua coleção para usar esta vista.",
     no_enum_values_configured: 'Nenhum valor enum configurado para a propriedade "{{property}}"',
     items_need_backfill: "Alguns itens não têm valores de ordem. Inicialize para ativar a reordenação por arrastar e soltar.",
+    kanban_order_not_configured: "A ordenação por arrastar e soltar não está configurada. Defina uma propriedade de ordem nas configurações da coleção para manter as posições dos cartões.",
     initialize: "Inicializar",
     confirm_multiple_delete: "Confirmar eliminação múltipla?",
     delete_entity_confirm_title: "Deseja eliminar este/a {{entityName}}?",

@@ -453,6 +453,7 @@ export interface RebaseTranslations {
     kanban_view_requires_enum: string;
     no_enum_values_configured: string;
     items_need_backfill: string;
+    kanban_order_not_configured: string;
     initialize: string;
     confirm_multiple_delete: string;
     delete_entity_confirm_title: string;

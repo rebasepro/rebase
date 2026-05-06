@@ -5,7 +5,7 @@ export const pagesCollectionTemplate = {
     table: "pages",
     name: "Pages",
     singularName: "Page",
-    icon: "insert_drive_file",
+    icon: "File",
     description: "List of website pages that can be edited here",
     properties: {
         title: {

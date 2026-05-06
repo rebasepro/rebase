@@ -7,11 +7,11 @@ import {
 import { getPropertiesWithPropertiesOrder, getPropertyInPath } from "../../util";
 import { CollectionActionsProps, Properties, Property, User, EntityCollection } from "@rebasepro/types";
 import {
-    EntityCollectionTable,
     getFieldConfig,
     PropertyConfigBadge,
     useSelectionController
 } from "../../components";
+import { EntityCollectionTable } from "../../components/EntityCollectionTable/EntityCollectionTable";
 import { useCollectionRegistryController } from "../../hooks";
 import { Button, cls, defaultBorderMixin, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Select, SelectItem, Tooltip, Typography , iconSize } from "@rebasepro/ui";
 import { UploadIcon } from "lucide-react";

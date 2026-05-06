@@ -56,7 +56,7 @@ view: suspense(<JSEditor/>) });
             views.push({ slug: "rls",
 name: "RLS Policies",
 group: "Database",
-icon: "security",
+icon: "ShieldCheck",
 description: "Row Level Security",
 view: suspense(<RLSEditor/>) });
         }
@@ -64,7 +64,7 @@ view: suspense(<RLSEditor/>) });
             views.push({ slug: "storage",
 name: "Storage",
 group: "Storage",
-icon: "cloud",
+icon: "HardDrive",
 description: "Manage storage files",
 view: suspense(<StorageView/>) });
         }
@@ -72,7 +72,7 @@ view: suspense(<StorageView/>) });
             views.push({ slug: "cron",
 name: "Cron Jobs",
 group: "Compute",
-icon: "schedule",
+icon: "Clock",
 description: "Manage scheduled tasks",
 view: suspense(<CronJobsView/>) });
         }
@@ -80,7 +80,7 @@ view: suspense(<CronJobsView/>) });
             views.push({ slug: "schema-visualizer",
 name: "Schema Visualizer",
 group: "Database",
-icon: "account_tree",
+icon: "Network",
 description: "Interactive database ERD",
 view: suspense(<SchemaVisualizer/>) });
         }
@@ -88,7 +88,7 @@ view: suspense(<SchemaVisualizer/>) });
             views.push({ slug: "branches",
 name: "Branches",
 group: "Database",
-icon: "fork_right",
+icon: "GitBranch",
 description: "Create and manage database branches",
 view: suspense(<BranchesView/>) });
         }
@@ -96,7 +96,7 @@ view: suspense(<BranchesView/>) });
             views.push({ slug: "api",
 name: "API Explorer",
 group: "API",
-icon: "auto_stories",
+icon: "BookOpen",
 description: "Interactive API documentation and testing",
 view: suspense(<ApiExplorer/>) });
         }

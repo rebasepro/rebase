@@ -47,7 +47,7 @@ export function ArrayOneOfPreview({
         <div className={"flex flex-col"}>
             {values &&
                 values.map((value: any, index: number) => {
-                    const resolvedProperty = property.resolvedProperties?.[index] ?? properties[value?.[typeField]];
+                    const resolvedProperty = properties[value?.[typeField]];
                     if (!value || !resolvedProperty) return null;
                     return (
                         <React.Fragment

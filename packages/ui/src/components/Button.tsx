@@ -76,12 +76,16 @@ const ButtonInner = React.memo(React.forwardRef<
         }
     );
 
+    const iconColorClass = (color === "neutral" || color === "text") && !disabled
+        ? "[&>svg]:text-surface-accent-500 dark:[&>svg]:text-surface-accent-300"
+        : "";
+
     if (Component) {
         return (
             <Component
                 ref={ref}
                 onClick={props.onClick}
-                className={cls(startIcon ? "pl-3" : "", baseClasses, buttonClasses, sizeClasses, className)}
+                className={cls(startIcon ? "pl-3" : "", baseClasses, buttonClasses, sizeClasses, iconColorClass, className)}
                 {...props}>
                 {startIcon}
                 {children}
@@ -93,7 +97,7 @@ const ButtonInner = React.memo(React.forwardRef<
         <button ref={ref as React.Ref<HTMLButtonElement>}
                 type={props.type ?? "button"}
                 onClick={props.onClick}
-                className={cls(startIcon ? "pl-3" : "", baseClasses, buttonClasses, sizeClasses, className)}
+                className={cls(startIcon ? "pl-3" : "", baseClasses, buttonClasses, sizeClasses, iconColorClass, className)}
                 disabled={disabled}
                 data-variant={variant}
                 data-size={size}

@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
     DndContext,
     DragEndEvent,
@@ -7,6 +8,8 @@ import {
     DragStartEvent,
     PointerSensor,
     pointerWithin,
+    rectIntersection,
+    CollisionDetection,
     useSensor,
     useSensors
 } from "@dnd-kit/core";
@@ -36,6 +39,25 @@ export function Board<M extends Record<string, unknown>, COLUMN extends string>(
     const [activeColumn, setActiveColumn] = useState<COLUMN | null>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
+
+    // Custom overlay positioning — bypasses position:fixed containment issues
+    const grabOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+    const [overlayPos, setOverlayPos] = useState<{ x: number; y: number } | null>(null);
+
+    const handleMouseMove = useCallback((e: MouseEvent) => {
+        setOverlayPos({
+            x: e.clientX - grabOffsetRef.current.x,
+            y: e.clientY - grabOffsetRef.current.y
+        });
+    }, []);
+    // Clean up window listeners on unmount
+    useEffect(() => {
+        return () => {
+            window.removeEventListener("mousemove", handleMouseMove);
+            window.removeEventListener("pointermove", handleMouseMove);
+        };
+    }, [handleMouseMove]);
+
     const [itemMapState, setItemMapState] = useState<BoardItemMap<M>>(() => {
         const dataColumnMap: Record<string, COLUMN> = data.reduce((prev, item: BoardItem<M>) => ({
             ...prev,
@@ -59,18 +81,82 @@ export function Board<M extends Record<string, unknown>, COLUMN extends string>(
     );
 
     useEffect(() => {
+        if (isDragging) return;
+
         const dataColumnMap: Record<string, COLUMN> = data.reduce((prev, item) => ({
             ...prev,
             [item.id]: assignColumn(item)
         }), {});
 
-        setItemMapState(() => columnsProp.reduce(
+        const newItemMap = columnsProp.reduce(
             (previous: BoardItemMap<M>, column: COLUMN) => ({
                 ...previous,
                 [column]: data.filter((item: BoardItem<M>) => dataColumnMap[item.id] === column)
             }),
-            {}
-        ));
+            {} as BoardItemMap<M>
+        );
+
+        // Compare incoming data with current state.
+        // If the structure (same item IDs in same order per column) is identical,
+        // skip the state update entirely to prevent unnecessary re-renders.
+        setItemMapState(prevMap => {
+            let structureChanged = false;
+
+            for (const col of columnsProp) {
+                const prevItems = prevMap[col] ?? [];
+                const newItems = newItemMap[col] ?? [];
+                if (prevItems.length !== newItems.length) {
+                    structureChanged = true;
+                    break;
+                }
+                for (let i = 0; i < prevItems.length; i++) {
+                    if (prevItems[i].id !== newItems[i].id) {
+                        structureChanged = true;
+                        break;
+                    }
+                }
+                if (structureChanged) break;
+            }
+
+            if (structureChanged) {
+                // Structure differs — accept the new data wholesale
+                return newItemMap;
+            }
+
+            // Structure is the same — check if entity data changed
+            let entityDataChanged = false;
+            for (const col of columnsProp) {
+                const prevItems = prevMap[col] ?? [];
+                const newItems = newItemMap[col] ?? [];
+                for (let i = 0; i < prevItems.length; i++) {
+                    if (prevItems[i].entity !== newItems[i].entity) {
+                        entityDataChanged = true;
+                        break;
+                    }
+                }
+                if (entityDataChanged) break;
+            }
+
+            if (!entityDataChanged) {
+                // Nothing changed at all — return same reference, no re-render
+                return prevMap;
+            }
+
+            // Same structure but entity data updated — preserve structure,
+            // update entity refs
+            const updated: BoardItemMap<M> = {};
+            for (const col of columnsProp) {
+                const prevItems = prevMap[col] ?? [];
+                const newItems = newItemMap[col] ?? [];
+                updated[col] = prevItems.map((item, i) =>
+                    item.entity !== newItems[i]?.entity
+                        ? { ...item, entity: newItems[i].entity }
+                        : item
+                );
+            }
+            return updated;
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [data, columnsProp, assignColumn]);
 
     const findColumnByItemId = (id: string): string | undefined => {
@@ -81,6 +167,28 @@ export function Board<M extends Record<string, unknown>, COLUMN extends string>(
         setIsDragging(true);
         setDragOverColumnId(null);
         const { active } = event;
+
+        // Compute grab offset: distance from pointer to element's top-left.
+        // active.rect.current.initial may be null at this point (measured async),
+        // so we find the DOM element directly from the activator event target.
+        const activatorEvt = event.activatorEvent as PointerEvent | MouseEvent;
+        if (activatorEvt) {
+            const target = activatorEvt.target as HTMLElement;
+            // Walk up to the sortable wrapper (the element with role="button"
+            // set by useSortable's attributes, or the closest [data-sortable])
+            const draggableEl = target.closest<HTMLElement>("[role='button']") ?? target;
+            const rect = draggableEl.getBoundingClientRect();
+            grabOffsetRef.current = {
+                x: activatorEvt.clientX - rect.left,
+                y: activatorEvt.clientY - rect.top
+            };
+            setOverlayPos({
+                x: rect.left,
+                y: rect.top
+            });
+        }
+        window.addEventListener("mousemove", handleMouseMove);
+        window.addEventListener("pointermove", handleMouseMove);
 
         if (active.data.current?.type === "COLUMN") {
             const columnId = active.id as string;
@@ -139,11 +247,10 @@ export function Board<M extends Record<string, unknown>, COLUMN extends string>(
         }
 
         if (!activeColumn || !overColumnForMove) return;
-        if (activeColumn === overColumnForMove && activeId === overId && overDataType !== "ITEM-LIST") return;
+        if (activeColumn === overColumnForMove) return;
 
         // Prevent moving to a column if item with same ID already exists there
-        if (overColumnForMove !== activeColumn &&
-            itemMapState[overColumnForMove]?.some(i => i.id === activeId)) {
+        if (itemMapState[overColumnForMove]?.some(i => i.id === activeId)) {
             return;
         }
 
@@ -160,30 +267,28 @@ export function Board<M extends Record<string, unknown>, COLUMN extends string>(
             } else {
                 overIndex = overItems.findIndex(i => i.id === overId);
                 if (overIndex !== -1) {
-                    const { y } = event.delta;
-                    const overRect = over.rect;
-                    if (overRect) {
-                        const threshold = overRect.height / 2;
-                        if (y > threshold) {
-                            overIndex += 1;
-                        }
-                    }
+                    const activeTop = active.rect.current.translated?.top ?? 0;
+                    const activeHeight = active.rect.current.translated?.height ?? 0;
+                    const activeCenter = activeTop + activeHeight / 2;
+                    
+                    const overTop = over?.rect.top ?? 0;
+                    const overHeight = over?.rect.height ?? 0;
+                    const overCenter = overTop + overHeight / 2;
+                    
+                    const isBelowOverItem = activeCenter > overCenter;
+
+                    const modifier = isBelowOverItem ? 1 : 0;
+                    overIndex = overIndex >= 0 ? overIndex + modifier : overItems.length;
                 } else {
                     overIndex = overItems.length;
                 }
             }
 
-            if (activeColumn === overColumnForMove && activeIndex === overIndex) return currentMap;
-
             const newItemMap = { ...currentMap };
-            if (activeColumn === overColumnForMove) {
-                newItemMap[activeColumn] = arrayMove(activeItems, activeIndex, overIndex);
-            } else {
-                const [moved] = activeItems.splice(activeIndex, 1);
-                overItems.splice(overIndex, 0, moved);
-                newItemMap[activeColumn] = activeItems;
-                newItemMap[overColumnForMove] = overItems;
-            }
+            const [moved] = activeItems.splice(activeIndex, 1);
+            overItems.splice(overIndex, 0, moved);
+            newItemMap[activeColumn] = activeItems;
+            newItemMap[overColumnForMove!] = overItems;
             return newItemMap;
         });
     };
@@ -193,6 +298,11 @@ export function Board<M extends Record<string, unknown>, COLUMN extends string>(
             active,
             over
         } = event;
+
+        // Clean up custom overlay tracking
+        window.removeEventListener("mousemove", handleMouseMove);
+        window.removeEventListener("pointermove", handleMouseMove);
+        setOverlayPos(null);
 
         setIsDragging(false);
         setActiveItem(null);
@@ -223,28 +333,46 @@ export function Board<M extends Record<string, unknown>, COLUMN extends string>(
 
             // Find the current column assignment from our internal state
             const currentColumn = findColumnByItemId(activeId) as COLUMN | undefined;
+            const overColumn = findColumnByItemId(overId) || currentColumn;
 
-            // When items have been reordered, convert itemMapState to a flat list
-            const allItems: BoardItem<M>[] = [];
+            let finalItemMapState = { ...itemMapState };
 
-            // Collect all items from all columns in their current order
-            Object.entries(itemMapState).forEach(([, columnItems]) => {
-                if (columnItems && (columnItems as BoardItem<M>[]).length > 0) {
-                    allItems.push(...(columnItems as BoardItem<M>[]));
+            if (currentColumn && currentColumn === overColumn) {
+                // Use dnd-kit's sortable indexes if available to avoid race conditions with mutating handleDragOver
+                const activeIndex = finalItemMapState[currentColumn].findIndex(i => i.id === activeId);
+                
+                let overIndex = finalItemMapState[overColumn].findIndex(i => i.id === overId);
+                const overType = over.data.current?.type;
+                if (overIndex === -1 && (overType === "COLUMN" || overType === "ITEM-LIST")) {
+                    if (originalColumn === currentColumn) {
+                        overIndex = finalItemMapState[overColumn].length;
+                    } else {
+                        // For cross-column, handleDragOver already placed it at the correct index (top/bottom)
+                        // when dragging over the column background.
+                        overIndex = activeIndex;
+                    }
+                } else if (overIndex === -1 && typeof over.data.current?.sortable?.index === 'number') {
+                    overIndex = over.data.current.sortable.index;
                 }
-            });
+
+                if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
+                    finalItemMapState[currentColumn] = arrayMove(finalItemMapState[currentColumn], activeIndex, overIndex);
+                    setItemMapState(finalItemMapState);
+                }
+            }
 
             // Notify parent component of the change, including column movement information
+            // Pass ONLY the items in the target column, in their new visual order
             if (originalColumn !== currentColumn && originalColumn && currentColumn) {
-                // Item has moved between columns - provide this context to parent
-                onItemsReorder(allItems, {
+                // Item has moved between columns
+                onItemsReorder(finalItemMapState[currentColumn] as BoardItem<M>[], {
                     itemId: activeId,
                     sourceColumn: originalColumn,
                     targetColumn: currentColumn
                 });
             } else if (currentColumn) {
-                // Reordering within the same column - still need to provide moveInfo
-                onItemsReorder(allItems, {
+                // Reordering within the same column
+                onItemsReorder(finalItemMapState[currentColumn] as BoardItem<M>[], {
                     itemId: activeId,
                     sourceColumn: currentColumn,
                     targetColumn: currentColumn
@@ -253,41 +381,70 @@ export function Board<M extends Record<string, unknown>, COLUMN extends string>(
         }
     };
 
+    const customCollisionDetection: CollisionDetection = (args) => {
+        const pointerCollisions = pointerWithin(args);
+        
+        if (pointerCollisions.length > 0) {
+            return pointerCollisions;
+        }
+        
+        return rectIntersection(args);
+    };
+
     return (
         <DndContext
             sensors={sensors}
-            collisionDetection={pointerWithin}
+            collisionDetection={customCollisionDetection}
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
         >
-            <DragOverlay dropAnimation={{
-                duration: 300,
-                easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)"
-            }}>
-                {activeItem ? (
-                    <ItemComponent
-                        item={activeItem}
-                        isDragging={true}
-                        index={-1}
-                        style={{
-                            boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
-                            opacity: 0.9
-                        }}
-                    />
-                ) : activeColumn ? (
-                    <BoardColumn
-                        key={String(activeColumn)}
-                        index={-1}
-                        id={String(activeColumn)}
-                        title={columnLabels?.[activeColumn] ?? String(activeColumn)}
-                        items={itemMapState[String(activeColumn)] || []}
-                        ItemComponent={ItemComponent}
-                        isDragging={true}
-                        isDragOverColumn={false}
-                    />
-                ) : null}
+            {/* Hidden DragOverlay — keeps dnd-kit's internal collision detection
+               and drag tracking working (it needs dragOverlay.rect to be set) */}
+            <DragOverlay dropAnimation={null} style={{ opacity: 0 }}>
+                {(activeItem || activeColumn) ? <div style={{ width: 1, height: 1 }}/> : null}
             </DragOverlay>
+
+            {/* Visual overlay — rendered at document.body via portal to bypass
+               any ancestor transforms/containment that break position:fixed */}
+            {overlayPos && (activeItem || activeColumn) && createPortal(
+                <div
+                    className={document.documentElement.classList.contains("dark") ? "dark" : ""}
+                    style={{
+                        position: "fixed",
+                        top: overlayPos.y,
+                        left: overlayPos.x,
+                        zIndex: 9999,
+                        pointerEvents: "none",
+                        touchAction: "none"
+                    }}
+                >
+                    {activeItem ? (
+                        <ItemComponent
+                            item={activeItem}
+                            isDragging={true}
+                            index={-1}
+                            style={{
+                                boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+                                opacity: 0.9,
+                                width: "304px"
+                            }}
+                        />
+                    ) : activeColumn ? (
+                        <BoardColumn
+                            key={String(activeColumn)}
+                            index={-1}
+                            id={String(activeColumn)}
+                            title={columnLabels?.[activeColumn] ?? String(activeColumn)}
+                            items={itemMapState[String(activeColumn)] || []}
+                            ItemComponent={ItemComponent}
+                            isDragging={true}
+                            isDragOverColumn={false}
+                        />
+                    ) : null}
+                </div>,
+                document.body
+            )}
 
             <SortableContext
                 items={columnsProp.map(String)}

@@ -1,6 +1,6 @@
 import React, { memo, useEffect, useMemo, useRef } from "react";
 import { useDroppable } from "@dnd-kit/core";
-import { useSortable } from "@dnd-kit/sortable";
+import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { CircularProgress, cls } from "@rebasepro/ui";
 import { BoardItem, BoardItemViewProps } from "./board_types";
@@ -94,31 +94,36 @@ export function BoardSortableList<M extends Record<string, unknown>>({
             className={containerClassName}
             style={{ minHeight: 80 }}
         >
-            {items.length === 0 && !loading ? (
-                <div className="flex-1 flex items-center justify-center">
-                    <span className="text-xs text-surface-400 dark:text-surface-500">
-                        No items
-                    </span>
-                </div>
-            ) : (
-                <>
-                    {items.map((item, index) => (
-                        <SortableItem
-                            key={item.id}
-                            item={item}
-                            index={index}
-                            columnId={columnId}
-                            ItemComponent={ItemComponent}
-                        />
-                    ))}
-                    {/* Infinite scroll sentinel - inside scrollable container */}
-                    {(loading || hasMore) && (
-                        <div ref={sentinelRef} className="flex items-center justify-center py-2 min-h-6">
-                            {loading && <CircularProgress size="smallest"/>}
-                        </div>
-                    )}
-                </>
-            )}
+            <SortableContext 
+                items={items.map(i => i.id)} 
+                strategy={verticalListSortingStrategy}
+            >
+                {items.length === 0 && !loading ? (
+                    <div className="flex-1 flex items-center justify-center">
+                        <span className="text-xs text-surface-400 dark:text-surface-500">
+                            No items
+                        </span>
+                    </div>
+                ) : (
+                    <>
+                        {items.map((item, index) => (
+                            <SortableItem
+                                key={item.id}
+                                item={item}
+                                index={index}
+                                columnId={columnId}
+                                ItemComponent={ItemComponent}
+                            />
+                        ))}
+                        {/* Infinite scroll sentinel - inside scrollable container */}
+                        {(loading || hasMore) && (
+                            <div ref={sentinelRef} className="flex items-center justify-center py-2 min-h-6">
+                                {loading && <CircularProgress size="smallest"/>}
+                            </div>
+                        )}
+                    </>
+                )}
+            </SortableContext>
         </div>
     );
 }

@@ -6,7 +6,7 @@ export const usersCollectionTemplate = {
     name: "Users",
     singularName: "User",
     description: "Registered users in the app/web",
-    icon: "person",
+    icon: "User",
     properties: {
         displayName: {
             name: "Display name",

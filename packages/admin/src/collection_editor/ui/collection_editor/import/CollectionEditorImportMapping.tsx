@@ -1,12 +1,11 @@
-import {
-    DataNewPropertiesMapping,
-    getInferenceType,
-    ImportConfig,
-    ImportNewPropertyFieldPreview
-} from "../../../_cms_internals";
+import { DataNewPropertiesMapping } from "../../../../data_import/components/DataNewPropertiesMapping";
+import { getInferenceType } from "../../../../data_import/utils/get_import_inference_type";
+import { ImportConfig } from "../../../../data_import/types";
+import { ImportNewPropertyFieldPreview } from "../../../../data_import/components/ImportNewPropertyFieldPreview";
 import { getIn, useFormex } from "@rebasepro/formex";
 
-import { getFieldConfig, getFieldId, PropertyConfigBadge } from "../../../_cms_internals";
+import { getFieldConfig, getFieldId } from "../../../../components/field_configs";
+import { PropertyConfigBadge } from "../../../../components/PropertyConfigBadge";
 import { EntityCollection, Properties, Property, PropertyConfig } from "@rebasepro/types";
 import { cls, Container, Select, SelectItem, Tooltip, Typography } from "@rebasepro/ui";
 import React, { useState } from "react";

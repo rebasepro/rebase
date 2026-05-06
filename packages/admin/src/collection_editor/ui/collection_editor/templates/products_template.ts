@@ -5,7 +5,7 @@ export const productsCollectionTemplate = {
     table: "products",
     name: "Products",
     singularName: "Product",
-    icon: "shopping_cart",
+    icon: "ShoppingCart",
     description: "List of the products currently sold in your shop",
     properties: {
         name: {

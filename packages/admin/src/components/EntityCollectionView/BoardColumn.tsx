@@ -76,10 +76,9 @@ export const BoardColumn = memo(function BoardColumn<M extends Record<string, un
         disabled: !allowReorder
     });
 
-    // Memoize combined style to avoid object recreation
     const combinedStyle = useMemo(() => ({
         ...style,
-        transform: CSS.Transform.toString(transform),
+        transform: CSS.Translate.toString(transform),
         transition,
         zIndex: isColumnBeingDragged ? 2 : 1
     }), [style, transform, transition, isColumnBeingDragged]);

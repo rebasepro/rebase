@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { getFieldConfig } from "../../../_cms_internals";
+import { getFieldConfig } from "../../../../components/field_configs";
 import { ArrayProperty, Property, PropertyConfig } from "@rebasepro/types";
 import { Button, Paper, Typography } from "@rebasepro/ui";
 import { Field, getIn, useFormex } from "@rebasepro/formex";

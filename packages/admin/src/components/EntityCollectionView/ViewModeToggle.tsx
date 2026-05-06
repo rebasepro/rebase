@@ -1,8 +1,8 @@
 
-import React, { useCallback, useMemo, useRef } from "react";
+import React, { useMemo } from "react";
 import { CollectionSize, ViewMode } from "@rebasepro/types";
 import { Button, Popover, Select, SelectItem, ToggleButtonGroup, ToggleButtonOption , iconSize } from "@rebasepro/ui";
-import { LayoutGridIcon, ListIcon, ColumnsIcon, KanbanIcon } from "lucide-react";
+import { LayoutGridIcon, ListIcon, TableIcon, ColumnsIcon, KanbanIcon } from "lucide-react";
 import { useTranslation } from "@rebasepro/core";
 
 export type KanbanPropertyOption = {
@@ -74,7 +74,7 @@ export function ViewModeToggle({
     const getViewModeIcon = () => {
         if (viewMode === "kanban") return <KanbanIcon size={iconSize.smallest}/>;
         if (viewMode === "cards") return <LayoutGridIcon size={iconSize.smallest}/>;
-        if (viewMode === "table") return <ListIcon size={iconSize.smallest}/>;
+        if (viewMode === "table") return <TableIcon size={iconSize.smallest}/>;
         return <ListIcon size={iconSize.smallest}/>;
     };
 
@@ -102,7 +102,7 @@ export function ViewModeToggle({
             {
                 value: "table",
                 label: t("table_view_mode"),
-                icon: <ListIcon size={iconSize.smallest}/>
+                icon: <TableIcon size={iconSize.smallest}/>
             },
             {
                 value: "cards",
@@ -119,32 +119,14 @@ export function ViewModeToggle({
         return allOptions;
     }, []);
 
-    const closeTimer = useRef<ReturnType<typeof setTimeout>>(null);
 
-    const handleMouseEnter = useCallback(() => {
-        if (closeTimer.current) {
-            clearTimeout(closeTimer.current);
-            closeTimer.current = null;
-        }
-        onOpenChange?.(true);
-    }, [onOpenChange]);
-
-    const handleMouseLeave = useCallback(() => {
-        closeTimer.current = setTimeout(() => {
-            onOpenChange?.(false);
-        }, 150);
-    }, [onOpenChange]);
 
     return (
-        <div onMouseEnter={handleMouseEnter}
-             onMouseLeave={handleMouseLeave}>
+        <div className="overflow-visible">
             <Popover
                 open={open}
-                onOpenChange={(v) => { if (v) onOpenChange?.(true); }}
+                onOpenChange={onOpenChange}
                 modal={false}
-                sideOffset={0}
-                onMouseEnter={handleMouseEnter}
-                onMouseLeave={handleMouseLeave}
                 trigger={
                     <Button size="small">
                         {getViewModeIcon()}

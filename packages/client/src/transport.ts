@@ -2,7 +2,7 @@ import { FindParams as TypesFindParams, FindResponse as TypesFindResponse, Where
 import { rebaseReviver } from "./reviver";
 
 export interface RebaseClientConfig {
-    baseUrl: string;
+    baseUrl?: string;
     token?: string;
     apiPath?: string;
     fetch?: typeof globalThis.fetch;
@@ -141,7 +141,8 @@ export function createTransport(config: RebaseClientConfig): Transport {
     }
 
     async function request<T = unknown>(path: string, init?: RequestInit): Promise<T> {
-        const url = config.baseUrl.replace(/\/$/, "") + apiPath + path;
+        const base = config.baseUrl ? config.baseUrl.replace(/\/$/, "") : "";
+        const url = base + apiPath + path;
 
         let activeToken = token;
         if (tokenGetter) {
@@ -201,9 +202,14 @@ headers: retryHeaders });
                     } catch (e) { /* ignore */ }
                 }
                 if (!retryRes.ok) {
+                    let fallbackMessage = retryRes.statusText;
+                    if (retryRes.status === 404 && !fallbackMessage) {
+                        const method = init?.method || "GET";
+                        fallbackMessage = `Endpoint not found (${method} ${path}). This usually means the collection is not registered on the backend, or the frontend API URL configuration (e.g. VITE_API_URL) is missing or pointing to the wrong host.`;
+                    }
                     throw new RebaseApiError(
                         retryRes.status,
-                        retryBody?.error?.message || retryBody?.message || retryRes.statusText,
+                        retryBody?.error?.message || retryBody?.message || fallbackMessage || `Request failed with status ${retryRes.status}`,
                         retryBody?.error?.code || retryBody?.code,
                         retryBody?.error?.details || retryBody?.details
                     );
@@ -213,9 +219,14 @@ headers: retryHeaders });
         }
 
         if (!res.ok) {
+            let fallbackMessage = res.statusText;
+            if (res.status === 404 && !fallbackMessage) {
+                const method = init?.method || "GET";
+                fallbackMessage = `Endpoint not found (${method} ${path}). This usually means the collection is not registered on the backend, or the frontend API URL configuration (e.g. VITE_API_URL) is missing or pointing to the wrong host.`;
+            }
             throw new RebaseApiError(
                 res.status,
-                body?.error?.message || body?.message || res.statusText,
+                body?.error?.message || body?.message || fallbackMessage || `Request failed with status ${res.status}`,
                 body?.error?.code || body?.code,
                 body?.error?.details || body?.details
             );
@@ -229,7 +240,7 @@ headers: retryHeaders });
         setToken(newToken: string | null) { token = newToken || undefined; },
         setAuthTokenGetter(getter: () => Promise<string | null>) { tokenGetter = getter; },
         setOnUnauthorized(handler: () => Promise<boolean>) { onUnauthorizedHandler = handler; },
-        get baseUrl() { return config.baseUrl.replace(/\/$/, ""); },
+        get baseUrl() { return config.baseUrl ? config.baseUrl.replace(/\/$/, "") : ""; },
         get apiPath() { return apiPath; },
         get fetchFn() { return fetchFn; },
         getHeaders: (init?: RequestInit) => getHeaders(token, init) as Record<string, string>,

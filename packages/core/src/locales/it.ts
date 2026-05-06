@@ -414,6 +414,7 @@ export const it: RebaseTranslations = {
     kanban_view_requires_enum: "La vista Kanban richiede una proprietà stringa con valori enumerati per raggruppare le entità nelle colonne. Aggiungi una proprietà enum allo schema della tua collezione per utilizzare questa vista.",
     no_enum_values_configured: "Nessun valore enumerativo configurato per \"{{property}}\"",
     items_need_backfill: "Alcuni elementi non hanno un ordine definito. Fai clic su 'Inizializza' per impostare l'ordine.",
+    kanban_order_not_configured: "L'ordinamento drag-and-drop non è configurato. Imposta una proprietà di ordinamento nelle impostazioni della collezione per mantenere le posizioni delle schede.",
     initialize: "Inizializza",
     confirm_multiple_delete: "Conferma eliminazione multipla",
     delete_entity_confirm_title: "Eliminare '{{entityName}}'?",

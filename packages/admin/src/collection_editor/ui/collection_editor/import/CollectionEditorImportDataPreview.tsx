@@ -1,7 +1,8 @@
 import { useCollectionRegistryController } from "../../../_cms_internals";
 import { convertDataToEntity, ImportConfig } from "../../../_cms_internals";
 import { useAuthController } from "@rebasepro/core";
-import { EntityCollectionTable, useSelectionController } from "../../../_cms_internals";
+import { EntityCollectionTable } from "../../../../components/EntityCollectionTable/EntityCollectionTable";
+import { useSelectionController } from "../../../../components/EntityCollectionView/useSelectionController";
 import { CircularProgressCenter } from "@rebasepro/ui";
 import { Properties } from "@rebasepro/types";
 import { useEffect, useState } from "react";

@@ -414,6 +414,7 @@ export const de: RebaseTranslations = {
     kanban_view_requires_enum: "Die Kanban-Ansicht erfordert eine String-Eigenschaft mit Enum-Werten, um Entitäten in Spalten zu gruppieren. Bitte fügen Sie dem Schema Ihrer Sammlung eine Enum-Eigenschaft hinzu, um diese Ansicht zu verwenden.",
     no_enum_values_configured: 'Keine Enum-Werte für Eigenschaft "{{property}}" konfiguriert',
     items_need_backfill: "Einige Elemente haben keine Reihenfolge. Initialisieren Sie sie, um das Verschieben per Drag-and-Drop zu aktivieren.",
+    kanban_order_not_configured: "Die Drag-and-Drop-Sortierung ist nicht konfiguriert. Legen Sie eine Ordnungseigenschaft in den Sammlungseinstellungen fest, um die Kartenpositionen zu speichern.",
     initialize: "Initialisieren",
     confirm_multiple_delete: "Mehrfaches Löschen bestätigen?",
     delete_entity_confirm_title: "Möchten Sie dieses {{entityName}} löschen?",

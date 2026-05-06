@@ -35,7 +35,7 @@ export function BoardColumnTitle({
                 <div
                     className="w-3 h-3 rounded-full flex-shrink-0"
                     style={{
-                        backgroundColor: colorScheme.color
+                        backgroundColor: colorScheme.darkColor ?? colorScheme.color
                     }}
                 />
             )}

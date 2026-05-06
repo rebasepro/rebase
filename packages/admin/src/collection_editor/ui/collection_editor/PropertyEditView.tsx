@@ -4,7 +4,8 @@ import { deepEqual as equal } from "fast-equals"
 
 import { Formex, FormexController, getIn, useCreateFormex } from "@rebasepro/formex";
 import { ConfirmationDialog } from "@rebasepro/core";
-import { DEFAULT_FIELD_CONFIGS, getFieldConfig, getFieldId, PropertyConfigBadge } from "../../_cms_internals";
+import { DEFAULT_FIELD_CONFIGS, getFieldConfig, getFieldId } from "../../../components/field_configs";
+import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
 import { Property, PropertyConfig, PropertyConfigId } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";
 import { Button, Card, cls, Dialog, DialogActions, DialogContent, DialogTitle, fieldBackgroundDisabledMixin, fieldBackgroundHoverMixin, fieldBackgroundMixin, IconButton, InfoLabel, Tooltip, Typography , iconSize } from "@rebasepro/ui";

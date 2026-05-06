@@ -64,6 +64,15 @@ import { useBreadcrumbsController } from "../../index";
 
 const DEFAULT_ENTITY_OPEN_MODE: "side_panel" | "full_screen" | "split" = "split";
 
+function getOpenEntityMode(
+    viewMode: ViewMode,
+    configuredMode?: "side_panel" | "full_screen" | "split"
+): "side_panel" | "full_screen" | "split" {
+    if (configuredMode) return configuredMode;
+    if (viewMode === "kanban") return "side_panel";
+    return DEFAULT_ENTITY_OPEN_MODE;
+}
+
 /**
  * @group Components
  */
@@ -168,8 +177,6 @@ export const EntityCollectionView = React.memo(
             return (userOverride ? mergeDeep(collectionProp, userOverride) : collectionProp) as EntityCollection<M>;
         }, [collectionProp, path, userConfigPersistence?.getCollectionConfig]);
 
-        const openEntityMode = collection?.openEntityMode ?? DEFAULT_ENTITY_OPEN_MODE;
-
         const collectionRef = React.useRef(collection);
         useEffect(() => {
             collectionRef.current = collection;
@@ -243,6 +250,8 @@ export const EntityCollectionView = React.memo(
             if (savedView) return savedView;
             return defaultViewMode;
         });
+
+        const openEntityMode = getOpenEntityMode(viewMode, collection?.openEntityMode);
 
         // Sync URL with current view on init (if view came from saved config)
         useEffect(() => {

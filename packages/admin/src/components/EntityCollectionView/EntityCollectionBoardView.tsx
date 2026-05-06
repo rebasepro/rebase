@@ -24,6 +24,7 @@ import { setIn } from "@rebasepro/formex";
 import { useBoardDataController } from "./useBoardDataController";
 import { useKanbanDragAndDrop } from "./hooks/useKanbanDragAndDrop";
 import { useSideEntityController } from "../../index";
+import { generateNKeysBetween } from "fractional-indexing";
 
 export type EntityCollectionBoardViewProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     collection: EntityCollection<M>;
@@ -192,10 +193,17 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
     // Build all entities from all columns for operations that need the full list
     const allEntities = useMemo(() => {
         const entities: Entity<M>[] = [];
+        const seenIds = new Set<string>();
         columns.forEach(col => {
             const colData = boardDataController.columnData[col];
             if (colData?.entities) {
-                entities.push(...colData.entities);
+                colData.entities.forEach((entity: Entity<M>) => {
+                    const idStr = String(entity.id);
+                    if (!seenIds.has(idStr)) {
+                        seenIds.add(idStr);
+                        entities.push(entity);
+                    }
+                });
             }
         });
         return entities;
@@ -368,11 +376,11 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
             });
             console.log(`${entitiesToUpdate.length} entities need order values`);
 
-            // Assign sequential order values
+            // Generate string fractional keys for all entities that need them
+            const keys = generateNKeysBetween(null, null, entitiesToUpdate.length);
             const updates: Promise<void>[] = [];
             entitiesToUpdate.forEach((entity: Entity<M>, index: number) => {
-                console.log(`Updating entity ${entity.id} with order ${index}`);
-                const updatedValues = setIn({ ...entity.values }, orderProperty, index);
+                const updatedValues = setIn({ ...entity.values }, orderProperty, keys[index]);
 
                 const saveProps: SaveEntityProps = {
                     path: entity.path,
@@ -389,12 +397,9 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
                         collection,
                         data: dataClient,
                         context,
-                        afterSave: () => {
-                            console.log(`Saved entity ${entity.id}`);
-                        },
+                        afterSave: () => {},
                         afterSaveError: (e) => console.error("Backfill save failed:", e)
-                    }).then(() => {
-                    })
+                    }).then(() => {})
                 );
             });
 
@@ -521,6 +526,17 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
                             {t("create_index")}
                         </Button>
                     )}
+                </div>
+            )}
+
+            {/* Warning: orderProperty not configured - drag reorder won't persist */}
+            {!orderProperty && !dataLoading && (
+                <div
+                    className="flex items-center justify-between gap-4 px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+                    <Typography variant="body2" color="secondary">
+                        {t("kanban_order_not_configured")}
+                    </Typography>
+                    {kanbanSetupSlots.length > 0 && kanbanSetupSlots[0]}
                 </div>
             )}
 

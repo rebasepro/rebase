@@ -194,7 +194,7 @@ meta: { total: 0 } }),
 
                 expect(mockFetch).toHaveBeenCalledTimes(1);
                 const urlArg = (mockFetch.mock.calls[0] as any)[0];
-                expect(urlArg.toString()).toContain("/api/data/company_members");
+                expect(urlArg.toString()).toContain("/api/company_members");
                 expect(urlArg.toString()).not.toContain("companyMembers");
             });
         });

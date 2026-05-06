@@ -51,7 +51,15 @@ import { createStorage } from "./storage";
  * Derive a WebSocket URL from an HTTP base URL.
  * `http://` → `ws://`, `https://` → `wss://`.
  */
-function deriveWebSocketUrl(baseUrl: string): string {
+function deriveWebSocketUrl(baseUrl?: string): string {
+    if (!baseUrl) {
+        // If no baseUrl is provided, we can try to derive it from the window object if in browser
+        if (typeof window !== "undefined") {
+            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            return `${protocol}//${window.location.host}`;
+        }
+        return "";
+    }
     return baseUrl
         .replace(/^https:\/\//, "wss://")
         .replace(/^http:\/\//, "ws://")

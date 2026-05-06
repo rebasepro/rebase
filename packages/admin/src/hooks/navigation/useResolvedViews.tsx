@@ -115,7 +115,7 @@ export function useResolvedViews<USER extends User>(
                 slug: "users",
                 name: "Users",
                 group: NAVIGATION_ADMIN_GROUP_NAME,
-                icon: "support_agent",
+                icon: "Headset",
                 view: usersViewElement
             });
             if (userManagement.roles && rolesViewElement) {

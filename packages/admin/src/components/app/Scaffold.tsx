@@ -223,12 +223,13 @@ function DrawerWrapper(props: {
 
     return (
         <div
-            className="z-20 relative"
+            className="z-20 relative flex-shrink-0 overflow-visible"
             onMouseEnter={props.onMouseEnter}
             onMouseMove={props.onMouseMove}
             onMouseLeave={props.onMouseLeave}
             style={{
                 width: layoutWidth,
+                minWidth: layoutWidth,
                 transition: "left 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms, opacity 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms, width 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms"
             }}>
 

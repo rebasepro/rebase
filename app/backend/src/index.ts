@@ -14,8 +14,8 @@ import {
     logger
 } from "@rebasepro/server-core";
 import { createPostgresDatabaseConnection, createPostgresBootstrapper } from "@rebasepro/server-postgresql";
-import { enums, relations, tables } from "./schema.generated";
-import { env } from "./env";
+import { enums, relations, tables } from "./schema.generated.js";
+import { env } from "./env.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -117,7 +117,7 @@ relations },
 
     // Serve the frontend in production
     if (isProduction) {
-        serveSPA(app, { frontendPath: path.join(__dirname, "../../frontend/dist") });
+        serveSPA(app, { frontendPath: path.resolve(process.cwd(), "../frontend/dist") });
     }
 
     if (!isProduction) {

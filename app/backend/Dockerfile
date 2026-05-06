@@ -31,7 +31,7 @@ RUN pnpm install --shamefully-hoist
 RUN pnpm --filter './packages/*' -r --no-bail run build; exit 0
 
 # Build the backend (TypeScript → JavaScript)
-RUN cd app/backend && pnpm run build
+RUN cd app/backend && npx tsc -p tsconfig.docker.json
 
 # Build frontend (reads .env.production for VITE_API_URL etc.)
 RUN cd app/frontend && npx vite build
@@ -71,4 +71,4 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1
 
 # Run the compiled JavaScript directly — no tsx, no --conditions development
-CMD ["node", "dist/src/index.js"]
+CMD ["node", "dist/app/backend/src/index.js"]

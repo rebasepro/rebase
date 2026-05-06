@@ -336,9 +336,10 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
 
     /**
      * Property key to use for ordering items.
-     * Must reference a number property. When items are reordered,
-     * this property will be updated to reflect the new order using
-     * fractional indexing. Used by Kanban view for ordering within columns
+     * Must reference a string/text property. When items are reordered,
+     * this property will be updated with lexicographic sort keys
+     * (e.g. "a0", "a1", "a0V") using string-based fractional indexing.
+     * Used by Kanban view for ordering within columns
      * and can be used for general ordering purposes.
      */
     readonly orderProperty?: Extract<keyof M, string> | (string & {});

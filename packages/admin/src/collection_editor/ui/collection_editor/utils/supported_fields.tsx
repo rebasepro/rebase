@@ -1,4 +1,4 @@
-import { DEFAULT_FIELD_CONFIGS } from "../../../_cms_internals";
+import { DEFAULT_FIELD_CONFIGS } from "../../../../components/field_configs";
 import { PropertyConfigId, PropertyConfig } from "@rebasepro/types";
 
 export const supportedFieldsIds: PropertyConfigId[] = [

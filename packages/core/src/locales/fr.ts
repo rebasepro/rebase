@@ -414,6 +414,7 @@ export const fr: RebaseTranslations = {
     kanban_view_requires_enum: "La vue Kanban requiert une propriété de chaîne de caractères avec des valeurs Enumération (enum) pour regrouper les entités en colonnes. Veuillez ajouter une propriété Enum à votre schéma de collection pour utiliser cette vue.",
     no_enum_values_configured: 'Aucune valeur enum configurée pour la propriété "{{property}}"',
     items_need_backfill: "Certains éléments n'ont pas de valeurs d'ordre. Initialisez-les pour permettre la réorganisation par glisser-déposer.",
+    kanban_order_not_configured: "L'ordonnancement par glisser-déposer n'est pas configuré. Définissez une propriété d'ordre dans les paramètres de la collection pour conserver les positions des cartes.",
     initialize: "Initialiser",
     confirm_multiple_delete: "Confirmez la suppression multiple ?",
     delete_entity_confirm_title: "Souhaitez-vous supprimer {{entityName}} ?",

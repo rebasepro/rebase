@@ -31,11 +31,11 @@ const SECTIONS: StudioSection[] = [
         dotColor: "bg-emerald-400",
         iconColor: "text-emerald-400",
         tools: [
-            { path: "/schema", name: "Collections", description: "Define and manage your data model and collection schemas", icon: "view_list" },
-            { path: "/schema-visualizer", name: "Schema Visualizer", description: "Interactive ERD showing tables, columns, and relationships", icon: "account_tree" },
+            { path: "/schema", name: "Collections", description: "Define and manage your data model and collection schemas", icon: "LayoutList" },
+            { path: "/schema-visualizer", name: "Schema Visualizer", description: "Interactive ERD showing tables, columns, and relationships", icon: "Network" },
             { path: "/sql", name: "SQL Console", description: "Execute raw SQL queries directly against your database", icon: "terminal" },
-            { path: "/branches", name: "Branches", description: "Create and manage isolated database copies for development", icon: "fork_right" },
-            { path: "/rls", name: "RLS Policies", description: "Configure Row Level Security for fine-grained data access", icon: "security" }
+            { path: "/branches", name: "Branches", description: "Create and manage isolated database copies for development", icon: "GitBranch" },
+            { path: "/rls", name: "RLS Policies", description: "Configure Row Level Security for fine-grained data access", icon: "ShieldCheck" }
         ]
     },
     {
@@ -44,7 +44,7 @@ const SECTIONS: StudioSection[] = [
         iconColor: "text-blue-400",
         tools: [
             { path: "/js", name: "JS Console", description: "Run JavaScript with the Rebase SDK in a live sandbox", icon: "code" },
-            { path: "/cron", name: "Cron Jobs", description: "Monitor and manage scheduled background tasks", icon: "schedule" }
+            { path: "/cron", name: "Cron Jobs", description: "Monitor and manage scheduled background tasks", icon: "Clock" }
         ]
     },
     {
@@ -52,7 +52,7 @@ const SECTIONS: StudioSection[] = [
         dotColor: "bg-violet-400",
         iconColor: "text-violet-400",
         tools: [
-            { path: "/api", name: "API Explorer", description: "Interactive API documentation with live request testing", icon: "auto_stories" }
+            { path: "/api", name: "API Explorer", description: "Interactive API documentation with live request testing", icon: "BookOpen" }
         ]
     },
     {
@@ -60,7 +60,7 @@ const SECTIONS: StudioSection[] = [
         dotColor: "bg-amber-400",
         iconColor: "text-amber-400",
         tools: [
-            { path: "/storage", name: "Storage", description: "Browse, upload, and manage files in your storage bucket", icon: "cloud" }
+            { path: "/storage", name: "Storage", description: "Browse, upload, and manage files in your storage bucket", icon: "HardDrive" }
         ]
     },
     {
@@ -69,7 +69,7 @@ const SECTIONS: StudioSection[] = [
         iconColor: "text-rose-400",
         tools: [
             { path: "/users", name: "Users", description: "Manage developers and assign roles in your workspace", icon: "group" },
-            { path: "/roles", name: "Roles", description: "Create and configure fine-grained access permissions", icon: "admin_panel_settings" }
+            { path: "/roles", name: "Roles", description: "Create and configure fine-grained access permissions", icon: "ShieldEllipsis" }
         ]
     }
 ];
