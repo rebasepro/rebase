@@ -7,6 +7,11 @@ import { AuthModuleConfig } from "./routes";
 
 interface AdminRouteOptions extends AuthModuleConfig {
     serviceKey?: string;
+    /**
+     * Callback to persistently mark bootstrap as completed.
+     * Invoked after the first admin user is promoted via POST /admin/bootstrap.
+     */
+    setBootstrapCompleted?: () => Promise<void>;
 }
 import { HonoEnv } from "../api/types";
 import { randomBytes, createHash } from "crypto";
@@ -67,12 +72,33 @@ export function createAdminRoutes(config: AdminRouteOptions): Hono<HonoEnv> {
     // Apply auth middleware to all routes (service-key-aware when configured)
     router.use("/*", createRequireAuth({ serviceKey: config.serviceKey }));
 
+    /**
+     * POST /admin/bootstrap
+     *
+     * One-time endpoint to promote the calling user to admin.
+     * Guarded by three layers:
+     *   1. Authentication (handled by middleware above)
+     *   2. Persistent `bootstrap_completed` flag (when `setBootstrapCompleted` is provided)
+     *   3. Database check — no existing admin users
+     *
+     * Once invoked successfully the persistent flag is set, permanently disabling
+     * this endpoint even if all admin users are later deleted.
+     */
     router.post("/bootstrap", async (c) => {
         const user = c.get("user");
         if (!user || typeof user !== "object") {
             throw ApiError.unauthorized("Not authenticated");
         }
 
+        // ── Guard 1: persistent flag ──────────────────────────────────
+        if (config.isBootstrapCompleted) {
+            const alreadyDone = await config.isBootstrapCompleted();
+            if (alreadyDone) {
+                throw ApiError.forbidden("Bootstrap has already been completed.", "BOOTSTRAP_COMPLETED");
+            }
+        }
+
+        // ── Guard 2: no existing admin users ─────────────────────────
         const users = await authRepo.listUsers();
         let hasAdmin = false;
 
@@ -85,14 +111,20 @@ export function createAdminRoutes(config: AdminRouteOptions): Hono<HonoEnv> {
         }
 
         if (hasAdmin) {
-            throw ApiError.forbidden("Admin users already exist. Bootstrap not allowed.");
+            throw ApiError.forbidden("Admin users already exist. Bootstrap not allowed.", "BOOTSTRAP_COMPLETED");
         }
 
+        // ── Promote caller ───────────────────────────────────────────
         const userId = "userId" in user ? user.userId : undefined;
         if (!userId) {
             throw ApiError.unauthorized("User ID not found in auth context");
         }
         await authRepo.setUserRoles(userId, ["admin"]);
+
+        // ── Set persistent flag ──────────────────────────────────────
+        if (config.setBootstrapCompleted) {
+            await config.setBootstrapCompleted();
+        }
 
         return c.json({
             success: true,

@@ -10,6 +10,7 @@ import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
 import { collections } from "virtual:rebase-collections";
 import { BlogEntryPreview } from "./BlogEntryPreview";
+import { DemoLoginView } from "./DemoLoginView";
 
 // Configuration from environment
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:3001" : undefined);
@@ -54,7 +55,7 @@ export function App() {
             userManagement={userManagement}
             plugins={plugins}
         >
-            <RebaseAuth/>
+            <RebaseAuth loginView={<DemoLoginView authController={authController} googleEnabled={true} googleClientId={GOOGLE_CLIENT_ID}/>}/>
             <RebaseCMS
                 collections={collections}
                 collectionEditor={collectionEditor}

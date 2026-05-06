@@ -249,7 +249,7 @@ function randomName() {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────
-async function runSeed() {
+export async function runSeed() {
     console.log("🌱 Connecting to database...");
     const { db, pool } = createPostgresDatabaseConnection(env.DATABASE_URL, undefined, { max: 1 });
 

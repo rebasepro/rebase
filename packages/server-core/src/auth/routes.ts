@@ -18,12 +18,20 @@ export interface AuthModuleConfig {
     authRepo: AuthRepository;
     emailService?: EmailService;
     emailConfig?: EmailConfig;
-    /** Allow new user registration (default: false). First user can always register for bootstrap. */
+    /** Allow new user registration (default: false). */
     allowRegistration?: boolean;
-    /** Default role ID to assign to new users (default: none). The first user always gets "admin". */
+    /** Default role ID to assign to new users (default: none). Must NOT be "admin". */
     defaultRole?: string;
     /** Optional array of OAuth providers */
     oauthProviders?: OAuthProvider[];
+    /** When true, blocks all self-registration regardless of `allowRegistration`. */
+    disableSelfRegistration?: boolean;
+    /**
+     * Callback that checks if bootstrap has already been completed.
+     * Used by GET /auth/config to report `needsSetup` status.
+     * When not provided, falls back to checking if any users exist.
+     */
+    isBootstrapCompleted?: () => Promise<boolean>;
 }
 
 /**
@@ -133,13 +141,12 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     }
 
     /**
-     * Check if registration is allowed (always allow first user for bootstrap)
+     * Check if registration is allowed.
+     * Registration is only allowed when explicitly enabled via `allowRegistration`.
+     * First-user bootstrap must use POST /admin/bootstrap instead.
      */
-    async function isRegistrationAllowed(): Promise<boolean> {
-        if (allowRegistration) return true;
-        // Always allow first user registration for bootstrap
-        const allUsers = await authRepo.listUsers();
-        return allUsers.length === 0;
+    function isRegistrationAllowed(): boolean {
+        return !!allowRegistration;
     }
 
     /**
@@ -171,9 +178,13 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     router.post("/register", defaultAuthLimiter, async (c) => {
         const { email, password, displayName } = parseBody(registerSchema, await c.req.json());
 
-        // Check if registration is allowed
-        const registrationAllowed = await isRegistrationAllowed();
-        if (!registrationAllowed) {
+        // Hard kill switch — blocks registration regardless of allowRegistration
+        if (config.disableSelfRegistration) {
+            throw ApiError.forbidden("Registration is disabled", "REGISTRATION_DISABLED");
+        }
+
+        // Check if registration is allowed (no bypass for empty databases)
+        if (!isRegistrationAllowed()) {
             throw ApiError.forbidden("Registration is disabled", "REGISTRATION_DISABLED");
         }
 
@@ -197,12 +208,8 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
             displayName: displayName || undefined
         });
 
-        // Check if this is the first user - make them admin
-        const allUsers = await authRepo.listUsers();
-        const isFirstUser = allUsers.length === 1;
-        if (isFirstUser) {
-            await authRepo.assignDefaultRole(user.id, "admin");
-        } else if (config.defaultRole) {
+        // Assign configured default role (never auto-assign admin via registration)
+        if (config.defaultRole) {
             await authRepo.assignDefaultRole(user.id, config.defaultRole);
         }
 
@@ -313,12 +320,8 @@ displayName: user.displayName });
 
                         await authRepo.linkUserIdentity(user.id, provider.id, externalUser.providerId, { email: externalUser.email });
 
-                        // Check if this is the first user - make them admin
-                        const allUsers = await authRepo.listUsers();
-                        const isFirstUser = allUsers.length === 1;
-                        if (isFirstUser) {
-                            await authRepo.assignDefaultRole(user.id, "admin");
-                        } else if (config.defaultRole) {
+                        // Assign configured default role (never auto-assign admin via registration)
+                        if (config.defaultRole) {
                             await authRepo.assignDefaultRole(user.id, config.defaultRole);
                         }
 
@@ -764,9 +767,18 @@ message: "Session revoked successfully" });
      * Get public auth configuration (for frontend to know what's available)
      */
     router.get("/config", defaultAuthLimiter, async (c) => {
-        const allUsers = await authRepo.listUsers();
-        const needsSetup = allUsers.length === 0;
-        const registrationAllowed = needsSetup || allowRegistration;
+        // Determine if setup is needed using the persistent bootstrap flag
+        // when available, falling back to user-count check for backward compat.
+        let needsSetup: boolean;
+        if (config.isBootstrapCompleted) {
+            needsSetup = !(await config.isBootstrapCompleted());
+        } else {
+            const allUsers = await authRepo.listUsers();
+            needsSetup = allUsers.length === 0;
+        }
+
+        // Registration is allowed when explicitly enabled OR during initial setup
+        const registrationAllowed = needsSetup || !!allowRegistration;
 
         // Build a dynamic map of enabled providers for frontend discovery.
         // Also maintain legacy boolean fields for backward compatibility.

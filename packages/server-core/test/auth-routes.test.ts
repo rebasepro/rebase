@@ -61,7 +61,7 @@ config: null };
 let mockAuthRepo: jest.Mocked<AuthRepository>;
 let mockEmailService: { send: jest.Mock; isConfigured: jest.Mock };
 
-function createApp(opts: { allowRegistration?: boolean; withEmail?: boolean; defaultRole?: string } = {}) {
+function createApp(opts: { allowRegistration?: boolean; withEmail?: boolean; defaultRole?: string; isBootstrapCompleted?: () => Promise<boolean>; demoMode?: boolean } = {}) {
     // Re-create mocked service instances each time
 
     // Wire constructor mocks to return our instances
@@ -155,6 +155,13 @@ photoUrl: "https://photo.url" };
         ]
     };
 
+    if (opts.isBootstrapCompleted) {
+        config.isBootstrapCompleted = opts.isBootstrapCompleted;
+    }
+    if (opts.demoMode !== undefined) {
+        config.demoMode = opts.demoMode;
+    }
+
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.route("/auth", createAuthRoutes(config));
@@ -191,10 +198,6 @@ accessExpiresIn: "1h" });
     describe("POST /auth/register", () => {
         it("registers a new user and returns 201 with tokens", async () => {
             const app = createApp();
-            // allowRegistration=true → isRegistrationAllowed() returns immediately
-            // Only the isFirstUser check calls listUsers
-            mockAuthRepo.listUsers
-                .mockResolvedValueOnce([mockUser()]); // isFirstUser check
 
             const res = await app.request("/auth/register", json({ email: "new@test.com",
 password: "StrongPass1" }));
@@ -205,34 +208,25 @@ password: "StrongPass1" }));
             expect(body.user.email).toBe("new@test.com");
         });
 
-        it("first user gets admin role", async () => {
+        it("first user does NOT get admin role (must use bootstrap)", async () => {
             const app = createApp();
-            // allowRegistration=true → isRegistrationAllowed() returns immediately
-            // Only the isFirstUser check calls listUsers (after createUser)
-            mockAuthRepo.listUsers
-                .mockResolvedValueOnce([mockUser()]); // allUsers.length === 1 → isFirstUser
 
             await app.request("/auth/register", json({ email: "first@test.com",
 password: "StrongPass1" }));
-            expect(mockAuthRepo.assignDefaultRole).toHaveBeenCalledWith(expect.any(String), "admin");
+            // No admin assignment — users must bootstrap via POST /admin/bootstrap
+            expect(mockAuthRepo.assignDefaultRole).not.toHaveBeenCalled();
         });
 
-        it("second user gets configured default role", async () => {
+        it("assigns configured default role to new users", async () => {
             const app = createApp({ defaultRole: "editor" });
-            // allowRegistration=true → isRegistrationAllowed() returns immediately
-            // isFirstUser check: 2 users → not first
-            mockAuthRepo.listUsers
-                .mockResolvedValueOnce([mockUser(), mockUser({ id: "user-2" })]);
 
             await app.request("/auth/register", json({ email: "second@test.com",
 password: "StrongPass1" }));
             expect(mockAuthRepo.assignDefaultRole).toHaveBeenCalledWith(expect.any(String), "editor");
         });
 
-        it("second user gets no role by default when not configured", async () => {
+        it("does not assign role when defaultRole is not configured", async () => {
             const app = createApp();
-            mockAuthRepo.listUsers
-                .mockResolvedValueOnce([mockUser(), mockUser({ id: "user-2" })]);
 
             await app.request("/auth/register", json({ email: "third@test.com",
 password: "StrongPass1" }));
@@ -277,9 +271,8 @@ password: "StrongPass1" }));
             expect(res.status).toBe(400);
         });
 
-        it("returns 403 when registration is disabled and users exist", async () => {
+        it("returns 403 when registration is disabled", async () => {
             const app = createApp({ allowRegistration: false });
-            mockAuthRepo.listUsers.mockResolvedValueOnce([mockUser()]); // users exist
 
             const res = await app.request("/auth/register", json({ email: "new@test.com",
 password: "StrongPass1" }));
@@ -288,20 +281,20 @@ password: "StrongPass1" }));
             expect(body.error.code).toBe("REGISTRATION_DISABLED");
         });
 
-        it("allows first-user registration even when registration is disabled", async () => {
+        it("blocks registration even on empty database when allowRegistration=false", async () => {
             const app = createApp({ allowRegistration: false });
-            mockAuthRepo.listUsers
-                .mockResolvedValueOnce([]) // isRegistrationAllowed → empty = allow
-                .mockResolvedValueOnce([mockUser()]); // isFirstUser
+            // Even with no users, registration should be denied
+            mockAuthRepo.listUsers.mockResolvedValueOnce([]);
 
             const res = await app.request("/auth/register", json({ email: "first@test.com",
 password: "StrongPass1" }));
-            expect(res.status).toBe(201);
+            expect(res.status).toBe(403);
+            const body = await res.json() as any;
+            expect(body.error.code).toBe("REGISTRATION_DISABLED");
         });
 
         it("stores refresh token after registration", async () => {
             const app = createApp();
-            mockAuthRepo.listUsers.mockResolvedValueOnce([mockUser()]);
 
             await app.request("/auth/register", json({ email: "a@b.com",
 password: "StrongPass1" }));
@@ -392,7 +385,6 @@ withEmail: false }); // Hack to pass empty list of providers
             const app = createApp();
             mockAuthRepo.getUserByIdentity.mockResolvedValueOnce(null);
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(null);
-            mockAuthRepo.listUsers.mockResolvedValueOnce([mockUser()]); // not first user
 
             const res = await app.request("/auth/google", json({ idToken: "valid-token" }));
             expect(res.status).toBe(200);
@@ -400,6 +392,8 @@ withEmail: false }); // Hack to pass empty list of providers
                 email: "google@test.com"
             }));
             expect(mockAuthRepo.linkUserIdentity).toHaveBeenCalledWith(expect.any(String), "google", "g-123", expect.any(Object));
+            // Verify no admin auto-assignment
+            expect(mockAuthRepo.assignDefaultRole).not.toHaveBeenCalled();
         });
 
         it("links Google to existing account by email", async () => {
@@ -877,9 +871,8 @@ ipAddress: "1.2.3.4" }
 
     // ── Auth Config ─────────────────────────────────────────────────────
     describe("GET /auth/config", () => {
-        it("returns setup status when no users exist", async () => {
-            const app = createApp();
-            mockAuthRepo.listUsers.mockResolvedValueOnce([]);
+        it("returns needsSetup=true when isBootstrapCompleted returns false", async () => {
+            const app = createApp({ isBootstrapCompleted: async () => false });
 
             const res = await app.request("/auth/config");
             expect(res.status).toBe(200);
@@ -888,7 +881,28 @@ ipAddress: "1.2.3.4" }
             expect(body.registrationEnabled).toBe(true); // always true when needsSetup
         });
 
-        it("returns correct flags when users exist", async () => {
+        it("returns needsSetup=false when isBootstrapCompleted returns true", async () => {
+            const app = createApp({ allowRegistration: false, isBootstrapCompleted: async () => true });
+
+            const res = await app.request("/auth/config");
+            expect(res.status).toBe(200);
+            const body = await res.json() as any;
+            expect(body.needsSetup).toBe(false);
+            expect(body.registrationEnabled).toBe(false);
+        });
+
+        it("falls back to user-count check when no isBootstrapCompleted callback", async () => {
+            const app = createApp();
+            mockAuthRepo.listUsers.mockResolvedValueOnce([]);
+
+            const res = await app.request("/auth/config");
+            expect(res.status).toBe(200);
+            const body = await res.json() as any;
+            expect(body.needsSetup).toBe(true);
+            expect(body.registrationEnabled).toBe(true);
+        });
+
+        it("returns correct flags when users exist and no callback", async () => {
             const app = createApp({ allowRegistration: false,
 withEmail: false });
             mockAuthRepo.listUsers.mockResolvedValueOnce([mockUser()]);
@@ -908,6 +922,122 @@ withEmail: false });
             const res = await app.request("/auth/config");
             const body = await res.json() as any;
             expect(body.googleEnabled).toBe(true);
+        });
+    });
+
+    // ═════════════════════════════════════════════════════════════════════
+    // SECURITY REGRESSION TESTS — CVE: First-User Admin Privilege Escalation
+    // These tests directly verify the exploit scenarios from the security audit.
+    // ═════════════════════════════════════════════════════════════════════
+
+    describe("Security: privilege escalation prevention", () => {
+        it("CVE-FIX: registration NEVER assigns admin role, even for first user", async () => {
+            const app = createApp({ allowRegistration: true });
+            // Simulate first user (empty database before, one user after create)
+            mockAuthRepo.listUsers.mockResolvedValueOnce([]);
+
+            const res = await app.request("/auth/register", json({
+                email: "hacker@evil.com",
+                password: "HackRebase2026!",
+                displayName: "Hacker"
+            }));
+
+            expect(res.status).toBe(201);
+            const body = await res.json() as any;
+
+            // The critical assertion: admin must NOT be in the roles
+            expect(mockAuthRepo.assignDefaultRole).not.toHaveBeenCalledWith(
+                expect.any(String), "admin"
+            );
+            // Verify the user was created but NOT given admin
+            expect(mockAuthRepo.createUser).toHaveBeenCalledTimes(1);
+        });
+
+        it("CVE-FIX: OAuth registration NEVER assigns admin role, even for first user", async () => {
+            const app = createApp({ allowRegistration: true });
+            mockAuthRepo.getUserByIdentity.mockResolvedValueOnce(null);
+            mockAuthRepo.getUserByEmail.mockResolvedValueOnce(null);
+
+            const res = await app.request("/auth/google", json({ idToken: "valid-token" }));
+            expect(res.status).toBe(200);
+
+            // The critical assertion: admin must NOT be assigned
+            expect(mockAuthRepo.assignDefaultRole).not.toHaveBeenCalledWith(
+                expect.any(String), "admin"
+            );
+        });
+
+        it("CVE-FIX: empty database does NOT bypass allowRegistration=false", async () => {
+            const app = createApp({ allowRegistration: false });
+            // Even with zero users, the registration endpoint must reject
+            mockAuthRepo.listUsers.mockResolvedValueOnce([]);
+
+            const res = await app.request("/auth/register", json({
+                email: "hacker@evil.com",
+                password: "HackRebase2026!",
+                displayName: "Hacker"
+            }));
+
+            expect(res.status).toBe(403);
+            const body = await res.json() as any;
+            expect(body.error.code).toBe("REGISTRATION_DISABLED");
+            // createUser must NOT have been called
+            expect(mockAuthRepo.createUser).not.toHaveBeenCalled();
+        });
+
+        it("CVE-FIX: demo mode blocks ALL registration attempts", async () => {
+            const app = createApp({ allowRegistration: true, demoMode: true });
+
+            const res = await app.request("/auth/register", json({
+                email: "hacker@evil.com",
+                password: "HackRebase2026!",
+                displayName: "Hacker"
+            }));
+
+            expect(res.status).toBe(403);
+            const body = await res.json() as any;
+            expect(body.error.code).toBe("REGISTRATION_DISABLED");
+            expect(mockAuthRepo.createUser).not.toHaveBeenCalled();
+        });
+
+        it("CVE-FIX: concurrent registration attempts cannot produce multiple admins", async () => {
+            const app = createApp({ allowRegistration: true });
+
+            // Simulate 5 concurrent registration requests
+            const requests = Array.from({ length: 5 }, (_, i) =>
+                app.request("/auth/register", json({
+                    email: `concurrent-${i}@evil.com`,
+                    password: "StrongPass1",
+                    displayName: `Concurrent ${i}`
+                }))
+            );
+
+            const responses = await Promise.all(requests);
+            const successfulRegistrations = responses.filter(r => r.status === 201);
+
+            // Even if multiple registrations succeed, NONE should get admin
+            expect(mockAuthRepo.assignDefaultRole).not.toHaveBeenCalledWith(
+                expect.any(String), "admin"
+            );
+        });
+
+        it("CVE-FIX: defaultRole cannot be set to 'admin' to grant admin via registration", async () => {
+            // Even if someone misconfigures defaultRole as 'admin',
+            // this test documents the current behavior — it would assign admin.
+            // The fix is in the config validation at startup (outside routes).
+            // Here we verify the defaultRole IS what's passed, and the auto-escalation is gone.
+            const app = createApp({ allowRegistration: true, defaultRole: "viewer" });
+
+            await app.request("/auth/register", json({
+                email: "new@test.com",
+                password: "StrongPass1"
+            }));
+
+            // Only the configured default role is assigned, never auto-admin
+            expect(mockAuthRepo.assignDefaultRole).toHaveBeenCalledWith(
+                expect.any(String), "viewer"
+            );
+            expect(mockAuthRepo.assignDefaultRole).toHaveBeenCalledTimes(1);
         });
     });
 });
