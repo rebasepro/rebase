@@ -232,16 +232,45 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
                 }
             }
 
-            setColumnData(prev => ({
-                ...prev,
-                [column]: {
-                    entities: processed,
-                    loading: false,
-                    hasMore: entities.length >= itemCount,
-                    error: undefined,
-                    totalCount: prev[column]?.totalCount // Keep existing count
+            const newHasMore = entities.length >= itemCount;
+
+            // Compare with current state — skip update if identical to avoid UI flash
+            setColumnData(prev => {
+                const existing = prev[column];
+                if (existing && !existing.loading && existing.entities.length === processed.length) {
+                    // Quick structural equality check: same IDs in same order with same values
+                    let identical = true;
+                    for (let i = 0; i < processed.length; i++) {
+                        const a = existing.entities[i];
+                        const b = processed[i];
+                        if (a.id !== b.id) {
+                            identical = false;
+                            break;
+                        }
+                        // Deep-compare values by JSON serialization
+                        // This covers order key, column assignment, and all other fields
+                        if (JSON.stringify(a.values) !== JSON.stringify(b.values)) {
+                            identical = false;
+                            break;
+                        }
+                    }
+                    if (identical && existing.hasMore === newHasMore) {
+                        // Data is the same — return previous reference to prevent re-render
+                        return prev;
+                    }
                 }
-            }));
+
+                return {
+                    ...prev,
+                    [column]: {
+                        entities: processed,
+                        loading: false,
+                        hasMore: newHasMore,
+                        error: undefined,
+                        totalCount: prev[column]?.totalCount // Keep existing count
+                    }
+                };
+            });
         };
 
         const onError = (error: Error) => {
@@ -441,7 +470,7 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
     }, [columns, pageSize]);
 
     // Optimistic update for when moving an item
-    const moveItemOptimistically = useCallback((itemId: string, sourceColumn: COLUMN, targetColumn: COLUMN, newValues?: Record<string, any>, newIndex?: number) => {
+    const moveItemOptimistically = useCallback((itemId: string, sourceColumn: COLUMN, targetColumn: COLUMN, newValues?: Record<string, any>, _newIndex?: number) => {
         setColumnData(prev => {
             const updated = { ...prev };
             let itemToMove: Entity<M> | undefined;
@@ -464,28 +493,26 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
                 };
 
                 const targetEntities = sourceColumn === targetColumn ? sourceEntities : [...(updated[targetColumn]?.entities || [])];
-                
-                if (newIndex !== undefined && newIndex >= 0 && newIndex <= targetEntities.length) {
-                    targetEntities.splice(newIndex, 0, updatedEntity);
-                } else {
-                    targetEntities.push(updatedEntity);
-                    if (orderPropertyRef.current) {
-                        const orderProp = orderPropertyRef.current;
-                        targetEntities.sort((a, b) => {
-                            const valA = a.values?.[orderProp] as string | undefined | null;
-                            const valB = b.values?.[orderProp] as string | undefined | null;
-                            
-                            // Handle nulls/empty strings to match Postgres NULLS LAST (ASC) behavior
-                            const isAEmpty = valA === undefined || valA === null || valA === "";
-                            const isBEmpty = valB === undefined || valB === null || valB === "";
-                            
-                            if (isAEmpty && isBEmpty) return 0;
-                            if (isAEmpty) return 1; // A is null, B is not -> A goes after B
-                            if (isBEmpty) return -1; // B is null, A is not -> A goes before B
-                            
-                            return valA < valB ? -1 : valA > valB ? 1 : 0;
-                        });
-                    }
+                targetEntities.push(updatedEntity);
+
+                // Always sort by orderProperty to ensure columnData matches the
+                // fractional-index order computed by the drag handler.
+                // This is the single source of truth for ordering.
+                const orderProp = orderPropertyRef.current;
+                if (orderProp) {
+                    targetEntities.sort((a, b) => {
+                        const valA = a.values?.[orderProp] as string | undefined | null;
+                        const valB = b.values?.[orderProp] as string | undefined | null;
+
+                        const isAEmpty = valA === undefined || valA === null || valA === "";
+                        const isBEmpty = valB === undefined || valB === null || valB === "";
+
+                        if (isAEmpty && isBEmpty) return 0;
+                        if (isAEmpty) return 1;
+                        if (isBEmpty) return -1;
+
+                        return valA < valB ? -1 : valA > valB ? 1 : 0;
+                    });
                 }
 
                 updated[sourceColumn] = {

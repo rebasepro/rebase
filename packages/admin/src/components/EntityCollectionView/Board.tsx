@@ -96,63 +96,55 @@ export function Board<M extends Record<string, unknown>, COLUMN extends string>(
             {} as BoardItemMap<M>
         );
 
-        // Compare incoming data with current state.
-        // If the structure (same item IDs in same order per column) is identical,
-        // skip the state update entirely to prevent unnecessary re-renders.
+        // Sync Board's itemMapState with incoming data.
+        // The incoming data is ordered by the fractional-index order key (from columnData).
+        // We accept that order as the source of truth, but avoid triggering re-renders
+        // when the data is structurally identical (same IDs in same order, same entity refs).
         setItemMapState(prevMap => {
-            let structureChanged = false;
+            let changed = false;
 
             for (const col of columnsProp) {
                 const prevItems = prevMap[col] ?? [];
                 const newItems = newItemMap[col] ?? [];
+
+                // Quick structural check: same length, same IDs in same order
                 if (prevItems.length !== newItems.length) {
-                    structureChanged = true;
-                    break;
+                    changed = true;
+                    continue;
                 }
                 for (let i = 0; i < prevItems.length; i++) {
-                    if (prevItems[i].id !== newItems[i].id) {
-                        structureChanged = true;
+                    if (prevItems[i].id !== newItems[i].id || prevItems[i].entity !== newItems[i].entity) {
+                        changed = true;
                         break;
                     }
                 }
-                if (structureChanged) break;
             }
 
-            if (structureChanged) {
-                // Structure differs — accept the new data wholesale
-                return newItemMap;
-            }
-
-            // Structure is the same — check if entity data changed
-            let entityDataChanged = false;
-            for (const col of columnsProp) {
-                const prevItems = prevMap[col] ?? [];
-                const newItems = newItemMap[col] ?? [];
-                for (let i = 0; i < prevItems.length; i++) {
-                    if (prevItems[i].entity !== newItems[i].entity) {
-                        entityDataChanged = true;
-                        break;
-                    }
-                }
-                if (entityDataChanged) break;
-            }
-
-            if (!entityDataChanged) {
-                // Nothing changed at all — return same reference, no re-render
+            if (!changed) {
+                // Nothing changed — return same reference, no re-render
                 return prevMap;
             }
 
-            // Same structure but entity data updated — preserve structure,
-            // update entity refs
+            // Something changed — accept the new data.
+            // Preserve entity refs that haven't changed to minimize downstream re-renders.
             const updated: BoardItemMap<M> = {};
             for (const col of columnsProp) {
                 const prevItems = prevMap[col] ?? [];
                 const newItems = newItemMap[col] ?? [];
-                updated[col] = prevItems.map((item, i) =>
-                    item.entity !== newItems[i]?.entity
-                        ? { ...item, entity: newItems[i].entity }
-                        : item
-                );
+
+                // Build prev lookup for entity ref reuse
+                const prevById = new Map<string, BoardItem<M>>();
+                for (const item of prevItems) {
+                    prevById.set(item.id, item);
+                }
+
+                updated[col] = newItems.map(newItem => {
+                    const prev = prevById.get(newItem.id);
+                    if (prev && prev.entity === newItem.entity) {
+                        return prev; // Reuse existing object reference
+                    }
+                    return newItem;
+                });
             }
             return updated;
         });
@@ -334,6 +326,7 @@ export function Board<M extends Record<string, unknown>, COLUMN extends string>(
             // Find the current column assignment from our internal state
             const currentColumn = findColumnByItemId(activeId) as COLUMN | undefined;
             const overColumn = findColumnByItemId(overId) || currentColumn;
+
 
             let finalItemMapState = { ...itemMapState };
 

@@ -19,7 +19,7 @@ export function useLocalCollectionsConfigController(
         console.log("dispatching dev server request", endpoint, payload);
         try {
             let token = options?.getAuthToken ? await options.getAuthToken() : null;
-            let baseUrl = typeof clientOrUrl === "string" ? clientOrUrl : "http://localhost:3001";
+            let baseUrl = typeof clientOrUrl === "string" ? clientOrUrl : "";
 
             if (typeof clientOrUrl === "object" && clientOrUrl !== null) {
                 baseUrl = clientOrUrl.baseUrl || baseUrl;

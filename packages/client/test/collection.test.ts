@@ -80,7 +80,7 @@ limit: 10,
 offset: 20,
 hasMore: false }
             });
-            expect(mockRequest).toHaveBeenCalledWith("/posts?limit=10&offset=20", { method: "GET" });
+            expect(mockRequest).toHaveBeenCalledWith("/data/posts?limit=10&offset=20", { method: "GET" });
         });
 
         it("calls GET /data/slug without query string if no params are passed", async () => {
@@ -93,7 +93,7 @@ hasMore: false } });
 
             const result = await client.find();
             expect(result.data).toEqual([]);
-            expect(mockRequest).toHaveBeenCalledWith("/posts", { method: "GET" });
+            expect(mockRequest).toHaveBeenCalledWith("/data/posts", { method: "GET" });
         });
 
         it("handles empty/missing data array gracefully", async () => {
@@ -139,7 +139,7 @@ status: "draft" } });
 meta: {} });
 
             await client.find({ where: { status: "eq.published" } });
-            expect(mockRequest).toHaveBeenCalledWith("/posts?status=eq.published", { method: "GET" });
+            expect(mockRequest).toHaveBeenCalledWith("/data/posts?status=eq.published", { method: "GET" });
         });
 
         it("uses orderBy together with other params", async () => {
@@ -149,7 +149,7 @@ meta: {} });
 
             await client.find({ limit: 5,
 orderBy: "title:asc" });
-            expect(mockRequest).toHaveBeenCalledWith("/posts?limit=5&orderBy=title%3Aasc", { method: "GET" });
+            expect(mockRequest).toHaveBeenCalledWith("/data/posts?limit=5&orderBy=title%3Aasc", { method: "GET" });
         });
     });
 
@@ -167,7 +167,7 @@ title: "Test" });
 path: "posts",
 values: { id: "123",
 title: "Test" } });
-            expect(mockRequest).toHaveBeenCalledWith("/posts/123", { method: "GET" });
+            expect(mockRequest).toHaveBeenCalledWith("/data/posts/123", { method: "GET" });
         });
 
         it("returns undefined when backend returns falsy", async () => {
@@ -184,7 +184,7 @@ title: "Test" } });
 title: "Encoded" });
 
             await client.findById("a/b");
-            expect(mockRequest).toHaveBeenCalledWith("/posts/a%2Fb", { method: "GET" });
+            expect(mockRequest).toHaveBeenCalledWith("/data/posts/a%2Fb", { method: "GET" });
         });
 
         it("handles numeric IDs by converting to string", async () => {
@@ -193,7 +193,7 @@ title: "Encoded" });
 title: "Numeric" });
 
             await client.findById(42);
-            expect(mockRequest).toHaveBeenCalledWith("/posts/42", { method: "GET" });
+            expect(mockRequest).toHaveBeenCalledWith("/data/posts/42", { method: "GET" });
         });
     });
 
@@ -213,7 +213,7 @@ title: "New" });
 path: "posts",
 values: { id: 1,
 title: "New" } });
-            expect(mockRequest).toHaveBeenCalledWith("/posts", { method: "POST",
+            expect(mockRequest).toHaveBeenCalledWith("/data/posts", { method: "POST",
 body: JSON.stringify(input) });
         });
 
@@ -229,7 +229,7 @@ title: "Custom" });
 path: "posts",
 values: { id: "custom-id",
 title: "Custom" } });
-            expect(mockRequest).toHaveBeenCalledWith("/posts", {
+            expect(mockRequest).toHaveBeenCalledWith("/data/posts", {
                 method: "POST",
                 body: JSON.stringify({ title: "Custom",
 id: "custom-id" })
@@ -263,7 +263,7 @@ title: "Updated" });
 path: "posts",
 values: { id: 1,
 title: "Updated" } });
-            expect(mockRequest).toHaveBeenCalledWith("/posts/1", { method: "PUT",
+            expect(mockRequest).toHaveBeenCalledWith("/data/posts/1", { method: "PUT",
 body: JSON.stringify(patch) });
         });
 
@@ -273,7 +273,7 @@ body: JSON.stringify(patch) });
 title: "Updated" });
 
             await client.update("x/y", { title: "Updated" });
-            expect(mockRequest).toHaveBeenCalledWith("/posts/x%2Fy", expect.any(Object));
+            expect(mockRequest).toHaveBeenCalledWith("/data/posts/x%2Fy", expect.any(Object));
         });
     });
 
@@ -286,7 +286,7 @@ title: "Updated" });
             mockRequest.mockResolvedValueOnce(undefined);
 
             await client.delete(42);
-            expect(mockRequest).toHaveBeenCalledWith("/posts/42", { method: "DELETE" });
+            expect(mockRequest).toHaveBeenCalledWith("/data/posts/42", { method: "DELETE" });
         });
 
         it("encodes special characters in delete ID", async () => {
@@ -294,7 +294,7 @@ title: "Updated" });
             mockRequest.mockResolvedValueOnce(undefined);
 
             await client.delete("a/b");
-            expect(mockRequest).toHaveBeenCalledWith("/posts/a%2Fb", { method: "DELETE" });
+            expect(mockRequest).toHaveBeenCalledWith("/data/posts/a%2Fb", { method: "DELETE" });
         });
     });
 
@@ -470,7 +470,7 @@ meta: {} });
 
             await qb.find();
             expect(mockRequest).toHaveBeenCalledWith(
-                expect.stringContaining("/posts"),
+                expect.stringContaining("/data/posts"),
                 expect.objectContaining({ method: "GET" })
             );
         });

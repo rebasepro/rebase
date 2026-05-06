@@ -32,7 +32,7 @@ import { Route, Outlet } from "react-router-dom";
 import { createRebaseClient } from "@rebasepro/client";
 
 // Configuration from environment
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:3001" : undefined);
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 export function App() {
@@ -40,8 +40,7 @@ export function App() {
     const userConfigPersistence = useBuildLocalConfigurationPersistence();
 
     const rebaseClient = React.useMemo(() => createRebaseClient({
-        baseUrl: API_URL,
-        websocketUrl: API_URL.replace(/^http/, "ws")
+        baseUrl: API_URL
     }), [API_URL]);
 
     const authController = useRebaseAuthController({
