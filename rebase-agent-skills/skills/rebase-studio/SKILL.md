@@ -14,11 +14,14 @@ The Studio is built on `@rebasepro/core` and provides:
 - **Visual schema editor** for non-developers
 - **Form views** with 20+ field types
 - **Card grid** and **Kanban board** view modes
+- **List** and **Split** view modes
 - **User management** with role-based access
 - **Data import/export** (CSV, JSON, Excel)
 - **Entity history** and audit trail
 - **Custom views** as React components
 - **Rich text editor** (TipTap-based, Notion-style)
+- **Storage browser** for uploaded files and media
+- **Collection Editor** with AST-backed schema editing
 
 ## Dev Mode & Editor Mode
 
@@ -53,10 +56,68 @@ When toggled to Editor Mode with an effective role set, the developer sees exact
 The Studio's collection editor allows non-developers to:
 - Add, remove, and reorder fields
 - Configure field types and validation
-- Set up enum values and references
+- Set up enum values and relations
 - Preview the form layout
 
 Under the hood, it uses **AST manipulation** (via `ts-morph`) to modify the TypeScript collection files — preserving all custom callbacks and code.
+
+### Collection Editor Auth
+
+The collection editor requires an auth token to communicate with the backend's AST editing endpoints:
+
+```typescript
+const collectionEditor = React.useMemo(() => ({
+    getAuthToken: authController.getAuthToken
+}), [authController.getAuthToken]);
+
+<RebaseCMS collections={collections} collectionEditor={collectionEditor}/>
+```
+
+## Frontend Composition
+
+The Studio is mounted using the declarative composition API:
+
+```tsx
+import { useRebaseAuthController, useBackendUserManagement, RebaseAuth } from "@rebasepro/auth";
+import { Rebase } from "@rebasepro/core";
+import { RebaseCMS, RebaseShell } from "@rebasepro/admin";
+import { useDataEnhancementPlugin } from "@rebasepro/plugin-data-enhancement";
+import { RebaseStudio } from "@rebasepro/studio";
+import { createRebaseClient } from "@rebasepro/client";
+import { collections } from "virtual:rebase-collections";
+
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:3001" : undefined);
+
+export function App() {
+    const rebaseClient = React.useMemo(() => createRebaseClient({ baseUrl: API_URL }), []);
+    const authController = useRebaseAuthController({ client: rebaseClient });
+    const userManagement = useBackendUserManagement({ client: rebaseClient, currentUser: authController.user });
+    const dataEnhancementPlugin = useDataEnhancementPlugin();
+
+    const collectionEditor = React.useMemo(() => ({
+        getAuthToken: authController.getAuthToken
+    }), [authController.getAuthToken]);
+
+    return (
+        <Rebase client={rebaseClient} authController={authController} userManagement={userManagement} plugins={[dataEnhancementPlugin]}>
+            <RebaseAuth/>
+            <RebaseCMS collections={collections} collectionEditor={collectionEditor}/>
+            <RebaseStudio/>
+            <RebaseShell title="Rebase"/>
+        </Rebase>
+    );
+}
+```
+
+### Key Components
+
+| Component | Package | Purpose |
+|-----------|---------|---------|
+| `<Rebase>` | `@rebasepro/core` | Root provider (client, auth, user management, plugins) |
+| `<RebaseAuth/>` | `@rebasepro/auth` | Authentication UI (login/register) |
+| `<RebaseCMS>` | `@rebasepro/admin` | CMS frontend (collections, views, editor) |
+| `<RebaseStudio/>` | `@rebasepro/studio` | Admin panel (visual schema, settings) |
+| `<RebaseShell>` | `@rebasepro/admin` | App shell (drawer, navigation) |
 
 ## Custom Views
 
@@ -81,6 +142,7 @@ const myCustomView = {
 | `useAuthController()` | Access current user and auth state |
 | `useNavigationController()` | Navigate between views |
 | `useDataSource()` | Access the data source for CRUD ops |
+| `useRebaseLocaleContext()` | Access `t()` for translations |
 
 ## Key Packages
 
@@ -88,7 +150,8 @@ const myCustomView = {
 |---------|-------------|
 | `@rebasepro/core` | Core framework, hooks, types |
 | `@rebasepro/studio` | Studio admin panel components |
-| `@rebasepro/admin` | CMS frontend application |
+| `@rebasepro/admin` | CMS frontend application (previously `cms`) |
+| `@rebasepro/ui` | Component library (Tailwind v4 + Radix) |
 | `@rebasepro/plugin-data-enhancement` | AI-powered autofill |
 | `@rebasepro/schema-inference` | Auto-infer schema from data |
 
@@ -100,7 +163,17 @@ cd app
 pnpm run dev
 ```
 
-This starts both frontend and backend. The Studio is accessible at `http://localhost:5173` (Vite default).
+This starts both frontend and backend via the monorepo dev script. The Studio is accessible at `http://localhost:5173` (Vite default).
+
+## Virtual Collection Import
+
+Collections are auto-loaded via a Vite plugin using the `virtual:rebase-collections` import:
+
+```typescript
+import { collections } from "virtual:rebase-collections";
+```
+
+This reads all collection files from `app/config/collections/` and makes them available to the frontend without manual barrel exports.
 
 ## References
 

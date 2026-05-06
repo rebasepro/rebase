@@ -3,6 +3,7 @@ import React, { useCallback } from "react";
 import { StringPropertyValidation } from "./validation/StringPropertyValidation";
 import { ValidationPanel } from "./validation/ValidationPanel";
 import { Field, getIn, useFormex } from "@rebasepro/formex";
+import { useTranslation } from "@rebasepro/core";
 
 import { BooleanSwitchWithLabel, DebouncedTextField, ExpandablePanel, TextField, Typography } from "@rebasepro/ui";
 import { UploadCloudIcon, SettingsIcon } from "lucide-react";
@@ -19,6 +20,7 @@ export function MarkdownPropertyField({
         values,
         setFieldValue
     } = useFormex();
+    const { t } = useTranslation();
 
     const baseStoragePath = "storage";
     const baseMarkdownPath = "markdown";
@@ -101,7 +103,7 @@ export function MarkdownPropertyField({
                             disabled={disabled}
                             value={!htmlValue}
                             onValueChange={(value) => updateMarkdownConfig("html", !value)}
-                            label={"Strip HTML on paste"}
+                            label={t("markdown_strip_html")}
                         />
                         <Typography variant={"caption"} className={"ml-3.5 mt-1 mb-2"}>
                             Remove HTML tags and inline styles when pasting content from external sources
@@ -112,7 +114,7 @@ export function MarkdownPropertyField({
                             disabled={disabled}
                             value={transformPastedTextValue}
                             onValueChange={(value) => updateMarkdownConfig("transformPastedText", value)}
-                            label={"Convert pasted text to markdown"}
+                            label={t("markdown_convert_pasted")}
                         />
                         <Typography variant={"caption"} className={"ml-3.5 mt-1 mb-2"}>
                             Convert rich text (from Google Docs, Word, etc.) to clean markdown format
@@ -138,7 +140,7 @@ export function MarkdownPropertyField({
                         <div className={"col-span-12"}>
                             <Field name={fileName}
                                 as={DebouncedTextField}
-                                label={"File name"}
+                                label={t("storage_file_name")}
                                 size={"small"}
                                 disabled={hasFilenameCallback || disabled}
                                 value={hasFilenameCallback ? "-" : fileNameValue}
@@ -147,7 +149,7 @@ export function MarkdownPropertyField({
                         <div className={"col-span-12"}>
                             <Field name={storagePath}
                                 as={DebouncedTextField}
-                                label={"Storage path"}
+                                label={t("storage_path")}
                                 disabled={hasStoragePathCallback || disabled}
                                 size={"small"}
                                 value={hasStoragePathCallback ? "-" : storagePathValue}
@@ -177,7 +179,7 @@ export function MarkdownPropertyField({
                         <div className={"col-span-12"}>
                             <DebouncedTextField name={maxSize}
                                 type={"number"}
-                                label={"Max size (in bytes)"}
+                                label={t("storage_max_size")}
                                 size={"small"}
                                 value={maxSizeValue !== undefined && maxSizeValue !== null ? maxSizeValue.toString() : ""}
                                 onChange={(e) => {
@@ -199,7 +201,7 @@ export function MarkdownPropertyField({
                     onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
                         setFieldValue("defaultValue", e.target.value === "" ? undefined : e.target.value);
                     }}
-                    label={"Default value"}
+                    label={t("default_value")}
                     value={getIn(values, "defaultValue") ?? ""}/>
 
             </div>

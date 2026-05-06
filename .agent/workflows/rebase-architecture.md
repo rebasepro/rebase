@@ -3,11 +3,13 @@ description: Rebase architecture rules and package entry points
 ---
 # Rebase Architecture and UX Rules
 
-When working on the Rebase / Rebase project, adhere to the following architectural guidelines:
+When working on the Rebase project, adhere to the following architectural guidelines:
 
 ## 1. Entry Points
-- **Primary End-User Entry**: The entry point for the application as an end-user is the `app` folder at the root of the project (`/Users/francesco/rebase_v4/app`). This is how users consume and run the CMS.
-- **Legacy Modules**: The `packages/rebase_cloud` package is maintained for legacy reasons and is **not** the main entry point for the Rebase project.
+- **Primary End-User Entry**: The entry point for the application as an end-user is the `app/` folder at the root of the project. This is how users consume and run the CMS.
+  - `app/frontend/` — React frontend (Vite)
+  - `app/backend/` — Hono backend server
+  - `app/config/collections/` — TypeScript collection definitions (one file per collection)
 
 ## 2. Dev Mode & End-User Preview
 - **Dev Mode Toggle**: The application uses `AdminModeController` with states `developer` and `editor`. This toggle must be preserved.
@@ -15,7 +17,33 @@ When working on the Rebase / Rebase project, adhere to the following architectur
 - **Effective Role Simulation**: Use an `EffectiveRoleController` context to simulate different user roles. When in Dev Mode, developers can select an "effective role" to accurately preview what that specific role can see/execute when toggling to Editor Mode.
 
 ## 3. Package Management
-- **Do not rename packages**: Existing packages (like `core`, `rebase_cloud`, `postgresql`, etc.) should keep their current names instead of being renamed to `rebase_*`.
+- **Do not rename packages**: Existing packages (like `core`, `admin`, `server-postgresql`, etc.) should keep their current names.
 - **Inner View Adaptability**: Internal views should conditionally render inline developer actions (like "Edit Schema") by checking if `mode === "developer"`.
+
+## 4. View Modes
+Collections support multiple view modes, configured via:
+- `enabledViews` — Array of enabled view modes: `"table"`, `"cards"`, `"kanban"`, `"list"`
+- `defaultViewMode` — The default view when opening the collection
+- `kanban` — Kanban board configuration: `{ columnProperty: "status" }`
+- `openEntityMode` — How entities open: `"split"` (side-by-side), `"side_panel"` (right drawer), `"full_screen"` (full page)
+
+## 5. Frontend Composition API
+The frontend uses a declarative composition pattern:
+
+```tsx
+<Rebase client={rebaseClient} authController={authController} userManagement={userManagement} plugins={plugins}>
+    <RebaseAuth/>
+    <RebaseCMS collections={collections} collectionEditor={collectionEditor} entityViews={entityViews}/>
+    <RebaseStudio/>
+    <RebaseShell title="Rebase"/>
+</Rebase>
+```
+
+Key components:
+- `<Rebase>` — Root provider (client, auth, user management, plugins)
+- `<RebaseAuth/>` — Authentication UI (login/register screens)
+- `<RebaseCMS>` — CMS frontend (collections, entity views, collection editor)
+- `<RebaseStudio/>` — Admin panel (visual schema editor, settings)
+- `<RebaseShell>` — App shell (drawer, navigation, title)
 
 Adhere to these rules when building features or refactoring packages for Rebase.

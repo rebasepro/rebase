@@ -34,4 +34,18 @@ When contributing to the Rebase monorepo, you MUST adhere strictly to the follow
 - **Principle of Least Astonishment**: When exposing relational data via APIs or SDKs, foreign key fields (e.g., `company_id`) MUST always return primitive scalars (`string` or `number`).
 - **Simultaneous Access**: Do not strip the raw foreign key from the payload just because the relation is expanded. Both the primitive key (`company_id`) and the hydrated relation object (`company`) must co-exist to maintain backward compatibility and type safety.
 
+## 7. Circular Dependency Prevention
+- **No barrel-file cross-imports**: Replace barrel-file imports (`import { X } from "./index"`) with explicit direct imports (`import { X } from "./models/x"`).
+- **Use `import type` for type-only references**: When a module only needs TypeScript types from another module, use `import type { ... }` to prevent runtime circular dependency chains.
+- **Strictly acyclic dependency graph**: Cross-package type references must follow a one-way dependency flow. If two modules reference each other, the shared types must be extracted to a common base module.
+
+## 8. No Hidden Side-Channels (Dunder Properties)
+- **No `__xyz` dunder properties on data objects**: Never attach hidden metadata (e.g., `__junction_table_info`) to entity values that flow through the serialization pipeline. These can leak into database writes and corrupt data.
+- **Use explicit variable transport**: Pass metadata through function parameters, context objects, or dedicated transport structures — never by mutating data payloads.
+
+## 9. Localization (i18n)
+- **All user-facing strings must use the `t()` hook**: Import `useRebaseLocaleContext` from `@rebasepro/core` and use the `t()` function for all visible text (labels, messages, tooltips, placeholders).
+- **Never hardcode English strings in UI components**: If a translation key is missing, add it to `packages/core/src/locales/en.ts` first, then use `t("your_key")`.
+- **Locale files are the single source of truth**: All translation strings live in the locale files under `packages/core/src/locales/`.
+
 *These rules were instated because lazy abstractions, dynamic requires, and hacking around problems instead of fixing the root cause have previously caused critical technical debt and system instability.*

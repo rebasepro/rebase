@@ -857,5 +857,37 @@ no_filter: "No filter",
     studio_home_collection_deleted: "Collection deleted",
     studio_kanban_configure: "Configure Kanban",
     studio_missing_reference_error: "No collection for path: {{path}}",
-    studio_new_collection_add: "Add new collection"
+    studio_new_collection_add: "नया संग्रह जोड़ें",
+
+    // ─── Property field labels ──────────────────────────────────
+    db_column_type: "डेटाबेस कॉलम प्रकार",
+    primary_key_unique_id: "प्राथमिक कुंजी / अद्वितीय ID",
+    spread_children_as_columns: "बच्चों को कॉलम के रूप में फैलाएं",
+    mode: "मोड",
+    timezone: "समय क्षेत्र",
+    target_collection: "लक्ष्य संग्रह",
+
+    // ─── Storage property ───────────────────────────────────────
+    storage_file_name: "फ़ाइल का नाम",
+    storage_path: "संग्रहण पथ",
+    storage_max_size: "अधिकतम आकार (बाइट्स में)",
+    storage_resize_mode: "आकार बदलने का मोड",
+    storage_output_format: "आउटपुट प्रारूप",
+    storage_max_width: "अधिकतम चौड़ाई (px)",
+    storage_max_height: "अधिकतम ऊंचाई (px)",
+    storage_quality: "गुणवत्ता (0-100)",
+    storage_file_upload_config: "फ़ाइल अपलोड कॉन्फ़िगरेशन",
+    storage_image_resize_config: "इमेज आकार बदलने का कॉन्फ़िगरेशन",
+    storage_all_file_types: "सभी फ़ाइल प्रकार अनुमत",
+    storage_allowed_file_types: "अनुमत फ़ाइल प्रकार",
+    storage_include_bucket_url: "सहेजे गए मान में बकेट URL (s3://...) शामिल करें",
+    storage_save_url: "संग्रहण पथ के बजाय URL सहेजें",
+
+    // ─── DateTime property ──────────────────────────────────────
+    datetime_automatic_value: "स्वचालित मान",
+
+    // ─── Markdown property ──────────────────────────────────────
+    markdown_paste_behavior: "पेस्ट व्यवहार",
+    markdown_strip_html: "पेस्ट करते समय HTML हटाएं",
+    markdown_convert_pasted: "पेस्ट किए गए टेक्स्ट को मार्कडाउन में बदलें"
 };

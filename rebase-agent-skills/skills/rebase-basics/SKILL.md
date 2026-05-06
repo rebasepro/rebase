@@ -44,7 +44,7 @@ Please adhere to these principles when working with Rebase, as they ensure relia
    - `packages/server-postgresql` — PostgreSQL bootstrapper and data driver (Drizzle ORM)
    - `packages/server-mongodb` — MongoDB bootstrapper and data driver
    - `packages/core` — Core framework, types, hooks, and components
-   - `packages/types` — Shared TypeScript type definitions
+   - `packages/types` — Shared TypeScript type definitions (including `PostgresCollection`)
    - `packages/ui` — Standalone component library (Tailwind CSS v4 + Radix)
    - `packages/admin` — CMS frontend application
    - `packages/studio` — Admin panel, collection editor, visual schema editor
@@ -60,9 +60,9 @@ Please adhere to these principles when working with Rebase, as they ensure relia
    - `packages/plugin-data-enhancement` — AI-powered data autofill
    - `packages/cli` — CLI tool
    - `packages/utils` — Utility functions
-   - `app/` — Developer-facing example application (frontend + backend + shared)
+   - `app/` — Developer-facing example application (frontend + backend + config)
 
-7. **Never deploy to production:** Agents should never run `firebase deploy`, `gcloud deploy`, or any command that pushes code to live infrastructure. Provide the exact command and let the user run it themselves.
+7. **Never deploy to production:** Agents should never run `rebase deploy`, `firebase deploy`, `gcloud deploy`, or any command that pushes code to live infrastructure. Provide the exact command and let the user run it themselves.
 
 8. **Scripting and Data Tasks:** Default to using the Rebase SDK (`@rebasepro/client` or `@rebasepro/server-core`) to write scripts or tasks for manipulating data. For standalone scripts running locally, you can dynamically read the active backend URL from the `.rebase-dev-url` temp file automatically created by the dev server. For internal server-side backend tasks, use the global `import { rebase } from "@rebasepro/server-core"` singleton. NEVER default to using raw `psql` queries or raw REST API calls (`fetch`/`curl`) unless explicitly instructed or the SDK lacks the functionality.
 
@@ -73,16 +73,16 @@ rebase/
 ├── app/                      # Developer example app
 │   ├── frontend/             # React frontend (Vite)
 │   ├── backend/              # Hono backend server
-│   └── shared/               # Shared collection definitions
-│       └── collections/      # TypeScript collection files
+│   └── config/               # Application configuration
+│       └── collections/      # TypeScript collection files (one per collection)
 ├── packages/
 │   ├── server-core/          # @rebasepro/server-core — Hono server, APIs, auth, storage
 │   ├── server-postgresql/    # @rebasepro/server-postgresql — PostgreSQL bootstrapper & driver
 │   ├── server-mongodb/       # @rebasepro/server-mongodb — MongoDB bootstrapper & driver
 │   ├── core/                 # @rebasepro/core — framework core
-│   ├── types/                # @rebasepro/types — shared types
+│   ├── types/                # @rebasepro/types — shared types (PostgresCollection, etc.)
 │   ├── ui/                   # @rebasepro/ui — component library
-│   ├── cms/                  # @rebasepro/admin — CMS frontend
+│   ├── admin/                # @rebasepro/admin — CMS frontend
 │   ├── studio/               # @rebasepro/studio — admin panel
 │   ├── auth/                 # @rebasepro/auth — authentication
 │   ├── cli/                  # @rebasepro/cli — CLI tool
@@ -133,4 +133,3 @@ The Rebase MCP server provides these tools for AI agents:
 - **`DATABASE_URL is not set`:** Ensure `app/.env` exists with `DATABASE_URL=postgresql://user:password@localhost:5432/rebase`
 - **pnpm not found:** Install with `npm install -g pnpm`
 - **Node.js version mismatch:** Rebase requires Node.js v20+. Use `nvm install 20 && nvm use 20`
-

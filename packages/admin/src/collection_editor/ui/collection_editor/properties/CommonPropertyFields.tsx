@@ -3,6 +3,7 @@ import { Field, getIn, useFormex } from "@rebasepro/formex";
 import { DebouncedTextField } from "@rebasepro/ui";
 import { PropertyWithId } from "../PropertyEditView";
 import React from "react";
+import { useTranslation } from "@rebasepro/core";
 ;
 import { prettifyIdentifier, toSnakeCase } from "@rebasepro/utils";
 
@@ -31,6 +32,7 @@ export const CommonPropertyFields = React.forwardRef<HTMLDivElement, CommonPrope
             touched,
             validate
         } = useFormex<PropertyWithId>();
+        const { t } = useTranslation();
 
         const name = "name";
         const nameError = showErrors && getIn(errors, name);
@@ -60,7 +62,7 @@ export const CommonPropertyFields = React.forwardRef<HTMLDivElement, CommonPrope
                             setFieldTouched(name, true);
                         }}
                         style={{ fontSize: 20 }}
-                        placeholder={"Field name"}
+                        placeholder={t("field_name")}
                         required
                         disabled={disabled}
                         error={Boolean(nameError)}/>
@@ -96,7 +98,7 @@ export const CommonPropertyFields = React.forwardRef<HTMLDivElement, CommonPrope
                 <div>
                     <Field name={description}
                         as={DebouncedTextField}
-                        label={"Description"}
+                        label={t("description")}
                         disabled={disabled}
                         error={Boolean(descriptionError)}/>
                     <FieldCaption error={Boolean(descriptionError)}>

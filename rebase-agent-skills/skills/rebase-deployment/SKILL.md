@@ -64,7 +64,9 @@ services:
       - "3001:3001"
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/rebase
-      - JWT_SECRET=your-secret-key
+      - JWT_SECRET=your-secret-key-must-be-at-least-32-characters-long
+      - NODE_ENV=production
+      - CORS_ORIGINS=https://your-frontend-url.com
     depends_on:
       - db
 
@@ -96,33 +98,59 @@ pnpm run build
 npx firebase-tools@latest deploy --only hosting
 ```
 
+## Production SPA Serving
+
+In production, the backend can serve the frontend SPA directly using `serveSPA()`:
+
+```typescript
+import { serveSPA } from "@rebasepro/server-core";
+
+if (isProduction) {
+    serveSPA(app, { frontendPath: path.resolve(process.cwd(), "../frontend/dist") });
+}
+```
+
+This eliminates the need for a separate web server or CDN for the frontend in single-instance deployments.
+
 ## ⛔ Agent Deployment Rules
 
 **Agents should NEVER deploy to production.** This includes:
-- `firebase deploy` (any variant)
 - `rebase deploy` (any variant)
+- `firebase deploy` (any variant)
 - `gcloud functions deploy`
+- `gcloud run deploy`
 - Any command targeting production environments
 
 **What agents CAN do:**
 - Edit source code
 - Run builds (`pnpm run build`)
 - Run tests (`pnpm test`)
-- Run local emulators
+- Run local dev server (`pnpm dev`)
 - Check logs (read-only)
 - Provide the exact deployment commands for the user to run
 
 ## Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `DATABASE_URL` | PostgreSQL connection string | ✅ Yes |
-| `JWT_SECRET` | JWT signing secret | ✅ Yes (self-hosted) |
-| `S3_BUCKET` | S3 storage bucket | ❌ Optional |
-| `S3_REGION` | S3 region | ❌ Optional |
-| `S3_ACCESS_KEY` | S3 access key | ❌ Optional |
-| `S3_SECRET_KEY` | S3 secret key | ❌ Optional |
-| `FIREBASE_PROJECT_ID` | Firebase project ID (for Firebase Auth) | ❌ Optional |
+All environment variables are validated at startup via a Zod schema. Required variables will cause the server to fail immediately if missing.
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DATABASE_URL` | ✅ Yes | — | PostgreSQL connection string |
+| `JWT_SECRET` | ✅ Yes (≥32 chars) | — | JWT signing secret |
+| `NODE_ENV` | No | `development` | `development`, `production`, or `test` |
+| `PORT` | No | `3001` | Server port |
+| `CORS_ORIGINS` | ⚠ Prod required | — | Comma-separated allowed origins |
+| `FRONTEND_URL` | ⚠ Prod required | — | Frontend URL (CORS fallback) |
+| `STORAGE_TYPE` | No | `local` | `local` or `s3` |
+| `STORAGE_PATH` | No | `./uploads` | Local file storage directory |
+| `S3_BUCKET` | If S3 | — | S3 bucket name |
+| `S3_REGION` | No | `auto` | S3 region |
+| `S3_ACCESS_KEY_ID` | If S3 | — | S3 access key |
+| `S3_SECRET_ACCESS_KEY` | If S3 | — | S3 secret key |
+| `S3_ENDPOINT` | No | — | Custom S3 endpoint (MinIO, R2) |
+| `GOOGLE_CLIENT_ID` | No | — | Google OAuth client ID |
+| `ALLOW_REGISTRATION` | No | `true` | Enable new user registration |
+| `REBASE_SERVICE_KEY` | No | — | Service-to-service auth key |
 
 ## References
 

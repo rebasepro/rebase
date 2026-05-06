@@ -906,5 +906,37 @@ export const en: RebaseTranslations = {
     studio_home_collection_deleted: "Collection deleted",
     studio_kanban_configure: "Configure Kanban",
     studio_missing_reference_error: "No collection for path: {{path}}",
-    studio_new_collection_add: "Add new collection"
+    studio_new_collection_add: "Add new collection",
+
+    // ─── Property field labels ──────────────────────────────────
+    db_column_type: "Database Column Type",
+    primary_key_unique_id: "Primary Key / Unique ID",
+    spread_children_as_columns: "Spread children as columns",
+    mode: "Mode",
+    timezone: "Timezone",
+    target_collection: "Target collection",
+
+    // ─── Storage property ───────────────────────────────────────
+    storage_file_name: "File name",
+    storage_path: "Storage path",
+    storage_max_size: "Max size (in bytes)",
+    storage_resize_mode: "Resize mode",
+    storage_output_format: "Output format",
+    storage_max_width: "Max width (px)",
+    storage_max_height: "Max height (px)",
+    storage_quality: "Quality (0-100)",
+    storage_file_upload_config: "File upload config",
+    storage_image_resize_config: "Image Resize Configuration",
+    storage_all_file_types: "All file types allowed",
+    storage_allowed_file_types: "Allowed file types",
+    storage_include_bucket_url: "Include bucket URL (s3://...) in saved value",
+    storage_save_url: "Save URL instead of storage path",
+
+    // ─── DateTime property ──────────────────────────────────────
+    datetime_automatic_value: "Automatic value",
+
+    // ─── Markdown property ──────────────────────────────────────
+    markdown_paste_behavior: "Paste behavior",
+    markdown_strip_html: "Strip HTML on paste",
+    markdown_convert_pasted: "Convert pasted text to markdown"
 };

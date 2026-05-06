@@ -4,6 +4,7 @@ import { getIn, useFormex } from "@rebasepro/formex";
 ;
 import { NumberProperty, StringProperty } from "@rebasepro/types";
 import { Select, SelectItem } from "@rebasepro/ui";
+import { useTranslation } from "@rebasepro/core";
 import { GeneralPropertyValidation } from "./validation/GeneralPropertyValidation";
 import { ValidationPanel } from "./validation/ValidationPanel";
 
@@ -113,6 +114,7 @@ export function DateTimePropertyField({ disabled }: {
         touched,
         setFieldValue
     } = useFormex<StringProperty | NumberProperty>();
+    const { t } = useTranslation();
 
     const modePath = "mode";
     const modeValue: string | undefined = getIn(values, modePath);
@@ -138,7 +140,7 @@ export function DateTimePropertyField({ disabled }: {
                         value={modeValue ?? "date"}
                         error={Boolean(modeError)}
                         onValueChange={(v) => setFieldValue(modePath, v)}
-                        label={"Mode"}
+                        label={t("mode")}
                         fullWidth={true}
                         renderValue={(v) => {
                             switch (v) {
@@ -175,7 +177,7 @@ export function DateTimePropertyField({ disabled }: {
                             }
                         }}
                         error={Boolean(autoValueError)}
-                        label={"Automatic value"}>
+                        label={t("datetime_automatic_value")}>
                         <SelectItem value={"none"}> None </SelectItem>
                         <SelectItem value={"on_create"}> On create </SelectItem>
                         <SelectItem value={"on_update"}> On any update </SelectItem>
@@ -196,7 +198,7 @@ export function DateTimePropertyField({ disabled }: {
                             return tz?.label ?? v;
                         }}
                         error={Boolean(timezoneError)}
-                        label={"Timezone"}>
+                        label={t("timezone")}>
                         <SelectItem value={"__local__"}> Local timezone </SelectItem>
                         {TIMEZONES.map((tz) => (
                             <SelectItem key={tz.value} value={tz.value}>
@@ -227,7 +229,7 @@ export function DateTimePropertyField({ disabled }: {
                         }
                     }}
                     error={Boolean(columnTypeError)}
-                    label={"Database Column Type"}>
+                    label={t("db_column_type")}>
                     <SelectItem value={"_default_"}> Default (timestamp) </SelectItem>
                     <SelectItem value={"timestamp"}> timestamp (with timezone) </SelectItem>
                     <SelectItem value={"date"}> date </SelectItem>

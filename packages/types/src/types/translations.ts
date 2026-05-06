@@ -942,4 +942,36 @@ export interface RebaseTranslations {
     studio_kanban_configure?: string;
     studio_missing_reference_error?: string;
     studio_new_collection_add?: string;
+
+    // ─── Property field labels ──────────────────────────────────
+    db_column_type?: string;
+    primary_key_unique_id?: string;
+    spread_children_as_columns?: string;
+    mode?: string;
+    timezone?: string;
+    target_collection?: string;
+
+    // ─── Storage property ───────────────────────────────────────
+    storage_file_name?: string;
+    storage_path?: string;
+    storage_max_size?: string;
+    storage_resize_mode?: string;
+    storage_output_format?: string;
+    storage_max_width?: string;
+    storage_max_height?: string;
+    storage_quality?: string;
+    storage_file_upload_config?: string;
+    storage_image_resize_config?: string;
+    storage_all_file_types?: string;
+    storage_allowed_file_types?: string;
+    storage_include_bucket_url?: string;
+    storage_save_url?: string;
+
+    // ─── DateTime property ──────────────────────────────────────
+    datetime_automatic_value?: string;
+
+    // ─── Markdown property ──────────────────────────────────────
+    markdown_paste_behavior?: string;
+    markdown_strip_html?: string;
+    markdown_convert_pasted?: string;
 }

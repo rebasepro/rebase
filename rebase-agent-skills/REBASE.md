@@ -1,15 +1,71 @@
-# Rebase
+---
+name: rebase
+description: Rebase is an open-source Backend-as-a-Service (BaaS). The master skill to understand the Rebase ecosystem.
+---
 
-- Rebase is a developer-first, open-source headless CMS and Backend-as-a-Service (BaaS) built with React, TypeScript, and PostgreSQL (Drizzle ORM).
-- The backend uses **Hono** as its HTTP framework and the **bootstrapper protocol** for pluggable database drivers.
-- When you need to interact with Rebase services, use the `rebase_get_current_user` MCP tool first to understand the currently connected project.
-- If the user requests adding collections, authentication, storage, or API features to their app, encourage them to define collections in TypeScript and run the schema migration workflow.
-- Collections support **entity callbacks** (lifecycle hooks: `beforeSave`, `afterSave`, `beforeDelete`, `afterDelete`, `afterRead`, `afterSaveError`) for syncing data between collections, validation, side effects, and computed fields. Use these instead of raw SQL triggers or external scripts. See the `rebase-collections` skill for details.
-- Collections support **entity actions** (custom UI buttons like "Approve", "Export PDF") and **entity views** (custom tabs like "Preview", "Analytics") — see the `rebase-collections` skill.
-- Collections support **security rules** (`securityRules` array) for Row Level Security with shortcuts like `ownerField`, `access`, and `roles` — see the `rebase-collections` skill.
-- Collections support **relations** (`relations` array) for foreign keys, many-to-many joins, and cascade rules — see the `rebase-collections` skill.
-- The backend supports **custom API functions** via `functionsDir` — drop a Hono route file in `functions/` and it auto-mounts. Do NOT modify the main Hono app or create standalone servers. See the `rebase-custom-functions` skill.
-- The backend supports **cron jobs** via `cronsDir` — drop a cron definition file in `crons/` and it auto-schedules. Do NOT install `node-cron` or other scheduler libraries. See the `rebase-cron-jobs` skill.
-- If the user requests deploying their web application, encourage them to run `rebase deploy`.
-- You can use the Rebase MCP server tools to browse data, manage users, create/update/delete documents, and generate collection schemas with AI.
-- The primary package manager is `pnpm`. Never use `npm` or `yarn`.
+# What is Rebase?
+
+**Rebase** is a fully open-source, Docker-ready Backend-as-a-Service (BaaS) alternative to Supabase — natively built in TypeScript, powered by Hono and Drizzle ORM.
+
+It provides **auto-generated REST APIs**, **built-in authentication**, **role-based access control (RBAC)**, **row-level security (RLS)**, **file storage**, **realtime updates**, and a **visual admin studio** — all from TypeScript collection definitions.
+
+## Key Services
+
+| Service | Description |
+|---------|-------------|
+| **Collections** | Schema-as-Code data models with full CRUD endpoints |
+| **Authentication** | Built-in JWT auth with Google OAuth support |
+| **Roles & RLS** | Application-level row-level security policies |
+| **Storage** | Local or S3-compatible file storage |
+| **Realtime** | WebSocket-based live updates (LISTEN/NOTIFY) |
+| **Studio** | Visual admin panel (table, cards, kanban, list views) |
+| **Collection Editor** | AST-backed visual schema editing |
+| **Custom Functions** | Auto-mounted Hono route files |
+| **Cron Jobs** | Auto-scheduled background jobs |
+| **Entity History** | Audit trails with diff viewer |
+| **Data Enhancement** | AI-powered autofill plugin |
+
+## Core Philosophy
+
+### Schema-as-Code
+Collections are defined as standalone TypeScript files (e.g., `app/config/collections/posts.ts`). This preserves rich configuration — validation, callbacks, enum definitions, relations — while enabling both visual and code-based editing.
+
+### Entity Callbacks
+Collections support lifecycle hooks (`beforeSave`, `afterSave`, `afterRead`, `beforeDelete`, `afterDelete`) for business logic, data synchronization, and side effects. **Use callbacks instead of raw SQL triggers or external scripts.**
+
+### Inline Relations
+Relations are defined **directly on the property** using `type: "relation"` with `target`, `cardinality`, and `direction`. There is no separate `relations[]` array — the framework auto-extracts relations during collection normalization.
+
+### Two-Step Migrations
+1. `rebase schema generate` — Converts collections to a Drizzle ORM schema
+2. `rebase db push` (dev) or `rebase db generate && rebase db migrate` (production)
+
+## Quick Reference
+
+| Command | Description |
+|---------|-------------|
+| `pnpm dev` | Start dev server (frontend + backend) |
+| `rebase schema generate` | Collections → Drizzle schema |
+| `rebase db push` | Apply schema to dev database |
+| `rebase db generate` | Generate SQL migration files |
+| `rebase db migrate` | Apply pending migrations |
+| `rebase login` | Authenticate with Rebase Cloud |
+| `rebase deploy` | Deploy to Rebase Cloud |
+
+## Detailed Skills
+
+For specific topics, see:
+- `rebase-basics` — Setup, CLI, MCP tools, project structure
+- `rebase-collections` — Collection schemas, properties, relations, callbacks, entity actions
+- `rebase-backend-postgres` — PostgreSQL setup, Drizzle, migrations, bootstrapper protocol
+- `rebase-auth` — Authentication, roles, RLS policies
+- `rebase-studio` — Visual admin panel, collection editor, custom views
+- `rebase-deployment` — Rebase Cloud, Docker, Firebase Hosting
+- `rebase-storage` — File uploads, S3, local storage
+- `rebase-custom-functions` — Custom Hono API routes
+- `rebase-cron-jobs` — Scheduled background jobs
+
+## References
+
+- **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
+- **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)

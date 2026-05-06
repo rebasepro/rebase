@@ -3,6 +3,7 @@ import React from "react";
 import { StringPropertyValidation } from "./validation/StringPropertyValidation";
 import { ValidationPanel } from "./validation/ValidationPanel";
 import { getIn, useFormex } from "@rebasepro/formex";
+import { useTranslation } from "@rebasepro/core";
 ;
 import { Select, SelectItem, TextField } from "@rebasepro/ui";
 
@@ -17,6 +18,7 @@ export function StringPropertyField({
 }) {
 
     const { values, setFieldValue, touched, errors } = useFormex();
+    const { t } = useTranslation();
 
     const columnTypePath = "columnType";
     const columnTypeValue: string | undefined = getIn(values, columnTypePath);
@@ -84,7 +86,7 @@ export function StringPropertyField({
                         }
                     }}
                     error={Boolean(columnTypeError)}
-                    label={"Database Column Type"}>
+                    label={t("db_column_type")}>
                     {isIdValue === "uuid" && <SelectItem value={"uuid"}> uuid (forced by Primary Key) </SelectItem>}
                     <SelectItem value={"_default_"}> Default (varchar) </SelectItem>
                     <SelectItem value={"varchar"}> varchar (variable length) </SelectItem>
@@ -118,7 +120,7 @@ export function StringPropertyField({
                         }
                     }}
                     error={Boolean(isIdError)}
-                    label={"Primary Key / Unique ID"}>
+                    label={t("primary_key_unique_id")}>
                     <SelectItem value={"_default_"}> No </SelectItem>
                     <SelectItem value={"manual"}> Yes (Manual input) </SelectItem>
                     <SelectItem value={"true"}> Yes (Auto-generated UUID/String) </SelectItem>
@@ -137,7 +139,7 @@ export function StringPropertyField({
                     onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
                         setFieldValue("defaultValue", e.target.value === "" ? undefined : e.target.value);
                     }}
-                    label={"Default value"}
+                    label={t("default_value")}
                     value={getIn(values, "defaultValue") ?? ""}/>
 
             </div>

@@ -5,12 +5,14 @@ import { ValidationPanel } from "./validation/ValidationPanel";
 ;
 import { Select, SelectItem, TextField } from "@rebasepro/ui";
 import { getIn, useFormex } from "@rebasepro/formex";
+import { useTranslation } from "@rebasepro/core";
 
 export function NumberPropertyField({ disabled }: {
     disabled: boolean;
 }) {
 
     const { values, setFieldValue, touched, errors } = useFormex();
+    const { t } = useTranslation();
 
     const columnTypePath = "columnType";
     const columnTypeValue: string | undefined = getIn(values, columnTypePath);
@@ -51,7 +53,7 @@ export function NumberPropertyField({ disabled }: {
                         }
                     }}
                     error={Boolean(columnTypeError)}
-                    label={"Database Column Type"}>
+                    label={t("db_column_type")}>
                     <SelectItem value={"_default_"}> Default (integer/numeric) </SelectItem>
                     <SelectItem value={"integer"}> integer </SelectItem>
                     <SelectItem value={"real"}> real (float4) </SelectItem>
@@ -87,7 +89,7 @@ export function NumberPropertyField({ disabled }: {
                         }
                     }}
                     error={Boolean(isIdError)}
-                    label={"Primary Key / Unique ID"}>
+                    label={t("primary_key_unique_id")}>
                     <SelectItem value={"_default_"}> No </SelectItem>
                     <SelectItem value={"manual"}> Yes (Manual input) </SelectItem>
                     <SelectItem value={"true"}> Yes (Auto-increment/identity) </SelectItem>
@@ -106,7 +108,7 @@ export function NumberPropertyField({ disabled }: {
                     onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
                         setFieldValue("defaultValue", e.target.value === "" ? undefined : parseFloat(e.target.value));
                     }}
-                    label={"Default value"}
+                    label={t("default_value")}
                     value={getIn(values, "defaultValue") ?? ""}/>
 
             </div>

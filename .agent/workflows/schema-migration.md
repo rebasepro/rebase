@@ -15,7 +15,7 @@ Rebase uses a **two-step schema generation process**:
 
 ```mermaid
 graph LR
-    A[collections.ts] -->|rebase schema generate| B[schema.generated.ts]
+    A[config/collections/*.ts] -->|rebase schema generate| B[schema.generated.ts]
     B -->|rebase db push| C[(Dev Database)]
     B -->|rebase db generate| D[./drizzle/*.sql]
     D -->|rebase db migrate| E[(Prod Database)]
@@ -45,11 +45,15 @@ For production deployments, use migrations for version-controlled, reviewable ch
 
 ### 1. Modify Your Collection Definitions
 
-Edit your collection file (e.g., `app/config/collections.ts`):
+Edit your collection file (e.g., `app/config/collections/posts.ts`):
 
 ```typescript
-const postsCollection: EntityCollection = {
+import { PostgresCollection } from "@rebasepro/types";
+
+const postsCollection: PostgresCollection = {
     name: "Posts",
+    singularName: "Post",
+    slug: "posts",
     table: "posts",
     properties: {
         // ...existing properties
@@ -58,10 +62,13 @@ const postsCollection: EntityCollection = {
         published_at: {
             name: "Published At",
             type: "date",
-            mode: "date"
+            mode: "date",
+            clearable: true
         }
     }
 };
+
+export default postsCollection;
 ```
 
 ### 2. Generate the Drizzle Schema
@@ -124,16 +131,46 @@ rebase schema generate && rebase db generate && rebase db migrate
 
 ### Adding a New Collection
 
-1. Create the collection definition
-2. Export it in your collections file
+1. Create the collection definition as a new file in `app/config/collections/`
+2. Export it from `app/config/collections/index.ts`
 3. Run `rebase schema generate` → `rebase db push` (dev) or `rebase db generate` → `rebase db migrate` (prod)
 
 ### Adding Relations
 
-1. Define the relation in your collection's `relations` array
-2. For `owning` relations, the foreign key column is added automatically
-3. For `many-to-many` relations, a junction table is created
-4. Run `rebase schema generate` → `rebase db push` (dev) or the migration workflow (prod)
+Relations are defined **inline on the property** using `type: "relation"`:
+
+```typescript
+import { PostgresCollection } from "@rebasepro/types";
+import authorsCollection from "./authors";
+import tagsCollection from "./tags";
+
+const postsCollection: PostgresCollection = {
+    name: "Posts",
+    table: "posts",
+    properties: {
+        // Many-to-One: each post has one author
+        author: {
+            name: "Author",
+            type: "relation",
+            target: () => authorsCollection,
+            cardinality: "one",
+            direction: "owning"
+        },
+        // Many-to-Many: posts can have multiple tags
+        tags: {
+            name: "Tags",
+            type: "relation",
+            target: () => tagsCollection,
+            cardinality: "many",
+            direction: "owning"
+        }
+    }
+};
+```
+
+- For `owning` relations with `cardinality: "one"`, the foreign key column is added automatically.
+- For `owning` relations with `cardinality: "many"`, a junction table is created automatically.
+- Run `rebase schema generate` → `rebase db push` (dev) or the migration workflow (prod).
 
 ## Important Notes
 

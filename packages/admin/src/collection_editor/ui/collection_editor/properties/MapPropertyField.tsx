@@ -6,6 +6,7 @@ import { BooleanSwitchWithLabel, Button, Paper, Typography } from "@rebasepro/ui
 import { PlusIcon } from "lucide-react";
 import { PropertyFormDialog } from "../PropertyEditView";
 import { getIn, useFormex } from "@rebasepro/formex";
+import { useTranslation } from "@rebasepro/core";
 import { PropertyTree } from "../PropertyTree";
 import { getFullId, idToPropertiesPath, namespaceToPropertiesOrderPath, namespaceToPropertiesPath } from "../util";
 
@@ -20,6 +21,7 @@ export function MapPropertyField({ disabled, getData, allowDataInference, proper
         values,
         setFieldValue
     } = useFormex<MapProperty>();
+    const { t } = useTranslation();
 
     const [propertyDialogOpen, setPropertyDialogOpen] = useState<boolean>(false);
     const [selectedPropertyKey, setSelectedPropertyKey] = useState<string | undefined>();
@@ -75,7 +77,7 @@ export function MapPropertyField({ disabled, getData, allowDataInference, proper
         <>
             <div className={"col-span-12"}>
                 <div className="flex justify-between items-end my-4">
-                    <Typography variant={"subtitle2"}>Properties in this group</Typography>
+                    <Typography variant={"subtitle2"}>{t("properties_in_this_group")}</Typography>
                     <Button
                         onClick={() => setPropertyDialogOpen(true)}
                         startIcon={<PlusIcon/>}
@@ -108,7 +110,7 @@ export function MapPropertyField({ disabled, getData, allowDataInference, proper
                 <BooleanSwitchWithLabel
                     position={"start"}
                     size={"medium"}
-                    label="Spread children as columns"
+                    label={t("spread_children_as_columns")}
                     onValueChange={(v) => setFieldValue("spreadChildren", v)}
                     value={values.spreadChildren ?? false}
                 />

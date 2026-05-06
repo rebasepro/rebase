@@ -76,7 +76,7 @@ The `drizzle.config.ts` is configured to:
 |---------|---------|
 | `packages/server-core` | Hono server coordinator, API generation, auth, storage |
 | `packages/server-postgresql` | PostgreSQL bootstrapper, data driver, realtime (LISTEN/NOTIFY) |
-| `packages/types` | Shared TypeScript type definitions |
+| `packages/types` | Shared TypeScript type definitions (`PostgresCollection`, etc.) |
 
 ## Backend Initialization (Bootstrapper Protocol)
 
@@ -86,20 +86,23 @@ The backend uses the **bootstrapper protocol** — database-specific logic is en
 import { Hono } from "hono";
 import { getRequestListener } from "@hono/node-server";
 import { createServer } from "http";
+import path from "path";
 import {
     initializeRebaseBackend,
     HonoEnv
 } from "@rebasepro/server-core";
 import { createPostgresDatabaseConnection, createPostgresBootstrapper } from "@rebasepro/server-postgresql";
-import { tables, enums, relations } from "./schema.generated";
+import { tables, enums, relations } from "./schema.generated.js";
 
 const app = new Hono<HonoEnv>();
 const server = createServer(getRequestListener(app.fetch));
 
-const { db, connectionString } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
+const { db, pool, connectionString } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
 
 const backend = await initializeRebaseBackend({
-    collectionsDir: path.resolve(__dirname, "../../shared/collections"),
+    collectionsDir: path.resolve(__dirname, "../../config/collections"),
+    functionsDir: path.resolve(__dirname, "../functions"),
+    cronsDir: path.resolve(__dirname, "../crons"),
     server,
     app,
     bootstrappers: [
@@ -149,12 +152,65 @@ server.listen(3001);
 > const backend = await initializeRebaseBackend({ ... });
 > ```
 
+## Environment Variables
+
+The backend validates all environment variables at startup using a Zod schema. Here's the full list:
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DATABASE_URL` | ✅ Yes | — | PostgreSQL connection string |
+| `JWT_SECRET` | ✅ Yes (≥32 chars) | — | JWT signing secret |
+| `NODE_ENV` | No | `development` | Environment mode |
+| `PORT` | No | `3001` | Server port |
+| `ADMIN_CONNECTION_STRING` | No | `DATABASE_URL` | Admin-level DB connection |
+| `JWT_ACCESS_EXPIRES_IN` | No | `1h` | Access token TTL |
+| `JWT_REFRESH_EXPIRES_IN` | No | `30d` | Refresh token TTL |
+| `GOOGLE_CLIENT_ID` | No | — | Google OAuth client ID |
+| `REBASE_SERVICE_KEY` | No | — | Service-to-service auth key |
+| `ALLOW_REGISTRATION` | No | `true` | Enable user registration |
+| `CORS_ORIGINS` | No (⚠ required in prod) | — | Comma-separated allowed origins |
+| `FRONTEND_URL` | No | — | Frontend URL (used for CORS) |
+| `STORAGE_TYPE` | No | `local` | `local` or `s3` |
+| `STORAGE_PATH` | No | `./uploads` | Path for local file storage |
+| `S3_BUCKET` | No (if s3) | — | S3 bucket name |
+| `S3_REGION` | No | `auto` | S3 region |
+| `S3_ACCESS_KEY_ID` | No (if s3) | — | S3 access key |
+| `S3_SECRET_ACCESS_KEY` | No (if s3) | — | S3 secret key |
+| `S3_ENDPOINT` | No | — | S3 endpoint URL (MinIO, R2) |
+| `S3_FORCE_PATH_STYLE` | No | `false` | Force path-style S3 URLs |
+| `DB_POOL_MAX` | No | `20` | Max DB connection pool size |
+| `DB_POOL_IDLE_TIMEOUT` | No | `30000` | Pool idle timeout (ms) |
+| `DB_POOL_CONNECT_TIMEOUT` | No | `10000` | Pool connect timeout (ms) |
+
+## Health Check
+
+The backend exposes a `/health` endpoint that returns:
+
+```json
+{
+    "status": "ok",
+    "latencyMs": 2.5,
+    "details": { ... }
+}
+```
+
+HTTP 200 for healthy, 503 for degraded.
+
+## Graceful Shutdown
+
+The backend handles `SIGTERM` and `SIGINT` signals:
+1. Stops accepting new HTTP connections
+2. Calls `backend.shutdown()` to flush background tasks
+3. Drains the database connection pool
+4. Force-exits after 15 seconds if shutdown hangs
+
 ## Important Notes
 
-- **Never use `db:pull` then `db:migrate`** — introspected databases already have the tables
+- **Never use `db pull` then `db migrate`** — introspected databases already have the tables
 - **Always backup before production migrations** — `ALTER COLUMN` or `DROP COLUMN` can cause data loss
 - **Tables not in schema are ignored** — custom tables and internal Rebase tables are safe
 - **Review generated SQL** — always inspect the `.sql` files in `./drizzle/` before applying
+- **Collections directory** — Collection files live at `app/config/collections/`, NOT `app/shared/collections/`
 
 ## References
 

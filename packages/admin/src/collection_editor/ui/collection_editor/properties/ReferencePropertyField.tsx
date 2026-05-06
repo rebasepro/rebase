@@ -1,4 +1,4 @@
-import { IconForView } from "@rebasepro/core";
+import { IconForView, useTranslation } from "@rebasepro/core";
 import { FieldCaption, useCollectionRegistryController } from "../../../_cms_internals";
 import React from "react";
 import { Field, getIn, useFormex } from "@rebasepro/formex";
@@ -72,6 +72,7 @@ export function CollectionsSelect({
 }) {
 
     const collectionRegistry = useCollectionRegistryController();
+    const { t } = useTranslation();
 
     if (!collectionRegistry.initialised)
         return <div className={"col-span-12"}>
@@ -96,7 +97,7 @@ export function CollectionsSelect({
                 name={pathPath}
                 fullWidth={true}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFieldValue(pathPath, e.target.value)}
-                label={"Target collection"}
+                label={t("target_collection")}
                 renderValue={(selected: string) => {
                     const selectedCollection = collections.find(collection => collection.slug === selected);
                     if (!selectedCollection) return null;

@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { getIn, useFormex } from "@rebasepro/formex";
-import { useSnackbarController } from "@rebasepro/core";
+import { useSnackbarController, useTranslation } from "@rebasepro/core";
 import { EnumValueConfig } from "@rebasepro/types";
 import { resolveEnumValues } from "@rebasepro/common";
 import { Select, SelectItem } from "@rebasepro/ui";
@@ -35,6 +35,7 @@ export function EnumPropertyField({
     } = useFormex<PropertyWithId>();
 
     const snackbarContext = useSnackbarController();
+    const { t } = useTranslation();
 
     const enumValuesPath = multiselect ? "of.enum" : "enum";
 
@@ -106,7 +107,7 @@ export function EnumPropertyField({
                     onValueChange={(value: string) => {
                         setFieldValue("defaultValue", value);
                     }}
-                    label={"Default value"}
+                    label={t("default_value")}
                     value={defaultValue ?? ""}>
                     {enumValues
                         .filter((enumValue) => Boolean(enumValue?.id))

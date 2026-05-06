@@ -6,13 +6,19 @@ This backend will be used to store and manage data for Rebase applications, prov
 - **There is a UI Kit** available via `@rebasepro/ui`. You MUST use components from this UI kit (e.g., `Card`, `Typography`, `Button`, etc.) rather than building raw HTML elements or using ad-hoc classes.
 - **Always use a reference UI view** when building new features. Look at existing views (such as `NavigationCard`, `RolesView`, or other studio views) to understand the established design patterns, spacing, and typography before creating something new. Future agents must take this into account every single time.
 
-In the current stage we have an app that mimics the experience of the end developer, under the `apps` folder.
-Including frontend and backend code, as well as a shared folder.
+## Project Layout
+- The developer-facing example application lives in the `app/` folder (singular) at the repo root, containing `frontend/`, `backend/`, and `config/` subdirectories.
+- Collection definitions are individual TypeScript files under `app/config/collections/` (e.g., `posts.ts`, `products.ts`).
+- Library code lives under `packages/`. Key backend packages are:
+  - `packages/server-core` — Hono server coordinator, API generation, auth, storage
+  - `packages/server-postgresql` — PostgreSQL bootstrapper, data driver, realtime (LISTEN/NOTIFY)
+  - `packages/types` — Shared TypeScript type definitions (including `PostgresCollection`)
+  - `packages/core` — Core framework, hooks, and components
 
-The library code can all be found under `packages`
-Especially relevant for the backend are:
-- `packages/backend`
-- `packages/core`
+## Data Model
+- Collections use `PostgresCollection` from `@rebasepro/types` as their type.
+- Relations are defined **inline on the property** using `type: "relation"` with `target`, `cardinality`, and `direction` fields directly on the property definition. There is no need for a separate `relations[]` array.
+- The `enum` shorthand (array of `{ id, label, color }`) replaces the old `enumValues` pattern.
 
 Be careful when escaping strings, avoid this lint error and similar ones:
 ESLint: Unnecessary escape character: \". (no-useless-escape)

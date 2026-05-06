@@ -4,6 +4,7 @@ import { Button, DebouncedTextField, ExpandablePanel, MultiSelect, MultiSelectIt
 import { UploadCloudIcon } from "lucide-react";
 
 import { Field, FormexFieldProps, getIn, useFormex } from "@rebasepro/formex";
+import { useTranslation } from "@rebasepro/core";
 import { GeneralPropertyValidation } from "./validation/GeneralPropertyValidation";
 import { ArrayPropertyValidation } from "./validation/ArrayPropertyValidation";
 import { ValidationPanel } from "./validation/ValidationPanel";
@@ -31,6 +32,7 @@ export function StoragePropertyField({
         values,
         setFieldValue
     } = useFormex();
+    const { t } = useTranslation();
 
     const baseStoragePath = multiple ? "of.storage" : "storage";
     const acceptedFiles = `${baseStoragePath}.acceptedFiles`;
@@ -133,7 +135,7 @@ export function StoragePropertyField({
                         <div className={"col-span-12"}>
                             <Field name={fileName}
                                 as={DebouncedTextField}
-                                label={"File name"}
+                                label={t("storage_file_name")}
                                 size={"small"}
                                 disabled={hasFilenameCallback || disabled}
                                 value={hasFilenameCallback ? "-" : fileNameValue}
@@ -142,7 +144,7 @@ export function StoragePropertyField({
                         <div className={"col-span-12"}>
                             <Field name={storagePath}
                                 as={DebouncedTextField}
-                                label={"Storage path"}
+                                label={t("storage_path")}
                                 disabled={hasStoragePathCallback || disabled}
                                 size={"small"}
                                 value={hasStoragePathCallback ? "-" : storagePathValue}
@@ -169,7 +171,7 @@ export function StoragePropertyField({
                                     form
                                 }: FormexFieldProps) => {
                                     return <SwitchControl
-                                        label={"Include bucket URL (s3://...) in saved value"}
+                                        label={t("storage_include_bucket_url")}
                                         disabled={existing || disabled}
                                         form={form}
                                         field={field}/>;
@@ -189,7 +191,7 @@ export function StoragePropertyField({
                                     form
                                 }: FormexFieldProps) => {
                                     return <SwitchControl
-                                        label={"Save URL instead of storage path"}
+                                        label={t("storage_save_url")}
                                         disabled={existing || disabled}
                                         form={form}
                                         field={field}/>;
@@ -208,7 +210,7 @@ export function StoragePropertyField({
                         <div className={"col-span-12"}>
                             <DebouncedTextField name={maxSize}
                                 type={"number"}
-                                label={"Max size (in bytes)"}
+                                label={t("storage_max_size")}
                                 size={"small"}
                                 value={maxSizeValue !== undefined && maxSizeValue !== null ? maxSizeValue.toString() : ""}
                                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -234,7 +236,7 @@ export function StoragePropertyField({
                             <DebouncedTextField
                                 name={imageResizeMaxWidth}
                                 type={"number"}
-                                label={"Max width (px)"}
+                                label={t("storage_max_width")}
                                 size={"small"}
                                 disabled={disabled}
                                 value={imageResizeMaxWidthValue !== undefined && imageResizeMaxWidthValue !== null ? imageResizeMaxWidthValue.toString() : ""}
@@ -250,7 +252,7 @@ export function StoragePropertyField({
                             <DebouncedTextField
                                 name={imageResizeMaxHeight}
                                 type={"number"}
-                                label={"Max height (px)"}
+                                label={t("storage_max_height")}
                                 size={"small"}
                                 disabled={disabled}
                                 value={imageResizeMaxHeightValue !== undefined && imageResizeMaxHeightValue !== null ? imageResizeMaxHeightValue.toString() : ""}
@@ -270,7 +272,7 @@ export function StoragePropertyField({
                                 size={"medium"}
                                 value={imageResizeModeValue || "cover"}
                                 onValueChange={(value) => setFieldValue(imageResizeMode, value || "cover")}
-                                label={"Resize mode"}
+                                label={t("storage_resize_mode")}
                                 renderValue={(selected) => {
                                     if (!selected) return "Cover";
                                     return selected === "contain" ? "Contain (fit within bounds)" : "Cover (fill bounds, may crop)";
@@ -292,7 +294,7 @@ export function StoragePropertyField({
                                 name={imageResizeFormat}
                                 value={imageResizeFormatValue || "original"}
                                 onValueChange={(value) => setFieldValue(imageResizeFormat, value || "original")}
-                                label={"Output format"}
+                                label={t("storage_output_format")}
                                 renderValue={(selected) => {
                                     if (!selected) return "Original";
                                     return selected.charAt(0).toUpperCase() + selected.slice(1);
@@ -316,7 +318,7 @@ export function StoragePropertyField({
                             <DebouncedTextField
                                 name={imageResizeQuality}
                                 type={"number"}
-                                label={"Quality (0-100)"}
+                                label={t("storage_quality")}
                                 size={"small"}
                                 disabled={disabled}
                                 value={imageResizeQualityValue !== undefined && imageResizeQualityValue !== null ? imageResizeQualityValue.toString() : ""}

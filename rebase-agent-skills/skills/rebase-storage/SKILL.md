@@ -38,6 +38,9 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
+> [!TIP]
+> In production, the backend will log a warning if you use local storage without setting `FORCE_LOCAL_STORAGE=true`. Local files will be lost if the container restarts — use S3 for production.
+
 ### S3-Compatible Storage
 
 Works with AWS S3, MinIO, DigitalOcean Spaces, Cloudflare R2, and any S3-compatible service.
@@ -57,8 +60,8 @@ const backend = await initializeRebaseBackend({
         type: "s3",
         bucket: process.env.S3_BUCKET!,
         region: process.env.S3_REGION,
-        accessKeyId: process.env.S3_ACCESS_KEY!,
-        secretAccessKey: process.env.S3_SECRET_KEY!,
+        accessKeyId: process.env.S3_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
         endpoint: process.env.S3_ENDPOINT,       // For MinIO, R2, etc.
         forcePathStyle: true,                     // Required for MinIO
         signedUrlExpiration: 3600,                // URL expiry (seconds)
@@ -88,12 +91,28 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
+### Environment-Based Configuration
+
+The backend uses a Zod-validated env schema for storage. When `STORAGE_TYPE=s3`, all S3 variables are expected:
+
+```env
+STORAGE_TYPE=s3
+S3_BUCKET=my-bucket
+S3_REGION=us-east-1
+S3_ACCESS_KEY_ID=AKIA...
+S3_SECRET_ACCESS_KEY=...
+S3_ENDPOINT=https://minio.example.com    # Optional: for MinIO, R2, etc.
+S3_FORCE_PATH_STYLE=true                 # Optional: for MinIO
+```
+
 ## File Upload Properties
 
-Define file upload fields in your collections:
+Define file upload fields in your collections using the `storage` option on string properties:
 
 ```typescript
-const productsCollection: EntityCollection = {
+import { PostgresCollection } from "@rebasepro/types";
+
+const productsCollection: PostgresCollection = {
     name: "Products",
     table: "products",
     properties: {

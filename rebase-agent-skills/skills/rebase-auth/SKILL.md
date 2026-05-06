@@ -71,6 +71,8 @@ const backend = await initializeRebaseBackend({
         refreshExpiresIn: "30d",     // Refresh token TTL
         allowRegistration: false,    // First user can always register
         seedDefaultRoles: true,      // Create default admin/editor/viewer roles
+        defaultRole: "admin",        // Default role for new users
+        serviceKey: process.env.REBASE_SERVICE_KEY, // Optional: service-to-service auth
         google: {                    // Optional: Google OAuth
             clientId: process.env.GOOGLE_CLIENT_ID!,
         },
@@ -97,6 +99,19 @@ const backend = await initializeRebaseBackend({
 
 Auth tables (`rebase.users`, `rebase.roles`, etc.) are auto-created on first startup.
 
+### Auth Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `jwtSecret` | `string` | — | JWT signing secret (≥32 chars) |
+| `accessExpiresIn` | `string` | `"1h"` | Access token TTL |
+| `refreshExpiresIn` | `string` | `"30d"` | Refresh token TTL |
+| `allowRegistration` | `boolean` | `true` | Allow new user registration |
+| `seedDefaultRoles` | `boolean` | `false` | Create admin/editor/viewer roles |
+| `defaultRole` | `string` | — | Default role for new users |
+| `serviceKey` | `string` | — | Service-to-service auth key |
+| `google` | `{ clientId }` | — | Google OAuth configuration |
+
 ### 2. Define Roles
 
 Roles can be defined in collection configuration or managed via the Studio UI:
@@ -111,10 +126,12 @@ const roles = [
 
 ### 3. Apply Security Rules (RLS)
 
-Security rules are defined per-collection via the `securityRules` array. Rebase generates PostgreSQL RLS policies from these definitions:
+Security rules are defined per-collection via the `securityRules` array:
 
 ```typescript
-const postsCollection: EntityCollection = {
+import { PostgresCollection } from "@rebasepro/types";
+
+const postsCollection: PostgresCollection = {
     name: "Posts",
     table: "posts",
     securityRules: [
@@ -131,6 +148,39 @@ const postsCollection: EntityCollection = {
         // ...
     }
 };
+```
+
+## Frontend Auth Setup
+
+The frontend uses a composition pattern for authentication:
+
+```tsx
+import { useRebaseAuthController, useBackendUserManagement, RebaseAuth } from "@rebasepro/auth";
+import { Rebase } from "@rebasepro/core";
+import { createRebaseClient } from "@rebasepro/client";
+
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:3001" : undefined);
+
+function App() {
+    const rebaseClient = React.useMemo(() => createRebaseClient({ baseUrl: API_URL }), []);
+
+    const authController = useRebaseAuthController({
+        client: rebaseClient,
+        googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID
+    });
+
+    const userManagement = useBackendUserManagement({
+        client: rebaseClient,
+        currentUser: authController.user
+    });
+
+    return (
+        <Rebase client={rebaseClient} authController={authController} userManagement={userManagement}>
+            <RebaseAuth/>
+            {/* ... rest of app */}
+        </Rebase>
+    );
+}
 ```
 
 ## User Management

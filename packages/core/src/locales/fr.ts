@@ -857,5 +857,37 @@ no_filter: "No filter",
     studio_home_collection_deleted: "Collection deleted",
     studio_kanban_configure: "Configure Kanban",
     studio_missing_reference_error: "No collection for path: {{path}}",
-    studio_new_collection_add: "Add new collection"
+    studio_new_collection_add: "Ajouter une nouvelle collection",
+
+    // ─── Property field labels ──────────────────────────────────
+    db_column_type: "Type de colonne de base de données",
+    primary_key_unique_id: "Clé primaire / ID unique",
+    spread_children_as_columns: "Étendre les enfants en colonnes",
+    mode: "Mode",
+    timezone: "Fuseau horaire",
+    target_collection: "Collection cible",
+
+    // ─── Storage property ───────────────────────────────────────
+    storage_file_name: "Nom du fichier",
+    storage_path: "Chemin de stockage",
+    storage_max_size: "Taille maximale (en octets)",
+    storage_resize_mode: "Mode de redimensionnement",
+    storage_output_format: "Format de sortie",
+    storage_max_width: "Largeur maximale (px)",
+    storage_max_height: "Hauteur maximale (px)",
+    storage_quality: "Qualité (0-100)",
+    storage_file_upload_config: "Configuration de téléchargement de fichier",
+    storage_image_resize_config: "Configuration du redimensionnement d'image",
+    storage_all_file_types: "Tous les types de fichiers autorisés",
+    storage_allowed_file_types: "Types de fichiers autorisés",
+    storage_include_bucket_url: "Inclure l'URL du bucket (s3://...) dans la valeur enregistrée",
+    storage_save_url: "Enregistrer l'URL au lieu du chemin de stockage",
+
+    // ─── DateTime property ──────────────────────────────────────
+    datetime_automatic_value: "Valeur automatique",
+
+    // ─── Markdown property ──────────────────────────────────────
+    markdown_paste_behavior: "Comportement au collage",
+    markdown_strip_html: "Supprimer le HTML au collage",
+    markdown_convert_pasted: "Convertir le texte collé en markdown"
 };

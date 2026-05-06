@@ -11,41 +11,53 @@ Rebase collections are the core building blocks of your data model. They define 
 
 ### Collections
 
-A collection is defined as a TypeScript object implementing the `EntityCollection` interface. Each collection maps to a database table (via the `table` property) and generates:
+A collection is defined as a TypeScript object implementing the `PostgresCollection` interface from `@rebasepro/types`. Each collection maps to a database table (via the `table` property) and generates:
 - Full CRUD REST endpoints at `/api/data/{slug}`
 - Optional GraphQL queries and mutations
-- Admin panel views (table, forms, cards, kanban)
+- Admin panel views (table, forms, cards, kanban, list)
 
 ### Properties
 
-Properties define the fields of your collection. Rebase supports 20+ built-in property types:
+Properties define the fields of your collection. Rebase supports these built-in property types:
 
 | Type | Description | PostgreSQL Column |
 |------|-------------|-------------------|
-| `string` | Text fields, URLs, emails | `VARCHAR` / `TEXT` |
+| `string` | Text fields, URLs, emails, file uploads | `VARCHAR` / `TEXT` |
 | `number` | Integers and decimals | `INTEGER` / `DOUBLE PRECISION` |
 | `boolean` | True/false toggles | `BOOLEAN` |
 | `date` | Date and datetime values | `TIMESTAMP` |
 | `map` | Nested objects (JSON) | `JSONB` |
 | `array` | Lists of values | `JSONB` |
-| `reference` | Foreign key to another collection | `UUID` with FK |
+| `relation` | Foreign key to another collection | FK column or junction table |
+| `reference` | Legacy FK reference by collection slug | `UUID` with FK |
 | `geopoint` | Latitude/longitude pairs | `JSONB` |
 
 ### Schema-as-Code
 
-Collections are defined as standalone TypeScript files. The visual Studio edits these files via AST manipulation — it never runs raw SQL. This preserves custom callbacks and complex configuration.
+Collections are defined as standalone TypeScript files under `app/config/collections/`. The visual Studio edits these files via AST manipulation — it never runs raw SQL. This preserves custom callbacks and complex configuration.
 
 ## Defining a Collection
 
-The `table` property is **required** and specifies the PostgreSQL table name:
-
 ```typescript
-import { EntityCollection } from "@rebasepro/core";
+import { PostgresCollection } from "@rebasepro/types";
 
-const productsCollection: EntityCollection = {
+const productsCollection: PostgresCollection = {
     name: "Products",
+    singularName: "Product",
+    slug: "products",
     table: "products",
+    icon: "ShoppingBag",
+    group: "E-Commerce",
+    history: true,
+    defaultViewMode: "table",
+    enabledViews: ["table", "cards"],
+    openEntityMode: "split",
     properties: {
+        id: {
+            name: "ID",
+            type: "number",
+            isId: "increment"
+        },
         name: {
             name: "Product Name",
             type: "string",
@@ -70,22 +82,46 @@ const productsCollection: EntityCollection = {
             name: "Created At",
             type: "date",
             mode: "date_time",
-            autoValue: "on_create"
+            autoValue: "on_create",
+            readOnly: true,
+            hideFromCollection: true
         },
         category: {
             name: "Category",
             type: "string",
-            enumValues: [
-                { id: "electronics", label: "Electronics" },
-                { id: "clothing", label: "Clothing" },
-                { id: "books", label: "Books" }
+            enum: [
+                { id: "electronics", label: "Electronics", color: "blue" },
+                { id: "clothing", label: "Clothing", color: "purple" },
+                { id: "books", label: "Books", color: "green" }
             ]
         }
-    }
+    },
+    propertiesOrder: [
+        "name", "price", "category", "description",
+        "published", "created_at"
+    ]
 };
 
 export default productsCollection;
 ```
+
+### Collection Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `name` | `string` | Display name (plural) |
+| `singularName` | `string` | Singular display name |
+| `slug` | `string` | URL slug for API and routing |
+| `table` | `string` | PostgreSQL table name |
+| `icon` | `string` | Lucide icon name |
+| `group` | `string` | Sidebar group heading |
+| `history` | `boolean` | Enable entity audit trail |
+| `defaultViewMode` | `"table" \| "cards" \| "kanban" \| "list"` | Default view on open |
+| `enabledViews` | `string[]` | Enabled view modes |
+| `openEntityMode` | `"split" \| "side_panel" \| "full_screen"` | How entities open |
+| `kanban` | `{ columnProperty: string }` | Kanban column config |
+| `propertiesOrder` | `string[]` | Field display order in forms |
+| `entityViews` | `string[] \| EntityView[]` | Custom tabs on entity detail |
 
 ## Property Validation
 
@@ -97,91 +133,99 @@ validation: {
     min: 0,                   // Minimum value (numbers) or length (strings)
     max: 1000,                // Maximum value or length
     matches: /^[a-z]+$/,      // Regex pattern (strings)
-    email: true,              // Must be valid email
-    url: true,                // Must be valid URL
     unique: true,             // Must be unique across all documents
     uniqueInArray: true,      // Must be unique within array
     requiredMessage: "...",   // Custom error message
 }
 ```
 
-## Relations
+## Enum Values
 
-Collections support two complementary relation systems:
-
-### Reference Properties (UI Pickers)
-
-Use `type: "reference"` in properties to render relation pickers in the admin UI:
+Use the `enum` property on `string` or `number` types to define picklist options:
 
 ```typescript
-properties: {
-    customer_id: {
-        name: "Customer",
-        type: "reference",
-        path: "customers",     // References the customers collection by slug
-        previewProperties: ["name", "email"]
-    }
+status: {
+    name: "Status",
+    type: "string",
+    defaultValue: "draft",
+    enum: [
+        { id: "draft", label: "Draft", color: "gray" },
+        { id: "published", label: "Published", color: "green" },
+        { id: "archived", label: "Archived", color: "red" }
+    ]
 }
 ```
 
-**Note:** The `path` property in references uses the collection's **slug** (not the database table name).
+Each enum entry supports `id` (stored value), `label` (display text), `color` (optional chip color), and `disabled` (optional).
 
-### Relations Array (Database-Level Foreign Keys)
+## Relations (Inline Property API)
 
-Use the `relations` array to define database-level foreign keys, cascade rules, and many-to-many joins:
+Relations are defined **directly on the property** using `type: "relation"`. The framework automatically extracts these into the collection's internal `relations[]` at normalization time — you do **not** need a separate `relations[]` array.
+
+### Many-to-One (Owning)
 
 ```typescript
-const postsCollection: EntityCollection = {
+import { PostgresCollection } from "@rebasepro/types";
+import authorsCollection from "./authors";
+
+const postsCollection: PostgresCollection = {
     name: "Posts",
     table: "posts",
-    relations: [
-        // Many-to-One: each post has one author
-        {
-            relationName: "author",
-            target: () => usersCollection,
-            cardinality: "one",
-            direction: "owning",
-            localKey: "author_id",
-            onDelete: "cascade"   // Delete posts when user is deleted
-        },
-        // One-to-Many (inverse): list comments on a post
-        {
-            relationName: "comments",
-            target: () => commentsCollection,
-            cardinality: "many",
-            direction: "inverse",
-            foreignKeyOnTarget: "post_id"
-        }
-    ],
     properties: {
         author: {
-            type: "relation",
             name: "Author",
-            relationName: "author",  // Must match a relation in relations[]
-            widget: "select"
-        },
-        // ... other properties
+            type: "relation",
+            target: () => authorsCollection,
+            cardinality: "one",
+            direction: "owning"
+        }
     }
 };
 ```
 
-### Many-to-Many (Junction Table)
+This automatically creates an `author_id` foreign key column on the `posts` table.
+
+### Many-to-Many (Owning)
 
 ```typescript
-relations: [
-    {
-        relationName: "tags",
-        target: () => tagsCollection,
-        cardinality: "many",
-        direction: "owning",
-        through: {
-            table: "post_tags",         // Junction table
-            sourceColumn: "post_id",
-            targetColumn: "tag_id"
-        }
-    }
-]
+tags: {
+    name: "Tags",
+    type: "relation",
+    target: () => tagsCollection,
+    cardinality: "many",
+    direction: "owning"
+}
 ```
+
+This automatically creates a `posts_tags` junction table with `post_id` and `tag_id` columns.
+
+### One-to-Many (Inverse)
+
+```typescript
+comments: {
+    name: "Comments",
+    type: "relation",
+    target: () => commentsCollection,
+    cardinality: "many",
+    direction: "inverse",
+    foreignKeyOnTarget: "post_id"
+}
+```
+
+### Relation Property Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `target` | `() => EntityCollection` | Target collection (use a function for lazy resolution) |
+| `cardinality` | `"one" \| "many"` | Whether this references one or many records |
+| `direction` | `"owning" \| "inverse"` | Which side owns the FK or junction table |
+| `localKey` | `string` | Column on this table storing the FK (auto-inferred) |
+| `foreignKeyOnTarget` | `string` | Column on target table storing the FK (for inverse) |
+| `through` | `{ table, sourceColumn, targetColumn }` | Custom junction table config |
+| `onDelete` | `OnAction` | Cascade rule on delete |
+| `onUpdate` | `OnAction` | Cascade rule on update |
+| `widget` | `"select" \| "dialog"` | UI widget for selecting relations |
+| `previewProperties` | `string[]` | Properties shown in relation preview (max 3) |
 
 ### Cascade Rules
 
@@ -202,7 +246,7 @@ relations: [
 Add a `callbacks` property to any collection definition:
 
 ```typescript
-const jobSubmissionsCollection: EntityCollection = {
+const jobSubmissionsCollection: PostgresCollection = {
     name: "Job Submissions",
     table: "job_submissions",
     callbacks: {
@@ -309,7 +353,7 @@ All callbacks receive these properties:
 Add an `entityActions` array to any collection definition:
 
 ```typescript
-const jobSubmissionsCollection: EntityCollection = {
+const jobSubmissionsCollection: PostgresCollection = {
     name: "Job Submissions",
     table: "job_submissions",
     entityActions: [
@@ -375,30 +419,28 @@ The `onClick` handler receives:
 
 Collections support `entityViews` — custom React components that appear as **tabs** in the entity detail view. Use these for previews, analytics, related items, or any custom UI per entity.
 
+Entity views can be registered:
+1. **Globally** in the `<RebaseCMS>` component via the `entityViews` prop
+2. **Per-collection** by referencing view keys in the collection's `entityViews` array
+
 ```typescript
-const productsCollection: EntityCollection = {
-    name: "Products",
-    table: "products",
-    entityViews: [
-        {
-            key: "preview",
-            name: "Preview",
-            Builder: ({ entity, modifiedValues }) => (
-                <div style={{ padding: 24 }}>
-                    <h2>{modifiedValues?.name || entity?.values.name}</h2>
-                    <p>{modifiedValues?.description || entity?.values.description}</p>
-                    <span>Price: ${modifiedValues?.price || entity?.values.price}</span>
-                </div>
-            )
-        },
-        {
-            key: "analytics",
-            name: "Analytics",
-            Builder: ({ entity }) => (
-                <AnalyticsDashboard productId={entity?.id} />
-            )
-        }
-    ],
+// Global registration in App.tsx
+const entityViews = [
+    {
+        key: "blog_preview",
+        name: "Preview",
+        Builder: BlogEntryPreview,
+        position: "start" as const
+    }
+];
+
+<RebaseCMS collections={collections} entityViews={entityViews}/>
+
+// Per-collection reference in collection definition
+const postsCollection: PostgresCollection = {
+    name: "Posts",
+    table: "posts",
+    entityViews: ["blog_preview"],  // References the global view by key
     properties: { /* ... */ }
 };
 ```
@@ -414,7 +456,7 @@ The `Builder` component receives:
 Collections support **Row Level Security** via the `securityRules` array. This generates PostgreSQL RLS policies:
 
 ```typescript
-const postsCollection: EntityCollection = {
+const postsCollection: PostgresCollection = {
     name: "Posts",
     table: "posts",
     securityRules: [

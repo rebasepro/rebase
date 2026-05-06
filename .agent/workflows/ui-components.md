@@ -63,3 +63,16 @@ description: Rules for creating UI components in the Rebase codebase
 
 2. **Back navigation**: Escape or a back action from the detail view should return to the list.
 
+---
+
+## View Mode Icon Conventions
+
+Each collection view mode has a standard icon from Lucide. When building view switchers or navigation, use these mappings consistently:
+
+| View Mode | Lucide Icon | Notes |
+|-----------|-------------|-------|
+| `table` | `Table` | Default tabular view |
+| `cards` | `LayoutGrid` | Grid of cards |
+| `kanban` | `Columns` | Board with columns |
+| `list` | `List` | Compact list view |
+

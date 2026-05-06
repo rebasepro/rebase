@@ -11,6 +11,23 @@ While Supabase stitched together many tools (GoTrue, PostgREST, Realtime), Rebas
 3. **Integrated Storage:** S3 / Local storage registries handled smoothly.
 4. **Realtime Engine:** WebSockets for instant table updates broadcast to clients.
 
+## Current Status
+
+The following features are fully shipped and production-ready:
+
+| Area | Capabilities |
+|------|-------------|
+| **Views** | Table, Cards, Kanban board, List, Split view |
+| **Entity Modes** | Full-screen, side panel, split panel (`openEntityMode`) |
+| **Relations** | Inline relation properties with `target`, `cardinality`, `direction` — auto-extracted at normalization time |
+| **History** | Entity audit trails with diff viewer (`history: true`) |
+| **Custom Functions** | Auto-mounted Hono route files via `functionsDir` |
+| **Cron Jobs** | Auto-scheduled jobs via `cronsDir` |
+| **API Docs** | OpenAPI/Swagger documentation auto-generated from collections |
+| **Health Check** | `/health` endpoint with latency metrics |
+| **i18n** | Full localization system with `t()` hook (EN, ES, FR, DE, IT, PT, HI) |
+| **SPA Serving** | `serveSPA()` for bundling frontend with backend in production |
+
 ## The Core Problem: Where is the Source of Truth?
 Supabase uses **PostgreSQL itself** as the single source of truth for the schema. When you click "Add Column" in their dashboard, it runs `ALTER TABLE`.
 * **Problem:** Postgres doesn't know what "UI" metadata is. If a user sets a field as `multiline`, or an `enum`, or assigns a custom Markdown preview callback, a Postgres `VARCHAR` column loses all of that rich UI configuration context.
@@ -33,7 +50,7 @@ Rebase will pioneer the "UI as a Code Generator" approach (similar to TinaCMS or
 
 3. **Hot-Reload & Drizzle Migrations**
    - The server saves the file.
-   - The backend detects the file change and dynamically restarts that specific route/schema on the Express server.
+   - The backend detects the file change and dynamically restarts that specific route/schema on the Hono server.
    - Under the hood, Rebase calls Drizzle ORM to generate SQL and seamlessly migrate the Postgres database to match the new TS definition.
 
 4. **"The Git Commit" Feature**
