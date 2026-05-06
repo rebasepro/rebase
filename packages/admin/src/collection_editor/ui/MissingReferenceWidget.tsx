@@ -3,6 +3,7 @@ import { ErrorView, useTranslation } from "@rebasepro/core";
 import { useCollectionEditorController } from "../useCollectionEditorController";
 import { Button } from "@rebasepro/ui";
 import { prettifyIdentifier } from "@rebasepro/utils";
+import { getLastSegment } from "@rebasepro/common";
 
 export function MissingReferenceWidget({ path: pathProp }: {
     path: string
@@ -30,12 +31,3 @@ name: prettifyIdentifier(path) },
     </div>;
 }
 
-function getParentPathSegments(path: string): string[] {
-    const segments = path.split("/");
-    return segments.filter((segment, index) => index % 2 === 0 && index !== segments.length - 1);
-}
-
-function getLastSegment(path: string): string {
-    const segments = path.split("/");
-    return segments[segments.length - 1];
-}

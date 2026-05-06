@@ -1,7 +1,7 @@
-import { EntityCollection } from "./collections";
-import { Entity, EntityStatus, EntityValues } from "./entities";
-import { User } from "../users";
-import { RebaseCallContext } from "../rebase_context";
+import type { EntityCollection } from "./collections";
+import type { Entity, EntityStatus, EntityValues } from "./entities";
+import type { User } from "../users";
+import type { RebaseCallContext } from "../rebase_context";
 
 /**
  * This interface defines all the callbacks that can be used when an entity

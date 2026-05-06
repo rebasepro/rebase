@@ -1,5 +1,13 @@
 import { EnumValueConfig, EnumValues } from "@rebasepro/types";
+import { unslugify } from "@rebasepro/utils";
 
+// Canonical utility functions — single source of truth in @rebasepro/utils
+export { unslugify, prettifyIdentifier, isObject, isPlainObject, mergeDeep } from "@rebasepro/utils";
+
+/**
+ * Extract enum values from a list of sample values.
+ * This is schema-inference-specific logic (not a general utility).
+ */
 export function extractEnumFromValues(values: unknown[]) {
     if (!Array.isArray(values)) {
         return [];
@@ -18,42 +26,6 @@ export function extractEnumFromValues(values: unknown[]) {
     return enumValues;
 }
 
-export function prettifyIdentifier(input: string) {
-    if (!input) return "";
-
-    let text = input;
-
-    // 1. Handle camelCase and Acronyms
-    // Group 1 ($1 $2): Lowercase followed by Uppercase (e.g., imageURL -> image URL)
-    // Group 2 ($3 $4): Uppercase followed by Uppercase+lowercase (e.g., XMLParser -> XML Parser)
-    text = text.replace(/([a-z])([A-Z])|([A-Z])([A-Z][a-z])/g, "$1$3 $2$4");
-
-    // 2. Replace hyphens/underscores with spaces
-    text = text.replace(/[_-]+/g, " ");
-
-    // 3. Capitalize first letter of each word (Title Case)
-    const s = text
-        .trim()
-        .replace(/\b\w/g, (char) => char.toUpperCase());
-    console.log("Prettified identifier:", {
-        input,
-        s
-    });
-    return s;
-}
-
-export function unslugify(slug?: string): string {
-    if (!slug) return "";
-    if (slug.includes("-") || slug.includes("_") || !slug.includes(" ")) {
-        const result = slug.replace(/[-_]/g, " ");
-        return result.replace(/\w\S*/g, function (txt) {
-            return txt.charAt(0).toUpperCase() + txt.substring(1);
-        }).trim();
-    } else {
-        return slug.trim();
-    }
-}
-
 export function resolveEnumValues(input: EnumValues): EnumValueConfig[] | undefined {
     // Check Array.isArray first since typeof [] === "object" is true in JavaScript
     if (Array.isArray(input)) {
@@ -70,47 +42,3 @@ export function resolveEnumValues(input: EnumValues): EnumValueConfig[] | undefi
         return undefined;
     }
 }
-
-export function mergeDeep<T extends Record<any, any>, U extends Record<any, any>>(target: T, source: U, ignoreUndefined = false): T & U {
-    const targetIsObject = isObject(target);
-    const output = targetIsObject ? { ...target } : target;
-    if (targetIsObject && isObject(source)) {
-        Object.keys(source).forEach(key => {
-            const sourceElement = source[key];
-            // Skip undefined values when ignoreUndefined is true
-            if (ignoreUndefined && sourceElement === undefined) {
-                return;
-            }
-            if (sourceElement instanceof Date) {
-                // Assign a new Date instance with the same time value
-                Object.assign(output, { [key]: new Date(sourceElement.getTime()) });
-            } else if (isPlainObject(sourceElement)) {
-                // Only recursively merge plain objects, not class instances
-                if (!(key in target))
-                    Object.assign(output, { [key]: sourceElement });
-                else if (isPlainObject((target as Record<string, unknown>)[key]))
-                    (output as Record<string, unknown>)[key] = mergeDeep((target as Record<string, unknown>)[key] as Record<string, unknown>, sourceElement);
-                else
-                    Object.assign(output, { [key]: sourceElement });
-            } else if (isObject(sourceElement)) {
-                // For class instances (EntityReference, GeoPoint, etc.), assign directly to preserve prototype
-                Object.assign(output, { [key]: sourceElement });
-            } else {
-                Object.assign(output, { [key]: sourceElement });
-            }
-        });
-    }
-    return output as T;
-}
-
-export function isObject(item: any) {
-    return item && typeof item === "object" && !Array.isArray(item);
-}
-
-export function isPlainObject(obj: any) {
-    if (typeof obj !== "object" || obj === null || Array.isArray(obj)) {
-        return false;
-    }
-    return Object.getPrototypeOf(obj) === Object.prototype;
-}
-

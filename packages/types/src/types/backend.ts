@@ -1,4 +1,5 @@
-import { Entity, EntityCollection, FilterValues, WhereFilterOp } from "./index";
+import type { Entity } from "./entities";
+import type { EntityCollection, FilterValues, WhereFilterOp } from "./collections";
 
 // =============================================================================
 // DATABASE CONNECTION INTERFACES

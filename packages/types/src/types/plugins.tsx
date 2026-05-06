@@ -1,14 +1,14 @@
 import React, { PropsWithChildren } from "react";
 
-import { EntityCollection, CollectionActionsProps, EntityTableController, SelectionController } from "./collections";
-import { EntityStatus } from "./entities";
-import { InferPropertyType, Property } from "./properties";
-import { FormContext } from "./entity_views";
-import { RebaseContext } from "../rebase_context";
-import { NavigationGroupMapping, AppView } from "../controllers";
-import { UserManagementDelegate } from "./user_management_delegate";
-import { User } from "../users";
-import { SlotContribution } from "./slots";
+import type { EntityCollection, CollectionActionsProps, EntityTableController, SelectionController } from "./collections";
+import type { EntityStatus } from "./entities";
+import type { InferPropertyType, Property } from "./properties";
+import type { FormContext } from "./entity_views";
+import type { RebaseContext } from "../rebase_context";
+import type { NavigationGroupMapping, AppView } from "../controllers";
+import type { UserManagementDelegate } from "./user_management_delegate";
+import type { User } from "../users";
+import type { SlotContribution } from "./slots";
 
 /**
  * Props interface for custom field components.

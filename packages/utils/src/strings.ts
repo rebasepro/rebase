@@ -96,7 +96,5 @@ export function prettifyIdentifier(input: string) {
     const s = text
         .trim()
         .replace(/\b\w/g, (char) => char.toUpperCase());
-    console.log("Prettified identifier:", { input,
-s });
     return s;
 }

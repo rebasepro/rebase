@@ -1,12 +1,12 @@
-import authorsCollection from "./authors.js";
-import profilesCollection from "./profiles.js";
-import postsCollection from "./posts.js";
-import tagsCollection from "./tags.js";
-import customersCollection from "./customers.js";
-import productsCollection from "./products.js";
-import ordersCollection from "./orders.js";
-import orderItemsCollection from "./order_items.js";
-import ticketsCollection from "./tickets.js";
+import authorsCollection from "./authors";
+import profilesCollection from "./profiles";
+import postsCollection from "./posts";
+import tagsCollection from "./tags";
+import customersCollection from "./customers";
+import productsCollection from "./products";
+import ordersCollection from "./orders";
+import orderItemsCollection from "./order_items";
+import ticketsCollection from "./tickets";
 
 export const collections = [
     authorsCollection,

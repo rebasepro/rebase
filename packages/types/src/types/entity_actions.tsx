@@ -1,10 +1,10 @@
 import React from "react";
-import { Entity } from "./entities";
-import { EntityCollection, SelectionController } from "./collections";
-import { FormContext } from "./entity_views";
-import { User } from "../users";
-import { RebaseContext } from "../rebase_context";
-import { SideEntityController } from "../controllers";
+import type { Entity } from "./entities";
+import type { EntityCollection, SelectionController } from "./collections";
+import type { FormContext } from "./entity_views";
+import type { User } from "../users";
+import type { RebaseContext } from "../rebase_context";
+import type { SideEntityController } from "../controllers";
 
 /**
  * An entity action is a custom action that can be performed on an entity.

@@ -30,8 +30,8 @@ RUN pnpm install --shamefully-hoist
 # Some packages may fail tsc declarations — that's fine, we only need vite bundles + esbuild outputs.
 RUN pnpm --filter './packages/*' -r --no-bail run build; exit 0
 
-# Build the backend (TypeScript → JavaScript)
-RUN cd app/backend && npx tsc -p tsconfig.docker.json
+# Build the backend (TypeScript → JavaScript), then resolve ESM import extensions
+RUN cd app/backend && npx tsc -p tsconfig.docker.json && npx tsc-alias -p tsconfig.docker.json
 
 # Build frontend (reads .env.production for VITE_API_URL etc.)
 RUN cd app/frontend && npx vite build

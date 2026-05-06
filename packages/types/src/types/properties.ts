@@ -1,14 +1,14 @@
 import React from "react";
 
-import { EntityReference, EntityRelation, EntityValues, GeoPoint, Entity } from "./entities";
-import { FilterValues } from "./collections";
+import type { EntityReference, EntityRelation, EntityValues, GeoPoint, Entity } from "./entities";
+import type { FilterValues } from "./collections";
 
-import { ColorKey, ColorScheme } from "./chips";
-import { AuthController } from "../controllers";
-import { Relation } from "./relations";
-import { EntityAfterReadProps, EntityBeforeSaveProps } from "./entity_callbacks";
-import { User } from "../users";
-import { RebaseContext } from "../rebase_context";
+import type { ColorKey, ColorScheme } from "./chips";
+import type { AuthController } from "../controllers";
+import type { Relation } from "./relations";
+import type { EntityAfterReadProps, EntityBeforeSaveProps } from "./entity_callbacks";
+import type { User } from "../users";
+import type { RebaseContext } from "../rebase_context";
 
 /**
  * Callbacks/Hooks for individual property fields

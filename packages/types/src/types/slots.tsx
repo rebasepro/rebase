@@ -1,9 +1,9 @@
 import React from "react";
-import { CollectionActionsProps, EntityTableController, SelectionController, EntityCollection } from "./collections";
-import { Entity } from "./entities";
-import { PluginFormActionProps, PluginGenericProps, PluginHomePageActionsProps, PluginHomePageAdditionalCardsProps } from "./plugins";
-import { Property } from "./properties";
-import { RebaseContext } from "../rebase_context";
+import type { CollectionActionsProps, EntityTableController, SelectionController, EntityCollection } from "./collections";
+import type { Entity } from "./entities";
+import type { PluginFormActionProps, PluginGenericProps, PluginHomePageActionsProps, PluginHomePageAdditionalCardsProps } from "./plugins";
+import type { Property } from "./properties";
+import type { RebaseContext } from "../rebase_context";
 
 /**
  * Registry mapping slot names to their component prop types.

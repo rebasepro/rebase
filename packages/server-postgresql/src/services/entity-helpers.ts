@@ -15,14 +15,14 @@ import { getTableName } from "@rebasepro/common";
  * Interface for Drizzle column metadata introspection.
  * Replaces unsafe `as unknown as Record<string, unknown>` double-cast chains.
  */
-interface DrizzleColumnMeta {
+export interface DrizzleColumnMeta {
     columnType?: string;
     dataType?: string;
     primary?: boolean;
 }
 
 /** Safely extract Drizzle column metadata from a column object. */
-function getColumnMeta(col: AnyPgColumn): DrizzleColumnMeta {
+export function getColumnMeta(col: AnyPgColumn): DrizzleColumnMeta {
     const raw = col as unknown as Record<string | symbol, unknown>;
     return {
         columnType: typeof raw.columnType === "string" ? raw.columnType : undefined,

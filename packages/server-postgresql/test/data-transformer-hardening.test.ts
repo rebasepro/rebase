@@ -229,3 +229,184 @@ describe("sanitizeAndConvertDates", () => {
         expect(result).toEqual([null, "hello", null]);
     });
 });
+
+// ─────────────────────────────────────────────────────────────
+// getColumnMeta — type guard regression (Issue #6)
+// ─────────────────────────────────────────────────────────────
+import { getColumnMeta } from "../src/services/entity-helpers";
+
+describe("getColumnMeta type guard", () => {
+    it("extracts columnType, dataType, primary from a well-formed column", () => {
+        const fakeCol = {
+            columnType: "PgVarchar",
+            dataType: "string",
+            primary: false
+        };
+        const meta = getColumnMeta(fakeCol as any);
+        expect(meta.columnType).toBe("PgVarchar");
+        expect(meta.dataType).toBe("string");
+        expect(meta.primary).toBe(false);
+    });
+
+    it("returns undefined for missing properties instead of crashing", () => {
+        const emptyCol = {};
+        const meta = getColumnMeta(emptyCol as any);
+        expect(meta.columnType).toBeUndefined();
+        expect(meta.dataType).toBeUndefined();
+        expect(meta.primary).toBeUndefined();
+    });
+
+    it("returns undefined for wrong-typed properties instead of passing them through", () => {
+        const badCol = {
+            columnType: 42,       // should be string
+            dataType: true,       // should be string
+            primary: "yes"        // should be boolean
+        };
+        const meta = getColumnMeta(badCol as any);
+        expect(meta.columnType).toBeUndefined();
+        expect(meta.dataType).toBeUndefined();
+        expect(meta.primary).toBeUndefined();
+    });
+});
+
+// ─────────────────────────────────────────────────────────────
+// FK column preservation (Issue #5) — normalizeScalarValues
+// ─────────────────────────────────────────────────────────────
+describe("normalizeDbValues FK column preservation", () => {
+    it("preserves internal FK columns as primitives when not defined as properties", () => {
+        const targetCollection = makeCollection("categories", {
+            name: { type: "string", name: "Name" } as Property
+        });
+
+        const collection = makeCollection("products", {
+            title: { type: "string", name: "Title" } as Property,
+            category: {
+                type: "relation",
+                name: "Category",
+                relation: {
+                    target: () => targetCollection,
+                    cardinality: "one",
+                    direction: "owning",
+                    localKey: "category_id",   // FK column NOT in properties
+                    relationName: "category"
+                }
+            } as unknown as Property
+        });
+
+        const result = normalizeDbValues(
+            { title: "Widget", category_id: "cat-123", category: "ignored" } as any,
+            collection
+        );
+
+        // FK column should be preserved as a primitive string
+        expect(result.category_id).toBe("cat-123");
+        // Relation property should be skipped (db.query handles it)
+        expect(result).not.toHaveProperty("category");
+        // Regular property should be present
+        expect(result.title).toBe("Widget");
+    });
+
+    it("preserves numeric FK columns as numbers", () => {
+        const targetCollection = makeCollection("authors", {
+            name: { type: "string", name: "Name" } as Property
+        });
+
+        const collection = makeCollection("books", {
+            title: { type: "string", name: "Title" } as Property,
+            author: {
+                type: "relation",
+                name: "Author",
+                relation: {
+                    target: () => targetCollection,
+                    cardinality: "one",
+                    direction: "owning",
+                    localKey: "author_id",
+                    relationName: "author"
+                }
+            } as unknown as Property
+        });
+
+        const result = normalizeDbValues(
+            { title: "Book", author_id: 42 } as any,
+            collection
+        );
+        expect(result.author_id).toBe(42);
+    });
+
+    it("converts null FK columns to null", () => {
+        const targetCollection = makeCollection("authors", {
+            name: { type: "string", name: "Name" } as Property
+        });
+
+        const collection = makeCollection("books", {
+            title: { type: "string", name: "Title" } as Property,
+            author: {
+                type: "relation",
+                name: "Author",
+                relation: {
+                    target: () => targetCollection,
+                    cardinality: "one",
+                    direction: "owning",
+                    localKey: "author_id",
+                    relationName: "author"
+                }
+            } as unknown as Property
+        });
+
+        const result = normalizeDbValues(
+            { title: "Book", author_id: null } as any,
+            collection
+        );
+        expect(result.author_id).toBeNull();
+    });
+});
+
+// ─────────────────────────────────────────────────────────────
+// Structural dunder guard (Issue #7) — prevent re-introduction
+// ─────────────────────────────────────────────────────────────
+describe("structural dunder guard", () => {
+    it("scalarData never contains any __ prefixed keys", () => {
+        const properties: Properties = {
+            title: { type: "string", name: "Title" } as Property,
+            count: { type: "number", name: "Count" } as Property,
+            active: { type: "boolean", name: "Active" } as Property
+        };
+
+        const result = serializeDataToServer(
+            { title: "Test", count: 10, active: true },
+            properties
+        );
+
+        const dunderKeys = Object.keys(result.scalarData).filter(k => k.startsWith("__"));
+        expect(dunderKeys).toEqual([]);
+    });
+
+    it("scalarData never contains any __ prefixed keys even with relation properties", () => {
+        const targetCollection = makeCollection("tags", {
+            label: { type: "string", name: "Label" } as Property
+        });
+
+        const properties: Properties = {
+            title: { type: "string", name: "Title" } as Property,
+            tag: {
+                type: "relation",
+                name: "Tag",
+                relation: {
+                    target: () => targetCollection,
+                    cardinality: "one",
+                    direction: "owning",
+                    localKey: "tag_id",
+                    relationName: "tag"
+                }
+            } as unknown as Property
+        };
+
+        const result = serializeDataToServer(
+            { title: "Test", tag: { id: "t1", path: "tags", __type: "relation" } },
+            properties
+        );
+
+        const dunderKeys = Object.keys(result.scalarData).filter(k => k.startsWith("__"));
+        expect(dunderKeys).toEqual([]);
+    });
+});

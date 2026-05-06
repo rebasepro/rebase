@@ -1,6 +1,6 @@
 import { EntityCollection } from "@rebasepro/types";
-import profilesCollection from "./profiles.js";
-import postsCollection from "./posts.js";
+import profilesCollection from "./profiles";
+import postsCollection from "./posts";
 
 const authorsCollection: EntityCollection = {
     name: "Authors",
