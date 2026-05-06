@@ -116,7 +116,7 @@ export function EntityPreviewData({
                 {(!usedImageProperty || !usedImageValue) ? <IconForView collectionOrView={collection}
                     color={"primary"}
                     size={size}
-                    className={"m-auto p-1"}/> : null}
+                    className={"m-auto"}/> : null}
             </div>
 
             <div
