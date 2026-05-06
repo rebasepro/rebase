@@ -23,7 +23,7 @@ export interface RebaseI18nProviderProps {
     /** BCP-47 locale tag, e.g. "en", "es", "fr". Defaults to "en". */
     locale?: string;
     /**
-     * Override or extend any FireCMS UI string, keyed by locale.
+     * Override or extend any Rebase UI string, keyed by locale.
      *
      * @example
      * translations={{
@@ -37,10 +37,10 @@ export interface RebaseI18nProviderProps {
 }
 
 /**
- * Initialises a dedicated i18next instance for FireCMS's internal UI strings.
+ * Initialises a dedicated i18next instance for Rebase's internal UI strings.
  *
  * This instance is isolated from any app-level i18next configuration the
- * consumer may have. Mount this at the top of the FireCMS component tree.
+ * consumer may have. Mount this at the top of the Rebase component tree.
  *
  * @internal
  */

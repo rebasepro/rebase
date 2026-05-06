@@ -19,7 +19,7 @@ app.all("/", async (c) => {
         }
 
         await rebase.email!.send({
-            to: "francesco@firecms.co",
+            to: "francesco@rebase.pro",
             subject: "Rebase SDK Email Test ✅",
             html: `
                 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 40px;">
@@ -36,7 +36,7 @@ app.all("/", async (c) => {
 
         return c.json({
             success: true,
-            message: "Email sent to francesco@firecms.co via rebase.email",
+            message: "Email sent to francesco@rebase.pro via rebase.email",
             timestamp: new Date().toISOString()
         });
     } catch (err: any) {

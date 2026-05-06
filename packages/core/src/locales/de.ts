@@ -610,7 +610,7 @@ export const de: RebaseTranslations = {
     settings_sample_theme_components: "Beispiel-Designkomponenten",
     settings_drag_drop_logo: "Ziehen Sie Ihr Logo hierher",
     settings_security_rules: "Sicherheitsregeln",
-    settings_security_rules_description: "FireCMS verwendet Firebase-Sicherheitsregeln, um den Zugriff auf Daten einzuschränken. Beim Erstellen eines neuen Benutzers über FireCMS wird dem Benutzer im Client-Projekt das benutzerdefinierte Attribut fireCMSUser hinzugefügt. Durch Hinzufügen der folgenden Sicherheitsregeln stellen Sie sicher, dass Rebase-Benutzer über FireCMS auf Daten zugreifen können.",
+    settings_security_rules_description: "Rebase verwendet Firebase-Sicherheitsregeln, um den Zugriff auf Daten einzuschränken. Beim Erstellen eines neuen Benutzers über Rebase wird dem Benutzer im Client-Projekt das benutzerdefinierte Attribut rebaseUser hinzugefügt. Durch Hinzufügen der folgenden Sicherheitsregeln stellen Sie sicher, dass Rebase-Benutzer über Rebase auf Daten zugreifen können.",
     settings_security_rules_add_domain: "Denken Sie daran, die Domain {{domain}} zu den erlaubten Domains Ihres Anbieters hinzuzufügen",
     settings_security_rules_caption: "Diese Regeln beschränken den Datenzugriff nur auf Rebase-Benutzer, setzen die Berechtigungen jedoch nicht auf Datenbankebene durch. Die Berechtigungen werden im Frontend durchgesetzt, was für die meisten Projekte ausreichend ist. Wenn Sie die Berechtigungen auf Datenbankebene durchsetzen müssen, können Sie diese Sicherheitsregeln entsprechend anpassen. Die einem Benutzer zugewiesenen Rollen werden als benutzerdefinierte Attribute im Firebase-Authentifizierungstoken gespeichert, sodass Sie sie in Ihren Sicherheitsregeln verwenden können.",
 

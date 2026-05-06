@@ -8,7 +8,7 @@ import { Container, Markdown, Typography } from "@rebasepro/ui";
  * This is a sample view used to render the content of a blog entry.
  * It is bound to the data that is modified in the form.
  *
- * Adapted from the original FireCMS example_pro BlogEntryPreview.
+ * Custom view for rendering blog entry content with live preview.
  * Uses useStorageSource().getSignedUrl() to resolve storage keys to
  * download URLs — the same pattern end-users should follow in their
  * own custom views and SDK integrations.

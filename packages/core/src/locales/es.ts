@@ -4,7 +4,7 @@ import { RebaseTranslations } from "@rebasepro/types";
  * Spanish baseline translations for @rebasepro/core.
  *
  * This is the single source of truth for all default UI strings in Spanish.
- * Override any key via the `translations` prop on FireCMS entry-point components.
+ * Override any key via the `translations` prop on Rebase entry-point components.
  *
  * @group Core
  */
@@ -612,7 +612,7 @@ export const es: RebaseTranslations = {
     settings_default_language: "Idioma predeterminado",
     settings_default_language_caption: "Selecciona el idioma base para este proyecto. Los usuarios pueden modificar esta preferencia en sus ajustes personales.",
     settings_enable_local_text_search: "Habilitar búsqueda de texto local",
-    settings_local_text_search_caption: "Habilita la búsqueda de texto local para todas las colecciones. Esto te permitirá buscar campos de texto en tus colecciones usando la barra de búsqueda de FireCMS. Ten en cuenta que esta función puede implicar un mayor número de lecturas, ya que indexará todos los campos de texto de tus colecciones.",
+    settings_local_text_search_caption: "Habilita la búsqueda de texto local para todas las colecciones. Esto te permitirá buscar campos de texto en tus colecciones usando la barra de búsqueda de Rebase. Ten en cuenta que esta función puede implicar un mayor número de lecturas, ya que indexará todos los campos de texto de tus colecciones.",
     settings_doc_history_all_collections: "Historial de documentos habilitado para todas las colecciones",
     settings_doc_history_caption: "Cuando está activado, todas las colecciones tendrán el historial habilitado por defecto. Puedes cambiar este ajuste en cada colección. El historial se guardará en la subcolección __history de cada documento.",
     settings_theme: "Tema",
@@ -621,9 +621,9 @@ export const es: RebaseTranslations = {
     settings_sample_theme_components: "Componentes de ejemplo del tema",
     settings_drag_drop_logo: "Arrastra y suelta tu logotipo aquí",
     settings_security_rules: "Reglas de seguridad",
-    settings_security_rules_description: "FireCMS utiliza las reglas de seguridad de Firebase para restringir el acceso a los datos. Al crear un nuevo usuario a través de FireCMS, se añade el atributo personalizado fireCMSUser al usuario en el proyecto cliente. Al añadir las siguientes reglas de seguridad a tu proyecto, te aseguras de que los usuarios de FireCMS puedan acceder a los datos a través de FireCMS.",
+    settings_security_rules_description: "Rebase utiliza las reglas de seguridad de Firebase para restringir el acceso a los datos. Al crear un nuevo usuario a través de Rebase, se añade el atributo personalizado rebaseUser al usuario en el proyecto cliente. Al añadir las siguientes reglas de seguridad a tu proyecto, te aseguras de que los usuarios de Rebase puedan acceder a los datos a través de Rebase.",
     settings_security_rules_add_domain: "Recuerda añadir el dominio {{domain}} a los dominios permitidos de tu proveedor",
-    settings_security_rules_caption: "Estas reglas restringen el acceso a los datos solo para usuarios de FireCMS, pero no aplican los permisos a nivel de base de datos. Los permisos se aplican en el frontend, lo que funciona bien en la mayoría de los proyectos. Si necesitas aplicar los permisos a nivel de base de datos, puedes modificar estas reglas de seguridad. Los roles asignados a un usuario se configuran como atributos personalizados en el token de autenticación de Firebase, por lo que puedes usarlos en tus reglas de seguridad.",
+    settings_security_rules_caption: "Estas reglas restringen el acceso a los datos solo para usuarios de Rebase, pero no aplican los permisos a nivel de base de datos. Los permisos se aplican en el frontend, lo que funciona bien en la mayoría de los proyectos. Si necesitas aplicar los permisos a nivel de base de datos, puedes modificar estas reglas de seguridad. Los roles asignados a un usuario se configuran como atributos personalizados en el token de autenticación de Firebase, por lo que puedes usarlos en tus reglas de seguridad.",
 
     // ─── Text Search Dialog ─────────────────────────────────────
     text_search_dialog_title: "Activar búsqueda de texto",

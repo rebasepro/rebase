@@ -19,7 +19,7 @@ import ordersCollection from "../config/collections/orders";
 
 import tagsCollection from "../config/collections/tags";
 
-const DB = "postgresql://postgres:A%3FCl8L%5DpUHiO%3A%5COT@34.22.208.81:5432/firecms";
+const DB = "postgresql://postgres:A%3FCl8L%5DpUHiO%3A%5COT@34.22.208.81:5432/rebase";
 const all: EntityCollection[] = [authorsCollection, postsCollection, profilesCollection, productsCollection, ordersCollection, tagsCollection];
 
 let sqlQ: string[] = [];

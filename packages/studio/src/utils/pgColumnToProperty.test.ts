@@ -214,7 +214,7 @@ character_maximum_length: null }
 
         it("detects auto-generated string IDs as manual fallback strategy if not a UUID column type", () => {
             const columns: TableColumnInfo[] = [
-                // If it's varchar with a random identity function that FireCMS doesn't purely know how to recreate natively
+                // If it's varchar with a random identity function that Rebase doesn't purely know how to recreate natively
                 { column_name: "id",
 data_type: "varchar",
 udt_name: "varchar",

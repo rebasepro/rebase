@@ -220,7 +220,7 @@ export const fr: RebaseTranslations = {
     no_custom_actions_defined: "Aucune action personnalisée définie. Définissez vos actions personnalisées dans les paramètres de personnalisation, avant d'utiliser cette boîte de dialogue.",
 
     no_collections_found: "Aucune collection trouvée",
-    start_building_collections: "Commencez à créer des collections dans FireCMS facilement. Mappez-les à vos données de base de données existantes, importez-les à partir de fichiers ou utilisez nos modèles.",
+    start_building_collections: "Commencez à créer des collections dans Rebase facilement. Mappez-les à vos données de base de données existantes, importez-les à partir de fichiers ou utilisez nos modèles.",
     create_first_collection: "Créez votre première collection",
     define_collections_programmatically: "Vous pouvez également définir des collections par programmation.",
     edit_collection: "Modifier la collection",
@@ -601,7 +601,7 @@ export const fr: RebaseTranslations = {
     settings_default_language: "Langue par défaut",
     settings_default_language_caption: "Sélectionnez la langue de base pour ce projet. Les utilisateurs peuvent modifier cette préférence dans leurs paramètres personnels.",
     settings_enable_local_text_search: "Activer la recherche de texte locale",
-    settings_local_text_search_caption: "Activez la recherche de texte locale pour toutes les collections. Cela vous permettra de rechercher des champs textuels à l'aide de la barre de recherche FireCMS. Notez que cette fonctionnalité peut entraîner un nombre de lectures plus élevé, car tous les champs textuels de vos collections seront indexés.",
+    settings_local_text_search_caption: "Activez la recherche de texte locale pour toutes les collections. Cela vous permettra de rechercher des champs textuels à l'aide de la barre de recherche Rebase. Notez que cette fonctionnalité peut entraîner un nombre de lectures plus élevé, car tous les champs textuels de vos collections seront indexés.",
     settings_doc_history_all_collections: "Historique des documents activé pour toutes les collections",
     settings_doc_history_caption: "Lorsque activé, toutes les collections auront l'historique activé par défaut. Vous pouvez modifier ce paramètre pour chaque collection. L'historique sera enregistré dans la sous-collection __history de chaque document.",
     settings_theme: "Thème",
@@ -610,9 +610,9 @@ export const fr: RebaseTranslations = {
     settings_sample_theme_components: "Exemples de composants du thème",
     settings_drag_drop_logo: "Glissez-déposez votre logo ici",
     settings_security_rules: "Règles de sécurité",
-    settings_security_rules_description: "FireCMS utilise les règles de sécurité Firebase pour restreindre l'accès aux données. Lors de la création d'un utilisateur via Rebase, l'attribut personnalisé fireCMSUser est ajouté à l'utilisateur dans le projet client. En ajoutant les règles de sécurité suivantes, vous garantissez que les utilisateurs FireCMS peuvent accéder aux données via Rebase.",
+    settings_security_rules_description: "Rebase utilise les règles de sécurité Firebase pour restreindre l'accès aux données. Lors de la création d'un utilisateur via Rebase, l'attribut personnalisé rebaseUser est ajouté à l'utilisateur dans le projet client. En ajoutant les règles de sécurité suivantes, vous garantissez que les utilisateurs Rebase peuvent accéder aux données via Rebase.",
     settings_security_rules_add_domain: "N'oubliez pas d'ajouter le domaine {{domain}} aux domaines autorisés de votre fournisseur",
-    settings_security_rules_caption: "Ces règles restreignent l'accès aux données aux seuls utilisateurs FireCMS, mais n'appliquent pas les permissions au niveau de la base de données. Les permissions sont appliquées côté frontend, ce qui convient à la plupart des projets. Si vous devez appliquer les permissions au niveau de la base de données, vous pouvez modifier ces règles de sécurité. Les rôles attribués à un utilisateur sont définis comme attributs personnalisés dans le jeton d'authentification Firebase, vous pouvez donc les utiliser dans vos règles de sécurité.",
+    settings_security_rules_caption: "Ces règles restreignent l'accès aux données aux seuls utilisateurs Rebase, mais n'appliquent pas les permissions au niveau de la base de données. Les permissions sont appliquées côté frontend, ce qui convient à la plupart des projets. Si vous devez appliquer les permissions au niveau de la base de données, vous pouvez modifier ces règles de sécurité. Les rôles attribués à un utilisateur sont définis comme attributs personnalisés dans le jeton d'authentification Firebase, vous pouvez donc les utiliser dans vos règles de sécurité.",
 
     // ─── Text Search Dialog ─────────────────────────────────────
     text_search_dialog_title: "Activer la recherche de texte",

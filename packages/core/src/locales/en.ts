@@ -4,7 +4,7 @@ import { RebaseTranslations } from "@rebasepro/types";
  * English baseline translations for @rebasepro/core.
  *
  * This is the single source of truth for all default UI strings.
- * Override any key via the `translations` prop on FireCMS entry-point components.
+ * Override any key via the `translations` prop on Rebase entry-point components.
  *
  * @group Core
  */
@@ -697,7 +697,7 @@ export const en: RebaseTranslations = {
     settings_default_language: "Default language",
     settings_default_language_caption: "Select the base language for this project. Users can override this preference in their personal settings.",
     settings_enable_local_text_search: "Enable local text search",
-    settings_local_text_search_caption: "Enable local text search for all collections. This will allow you to search text fields in your collections using the FireCMS search bar. Note that this feature can incur in higher read counts, as it will index all text fields in your collections.",
+    settings_local_text_search_caption: "Enable local text search for all collections. This will allow you to search text fields in your collections using the Rebase search bar. Note that this feature can incur in higher read counts, as it will index all text fields in your collections.",
     settings_doc_history_all_collections: "Document history enabled for all collections",
     settings_doc_history_caption: "When true, all collections will have the history enabled by default. You can override this setting in each collection. History will be saved in the __history subcollection of each document.",
     settings_theme: "Theme",
@@ -706,7 +706,7 @@ export const en: RebaseTranslations = {
     settings_sample_theme_components: "Sample theme components",
     settings_drag_drop_logo: "Drag and drop your logo here",
     settings_security_rules: "Security rules",
-    settings_security_rules_description: "FireCMS uses Firebase security rules to restrict access to data. When creating a new user through FireCMS, the custom claim fireCMSUser is added to the user in the client project. By adding the following security rules to your project, you ensure FireCMS users can access data through FireCMS.",
+    settings_security_rules_description: "Rebase uses Firebase security rules to restrict access to data. When creating a new user through Rebase, the custom claim rebaseUser is added to the user in the client project. By adding the following security rules to your project, you ensure Rebase users can access data through Rebase.",
     settings_security_rules_add_domain: "Remember to add the domain {{domain}} to your provider allowed domains",
     settings_security_rules_caption: "This rules restrict access to data to Rebase users only, but does not enforce the permissions at the database level. The permissions are enforced in the frontend though, which will work fine for most projects. If you need to enforce the permissions at the database level, you can modify these security rules yourself to suit your needs. The roles assigned to a user are set as a custom claim in the Firebase auth token, so you can use them in your security rules.",
 

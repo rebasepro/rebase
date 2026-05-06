@@ -225,7 +225,7 @@ export const pt: RebaseTranslations = {
     no_custom_actions_defined: "Nenhuma ação personalizada definida. Defina as suas ações personalizadas nas definições de personalização, antes de usar este diálogo.",
 
     no_collections_found: "Nenhuma coleção encontrada",
-    start_building_collections: "Comece a criar coleções no FireCMS facilmente. Mapeie-as aos dados existentes na sua base de dados, importe de ficheiros ou use os nossos modelos.",
+    start_building_collections: "Comece a criar coleções no Rebase facilmente. Mapeie-as aos dados existentes na sua base de dados, importe de ficheiros ou use os nossos modelos.",
     create_first_collection: "Crie a sua primeira coleção",
     define_collections_programmatically: "Também pode definir coleções programaticamente.",
     edit_collection: "Editar coleção",
@@ -609,7 +609,7 @@ export const pt: RebaseTranslations = {
     settings_default_language: "Idioma predefinido",
     settings_default_language_caption: "Selecione o idioma base para este projeto. Os utilizadores podem alterar esta preferência nas suas definições pessoais.",
     settings_enable_local_text_search: "Ativar pesquisa de texto local",
-    settings_local_text_search_caption: "Ative a pesquisa de texto local para todas as coleções. Isto permitirá pesquisar campos de texto nas suas coleções usando a barra de pesquisa do FireCMS. Note que esta funcionalidade pode resultar num maior número de leituras, pois todos os campos de texto das suas coleções serão indexados.",
+    settings_local_text_search_caption: "Ative a pesquisa de texto local para todas as coleções. Isto permitirá pesquisar campos de texto nas suas coleções usando a barra de pesquisa do Rebase. Note que esta funcionalidade pode resultar num maior número de leituras, pois todos os campos de texto das suas coleções serão indexados.",
     settings_doc_history_all_collections: "Histórico de documentos ativado para todas as coleções",
     settings_doc_history_caption: "Quando ativado, todas as coleções terão o histórico ativado por predefinição. Pode alterar esta definição em cada coleção. O histórico será guardado na subcoleção __history de cada documento.",
     settings_theme: "Tema",
@@ -618,9 +618,9 @@ export const pt: RebaseTranslations = {
     settings_sample_theme_components: "Exemplos de componentes do tema",
     settings_drag_drop_logo: "Arraste e solte o seu logótipo aqui",
     settings_security_rules: "Regras de segurança",
-    settings_security_rules_description: "O FireCMS utiliza as regras de segurança do Firebase para restringir o acesso aos dados. Ao criar um novo utilizador através do FireCMS, o atributo personalizado fireCMSUser é adicionado ao utilizador no projeto cliente. Ao adicionar as seguintes regras de segurança ao seu projeto, garante que os utilizadores do FireCMS possam aceder aos dados através do FireCMS.",
+    settings_security_rules_description: "O Rebase utiliza as regras de segurança do Firebase para restringir o acesso aos dados. Ao criar um novo utilizador através do Rebase, o atributo personalizado rebaseUser é adicionado ao utilizador no projeto cliente. Ao adicionar as seguintes regras de segurança ao seu projeto, garante que os utilizadores do Rebase possam aceder aos dados através do Rebase.",
     settings_security_rules_add_domain: "Lembre-se de adicionar o domínio {{domain}} aos domínios permitidos do seu fornecedor",
-    settings_security_rules_caption: "Estas regras restringem o acesso aos dados apenas aos utilizadores do FireCMS, mas não aplicam as permissões ao nível da base de dados. As permissões são aplicadas no frontend, o que funciona bem para a maioria dos projetos. Se precisar de aplicar as permissões ao nível da base de dados, pode modificar estas regras de segurança. As funções atribuídas a um utilizador são definidas como atributos personalizados no token de autenticação do Firebase, pelo que pode utilizá-las nas suas regras de segurança.",
+    settings_security_rules_caption: "Estas regras restringem o acesso aos dados apenas aos utilizadores do Rebase, mas não aplicam as permissões ao nível da base de dados. As permissões são aplicadas no frontend, o que funciona bem para a maioria dos projetos. Se precisar de aplicar as permissões ao nível da base de dados, pode modificar estas regras de segurança. As funções atribuídas a um utilizador são definidas como atributos personalizados no token de autenticação do Firebase, pelo que pode utilizá-las nas suas regras de segurança.",
 
     // ─── Text Search Dialog ─────────────────────────────────────
     text_search_dialog_title: "Ativar pesquisa de texto",

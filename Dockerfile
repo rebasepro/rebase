@@ -31,7 +31,9 @@ RUN pnpm install --shamefully-hoist
 RUN pnpm --filter './packages/*' -r --no-bail run build; exit 0
 
 # Build the backend (TypeScript → JavaScript), then resolve ESM import extensions
-RUN cd app/backend && npx tsc -p tsconfig.docker.json && npx tsc-alias -p tsconfig.docker.json -f
+# 1. tsc compiles TS→JS  2. tsc-alias resolves path aliases  3. sed adds .js to remaining relative imports
+RUN cd app/backend && npx tsc -p tsconfig.docker.json && npx tsc-alias -p tsconfig.docker.json -f \
+    && find dist -name '*.js' -exec sed -i 's/from "\(\.[^"]*\)"/from "\1.js"/g; s/\.js\.js/.js/g' {} +
 
 # Build frontend (reads .env.production for VITE_API_URL etc.)
 RUN cd app/frontend && npx vite build

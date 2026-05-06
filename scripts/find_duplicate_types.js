@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const ROOT = "/Users/francesco/firecms_v4/packages";
+const ROOT = "/Users/francesco/rebase/packages";
 
 const SKIP_DIRS = new Set(["node_modules", "dist", ".next", "build", "lib", "__tests__", "__mocks__", "coverage", ".yarn"]);
 
