@@ -5,7 +5,7 @@ import type { EntityStatus } from "./entities";
 import type { InferPropertyType, Property } from "./properties";
 import type { FormContext } from "./entity_views";
 import type { RebaseContext } from "../rebase_context";
-import type { NavigationGroupMapping, AppView } from "../controllers";
+import type { NavigationGroupMapping, AppView } from "../controllers/navigation";
 import type { UserManagementDelegate } from "./user_management_delegate";
 import type { User } from "../users";
 import type { SlotContribution } from "./slots";

@@ -65,6 +65,7 @@ export class EntityPersistService {
         // If saving under a nested relation path, resolve the parent and inject FK
         let effectiveCollectionPath = collectionPath;
         const effectiveValues: Partial<M> = { ...values };
+        let junctionTableInfo: { parentCollection: EntityCollection; parentId: string | number; relation: Relation; relationKey: string; } | undefined;
 
         if (collectionPath.includes("/")) {
             const segments = collectionPath.split("/").filter(Boolean);
@@ -94,7 +95,7 @@ export class EntityPersistService {
                             const parsedParentIdObj = parseIdValues(currentEntityId, parentIdInfoArray);
                             const parsedParentId = parsedParentIdObj[parentIdInfo.fieldName];
 
-                            (effectiveValues as Record<string, unknown>).__junction_table_info = {
+                            junctionTableInfo = {
                                 parentCollection: currentCollection,
                                 parentId: parsedParentId,
                                 relation: relation,
@@ -177,11 +178,9 @@ export class EntityPersistService {
         // Transform relations to IDs, then sanitize
         const serializedResult = serializeDataToServer(otherValues as M, collection.properties as Properties, collection, this.registry);
 
-        // Extract relation updates from the typed result (no more hidden __dunder properties)
+        // Extract relation updates from the typed result
         const inverseRelationUpdates = serializedResult.inverseRelationUpdates;
         const joinPathRelationUpdates = serializedResult.joinPathRelationUpdates;
-        const junctionTableInfo = (serializedResult.scalarData as Record<string, unknown>).__junction_table_info as { parentCollection: EntityCollection; parentId: string | number; relation: Relation; relationKey: string; } | undefined;
-        delete (serializedResult.scalarData as Record<string, unknown>).__junction_table_info;
 
         const entityData = sanitizeAndConvertDates(serializedResult.scalarData);
 

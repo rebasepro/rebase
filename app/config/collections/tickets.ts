@@ -89,13 +89,9 @@ const ticketsCollection: PostgresCollection = {
         customer: {
             name: "Customer",
             type: "relation",
-            relationName: "customer",
-            relation: {
-                relationName: "customer",
-                cardinality: "one",
-                direction: "owning",
-                target: () => customersCollection
-            }
+            target: () => customersCollection,
+            cardinality: "one",
+            direction: "owning"
         },
         assigned_to: {
             name: "Assigned To",
@@ -136,14 +132,6 @@ const ticketsCollection: PostgresCollection = {
         "created_at",
         "updated_at",
         "__order"
-    ],
-    relations: [
-        {
-            relationName: "customer",
-            target: () => customersCollection,
-            cardinality: "one",
-            direction: "owning"
-        }
     ]
 };
 

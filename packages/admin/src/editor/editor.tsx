@@ -459,12 +459,21 @@ ul[data-type="taskList"] li[data-checked="true"] > div > p {
   border-right: none;
 }
 
+.ProseMirror td {
+  background-color: transparent;
+}
+
 .ProseMirror th {
   font-weight: 600;
   text-align: left;
-  background-color: #f9fafb;
+  background-color: #f3f4f6;
+  color: #374151;
+}
+[data-theme="dark"] .ProseMirror td {
+  background-color: transparent;
 }
 [data-theme="dark"] .ProseMirror th {
-  background-color: #1f2937;
+  background-color: rgba(255, 255, 255, 0.05);
+  color: #d1d5db;
 }
 `;

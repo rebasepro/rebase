@@ -1,5 +1,11 @@
 import React from "react";
-import { EntityLinkBuilder, Locale, EntityAction, EntityCustomView, RebasePlugin, PropertyConfig, SlotContribution } from "../types";
+import type { EntityLinkBuilder } from "../types/entity_link_builder";
+import type { Locale } from "../types/locales";
+import type { EntityAction } from "../types/entity_actions";
+import type { EntityCustomView } from "../types/entity_views";
+import type { RebasePlugin } from "../types/plugins";
+import type { PropertyConfig } from "../types/property_config";
+import type { SlotContribution } from "../types/slots";
 
 export type CustomizationController = {
 

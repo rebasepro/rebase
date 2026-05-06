@@ -1,11 +1,10 @@
 import React from "react";
 
 import type { EntityReference, EntityRelation, EntityValues, GeoPoint, Entity } from "./entities";
-import type { FilterValues } from "./collections";
-
+import type { Relation, JoinStep, OnAction } from "./relations";
+import type { EntityCollection, FilterValues } from "./collections";
 import type { ColorKey, ColorScheme } from "./chips";
-import type { AuthController } from "../controllers";
-import type { Relation } from "./relations";
+import type { AuthController } from "../controllers/auth";
 import type { EntityAfterReadProps, EntityBeforeSaveProps } from "./entity_callbacks";
 import type { User } from "../users";
 import type { RebaseContext } from "../rebase_context";
@@ -479,18 +478,105 @@ export interface RelationProperty extends BaseProperty {
      * UI behavior: Field value cannot be changed after creation.
      */
     isId?: boolean;
-    /**
-     * The name of the relation this property refers to. This name must match
-     * one of the `relationName`s defined in the top-level `relations` array
-     * of the collection.
-     */
-    relationName: string;
+
+    // ─── Inline relation config ───
+    // Define the relation directly on the property. The framework automatically
+    // extracts these into the collection's `relations[]` at normalization time.
+    // You no longer need a separate `relations[]` entry for properties.
 
     /**
-     * The resolved relation object.
-     * This is set by the framework
+     * The target collection this relation points to.
+     * When set, the framework treats this property as a self-contained relation
+     * definition and no separate `relations[]` entry is needed.
+     */
+    target?: () => EntityCollection;
+
+    /**
+     * Whether this property references one or many records.
+     * Defaults to `"one"`.
+     */
+    cardinality?: "one" | "many";
+
+    /**
+     * Which side owns the persistence for this relationship.
+     * - `"owning"`: The foreign key (for one-to-one) or junction table (for many-to-many) is on this collection.
+     * - `"inverse"`: The foreign key is on the target collection's table.
+     * Defaults to `"owning"`.
+     */
+    direction?: "owning" | "inverse";
+
+    /**
+     * The name of the corresponding relation on the target collection.
+     * Used for inverse relations to locate the owning side.
+     */
+    inverseRelationName?: string;
+
+    /**
+     * Column on THIS table that stores the foreign key to the target.
+     * Required when `direction` is `"owning"` and `cardinality` is `"one"`.
+     * Auto-inferred if not set.
+     * @example "author_id"
+     */
+    localKey?: string;
+
+    /**
+     * Column on the TARGET table that stores the foreign key back to this entity.
+     * Required when `direction` is `"inverse"`.
+     * Auto-inferred if not set.
+     * @example "post_id"
+     */
+    foreignKeyOnTarget?: string;
+
+    /**
+     * Junction table configuration for many-to-many relationships.
+     * Required when `cardinality` is `"many"` and `direction` is `"owning"`.
+     * Auto-inferred if not set.
+     */
+    through?: {
+        table: string;
+        sourceColumn: string;
+        targetColumn: string;
+    };
+
+    /**
+     * Explicit, ordered join path for advanced multi-hop relations.
+     * When set, overrides `localKey`, `foreignKeyOnTarget`, and `through`.
+     */
+    joinPath?: JoinStep[];
+
+    /**
+     * Cascade action on update.
+     */
+    onUpdate?: OnAction;
+
+    /**
+     * Cascade action on delete.
+     */
+    onDelete?: OnAction;
+
+    /**
+     * Overrides applied to the target collection when rendered as a subcollection tab.
+     */
+    overrides?: Partial<EntityCollection>;
+
+    // ─── Framework-managed fields ───
+
+    /**
+     * Optional name for this relation. Defaults to the property key at runtime.
+     * Only needed when the relation name should differ from the property key,
+     * or for backward compatibility with existing `relations[]` entries.
+     */
+    relationName?: string;
+
+    /**
+     * The resolved relation object, populated by the framework at normalization time.
+     * **Do not set manually** — it is computed from the inline fields above
+     * or looked up from the collection's `relations[]` array.
      */
     relation?: Relation;
+
+    // ─── UI configuration ───
+
     /**
      * Allow selection of entities that pass the given filter only.
      * e.g. `forceFilter: { age: [">=", 18] }`

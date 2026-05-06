@@ -1,6 +1,9 @@
 import { ReactNode } from "react";
-import { EntityCollection, EntityCollectionsBuilder, EntityCustomView, EntityAction } from "../types";
-import { AppView } from "./navigation";
+import type { EntityCollection } from "../types/collections";
+import type { EntityCollectionsBuilder } from "../types/builders";
+import type { EntityCustomView } from "../types/entity_views";
+import type { EntityAction } from "../types/entity_actions";
+import type { AppView } from "./navigation";
 
 /**
  * Options to enable the built-in collection editor.

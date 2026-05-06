@@ -1,6 +1,6 @@
-import { Entity } from "./entities";
-import { User } from "../users";
-import { RebaseContext } from "../rebase_context";
+import type { Entity } from "./entities";
+import type { User } from "../users";
+import type { RebaseContext } from "../rebase_context";
 
 /**
  * You can use this configuration to add additional fields to the data

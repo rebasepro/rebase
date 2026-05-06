@@ -27,16 +27,10 @@ const profilesCollection: EntityCollection = {
         author: {
             name: "Author",
             type: "relation",
-            relationName: "author"
-        }
-    },
-    relations: [
-        {
-            relationName: "author",
             target: () => authorsCollection,
             cardinality: "one"
         }
-    ]
+    }
 };
 
 export default profilesCollection;

@@ -1,7 +1,8 @@
-import { CollectionRegistryController } from "./collection_registry";
-import { Entity, EntityCollection, EntityStatus, EntityValues, FilterValues } from "../types";
-import { RebaseContext } from "../rebase_context";
-import { TableMetadata } from "../types/websockets";
+import type { CollectionRegistryController } from "./collection_registry";
+import type { Entity, EntityStatus, EntityValues } from "../types/entities";
+import type { EntityCollection, FilterValues } from "../types/collections";
+import type { RebaseContext } from "../rebase_context";
+import type { TableMetadata } from "../types/websockets";
 
 /**
  * @internal

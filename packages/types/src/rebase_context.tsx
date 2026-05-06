@@ -1,14 +1,12 @@
-import {
-    AnalyticsController,
-    AuthController,
-    StorageSource,
-    UserConfigurationPersistence,
-    DatabaseAdmin
-} from "./controllers";
+import type { AnalyticsController } from "./controllers/analytics_controller";
+import type { AuthController } from "./controllers/auth";
+import type { StorageSource } from "./controllers/storage";
+import type { UserConfigurationPersistence } from "./controllers/local_config_persistence";
+import type { DatabaseAdmin } from "./types/backend";
 
-import { RebaseData } from "./controllers/data";
-import { User } from "./users";
-import { UserManagementDelegate } from "./types/user_management_delegate";
+import type { RebaseData } from "./controllers/data";
+import type { User } from "./users";
+import type { UserManagementDelegate } from "./types/user_management_delegate";
 
 
 /**

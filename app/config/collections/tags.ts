@@ -9,6 +9,7 @@ const tagsCollection: EntityCollection = {
     icon: "Tag",
     group: "Content",
     history: true,
+    hideFromNavigation: true,
     properties: {
         id: {
             name: "ID",
@@ -33,9 +34,6 @@ const tagsCollection: EntityCollection = {
             direction: "inverse",
             inverseRelationName: "tags"
         }
-    ],
-    entityViews: [
-        "__rebase_history"
     ]
 };
 

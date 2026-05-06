@@ -45,7 +45,7 @@ export function MultipleRelationFieldBinding({
     if (!parentCollection || !isPostgresCollection(parentCollection) || !parentCollection.relations) {
         throw Error("RelationFieldBinding expected a PostgreSQL collection with relations");
     }
-    const resolvedProperty = resolveRelationProperty(property, parentCollection.relations)
+    const resolvedProperty = resolveRelationProperty(property, parentCollection.relations, propertyKey)
     const relation = resolvedProperty.relation;
     if (!relation)
         throw Error(

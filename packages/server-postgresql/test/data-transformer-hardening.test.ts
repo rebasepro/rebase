@@ -278,20 +278,22 @@ describe("normalizeDbValues FK column preservation", () => {
             name: { type: "string", name: "Name" } as Property
         });
 
+        const categoryRelation = {
+            target: () => targetCollection,
+            cardinality: "one" as const,
+            direction: "owning" as const,
+            localKey: "category_id",
+            relationName: "category"
+        };
+
         const collection = makeCollection("products", {
             title: { type: "string", name: "Title" } as Property,
             category: {
                 type: "relation",
                 name: "Category",
-                relation: {
-                    target: () => targetCollection,
-                    cardinality: "one",
-                    direction: "owning",
-                    localKey: "category_id",   // FK column NOT in properties
-                    relationName: "category"
-                }
+                relationName: "category"
             } as unknown as Property
-        });
+        }, [categoryRelation] as any);
 
         const result = normalizeDbValues(
             { title: "Widget", category_id: "cat-123", category: "ignored" } as any,
@@ -311,20 +313,22 @@ describe("normalizeDbValues FK column preservation", () => {
             name: { type: "string", name: "Name" } as Property
         });
 
+        const authorRelation = {
+            target: () => targetCollection,
+            cardinality: "one" as const,
+            direction: "owning" as const,
+            localKey: "author_id",
+            relationName: "author"
+        };
+
         const collection = makeCollection("books", {
             title: { type: "string", name: "Title" } as Property,
             author: {
                 type: "relation",
                 name: "Author",
-                relation: {
-                    target: () => targetCollection,
-                    cardinality: "one",
-                    direction: "owning",
-                    localKey: "author_id",
-                    relationName: "author"
-                }
+                relationName: "author"
             } as unknown as Property
-        });
+        }, [authorRelation] as any);
 
         const result = normalizeDbValues(
             { title: "Book", author_id: 42 } as any,
@@ -338,20 +342,22 @@ describe("normalizeDbValues FK column preservation", () => {
             name: { type: "string", name: "Name" } as Property
         });
 
+        const authorRelation = {
+            target: () => targetCollection,
+            cardinality: "one" as const,
+            direction: "owning" as const,
+            localKey: "author_id",
+            relationName: "author"
+        };
+
         const collection = makeCollection("books", {
             title: { type: "string", name: "Title" } as Property,
             author: {
                 type: "relation",
                 name: "Author",
-                relation: {
-                    target: () => targetCollection,
-                    cardinality: "one",
-                    direction: "owning",
-                    localKey: "author_id",
-                    relationName: "author"
-                }
+                relationName: "author"
             } as unknown as Property
-        });
+        }, [authorRelation] as any);
 
         const result = normalizeDbValues(
             { title: "Book", author_id: null } as any,

@@ -1,12 +1,13 @@
 
 import React, { ReactNode, useEffect, useRef, useState } from "react";
 
-import { Button, cls, IconButton, LoadingButton, Paper, TextField, Typography } from "@rebasepro/ui";
-import { ArrowLeftIcon, MailIcon } from "lucide-react";
+import { Button, cls, IconButton, LoadingButton, Menu, MenuItem, TextField, Typography, iconSize } from "@rebasepro/ui";
+import { ArrowLeftIcon, MailIcon, MoonIcon, SunIcon, SunMoonIcon } from "lucide-react";
 import { AuthControllerExtended, User } from "@rebasepro/types";
 import { ErrorView } from "../ErrorView";
 import { RebaseLogo } from "../RebaseLogo";
-import { useModeController } from "../../hooks";
+import { LanguageToggle } from "../LanguageToggle";
+import { useModeController, useTranslation } from "../../hooks";
 
 /**
  * Props for the generic LoginView.
@@ -101,7 +102,9 @@ export function LoginView({
 }: LoginViewProps) {
 
     const modeState = useModeController();
-    const isDark = modeState.mode === "dark";
+    const { mode: colorMode, setMode: setColorMode } = modeState;
+    const isDark = colorMode === "dark";
+    const { t } = useTranslation();
 
     const [mode, setMode] = useState<AuthMode>("buttons");
     const [fadeIn, setFadeIn] = useState(false);
@@ -169,11 +172,28 @@ export function LoginView({
     return (
         <div
             className={cls(
-                "flex items-center justify-center min-h-screen w-full p-4 transition-opacity duration-500",
+                "relative flex items-center justify-center h-screen w-screen p-4 transition-opacity duration-500 bg-white dark:bg-surface-950",
                 fadeIn ? "opacity-100" : "opacity-0"
             )}>
 
-            <Paper className="flex flex-col items-center w-[480px] max-w-full p-8 sm:p-10">
+            {/* Top-right controls */}
+            <div className="absolute top-4 right-4 flex items-center gap-1 z-10">
+                <LanguageToggle/>
+                <Menu
+                    trigger={<IconButton
+                        color="inherit"
+                        aria-label="Toggle theme">
+                        {colorMode === "dark"
+                            ? <MoonIcon size={iconSize.small}/>
+                            : <SunIcon size={iconSize.small}/>}
+                    </IconButton>}>
+                    <MenuItem onClick={() => setColorMode("dark")}><MoonIcon size={iconSize.smallest}/> {t("dark_mode")}</MenuItem>
+                    <MenuItem onClick={() => setColorMode("light")}><SunIcon size={iconSize.smallest}/> {t("light_mode")}</MenuItem>
+                    <MenuItem onClick={() => setColorMode("system")}><SunMoonIcon size={iconSize.smallest}/> {t("system_mode")}</MenuItem>
+                </Menu>
+            </div>
+
+            <div className="flex flex-col items-center w-[480px] max-w-full p-8 sm:p-10">
                 {/* Logo */}
                 <div className="w-32 h-32 m-2 mb-6">
                     {logoComponent}
@@ -282,7 +302,7 @@ export function LoginView({
                         </>
                     )}
                 </div>
-            </Paper>
+            </div>
         </div>
     );
 }

@@ -1,15 +1,15 @@
 import React, { Dispatch, SetStateAction } from "react";
-import { Entity, EntityStatus, EntityValues } from "./entities";
-import { EntityCallbacks } from "./entity_callbacks";
+import type { Entity, EntityStatus, EntityValues } from "./entities";
+import type { EntityCallbacks } from "./entity_callbacks";
 
-import { EnumValues, Properties } from "./properties";
-import { ExportConfig } from "./export_import";
-import { EntityOverrides } from "./entity_overrides";
-import { User } from "../users";
-import { RebaseContext } from "../rebase_context";
-import { Relation } from "./relations";
-import { EntityCustomView } from "./entity_views";
-import { EntityAction } from "./entity_actions";
+import type { EnumValues, Properties } from "./properties";
+import type { ExportConfig } from "./export_import";
+import type { EntityOverrides } from "./entity_overrides";
+import type { User } from "../users";
+import type { RebaseContext } from "../rebase_context";
+import type { Relation } from "./relations";
+import type { EntityCustomView } from "./entity_views";
+import type { EntityAction } from "./entity_actions";
 
 /**
  * Base interface containing all driver-agnostic collection properties.

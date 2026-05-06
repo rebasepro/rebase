@@ -33,13 +33,9 @@ const ordersCollection: PostgresCollection = {
         customer: {
             name: "Customer",
             type: "relation",
-            relationName: "customer",
-            relation: {
-                relationName: "customer",
-                cardinality: "one",
-                direction: "owning",
-                target: () => customersCollection
-            },
+            target: () => customersCollection,
+            cardinality: "one",
+            direction: "owning",
             validation: {
                 required: true
             }
@@ -215,13 +211,8 @@ label: "AUD (A$)" }
         "created_at",
         "updated_at"
     ],
+    // Headless relation: no property for "order_items", only used for subcollection tab
     relations: [
-        {
-            relationName: "customer",
-            target: () => customersCollection,
-            cardinality: "one",
-            direction: "owning"
-        },
         {
             relationName: "order_items",
             target: () => orderItemsCollection,

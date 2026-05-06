@@ -1,6 +1,7 @@
 import React from "react";
-import { EntityReference } from "../types/entities";import { EntityCollection } from "../types/collections";
-import { RebasePlugin } from "../types/plugins";
+import type { EntityReference } from "../types/entities";
+import type { EntityCollection } from "../types/collections";
+import type { RebasePlugin } from "../types/plugins";
 
 /**
  * Controller that handles URL path building and resolution.

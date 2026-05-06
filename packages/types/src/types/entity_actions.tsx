@@ -4,7 +4,7 @@ import type { EntityCollection, SelectionController } from "./collections";
 import type { FormContext } from "./entity_views";
 import type { User } from "../users";
 import type { RebaseContext } from "../rebase_context";
-import type { SideEntityController } from "../controllers";
+import type { SideEntityController } from "../controllers/side_entity_controller";
 
 /**
  * An entity action is a custom action that can be performed on an entity.

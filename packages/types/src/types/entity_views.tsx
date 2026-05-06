@@ -1,6 +1,6 @@
 import React from "react";
-import { Entity, EntityValues } from "./entities";
-import { EntityCollection } from "./collections";
+import type { Entity, EntityValues } from "./entities";
+import type { EntityCollection } from "./collections";
 
 /**
  * Context passed to custom fields and entity views.

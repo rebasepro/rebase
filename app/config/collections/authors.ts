@@ -69,25 +69,15 @@ const authorsCollection: EntityCollection = {
         profile: {
             name: "Profile",
             type: "relation",
-            relationName: "profile",
             description: "Profile of the author",
-            relation: {
-                relationName: "profile",
-                target: () => profilesCollection,
-                cardinality: "one",
-                direction: "inverse",
-                inverseRelationName: "author"
-            }
-        }
-    },
-    relations: [
-        {
-            relationName: "profile",
             target: () => profilesCollection,
             cardinality: "one",
             direction: "inverse",
             inverseRelationName: "author"
-        },
+        }
+    },
+    // Headless relation: no property for "posts", only used for subcollection tab
+    relations: [
         {
             relationName: "posts",
             target: () => postsCollection,

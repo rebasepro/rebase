@@ -1,4 +1,5 @@
-import { Entity, EntityCollection } from "../types";
+import type { Entity } from "../types/entities";
+import type { EntityCollection } from "../types/collections";
 
 /**
  * Props used to open a side dialog

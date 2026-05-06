@@ -19,24 +19,16 @@ const orderItemsCollection: PostgresCollection = {
         order: {
             name: "Order",
             type: "relation",
-            relationName: "order",
-            relation: {
-                relationName: "order",
-                cardinality: "one",
-                direction: "owning",
-                target: () => ordersCollection
-            }
+            target: () => ordersCollection,
+            cardinality: "one",
+            direction: "owning"
         },
         product: {
             name: "Product",
             type: "relation",
-            relationName: "product",
-            relation: {
-                relationName: "product",
-                cardinality: "one",
-                direction: "owning",
-                target: () => productsCollection
-            }
+            target: () => productsCollection,
+            cardinality: "one",
+            direction: "owning"
         },
         product_name: {
             name: "Product Name",
@@ -82,20 +74,6 @@ const orderItemsCollection: PostgresCollection = {
         "quantity",
         "unit_price",
         "line_total"
-    ],
-    relations: [
-        {
-            relationName: "order",
-            target: () => ordersCollection,
-            cardinality: "one",
-            direction: "owning"
-        },
-        {
-            relationName: "product",
-            target: () => productsCollection,
-            cardinality: "one",
-            direction: "owning"
-        }
     ]
 };
 

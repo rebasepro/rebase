@@ -18,19 +18,19 @@
     "jsx": "preserve",
     "paths": {
       "@rebasepro/types": [
-        "../../packages/types/src"
+        "../../packages/types/src/index"
       ],
       "@rebasepro/server-core": [
-        "../../packages/server-core/src"
+        "../../packages/server-core/src/index"
       ],
       "@rebasepro/common": [
-        "../../packages/common/src"
+        "../../packages/common/src/index"
       ],
       "config": [
-        "../config"
+        "../config/index"
       ],
       "@rebasepro/server-postgresql": [
-        "../../packages/server-postgresql/src"
+        "../../packages/server-postgresql/src/index"
       ]
     }
   },

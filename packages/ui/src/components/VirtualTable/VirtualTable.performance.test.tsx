@@ -1,5 +1,3 @@
-import { ListIcon } from "lucide-react";
-
 /**
  * @jest-environment jsdom
  */

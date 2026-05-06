@@ -9,7 +9,9 @@ import {
     Property,
     Relation,
     RelationProperty,
-    StringProperty
+    StringProperty,
+    OnAction,
+    JoinStep
 } from "@rebasepro/types";
 import { deepEqual } from "fast-equals";
 
@@ -149,9 +151,26 @@ export class CollectionRegistry {
     }
 
     public normalizeCollection(collection: EntityCollection): EntityCollection {
-        const relations = isPostgresCollection(collection) ? (collection.relations ?? []) : [];
-        const properties: Properties = this.normalizeProperties(collection.properties, relations);
+        // 1. Extract relations from properties that have inline config (target set)
+        const extractedRelations = this.extractRelationsFromProperties(collection.properties);
 
+        // 2. Merge with manual relations[] (manual entries win on name conflict)
+        const manualRelations = isPostgresCollection(collection) ? (collection.relations ?? []) : [];
+        const mergedRelations = [...extractedRelations];
+        for (const manual of manualRelations) {
+            const name = manual.relationName;
+            if (!name || !mergedRelations.find(r => r.relationName === name)) {
+                mergedRelations.push(manual);
+            }
+        }
+
+        // 3. Set the merged relations on the collection
+        if (isPostgresCollection(collection)) {
+            collection.relations = mergedRelations;
+        }
+
+        // 4. Normalize properties (which stamps relation on each property)
+        const properties: Properties = this.normalizeProperties(collection.properties, mergedRelations);
         collection.properties = properties;
 
         // Populate childCollections from driver-specific fields
@@ -172,15 +191,47 @@ export class CollectionRegistry {
         return collection;
     }
 
+    /**
+     * Extract Relation[] from properties that have inline relation config (i.e. `target` is set).
+     * This allows developers to define relations directly on properties without a separate
+     * `relations[]` entry on the collection.
+     */
+    private extractRelationsFromProperties(properties: Properties): Relation[] {
+        const relations: Relation[] = [];
+        for (const [key, property] of Object.entries(properties as Record<string, Property>)) {
+            if (property.type === "relation") {
+                const relProp = property as RelationProperty;
+                if (relProp.target) {
+                    const relationName = relProp.relationName || key;
+                    relations.push({
+                        relationName,
+                        target: relProp.target,
+                        cardinality: relProp.cardinality || "one",
+                        direction: relProp.direction || "owning",
+                        inverseRelationName: relProp.inverseRelationName,
+                        localKey: relProp.localKey,
+                        foreignKeyOnTarget: relProp.foreignKeyOnTarget,
+                        through: relProp.through,
+                        joinPath: relProp.joinPath,
+                        onUpdate: relProp.onUpdate,
+                        onDelete: relProp.onDelete,
+                        overrides: relProp.overrides,
+                    });
+                }
+            }
+        }
+        return relations;
+    }
+
     private normalizeProperties(properties: Properties, relations: Relation[]): Properties {
         const newProperties: Properties = {};
         for (const key in properties) {
-            newProperties[key] = this.normalizeProperty(properties[key], relations);
+            newProperties[key] = this.normalizeProperty(key, properties[key], relations);
         }
         return newProperties;
     }
 
-    private normalizeProperty(property: Property, relations: Relation[]): Property {
+    private normalizeProperty(key: string, property: Property, relations: Relation[]): Property {
         const newProperty = { ...property };
 
         if (newProperty.type === "map" && newProperty.properties) {
@@ -190,9 +241,9 @@ export class CollectionRegistry {
             const arrayProp = newProperty as ArrayProperty;
             if (arrayProp.of) {
                 if (Array.isArray(arrayProp.of)) {
-                    (arrayProp as { of: Property | Property[] }).of = arrayProp.of.map(p => this.normalizeProperty(p, relations));
+                    (arrayProp as { of: Property | Property[] }).of = arrayProp.of.map((p, i) => this.normalizeProperty(`${key}[${i}]`, p, relations));
                 } else {
-                    arrayProp.of = this.normalizeProperty(arrayProp.of, relations);
+                    arrayProp.of = this.normalizeProperty(`${key}.of`, arrayProp.of, relations);
                 }
             } else if (arrayProp.oneOf && arrayProp.oneOf.properties) {
                 arrayProp.oneOf.properties = this.normalizeProperties(arrayProp.oneOf.properties, relations);
@@ -204,12 +255,13 @@ export class CollectionRegistry {
             }
         } else if (newProperty.type === "relation") {
             const relationProperty = newProperty as RelationProperty;
-            const relation = relations.find(r => r.relationName === relationProperty.relationName);
+            const name = relationProperty.relationName || key;
+            const relation = relations.find(r => r.relationName === name);
             if (relation) {
                 // we attach the resolved relation to the property
                 (relationProperty as RelationProperty & { relation?: Relation }).relation = relation;
             } else {
-                console.warn(`Could not find relation for property with relationName: ${relationProperty.relationName}`);
+                console.warn(`Could not find relation for property '${key}' with relationName: ${name}`);
             }
         }
 

@@ -1,4 +1,5 @@
-import { DataDriver, StorageSource } from "../controllers";
+import type { DataDriver } from "../controllers/data_driver";
+import type { StorageSource } from "../controllers/storage";
 
 export type EntityOverrides = {
     /**

@@ -1,4 +1,4 @@
-import { EntityCollection, isPostgresCollection, PostgresCollection, Property, Relation } from "@rebasepro/types";
+import { EntityCollection, isPostgresCollection, PostgresCollection, Property, Relation, RelationProperty } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { generateForeignKeyName } from "@rebasepro/utils";
 
@@ -210,7 +210,28 @@ export function resolvePropertyRelation({
 }): Relation | undefined {
     if (property.type !== "relation") return undefined;
 
-    const relation = (sourceCollection.relations ?? []).find((rel: Relation) => rel.relationName === property.relationName)
+    const relProp = property as RelationProperty;
+
+    // 1. If the property has inline config (target set), build a Relation from it
+    if (relProp.target) {
+        return {
+            relationName: relProp.relationName || propertyKey,
+            target: relProp.target,
+            cardinality: relProp.cardinality || "one",
+            direction: relProp.direction || "owning",
+            inverseRelationName: relProp.inverseRelationName,
+            localKey: relProp.localKey,
+            foreignKeyOnTarget: relProp.foreignKeyOnTarget,
+            through: relProp.through,
+            joinPath: relProp.joinPath,
+            onUpdate: relProp.onUpdate,
+            onDelete: relProp.onDelete,
+            overrides: relProp.overrides,
+        } as Relation;
+    }
+
+    // 2. Fall back to lookup from collection.relations[] (backward compat)
+    const relation = (sourceCollection.relations ?? []).find((rel: Relation) => rel.relationName === relProp.relationName)
     if (!relation) {
         console.warn(`Unrecognized relation format for property '${propertyKey}' in collection '${sourceCollection.slug}'`);
         return undefined;

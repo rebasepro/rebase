@@ -132,24 +132,16 @@ const postsCollection: PostgresCollection = {
         author: {
             name: "Author",
             type: "relation",
-            relationName: "author",
-            relation: {
-                relationName: "author",
-                cardinality: "one",
-                direction: "owning",
-                target: () => authorsCollection
-            }
+            target: () => authorsCollection,
+            cardinality: "one",
+            direction: "owning"
         },
         tags: {
             name: "Tags",
             type: "relation",
-            relationName: "tags",
-            relation: {
-                relationName: "tags",
-                cardinality: "many",
-                direction: "owning",
-                target: () => tagsCollection
-            }
+            target: () => tagsCollection,
+            cardinality: "many",
+            direction: "owning"
         }
     },
     propertiesOrder: [
@@ -165,23 +157,8 @@ const postsCollection: PostgresCollection = {
         "created_at",
         "updated_at"
     ],
-    relations: [
-        {
-            relationName: "author",
-            target: () => authorsCollection,
-            cardinality: "one",
-            direction: "owning"
-        },
-        {
-            relationName: "tags",
-            target: () => tagsCollection,
-            cardinality: "many",
-            direction: "owning"
-        }
-    ],
     entityViews: [
-        "blog_preview",
-        "__rebase_history"
+        "blog_preview"
     ]
 };
 

@@ -135,11 +135,19 @@ export function resolveProperty<M extends Record<string, unknown> = Record<strin
     return resolvedProperty;
 }
 
-export function resolveRelationProperty(property: RelationProperty, relations: Relation[]) {
-    // find the relation by name
-    const relation = relations.find((rel) => rel.relationName === property.relationName);
+export function resolveRelationProperty(property: RelationProperty, relations: Relation[], propertyKey?: string) {
+    // If the property already has a resolved relation, return as-is
+    if (property.relation) {
+        return property;
+    }
+
+    // Determine the relation name: explicit > property key
+    const name = property.relationName || propertyKey;
+
+    // Find the relation by name (it may have been extracted from the property during normalization)
+    const relation = name ? relations.find((rel) => rel.relationName === name) : undefined;
     if (!relation) {
-        throw Error(`Relation ${property.relationName} not found`);
+        throw Error(`Relation ${name ?? "(unnamed)"} not found`);
     }
     return {
         ...property,

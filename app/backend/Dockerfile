@@ -31,7 +31,7 @@ RUN pnpm install --shamefully-hoist
 RUN pnpm --filter './packages/*' -r --no-bail run build; exit 0
 
 # Build the backend (TypeScript → JavaScript), then resolve ESM import extensions
-RUN cd app/backend && npx tsc -p tsconfig.docker.json && npx tsc-alias -p tsconfig.docker.json
+RUN cd app/backend && npx tsc -p tsconfig.docker.json && npx tsc-alias -p tsconfig.docker.json -f
 
 # Build frontend (reads .env.production for VITE_API_URL etc.)
 RUN cd app/frontend && npx vite build

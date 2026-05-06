@@ -1,4 +1,4 @@
-import { EntityCollection } from "./collections";
+import type { EntityCollection } from "./collections";
 
 /**
  * @group Models

@@ -38,7 +38,7 @@ export function RelationFieldBinding({
     if (!collection || !isPostgresCollection(collection) || !collection.relations) {
         throw Error("RelationFieldBinding expected a PostgreSQL collection with relations");
     }
-    const resolvedProperty = resolveRelationProperty(property, collection.relations)
+    const resolvedProperty = resolveRelationProperty(property, collection.relations, propertyKey)
     const relation = resolvedProperty.relation;
 
     const manyRelation = relation?.cardinality === "many";
