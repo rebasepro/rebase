@@ -132,6 +132,9 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
     // Flag to prevent race conditions during cleanup
     const isCleaningUpRef = useRef(false);
 
+    // Track items that are currently in an optimistic state (awaiting DB sync)
+    const pendingItemsRef = useRef<Record<string, { entity: Entity<M>, expectedValues: Record<string, any> }>>({});
+
     // Stable keys for dependency comparison
     const columnsKey = useMemo(() => [...columns].sort().join(","), [columns]);
     const filterKey = useMemo(() => JSON.stringify(filterValues), [filterValues]);
@@ -207,12 +210,68 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
             // Skip updates if we're cleaning up
             if (isCleaningUpRef.current) return;
 
-            // When text search is active, the data source returns ALL matching entities
-            // regardless of the column filter. We need to filter in memory to only show
-            // entities that belong to this specific column.
-            let processed = currentSearchString
-                ? entities.filter(e => e.values?.[currentColumnProperty] === column)
-                : entities;
+            const pendingMap = pendingItemsRef.current;
+            
+            // Apply pending updates to incoming entities
+            const mergedEntities = entities.map(e => {
+                const pending = pendingMap[String(e.id)];
+                if (pending) {
+                    // Check if DB entity has caught up to the expected column and order
+                    const expectedCol = pending.expectedValues[currentColumnProperty];
+                    const expectedOrder = currentOrderProperty ? pending.expectedValues[currentOrderProperty] : undefined;
+                    
+                    let caughtUp = true;
+                    if (e.values?.[currentColumnProperty] !== expectedCol) {
+                        caughtUp = false;
+                    }
+                    if (currentOrderProperty && e.values?.[currentOrderProperty] !== expectedOrder) {
+                        caughtUp = false;
+                    }
+                    
+                    if (caughtUp) {
+                        // DB has caught up, clear pending state
+                        delete pendingMap[String(e.id)];
+                        return e; // Use the real DB entity
+                    }
+                    
+                    // DB hasn't caught up, overlay expected values
+                    return { ...e, values: { ...e.values, ...pending.expectedValues } };
+                }
+                return e;
+            });
+
+            // Add any pending items that belong to this column but aren't in the incoming entities yet
+            // (e.g. backend hasn't moved them to this column yet)
+            Object.values(pendingMap).forEach(pending => {
+                if (pending.expectedValues[currentColumnProperty] === column) {
+                    if (!mergedEntities.some(e => String(e.id) === String(pending.entity.id))) {
+                        mergedEntities.push(pending.entity);
+                    }
+                }
+            });
+
+            // Always filter in memory to only show entities that belong to this specific column.
+            // This is required because text search returns all matches, and collection_entity_patch
+            // may contain entities that have just been moved out of this column.
+            let processed = mergedEntities.filter(e => e.values?.[currentColumnProperty] === column);
+
+            // Sort locally if orderProperty is defined. This ensures that collection_entity_patch
+            // insertions (which prepend by default in websocket.ts) are correctly placed.
+            if (currentOrderProperty) {
+                processed = [...processed].sort((a, b) => {
+                    const valA = a.values?.[currentOrderProperty] as string | undefined | null;
+                    const valB = b.values?.[currentOrderProperty] as string | undefined | null;
+                    
+                    const isAEmpty = valA === undefined || valA === null || valA === "";
+                    const isBEmpty = valB === undefined || valB === null || valB === "";
+                    
+                    if (isAEmpty && isBEmpty) return 0;
+                    if (isAEmpty) return 1;
+                    if (isBEmpty) return -1;
+                    
+                    return valA < valB ? -1 : valA > valB ? 1 : 0;
+                });
+            }
 
             // Apply afterRead callbacks if any
             if (currentCollection.callbacks?.afterRead) {
@@ -486,12 +545,20 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
             }
 
             if (itemToMove) {
+                const newValuesMerged = {
+                    ...itemToMove.values,
+                    ...(newValues || {})
+                };
+                
                 const updatedEntity = {
                     ...itemToMove,
-                    values: {
-                        ...itemToMove.values,
-                        ...(newValues || {})
-                    }
+                    values: newValuesMerged
+                };
+
+                // Store in pending items ref
+                pendingItemsRef.current[String(updatedEntity.id)] = {
+                    entity: updatedEntity,
+                    expectedValues: newValuesMerged
                 };
 
                 const targetEntities = sourceColumn === targetColumn ? sourceEntities : [...(updated[targetColumn]?.entities || [])];
