@@ -1,11 +1,8 @@
-import React, { useCallback } from "react";
+import React from "react";
 
-import { useAuthController } from "@rebasepro/core";
-import { EntityCollection, RebasePlugin, PluginFieldBuilderParams, User } from "@rebasepro/types";
+import { EntityCollection, RebasePlugin, User } from "@rebasepro/types";
 import { DataEnhancementControllerProvider } from "./components/DataEnhancementControllerProvider";
-import { fieldBuilder } from "./components/field_builder";
 import { FormEnhanceAction } from "./components/FormEnhanceAction";
-import { SubscriptionMessageProps } from "./types/subscriptions_message_props";
 
 const DEFAULT_API_KEY = "fcms-U9jdDii0xXWSDC34asfrf54lbkFJBfKfRWcEDEwdc4V5wDWEDF";
 
@@ -44,17 +41,6 @@ export function useDataEnhancementPlugin(props?: DataEnhancementPluginProps): Re
 
     const apiKey = props?.apiKey ?? DEFAULT_API_KEY;
     const getConfigForPath = props?.getConfigForPath;
-    const authController = useAuthController();
-
-    const fieldBuilderEnabled = useCallback((params: PluginFieldBuilderParams<any>) => {
-        if (!getConfigForPath) return true;
-        if (!params.path || !params.collection) return false;
-        return getConfigForPath({
-            path: params.path,
-            collection: params.collection,
-            user: authController.user
-        })
-    }, [getConfigForPath, authController.user?.uid]);
 
     return React.useMemo(() => ({
         key: "data_enhancement",
@@ -75,11 +61,6 @@ export function useDataEnhancementPlugin(props?: DataEnhancementPluginProps): Re
                     host: props?.host
                 }
             }
-        ],
-        fieldBuilder: {
-            wrap: fieldBuilder,
-            enabled: fieldBuilderEnabled
-        }
-        // loading: configController.loading,
-    }), [apiKey, getConfigForPath, props?.host, fieldBuilderEnabled]);
+        ]
+    }), [apiKey, getConfigForPath, props?.host]);
 }

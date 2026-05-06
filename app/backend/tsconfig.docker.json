@@ -2,6 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "skipLibCheck": true,
-    "noCheck": true
+    "noCheck": true,
+    "jsx": "react-jsx"
   }
 }

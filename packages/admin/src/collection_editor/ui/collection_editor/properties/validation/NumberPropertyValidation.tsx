@@ -2,6 +2,7 @@ import React from "react";
 
 import { Field, FormexFieldProps, getIn, useFormex } from "@rebasepro/formex";
 import { DebouncedTextField } from "@rebasepro/ui";
+import { useTranslation } from "@rebasepro/core";
 import { GeneralPropertyValidation } from "./GeneralPropertyValidation";
 import { SwitchControl } from "../../SwitchControl";
 
@@ -13,6 +14,7 @@ export function NumberPropertyValidation({ disabled }: {
         values,
         handleChange
     } = useFormex();
+    const { t } = useTranslation();
 
     const validationMin = "validation.min";
     const validationMax = "validation.max";
@@ -30,7 +32,7 @@ export function NumberPropertyValidation({ disabled }: {
 
             <div className={"col-span-6"}>
                 <DebouncedTextField value={getIn(values, validationMin)}
-                    label={"Min value"}
+                    label={t("min_value")}
                     name={validationMin}
                     type="number"
                     size="small"
@@ -40,7 +42,7 @@ export function NumberPropertyValidation({ disabled }: {
 
             <div className={"col-span-6"}>
                 <DebouncedTextField value={getIn(values, validationMax)}
-                    label={"Max value"}
+                    label={t("max_value")}
                     name={validationMax}
                     type="number"
                     size="small"
@@ -53,7 +55,7 @@ export function NumberPropertyValidation({ disabled }: {
             <div className={"col-span-6"}>
                 <DebouncedTextField
                     value={getIn(values, validationLessThan)}
-                    label={"Less than"}
+                    label={t("less_than")}
                     name={validationLessThan}
                     type="number"
                     size="small"
@@ -65,7 +67,7 @@ export function NumberPropertyValidation({ disabled }: {
             <div className={"col-span-6"}>
                 <DebouncedTextField
                     value={getIn(values, validationMoreThan)}
-                    label={"More than"}
+                    label={t("more_than")}
                     name={validationMoreThan}
                     type="number"
                     size="small"
@@ -79,7 +81,7 @@ export function NumberPropertyValidation({ disabled }: {
                     type="checkbox">
                     {({ field, form }: FormexFieldProps) => {
                         return <SwitchControl
-                            label={"Positive value"}
+                            label={t("positive_value")}
                             disabled={disabled}
                             form={form}
                             field={field}/>
@@ -91,7 +93,7 @@ export function NumberPropertyValidation({ disabled }: {
                     type="checkbox">
                     {({ field, form }: FormexFieldProps) => {
                         return <SwitchControl
-                            label={"Negative value"}
+                            label={t("negative_value")}
                             disabled={disabled}
                             form={form}
                             field={field}/>
@@ -103,7 +105,7 @@ export function NumberPropertyValidation({ disabled }: {
                     type="checkbox">
                     {({ field, form }: FormexFieldProps) => {
                         return <SwitchControl
-                            label={"Integer value"}
+                            label={t("integer_value")}
                             disabled={disabled}
                             form={form}
                             field={field}/>

@@ -2,6 +2,7 @@ import React from "react";
 
 import { getIn, useFormex } from "@rebasepro/formex";
 import { DebouncedTextField } from "@rebasepro/ui";
+import { useTranslation } from "@rebasepro/core";
 import { GeneralPropertyValidation } from "./GeneralPropertyValidation";
 
 export function ArrayPropertyValidation({
@@ -18,6 +19,7 @@ export function ArrayPropertyValidation({
         values,
         handleChange
     } = useFormex();
+    const { t } = useTranslation();
 
     const validationMin = "validation.min";
     const validationMax = "validation.max";
@@ -30,7 +32,7 @@ export function ArrayPropertyValidation({
             {min && <div className={"col-span-6"}>
                 <DebouncedTextField value={getIn(values, validationMin)}
                     disabled={disabled}
-                    label={"Min length"}
+                    label={t("min_length")}
                     name={validationMin}
                     type="number"
                     size="small"
@@ -39,7 +41,7 @@ export function ArrayPropertyValidation({
             {max && <div className={"col-span-6"}>
                 <DebouncedTextField value={getIn(values, validationMax)}
                     disabled={disabled}
-                    label={"Max length"}
+                    label={t("max_length")}
                     name={validationMax}
                     type="number"
                     size="small"

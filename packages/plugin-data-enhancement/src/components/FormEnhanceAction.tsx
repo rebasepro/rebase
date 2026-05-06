@@ -17,7 +17,6 @@ export function FormEnhanceAction({
     path,
     status,
     collection,
-    disabled,
     formContext,
     openEntityMode
 }: PluginFormActionProps) {
@@ -109,7 +108,7 @@ export function FormEnhanceAction({
                 color={"neutral"}
                 fullWidth={largeLayout && openEntityMode === "full_screen"}
                 size={"small"}
-                disabled={loading || disabled}>
+                disabled={loading}>
                 {!loading && <AIIcon size={"small"}/>}
                 {loading && <CircularProgress size={"small"}/>}
                 Autofill
