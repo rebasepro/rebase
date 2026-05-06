@@ -70,5 +70,10 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1
 
-# Run the compiled JavaScript directly — no tsx, no --conditions development
-CMD ["node", "dist/app/backend/src/index.js"]
+# Copy the entrypoint script and drizzle config for auto-migration
+COPY --from=builder /app/app/backend/entrypoint.sh ./entrypoint.sh
+COPY --from=builder /app/app/backend/drizzle.config.ts ./drizzle.config.ts
+COPY --from=builder /app/app/backend/drizzle ./drizzle
+
+# Auto-migrate then start the compiled JavaScript backend
+CMD ["sh", "entrypoint.sh"]

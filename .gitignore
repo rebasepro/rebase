@@ -73,4 +73,4 @@ app/frontend/debug_trace**
 !/PUBLISHING.md
 !/LICENSE
 tsc_output.txt
-yarn.lock
+yarn.lockapp/uploads/
