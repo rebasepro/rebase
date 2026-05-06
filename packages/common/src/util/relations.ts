@@ -132,9 +132,15 @@ export function sanitizeRelation(relation: Partial<Relation>, sourceCollection: 
     return newRelation as Relation;
 }
 
+/** WeakMap cache — same collection instance always yields the same relation map. */
+const _resolvedRelationsCache = new WeakMap<EntityCollection, Record<string, Relation>>();
+
 export function resolveCollectionRelations(
     collection: EntityCollection
 ): Record<string, Relation> {
+    const cached = _resolvedRelationsCache.get(collection);
+    if (cached) return cached;
+
     if (!isPostgresCollection(collection)) return {};
     const relations: Record<string, Relation> = {};
 
@@ -189,6 +195,7 @@ export function resolveCollectionRelations(
         });
     }
 
+    _resolvedRelationsCache.set(collection, relations);
     return relations;
 }
 

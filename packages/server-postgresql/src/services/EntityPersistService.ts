@@ -175,17 +175,15 @@ export class EntityPersistService {
         }
 
         // Transform relations to IDs, then sanitize
-        const processedData = serializeDataToServer(otherValues as M, collection.properties as Properties, collection, this.registry);
+        const serializedResult = serializeDataToServer(otherValues as M, collection.properties as Properties, collection, this.registry);
 
-        // Extract relation updates before sanitizing
-        const inverseRelationUpdates = ((processedData as Record<string, unknown>).__inverseRelationUpdates as Array<{ relationKey: string; relation: Relation; newValue: unknown; currentEntityId?: string | number; }>) || [];
-        const joinPathRelationUpdates = ((processedData as Record<string, unknown>).__joinPathRelationUpdates as Array<{ relationKey: string; relation: Relation; newTargetId: string | number | null; }>) || [];
-        const junctionTableInfo = (processedData as Record<string, unknown>).__junction_table_info as { parentCollection: EntityCollection; parentId: string | number; relation: Relation; relationKey: string; } | undefined;
-        delete (processedData as Record<string, unknown>).__inverseRelationUpdates;
-        delete (processedData as Record<string, unknown>).__joinPathRelationUpdates;
-        delete (processedData as Record<string, unknown>).__junction_table_info;
+        // Extract relation updates from the typed result (no more hidden __dunder properties)
+        const inverseRelationUpdates = serializedResult.inverseRelationUpdates;
+        const joinPathRelationUpdates = serializedResult.joinPathRelationUpdates;
+        const junctionTableInfo = (serializedResult.scalarData as Record<string, unknown>).__junction_table_info as { parentCollection: EntityCollection; parentId: string | number; relation: Relation; relationKey: string; } | undefined;
+        delete (serializedResult.scalarData as Record<string, unknown>).__junction_table_info;
 
-        const entityData = sanitizeAndConvertDates(processedData);
+        const entityData = sanitizeAndConvertDates(serializedResult.scalarData);
 
         let savedId: string | number;
         try {

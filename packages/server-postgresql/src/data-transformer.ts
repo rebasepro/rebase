@@ -2,7 +2,7 @@ import { eq, SQL } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { EntityCollection, Properties, Property, Relation, RelationProperty, isPostgresCollection } from "@rebasepro/types";
-import { getTableName, resolveCollectionRelations, findRelation, DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "@rebasepro/common";
+import { getTableName, resolveCollectionRelations, findRelation, createRelationRef, DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { DrizzleConditionBuilder } from "./utils/drizzle-conditions";
 import { getPrimaryKeys, buildCompositeId } from "./services/entity-helpers";
@@ -11,6 +11,28 @@ import { getPrimaryKeys, buildCompositeId } from "./services/entity-helpers";
  * Data transformation utilities for converting between frontend and database formats.
  */
 
+/**
+ * Typed result from `serializeDataToServer`.
+ * Replaces the hidden `__inverseRelationUpdates` / `__joinPathRelationUpdates`
+ * dunder-property mutation pattern with explicit, typed state management.
+ */
+export interface SerializedEntityData {
+    /** Scalar column values ready for INSERT/UPDATE. */
+    scalarData: Record<string, unknown>;
+    /** Inverse relation updates that must be applied to target tables. */
+    inverseRelationUpdates: Array<{
+        relationKey: string;
+        relation: Relation;
+        newValue: unknown;
+        currentEntityId?: string | number;
+    }>;
+    /** JoinPath relation updates that require multi-hop writes. */
+    joinPathRelationUpdates: Array<{
+        relationKey: string;
+        relation: Relation;
+        newTargetId: string | number | null;
+    }>;
+}
 /**
  * Helper function to sanitize and convert dates to ISO strings
  */
@@ -67,8 +89,8 @@ export function serializeDataToServer<M extends Record<string, unknown>>(
     properties: Properties,
     collection?: EntityCollection,
     registry?: PostgresCollectionRegistry
-): Record<string, unknown> {
-    if (!entity || !properties) return entity;
+): SerializedEntityData {
+    if (!entity || !properties) return { scalarData: entity ?? {}, inverseRelationUpdates: [], joinPathRelationUpdates: [] };
 
     const result: Record<string, unknown> = {};
 
@@ -171,14 +193,11 @@ export function serializeDataToServer<M extends Record<string, unknown>>(
         result[key] = serializePropertyToServer(effectiveValue, property);
     }
 
-    if (inverseRelationUpdates.length > 0) {
-        (result as Record<string, unknown>).__inverseRelationUpdates = inverseRelationUpdates;
-    }
-    if (joinPathRelationUpdates.length > 0) {
-        (result as Record<string, unknown>).__joinPathRelationUpdates = joinPathRelationUpdates;
-    }
-
-    return result;
+    return {
+        scalarData: result,
+        inverseRelationUpdates,
+        joinPathRelationUpdates
+    };
 }
 
 /**
@@ -256,36 +275,11 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
     const properties = collection.properties;
     if (!data || !properties) return data;
 
-    const result: Record<string, unknown> = {};
-
     // Get the normalized relations once
     const resolvedRelations = resolveCollectionRelations(collection);
 
-    // Get list of FK columns that are used only for relations and not defined as properties
-    const internalFKColumns = new Set<string>();
-    Object.values(resolvedRelations).forEach(relation => {
-        if (relation.localKey && !properties[relation.localKey]) {
-            // This FK is used internally but not exposed as a property
-            internalFKColumns.add(relation.localKey);
-        }
-    });
-
-    // Process only the properties that are defined in the collection
-    for (const [key, value] of Object.entries(data)) {
-        // Keep internal FK columns as primitives
-        if (internalFKColumns.has(key)) {
-            result[key] = value === null ? null : (typeof value === "number" ? value : String(value));
-            continue;
-        }
-
-        const property = properties[key as keyof M] as Property;
-        if (!property) {
-            // Also skip any other database columns not defined in properties
-            continue;
-        }
-
-        result[key] = parsePropertyFromServer(value, property, collection, key);
-    }
+    // Shared scalar + relation value normalization
+    const result = normalizeScalarValues(data, properties, collection, resolvedRelations, { skipRelations: false });
 
     // Add relation properties that should be populated from FK values or inverse queries
     for (const [propKey, property] of Object.entries(properties)) {
@@ -299,11 +293,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                     if (fkValue !== null && fkValue !== undefined) {
                         try {
                             const targetCollection = relation.target();
-                            result[propKey] = {
-                                id: fkValue.toString(),
-                                path: targetCollection.slug,
-                                __type: "relation"
-                            };
+                            result[propKey] = createRelationRef(fkValue.toString(), targetCollection.slug);
                         } catch (e) {
                             console.warn(`Could not resolve target collection for relation property: ${propKey}`, e);
                         }
@@ -331,19 +321,13 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                                         // One-to-one: return single relation object
                                         const targetPks = getPrimaryKeys(targetCollection, registry!);
                                         const relatedEntity = relatedEntities[0] as Record<string, unknown>;
-                                        result[propKey] = {
-                                            id: buildCompositeId(relatedEntity, targetPks),
-                                            path: targetCollection.slug,
-                                            __type: "relation"
-                                        };
+                                        result[propKey] = createRelationRef(buildCompositeId(relatedEntity, targetPks), targetCollection.slug);
                                     } else {
                                         // One-to-many: return array of relation objects
                                         const targetPks = getPrimaryKeys(targetCollection, registry!);
-                                        result[propKey] = relatedEntities.map((entity: Record<string, unknown>) => ({
-                                            id: buildCompositeId(entity, targetPks),
-                                            path: targetCollection.slug,
-                                            __type: "relation"
-                                        }));
+                                        result[propKey] = relatedEntities.map((entity: Record<string, unknown>) => 
+                                            createRelationRef(buildCompositeId(entity, targetPks), targetCollection.slug)
+                                        );
                                     }
                                 }
                             }
@@ -433,20 +417,12 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                                     // One-to-one: return single relation object
                                     const joinResult = joinResults[0] as Record<string, unknown>;
                                     const targetEntity = (joinResult[targetTableName] || joinResult) as Record<string, unknown>;
-                                    result[propKey] = {
-                                        id: buildCompositeId(targetEntity, targetPks),
-                                        path: targetCollection.slug,
-                                        __type: "relation"
-                                    };
+                                    result[propKey] = createRelationRef(buildCompositeId(targetEntity, targetPks), targetCollection.slug);
                                 } else {
                                     // One-to-many: return array of relation objects
                                     result[propKey] = joinResults.map((joinResult: Record<string, unknown>) => {
                                         const targetEntity = (joinResult[targetTableName] || joinResult) as Record<string, unknown>;
-                                        return {
-                                            id: buildCompositeId(targetEntity, targetPks),
-                                            path: targetCollection.slug,
-                                            __type: "relation"
-                                        };
+                                        return createRelationRef(buildCompositeId(targetEntity, targetPks), targetCollection.slug);
                                     });
                                 }
                             }
@@ -490,11 +466,7 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
 
                 try {
                     const targetCollection = relationDef.target();
-                    return {
-                        id: value.toString(),
-                        path: targetCollection.slug,
-                        __type: "relation"
-                    };
+                    return createRelationRef(value.toString(), targetCollection.slug);
                 } catch (e) {
                     console.warn(`Could not resolve target collection for relation property: ${propertyKey || "unknown"}`, e);
                     return value;
@@ -572,25 +544,24 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
 }
 
 /**
- * Lightweight value normalization for db.query results.
- * Only handles type coercion (dates, numbers, NaN) and property filtering.
- * Does NOT query the database for relations — those are already resolved
- * by Drizzle's relational query API.
+ * Shared internal helper: normalizes scalar column values from a DB row
+ * into frontend format. Handles FK-column preservation, type coercion
+ * (dates, numbers, NaN), and property filtering.
  *
- * Use this instead of `parseDataFromServer` when processing results from
- * `db.query.findFirst/findMany` which return pre-hydrated relation data.
+ * @param skipRelations  When `true`, relation-typed properties are omitted
+ *                       from the result (used by `normalizeDbValues` where
+ *                       Drizzle's relational API already hydrates them).
  */
-export function normalizeDbValues<M extends Record<string, unknown>>(
+function normalizeScalarValues<M extends Record<string, unknown>>(
     data: M,
-    collection: EntityCollection
-): M {
-    const properties = collection.properties;
-    if (!data || !properties) return data;
-
+    properties: Properties,
+    collection: EntityCollection,
+    resolvedRelations: Record<string, Relation>,
+    options: { skipRelations: boolean }
+): Record<string, unknown> {
     const result: Record<string, unknown> = {};
 
-    // Get FK columns that are used internally for relations and not defined as properties
-    const resolvedRelations = resolveCollectionRelations(collection);
+    // Identify FK columns used only for relations and not exposed as properties
     const internalFKColumns = new Set<string>();
     Object.values(resolvedRelations).forEach(relation => {
         if (relation.localKey && !properties[relation.localKey]) {
@@ -608,11 +579,30 @@ export function normalizeDbValues<M extends Record<string, unknown>>(
         const property = properties[key as keyof M] as Property;
         if (!property) continue; // Skip DB columns not defined in properties
 
-        // Skip relation properties — they're already handled by db.query
-        if (property.type === "relation") continue;
+        if (options.skipRelations && property.type === "relation") continue;
 
         result[key] = parsePropertyFromServer(value, property, collection, key);
     }
 
-    return result as M;
+    return result;
+}
+
+/**
+ * Lightweight value normalization for db.query results.
+ * Only handles type coercion (dates, numbers, NaN) and property filtering.
+ * Does NOT query the database for relations — those are already resolved
+ * by Drizzle's relational query API.
+ *
+ * Use this instead of `parseDataFromServer` when processing results from
+ * `db.query.findFirst/findMany` which return pre-hydrated relation data.
+ */
+export function normalizeDbValues<M extends Record<string, unknown>>(
+    data: M,
+    collection: EntityCollection
+): M {
+    const properties = collection.properties;
+    if (!data || !properties) return data;
+
+    const resolvedRelations = resolveCollectionRelations(collection);
+    return normalizeScalarValues(data, properties, collection, resolvedRelations, { skipRelations: true }) as M;
 }

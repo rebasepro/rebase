@@ -11,6 +11,26 @@ import { getTableName } from "@rebasepro/common";
  * `PostgresCollectionRegistry` instance — there is no global singleton.
  */
 
+/**
+ * Interface for Drizzle column metadata introspection.
+ * Replaces unsafe `as unknown as Record<string, unknown>` double-cast chains.
+ */
+interface DrizzleColumnMeta {
+    columnType?: string;
+    dataType?: string;
+    primary?: boolean;
+}
+
+/** Safely extract Drizzle column metadata from a column object. */
+function getColumnMeta(col: AnyPgColumn): DrizzleColumnMeta {
+    const raw = col as unknown as Record<string | symbol, unknown>;
+    return {
+        columnType: typeof raw.columnType === "string" ? raw.columnType : undefined,
+        dataType: typeof raw.dataType === "string" ? raw.dataType : undefined,
+        primary: typeof raw.primary === "boolean" ? raw.primary : undefined
+    };
+}
+
 export function getCollectionByPath(collectionPath: string, registry: PostgresCollectionRegistry): EntityCollection {
     const collection = registry.getCollectionByPath(collectionPath);
     if (!collection) {
@@ -35,11 +55,11 @@ export function getPrimaryKeys(collection: EntityCollection, registry: PostgresC
     // Fallback to explicitly defined isId properties
     if (collection.properties) {
         const idProps = Object.entries(collection.properties)
-            .filter(([_, prop]) => "isId" in (prop as object) && Boolean((prop as unknown as Record<string, unknown>).isId))
+            .filter(([_, prop]) => "isId" in (prop as object) && Boolean((prop as { isId?: unknown }).isId))
             .map(([key, prop]) => ({
                 fieldName: key,
                 type: prop.type === "number" ? "number" as const : "string" as const,
-                isUUID: (prop as unknown as Record<string, unknown>).isId === "uuid"
+                isUUID: (prop as { isId?: unknown }).isId === "uuid"
             }));
 
         if (idProps.length > 0) {
@@ -52,11 +72,10 @@ export function getPrimaryKeys(collection: EntityCollection, registry: PostgresC
     for (const [key, colRaw] of Object.entries(table)) {
         const col = colRaw as AnyPgColumn;
         if (col && typeof col === "object" && "primary" in col && col.primary) {
-            const type = col.dataType === "number" || (col as unknown as Record<string, unknown>).columnType === "PgSerial" || (col as unknown as Record<string, unknown>).columnType === "PgInteger" ? "number" : "string";
-            const isUUID = (col as unknown as Record<string, unknown>).columnType === "PgUUID";
-            keys.push({ fieldName: key,
-type,
-isUUID });
+            const meta = getColumnMeta(col);
+            const type = col.dataType === "number" || meta.columnType === "PgSerial" || meta.columnType === "PgInteger" ? "number" : "string";
+            const isUUID = meta.columnType === "PgUUID";
+            keys.push({ fieldName: key, type, isUUID });
         }
     }
 
@@ -64,11 +83,10 @@ isUUID });
     // This maintains backwards compatibility
     if (keys.length === 0 && "id" in table) {
         const idCol = table["id" as keyof typeof table] as AnyPgColumn;
-        const type = idCol.dataType === "number" || (idCol as unknown as Record<string, unknown>).columnType === "PgSerial" || (idCol as unknown as Record<string, unknown>).columnType === "PgInteger" ? "number" : "string";
-        const isUUID = (idCol as unknown as Record<string, unknown>).columnType === "PgUUID";
-        keys.push({ fieldName: "id",
-type,
-isUUID });
+        const idMeta = getColumnMeta(idCol);
+        const type = idCol.dataType === "number" || idMeta.columnType === "PgSerial" || idMeta.columnType === "PgInteger" ? "number" : "string";
+        const isUUID = idMeta.columnType === "PgUUID";
+        keys.push({ fieldName: "id", type, isUUID });
     }
 
     return keys;

@@ -1,7 +1,7 @@
 import { and, asc, count, desc, eq, getTableName, gt, lt, or, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { Entity, EntityCollection, FilterValues, Relation } from "@rebasepro/types";
-import { resolveCollectionRelations, findRelation } from "@rebasepro/common";
+import { resolveCollectionRelations, findRelation, createRelationRef, createRelationRefWithData } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
     getCollectionByPath,
@@ -89,7 +89,6 @@ export class EntityFetchService {
         include?: string[]
     ): Record<string, boolean | { with: Record<string, boolean> }> {
         const resolvedRelations = resolveCollectionRelations(collection);
-        const propertyKeys = new Set(Object.keys(collection.properties || {}));
         const withConfig: Record<string, boolean | { with: Record<string, boolean> }> = {};
 
         const shouldInclude = (key: string) =>
@@ -167,7 +166,6 @@ export class EntityFetchService {
         idInfoArray?: { fieldName: string; type: "string" | "number" }[]
     ): Entity<M> {
         const resolvedRelations = resolveCollectionRelations(collection);
-        const propertyKeys = new Set(Object.keys(collection.properties || {}));
 
         // Normalize non-relation values (dates, numbers, etc.)
         const normalizedValues = normalizeDbValues(row as M, collection);
@@ -202,17 +200,12 @@ export class EntityFetchService {
                     const relId = String(targetEntity[targetIdField] ?? targetEntity.id ?? targetEntity[Object.keys(targetEntity)[0]]);
                     const targetValues = normalizeDbValues(targetEntity, targetCollection);
 
-                    return {
+                    return createRelationRefWithData(relId, targetPath, {
                         id: relId,
                         path: targetPath,
-                        __type: "relation" as const,
-                        data: {
-                            id: relId,
-                            path: targetPath,
-                            values: targetValues,
-                            databaseId
-                        }
-                    };
+                        values: targetValues,
+                        databaseId
+                    });
                 });
             } else if (relation.cardinality === "one" && typeof relData === "object" && !Array.isArray(relData)) {
                 const targetCollection = relation.target();
@@ -224,17 +217,12 @@ export class EntityFetchService {
                 const relId = String(relObj[targetIdField] ?? relObj.id ?? relObj[Object.keys(relObj)[0]]);
                 const targetValues = normalizeDbValues(relObj, targetCollection);
 
-                (normalizedValues as Record<string, unknown>)[key] = {
+                (normalizedValues as Record<string, unknown>)[key] = createRelationRefWithData(relId, targetPath, {
                     id: relId,
                     path: targetPath,
-                    __type: "relation" as const,
-                    data: {
-                        id: relId,
-                        path: targetPath,
-                        values: targetValues,
-                        databaseId
-                    }
-                };
+                    values: targetValues,
+                    databaseId
+                });
             }
         }
 
@@ -259,7 +247,6 @@ export class EntityFetchService {
         databaseId?: string
     ): Promise<void> {
         const resolvedRelations = resolveCollectionRelations(collection);
-        const propertyKeys = new Set(Object.keys(collection.properties || {}));
 
         const promises = Object.entries(resolvedRelations)
             .filter(([key, relation]) => relation.joinPath && relation.joinPath.length > 0)
@@ -274,19 +261,11 @@ export class EntityFetchService {
 
                     if (relation.cardinality === "one" && relatedEntities.length > 0) {
                         const e = relatedEntities[0];
-                        (entity.values as Record<string, unknown>)[key] = {
-                            id: e.id,
-                            path: e.path,
-                            __type: "relation" as const,
-                            data: e
-                        };
+                        (entity.values as Record<string, unknown>)[key] = createRelationRefWithData(e.id, e.path, e);
                     } else if (relation.cardinality === "many") {
-                        (entity.values as Record<string, unknown>)[key] = relatedEntities.map(e => ({
-                            id: e.id,
-                            path: e.path,
-                            __type: "relation" as const,
-                            data: e
-                        }));
+                        (entity.values as Record<string, unknown>)[key] = relatedEntities.map(e =>
+                            createRelationRefWithData(e.id, e.path, e)
+                        );
                     }
                 } catch (e) {
                     console.warn(`Could not resolve joinPath relation '${key}':`, e);
@@ -310,7 +289,6 @@ export class EntityFetchService {
         if (entities.length === 0) return;
 
         const resolvedRelations = resolveCollectionRelations(collection);
-        const propertyKeys = new Set(Object.keys(collection.properties || {}));
 
         const joinPathRelations = Object.entries(resolvedRelations)
             .filter(([key, relation]) => relation.joinPath && relation.joinPath.length > 0);
@@ -338,12 +316,7 @@ export class EntityFetchService {
 
                     if (relatedEntity) {
                         if (relation.cardinality === "one") {
-                            (entity.values as Record<string, unknown>)[key] = {
-                                id: relatedEntity.id,
-                                path: relatedEntity.path,
-                                __type: "relation" as const,
-                                data: relatedEntity
-                            };
+                            (entity.values as Record<string, unknown>)[key] = createRelationRefWithData(relatedEntity.id, relatedEntity.path, relatedEntity);
                         }
                     }
                 }
@@ -674,11 +647,9 @@ export class EntityFetchService {
                         key,
                         {}
                     );
-                    (values as Record<string, unknown>)[key] = relatedEntities.map(e => ({
-                        id: e.id,
-                        path: e.path,
-                        __type: "relation"
-                    }));
+                    (values as Record<string, unknown>)[key] = relatedEntities.map(e =>
+                        createRelationRef(e.id, e.path)
+                    );
                 } else if (relation.cardinality === "one") {
                     if ((values as Record<string, unknown>)[key] == null) {
                         try {
@@ -690,11 +661,7 @@ export class EntityFetchService {
                             );
                             if (relatedEntities.length > 0) {
                                 const e = relatedEntities[0];
-                                (values as Record<string, unknown>)[key] = {
-                                    id: e.id,
-                                    path: e.path,
-                                    __type: "relation"
-                                };
+                                (values as Record<string, unknown>)[key] = createRelationRef(e.id, e.path);
                             }
                         } catch (e) {
                             console.warn(`Could not resolve one-to-one relation property: ${key}`, e);
@@ -886,12 +853,7 @@ export class EntityFetchService {
                         const entityId = item.entity[idInfo.fieldName] as string | number;
                         const relatedEntity = relationResults.get(String(entityId));
                         if (relatedEntity) {
-                            (item.values as Record<string, unknown>)[key] = {
-                                id: relatedEntity.id,
-                                path: relatedEntity.path,
-                                __type: "relation",
-                                data: relatedEntity
-                            };
+                            (item.values as Record<string, unknown>)[key] = createRelationRefWithData(relatedEntity.id, relatedEntity.path, relatedEntity);
                         }
                     });
                 } catch (e) {
@@ -917,12 +879,9 @@ export class EntityFetchService {
                     entitiesWithValues.forEach(item => {
                         const entityId = String(item.entity[idInfo.fieldName]);
                         const relatedEntities = relationResults.get(entityId) || [];
-                        (item.values as Record<string, unknown>)[key] = relatedEntities.map(e => ({
-                            id: e.id,
-                            path: e.path,
-                            __type: "relation",
-                            data: e
-                        }));
+                        (item.values as Record<string, unknown>)[key] = relatedEntities.map(e =>
+                            createRelationRefWithData(e.id, e.path, e)
+                        );
                     });
                 } catch (e) {
                     console.warn(`Could not batch load many relation property: ${key}`, e);

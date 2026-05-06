@@ -91,14 +91,17 @@ export function useKanbanDragAndDrop<M extends Record<string, unknown>>({
             updatedValues = setIn(updatedValues, columnProperty, moveInfo.targetColumn);
         }
 
-        // Apply optimistic update immediately
+        // Apply optimistic UI update to boardDataController's internal state
+        // This ensures the backend state matches the dragged UI state instantly
+        // and prevents the Board component from reverting the dragged item
         if (boardDataController.moveItemOptimistically) {
+            const targetIndex = items.findIndex(item => item.id === moveInfo.itemId);
             boardDataController.moveItemOptimistically(
                 moveInfo.itemId,
                 moveInfo.sourceColumn,
                 moveInfo.targetColumn,
                 updatedValues,
-                orderProperty ? items.findIndex(item => item.id === moveInfo.itemId) : undefined
+                targetIndex !== -1 ? targetIndex : undefined
             );
         }
 

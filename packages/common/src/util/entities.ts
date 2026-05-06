@@ -237,3 +237,33 @@ export function traverseValueProperty(inputValue: unknown,
 
     return value;
 }
+
+/**
+ * Relation reference types used throughout the server layer.
+ * These replace the 50+ manual `{ id, path, __type: "relation" }` constructions.
+ */
+export interface RelationRef {
+    readonly id: string | number;
+    readonly path: string;
+    readonly __type: "relation";
+}
+
+export interface RelationRefWithData extends RelationRef {
+    readonly data: Entity;
+}
+
+/**
+ * Create a lightweight relation stub for CMS views.
+ * Replaces inline `{ id, path, __type: "relation" }` object literals.
+ */
+export function createRelationRef(id: string | number, path: string): RelationRef {
+    return { id, path, __type: "relation" };
+}
+
+/**
+ * Create a hydrated relation reference that includes the full entity data.
+ * Used when entity data has been pre-fetched (e.g., via batch loading or JOINs).
+ */
+export function createRelationRefWithData(id: string | number, path: string, data: Entity): RelationRefWithData {
+    return { id, path, __type: "relation", data };
+}

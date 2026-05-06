@@ -234,6 +234,8 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
 
             const newHasMore = entities.length >= itemCount;
 
+            console.log(`[useBoardDataController] Listener update for col ${column}. Length: ${processed.length}. Entities:`, processed.map(e => e.id));
+
             // Compare with current state — skip update if identical to avoid UI flash
             setColumnData(prev => {
                 const existing = prev[column];
@@ -470,7 +472,7 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
     }, [columns, pageSize]);
 
     // Optimistic update for when moving an item
-    const moveItemOptimistically = useCallback((itemId: string, sourceColumn: COLUMN, targetColumn: COLUMN, newValues?: Record<string, any>, _newIndex?: number) => {
+    const moveItemOptimistically = useCallback((itemId: string, sourceColumn: COLUMN, targetColumn: COLUMN, newValues?: Record<string, any>, newIndex?: number) => {
         setColumnData(prev => {
             const updated = { ...prev };
             let itemToMove: Entity<M> | undefined;
@@ -493,26 +495,28 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
                 };
 
                 const targetEntities = sourceColumn === targetColumn ? sourceEntities : [...(updated[targetColumn]?.entities || [])];
-                targetEntities.push(updatedEntity);
-
-                // Always sort by orderProperty to ensure columnData matches the
-                // fractional-index order computed by the drag handler.
-                // This is the single source of truth for ordering.
-                const orderProp = orderPropertyRef.current;
-                if (orderProp) {
-                    targetEntities.sort((a, b) => {
-                        const valA = a.values?.[orderProp] as string | undefined | null;
-                        const valB = b.values?.[orderProp] as string | undefined | null;
-
-                        const isAEmpty = valA === undefined || valA === null || valA === "";
-                        const isBEmpty = valB === undefined || valB === null || valB === "";
-
-                        if (isAEmpty && isBEmpty) return 0;
-                        if (isAEmpty) return 1;
-                        if (isBEmpty) return -1;
-
-                        return valA < valB ? -1 : valA > valB ? 1 : 0;
-                    });
+                
+                if (newIndex !== undefined && newIndex >= 0 && newIndex <= targetEntities.length) {
+                    targetEntities.splice(newIndex, 0, updatedEntity);
+                } else {
+                    targetEntities.push(updatedEntity);
+                    if (orderPropertyRef.current) {
+                        const orderProp = orderPropertyRef.current;
+                        targetEntities.sort((a, b) => {
+                            const valA = a.values?.[orderProp] as string | undefined | null;
+                            const valB = b.values?.[orderProp] as string | undefined | null;
+                            
+                            // Handle nulls/empty strings to match Postgres NULLS LAST (ASC) behavior
+                            const isAEmpty = valA === undefined || valA === null || valA === "";
+                            const isBEmpty = valB === undefined || valB === null || valB === "";
+                            
+                            if (isAEmpty && isBEmpty) return 0;
+                            if (isAEmpty) return 1; // A is null, B is not -> A goes after B
+                            if (isBEmpty) return -1; // B is null, A is not -> A goes before B
+                            
+                            return valA < valB ? -1 : valA > valB ? 1 : 0;
+                        });
+                    }
                 }
 
                 updated[sourceColumn] = {
@@ -530,6 +534,8 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
                         totalCount: (updated[targetColumn].totalCount ?? 0) + 1
                     };
                 }
+
+                console.log(`[useBoardDataController] moveItemOptimistically: ${itemId} from ${sourceColumn} (${updated[sourceColumn].entities.length}) to ${targetColumn} (${updated[targetColumn].entities.length})`);
             } else if (sourceColumn !== targetColumn) {
                 // If item not found locally but counts need update
                 if (updated[sourceColumn]?.totalCount !== undefined) {

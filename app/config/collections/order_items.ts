@@ -1,6 +1,6 @@
 import { PostgresCollection } from "@rebasepro/types";
-import ordersCollection from "./orders";
-import productsCollection from "./products";
+import ordersCollection from "./orders.js";
+import productsCollection from "./products.js";
 
 const orderItemsCollection: PostgresCollection = {
     name: "Order Items",
