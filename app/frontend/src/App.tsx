@@ -277,8 +277,6 @@ export function App() {
                 ],
             },
         },
-            },
-        ],
     }), [rebaseClient]);
 
     const insightsPlugin = useInsightsPlugin(insightsConfig);
