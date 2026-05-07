@@ -31,12 +31,7 @@ export type EntityCollectionListViewProps<M extends Record<string, unknown> = Re
     selectionEnabled?: boolean;
     highlightedEntities?: Entity<M>[];
     emptyComponent?: React.ReactNode;
-    onScroll?: (props: {
-        scrollDirection: "forward" | "backward";
-        scrollOffset: number;
-        scrollUpdateWasRequested: boolean;
-    }) => void;
-    initialScroll?: number;
+
     /**
      * Size of the list rows.
      * - "xs": Most compact, single-line rows
@@ -78,21 +73,6 @@ function getPreviewCount(size: CollectionSize): number {
     }
 }
 
-/**
- * Fixed row height in pixels for react-window virtualisation.
- * Must match the visual height produced by getRowClasses (padding + content).
- */
-function getRowHeight(size: CollectionSize): number {
-    // +1 accounts for the 1px bottom border on each row wrapper
-    switch (size) {
-        case "xs": return 45;
-        case "s": return 53;
-        case "m": return 73;
-        case "l": return 85;
-        case "xl": return 97;
-        default: return 73;
-    }
-}
 
 /**
  * Get row padding/spacing classes based on size
@@ -243,8 +223,7 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
     selectionEnabled = true,
     highlightedEntities,
     emptyComponent,
-    onScroll,
-    initialScroll,
+
     size = "m",
     selectedEntityId
 }: EntityCollectionListViewProps<M>) {
@@ -489,7 +468,7 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
             ref={containerRef}
             className={cls(
                 "w-full",
-                selectedEntityId === undefined && "rounded-lg overflow-hidden border border-surface-200 dark:border-surface-700"
+                selectedEntityId === undefined && "rounded-lg overflow-hidden border " + defaultBorderMixin
             )}
         >
             {/* Error state */}

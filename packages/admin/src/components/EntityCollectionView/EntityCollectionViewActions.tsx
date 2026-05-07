@@ -2,9 +2,9 @@
 import type { EntityCollection } from "@rebasepro/types";
 import React, { lazy, Suspense } from "react";
 
-import { useAuthController, useLargeLayout, useTranslation, useSlot } from "@rebasepro/core";
-import { CollectionActionsProps, EntityTableController, SelectionController, ViewMode } from "@rebasepro/types";
-import { Button, IconButton, Tooltip, Popover , iconSize } from "@rebasepro/ui";
+import { useLargeLayout, useTranslation, useSlot } from "@rebasepro/core";
+import { CollectionActionsProps, EntityTableController, SelectionController } from "@rebasepro/types";
+import { Button, IconButton, Tooltip, Popover, iconSize } from "@rebasepro/ui";
 import { PlusIcon, Trash2Icon, MoreVerticalIcon } from "lucide-react";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { usePermissions } from "@rebasepro/core";
@@ -81,8 +81,8 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
     const multipleDeleteEnabled = canDelete(collection, path, null);
 
     let multipleDeleteButton: React.ReactNode | undefined;
-    if (selectionEnabled && !compact) {
-        const button = largeLayout
+    {
+        const button = largeLayout && !compact
             ? <Button
                 variant={"text"}
                 disabled={!(selectedEntities?.length) || !multipleDeleteEnabled}
@@ -167,7 +167,7 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
                             <MoreVerticalIcon size={iconSize.smallest}/>
                         </IconButton>
                     }>
-                    <div className="flex flex-col gap-1 p-2 min-w-[200px]" onClick={() => setOverflowOpen(false)}>
+                    <div className="flex flex-row items-center gap-1 p-2">
                         {secondaryActions}
                     </div>
                 </Popover>

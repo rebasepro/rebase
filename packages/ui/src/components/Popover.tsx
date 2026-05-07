@@ -87,7 +87,7 @@ export function Popover({
                 onMouseLeave={onMouseLeave}>
 
                 {children}
-                <PopoverPrimitive.Arrow className="fill-white dark:fill-surface-accent-950"/>
+                <PopoverPrimitive.Arrow className="fill-white dark:fill-surface-800"/>
             </PopoverPrimitive.Content>
         </PopoverPrimitive.Portal>
     </PopoverPrimitive.Root>;

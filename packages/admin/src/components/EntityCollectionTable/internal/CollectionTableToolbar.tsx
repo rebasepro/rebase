@@ -1,7 +1,6 @@
-import React, { useState } from "react";
+import React from "react";
 
-import { CircularProgress, cls, defaultBorderMixin, IconButton, Popover, SearchBar , iconSize } from "@rebasepro/ui";
-import { MoreVerticalIcon } from "lucide-react";
+import { CircularProgress, cls, defaultBorderMixin, SearchBar } from "@rebasepro/ui";
 import { useLargeLayout, useTranslation } from "@rebasepro/core";
 
 interface CollectionTableToolbarProps {
@@ -17,7 +16,7 @@ interface CollectionTableToolbarProps {
     /**
      * When true the toolbar is in "compact" mode for the split-view left panel.
      * - Search bar, loading spinner, and view-mode toggle are hidden.
-     * - Secondary actions are collapsed into a "⋮" popover.
+     * - Secondary actions remain inline (displayed horizontally).
      * - Only `actionsStart` (filters) and the add button (last child of `actions`) remain visible.
      */
     compact?: boolean;
@@ -35,7 +34,6 @@ export function CollectionTableToolbar({
 
     const largeLayout = useLargeLayout();
     const { t } = useTranslation();
-    const [overflowOpen, setOverflowOpen] = useState(false);
 
     // Split actions into "primary" (add button = last child) and "secondary" (everything else)
     const actionChildren = React.Children.toArray(actions);
@@ -89,38 +87,10 @@ export function CollectionTableToolbar({
                             expandable={true}/>}
                 </div>
 
-                {/* Secondary actions — visible normally, collapsed to popover in compact */}
-                <div className={cls(
-                    "flex items-center gap-1 transition-all duration-300 ease-out overflow-hidden",
-                    compact ? "max-w-0 opacity-0 pointer-events-none" : "max-w-[600px] opacity-100"
-                )}>
+                {/* Secondary actions — always inline */}
+                <div className="flex items-center gap-1">
                     {secondaryActions}
                 </div>
-
-                {/* Overflow popover — only visible in compact mode */}
-                {secondaryActions.length > 0 && (
-                    <div className={cls(
-                        "transition-all duration-300 ease-out overflow-hidden",
-                        compact ? "max-w-[40px] opacity-100" : "max-w-0 opacity-0 pointer-events-none"
-                    )}>
-                        <Popover
-                            open={overflowOpen}
-                            onOpenChange={setOverflowOpen}
-                            trigger={
-                                <IconButton size="small">
-                                    <MoreVerticalIcon size={iconSize.small}/>
-                                </IconButton>
-                            }>
-                            <div className="flex flex-col gap-1 p-2 min-w-[200px]">
-                                {secondaryActions.map((child, i) => (
-                                    <div key={i} className="flex items-center" onClick={() => setOverflowOpen(false)}>
-                                        {child}
-                                    </div>
-                                ))}
-                            </div>
-                        </Popover>
-                    </div>
-                )}
 
                 {/* Add button — always visible */}
                 {addButton}

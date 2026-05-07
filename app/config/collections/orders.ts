@@ -11,7 +11,10 @@ const ordersCollection: PostgresCollection = {
     group: "E-Commerce",
     history: true,
     openEntityMode: "split",
-    enabledViews: ["table", "kanban"],
+    enabledViews: [
+        "table",
+        "kanban"
+    ],
     kanban: {
         columnProperty: "status"
     },
@@ -33,12 +36,17 @@ const ordersCollection: PostgresCollection = {
         customer: {
             name: "Customer",
             type: "relation",
-            target: () => customersCollection,
             cardinality: "one",
             direction: "owning",
             validation: {
                 required: true
-            }
+            },
+            relation: {
+                relationName: "customer",
+                cardinality: "one",
+                direction: "owning"
+            },
+            target: () => customersCollection
         },
         status: {
             name: "Status",
@@ -48,27 +56,41 @@ const ordersCollection: PostgresCollection = {
             },
             defaultValue: "pending",
             enum: [
-                { id: "pending",
-label: "Pending",
-color: "orange" },
-                { id: "confirmed",
-label: "Confirmed",
-color: "blue" },
-                { id: "processing",
-label: "Processing",
-color: "cyan" },
-                { id: "shipped",
-label: "Shipped",
-color: "purple" },
-                { id: "delivered",
-label: "Delivered",
-color: "green" },
-                { id: "cancelled",
-label: "Cancelled",
-color: "red" },
-                { id: "refunded",
-label: "Refunded",
-color: "gray" }
+                {
+                    id: "pending",
+                    label: "Pending",
+                    color: "orange"
+                },
+                {
+                    id: "confirmed",
+                    label: "Confirmed",
+                    color: "blue"
+                },
+                {
+                    id: "processing",
+                    label: "Processing",
+                    color: "cyan"
+                },
+                {
+                    id: "shipped",
+                    label: "Shipped",
+                    color: "purple"
+                },
+                {
+                    id: "delivered",
+                    label: "Delivered",
+                    color: "green"
+                },
+                {
+                    id: "cancelled",
+                    label: "Cancelled",
+                    color: "red"
+                },
+                {
+                    id: "refunded",
+                    label: "Refunded",
+                    color: "gray"
+                }
             ]
         },
         payment_status: {
@@ -79,18 +101,26 @@ color: "gray" }
             },
             defaultValue: "unpaid",
             enum: [
-                { id: "unpaid",
-label: "Unpaid",
-color: "red" },
-                { id: "paid",
-label: "Paid",
-color: "green" },
-                { id: "partially_refunded",
-label: "Partially Refunded",
-color: "orange" },
-                { id: "refunded",
-label: "Refunded",
-color: "gray" }
+                {
+                    id: "unpaid",
+                    label: "Unpaid",
+                    color: "red"
+                },
+                {
+                    id: "paid",
+                    label: "Paid",
+                    color: "green"
+                },
+                {
+                    id: "partially_refunded",
+                    label: "Partially Refunded",
+                    color: "orange"
+                },
+                {
+                    id: "refunded",
+                    label: "Refunded",
+                    color: "gray"
+                }
             ]
         },
         subtotal: {
@@ -127,16 +157,26 @@ color: "gray" }
             type: "string",
             defaultValue: "USD",
             enum: [
-                { id: "USD",
-label: "USD ($)" },
-                { id: "EUR",
-label: "EUR (€)" },
-                { id: "GBP",
-label: "GBP (£)" },
-                { id: "CAD",
-label: "CAD (C$)" },
-                { id: "AUD",
-label: "AUD (A$)" }
+                {
+                    id: "USD",
+                    label: "USD ($)"
+                },
+                {
+                    id: "EUR",
+                    label: "EUR (€)"
+                },
+                {
+                    id: "GBP",
+                    label: "GBP (£)"
+                },
+                {
+                    id: "CAD",
+                    label: "CAD (C$)"
+                },
+                {
+                    id: "AUD",
+                    label: "AUD (A$)"
+                }
             ]
         },
         shipping_address: {
@@ -193,8 +233,8 @@ label: "AUD (A$)" }
     },
     propertiesOrder: [
         "order_number",
-        "customer",
         "status",
+        "customer",
         "payment_status",
         "order_date",
         "subtotal",
@@ -209,7 +249,8 @@ label: "AUD (A$)" }
         "delivered_date",
         "notes",
         "created_at",
-        "updated_at"
+        "updated_at",
+        "id"
     ],
     // Headless relation: no property for "order_items", only used for subcollection tab
     relations: [
@@ -219,6 +260,17 @@ label: "AUD (A$)" }
             cardinality: "many",
             direction: "inverse",
             inverseRelationName: "order"
+        }
+    ],
+    securityRules: [
+        {
+            name: "test_policy",
+            mode: "permissive",
+            operation: "all",
+            pgRoles: [
+                "public"
+            ],
+            using: "true"
         }
     ]
 };

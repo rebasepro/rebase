@@ -151,7 +151,7 @@ attrs: { level: 6 } }
             { tag: "pre",
 preserveWhitespace: "full" }
         ],
-        toDOM(node) { return ["pre", { class: "rounded bg-blue-50 dark:bg-surface-700 border border-solid border-gray-200 dark:border-gray-800 p-5 font-mono font-medium" }, ["code", 0]]; }
+        toDOM(node) { return ["pre", { class: "rounded bg-blue-50 dark:bg-surface-700 border border-solid border-gray-200 dark:border-gray-800 p-5 font-mono font-medium text-gray-800 dark:text-gray-200" }, ["code", 0]]; }
     },
     image: {
         inline: false,
