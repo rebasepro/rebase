@@ -1004,24 +1004,26 @@ export const EntityCollectionView = React.memo(
                         {(selectedEntityIdProp !== undefined || viewMode === "list") ? (
                             <div
                                 className={cls(
-                                    "flex flex-col w-full transition-all duration-300",
+                                    "flex flex-col w-full",
                                     selectedEntityIdProp === undefined
                                         ? "max-w-6xl mx-auto px-3 md:px-4 lg-px-6 py-4"
-                                        : "max-w-none mx-0 px-0 py-0"
+                                        : ""
                                 )}
                             >
-                                {/* Collapsible title — animates height to 0 when split-view */}
+                                {/* Collapsible title — grid-rows for smooth height, transform for GPU */}
                                 <div
                                     className={cls(
-                                        "overflow-hidden transition-all duration-300 flex items-center gap-4",
+                                        "grid transition-[grid-template-rows,transform,margin] duration-150 ease-out",
                                         selectedEntityIdProp === undefined
-                                            ? "max-h-24 opacity-100 mt-12 mb-6"
-                                            : "max-h-0 opacity-0 mt-0 mb-0"
+                                            ? "grid-rows-[1fr] translate-y-0 mt-12 mb-6"
+                                            : "grid-rows-[0fr] -translate-y-2 mt-0 mb-0"
                                     )}
                                 >
-                                    <Typography gutterBottom variant="h4" className="grow mb-0" component="h4">
-                                        {collection.name}
-                                    </Typography>
+                                    <div className="overflow-hidden flex items-center gap-4">
+                                        <Typography gutterBottom variant="h4" className="grow mb-0" component="h4">
+                                            {collection.name}
+                                        </Typography>
+                                    </div>
                                 </div>
                                 <EntityCollectionListView
                                     key={`list-view-${path}`}

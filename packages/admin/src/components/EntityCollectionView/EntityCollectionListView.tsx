@@ -487,7 +487,10 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
     return (
         <div
             ref={containerRef}
-            className="w-full rounded-lg overflow-hidden border border-surface-200 dark:border-surface-700"
+            className={cls(
+                "w-full",
+                selectedEntityId === undefined && "rounded-lg overflow-hidden border border-surface-200 dark:border-surface-700"
+            )}
         >
             {/* Error state */}
             {dataLoadingError ? (
