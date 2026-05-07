@@ -19,7 +19,6 @@ import {
 } from "@rebasepro/types";
 import { MongoEntityService } from "../db/MongoEntityService";
 import { MongoRealtimeService } from "./MongoRealtimeService";
-import { MongoHistoryService } from "./MongoHistoryService";
 
 /**
  * MongoDB DataDriver Delegate
@@ -33,16 +32,14 @@ export class MongoDriver implements DataDriver {
 
     private entityService: MongoEntityService;
     private realtimeService: MongoRealtimeService;
-    private historyService: MongoHistoryService;
+
 
     constructor(
         private db: Db,
-        realtimeService?: MongoRealtimeService,
-        historyService?: MongoHistoryService
+        realtimeService?: MongoRealtimeService
     ) {
         this.entityService = new MongoEntityService(db);
         this.realtimeService = realtimeService ?? new MongoRealtimeService(db);
-        this.historyService = historyService ?? new MongoHistoryService(db);
     }
 
 
@@ -184,27 +181,10 @@ export class MongoDriver implements DataDriver {
         path,
         entityId,
         values,
-        previousValues,
         collection,
         status
     }: SaveEntityProps<M>): Promise<Entity<M>> {
-        const isNew = status === "new" || !previousValues;
-
         const entity = await this.entityService.saveEntity<M>(path, values, entityId);
-
-        // Handle history recording
-        if (collection?.history) {
-            this.historyService.recordHistory({
-                action: isNew ? "create" : "update",
-                entityId: String(entity.id),
-                tableName: path,
-                values: entity.values,
-                previousValues: isNew ? undefined : previousValues,
-            }).catch(err => {
-                // Fire and forget, don't fail the save operation
-                console.error(`Failed to record history for ${path}/${entity.id}:`, err);
-            });
-        }
 
         // Notify subscribers of the update
         await this.realtimeService.notifyEntityUpdate(path, String(entity.id), entity);
@@ -220,17 +200,6 @@ export class MongoDriver implements DataDriver {
         collection
     }: DeleteEntityProps<M>): Promise<void> {
         await this.entityService.deleteEntity(entity.path, entity.id);
-
-        if (collection?.history) {
-            this.historyService.recordHistory({
-                action: "delete",
-                entityId: String(entity.id),
-                tableName: entity.path,
-                previousValues: entity.values,
-            }).catch(err => {
-                console.error(`Failed to record history for ${entity.path}/${entity.id}:`, err);
-            });
-        }
 
         // Notify subscribers of the deletion
         await this.realtimeService.notifyEntityUpdate(entity.path, String(entity.id), null);

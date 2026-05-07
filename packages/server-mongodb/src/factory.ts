@@ -11,6 +11,7 @@ import { DataDriver, EntityCollection } from "@rebasepro/types";
 import { MongoEntityService } from "./db/MongoEntityService";
 import { MongoRealtimeService } from "./services/MongoRealtimeService";
 import { MongoDriver } from "./services/MongoDriver";
+import { MongoHistoryService, HistoryRetentionConfig } from "./services/MongoHistoryService";
 import { MongoDBConnection } from "./connection";
 import { BackendConfig, BackendInstance, CollectionRegistryInterface, EntityRepository, RealtimeProvider, DatabaseConnection, DatabaseAdmin, DocumentAdmin, SchemaAdmin, HealthCheckResult } from "@rebasepro/types";
 
@@ -25,6 +26,8 @@ export interface MongoBackendConfig extends BackendConfig {
     client: MongoClient;
     /** Collections to register (optional, can be registered later) */
     collections?: EntityCollection[];
+    /** History retention configuration */
+    historyRetention?: Partial<HistoryRetentionConfig>;
 }
 
 /**
@@ -124,7 +127,8 @@ export function createMongoBackend(config: MongoBackendConfig): MongoBackendInst
     // Create services
     const entityService = new MongoEntityService(db);
     const realtimeService = new MongoRealtimeService(db);
-    const driver = new MongoDriver(db, realtimeService);
+    const historyService = new MongoHistoryService(db, config.historyRetention);
+    const driver = new MongoDriver(db, realtimeService, historyService);
     const mongoConnection = new MongoDBConnection(db, client);
 
     // Build admin capabilities for MongoDB
@@ -222,10 +226,12 @@ latencyMs: Date.now() - start };
  */
 export function createMongoDelegate(
     db: Db,
-    realtimeService?: MongoRealtimeService
+    realtimeService?: MongoRealtimeService,
+    historyService?: MongoHistoryService
 ): MongoDriver {
     const realtime = realtimeService ?? new MongoRealtimeService(db);
-    return new MongoDriver(db, realtime);
+    const history = historyService ?? new MongoHistoryService(db);
+    return new MongoDriver(db, realtime, history);
 }
 
 /**
