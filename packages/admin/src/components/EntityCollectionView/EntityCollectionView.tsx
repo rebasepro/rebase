@@ -420,6 +420,12 @@ export const EntityCollectionView = React.memo(
             onNewClick
         });
 
+        const pluginInsights = useSlot("collection.insights", {
+            path,
+            parentCollectionIds: parentCollectionIds ?? EMPTY_ARRAY,
+            collection
+        });
+
         const onCollectionModifiedForUser = useCallback((path: string, partialCollection: PartialEntityCollection<M>) => {
             if (userConfigPersistence) {
                 const currentStoredConfig = userConfigPersistence.getCollectionConfig(path);
@@ -960,6 +966,12 @@ export const EntityCollectionView = React.memo(
                 ref={containerRef}>
 
                 {countFetcher}
+
+                {pluginInsights.length > 0 && (
+                    <div className="px-2 flex-shrink-0">
+                        {pluginInsights}
+                    </div>
+                )}
 
                 {/* When isSplitLayout, SplitListView is ALWAYS mounted — regardless
                     of viewMode. The toolbar + current view live in the left panel;

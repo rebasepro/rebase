@@ -27,6 +27,19 @@ export interface EntityFetchResult<M extends Record<string, any>> {
 const CACHE: Record<string, Entity<any> | undefined> = {};
 
 /**
+ * Pre-populate the entity fetch cache with entities loaded from a collection.
+ * This allows entity detail views to render instantly using cached data,
+ * while the background fetch/listener brings in fresh data.
+ * @param path - The collection path (e.g. "products")
+ * @param entities - Array of entities to cache
+ */
+export function populateEntityFetchCache<M extends Record<string, any>>(path: string, entities: Entity<M>[]): void {
+    for (const entity of entities) {
+        CACHE[`${path}/${entity.id}`] = entity;
+    }
+}
+
+/**
  * This hook is used to fetch an entity.
  * It gives real time updates if the driver supports it.
  * @param path
@@ -49,13 +62,22 @@ export function useEntityFetch<M extends Record<string, any>, USER extends User 
 
     const context: RebaseContext<USER> = useRebaseContext();
 
-    const [entity, setEntity] = useState<Entity<M> | undefined>();
-    const [dataLoading, setDataLoading] = useState<boolean>(true);
+    // Seed initial state from the cache to avoid skeleton flashes.
+    // Even when useCache is false, we show cached data instantly while
+    // the background fetch/listener brings in fresh data.
+    const cacheKey = entityId ? `${path}/${entityId}` : undefined;
+    const cachedEntity = cacheKey ? CACHE[cacheKey] as Entity<M> | undefined : undefined;
+
+    const [entity, setEntity] = useState<Entity<M> | undefined>(cachedEntity);
+    const [dataLoading, setDataLoading] = useState<boolean>(!cachedEntity);
     const [dataLoadingError, setDataLoadingError] = useState<Error | undefined>();
 
     useEffect(() => {
 
-        setDataLoading(true);
+        // Only show loading state if we have no cached entity to display
+        if (!CACHE[`${path}/${entityId}`]) {
+            setDataLoading(true);
+        }
 
         const onEntityUpdate = async (updatedEntity?: Entity<M> | null) => {
             CACHE[`${path}/${entityId}`] = updatedEntity ?? undefined;

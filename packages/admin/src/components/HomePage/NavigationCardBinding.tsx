@@ -77,6 +77,12 @@ export function NavigationCardBinding({
         context
     });
 
+    const pluginCardInsights = useSlot("home.card.insight", {
+        slug: slug,
+        collection: collection!,
+        context
+    });
+
     if ((collection as any)?.isTableMissing) {
         actionsArray.unshift(
             <Tooltip key="warning" title={`Table mapped to "${collection?.slug || collection?.name}" is missing in the database. Run migrations.`}>
@@ -97,6 +103,7 @@ export function NavigationCardBinding({
         name={name}
         description={description}
         actions={actions}
+        additionalContent={pluginCardInsights.length > 0 ? <>{pluginCardInsights}</> : undefined}
         onClick={() => {
             onClick?.();
             navigate(url);

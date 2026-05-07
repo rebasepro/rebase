@@ -7,6 +7,7 @@ export type NavigationCardProps = {
     description?: string;
     actions: React.ReactNode;
     icon: React.ReactNode;
+    additionalContent?: React.ReactNode;
     onClick?: () => void,
     shrink?: boolean
 };
@@ -17,6 +18,7 @@ export const NavigationCard = React.memo(function NavigationCard({
     description,
     icon,
     actions,
+    additionalContent,
     onClick,
     shrink
 }: NavigationCardProps) {
@@ -66,6 +68,15 @@ export const NavigationCard = React.memo(function NavigationCard({
                         <Markdown source={description} size={"small"}/>
                     </Typography>}
                 </div>
+
+                {additionalContent && (
+                    <div className="pl-[44px]" onClick={(e: React.MouseEvent) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }}>
+                        {additionalContent}
+                    </div>
+                )}
 
                 {/* Arrow */}
                 <div className="self-end mt-1">

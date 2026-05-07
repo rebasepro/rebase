@@ -16,6 +16,8 @@ export interface SlotRegistry {
     "home.cards": PluginHomePageAdditionalCardsProps;
     "home.children.start": PluginGenericProps;
     "home.children.end": PluginGenericProps;
+    /** Compact insight widget rendered inline in a home page collection card. */
+    "home.card.insight": HomeCardInsightSlotProps;
     "home.collection.actions": PluginHomePageActionsProps;
 
     // ── Navigation / Drawer ───────────────────────────────────────────
@@ -34,6 +36,8 @@ export interface SlotRegistry {
     "collection.toolbar": CollectionToolbarProps;
     /** Custom empty-state component when a collection has no data. */
     "collection.empty-state": CollectionEmptyStateProps;
+    /** Insight widgets rendered above the collection table. */
+    "collection.insights": CollectionInsightsSlotProps;
 
     // ── Entity / Form ─────────────────────────────────────────────────
     "form.actions": PluginFormActionProps;
@@ -267,5 +271,27 @@ export interface GlobalSearchProps {
  * @group Plugins
  */
 export interface ShellToolbarProps {
+    context: RebaseContext;
+}
+
+/**
+ * Props for `collection.insights` slot.
+ * Insight widgets rendered above the collection table.
+ * @group Plugins
+ */
+export interface CollectionInsightsSlotProps {
+    path: string;
+    collection: EntityCollection;
+    parentCollectionIds: string[];
+}
+
+/**
+ * Props for `home.card.insight` slot.
+ * Compact insight rendered inline in a home page collection card.
+ * @group Plugins
+ */
+export interface HomeCardInsightSlotProps {
+    slug: string;
+    collection: EntityCollection;
     context: RebaseContext;
 }

@@ -4,6 +4,7 @@ import { useLocation } from "react-router-dom";
 
 import { useData, useRebaseContext } from "../../hooks";
 import { useDataOrder } from "../../hooks/data/useDataOrder";
+import { populateEntityFetchCache } from "../../hooks/data/useEntityFetch";
 import { Entity, EntityReference, EntityRelation, EntityTableController, FilterValues, RebaseContext, SelectedCellProps, User, WhereFilterOp, FindResponse } from "@rebasepro/types";
 import { ScrollRestorationController } from "./useScrollRestoration";
 
@@ -213,6 +214,10 @@ export function useDataTableController<M extends Record<string, any> = any, USER
                 // values: sanitizeData(e.values, resolvedCollection.properties)
             })));
             setNoMoreToLoad(!itemCount || entities.length < itemCount);
+
+            // Pre-populate the entity fetch cache so that navigating to an
+            // entity detail view renders instantly with cached data.
+            populateEntityFetchCache(path, entities);
         };
 
         const onError = (error: Error) => {
