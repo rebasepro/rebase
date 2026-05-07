@@ -323,6 +323,7 @@ export function ContentHomePage({
                         onTextSearch={updateSearch}
                         placeholder={t("search_collections")}
                         autoFocus
+                        size="small"
                         innerClassName="w-full"
                         className="w-full grow"
                     />

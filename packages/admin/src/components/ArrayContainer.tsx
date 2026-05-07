@@ -36,7 +36,7 @@ export interface ArrayContainerProps<T> {
     disabled?: boolean;
     size?: "small" | "medium";
     onInternalIdAdded?: (id: number) => void;
-    includeAddButton?: boolean;
+
     canAddElements?: boolean;
     sortable?: boolean;
     newDefaultEntry: T;
@@ -338,7 +338,6 @@ export function ArrayContainer<T>({
     buildEntry,
     size = "medium",
     onInternalIdAdded,
-    includeAddButton: deprecatedIncludeAddButton,
     canAddElements: canAddElementsProp = true,
     sortable = true,
     newDefaultEntry,
@@ -347,9 +346,7 @@ export function ArrayContainer<T>({
     min = 0,
     max = Infinity
 }: ArrayContainerProps<T>) {
-    const canAddElements =
-        (canAddElementsProp === undefined ? true : canAddElementsProp) && // Default canAddElementsProp to true if undefined
-        (deprecatedIncludeAddButton === undefined || deprecatedIncludeAddButton);
+    const canAddElements = canAddElementsProp;
 
     const hasValue = value && Array.isArray(value) && value.length > 0;
     const internalIdsRef = useRef<Record<string, number>>(buildIdsMap(value));

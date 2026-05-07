@@ -4,8 +4,8 @@ import type { HydratedChartConfig } from "../types";
 const DEFAULT_FONT = "'Inter', 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif";
 
 const DEFAULT_CHART_PALETTE = [
-    "#6366F1", "#EC4899", "#10B981", "#F59E0B", "#8B5CF6",
-    "#0EA5E9", "#F97316", "#14B8A6", "#E11D48", "#06B6D4"
+    "#0070F4", "#FF5B79", "#10B981", "#F59E0B", "#8B5CF6",
+    "#EC4899", "#06B6D4", "#F97316", "#14B8A6", "#6366F1"
 ];
 
 function isFullVegaSpec(config: HydratedChartConfig): boolean {
@@ -37,15 +37,16 @@ function sanitizeVegaSpec(obj: unknown): unknown {
  * Uses dynamic `import("vega-embed")` for chunk-loading — the vega dependency
  * is only downloaded when a chart widget is actually rendered.
  *
- * Reads Rebase's dark/light mode to inject matching axis colors, text colors,
- * and transparent backgrounds that blend with the admin surface.
+ * Detects dark mode via the DOM `dark` class on `<html>` to inject matching
+ * axis/text colors and transparent backgrounds.
  */
 export function InsightsChartView({
     config,
-    isDarkMode = false,
+    embedded = false,
 }: {
     config: HydratedChartConfig;
-    isDarkMode?: boolean;
+    /** When true, skip own border/padding since the parent card provides them. */
+    embedded?: boolean;
 }) {
     const containerRef = useRef<HTMLDivElement>(null);
     const embedResultRef = useRef<{ finalize: () => void } | null>(null);
@@ -75,10 +76,13 @@ export function InsightsChartView({
             embedResultRef.current = null;
         }
 
-        const textColor = isDarkMode
+        // Detect dark mode from the DOM class — no React prop needed
+        const isDark = document.documentElement.classList.contains("dark");
+
+        const textColor = isDark
             ? "rgba(255,255,255,0.72)"
             : "rgba(0,0,0,0.72)";
-        const gridColor = isDarkMode
+        const gridColor = isDark
             ? "rgba(255,255,255,0.08)"
             : "rgba(0,0,0,0.08)";
         const chartBg = "transparent";
@@ -159,7 +163,11 @@ export function InsightsChartView({
                 return embed(
                     containerRef.current,
                     sanitizeVegaSpec(themedConfig) as Parameters<typeof embed>[1],
-                    { actions: false, renderer: "svg" }
+                    {
+                        actions: false,
+                        renderer: "svg",
+                        tooltip: { theme: isDark ? "dark" : "light" }
+                    }
                 );
             })
             .then((result) => {
@@ -175,25 +183,18 @@ export function InsightsChartView({
                 embedResultRef.current = null;
             }
         };
-    }, [config, dimensions.width, dimensions.height, isDarkMode]);
+    }, [config, dimensions.width, dimensions.height]);
 
     return (
         <div
-            className="w-full relative overflow-hidden rounded-lg"
-            style={{
-                flex: "1 1 auto",
-                minHeight: 0,
-                backgroundColor: isDarkMode
-                    ? "rgba(255,255,255,0.03)"
-                    : "rgba(0,0,0,0.02)",
-                border: isDarkMode
-                    ? "1px solid rgba(255,255,255,0.06)"
-                    : "1px solid rgba(0,0,0,0.06)",
-            }}
+            className={embedded
+                ? "w-full h-full relative overflow-hidden"
+                : "w-full h-full relative overflow-hidden rounded-lg bg-transparent border border-surface-200 dark:border-surface-800 p-4"
+            }
         >
             <div
                 ref={containerRef}
-                style={{ width: "100%", height: "100%" }}
+                className="w-full h-full"
             />
         </div>
     );

@@ -12,49 +12,36 @@ import { InsightWidgetSkeleton } from "./InsightWidgetSkeleton";
  * (chart or scorecard) based on the definition type, and manages
  * loading/error states.
  *
- * @param definition - The insight configuration
- * @param collectionSlug - Optional collection context
- * @param isDarkMode - Whether the UI is in dark mode
- * @param compact - Whether to render in compact (card-inline) mode
+ * When `dashboard` is true, the widget is rendered inside a dashboard card
+ * that already provides background/border styling, so inner components
+ * skip their own borders.
+ *
+ * All theme-awareness is handled via Tailwind `dark:` classes — no isDarkMode prop.
  */
 export function InsightWidget({
     definition,
     collectionSlug,
-    isDarkMode = false,
     compact = false,
+    dashboard = false,
 }: {
     definition: InsightDefinition;
     collectionSlug?: string;
-    isDarkMode?: boolean;
     compact?: boolean;
+    /** When true, inner views skip their own borders since the parent card provides them. */
+    dashboard?: boolean;
 }) {
     const { data, loading, error } = useInsightsData(definition, collectionSlug);
 
     if (loading) {
-        return <InsightWidgetSkeleton type={definition.type} compact={compact} />;
+        return <InsightWidgetSkeleton type={definition.type} compact={compact} embedded={dashboard} />;
     }
 
     if (error) {
         return (
             <div
-                className="rounded-lg"
-                style={{
-                    padding: compact ? "12px 14px" : "16px 20px",
-                    color: isDarkMode
-                        ? "rgba(239,68,68,0.7)"
-                        : "rgba(220,38,38,0.7)",
-                    fontSize: "0.8125rem",
-                    backgroundColor: isDarkMode
-                        ? "rgba(239,68,68,0.06)"
-                        : "rgba(220,38,38,0.04)",
-                    border: isDarkMode
-                        ? "1px solid rgba(239,68,68,0.12)"
-                        : "1px solid rgba(220,38,38,0.1)",
-                }}
+                className={`text-red-500/70 dark:text-red-400/70 text-[0.8125rem] ${dashboard ? "px-5 py-4 h-full" : `rounded-lg bg-red-500/5 dark:bg-red-400/5 border border-red-500/10 dark:border-red-400/10 ${compact ? "px-3.5 py-3" : "px-5 py-4"}`}`}
             >
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                    {definition.title}
-                </div>
+                <div className="font-semibold mb-1">{definition.title}</div>
                 <div>{error.message}</div>
             </div>
         );
@@ -63,17 +50,7 @@ export function InsightWidget({
     if (!data || data.rows.length === 0) {
         return (
             <div
-                className="rounded-lg"
-                style={{
-                    padding: compact ? "12px 14px" : "16px 20px",
-                    color: isDarkMode
-                        ? "rgba(255,255,255,0.4)"
-                        : "rgba(0,0,0,0.4)",
-                    fontSize: "0.8125rem",
-                    backgroundColor: isDarkMode
-                        ? "rgba(255,255,255,0.02)"
-                        : "rgba(0,0,0,0.02)",
-                }}
+                className={`text-surface-400 dark:text-surface-500 text-[0.8125rem] ${dashboard ? "px-5 py-4 h-full" : `rounded-lg bg-surface-100 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 ${compact ? "px-3.5 py-3" : "px-5 py-4"}`}`}
             >
                 {definition.title} — No data
             </div>
@@ -81,30 +58,25 @@ export function InsightWidget({
     }
 
     if (definition.type === "chart" && definition.chart) {
-        // Merge fetched data into the chart config
-        const hydratedConfig: HydratedChartConfig = {
+        const hydratedConfig = {
             ...definition.chart,
             data: { values: data.rows },
-        };
+        } as HydratedChartConfig;
+
+        // Dashboard mode: fill parent (parent card has explicit height set)
+        // Standalone mode: use fixed pixel height
+        const heightClass = dashboard ? "h-full" : compact ? "h-[160px]" : "h-[240px]";
 
         return (
-            <div style={{ minHeight: compact ? 120 : 200, height: compact ? 180 : 260 }}>
-                {!compact && definition.title && (
-                    <div style={{
-                        fontSize: "0.8125rem",
-                        fontWeight: 600,
-                        marginBottom: 8,
-                        color: isDarkMode
-                            ? "rgba(255,255,255,0.72)"
-                            : "rgba(0,0,0,0.72)",
-                    }}>
+            <div className={`flex flex-col ${heightClass}`}>
+                {definition.title && (
+                    <div className={`font-semibold shrink-0 text-surface-600 dark:text-surface-300 ${dashboard ? "text-sm px-5 pt-4 pb-2" : "text-[0.8125rem] mb-2"}`}>
                         {definition.title}
                     </div>
                 )}
-                <InsightsChartView
-                    config={hydratedConfig}
-                    isDarkMode={isDarkMode}
-                />
+                <div className={`flex-1 min-h-0 ${dashboard ? "px-3 pb-3" : ""}`}>
+                    <InsightsChartView config={hydratedConfig} embedded={dashboard} />
+                </div>
             </div>
         );
     }
@@ -115,8 +87,8 @@ export function InsightWidget({
                 config={definition.scorecard}
                 data={data.rows[0] as DataRow}
                 title={definition.title}
-                isDarkMode={isDarkMode}
                 compact={compact}
+                embedded={dashboard}
             />
         );
     }

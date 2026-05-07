@@ -45,6 +45,10 @@
         "../../packages/plugin-data-enhancement/src"
       ],
 
+      "@rebasepro/plugin-insights": [
+        "../../packages/plugin-insights/src"
+      ],
+
       "@rebasepro/studio": [
         "../../packages/studio/src"
       ],

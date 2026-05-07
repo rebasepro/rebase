@@ -83,7 +83,7 @@ jobs:
 
       - name: Publish to npm
         if: ${{ !inputs.dry_run }}
-        run: pnpm exec lerna publish from-package --yes --no-verify-access
+        run: pnpm --filter './packages/*' -r publish --no-git-checks --access public --report-summary
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

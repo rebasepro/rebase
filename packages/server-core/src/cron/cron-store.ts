@@ -1,10 +1,11 @@
 import type { CronJobLogEntry } from "@rebasepro/types";
 import type { DataDriver } from "@rebasepro/types";
+import { isSQLAdmin } from "@rebasepro/types";
 
 /**
  * Persistence layer for cron job execution logs.
  *
- * Uses the DataDriver's `executeSql` capability to store logs in a
+ * Uses the DataDriver's `admin.executeSql` capability to store logs in a
  * `rebase.cron_logs` table. Falls back gracefully if the driver doesn't
  * support SQL (e.g. MongoDB) — in that case, no persistence occurs.
  */
@@ -35,12 +36,13 @@ export interface CronStore {
 const TABLE = "rebase.cron_logs";
 
 export function createCronStore(driver: DataDriver): CronStore | undefined {
-    if (!driver.executeSql) {
-        console.warn("⚠️ [cron-store] DataDriver does not support executeSql — cron logs will not be persisted.");
+    const admin = driver.admin;
+    if (!isSQLAdmin(admin)) {
+        console.warn("⚠️ [cron-store] DataDriver does not support SQL admin — cron logs will not be persisted.");
         return undefined;
     }
 
-    const exec = driver.executeSql.bind(driver);
+    const exec = admin.executeSql.bind(admin);
 
     return {
         async ensureTable(): Promise<void> {

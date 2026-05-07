@@ -26,6 +26,7 @@
         "packages/server-mongodb",
         "packages/client-firebase",
         "packages/plugin-data-enhancement",
+        "packages/plugin-insights",
         "packages/schema-inference",
         "packages/sdk-generator",
         "packages/mcp-server",

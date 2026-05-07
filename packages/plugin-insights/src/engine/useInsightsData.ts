@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
 import type { InsightDefinition, InsightDataResult } from "../types";
 import { useInsightsEngine } from "./InsightsProvider";
+import { useAuthController } from "@rebasepro/core";
+;;;
 
 /**
  * Hook that fetches and caches data for a single insight definition.
  *
- * Handles:
+ * Calls the definition's own `data()` callback and manages:
  * - TTL-based caching via InsightsCache
- * - Inflight request deduplication (multiple widgets sharing same query)
+ * - Inflight request deduplication (multiple mounts of the same widget)
  * - Loading and error state management
  *
  * @param definition - The insight to fetch data for
- * @param collectionSlug - Optional collection context for scoped queries
+ * @param collectionSlug - Optional collection context for cache key scoping
  */
 export function useInsightsData(
     definition: InsightDefinition,
@@ -21,7 +23,9 @@ export function useInsightsData(
     loading: boolean;
     error: Error | null;
 } {
-    const { fetchData, cache } = useInsightsEngine();
+    const { cache } = useInsightsEngine();
+    const { initialLoading, authLoading, user, loginSkipped } = useAuthController();
+    const authReady = !initialLoading && !authLoading && (Boolean(user) || loginSkipped);
     const [data, setData] = useState<InsightDataResult | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
@@ -29,6 +33,10 @@ export function useInsightsData(
     const cacheKey = `${definition.id}:${collectionSlug ?? "global"}`;
 
     useEffect(() => {
+        if (!authReady) {
+            return;
+        }
+
         let cancelled = false;
 
         // 1. Check cache
@@ -39,7 +47,7 @@ export function useInsightsData(
             return;
         }
 
-        // 2. Check inflight — deduplicate concurrent requests for the same query
+        // 2. Check inflight — deduplicate concurrent requests for the same widget
         const inflight = cache.getInflight(cacheKey);
         if (inflight) {
             setLoading(true);
@@ -58,14 +66,11 @@ export function useInsightsData(
             return;
         }
 
-        // 3. Fresh fetch — execute the SQL query
+        // 3. Fresh fetch — invoke the definition's own data callback
         setLoading(true);
         setError(null);
 
-        const promise = fetchData({
-            query: definition.query,
-            collectionSlug,
-        });
+        const promise = definition.data();
 
         cache.setInflight(cacheKey, promise);
 
@@ -88,7 +93,7 @@ export function useInsightsData(
         return () => {
             cancelled = true;
         };
-    }, [definition.id, definition.query, collectionSlug, cacheKey, fetchData, cache]);
+    }, [definition.id, definition.data, collectionSlug, cacheKey, cache, authReady]);
 
     return { data, loading, error };
 }

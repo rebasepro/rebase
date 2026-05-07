@@ -1,4 +1,4 @@
-import { RealtimeProvider, DataDriver, FetchCollectionProps, FetchEntityProps, SaveEntityProps, DeleteEntityProps, TableMetadata } from "@rebasepro/types";
+import { RealtimeProvider, DataDriver, FetchCollectionProps, FetchEntityProps, SaveEntityProps, DeleteEntityProps, TableMetadata, DatabaseAdmin, isSchemaAdmin } from "@rebasepro/types";
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
@@ -45,7 +45,8 @@ export function createMongoWebSocket(
     server: Server,
     realtimeService: MongoRealtimeService,
     driver: MongoDriver,
-    authConfig?: AuthConfig
+    authConfig?: AuthConfig,
+    admin?: DatabaseAdmin
 ) {
     const isProduction = process.env.NODE_ENV === "production";
     const wsDebug = (...args: unknown[]) => { if (!isProduction) console.debug(...args); };
@@ -197,22 +198,31 @@ export function createMongoWebSocket(
                     }
                     case "EXECUTE_SQL": {
                         const { sql, options } = payload;
-                        const delegate = await getScopedDelegate();
-                        const result = await (delegate as any).admin?.executeAggregate?.(sql); // Use aggregate for mongo
-                        ws.send(JSON.stringify({ type: "EXECUTE_SQL_SUCCESS", payload: { result }, requestId }));
+                        if (admin && "executeAggregate" in admin && typeof (admin as any).executeAggregate === "function") {
+                            const result = await (admin as any).executeAggregate(sql);
+                            ws.send(JSON.stringify({ type: "EXECUTE_SQL_SUCCESS", payload: { result }, requestId }));
+                        } else {
+                            ws.send(JSON.stringify({ type: "ERROR", requestId, payload: { error: { message: "SQL execution not supported for this driver", code: "NOT_SUPPORTED" } } }));
+                        }
                         break;
                     }
                     case "FETCH_UNMAPPED_TABLES": {
-                        const delegate = await getScopedDelegate();
-                        const tables = await (delegate as any).admin?.fetchUnmappedTables?.(payload?.mappedPaths) || [];
-                        ws.send(JSON.stringify({ type: "FETCH_UNMAPPED_TABLES_SUCCESS", payload: { tables }, requestId }));
+                        if (admin && isSchemaAdmin(admin)) {
+                            const tables = await admin.fetchUnmappedTables?.(payload?.mappedPaths) || [];
+                            ws.send(JSON.stringify({ type: "FETCH_UNMAPPED_TABLES_SUCCESS", payload: { tables }, requestId }));
+                        } else {
+                            ws.send(JSON.stringify({ type: "FETCH_UNMAPPED_TABLES_SUCCESS", payload: { tables: [] }, requestId }));
+                        }
                         break;
                     }
                     case "FETCH_TABLE_METADATA": {
                         const { tableName } = payload;
-                        const delegate = await getScopedDelegate();
-                        const metadata = await (delegate as any).admin?.fetchTableMetadata?.(tableName);
-                        ws.send(JSON.stringify({ type: "FETCH_TABLE_METADATA_SUCCESS", payload: { metadata }, requestId }));
+                        if (admin && isSchemaAdmin(admin)) {
+                            const metadata = await admin.fetchTableMetadata?.(tableName);
+                            ws.send(JSON.stringify({ type: "FETCH_TABLE_METADATA_SUCCESS", payload: { metadata }, requestId }));
+                        } else {
+                            ws.send(JSON.stringify({ type: "FETCH_TABLE_METADATA_SUCCESS", payload: { metadata: null }, requestId }));
+                        }
                         break;
                     }
                     case "subscribe_collection":

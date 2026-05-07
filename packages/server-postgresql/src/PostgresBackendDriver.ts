@@ -1004,32 +1004,4 @@ roles: this.user?.roles ?? [] };
         return this.withTransaction((delegate) => delegate.countEntities(props));
     }
 
-    /**
-     * Intentionally delegates to the base delegate WITHOUT RLS wrapping.
-     * executeSql is an admin-only feature; access control should be enforced
-     * at the API route level, not via database-level RLS.
-     */
-    async executeSql(sqlText: string, options?: { database?: string, role?: string }): Promise<Record<string, unknown>[]> {
-        return this.delegate.executeSql(sqlText, options);
-    }
-
-    async fetchAvailableDatabases(): Promise<string[]> {
-        return this.delegate.fetchAvailableDatabases();
-    }
-
-    async fetchAvailableRoles(): Promise<string[]> {
-        return this.delegate.fetchAvailableRoles();
-    }
-
-    async fetchCurrentDatabase(): Promise<string | undefined> {
-        return this.delegate.fetchCurrentDatabase();
-    }
-
-    async fetchUnmappedTables(mappedPaths?: string[]): Promise<string[]> {
-        return this.delegate.fetchUnmappedTables(mappedPaths);
-    }
-
-    async fetchTableMetadata(tableName: string) {
-        return this.delegate.fetchTableMetadata(tableName);
-    }
 }

@@ -100,8 +100,7 @@ export function StudioHomePage({
     const { containerRef } = useRestoreScroll();
 
     const sectionProps: PluginGenericProps = { context };
-    const pluginChildrenStart = useSlot("home.children.start", sectionProps);
-    const pluginChildrenEnd = useSlot("home.children.end", sectionProps);
+
     const pluginActions = useSlot("home.actions", sectionProps);
 
     return (
@@ -116,7 +115,6 @@ export function StudioHomePage({
                 )}
 
                 {additionalChildrenStart}
-                {pluginChildrenStart}
 
                 {/* ── Tool sections ── */}
                 <div className="flex flex-col gap-8 pt-2">
@@ -252,7 +250,6 @@ icon: tool.icon }}
                     </div>
                 ))}
 
-                {pluginChildrenEnd}
                 {additionalChildrenEnd}
             </Container>
         </div>

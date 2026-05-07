@@ -27,6 +27,9 @@ export interface MongoDriverInternals {
 }
 
 export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): BackendBootstrapper {
+    // Cached admin object, set during getAdmin() and used by initializeWebsockets
+    let cachedAdmin: DatabaseAdmin | undefined;
+
     return {
         type: "mongodb",
 
@@ -121,7 +124,7 @@ export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): Backend
             const internals = driverResult.internals as MongoDriverInternals;
             const db = internals.db;
 
-            return {
+            const admin: DatabaseAdmin = {
                 async executeAggregate(pipeline: Record<string, unknown>[]) {
                     const firstStage = pipeline[0];
                     const collName = (firstStage as any)?.$from ?? "__admin__";
@@ -153,6 +156,9 @@ export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): Backend
                     return { columns, foreignKeys: [], junctions: [], policies: [] };
                 }
             };
+
+            cachedAdmin = admin;
+            return admin;
         },
 
         mountRoutes() {},
@@ -163,7 +169,8 @@ export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): Backend
                 server as import("http").Server,
                 realtimeService as MongoRealtimeService,
                 driver as MongoDriver,
-                config as any
+                config as any,
+                cachedAdmin
             );
         }
     };

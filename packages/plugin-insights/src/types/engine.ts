@@ -1,46 +1,19 @@
 import type { DataRow, HydratedChartConfig, ScorecardConfig } from "./widgets";
 
 /**
- * Result returned by the data engine after executing a query.
+ * Result returned by an insight's data callback.
  */
 export interface InsightDataResult {
     rows: DataRow[];
 }
 
 /**
- * Parameters passed to the fetch function when executing a query.
- */
-export interface InsightFetchParams {
-    /** The SQL query string to execute */
-    query: string;
-    /** Optional collection slug for context-scoped queries */
-    collectionSlug?: string;
-    /** Arbitrary extra context for custom fetch implementations */
-    context?: Record<string, unknown>;
-}
-
-/**
- * The data engine is a user-provided async function that executes
- * a query and returns tabular data. This decouples the plugin from
- * any specific backend implementation.
- *
- * @example
- * ```typescript
- * const fetchData: InsightsFetchFn = async ({ query }) => {
- *     const res = await fetch("/api/insights/query", {
- *         method: "POST",
- *         headers: { "Content-Type": "application/json" },
- *         body: JSON.stringify({ sql: query }),
- *     });
- *     return res.json();
- * };
- * ```
- */
-export type InsightsFetchFn = (params: InsightFetchParams) => Promise<InsightDataResult>;
-
-/**
  * A single insight definition — the "dry" configuration that describes
  * what data to fetch and how to render it.
+ *
+ * Each insight owns its own `data()` callback, giving the developer
+ * full flexibility: use the Rebase client SDK, call a custom function,
+ * hit an external API — whatever makes sense for that widget.
  */
 export interface InsightDefinition {
     /** Unique identifier for this insight */
@@ -51,11 +24,31 @@ export interface InsightDefinition {
     description?: string;
     /** Type of visualization */
     type: "chart" | "scorecard";
+
     /**
-     * The SQL query string used to fetch data.
-     * Passed to the `InsightsFetchFn` at runtime.
+     * Async callback that fetches data for this insight.
+     *
+     * The developer has full control — they can use any data source:
+     * - `rebaseClient.data.orders.find({ limit: 100 })`
+     * - `rebaseClient.call("functions/my-analytics", { ... })`
+     * - A plain `fetch()` to any external API
+     * - Static data for prototyping
+     *
+     * @returns Tabular data as `{ rows: DataRow[] }`.
+     *
+     * @example
+     * ```typescript
+     * data: async () => {
+     *     const res = await rebaseClient.data.orders.find({
+     *         limit: 1000,
+     *         orderBy: "created_at",
+     *     });
+     *     return { rows: res.data };
+     * }
+     * ```
      */
-    query: string;
+    data: () => Promise<InsightDataResult>;
+
     /** Vega-Lite chart spec (merged with fetched data). Required when type is "chart". */
     chart?: Partial<HydratedChartConfig>;
     /** Scorecard field mapping. Required when type is "scorecard". */
@@ -64,6 +57,10 @@ export interface InsightDefinition {
 
 /**
  * Full plugin configuration passed to `useInsightsPlugin`.
+ *
+ * The developer defines insight widgets by placement and provides
+ * their own data callbacks. No global fetch function needed — each
+ * widget is self-contained.
  */
 export interface InsightsPluginConfig {
     /**
@@ -78,9 +75,6 @@ export interface InsightsPluginConfig {
         collections?: Record<string, InsightDefinition[]>;
         cards?: Record<string, InsightDefinition[]>;
     };
-
-    /** Data fetching function — executes queries and returns tabular data */
-    fetchData: InsightsFetchFn;
 
     /** Optional cache TTL in milliseconds (default: 60_000) */
     cacheTTL?: number;

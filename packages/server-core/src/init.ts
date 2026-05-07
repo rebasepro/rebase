@@ -1,4 +1,4 @@
-import { DataDriver, EntityCollection, BackendBootstrapper, BootstrappedAuth, RealtimeProvider, HealthCheckResult, InitializedDriver } from "@rebasepro/types";
+import { DataDriver, EntityCollection, BackendBootstrapper, BootstrappedAuth, RealtimeProvider, HealthCheckResult, InitializedDriver, isSQLAdmin } from "@rebasepro/types";
 import { BackendCollectionRegistry } from "./collections/BackendCollectionRegistry";
 import { loadCollectionsFromDirectory } from "./collections/loader";
 import { DriverRegistry, DEFAULT_DRIVER_ID, DefaultDriverRegistry } from "./services/driver-registry";
@@ -655,9 +655,10 @@ path: `${basePath}/cron` });
     const healthCheck = async (): Promise<HealthCheckResult> => {
         const start = performance.now();
         try {
-            // Use executeSql if available (Postgres), otherwise try fetchCollection as a probe
-            if (typeof defaultDriver.executeSql === "function") {
-                await defaultDriver.executeSql("SELECT 1");
+            // Use admin.executeSql if available (Postgres), otherwise try fetchCollection as a probe
+            const admin = defaultDriver.admin;
+            if (isSQLAdmin(admin)) {
+                await admin.executeSql("SELECT 1");
             } else {
                 // Fallback: try a lightweight fetch to confirm driver is responsive
                 await defaultDriver.fetchCollection({ path: "__health_check_nonexistent__",

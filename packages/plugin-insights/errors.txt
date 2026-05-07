@@ -1,0 +1,82 @@
+src/components/DashboardHistoryView.tsx(30,73): error TS7006: Parameter 'newHistory' implicitly has an 'any' type.
+src/components/DashboardHistoryView.tsx(78,41): error TS7006: Parameter 'error' implicitly has an 'any' type.
+src/components/dashboards/DashboardPageReadOnlyView.tsx(304,29): error TS2322: Type '{ children: Element[]; className: string; layout: LayoutItem[]; cols: number; rowHeight: number; width: number; isDraggable: boolean; isResizable: boolean; isDroppable: boolean; margin: [...]; containerPadding: [...]; compactType: string; preventCollision: boolean; }' is not assignable to type 'IntrinsicAttributes & GridLayoutProps'.
+  Property 'cols' does not exist on type 'IntrinsicAttributes & GridLayoutProps'.
+src/components/dashboards/DashboardPageView.tsx(696,50): error TS2339: Property 'id' does not exist on type 'void'.
+src/components/dashboards/DashboardPageView.tsx(1135,49): error TS2322: Type '(newLayout: LayoutItem[]) => void' is not assignable to type 'EventCallback'.
+  Types of parameters 'newLayout' and 'layout' are incompatible.
+    The type 'Layout' is 'readonly' and cannot be assigned to the mutable type 'LayoutItem[]'.
+src/components/dashboards/DashboardPageView.tsx(1136,49): error TS2322: Type '(newLayout: LayoutItem[]) => void' is not assignable to type 'EventCallback'.
+  Types of parameters 'newLayout' and 'layout' are incompatible.
+    The type 'Layout' is 'readonly' and cannot be assigned to the mutable type 'LayoutItem[]'.
+src/components/dashboards/DashboardPageView.tsx(1137,49): error TS2322: Type '(layout: LayoutItem[], layoutItem: LayoutItem, _event: Event) => void' is not assignable to type '(layout: Layout, item: LayoutItem | undefined, e: Event) => void'.
+  Types of parameters 'layout' and 'layout' are incompatible.
+    The type 'Layout' is 'readonly' and cannot be assigned to the mutable type 'LayoutItem[]'.
+src/components/dashboards/DashboardPageView.tsx(1146,49): error TS2322: Type '(l: LayoutItem[]) => void' is not assignable to type '(layout: Layout) => void'.
+  Types of parameters 'l' and 'layout' are incompatible.
+    The type 'Layout' is 'readonly' and cannot be assigned to the mutable type 'LayoutItem[]'.
+src/components/dashboards/DashboardPageView.tsx(1147,49): error TS2322: Type '{ i: string; w: number; h: number; } | undefined' is not assignable to type 'LayoutItem | undefined'.
+  Type '{ i: string; w: number; h: number; }' is missing the following properties from type 'LayoutItem': x, y
+src/components/dashboards/DashboardPreviewCard.tsx(8,37): error TS2307: Cannot find module '../hooks/useNewDashboardFlow' or its corresponding type declarations.
+src/components/dashboards/DashboardPreviewCard.tsx(34,50): error TS2339: Property 'id' does not exist on type 'void'.
+src/components/dashboards/DashboardPreviewCard.tsx(75,33): error TS2322: Type '{ children: Element[]; trigger: Element; }' is not assignable to type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'.
+  Property 'trigger' does not exist on type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'.
+src/components/dashboards/nodes/GridTextWrapper.tsx(34,15): error TS7030: Not all code paths return a value.
+src/components/DataSourcesSelection.tsx(3,10): error TS2305: Module '"@rebasepro/utils"' has no exported member 'useAuthController'.
+src/components/DataSourcesSelection.tsx(3,29): error TS2305: Module '"@rebasepro/utils"' has no exported member 'useSnackbarController'.
+src/components/DataSourcesSelection.tsx(5,39): error TS2307: Cannot find module './hooks/useTeamGCPDataSources' or its corresponding type declarations.
+src/components/DataSourcesSelection.tsx(6,38): error TS2307: Cannot find module '../hooks/useDatakiAuthController' or its corresponding type declarations.
+src/components/DataSourcesSelection.tsx(29,8): error TS2307: Cannot find module '@firecms/ui' or its corresponding type declarations.
+src/components/DataSourcesSelection.tsx(30,29): error TS2307: Cannot find module './DatakiLogin' or its corresponding type declarations.
+src/components/DataSourcesSelection.tsx(32,42): error TS2307: Cannot find module './teams/TeamGCPProjects' or its corresponding type declarations.
+src/components/DataSourcesSelection.tsx(34,26): error TS2307: Cannot find module './TeamChip' or its corresponding type declarations.
+src/components/DataSourcesSelection.tsx(35,39): error TS2307: Cannot find module '../hooks/useDbConnectionDialog' or its corresponding type declarations.
+src/components/DataSourcesSelection.tsx(37,39): error TS2307: Cannot find module './databases/ConnectPostgresButton' or its corresponding type declarations.
+src/components/DataSourcesSelection.tsx(38,44): error TS2307: Cannot find module './databases/ConnectGoogleProjectButton' or its corresponding type declarations.
+src/components/DataSourcesSelection.tsx(39,43): error TS2307: Cannot find module './databases/ConnectGoogleSheetsButton' or its corresponding type declarations.
+src/components/DataSourcesSelection.tsx(40,45): error TS2307: Cannot find module './teams/defaults' or its corresponding type declarations.
+src/components/DataSourcesSelection.tsx(41,32): error TS2307: Cannot find module './SupabaseConnection' or its corresponding type declarations.
+src/components/DataSourcesSelection.tsx(42,31): error TS2307: Cannot find module './AnimateHeight' or its corresponding type declarations.
+src/components/DataSourcesSelection.tsx(43,10): error TS2305: Module '"../api"' has no exported member 'refreshTeamDataSources'.
+src/components/DataSourcesSelection.tsx(44,36): error TS2307: Cannot find module './GoogleSheetsPicker' or its corresponding type declarations.
+src/components/DataSourcesSelection.tsx(45,52): error TS2307: Cannot find module './DataSourceLabel' or its corresponding type declarations.
+src/components/DataSourcesSelection.tsx(46,30): error TS2307: Cannot find module './files/FileUploadButton' or its corresponding type declarations.
+src/components/DataSourcesSelection.tsx(94,54): error TS7006: Parameter 'team' implicitly has an 'any' type.
+src/components/DataSourcesSelection.tsx(96,42): error TS7006: Parameter 'teamDs' implicitly has an 'any' type.
+src/components/DataSourcesSelection.tsx(124,27): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/DataSourcesSelection.tsx(185,29): error TS7006: Parameter 'team' implicitly has an 'any' type.
+src/components/DataSourcesSelection.tsx(615,39): error TS7006: Parameter 'updatedSources' implicitly has an 'any' type.
+src/components/DataSourcesSelection.tsx(632,36): error TS7006: Parameter 'open' implicitly has an 'any' type.
+src/components/DataSourcesSelection.tsx(667,46): error TS7006: Parameter 'config' implicitly has an 'any' type.
+src/components/DataSourcesSelection.tsx(676,45): error TS7006: Parameter 'u' implicitly has an 'any' type.
+src/components/DataSourcesSelection.tsx(718,29): error TS7006: Parameter 'newSheet' implicitly has an 'any' type.
+src/components/DataSourcesSelection.tsx(727,40): error TS7006: Parameter 'active' implicitly has an 'any' type.
+src/components/DataTable.tsx(3,10): error TS2305: Module '"@rebasepro/utils"' has no exported member 'CellRendererParams'.
+src/components/DataTable.tsx(3,30): error TS2305: Module '"@rebasepro/utils"' has no exported member 'VirtualTable'.
+src/components/DataTable.tsx(3,44): error TS2305: Module '"@rebasepro/utils"' has no exported member 'VirtualTableColumn'.
+src/components/DataTable.tsx(4,26): error TS2307: Cannot find module '@firecms/ui' or its corresponding type declarations.
+src/components/DataTable.tsx(5,23): error TS2307: Cannot find module '@firecms/formex' or its corresponding type declarations.
+src/components/DataTable.tsx(7,31): error TS2307: Cannot find module './DataTableCell' or its corresponding type declarations.
+src/components/DataTable.tsx(8,20): error TS2307: Cannot find module 'moment' or its corresponding type declarations.
+src/components/FilterConfigFormDialog.tsx(15,8): error TS2307: Cannot find module '@firecms/ui' or its corresponding type declarations.
+src/components/FilterConfigFormDialog.tsx(17,28): error TS2307: Cannot find module './FieldLabel' or its corresponding type declarations.
+src/components/FilterConfigFormDialog.tsx(130,44): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/FilterConfigFormDialog.tsx(146,44): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/FilterConfigFormDialog.tsx(163,44): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/FilterConfigFormDialog.tsx(185,44): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/FilterConfigFormDialog.tsx(236,64): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/FilterConfigFormDialog.tsx(243,64): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/FilterView.tsx(183,33): error TS2322: Type '{ children: (Element | undefined)[]; className: string; trigger: Element; }' is not assignable to type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'.
+  Property 'trigger' does not exist on type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'.
+src/components/FilterView.tsx(485,49): error TS7006: Parameter 'row' implicitly has an 'any' type.
+src/components/ShareDialog.tsx(1,10): error TS2300: Duplicate identifier 'Code'.
+src/components/ShareDialog.tsx(17,5): error TS2300: Duplicate identifier 'Code'.
+src/components/ShareDialog.tsx(19,8): error TS2307: Cannot find module '@firecms/ui' or its corresponding type declarations.
+src/components/ShareDialog.tsx(24,10): error TS2305: Module '"@rebasepro/utils"' has no exported member 'useAuthController'.
+src/components/ShareDialog.tsx(24,29): error TS2305: Module '"@rebasepro/utils"' has no exported member 'useSnackbarController'.
+src/components/ShareDialog.tsx(25,28): error TS2307: Cannot find module './UserAvatar' or its corresponding type declarations.
+src/components/ShareDialog.tsx(26,35): error TS2307: Cannot find module './TextFieldWithTags' or its corresponding type declarations.
+src/components/widgets/ChartConfigView.tsx(273,21): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+src/components/widgets/ChartConfigView.tsx(281,21): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+src/components/widgets/TableConfigView.tsx(268,21): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+src/components/widgets/TableConfigView.tsx(276,21): error TS2722: Cannot invoke an object which is possibly 'undefined'.

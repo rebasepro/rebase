@@ -2,7 +2,7 @@ import type { CollectionRegistryController } from "./collection_registry";
 import type { Entity, EntityStatus, EntityValues } from "../types/entities";
 import type { EntityCollection, FilterValues } from "../types/collections";
 import type { RebaseContext } from "../rebase_context";
-import type { TableMetadata } from "../types/websockets";
+
 
 /**
  * @internal
@@ -203,28 +203,5 @@ export interface DataDriver {
      * @see SchemaAdmin
      */
     admin?: import("../types/backend").DatabaseAdmin;
-
-    // ── Direct admin methods ────────────────────────────────────────────
-    // These convenience methods are kept on the driver interface for
-    // simple use cases. For capability-based access, use `driver.admin`
-    // with `isSQLAdmin()` / `isSchemaAdmin()` type guards.
-
-    /** @deprecated Use `driver.admin` with `isSQLAdmin()` type guard instead. */
-    executeSql?(sql: string, options?: { database?: string; role?: string }): Promise<Record<string, unknown>[]>;
-
-    /** @deprecated Use `driver.admin` with `isSchemaAdmin()` type guard instead. */
-    fetchAvailableDatabases?(): Promise<string[]>;
-
-    /** @deprecated Use `driver.admin` with `isSchemaAdmin()` type guard instead. */
-    fetchAvailableRoles?(): Promise<string[]>;
-
-    /** @deprecated Use `driver.admin` with `isSchemaAdmin()` type guard instead. */
-    fetchCurrentDatabase?(): Promise<string | undefined>;
-
-    /** @deprecated Use `driver.admin` with `isSchemaAdmin()` type guard instead. */
-    fetchUnmappedTables?(mappedPaths?: string[]): Promise<string[]>;
-
-    /** @deprecated Use `driver.admin` with `isSchemaAdmin()` type guard instead. */
-    fetchTableMetadata?(tableName: string): Promise<TableMetadata>;
 
 }

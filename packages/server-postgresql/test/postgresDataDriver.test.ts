@@ -356,10 +356,10 @@ status: "new" })
 email: "test@example.com" });
         });
 
-        it("should delegate executeSql directly without a transaction", async () => {
+        it("should delegate executeSql via admin without a transaction", async () => {
             jest.spyOn(delegate, "executeSql").mockResolvedValueOnce([{ id: 1 }] as unknown as Record<string, unknown>[]);
 
-            const result = await authDelegate.executeSql("SELECT 1");
+            const result = await authDelegate.admin.executeSql("SELECT 1");
 
             expect(mockDb.transaction).not.toHaveBeenCalled();
             expect(delegate.executeSql).toHaveBeenCalledWith("SELECT 1", undefined);
@@ -434,38 +434,38 @@ callbacks: {} as unknown as Record<string, unknown> });
             expect(mockRealtimeService.subscriptions.get("sub-ext").authContext).toBeUndefined();
         });
 
-        it("should delegate fetchAvailableDatabases without a transaction", async () => {
+        it("should delegate fetchAvailableDatabases via admin without a transaction", async () => {
             jest.spyOn(delegate, "fetchAvailableDatabases").mockResolvedValueOnce(["db1", "db2"]);
-            const result = await authDelegate.fetchAvailableDatabases();
+            const result = await authDelegate.admin.fetchAvailableDatabases!();
             expect(mockDb.transaction).not.toHaveBeenCalled();
             expect(result).toEqual(["db1", "db2"]);
         });
 
-        it("should delegate fetchAvailableRoles without a transaction", async () => {
+        it("should delegate fetchAvailableRoles via admin without a transaction", async () => {
             jest.spyOn(delegate, "fetchAvailableRoles").mockResolvedValueOnce(["admin", "viewer"]);
-            const result = await authDelegate.fetchAvailableRoles();
+            const result = await authDelegate.admin.fetchAvailableRoles!();
             expect(mockDb.transaction).not.toHaveBeenCalled();
             expect(result).toEqual(["admin", "viewer"]);
         });
 
-        it("should delegate fetchCurrentDatabase without a transaction", async () => {
+        it("should delegate fetchCurrentDatabase via admin without a transaction", async () => {
             jest.spyOn(delegate, "fetchCurrentDatabase").mockResolvedValueOnce("my_db");
-            const result = await authDelegate.fetchCurrentDatabase();
+            const result = await authDelegate.admin.fetchCurrentDatabase!();
             expect(mockDb.transaction).not.toHaveBeenCalled();
             expect(result).toBe("my_db");
         });
 
-        it("should delegate fetchUnmappedTables without a transaction", async () => {
+        it("should delegate fetchUnmappedTables via admin without a transaction", async () => {
             jest.spyOn(delegate, "fetchUnmappedTables").mockResolvedValueOnce(["orphan_table"]);
-            const result = await authDelegate.fetchUnmappedTables(["mapped"]);
+            const result = await authDelegate.admin.fetchUnmappedTables!(["mapped"]);
             expect(mockDb.transaction).not.toHaveBeenCalled();
             expect(result).toEqual(["orphan_table"]);
         });
 
-        it("should delegate fetchTableMetadata without a transaction", async () => {
+        it("should delegate fetchTableMetadata via admin without a transaction", async () => {
             jest.spyOn(delegate, "fetchTableMetadata").mockResolvedValueOnce([{ name: "id",
 type: "int4" }] as unknown as Record<string, unknown>[]);
-            const result = await authDelegate.fetchTableMetadata("users");
+            const result = await authDelegate.admin.fetchTableMetadata!("users");
             expect(mockDb.transaction).not.toHaveBeenCalled();
             expect(result).toEqual([{ name: "id",
 type: "int4" }]);

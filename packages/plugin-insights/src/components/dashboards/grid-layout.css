@@ -1,0 +1,78 @@
+/* Dashboard scale transition */
+.dashboard-zoom-transition {
+    transition: transform 200ms ease-out, margin 200ms ease-out;
+}
+
+.react-grid-item.resizing {
+    z-index: 100;
+    will-change: width, height;
+}
+
+.react-grid-item.react-draggable-dragging {
+    transition: none;
+    z-index: 100;
+    will-change: transform;
+    cursor: grabbing !important;
+}
+
+.react-grid-item.react-draggable-dragging * {
+    cursor: grabbing !important;
+}
+
+/* Resize handle */
+.react-grid-item>.react-resizable-handle {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    bottom: 0;
+    right: 0;
+    cursor: se-resize;
+}
+
+/* Hide resize handles in read-only mode */
+.layout.read-only .react-grid-item>.react-resizable-handle {
+    display: none;
+}
+
+.react-grid-item>.react-resizable-handle::after {
+    content: "";
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    width: 5px;
+    height: 5px;
+    border-right: 2px solid rgba(0, 0, 0, 0.3);
+    border-bottom: 2px solid rgba(0, 0, 0, 0.3);
+}
+
+/* Use app theme (Tailwind dark) instead of OS preference */
+.dark .react-grid-item>.react-resizable-handle::after {
+    border-right-color: rgba(255, 255, 255, 0.6);
+    border-bottom-color: rgba(255, 255, 255, 0.6);
+}
+
+/* Drag placeholder - blue instead of default red */
+.react-grid-placeholder {
+    background: rgb(59, 130, 246) !important;
+    /* blue-500 */
+    opacity: 0.3 !important;
+    transition-duration: 100ms;
+    z-index: 2;
+    border-radius: 8px;
+}
+
+.dark .react-grid-placeholder {
+    background: rgb(96, 165, 250) !important;
+    /* blue-400 */
+    opacity: 0.25 !important;
+}
+
+/* Allow hover toolbars to overflow above grid items */
+.react-grid-item {
+    overflow: visible !important;
+}
+
+/* Elevate hovered grid item so its toolbar renders above sibling items */
+.react-grid-item:hover {
+    z-index: 10;
+}

@@ -97,6 +97,8 @@ export interface ScorecardConfig {
          */
         intent: "increase_is_good" | "decrease_is_good";
     };
-    /** Optional Material Icon name (e.g., "shopping_cart", "attach_money") */
+    /** Optional icon key (e.g., "shopping_cart", "users") — resolved via getIcon */
     icon?: string;
+    /** Optional date range text (e.g., "Last 30 days") */
+    dateRange?: string;
 }

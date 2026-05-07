@@ -107,24 +107,12 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
     const resolvedStorage = storageSourceProp ?? client?.storage;
 
     // Database admin — use explicit prop, or derive from client.ws / driver when available.
-    // Merges SQL capabilities with admin capabilities (branching, etc.) into a single object.
     const resolvedDatabaseAdmin = useMemo(() => {
         if (databaseAdmin) return databaseAdmin;
 
-        // 1. New path: DataDriver exposes `.admin` capability object
-        // Merge it with SQL/schema methods from the driver itself.
+        // 1. DataDriver exposes `.admin` capability object
         if (driverProp?.admin) {
-            return {
-                ...(typeof driverProp.executeSql === "function" ? {
-                    executeSql: driverProp.executeSql.bind(driverProp),
-                    fetchAvailableDatabases: driverProp.fetchAvailableDatabases?.bind(driverProp),
-                    fetchAvailableRoles: driverProp.fetchAvailableRoles?.bind(driverProp),
-                    fetchCurrentDatabase: driverProp.fetchCurrentDatabase?.bind(driverProp),
-                    fetchUnmappedTables: driverProp.fetchUnmappedTables?.bind(driverProp),
-                    fetchTableMetadata: driverProp.fetchTableMetadata?.bind(driverProp)
-                } : {}),
-                ...driverProp.admin
-            };
+            return driverProp.admin;
         }
 
         // 2. Auto-derive from the client's WebSocket connection (Rebase backend)
@@ -146,17 +134,6 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
             };
         }
 
-        // 3. Legacy: derive from deprecated per-method properties on DataDriver
-        if (driverProp && typeof driverProp.executeSql === "function") {
-            return {
-                executeSql: driverProp.executeSql.bind(driverProp),
-                fetchAvailableDatabases: driverProp.fetchAvailableDatabases?.bind(driverProp),
-                fetchAvailableRoles: driverProp.fetchAvailableRoles?.bind(driverProp),
-                fetchCurrentDatabase: driverProp.fetchCurrentDatabase?.bind(driverProp),
-                fetchUnmappedTables: driverProp.fetchUnmappedTables?.bind(driverProp),
-                fetchTableMetadata: driverProp.fetchTableMetadata?.bind(driverProp)
-            };
-        }
         return undefined;
     }, [databaseAdmin, client, driverProp]);
 

@@ -84,6 +84,7 @@ export default defineConfig({
             "@rebasepro/client-postgresql": path.resolve(__dirname, "../../packages/client-postgresql/src"),
             "@rebasepro/client-firebase": path.resolve(__dirname, "../../packages/client-firebase/src"),
             "@rebasepro/plugin-data-enhancement": path.resolve(__dirname, "../../packages/plugin-data-enhancement/src"),
+            "@rebasepro/plugin-insights": path.resolve(__dirname, "../../packages/plugin-insights/src"),
             "@rebasepro/schema-inference": path.resolve(__dirname, "../../packages/schema-inference/src"),
             "@rebasepro/auth": path.resolve(__dirname, "../../packages/auth/src"),
             "@rebasepro/admin": path.resolve(__dirname, "../../packages/admin/src"),

@@ -1,6 +1,6 @@
 import { RealtimeService } from "./services/realtimeService";
 import { PostgresBackendDriver } from "./PostgresBackendDriver";
-import { DataDriver, DeleteEntityProps, FetchCollectionProps, FetchEntityProps, SaveEntityProps, TableMetadata, BranchInfo } from "@rebasepro/types";
+import { DataDriver, DeleteEntityProps, FetchCollectionProps, FetchEntityProps, SaveEntityProps, TableMetadata, BranchInfo, isSQLAdmin, isSchemaAdmin } from "@rebasepro/types";
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
@@ -307,7 +307,12 @@ colors: true }));
                     case "EXECUTE_SQL": {
                         const { sql, options } = payload;
                         const delegate = await getScopedDelegate();
-                        const result = await (delegate as unknown as { executeSql: (sql: string, options?: { database?: string, role?: string }) => Promise<Record<string, unknown>[]> }).executeSql(sql, options);
+                        const admin = delegate.admin;
+                        if (!isSQLAdmin(admin)) {
+                            sendError("ERROR", "NOT_SUPPORTED", "SQL execution is not available for this driver.");
+                            break;
+                        }
+                        const result = await admin.executeSql(sql, options);
                         if (process.env.NODE_ENV !== "production") {
                             wsDebug(`⚡ [WebSocket Server] SQL executed. Returned ${Array.isArray(result) ? result.length : "non-array"} rows.`);
                         }
@@ -323,9 +328,10 @@ colors: true }));
                     case "FETCH_DATABASES": {
                         wsDebug("📚 [WebSocket Server] Processing FETCH_DATABASES request");
                         const delegate = await getScopedDelegate();
+                        const admin = delegate.admin;
                         let databases: string[] = [];
-                        if (delegate.fetchAvailableDatabases) {
-                            databases = await delegate.fetchAvailableDatabases();
+                        if (isSQLAdmin(admin) && admin.fetchAvailableDatabases) {
+                            databases = await admin.fetchAvailableDatabases();
                         }
                         wsDebug(`📚 [WebSocket Server] Fetched ${databases.length} databases.`);
                         const response = {
@@ -340,9 +346,10 @@ colors: true }));
                     case "FETCH_ROLES": {
                         wsDebug("👤 [WebSocket Server] Processing FETCH_ROLES request");
                         const delegate = await getScopedDelegate();
+                        const admin = delegate.admin;
                         let roles: string[] = [];
-                        if (delegate.fetchAvailableRoles) {
-                            roles = await delegate.fetchAvailableRoles();
+                        if (isSQLAdmin(admin) && admin.fetchAvailableRoles) {
+                            roles = await admin.fetchAvailableRoles();
                         }
                         wsDebug(`👤 [WebSocket Server] Fetched ${roles.length} roles.`);
                         const response = {
@@ -357,9 +364,10 @@ colors: true }));
                     case "FETCH_CURRENT_DATABASE": {
                         wsDebug("📚 [WebSocket Server] Processing FETCH_CURRENT_DATABASE request");
                         const delegate = await getScopedDelegate();
+                        const admin = delegate.admin;
                         let database: string | undefined = undefined;
-                        if (delegate.fetchCurrentDatabase) {
-                            database = await delegate.fetchCurrentDatabase();
+                        if (isSQLAdmin(admin) && admin.fetchCurrentDatabase) {
+                            database = await admin.fetchCurrentDatabase();
                         }
                         const response = {
                             type: "FETCH_CURRENT_DATABASE_SUCCESS",
@@ -373,9 +381,10 @@ colors: true }));
                     case "FETCH_UNMAPPED_TABLES": {
                         wsDebug("📋 [WebSocket Server] Processing FETCH_UNMAPPED_TABLES request");
                         const delegate = await getScopedDelegate();
+                        const admin = delegate.admin;
                         let tables: string[] = [];
-                        if (delegate.fetchUnmappedTables) {
-                            tables = await delegate.fetchUnmappedTables(payload?.mappedPaths);
+                        if (isSchemaAdmin(admin) && admin.fetchUnmappedTables) {
+                            tables = await admin.fetchUnmappedTables(payload?.mappedPaths);
                         }
                         wsDebug(`📋 [WebSocket Server] Fetched ${tables.length} unmapped tables.`);
                         const response = {
@@ -391,9 +400,10 @@ colors: true }));
                         wsDebug("📋 [WebSocket Server] Processing FETCH_TABLE_METADATA request");
                         const { tableName } = payload;
                         const delegate = await getScopedDelegate();
+                        const admin = delegate.admin;
                         let metadata: TableMetadata | undefined;
-                        if (delegate.fetchTableMetadata) {
-                            metadata = await delegate.fetchTableMetadata(tableName);
+                        if (isSchemaAdmin(admin) && admin.fetchTableMetadata) {
+                            metadata = await admin.fetchTableMetadata(tableName) as TableMetadata;
                         }
                         wsDebug(`📋 [WebSocket Server] Fetched metadata for table '${tableName}'. (${metadata?.columns?.length ?? 0} columns)`);
                         const response = {

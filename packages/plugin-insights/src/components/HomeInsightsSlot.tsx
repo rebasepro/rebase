@@ -6,33 +6,38 @@ import { InsightWidget } from "./InsightWidget";
  * Full-width insights panel rendered at the top of the home page.
  * Injected via the `home.children.start` slot.
  *
- * Renders a responsive grid of insights (charts and scorecards)
- * that provides a dashboard-like overview.
+ * Separates scorecards (compact 4-col grid) from charts (2-col grid)
+ * to give each widget type the right amount of breathing room.
  */
 export function HomeInsightsSlot({
     insights,
-    isDarkMode = false,
 }: {
     context?: unknown;
     insights: InsightDefinition[];
-    isDarkMode?: boolean;
 }) {
     if (!insights || insights.length === 0) return null;
 
+    const scorecards = insights.filter((i) => i.type === "scorecard");
+    const charts = insights.filter((i) => i.type === "chart");
+
     return (
-        <div style={{
-            display: "grid",
-            gridTemplateColumns: `repeat(auto-fill, minmax(${insights.some(i => i.type === "chart") ? "300px" : "220px"}, 1fr))`,
-            gap: 16,
-            padding: "0 0 24px",
-        }}>
-            {insights.map((def) => (
-                <InsightWidget
-                    key={def.id}
-                    definition={def}
-                    isDarkMode={isDarkMode}
-                />
-            ))}
+        <div className="flex flex-col gap-4 pb-6">
+            {/* Scorecards — compact row */}
+            {scorecards.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {scorecards.map((def) => (
+                        <InsightWidget key={def.id} definition={def} />
+                    ))}
+                </div>
+            )}
+            {/* Charts — wider panels */}
+            {charts.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {charts.map((def) => (
+                        <InsightWidget key={def.id} definition={def} />
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

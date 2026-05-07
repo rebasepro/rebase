@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
+import { getIcon } from "@rebasepro/core";
+;;;
 import type { DataRow, ScorecardConfig, ScorecardFormat } from "../types";
 
 function formatNumber(value: number, format?: ScorecardFormat): string {
@@ -25,23 +27,25 @@ function formatNumber(value: number, format?: ScorecardFormat): string {
 }
 
 /**
- * Scorecard widget adapted from Dataki for the Rebase design system.
+ * Scorecard widget for the Rebase design system.
  *
  * Renders a single KPI metric with optional comparison value and icon.
- * Automatically scales typography based on container size via ResizeObserver.
+ * Uses Tailwind `dark:` classes — no JS dark mode detection.
+ * Icons are resolved via `getIcon` from `@rebasepro/core`.
  */
 export function InsightsScorecardView({
     config,
     data,
     title,
-    isDarkMode = false,
     compact = false,
+    embedded = false,
 }: {
     config: ScorecardConfig;
     data: DataRow;
     title: string;
-    isDarkMode?: boolean;
     compact?: boolean;
+    /** When true, skip own border/bg since the parent card provides them. */
+    embedded?: boolean;
 }) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [containerWidth, setContainerWidth] = useState(300);
@@ -71,104 +75,79 @@ export function InsightsScorecardView({
             const isPositive = comparisonValue > 0;
             const isNegative = comparisonValue < 0;
 
-            let color = isDarkMode
-                ? "rgba(255,255,255,0.5)"
-                : "rgba(0,0,0,0.5)";
+            let colorClass = "text-surface-500 dark:text-surface-400";
             if (config.comparison.intent === "increase_is_good") {
-                if (isPositive) color = "#10B981";
-                if (isNegative) color = "#EF4444";
+                if (isPositive) colorClass = "text-emerald-500";
+                if (isNegative) colorClass = "text-red-500";
             } else if (config.comparison.intent === "decrease_is_good") {
-                if (isPositive) color = "#EF4444";
-                if (isNegative) color = "#10B981";
+                if (isPositive) colorClass = "text-red-500";
+                if (isNegative) colorClass = "text-emerald-500";
             }
 
             comparisonElement = (
-                <span style={{
-                    color,
-                    fontWeight: 500,
-                    fontSize: compact ? "0.75rem" : "0.875rem",
-                }}>
+                <span className={`font-medium ${compact ? "text-[10px]" : "text-xs"} ${colorClass}`}>
                     {formattedComparison}
                 </span>
             );
         }
     }
 
-    // Responsive typography
     const isSmall = compact || containerWidth < 200;
-    const valueFontSize = isSmall ? "1.5rem" : containerWidth < 300 ? "2rem" : "2.5rem";
-    const titleFontSize = isSmall ? "0.75rem" : "0.8125rem";
 
-    return (
-        <div
-            ref={containerRef}
-            className="rounded-lg flex flex-col"
-            style={{
-                padding: isSmall ? "12px 14px" : "16px 20px",
-                backgroundColor: isDarkMode
-                    ? "rgba(255,255,255,0.03)"
-                    : "rgba(0,0,0,0.02)",
-                border: isDarkMode
-                    ? "1px solid rgba(255,255,255,0.06)"
-                    : "1px solid rgba(0,0,0,0.06)",
-                minWidth: 0,
-            }}
-        >
-            {/* Title row */}
-            <div style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: isSmall ? 4 : 8,
-            }}>
-                <span style={{
-                    fontSize: titleFontSize,
-                    fontWeight: 500,
-                    color: isDarkMode
-                        ? "rgba(255,255,255,0.55)"
-                        : "rgba(0,0,0,0.55)",
-                    lineHeight: 1.3,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                }}>
+    // Resolve icon via getIcon (Lucide-based resolution)
+    const iconElement = config.icon
+        ? getIcon(config.icon, "text-surface-400 dark:text-surface-500", undefined, isSmall ? 14 : 18)
+        : null;
+
+    // ── Compact card-inline layout ──────────────────────────────────────
+    if (compact) {
+        return (
+            <div className="flex flex-col gap-0.5 px-2.5 py-2 rounded-md bg-transparent border border-surface-200 dark:border-surface-800 min-w-0">
+                <span className="text-[10px] uppercase tracking-wider text-surface-400 dark:text-surface-500 truncate">
                     {title}
                 </span>
-
-                {config.icon && (
-                    <span
-                        className="material-symbols-outlined"
-                        style={{
-                            fontSize: isSmall ? 18 : 22,
-                            color: isDarkMode
-                                ? "rgba(255,255,255,0.3)"
-                                : "rgba(0,0,0,0.2)",
-                            marginLeft: 8,
-                            flexShrink: 0,
-                        }}
-                    >
-                        {config.icon}
+                <div className="flex items-baseline gap-1.5">
+                    <span className="text-sm font-semibold tabular-nums text-surface-800 dark:text-surface-100">
+                        {formattedValue}
                     </span>
+                    {comparisonElement}
+                </div>
+            </div>
+        );
+    }
+
+    // ── Standard scorecard layout ───────────────────────────────────────
+    const baseClass = embedded
+        ? `flex flex-col min-w-0 h-full ${isSmall ? "px-3.5 py-3" : "px-5 py-4"}`
+        : `rounded-lg flex flex-col min-w-0 bg-transparent border border-surface-200 dark:border-surface-800 ${isSmall ? "px-3.5 py-3" : "px-5 py-4"}`;
+
+    return (
+        <div ref={containerRef} className={baseClass}>
+            {/* Title row */}
+            <div className={`flex items-center justify-between ${isSmall ? "mb-1" : "mb-2"}`}>
+                <div className="flex flex-col min-w-0">
+                    <span className={`font-medium leading-snug truncate text-surface-500 dark:text-surface-400 ${isSmall ? "text-[11px]" : "text-xs"}`}>
+                        {title}
+                    </span>
+                    {config.dateRange && !isSmall && (
+                        <span className="text-[10px] text-surface-400 dark:text-surface-500 truncate mt-0.5">
+                            {config.dateRange}
+                        </span>
+                    )}
+                </div>
+                {iconElement && (
+                    <span className="ml-2 shrink-0">{iconElement}</span>
                 )}
             </div>
 
             {/* Main value */}
-            <div style={{
-                fontSize: valueFontSize,
-                fontWeight: 700,
-                lineHeight: 1.15,
-                color: isDarkMode
-                    ? "rgba(255,255,255,0.92)"
-                    : "rgba(0,0,0,0.87)",
-                letterSpacing: "-0.02em",
-                wordBreak: "break-all",
-            }}>
+            <div className={`font-semibold leading-tight tracking-tight break-all text-surface-800 dark:text-surface-100 ${isSmall ? "text-lg" : containerWidth < 300 ? "text-xl" : "text-2xl"}`}>
                 {formattedValue}
             </div>
 
             {/* Comparison */}
             {comparisonElement && (
-                <div style={{ marginTop: isSmall ? 2 : 4 }}>
+                <div className={isSmall ? "mt-0.5" : "mt-1"}>
                     {comparisonElement}
                 </div>
             )}

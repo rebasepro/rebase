@@ -1,7 +1,21 @@
 
 import type { AppView, AppViewsBuilder, EffectiveRoleController, EntityCollection, RebasePlugin } from "@rebasepro/types";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { deepEqual as equal } from "fast-equals";
+
+/**
+ * Compare two view arrays by their slug identity.
+ * Returns true when the sets of slugs are identical (same order, same values).
+ * This avoids deepEqual on React elements, which have unstable internal refs.
+ */
+function viewSlugsEqual(a: AppView[] | undefined, b: AppView[] | undefined): boolean {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+        if (a[i].slug !== b[i].slug) return false;
+    }
+    return true;
+}
 
 import { AuthController, RebaseData, User } from "@rebasepro/types";
 import { UserManagementDelegate } from "@rebasepro/types";
@@ -154,13 +168,15 @@ export function useResolvedViews<USER extends User>(
 
                 const newAdminViews = [...newAdminViewsProp, ...injectedAdminViewsRef.current];
 
-                // Only update state if views actually changed
-                if (!equal(viewsRef.current, newViews)) {
+                // Compare views by slug identity rather than deepEqual.
+                // Views contain React elements (JSX) whose internal properties
+                // change on every render, making deepEqual unreliable.
+                if (!viewSlugsEqual(viewsRef.current, newViews)) {
                     viewsRef.current = newViews;
                     setResolvedViews(newViews);
                 }
 
-                if (!equal(adminViewsRef.current, newAdminViews)) {
+                if (!viewSlugsEqual(adminViewsRef.current, newAdminViews)) {
                     adminViewsRef.current = newAdminViews;
                     setResolvedAdminViews(newAdminViews);
                 }
