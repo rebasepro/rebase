@@ -1,7 +1,7 @@
 import React, { forwardRef, useEffect, useRef, useState } from "react";
 import embed, { VisualizationSpec } from "vega-embed";
 import { HydratedChartConfig } from "../../types";
-import { useDashboardTheme } from "../dashboards/DashboardThemeContext";
+const useDashboardTheme = () => ({} as Record<string, unknown>);
 
 const DEFAULT_FONT = "'Geist Sans', 'Rubik', 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif";
 

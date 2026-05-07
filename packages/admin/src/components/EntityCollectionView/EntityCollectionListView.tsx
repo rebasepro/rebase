@@ -2,9 +2,6 @@
 import type { EntityCollection, Property } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CollectionSize, Entity, EntityTableController, SelectionController } from "@rebasepro/types";
-// @ts-ignore
-import { FixedSizeList as List, ListOnItemsRenderedProps } from "react-window";
-import useMeasure from "react-use-measure";
 import { getEntityImagePreviewPropertyKey } from "@rebasepro/common";
 import {
     Checkbox,
@@ -256,12 +253,18 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
     const analyticsController = useAnalyticsController();
 
     const containerRef = useRef<HTMLDivElement>(null);
-    const listRef = useRef<List>(null);
-    const [measureRef, bounds] = useMeasure({
-        debounce: 50,
-        polyfill: ResizeObserver,
-        offsetSize: true
-    });
+    const [containerWidth, setContainerWidth] = useState(1200);
+
+    // Track container width for responsive column visibility
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        const ro = new ResizeObserver(([entry]) => {
+            if (entry) setContainerWidth(entry.contentRect.width);
+        });
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
 
     const {
         data,
@@ -276,48 +279,10 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
 
     const isLoadingMore = useRef(false);
 
-    // Infinite scroll via react-window onItemsRendered
-    const onItemsRendered = useCallback(({ visibleStopIndex }: ListOnItemsRenderedProps) => {
-        if (!paginationEnabled || noMoreToLoad || dataLoading || isLoadingMore.current) return;
-        // Trigger load when within 10 rows of the end
-        if (visibleStopIndex >= data.length - 10) {
-            isLoadingMore.current = true;
-            setItemCount?.((itemCount ?? pageSize) + pageSize);
-        }
-    }, [paginationEnabled, noMoreToLoad, dataLoading, data.length, itemCount, pageSize, setItemCount]);
-
     // Reset the loading-more gate when new data arrives
     useEffect(() => {
         if (!dataLoading) isLoadingMore.current = false;
     }, [dataLoading]);
-
-    // Scroll restoration via react-window scrollTo
-    const hasRestoredScroll = useRef(false);
-    useEffect(() => {
-        if (!initialScroll || hasRestoredScroll.current || data.length === 0) return;
-        if (listRef.current) {
-            listRef.current.scrollTo(initialScroll);
-            hasRestoredScroll.current = true;
-        }
-    }, [initialScroll, data.length]);
-
-    // Scroll tracking via react-window onScroll
-    const lastScrollOffset = useRef(0);
-    const handleListScroll = useCallback(({ scrollDirection, scrollOffset, scrollUpdateWasRequested }: {
-        scrollDirection: "forward" | "backward";
-        scrollOffset: number;
-        scrollUpdateWasRequested: boolean;
-    }) => {
-        lastScrollOffset.current = scrollOffset;
-        onScroll?.({
-            scrollDirection,
-            scrollOffset,
-            scrollUpdateWasRequested
-        });
-    }, [onScroll]);
-
-    // Responsive column count: derived from useMeasure bounds
-    const containerWidth = bounds.width || 1200;
 
     const resolvedCollection = collection;
 
@@ -443,7 +408,7 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
     }, [resolvedCollection, titlePropertyKey, statusPropertyKey, datePropertyKey, imagePropertyKey, previewKeys, size]);
 
     const showImage = size !== "xs";
-    const rowHeight = getRowHeight(size);
+
 
     // Responsive: determine visible columns based on container width.
     // The first extra column requires significantly more available space (600px)
@@ -502,51 +467,31 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
     // Empty state
     const isEmpty = !dataLoading && data.length === 0 && !dataLoadingError;
 
-    // Memoised row renderer for react-window
-    const Row = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
-        const entity = data[index];
-        if (!entity) return null;
-        const isLast = index === data.length - 1;
-        return (
-            <div
-                style={style}
-                className={cls(
-                    !isLast && "border-b",
-                    !isLast && defaultBorderMixin
-                )}
-            >
-                <ListRow
-                    entity={entity}
-                    collection={resolvedCollection}
-                    onClick={handleEntityClick}
-                    selected={isEntitySelected(entity)}
-                    highlighted={isEntityHighlighted(entity)}
-                    onSelectionChange={handleSelectionChange}
-                    selectionEnabled={selectionEnabled}
-                    columns={visibleColumns}
-                    slotKeys={slotKeys}
-                    rowClasses={rowClasses}
-                    showImage={showImage}
-                    size={size}
-                    isLast={isLast}
-                    isActive={selectedEntityId !== undefined && entity.id === selectedEntityId}
-                />
-            </div>
-        );
-    }, [data, resolvedCollection, handleEntityClick, isEntitySelected, isEntityHighlighted, handleSelectionChange, selectionEnabled, visibleColumns, slotKeys, rowClasses, showImage, size, selectedEntityId]);
+
+    // Sentinel ref for IntersectionObserver-based infinite scroll
+    const sentinelRef = useRef<HTMLDivElement | null>(null);
+    useEffect(() => {
+        if (!paginationEnabled || noMoreToLoad || dataLoading) return;
+        const sentinel = sentinelRef.current;
+        if (!sentinel) return;
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0]?.isIntersecting && !isLoadingMore.current) {
+                isLoadingMore.current = true;
+                setItemCount?.((itemCount ?? pageSize) + pageSize);
+            }
+        }, { rootMargin: "200px" });
+        observer.observe(sentinel);
+        return () => observer.disconnect();
+    }, [paginationEnabled, noMoreToLoad, dataLoading, data.length, itemCount, pageSize, setItemCount]);
 
     return (
         <div
-            ref={(node) => {
-                // Merge refs: useMeasure + containerRef
-                measureRef(node);
-                (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
-            }}
-            className="flex-1 overflow-hidden"
+            ref={containerRef}
+            className="w-full rounded-lg overflow-hidden border border-surface-200 dark:border-surface-700"
         >
             {/* Error state */}
             {dataLoadingError ? (
-                <div className="h-full flex items-center justify-center p-8">
+                <div className="flex items-center justify-center p-8">
                     <Typography className="text-red-500">
                         Error loading data: {dataLoadingError.message}
                     </Typography>
@@ -554,7 +499,7 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
             ) : isInitialLoading ? (
                 <CircularProgressCenter/>
             ) : isEmpty ? (
-                <div className="h-full flex items-center justify-center p-8">
+                <div className="flex items-center justify-center p-8">
                     {emptyComponent ?? (
                         <Typography variant="label" color="secondary">
                             No entries found
@@ -563,20 +508,41 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
                 </div>
             ) : (
                 <>
-                    <List
-                        ref={listRef}
-                        height={bounds.height || 600}
-                        width={bounds.width || "100%"}
-                        itemCount={data.length}
-                        itemSize={rowHeight}
-                        overscanCount={8}
-                        onScroll={handleListScroll}
-                        onItemsRendered={onItemsRendered}
-                    >
-                        {Row}
-                    </List>
+                    {data.map((entity, index) => {
+                        const isLast = index === data.length - 1;
+                        return (
+                            <div
+                                key={entity.id}
+                                className={cls(
+                                    !isLast && "border-b",
+                                    !isLast && defaultBorderMixin
+                                )}
+                            >
+                                <ListRow
+                                    entity={entity}
+                                    collection={resolvedCollection}
+                                    onClick={handleEntityClick}
+                                    selected={isEntitySelected(entity)}
+                                    highlighted={isEntityHighlighted(entity)}
+                                    onSelectionChange={handleSelectionChange}
+                                    selectionEnabled={selectionEnabled}
+                                    columns={visibleColumns}
+                                    slotKeys={slotKeys}
+                                    rowClasses={rowClasses}
+                                    showImage={showImage}
+                                    size={size}
+                                    isLast={isLast}
+                                    isActive={selectedEntityId !== undefined && entity.id === selectedEntityId}
+                                />
+                            </div>
+                        );
+                    })}
 
-                    {/* Loading indicator (below the virtual list) */}
+                    {/* Sentinel for infinite scroll pagination */}
+                    {paginationEnabled && !noMoreToLoad && (
+                        <div ref={sentinelRef} className="h-1"/>
+                    )}
+
                     {dataLoading && (
                         <div className="flex items-center justify-center py-4">
                             <CircularProgress size="small"/>

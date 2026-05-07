@@ -1001,35 +1001,43 @@ export const EntityCollectionView = React.memo(
                         {/* When detail panel is open, left panel is always the list
                             view — regardless of which view mode triggered the entity
                             click. When no detail, show the active view mode. */}
-                        {selectedEntityIdProp !== undefined ? (
-                            <EntityCollectionListView
-                                key={`list-view-${path}`}
-                                collection={collection}
-                                tableController={tableController}
-                                onEntityClick={onEntityClick}
-                                selectionController={usedSelectionController}
-                                selectionEnabled={selectionEnabled}
-                                highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
-                                onScroll={tableController.onScroll}
-                                initialScroll={tableController.initialScroll}
-                                size={listSize}
-                                emptyComponent={emptyComponent}
-                                selectedEntityId={selectedEntityIdProp}
-                            />
-                        ) : viewMode === "list" ? (
-                            <EntityCollectionListView
-                                key={`list-view-${path}`}
-                                collection={collection}
-                                tableController={tableController}
-                                onEntityClick={onEntityClick}
-                                selectionController={usedSelectionController}
-                                selectionEnabled={selectionEnabled}
-                                highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
-                                onScroll={tableController.onScroll}
-                                initialScroll={tableController.initialScroll}
-                                size={listSize}
-                                emptyComponent={emptyComponent}
-                            />
+                        {(selectedEntityIdProp !== undefined || viewMode === "list") ? (
+                            <div
+                                className={cls(
+                                    "flex flex-col w-full transition-all duration-300",
+                                    selectedEntityIdProp === undefined
+                                        ? "max-w-6xl mx-auto px-3 md:px-4 lg-px-6 py-4"
+                                        : "max-w-none mx-0 px-0 py-0"
+                                )}
+                            >
+                                {/* Collapsible title — animates height to 0 when split-view */}
+                                <div
+                                    className={cls(
+                                        "overflow-hidden transition-all duration-300 flex items-center gap-4",
+                                        selectedEntityIdProp === undefined
+                                            ? "max-h-24 opacity-100 mt-12 mb-6"
+                                            : "max-h-0 opacity-0 mt-0 mb-0"
+                                    )}
+                                >
+                                    <Typography gutterBottom variant="h4" className="grow mb-0" component="h4">
+                                        {collection.name}
+                                    </Typography>
+                                </div>
+                                <EntityCollectionListView
+                                    key={`list-view-${path}`}
+                                    collection={collection}
+                                    tableController={tableController}
+                                    onEntityClick={onEntityClick}
+                                    selectionController={usedSelectionController}
+                                    selectionEnabled={selectionEnabled}
+                                    highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                                    onScroll={tableController.onScroll}
+                                    initialScroll={tableController.initialScroll}
+                                    size={listSize}
+                                    emptyComponent={emptyComponent}
+                                    selectedEntityId={selectedEntityIdProp}
+                                />
+                            </div>
                         ) : (
                             innerView
                         )}

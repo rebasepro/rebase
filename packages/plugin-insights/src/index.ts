@@ -6,7 +6,6 @@ export type {
     ScorecardConfig,
     InsightDataResult,
     InsightDefinition,
-    DashboardDefinition,
     InsightsPluginConfig,
 } from "./types";
 
@@ -23,6 +22,3 @@ export { InsightsChartView } from "./components/InsightsChartView";
 export { InsightsScorecardView } from "./components/InsightsScorecardView";
 export { InsightWidget } from "./components/InsightWidget";
 export { InsightWidgetSkeleton } from "./components/InsightWidgetSkeleton";
-
-// ── Dashboard components ──────────────────────────────────────────────
-export { CodeDashboardView } from "./components/dashboards/CodeDashboardView";

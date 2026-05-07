@@ -255,14 +255,16 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
     const listPanel = (
         <div
             className={cls(
-                "flex flex-col h-full overflow-hidden min-w-0 transition-all ease-out w-full",
+                "flex flex-col h-full overflow-y-auto overflow-x-hidden min-w-0 transition-all ease-out w-full",
                 (!largeLayout && isDetailVisible)
                     ? "opacity-0 -translate-x-1/3 pointer-events-none"
                     : "opacity-100 translate-x-0"
             )}
             style={{ transitionDuration: `${TRANSITION_DURATION}ms` }}
         >
-            {toolbar}
+            <div className="sticky top-0 z-10 bg-surface-900">
+                {toolbar}
+            </div>
             {children}
         </div>
     );

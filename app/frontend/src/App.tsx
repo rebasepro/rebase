@@ -8,7 +8,7 @@ import { RebaseCMS, RebaseShell } from "@rebasepro/admin";
 import type { RebasePlugin } from "@rebasepro/types";
 import { useDataEnhancementPlugin } from "@rebasepro/plugin-data-enhancement";
 import { useInsightsPlugin } from "@rebasepro/plugin-insights";
-import type { InsightsPluginConfig, DashboardDefinition } from "@rebasepro/plugin-insights";
+import type { InsightsPluginConfig } from "@rebasepro/plugin-insights";
 import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
 import { collections } from "virtual:rebase-collections";
