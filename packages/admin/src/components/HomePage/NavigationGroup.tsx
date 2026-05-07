@@ -100,7 +100,7 @@ export function NavigationGroup({
                         "rounded flex items-center justify-between w-full",
                         "hover:bg-transparent",
                         "cursor-pointer select-none",
-                        collapsed && "bg-surface-100 dark:bg-surface-800/50"
+                        collapsed && "bg-surface-100 dark:bg-surface-900/50"
                     )}
                     innerClassName={cls("mt-4", !minimised ? "pt-0" : "")}
                     title={

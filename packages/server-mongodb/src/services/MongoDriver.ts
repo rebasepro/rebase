@@ -33,7 +33,7 @@ export class MongoDriver implements DataDriver {
 
     private entityService: MongoEntityService;
     private realtimeService: MongoRealtimeService;
-    private historyService: MongoHistoryService;
+    public historyService: MongoHistoryService;
 
     constructor(
         private db: Db,

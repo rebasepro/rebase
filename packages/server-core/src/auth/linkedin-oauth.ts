@@ -12,7 +12,7 @@ export interface LinkedinUserInfo {
 /**
  * Creates a LinkedIn OAuth Provider integration
  */
-export function createLinkedinProvider(config: { clientId: string, clientSecret: string }): OAuthProvider {
+export function createLinkedinProvider(config: { clientId: string, clientSecret: string }): OAuthProvider<{ code: string; redirectUri: string }> {
     return {
         id: "linkedin",
         schema: z.object({

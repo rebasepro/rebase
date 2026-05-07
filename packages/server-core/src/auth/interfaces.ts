@@ -61,15 +61,15 @@ export interface OAuthProviderProfile {
 /**
  * Pluggable OAuth Provider integration strategy
  */
-export interface OAuthProvider {
+export interface OAuthProvider<T = unknown> {
     /** The identifier of the provider (e.g. "github", "google") */
     id: string;
 
     /** Zod schema validating the expected request payload (e.g. { code: string }) */
-    schema: z.ZodSchema<any>;
+    schema: z.ZodSchema<T>;
 
     /** Verify external tokens/codes and return a standardized user profile */
-    verify: (payload: any) => Promise<OAuthProviderProfile | null>;
+    verify: (payload: T) => Promise<OAuthProviderProfile | null>;
 }
 
 /**

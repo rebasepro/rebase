@@ -21,7 +21,11 @@ export function createAppleProvider(config: {
     keyId: string;
     /** The raw PEM contents of the .p8 private key file */
     privateKey: string;
-}): OAuthProvider {
+}): OAuthProvider<{
+            code: string;
+            redirectUri: string;
+            user?: { name?: { firstName?: string; lastName?: string }; email?: string };
+        }> {
     /**
      * Generate a client_secret JWT signed with the Apple private key.
      * Apple requires this instead of a static client_secret.

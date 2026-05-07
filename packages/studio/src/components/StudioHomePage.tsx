@@ -272,7 +272,7 @@ function SyntaxHighlightedSnippet() {
     const fn = "text-blue-600 dark:text-blue-400"; // functions
     const cm = "text-surface-500 dark:text-surface-400 italic"; // comments
     const op = "text-surface-500 dark:text-surface-400"; // operators / punctuation
-    const tx = "text-surface-800 dark:text-surface-200"; // plain text
+    const tx = "text-surface-950 dark:text-surface-200"; // plain text
 
     return (
         <pre className="m-0 whitespace-pre">

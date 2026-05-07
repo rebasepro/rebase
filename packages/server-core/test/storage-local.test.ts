@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, jest as vi } from "@jest/globals";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -42,8 +42,8 @@ force: true });
                 key: "uploads/test.txt"
             });
 
-            expect(result.path).toContain("uploads");
-            expect(result.path).toContain("test.txt");
+            expect(result.key).toContain("uploads");
+            expect(result.key).toContain("test.txt");
 
             // Verify file exists on disk (uses default bucket)
             const filePath = path.join(tempDir, "default", "uploads", "test.txt");

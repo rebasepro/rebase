@@ -42,7 +42,7 @@ export function CollectionStudioView({ collectionId, ...props }: CollectionStudi
     };
 
     return (
-        <div className="flex-grow flex flex-col h-full w-full bg-white dark:bg-surface-950">
+        <div className="flex-grow flex flex-col h-full w-full bg-white dark:bg-surface-900">
             <AIModifiedPathsProvider>
                 {activeCollectionId ? (
                     <CollectionEditor

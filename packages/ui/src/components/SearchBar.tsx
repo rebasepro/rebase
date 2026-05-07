@@ -79,7 +79,7 @@ export function SearchBar({
             onClick={onClick}
             className={cls("relative transition-all",
                 heightClass,
-                "bg-surface-accent-50 dark:bg-surface-800 border",
+                "bg-surface-accent-50 dark:bg-surface-900 border",
                 defaultBorderMixin,
                 "focus-within:ring-2 focus-within:ring-primary focus-within:border-primary",
                 "rounded-lg overflow-hidden",

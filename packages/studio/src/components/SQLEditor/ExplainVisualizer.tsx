@@ -40,10 +40,10 @@ export const ExplainVisualizer: React.FC<ExplainVisualizerProps> = ({ plan, isRo
         <div className={cls("flex flex-col", isRoot ? "p-4" : "pl-6 mt-2 relative")}>
             {/* Tree branch line */}
             {!isRoot && (
-                <div className="absolute left-2.5 top-0 bottom-0 w-px bg-surface-200 dark:bg-surface-800 -z-10"></div>
+                <div className="absolute left-2.5 top-0 bottom-0 w-px bg-surface-200 dark:bg-surface-950 -z-10"></div>
             )}
             {!isRoot && (
-                <div className="absolute left-2.5 top-5 w-3 h-px bg-surface-200 dark:bg-surface-800 -z-10"></div>
+                <div className="absolute left-2.5 top-5 w-3 h-px bg-surface-200 dark:bg-surface-950 -z-10"></div>
             )}
 
             <div className={cls("border rounded-md bg-white dark:bg-surface-900 text-text-primary dark:text-text-primary-dark shadow-xs relative z-10 w-[420px] max-w-full", defaultBorderMixin)}>
@@ -63,7 +63,7 @@ export const ExplainVisualizer: React.FC<ExplainVisualizerProps> = ({ plan, isRo
                         </Typography>
 
                         {plan["Relation Name"] && (
-                            <span className="font-mono text-[11px] text-text-secondary dark:text-text-secondary-dark px-2 py-0.5 rounded bg-surface-200 dark:bg-surface-800 ml-2">
+                            <span className="font-mono text-[11px] text-text-secondary dark:text-text-secondary-dark px-2 py-0.5 rounded bg-surface-200 dark:bg-surface-950 ml-2">
                                 on {plan["Relation Name"]} {plan.Alias && plan.Alias !== plan["Relation Name"] ? `(${plan.Alias})` : ""}
                             </span>
                         )}
@@ -82,7 +82,7 @@ export const ExplainVisualizer: React.FC<ExplainVisualizerProps> = ({ plan, isRo
                 </div>
 
                 <Collapse in={expanded}>
-                    <div className="px-4 py-3 border-t border-surface-200 dark:border-surface-800 text-[13px] flex flex-col gap-2">
+                    <div className="px-4 py-3 border-t border-surface-200 dark:border-surface-950 text-[13px] flex flex-col gap-2">
                         <div className="flex items-center space-x-6">
                             <div className="flex items-center space-x-2">
                                 <span className="text-text-disabled dark:text-text-disabled-dark">Startup Cost:</span>
@@ -97,19 +97,19 @@ export const ExplainVisualizer: React.FC<ExplainVisualizerProps> = ({ plan, isRo
                         {plan.Filter && (
                             <div className="mt-1">
                                 <span className="text-text-disabled dark:text-text-disabled-dark block mb-1">Filter:</span>
-                                <code className="block w-full p-2 bg-surface-50 dark:bg-surface-950 border dark:border-surface-800 rounded font-mono text-[12px] truncate">{plan.Filter}</code>
+                                <code className="block w-full p-2 bg-surface-50 dark:bg-surface-950 border dark:border-surface-950 rounded font-mono text-[12px] truncate">{plan.Filter}</code>
                             </div>
                         )}
                         {plan["Index Cond"] && (
                             <div className="mt-1">
                                 <span className="text-text-disabled dark:text-text-disabled-dark block mb-1">Index Cond:</span>
-                                <code className="block w-full p-2 bg-surface-50 dark:bg-surface-950 border dark:border-surface-800 rounded font-mono text-[12px] truncate">{plan["Index Cond"]}</code>
+                                <code className="block w-full p-2 bg-surface-50 dark:bg-surface-950 border dark:border-surface-950 rounded font-mono text-[12px] truncate">{plan["Index Cond"]}</code>
                             </div>
                         )}
                         {plan["Hash Cond"] && (
                             <div className="mt-1">
                                 <span className="text-text-disabled dark:text-text-disabled-dark block mb-1">Hash Cond:</span>
-                                <code className="block w-full p-2 bg-surface-50 dark:bg-surface-950 border dark:border-surface-800 rounded font-mono text-[12px] truncate">{plan["Hash Cond"]}</code>
+                                <code className="block w-full p-2 bg-surface-50 dark:bg-surface-950 border dark:border-surface-950 rounded font-mono text-[12px] truncate">{plan["Hash Cond"]}</code>
                             </div>
                         )}
                     </div>

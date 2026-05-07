@@ -614,11 +614,11 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
         }
     };
 
-    return <div className="h-full w-full flex flex-col bg-white dark:bg-surface-950">
+    return <div className="h-full w-full flex flex-col bg-white dark:bg-surface-900">
         <Formex value={formController}>
 
             <>
-                {!isNewCollection && <div className={cls("px-4 py-2 w-full flex shrink-0 items-center justify-between gap-4 bg-white dark:bg-surface-950 border-b", defaultBorderMixin)}>
+                {!isNewCollection && <div className={cls("px-4 py-2 w-full flex shrink-0 items-center justify-between gap-4 bg-white dark:bg-surface-900 border-b", defaultBorderMixin)}>
                     <div className="flex flex-1 items-center justify-end gap-4 min-w-0">
                         <Tabs value={currentView}
                             className="bg-transparent !w-fit max-w-full"

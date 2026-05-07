@@ -70,14 +70,14 @@ block: "start" });
                 <div className="mt-3 flex-grow overflow-scroll no-scrollbar">
                     <div className="my-2 mx-2 flex flex-col">
                         {/* Group header — from DrawerNavigationGroup */}
-                        <div className={cls("pl-4 pr-2 py-1 flex flex-row items-center transition-colors cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-700/50 rounded-t-lg bg-surface-50 dark:bg-surface-800/30")}>
+                        <div className={cls("pl-4 pr-2 py-1 flex flex-row items-center transition-colors cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-700/50 rounded-t-lg bg-surface-50 dark:bg-surface-950/30")}>
                             <ChevronDownIcon size={iconSize.smallest} className="text-surface-500 dark:text-surface-400 transition-transform duration-200 mr-1"/>
                             <Typography variant="caption" color="secondary" className="font-medium flex-grow line-clamp-1">
                                 SECTIONS
                             </Typography>
                         </div>
                         {/* Nav items — from DrawerNavigationItem */}
-                        <div className="overflow-hidden bg-surface-50 dark:bg-surface-800/30 rounded-b-lg">
+                        <div className="overflow-hidden bg-surface-50 dark:bg-surface-950/30 rounded-b-lg">
                             {SECTIONS.map(s => (
                                 <div key={s.id}>
                                     <div
@@ -88,7 +88,7 @@ block: "start" });
                                             "flex flex-row items-center",
                                             "pr-4 h-10",
                                             "font-semibold text-xs cursor-pointer",
-                                            activeSection === s.id ? "bg-surface-accent-200/60 dark:bg-surface-800 dark:bg-opacity-50" : ""
+                                            activeSection === s.id ? "bg-surface-accent-200/60 dark:bg-surface-950 dark:bg-opacity-50" : ""
                                         )}
                                     >
                                         <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px] text-text-secondary dark:text-text-secondary-dark">
@@ -108,7 +108,7 @@ block: "start" });
                 <div className={cls("shrink-0 mt-auto border-t px-2 py-2", defaultBorderMixin)}>
                     <div className={cls(
                         "flex flex-row items-center rounded-lg cursor-pointer",
-                        "hover:bg-surface-accent-100 dark:hover:bg-surface-800",
+                        "hover:bg-surface-accent-100 dark:hover:bg-surface-950",
                         "transition-colors duration-150",
                         "py-2"
                     )}>
@@ -146,7 +146,7 @@ block: "start" });
                                 </div>
                                 <div className="mt-3 flex-grow overflow-hidden">
                                     <div className="my-2 mx-2 flex flex-col">
-                                        <div className="overflow-hidden rounded-lg bg-surface-50 dark:bg-surface-800/30">
+                                        <div className="overflow-hidden rounded-lg bg-surface-50 dark:bg-surface-950/30">
                                             {[<FolderIcon size={iconSize.small}/>, <UserIcon size={iconSize.small}/>, <TagIcon size={iconSize.small}/>].map((icon, i) => (
                                                 <div key={i} className="rounded-lg truncate hover:bg-surface-accent-300/75 dark:hover:bg-surface-accent-800/75 flex flex-row items-center h-10">
                                                     <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px] text-text-secondary dark:text-text-secondary-dark">
@@ -158,7 +158,7 @@ block: "start" });
                                     </div>
                                 </div>
                                 <div className={cls("shrink-0 mt-auto border-t px-2 py-2", defaultBorderMixin)}>
-                                    <div className="flex flex-row items-center rounded-lg cursor-pointer hover:bg-surface-accent-100 dark:hover:bg-surface-800 transition-colors duration-150 py-2">
+                                    <div className="flex flex-row items-center rounded-lg cursor-pointer hover:bg-surface-accent-100 dark:hover:bg-surface-950 transition-colors duration-150 py-2">
                                         <div className="shrink-0 flex items-center justify-center w-[56px] h-[24px] text-surface-500 dark:text-surface-400">
                                             <ChevronsRightIcon size={iconSize.small}/>
                                         </div>
@@ -183,11 +183,11 @@ block: "start" });
                                 {/* DrawerNavigationGroup */}
                                 <div className="mt-3 flex-grow overflow-hidden">
                                     <div className="my-2 mx-2 flex flex-col">
-                                        <div className="pl-4 pr-2 py-1 flex flex-row items-center transition-colors cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-700/50 rounded-t-lg bg-surface-50 dark:bg-surface-800/30">
+                                        <div className="pl-4 pr-2 py-1 flex flex-row items-center transition-colors cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-700/50 rounded-t-lg bg-surface-50 dark:bg-surface-950/30">
                                             <ChevronDownIcon size={iconSize.smallest} className="text-surface-500 dark:text-surface-400 mr-1"/>
                                             <Typography variant="caption" color="secondary" className="font-medium flex-grow line-clamp-1">CONTENT</Typography>
                                         </div>
-                                        <div className="overflow-hidden bg-surface-50 dark:bg-surface-800/30 rounded-b-lg">
+                                        <div className="overflow-hidden bg-surface-50 dark:bg-surface-950/30 rounded-b-lg">
                                             {[
                                                 { label: "Posts",
 icon: <FolderIcon size={iconSize.small}/>,
@@ -201,7 +201,7 @@ active: false }
                                             ].map(({ label, icon, active }) => (
                                                 <div key={label} className={cls(
                                                     "rounded-lg truncate hover:bg-surface-accent-300/75 dark:hover:bg-surface-accent-800/75 text-text-primary dark:text-surface-200 hover:text-surface-900 dark:hover:text-white flex flex-row items-center pr-4 h-10 font-semibold text-xs cursor-pointer",
-                                                    active ? "bg-surface-accent-200/60 dark:bg-surface-800 dark:bg-opacity-50" : ""
+                                                    active ? "bg-surface-accent-200/60 dark:bg-surface-950 dark:bg-opacity-50" : ""
                                                 )}>
                                                     <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px] text-text-secondary dark:text-text-secondary-dark">
                                                         {icon}
@@ -216,7 +216,7 @@ active: false }
                                 </div>
                                 {/* DrawerToggle */}
                                 <div className={cls("shrink-0 mt-auto border-t px-2 py-2", defaultBorderMixin)}>
-                                    <div className="flex flex-row items-center rounded-lg cursor-pointer hover:bg-surface-accent-100 dark:hover:bg-surface-800 transition-colors duration-150 py-2">
+                                    <div className="flex flex-row items-center rounded-lg cursor-pointer hover:bg-surface-accent-100 dark:hover:bg-surface-950 transition-colors duration-150 py-2">
                                         <div className="shrink-0 flex items-center justify-center w-[56px] h-[24px] text-surface-500 dark:text-surface-400">
                                             <ChevronsLeftIcon size={iconSize.small}/>
                                         </div>
@@ -258,7 +258,7 @@ active: false }
                         </div>
                         <div className="grow"/>
                         {/* Content/Studio toggle — from DefaultAppBar line 204-225 */}
-                        <div className={cls("mr-2 hidden sm:flex bg-surface-100 dark:bg-surface-800 rounded-lg p-0.5 border", defaultBorderMixin)}>
+                        <div className={cls("mr-2 hidden sm:flex bg-surface-100 dark:bg-surface-950 rounded-lg p-0.5 border", defaultBorderMixin)}>
                             <button className={cls("px-3 py-1 text-xs font-semibold rounded-md transition-all", "bg-white dark:bg-surface-900 shadow-sm text-primary dark:text-primary-400")}>
                                 Content
                             </button>
@@ -312,7 +312,7 @@ active: false }
                         <div>
                             <Typography variant="caption" color="secondary" className="block mb-2 font-mono">variant=&quot;boxy&quot; (Editor Standard)</Typography>
                             <div className={cls("border rounded-lg overflow-hidden w-[320px]", defaultBorderMixin)}>
-                                <Tabs value="schema" onValueChange={() => {}} variant="boxy" className="border-b border-surface-200 dark:border-surface-800">
+                                <Tabs value="schema" onValueChange={() => {}} variant="boxy" className="border-b border-surface-200 dark:border-surface-950">
                                     <Tab value="schema">Schema</Tab>
                                     <Tab value="snippets">Snippets</Tab>
                                     <Tab value="history">History</Tab>
@@ -351,7 +351,7 @@ active: false }
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                     <Button variant="text" size="small">Explain</Button>
-                                    <div className="h-4 w-px bg-surface-200 dark:bg-surface-800"/>
+                                    <div className="h-4 w-px bg-surface-200 dark:bg-surface-950"/>
                                     <Button size="small" color="primary">Run</Button>
                                 </div>
                             </div>
@@ -374,7 +374,7 @@ active: false }
                         <div>
                             <Typography variant="caption" color="secondary" className="block mb-1">SQL Editor Sidebar</Typography>
                             <div className={cls("flex flex-col h-72 w-[240px] border rounded-lg overflow-hidden", defaultBorderMixin)}>
-                                <Tabs value="schema" onValueChange={() => {}} variant="boxy" className="border-b border-surface-200 dark:border-surface-800">
+                                <Tabs value="schema" onValueChange={() => {}} variant="boxy" className="border-b border-surface-200 dark:border-surface-950">
                                     <Tab value="schema">Schema</Tab>
                                     <Tab value="snippets">Snippets</Tab>
                                     <Tab value="history">History</Tab>
@@ -388,13 +388,13 @@ active: false }
                                 <div className="flex-grow overflow-y-auto no-scrollbar p-1">
                                     {/* Schema tree items — from SchemaBrowser */}
                                     <div className="mb-2">
-                                        <div className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-800 rounded transition-colors">
+                                        <div className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-950 rounded transition-colors">
                                             <svg className="w-3 h-3 mr-1 rotate-90" fill="currentColor" viewBox="0 0 20 20"><path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/></svg>
                                             <Typography variant="body2" className="text-text-primary dark:text-text-primary-dark font-medium text-xs">public</Typography>
                                         </div>
                                         <div className="ml-3 mt-1 space-y-1">
                                             {["users", "posts", "comments"].map(t => (
-                                                <div key={t} className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-800 rounded transition-colors group">
+                                                <div key={t} className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-950 rounded transition-colors group">
                                                     <svg className="w-3.5 h-3.5 mr-1 shrink-0 text-text-disabled dark:text-text-disabled-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                                                     <Typography variant="body2" className="text-text-secondary dark:text-text-secondary-dark text-xs truncate">{t}</Typography>
                                                 </div>
@@ -409,7 +409,7 @@ active: false }
                         <div>
                             <Typography variant="caption" color="secondary" className="block mb-1">RLS Editor Sidebar</Typography>
                             <div className={cls("flex flex-col h-72 w-[240px] border rounded-lg overflow-hidden", defaultBorderMixin)}>
-                                <Tabs value="tables" onValueChange={() => {}} variant="boxy" className="border-b border-surface-200 dark:border-surface-800">
+                                <Tabs value="tables" onValueChange={() => {}} variant="boxy" className="border-b border-surface-200 dark:border-surface-950">
                                     <Tab value="tables">Tables</Tab>
                                     <Tab value="info">Info</Tab>
                                 </Tabs>
@@ -421,7 +421,7 @@ active: false }
                                 </div>
                                 <div className="flex-grow overflow-y-auto no-scrollbar p-1">
                                     <div className="mb-2">
-                                        <div className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-800 rounded transition-colors">
+                                        <div className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-950 rounded transition-colors">
                                             <svg className="w-3 h-3 mr-1 rotate-90" fill="currentColor" viewBox="0 0 20 20"><path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/></svg>
                                             <Typography variant="body2" className="text-text-primary dark:text-text-primary-dark font-medium text-xs">public</Typography>
                                         </div>
@@ -430,7 +430,7 @@ active: false }
 enabled: true }, { name: "posts",
 enabled: true }, { name: "sessions",
 enabled: false }].map(t => (
-                                                <div key={t.name} className={cls("flex items-center p-1 cursor-pointer rounded transition-colors", t.name === "users" ? "bg-primary/10 text-primary dark:bg-primary/20" : "hover:bg-surface-100 dark:hover:bg-surface-800 text-text-secondary")}>
+                                                <div key={t.name} className={cls("flex items-center p-1 cursor-pointer rounded transition-colors", t.name === "users" ? "bg-primary/10 text-primary dark:bg-primary/20" : "hover:bg-surface-100 dark:hover:bg-surface-950 text-text-secondary")}>
                                                     <svg className="w-3.5 h-3.5 mr-1 shrink-0 text-text-disabled" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                                                     <Typography variant="body2" className="text-xs truncate flex-1">{t.name}</Typography>
                                                     <div className={cls("w-1.5 h-1.5 rounded-full shrink-0", t.enabled ? "bg-green-500" : "bg-orange-400 opacity-50")}/>
@@ -455,7 +455,7 @@ enabled: false }].map(t => (
                                 <div className="flex-grow overflow-y-auto no-scrollbar p-2 space-y-0.5">
                                     {[{ name: "Authors" }, { name: "Posts",
 selected: true }, { name: "Tags" }].map(c => (
-                                        <div key={c.name} className={cls("flex items-center gap-3 px-3 py-2 cursor-pointer rounded-md text-sm transition-colors", c.selected ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light" : "hover:bg-surface-100 dark:hover:bg-surface-800 text-text-secondary dark:text-text-secondary-dark")}>
+                                        <div key={c.name} className={cls("flex items-center gap-3 px-3 py-2 cursor-pointer rounded-md text-sm transition-colors", c.selected ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light" : "hover:bg-surface-100 dark:hover:bg-surface-950 text-text-secondary dark:text-text-secondary-dark")}>
                                             <FolderIcon size={iconSize.small} className={cls(c.selected ? "text-primary dark:text-primary-light" : "text-text-secondary dark:text-text-secondary-dark")}/>
                                             <span className="truncate flex-1">{c.name}</span>
                                         </div>

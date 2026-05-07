@@ -22,7 +22,7 @@ This scaffolds a project with three packages:
 ## Prerequisites
 
 - **Node.js** 18+
-- **PostgreSQL** — local install, Docker, or any managed Postgres (Neon, Supabase, RDS)
+- **PostgreSQL or MongoDB** — local install, Docker, or any managed database (Neon, Supabase, Atlas, etc.)
 - **pnpm** (recommended) or npm
 
 ## Configure Your Environment
@@ -30,8 +30,9 @@ This scaffolds a project with three packages:
 After scaffolding, edit the `.env` file at the project root:
 
 ```bash
-# Database connection string
+# Database connection string (PostgreSQL or MongoDB)
 DATABASE_URL=postgresql://username:password@localhost:5432/your_database
+# DATABASE_URL=mongodb://localhost:27017/your_database
 
 # JWT secret for authentication (generate a strong random string)
 JWT_SECRET=change-me-to-a-random-secret

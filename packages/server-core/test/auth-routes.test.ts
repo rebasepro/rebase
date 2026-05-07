@@ -61,7 +61,7 @@ config: null };
 let mockAuthRepo: jest.Mocked<AuthRepository>;
 let mockEmailService: { send: jest.Mock; isConfigured: jest.Mock };
 
-function createApp(opts: { allowRegistration?: boolean; withEmail?: boolean; defaultRole?: string; isBootstrapCompleted?: () => Promise<boolean>; demoMode?: boolean } = {}) {
+function createApp(opts: { allowRegistration?: boolean; withEmail?: boolean; defaultRole?: string; isBootstrapCompleted?: () => Promise<boolean> } = {}) {
     // Re-create mocked service instances each time
 
     // Wire constructor mocks to return our instances
@@ -158,9 +158,7 @@ photoUrl: "https://photo.url" };
     if (opts.isBootstrapCompleted) {
         config.isBootstrapCompleted = opts.isBootstrapCompleted;
     }
-    if (opts.demoMode !== undefined) {
-        config.demoMode = opts.demoMode;
-    }
+
 
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
@@ -192,6 +190,12 @@ accessExpiresIn: "1h" });
 
     beforeEach(() => {
         jest.clearAllMocks();
+    });
+
+    describe("Configuration Security", () => {
+        it("throws an error when defaultRole is set to 'admin'", () => {
+            expect(() => createApp({ defaultRole: "admin" })).toThrowError(/CRITICAL SECURITY ERROR/);
+        });
     });
 
     // ── Registration ────────────────────────────────────────────────────
@@ -985,8 +989,8 @@ withEmail: false });
             expect(mockAuthRepo.createUser).not.toHaveBeenCalled();
         });
 
-        it("CVE-FIX: demo mode blocks ALL registration attempts", async () => {
-            const app = createApp({ allowRegistration: true, demoMode: true });
+        it("CVE-FIX: registration is blocked when allowRegistration defaults to false", async () => {
+            const app = createApp({ allowRegistration: false });
 
             const res = await app.request("/auth/register", json({
                 email: "hacker@evil.com",

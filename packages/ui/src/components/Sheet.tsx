@@ -103,7 +103,7 @@ export const Sheet: React.FC<SheetProps> = ({
                         "fixed transform z-50 transition-[transform,opacity] ease-in-out",
                         !displayed ? "duration-150" : "duration-100",
                         "outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus:ring-0",
-                        transparent ? "" : "shadow-md bg-white dark:bg-surface-950",
+                        transparent ? "" : "shadow-md bg-white dark:bg-surface-900",
                         side === "top" || side === "bottom" ? "w-full" : "h-full",
                         side === "left" || side === "top" ? "left-0 top-0" : "right-0 bottom-0",
                         displayed && open ? "opacity-100" : "opacity-50",

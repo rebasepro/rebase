@@ -633,7 +633,7 @@ function ForgotPasswordForm({
 
                 <div className={cls(
                     "text-center rounded-xl p-6",
-                    isDark ? "bg-surface-800" : "bg-surface-50"
+                    isDark ? "bg-surface-950" : "bg-surface-50"
                 )}>
                     <div className="text-3xl mb-3">📧</div>
                     <Typography variant="subtitle1" className="mb-2">

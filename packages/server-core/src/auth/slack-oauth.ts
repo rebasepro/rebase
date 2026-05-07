@@ -5,7 +5,7 @@ import { z } from "zod";
  * Creates a Slack OAuth Provider integration (OAuth 2.0 / "Sign in with Slack").
  * Uses the OpenID Connect flow with the "openid,email,profile" scopes.
  */
-export function createSlackProvider(config: { clientId: string; clientSecret: string }): OAuthProvider {
+export function createSlackProvider(config: { clientId: string; clientSecret: string }): OAuthProvider<{ code: string; redirectUri: string }> {
     return {
         id: "slack",
         schema: z.object({

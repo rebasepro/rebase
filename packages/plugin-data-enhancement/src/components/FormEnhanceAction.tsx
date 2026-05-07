@@ -159,7 +159,7 @@ export function FormEnhanceAction({
                 )}>
 
                 <TextareaAutosize
-                    className={cls("p-4 rounded-lg resize-none bg-surface-100 dark:bg-surface-800 mx-2 w-full grow outline-hidden max-h-[300px] overflow-auto", focusedDisabled)}
+                    className={cls("p-4 rounded-lg resize-none bg-surface-100 dark:bg-surface-950 mx-2 w-full grow outline-hidden max-h-[300px] overflow-auto", focusedDisabled)}
                     value={instructions}
                     autoFocus={status === "new"}
                     disabled={loading}

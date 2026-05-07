@@ -18,7 +18,7 @@ const envSchema = z.object({
     JWT_REFRESH_EXPIRES_IN: z.string().default("30d"),
     GOOGLE_CLIENT_ID: z.string().optional(),
     REBASE_SERVICE_KEY: z.string().optional(),
-    ALLOW_REGISTRATION: z.enum(["true", "false", ""]).default("true").transform(v => v === "true"),
+    ALLOW_REGISTRATION: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
     CORS_ORIGINS: z.string().optional(),
     FRONTEND_URL: z.string().optional(),
     DB_POOL_MAX: z.string().default("20").transform(Number),

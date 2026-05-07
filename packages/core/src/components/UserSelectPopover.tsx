@@ -168,7 +168,7 @@ export function UserSelectPopover({
                         "flex items-center gap-1.5 text-xs font-medium transition-colors rounded border border-transparent",
                         "text-text-secondary dark:text-text-secondary-dark",
                         "hover:text-text-primary dark:hover:text-text-primary-dark",
-                        "bg-surface-100 hover:bg-surface-200 dark:bg-surface-800 dark:hover:bg-surface-700",
+                        "bg-surface-100 hover:bg-surface-200 dark:bg-surface-950 dark:hover:bg-surface-700",
                         size === "small" ? "px-2 py-1" : "px-3 py-1.5",
                         className
                     )}
@@ -243,7 +243,7 @@ export function UserSelectPopover({
                             placeholder="SearchIcon by name, email, or role…"
                             className={cls(
                                 "w-full pl-7 pr-7 py-1.5 text-xs rounded-md",
-                                "bg-surface-100 dark:bg-surface-800 border",
+                                "bg-surface-100 dark:bg-surface-950 border",
                                 defaultBorderMixin,
                                 "outline-none focus:ring-1 focus:ring-primary/40",
                                 "placeholder-text-disabled dark:placeholder-text-disabled-dark",

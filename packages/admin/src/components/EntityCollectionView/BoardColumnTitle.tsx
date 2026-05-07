@@ -26,7 +26,7 @@ export function BoardColumnTitle({
         <h4
             className={
                 cls("py-3 px-3 transition-colors duration-200 flex-grow select-none relative outline-none focus:outline focus:outline-2 focus:outline-offset-2 flex items-center gap-3",
-                    "text-sm font-semibold text-surface-800 dark:text-surface-200",
+                    "text-sm font-semibold text-surface-900 dark:text-surface-200",
                     className)
             }
             {...props}

@@ -82,7 +82,7 @@ function EntityBoardCardInner<M extends Record<string, unknown> = Record<string,
     // Memoize className computations
     const backgroundColor = useMemo((): string => {
         if (isDragging) {
-            return "bg-surface-100 dark:bg-surface-800";
+            return "bg-surface-100 dark:bg-surface-900";
         }
         if (isGroupedOver) {
             return "bg-surface-200";
@@ -135,7 +135,7 @@ function EntityBoardCardInner<M extends Record<string, unknown> = Record<string,
                         </div>
                     ) : (
                         <div className={cls(
-                            "w-10 h-10 rounded-md bg-surface-100 dark:bg-surface-800 flex items-center justify-center transition-opacity duration-200",
+                            "w-10 h-10 rounded-md bg-surface-100 dark:bg-surface-900 flex items-center justify-center transition-opacity duration-200",
                             selectionEnabled && "group-hover/card:opacity-30",
                             selected && "opacity-0"
                         )}>

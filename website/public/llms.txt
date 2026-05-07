@@ -14,9 +14,9 @@
 
 ### What is Rebase?
 
-Rebase is an **open-source Backend-as-a-Service (BaaS)** and **admin panel** built with React and TypeScript. It gives you everything you need to build production-ready back-office applications on top of **PostgreSQL**:
+Rebase is an **open-source Backend-as-a-Service (BaaS)** and **admin panel** built with React and TypeScript. It gives you everything you need to build production-ready back-office applications on top of **PostgreSQL** or **MongoDB**:
 
-- **Schema as Code** — Define your data models as TypeScript collections. Rebase generates PostgreSQL tables, a full CRUD UI, REST API endpoints, and type-safe client SDKs from a single source of truth.
+- **Schema as Code** — Define your data models as TypeScript collections. Rebase generates a full CRUD UI, REST API endpoints, and type-safe client SDKs from a single source of truth. (Also generates PostgreSQL tables if using Postgres).
 - **Instant Admin Panel** — A beautiful, fast React-based admin UI with spreadsheet tables, forms, Kanban boards, inline editing, and real-time sync.
 - **Integrated Backend** — Authentication (JWT + Google OAuth), file storage (local or S3), Row Level Security, entity history, and WebSocket real-time — all built in.
 - **Radically Extensible** — If you can build it in React, you can add it to Rebase. Custom fields, custom views, plugins, and full access to internal hooks.
@@ -46,7 +46,7 @@ Rebase is **not** a hosted SaaS. You self-host it, you own your data, and you ow
         │         │          │             │
         ▼         ▼          ▼             ▼
 ┌──────────────────────────────────────────────────────┐
-│              PostgreSQL (via Drizzle ORM)             │
+│        PostgreSQL (Drizzle) OR MongoDB               │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -61,6 +61,7 @@ Configure your database in `.env`:
 
 ```bash
 DATABASE_URL=postgresql://user:password@localhost:5432/mydb
+## OR DATABASE_URL=mongodb://localhost:27017/mydb
 JWT_SECRET=your-secret-key
 ```
 
@@ -121,7 +122,7 @@ This scaffolds a project with three packages:
 ### Prerequisites
 
 - **Node.js** 18+
-- **PostgreSQL** — local install, Docker, or any managed Postgres (Neon, Supabase, RDS)
+- **PostgreSQL or MongoDB** — local install, Docker, or any managed database (Neon, Supabase, Atlas, etc.)
 - **pnpm** (recommended) or npm
 
 ### Configure Your Environment
@@ -129,8 +130,9 @@ This scaffolds a project with three packages:
 After scaffolding, edit the `.env` file at the project root:
 
 ```bash
-## Database connection string
+## Database connection string (PostgreSQL or MongoDB)
 DATABASE_URL=postgresql://username:password@localhost:5432/your_database
+## DATABASE_URL=mongodb://localhost:27017/your_database
 
 ## JWT secret for authentication (generate a strong random string)
 JWT_SECRET=change-me-to-a-random-secret
@@ -369,7 +371,7 @@ All configuration is done via environment variables in your `.env` file at the p
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@localhost:5432/mydb` |
+| `DATABASE_URL` | Database connection string (PostgreSQL or MongoDB) | `postgresql://user:pass@localhost:5432/mydb` or `mongodb://localhost:27017/mydb` |
 | `JWT_SECRET` | Secret key for signing JWT tokens. Use a strong random string (min 32 chars). | `a1b2c3d4e5...` |
 
 #### Frontend
@@ -432,10 +434,9 @@ await initializeRebaseBackend({
     basePath: "/api",        // Base path for all API routes (default: "/api")
 
     bootstrappers: [         // Database and service bootstrappers
-        createPostgresBootstrapper({
-            connection: db,
-            schema: { tables, enums, relations }
-        })
+        isMongo
+            ? createMongoBootstrapper({ ... })
+            : createPostgresBootstrapper({ ... })
     ],
 
     auth: {                  // Authentication config
@@ -615,11 +616,11 @@ Rebase is a full-stack platform with four layers:
 │  Hono HTTP Server  •  REST API  •  Auth  •  Storage  •  WS     │
 │  @rebasepro/backend                                             │
 └───────────────────────────┬─────────────────────────────────────┘
-                            │ Drizzle ORM
+                            │ Drizzle ORM (Postgres) / Native Driver (Mongo)
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                       Database Layer                            │
-│  PostgreSQL  •  Tables  •  RLS Policies  •  LISTEN/NOTIFY       │
+│  PostgreSQL / MongoDB  •  Tables/Collections  •  Realtime sync  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -632,10 +633,7 @@ The backend initializes through a plugin-based bootstrapper system. Database-spe
 ```typescript
 
 bootstrappers: [
-    createPostgresBootstrapper({
-        connection: db,
-        schema: { tables, enums, relations }
-    })
+    isMongo ? createMongoBootstrapper({ ... }) : createPostgresBootstrapper({ ... })
 ]
 ```
 
@@ -647,15 +645,15 @@ The `BackendCollectionRegistry` is the runtime index of all collections, their d
 
 #### Realtime Service
 
-Real-time sync uses PostgreSQL's native `LISTEN/NOTIFY` mechanism:
+Real-time sync uses database-native mechanisms:
 
 1. A data mutation happens (insert, update, delete)
-2. The backend emits a `NOTIFY` on a Postgres channel
-3. The `RealtimeService` receives the notification
+2. For Postgres: backend emits a `NOTIFY` on a channel. For Mongo: Change Streams detect the mutation.
+3. The `RealtimeService` receives the notification/change event
 4. It broadcasts the change to all connected WebSocket clients
 5. React components re-render with the new data
 
-For **multi-instance deployments** (e.g., Cloud Run with multiple replicas), provide a `connectionString` in your PostgresBootstrapper. This creates a dedicated Postgres connection for cross-instance broadcasting.
+For **multi-instance deployments** (e.g., Cloud Run with multiple replicas), provide a `connectionString` in your PostgresBootstrapper, or ensure MongoDB is a replica set to use Change Streams.
 
 #### Storage Registry
 
@@ -683,8 +681,8 @@ Like drivers, storage backends are registered in a registry. You can have multip
 #### Read Flow
 1. User opens a collection in the admin UI
 2. Client SDK sends `GET /api/data/:slug` + opens a WebSocket subscription
-3. Backend queries PostgreSQL via Drizzle ORM
-4. Data transformer deserializes database rows into entity format
+3. Backend queries PostgreSQL via Drizzle ORM, or MongoDB via its native driver
+4. Data transformer deserializes database records into entity format
 5. Response sent to frontend, components render
 6. WebSocket keeps the view synced in real-time
 

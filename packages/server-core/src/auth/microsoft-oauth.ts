@@ -12,7 +12,7 @@ export function createMicrosoftProvider(config: {
     clientSecret: string;
     /** Tenant ID. Defaults to "common" which allows both personal and organizational accounts. */
     tenantId?: string;
-}): OAuthProvider {
+}): OAuthProvider<{ code: string; redirectUri: string }> {
     const tenantId = config.tenantId || "common";
 
     return {

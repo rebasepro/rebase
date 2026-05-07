@@ -674,7 +674,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                         ? "bg-primary-50 dark:bg-primary-900/20 hover:bg-surface-50 dark:hover:bg-surface-800/40"
                         : highlighted
                             ? "bg-surface-accent-50 dark:bg-surface-accent-950 hover:bg-surface-50 dark:hover:bg-surface-800/40"
-                            : "bg-white dark:bg-surface-950 hover:bg-surface-50 dark:hover:bg-surface-800/40"
+                            : "bg-white dark:bg-surface-900 hover:bg-surface-50 dark:hover:bg-surface-800/40"
             )}
             onClick={handleClick}
         >
@@ -701,11 +701,11 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
             {showImage && (
                 <div className="flex-shrink-0">
                     {slots.image ? (
-                        <div className={cls("w-10 h-10 rounded-lg border relative overflow-hidden bg-surface-100 dark:bg-surface-800", defaultBorderMixin)}>
+                        <div className={cls("w-10 h-10 rounded-lg border relative overflow-hidden bg-surface-100 dark:bg-surface-900", defaultBorderMixin)}>
                             <PropertyPreview propertyKey={slots.image.propertyKey} value={slots.image.value} property={slots.image.property} size="small" fill={true}/>
                         </div>
                     ) : (
-                        <div className={cls("w-10 h-10 rounded-lg bg-surface-100 dark:bg-surface-800 flex items-center justify-center border", defaultBorderMixin)}>
+                        <div className={cls("w-10 h-10 rounded-lg bg-surface-100 dark:bg-surface-900 flex items-center justify-center border", defaultBorderMixin)}>
                             <IconForView
                                 collectionOrView={collection}
                                 className="text-surface-500 dark:text-surface-400"

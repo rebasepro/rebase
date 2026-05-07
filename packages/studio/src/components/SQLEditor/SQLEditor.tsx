@@ -927,7 +927,7 @@ role: selectedRole });
         if (results.length === 0) {
             return (
                 <div className="flex-grow p-6 flex flex-col items-center justify-center">
-                    <Typography variant="body2" className="text-text-secondary dark:text-text-secondary-dark font-mono border-b border-surface-200 dark:border-surface-800 pb-2 mb-2">{t("studio_sql_success")}</Typography>
+                    <Typography variant="body2" className="text-text-secondary dark:text-text-secondary-dark font-mono border-b border-surface-200 dark:border-surface-950 pb-2 mb-2">{t("studio_sql_success")}</Typography>
                     <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark">{t("studio_sql_no_results")}</Typography>
                 </div>
             );
@@ -1246,7 +1246,7 @@ id: String(ra.entityId) })}
                                     {t("studio_sql_explain")}
                                 </Button>
 
-                                <div className="h-4 w-px bg-surface-200 dark:bg-surface-800 mx-1"></div>
+                                <div className="h-4 w-px bg-surface-200 dark:bg-surface-950 mx-1"></div>
 
                                 <div className="flex items-center space-x-2 px-2 cursor-pointer" onClick={() => setAutoLimit(!autoLimit)}>
                                     <Typography variant="caption" className="text-[11px] text-text-secondary cursor-pointer select-none">{t("studio_sql_limit_1000")}</Typography>
@@ -1259,7 +1259,7 @@ id: String(ra.entityId) })}
                                     />
                                 </div>
 
-                                <div className="h-4 w-px bg-surface-200 dark:bg-surface-800 mx-1"></div>
+                                <div className="h-4 w-px bg-surface-200 dark:bg-surface-950 mx-1"></div>
 
                                 <Tooltip title={isFavorite ? t("studio_sql_remove_from_favorites") : t("studio_sql_add_to_favorites")}>
                                     <IconButton
@@ -1288,7 +1288,7 @@ isFavorite: !s.isFavorite } : s));
                                     {t("studio_sql_save")}
                                 </Button>
 
-                                <div className="h-4 w-px bg-surface-200 dark:bg-surface-800 mx-1"></div>
+                                <div className="h-4 w-px bg-surface-200 dark:bg-surface-950 mx-1"></div>
 
                                 <Menu
                                     trigger={
@@ -1303,7 +1303,7 @@ isFavorite: !s.isFavorite } : s));
                                     }
                                 >
                                     <div className="max-h-64 overflow-y-auto">
-                                        <div className="px-3 py-1.5 border-b border-surface-200 dark:border-surface-800 mb-1">
+                                        <div className="px-3 py-1.5 border-b border-surface-200 dark:border-surface-950 mb-1">
                                             <Typography variant="caption" className="font-bold uppercase tracking-wider text-[9px] text-text-disabled dark:text-text-disabled-dark">{t("studio_sql_database")}</Typography>
                                         </div>
                                         {isLoadingConfig ? (
@@ -1322,7 +1322,7 @@ isFavorite: !s.isFavorite } : s));
                                                     </MenuItem>
                                                 ))}
 
-                                                <div className="px-3 py-1.5 border-y border-surface-200 dark:border-surface-800 mb-1 mt-1">
+                                                <div className="px-3 py-1.5 border-y border-surface-200 dark:border-surface-950 mb-1 mt-1">
                                                     <Typography variant="caption" className="font-bold uppercase tracking-wider text-[9px] text-text-disabled dark:text-text-disabled-dark">{t("studio_sql_role")}</Typography>
                                                 </div>
                                                 {availableRoles.map(role => (

@@ -115,7 +115,7 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
                     {[1, 2, 3].map(i => (
                         <div key={i} className="flex flex-col gap-2 animate-pulse">
                             <div className="h-4 w-48 bg-surface-200 dark:bg-surface-700 rounded"/>
-                            <div className="h-12 w-full bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700"/>
+                            <div className="h-12 w-full bg-surface-100 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700"/>
                         </div>
                     ))}
                 </div>

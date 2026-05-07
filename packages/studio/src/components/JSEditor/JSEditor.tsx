@@ -684,7 +684,7 @@ message: t("studio_sql_markdown_copy_failed") });
                                     firstPanel={
                                         <div className="h-full w-full overflow-hidden flex flex-col">
                                             {/* Auth Simulation UI */}
-                                            <div className="p-2 px-3 border-b border-surface-200 dark:border-surface-800 bg-surface-50 dark:bg-surface-900 flex items-center shrink-0">
+                                            <div className="p-2 px-3 border-b border-surface-200 dark:border-surface-950 bg-surface-50 dark:bg-surface-900 flex items-center shrink-0">
                                                 <AuthSimulationSelector
                                                     authMode={authMode}
                                                     setAuthMode={setAuthMode}

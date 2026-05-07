@@ -82,10 +82,10 @@ export function BoardSortableList<M extends Record<string, unknown>>({
     const containerClassName = useMemo(() => cls(
         "flex flex-col p-2 transition-opacity duration-100 transition-bg ease-linear w-full overflow-y-auto no-scrollbar flex-1 rounded-md",
         isDragging && isDragOverColumn
-            ? "bg-surface-accent-200 dark:bg-surface-800"
+            ? "bg-surface-accent-200 dark:bg-surface-900"
             : isDragging
-                ? "bg-surface-50 dark:bg-surface-950 hover:bg-surface-accent-100 dark:hover:bg-surface-800"
-                : "bg-surface-50 dark:bg-surface-950"
+                ? "bg-surface-50 dark:bg-surface-900 hover:bg-surface-accent-100 dark:hover:bg-surface-800"
+                : "bg-surface-50 dark:bg-surface-900"
     ), [isDragging, isDragOverColumn]);
 
     return (

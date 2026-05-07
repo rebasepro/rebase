@@ -22,11 +22,11 @@ Rebase is a full-stack platform with four layers:
 │  Hono HTTP Server  •  REST API  •  Auth  •  Storage  •  WS     │
 │  @rebasepro/backend                                             │
 └───────────────────────────┬─────────────────────────────────────┘
-                            │ Drizzle ORM
+                            │ Drizzle ORM (Postgres) / Native Driver (Mongo)
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                       Database Layer                            │
-│  PostgreSQL  •  Tables  •  RLS Policies  •  LISTEN/NOTIFY       │
+│  PostgreSQL / MongoDB  •  Tables/Collections  •  Realtime sync  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -37,13 +37,11 @@ Rebase is a full-stack platform with four layers:
 The backend initializes through a plugin-based bootstrapper system. Database-specific logic is decoupled into its own package, and bootstrappers handle initialization of databases, authentication, and internal services.
 
 ```typescript
-import { createPostgresBootstrapper } from "@rebasepro/postgresql-backend";
+import { createPostgresBootstrapper } from "@rebasepro/server-postgresql";
+import { createMongoBootstrapper } from "@rebasepro/server-mongodb";
 
 bootstrappers: [
-    createPostgresBootstrapper({
-        connection: db,
-        schema: { tables, enums, relations }
-    })
+    isMongo ? createMongoBootstrapper({ ... }) : createPostgresBootstrapper({ ... })
 ]
 ```
 
@@ -55,15 +53,15 @@ The `BackendCollectionRegistry` is the runtime index of all collections, their d
 
 ### Realtime Service
 
-Real-time sync uses PostgreSQL's native `LISTEN/NOTIFY` mechanism:
+Real-time sync uses database-native mechanisms:
 
 1. A data mutation happens (insert, update, delete)
-2. The backend emits a `NOTIFY` on a Postgres channel
-3. The `RealtimeService` receives the notification
+2. For Postgres: backend emits a `NOTIFY` on a channel. For Mongo: Change Streams detect the mutation.
+3. The `RealtimeService` receives the notification/change event
 4. It broadcasts the change to all connected WebSocket clients
 5. React components re-render with the new data
 
-For **multi-instance deployments** (e.g., Cloud Run with multiple replicas), provide a `connectionString` in your PostgresBootstrapper. This creates a dedicated Postgres connection for cross-instance broadcasting.
+For **multi-instance deployments** (e.g., Cloud Run with multiple replicas), provide a `connectionString` in your PostgresBootstrapper, or ensure MongoDB is a replica set to use Change Streams.
 
 ### Storage Registry
 
@@ -91,8 +89,8 @@ Like drivers, storage backends are registered in a registry. You can have multip
 ### Read Flow
 1. User opens a collection in the admin UI
 2. Client SDK sends `GET /api/data/:slug` + opens a WebSocket subscription
-3. Backend queries PostgreSQL via Drizzle ORM
-4. Data transformer deserializes database rows into entity format
+3. Backend queries PostgreSQL via Drizzle ORM, or MongoDB via its native driver
+4. Data transformer deserializes database records into entity format
 5. Response sent to frontend, components render
 6. WebSocket keeps the view synced in real-time
 

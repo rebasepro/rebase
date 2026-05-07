@@ -256,7 +256,7 @@ time: elapsed });
                 )}
 
                 {/* URL Preview */}
-                <div className="rounded-lg bg-surface-100 dark:bg-surface-800 p-3">
+                <div className="rounded-lg bg-surface-100 dark:bg-surface-900 p-3">
                     <Typography
                         variant="caption"
                         className="text-text-secondary dark:text-text-secondary-dark text-[10px] uppercase tracking-wider block mb-1"
@@ -289,7 +289,7 @@ time: elapsed });
                         <div
                             className={cls(
                                 "flex items-center justify-between px-4 py-2.5",
-                                "bg-surface-50 dark:bg-surface-800/50"
+                                "bg-surface-50 dark:bg-surface-900/50"
                             )}
                         >
                             <div className="flex items-center gap-3">
@@ -312,7 +312,7 @@ time: elapsed });
                             className={cls(
                                 "p-4 text-xs font-mono overflow-auto max-h-96",
                                 "bg-surface-950 text-emerald-400",
-                                "dark:bg-surface-950 dark:text-emerald-400"
+                                "dark:bg-surface-900 dark:text-emerald-400"
                             )}
                         >
                             {response.body}
@@ -461,19 +461,15 @@ function CustomKeyValueSection({
 /* ── Helpers ──────────────────────────────────────────────────────── */
 
 function ResponseBadge({ status }: { status: number }) {
-    const color =
-        status === 0
-            ? "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/20"
-            : status < 300
-              ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-              : status < 400
-                ? "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/20"
-                : status < 500
-                  ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20"
-                  : "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/20";
+    let colorClass = "text-red-500";
+    if (status >= 200 && status < 300) colorClass = "text-emerald-500";
+    else if (status >= 300 && status < 400) colorClass = "text-blue-500";
+    else if (status >= 400 && status < 500) colorClass = "text-amber-500";
 
     return (
-        <span className={cls("text-xs font-bold px-2 py-0.5 rounded border font-mono", defaultBorderMixin, color)}>{status || "ERR"}</span>
+        <span className={cls("text-xs font-bold font-mono", colorClass)}>
+            {status || "ERR"}
+        </span>
     );
 }
 

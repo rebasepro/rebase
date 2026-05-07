@@ -8,7 +8,7 @@ import { z } from "zod";
  * This provider exchanges the code for an access token, then fetches the user's
  * profile and primary email from the GitHub API.
  */
-export function createGitHubProvider(config: { clientId: string; clientSecret: string }): OAuthProvider {
+export function createGitHubProvider(config: { clientId: string; clientSecret: string }): OAuthProvider<{ code: string; redirectUri: string }> {
     return {
         id: "github",
         schema: z.object({

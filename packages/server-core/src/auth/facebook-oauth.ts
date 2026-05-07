@@ -7,7 +7,7 @@ import { z } from "zod";
  * Uses the authorization code flow to exchange a code for an access token,
  * then fetches user profile from the Facebook Graph API.
  */
-export function createFacebookProvider(config: { clientId: string; clientSecret: string }): OAuthProvider {
+export function createFacebookProvider(config: { clientId: string; clientSecret: string }): OAuthProvider<{ code: string; redirectUri: string }> {
     return {
         id: "facebook",
         schema: z.object({

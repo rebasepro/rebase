@@ -5,7 +5,7 @@ import { z } from "zod";
  * Creates a Spotify OAuth Provider integration.
  * Uses the authorization code flow with the "user-read-email" scope.
  */
-export function createSpotifyProvider(config: { clientId: string; clientSecret: string }): OAuthProvider {
+export function createSpotifyProvider(config: { clientId: string; clientSecret: string }): OAuthProvider<{ code: string; redirectUri: string }> {
     return {
         id: "spotify",
         schema: z.object({

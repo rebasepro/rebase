@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, jest as vi } from "@jest/globals";
 import { S3StorageController } from "../src/storage/S3StorageController";
 
 // Mock the AWS SDK before importing the controller
@@ -88,7 +88,7 @@ describe("S3StorageController", () => {
                 ContentType: "text/plain"
             }));
             expect(mockSend).toHaveBeenCalled();
-            expect(result.path).toBe("uploads/test.txt");
+            expect(result.key).toBe("uploads/test.txt");
         });
 
         it("should include metadata in upload", async () => {

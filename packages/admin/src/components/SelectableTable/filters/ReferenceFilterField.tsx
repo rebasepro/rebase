@@ -186,7 +186,7 @@ export function ReferenceFilterField({
                 }
 
                 {!isArray && <Label
-                    className="border cursor-pointer rounded-md p-2 flex items-center gap-2 [&:has(:checked)]:bg-surface-100 dark:[&:has(:checked)]:bg-surface-800"
+                    className="border cursor-pointer rounded-md p-2 flex items-center gap-2 [&:has(:checked)]:bg-surface-100 dark:[&:has(:checked)]:bg-surface-900"
                     htmlFor="null-filter"
                 >
                     <Checkbox id="null-filter"

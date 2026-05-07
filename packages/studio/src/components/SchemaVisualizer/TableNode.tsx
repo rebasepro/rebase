@@ -105,8 +105,8 @@ top: midY });
                 className={cls(
                     "flex items-center gap-2 px-3 py-2 border-b rounded-t-lg",
                     isJunction
-                        ? "bg-surface-50 dark:bg-surface-800/50 border-surface-200/30 dark:border-surface-700/30"
-                        : "bg-surface-50 dark:bg-surface-800 border-surface-200/40 dark:border-surface-700/40"
+                        ? "bg-surface-50 dark:bg-surface-950/50 border-surface-200/30 dark:border-surface-700/30"
+                        : "bg-surface-50 dark:bg-surface-950 border-surface-200/40 dark:border-surface-700/40"
                 )}
             >
                 {icon && !isJunction && (
@@ -172,7 +172,7 @@ icon }}
             </div>
 
             {/* ── Columns ── */}
-            <div className="divide-y divide-surface-100 dark:divide-surface-800/60">
+            <div className="divide-y divide-surface-100 dark:divide-surface-950/60">
                 {(columns as ColumnInfo[]).map((col: ColumnInfo) => (
                     <div
                         key={col.name}

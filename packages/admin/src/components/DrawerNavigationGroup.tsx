@@ -76,7 +76,7 @@ export function DrawerNavigationGroup({
             {!hideHeader && (
                 <div
                     className={cls("pl-4 pr-2 py-0.5 flex flex-row items-center transition-colors",
-                        drawerOpen ? "cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-700/50 rounded-t-lg bg-surface-50 dark:bg-surface-800/30" : "opacity-0 invisible pointer-events-none"
+                        drawerOpen ? "cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-800/40 rounded-lg" : "opacity-0 invisible pointer-events-none"
                     )}
                     onClick={drawerOpen ? onToggleCollapsed : undefined}
                 >
@@ -107,8 +107,8 @@ export function DrawerNavigationGroup({
                 className={cls(
                     "transition-all duration-200 ease-in-out",
                     (!hideHeader && collapsed) ? "overflow-hidden" : "overflow-visible",
-                    !hideHeader && "bg-surface-50 dark:bg-surface-800/30",
-                    !hideHeader ? (drawerOpen ? "rounded-b-lg" : "rounded-lg") : "rounded-lg",
+                    !hideHeader && "dark:bg-transparent",
+                    !hideHeader ? (drawerOpen ? "rounded-lg" : "rounded-lg") : "rounded-lg",
                     (!hideHeader && collapsed) ? "max-h-0 opacity-0" : "max-h-[2000px] opacity-100"
                 )}
             >

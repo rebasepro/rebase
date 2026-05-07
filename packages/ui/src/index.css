@@ -28,17 +28,17 @@
     --color-text-disabled-dark: #757580;
 
     /* Surface Colors */
-    --color-surface-50: #f8f8fc;
-    --color-surface-100: #e7e7eb;
-    --color-surface-200: #cfcfd6;
-    --color-surface-300: #b7b7bf;
-    --color-surface-400: #a0a0a9;
-    --color-surface-500: #87878f;
-    --color-surface-600: #6b6b74;
-    --color-surface-700: #454552;
-    --color-surface-800: #292934;
-    --color-surface-900: #18181c;
-    --color-surface-950: #101013;
+    --color-surface-50: #fafafa;
+    --color-surface-100: #f5f5f5;
+    --color-surface-200: #e5e5e5;
+    --color-surface-300: #d4d4d4;
+    --color-surface-400: #a3a3a3;
+    --color-surface-500: #737373;
+    --color-surface-600: #404040;
+    --color-surface-700: #262626;
+    --color-surface-800: #171717;
+    --color-surface-900: #0a0a0a;
+    --color-surface-950: #000000;
 
     /* Surface Accent Colors */
     --color-surface-accent-50: #f8fafc;

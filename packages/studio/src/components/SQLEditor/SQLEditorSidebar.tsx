@@ -42,7 +42,7 @@ export const SQLEditorSidebar = ({
 
     return (
         <div className={cls("flex flex-col h-full w-full bg-white dark:bg-surface-950 border-r", defaultBorderMixin)}>
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "schema" | "snippets" | "history")} variant="boxy" className="border-b border-surface-200 dark:border-surface-800">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "schema" | "snippets" | "history")} variant="boxy" className="border-b border-surface-200 dark:border-surface-950">
                 <Tab value="schema">{t("studio_sql_sidebar_schema")}</Tab>
                 <Tab value="snippets">{t("studio_sql_sidebar_snippets")}</Tab>
                 <Tab value="history">{t("studio_sql_sidebar_history")}</Tab>
@@ -157,7 +157,7 @@ export const SQLEditorSidebar = ({
                                 [...history].reverse().map((sql, i) => (
                                     <div
                                         key={i}
-                                        className="p-2 py-1.5 rounded hover:bg-surface-100 dark:hover:bg-surface-800 cursor-pointer group transition-colors flex items-start"
+                                        className="p-2 py-1.5 rounded hover:bg-surface-100 dark:hover:bg-surface-950 cursor-pointer group transition-colors flex items-start"
                                         onClick={() => onSelectSnippet(sql)}
                                     >
                                         <svg className="w-3 h-3 mt-1 mr-2 text-text-disabled dark:text-text-disabled-dark group-hover:text-primary transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>

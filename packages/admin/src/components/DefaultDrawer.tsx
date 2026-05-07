@@ -104,7 +104,7 @@ context });
 
     return (
         <>
-            <div role="navigation" aria-label="Main navigation" className={cls("flex flex-col h-full relative grow w-full", isStudioDark ? "dark:bg-surface-950" : "", className)} style={style}>
+            <div role="navigation" aria-label="Main navigation" className={cls("flex flex-col h-full relative grow w-full", className)} style={style}>
 
                 <DrawerLogo
                     logo={resolvedLogo}
@@ -310,7 +310,7 @@ function DrawerModeSwitch({
                 showSwitch ? "opacity-100 h-7 mt-2 mb-0" : "opacity-0 pointer-events-none h-7 mt-2 mb-0"
             )}
         >
-            <div role="group" aria-label="Content mode" className="flex bg-surface-100 dark:bg-surface-800 rounded-lg p-0.5 border border-surface-200 dark:border-surface-700">
+            <div role="group" aria-label="Content mode" className="flex bg-surface-100 dark:bg-surface-900 rounded-lg p-0.5 border border-surface-200 dark:border-surface-700/60">
                 <button
                     onClick={() => {
                         adminModeController.setMode("content");
@@ -320,7 +320,7 @@ function DrawerModeSwitch({
                     className={cls(
                         "flex-1 px-3 py-0.5 text-xs font-semibold rounded-md transition-all text-center",
                         adminModeController.mode === "content"
-                            ? "bg-white dark:bg-surface-900 shadow-sm text-primary dark:text-primary-400"
+                            ? "bg-white dark:bg-surface-800 shadow-sm text-primary dark:text-primary-400"
                             : "text-surface-500 hover:text-surface-900 dark:hover:text-white"
                     )}
                 >
@@ -335,7 +335,7 @@ function DrawerModeSwitch({
                     className={cls(
                         "flex-1 px-3 py-0.5 text-xs font-semibold rounded-md transition-all text-center",
                         adminModeController.mode === "studio"
-                            ? "bg-white dark:bg-surface-900 shadow-sm text-primary dark:text-primary-400"
+                            ? "bg-white dark:bg-surface-800 shadow-sm text-primary dark:text-primary-400"
                             : "text-surface-500 hover:text-surface-900 dark:hover:text-white"
                     )}
                 >

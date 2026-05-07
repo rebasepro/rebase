@@ -210,7 +210,7 @@ export function DemoLoginView({
                                     {/* Demo info */}
                                     <div className={cls(
                                         "rounded-lg px-4 py-3 text-sm",
-                                        isDark ? "bg-surface-800 text-surface-300" : "bg-surface-100 text-surface-600"
+                                        isDark ? "bg-surface-950 text-surface-300" : "bg-surface-100 text-surface-600"
                                     )}>
                                         No account needed — demo credentials are pre-filled. Just click <strong>Sign in with email</strong>.
                                     </div>
@@ -657,7 +657,7 @@ function ForgotPasswordForm({
 
                 <div className={cls(
                     "text-center rounded-xl p-6",
-                    isDark ? "bg-surface-800" : "bg-surface-50"
+                    isDark ? "bg-surface-950" : "bg-surface-50"
                 )}>
                     <div className="text-3xl mb-3">📧</div>
                     <Typography variant="subtitle1" className="mb-2">

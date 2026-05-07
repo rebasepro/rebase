@@ -575,7 +575,7 @@ message: t("password_copied") ?? "Password copied to clipboard" });
                                 {t("temporary_password") ?? "Temporary Password"}
                             </Typography>
                             <div className="flex items-center gap-2 mt-1">
-                                <code className="flex-grow bg-surface-100 dark:bg-surface-800 border border-surface-300 dark:border-surface-600 rounded px-3 py-2 font-mono text-base select-all">
+                                <code className="flex-grow bg-surface-100 dark:bg-surface-900 border border-surface-300 dark:border-surface-600 rounded px-3 py-2 font-mono text-base select-all">
                                     {result.temporaryPassword}
                                 </code>
                                 <Tooltip title={t("copy_password") ?? "CopyIcon password"} asChild>

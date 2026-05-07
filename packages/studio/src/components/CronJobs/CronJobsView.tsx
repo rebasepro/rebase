@@ -157,7 +157,7 @@ message: e instanceof Error ? e.message : String(e) });
             <CalendarIcon size={iconSize.medium} className="text-surface-300 dark:text-surface-600"/>
             <Typography variant="h6" color="secondary">No Cron Jobs Registered</Typography>
             <Typography variant="body2" color="disabled" className="max-w-md">
-                Create a file in your <code className="text-xs bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded font-mono">crons/</code> directory that default-exports a <code className="text-xs bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded font-mono">CronJobDefinition</code>.
+                Create a file in your <code className="text-xs bg-surface-100 dark:bg-surface-950 px-1.5 py-0.5 rounded font-mono">crons/</code> directory that default-exports a <code className="text-xs bg-surface-100 dark:bg-surface-950 px-1.5 py-0.5 rounded font-mono">CronJobDefinition</code>.
             </Typography>
         </div>
     );
@@ -183,7 +183,7 @@ message: e instanceof Error ? e.message : String(e) });
                                 "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all",
                                 selectedId === job.id
                                     ? "bg-primary/10 dark:bg-primary/15 ring-1 ring-primary/30"
-                                    : "hover:bg-surface-100 dark:hover:bg-surface-800"
+                                    : "hover:bg-surface-100 dark:hover:bg-surface-950"
                             )}
                         >
                             <div className={cls("w-2 h-2 rounded-full shrink-0", stateColors[job.state] || "bg-surface-400")}/>
@@ -270,7 +270,7 @@ message: e instanceof Error ? e.message : String(e) });
                                     <Typography variant="body2" color="disabled">No executions yet</Typography>
                                 </div>
                             ) : (
-                                <div className="divide-y divide-surface-100 dark:divide-surface-800">
+                                <div className="divide-y divide-surface-100 dark:divide-surface-950">
                                     {logs.map((log, idx) => (
                                         <LogRow key={idx} log={log}/>
                                     ))}
@@ -305,7 +305,7 @@ function StatCard({ label, value, mono, chipColor, highlight }: {
 function LogRow({ log }: { log: CronJobLogEntry }) {
     const [expanded, setExpanded] = useState(false);
     return (
-        <div className="px-5 py-2.5 hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors">
+        <div className="px-5 py-2.5 hover:bg-surface-50 dark:hover:bg-surface-950/50 transition-colors">
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => setExpanded(!expanded)}>
                 {log.success
                     ? <CheckCircleIcon size={iconSize.smallest} className="text-emerald-500 shrink-0"/>

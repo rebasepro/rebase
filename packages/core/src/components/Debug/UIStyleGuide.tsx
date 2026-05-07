@@ -33,7 +33,7 @@ export const UIStyleGuide = () => {
                 <Typography variant="h4" gutterBottom className="border-b pb-2 mb-6">Typography Variants</Typography>
                 <Paper className="p-6 space-y-6">
                     {typographyVariants.map(variant => (
-                        <div key={variant} className="flex items-center gap-4 border-b border-surface-100 dark:border-surface-800 pb-4 last:border-0">
+                        <div key={variant} className="flex items-center gap-4 border-b border-surface-100 dark:border-surface-950 pb-4 last:border-0">
                             <span className="w-24 text-[10px] uppercase tracking-wider text-text-disabled font-mono">{variant}</span>
                             <Typography variant={variant}>
                                 The quick brown fox jumps over the lazy dog ({variant})
@@ -142,7 +142,7 @@ export const UIStyleGuide = () => {
             </section>
 
             <section className="mb-12">
-                <div className="flex justify-between items-center bg-surface-100 dark:bg-surface-800 p-8 rounded-xl border border-dashed border-surface-400">
+                <div className="flex justify-between items-center bg-surface-100 dark:bg-surface-950 p-8 rounded-xl border border-dashed border-surface-400">
                     <div>
                         <Typography variant="h5">Dark Mode Check</Typography>
                         <Typography variant="body2" color="secondary">Typography and buttons should adapt automatically.</Typography>

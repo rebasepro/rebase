@@ -34,7 +34,7 @@ export function EndpointDetail({ endpoint, spec }: { endpoint: ParsedEndpoint; s
                     <div className={cls("rounded-lg border overflow-hidden", defaultBorderMixin)}>
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="bg-surface-100 dark:bg-surface-800 text-left">
+                                <tr className="bg-surface-100 dark:bg-surface-900 text-left">
                                     <th className="px-4 py-2 font-medium text-text-secondary dark:text-text-secondary-dark">
                                         Name
                                     </th>
@@ -108,7 +108,7 @@ export function EndpointDetail({ endpoint, spec }: { endpoint: ParsedEndpoint; s
                             <div
                                 className={cls(
                                     "flex items-center gap-3 px-4 py-2.5",
-                                    "bg-surface-50 dark:bg-surface-800/50"
+                                    "bg-surface-50 dark:bg-surface-900/50"
                                 )}
                             >
                                 <StatusBadge code={code}/>
@@ -199,7 +199,7 @@ function SchemaBlock({ schema, spec, depth }: { schema: OpenApiSchema; spec: Ope
                                             {prop.enum.map((v) => (
                                                 <span
                                                     key={String(v)}
-                                                    className="px-1.5 py-0.5 rounded bg-surface-200 dark:bg-surface-700 text-[10px] font-mono"
+                                                    className="px-1.5 py-0.5 rounded bg-surface-200 dark:bg-surface-800 text-[10px] font-mono"
                                                 >
                                                     {String(v)}
                                                 </span>
@@ -260,12 +260,12 @@ function StatusBadge({ code }: { code: string }) {
     const n = parseInt(code, 10);
     const color =
         n < 300
-            ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+            ? "text-emerald-600 dark:text-emerald-400"
             : n < 400
-              ? "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/20"
+              ? "text-blue-600 dark:text-blue-400"
               : n < 500
-                ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20"
-                : "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/20";
+                ? "text-amber-600 dark:text-amber-400"
+                : "text-red-600 dark:text-red-400";
 
-    return <span className={cls("text-xs font-bold px-2 py-0.5 rounded border font-mono", defaultBorderMixin, color)}>{code}</span>;
+    return <span className={cls("text-xs font-bold font-mono", color)}>{code}</span>;
 }

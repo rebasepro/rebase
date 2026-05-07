@@ -265,7 +265,7 @@ export const EntityTableCell = React.memo<EntityTableCellProps>(
                 style={sortableStyle}
                 className={cls(
                     "flex-shrink-0",
-                    frozen && "sticky left-0 z-10 bg-white dark:bg-surface-950"
+                    frozen && "sticky left-0 z-10 bg-white dark:bg-surface-900"
                 )}
                 {...sortableAttrsWithoutTabIndex}
             >

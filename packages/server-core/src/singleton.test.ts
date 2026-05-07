@@ -4,8 +4,8 @@ import type { RebaseClient } from "@rebasepro/types";
 describe("rebase singleton", () => {
     beforeEach(() => {
         // Reset the singleton before each test
-        // By calling _initRebase with null (cast to any to bypass type checking for the reset)
-        _initRebase(null as any);
+        // By calling _initRebase with null (cast to bypass type checking for the reset)
+        _initRebase(null as unknown as RebaseClient);
     });
 
     it("should throw an error if accessed before initialization", () => {

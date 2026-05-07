@@ -10,7 +10,11 @@ import { z } from "zod";
  * Twitter API v2 requires the "tweet.read" and "users.read" scopes at minimum,
  * plus "offline.access" if refresh tokens are needed on Twitter's side.
  */
-export function createTwitterProvider(config: { clientId: string; clientSecret: string }): OAuthProvider {
+export function createTwitterProvider(config: { clientId: string; clientSecret: string }): OAuthProvider<{
+            code: string;
+            redirectUri: string;
+            codeVerifier: string;
+        }> {
     return {
         id: "twitter",
         schema: z.object({

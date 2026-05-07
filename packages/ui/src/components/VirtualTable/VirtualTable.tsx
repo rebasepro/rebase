@@ -469,7 +469,7 @@ const SortableCellWrapper = ({
             style={style}
             className={cls(
                 "flex-shrink-0",
-                frozen && "sticky left-0 z-10 bg-white dark:bg-surface-950"
+                frozen && "sticky left-0 z-10 bg-white dark:bg-surface-900"
             )}
             {...attrsWithoutTabIndex}
         >
@@ -579,7 +579,7 @@ function MemoizedList({
                                     key={`cell_wrapper_${column.key}`}
                                     className={cls(
                                         "flex-shrink-0 relative",
-                                        column.frozen && "sticky left-0 z-10 bg-white dark:bg-surface-950"
+                                        column.frozen && "sticky left-0 z-10 bg-white dark:bg-surface-900"
                                     )}
                                     style={{
                                         minWidth: column.width,

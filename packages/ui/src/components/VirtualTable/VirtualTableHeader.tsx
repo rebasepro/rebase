@@ -92,7 +92,7 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<any>>(
                             ? "bg-primary-bg dark:bg-primary-bg-dark"
                             : "bg-surface-50 dark:bg-surface-900",
                         "text-text-secondary hover:text-text-primary dark:text-text-secondary-dark dark:hover:text-text-primary-dark",
-                        !isDragging && "hover:bg-surface-100 dark:hover:bg-surface-800 hover:bg-opacity-50 hover:bg-surface-100/50 dark:hover:bg-opacity-50 dark:hover:bg-surface-800/50",
+                        !isDragging && "hover:bg-surface-100 dark:hover:bg-surface-900 hover:bg-opacity-50 hover:bg-surface-100/50 dark:hover:bg-opacity-50 dark:hover:bg-surface-900/50",
                         column.frozen ? "sticky left-0 z-10" : "relative z-0",
                         isDraggable && "cursor-grab"
                     )}
@@ -134,7 +134,7 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<any>>(
                                 invisible={!sort}>
                                 <IconButton
                                     size={"small"}
-                                    className={onHover || openFilter ? "bg-white dark:bg-surface-950" : undefined}
+                                    className={onHover || openFilter ? "bg-white dark:bg-surface-900" : undefined}
                                     onClick={() => {
                                         onColumnSort(column.key as Extract<keyof M, string>);
                                     }}
@@ -161,7 +161,7 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<any>>(
                                 modal={true}
                                 trigger={
                                     <IconButton
-                                        className={onHover || openFilter ? "bg-white dark:bg-surface-950" : undefined}
+                                        className={onHover || openFilter ? "bg-white dark:bg-surface-900" : undefined}
                                         size={"small"}
                                         onClick={handleSettingsClick}>
                                         <FilterIcon size={iconSize.small}/>

@@ -9,7 +9,7 @@ export function createGitLabProvider(config: {
     clientId: string;
     clientSecret: string;
     baseUrl?: string;
-}): OAuthProvider {
+}): OAuthProvider<{ code: string; redirectUri: string }> {
     const gitlabUrl = (config.baseUrl || "https://gitlab.com").replace(/\/$/, "");
 
     return {

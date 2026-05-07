@@ -7,7 +7,7 @@ import { z } from "zod";
  * Uses the authorization code flow. Requires the "identify" and "email"
  * scopes to retrieve the user's email and profile information.
  */
-export function createDiscordProvider(config: { clientId: string; clientSecret: string }): OAuthProvider {
+export function createDiscordProvider(config: { clientId: string; clientSecret: string }): OAuthProvider<{ code: string; redirectUri: string }> {
     return {
         id: "discord",
         schema: z.object({

@@ -361,7 +361,7 @@ function ConditionRow({
     return (
         <div className={cls(
             "flex items-center gap-2 p-2 rounded-md",
-            hasError ? "bg-red-50 dark:bg-red-900/20" : "bg-surface-100 dark:bg-surface-800"
+            hasError ? "bg-red-50 dark:bg-red-900/20" : "bg-surface-100 dark:bg-surface-900"
         )}>
             {/* Field selector with colored badge */}
             <Select

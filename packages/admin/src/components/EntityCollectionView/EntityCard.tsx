@@ -100,7 +100,7 @@ export function EntityCard<M extends Record<string, unknown> = Record<string, un
             onClick={handleClick}
         >
             {/* Thumbnail area — image slot */}
-            <div className="aspect-[4/3] relative overflow-hidden bg-surface-100 dark:bg-surface-800">
+            <div className="aspect-[4/3] relative overflow-hidden bg-surface-100 dark:bg-surface-900">
                 {slots.image ? (
                     <div className="w-full h-full">
                         <PropertyPreview

@@ -31,7 +31,7 @@ export function CollectionViewHeaderAction({
             asChild={true}
             title={t("studio_collection_view_edit")}>
             <IconButton
-                className={onHover ? "bg-white dark:bg-surface-950" : "hidden"}
+                className={onHover ? "bg-white dark:bg-surface-900" : "hidden"}
                 onClick={() => {
                     collectionEditorController.editProperty({
                         propertyKey,

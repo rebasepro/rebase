@@ -126,7 +126,7 @@ export function BranchesView() {
                 <Typography variant="h6" color="secondary">Database Branching Not Available</Typography>
                 <Typography variant="body2" color="disabled" className="max-w-md">
                     Branching requires a PostgreSQL backend with an admin connection configured.
-                    Set <code className="text-xs bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded font-mono">adminConnectionString</code> in your server configuration.
+                    Set <code className="text-xs bg-surface-100 dark:bg-surface-950 px-1.5 py-0.5 rounded font-mono">adminConnectionString</code> in your server configuration.
                 </Typography>
             </div>
         );
@@ -186,7 +186,7 @@ export function BranchesView() {
                                     "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all",
                                     selectedBranch === branch.name
                                         ? "bg-primary/10 dark:bg-primary/15 ring-1 ring-primary/30"
-                                        : "hover:bg-surface-100 dark:hover:bg-surface-800"
+                                        : "hover:bg-surface-100 dark:hover:bg-surface-950"
                                 )}
                             >
                                 <div className="w-2 h-2 rounded-full shrink-0 bg-emerald-500"/>
@@ -257,7 +257,7 @@ export function BranchesView() {
                             <Alert color="info">
                                 <Typography variant="body2" className="text-[13px]">
                                     <strong>How to use this branch:</strong> Switch your application&apos;s database connection to
-                                    <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-100 dark:bg-surface-800 font-mono text-[12px]">{selected.name}</code>
+                                    <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-100 dark:bg-surface-950 font-mono text-[12px]">{selected.name}</code>
                                     to work with an isolated copy of your data. Changes made to this branch won&apos;t affect your main database.
                                 </Typography>
                             </Alert>

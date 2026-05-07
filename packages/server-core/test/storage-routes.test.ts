@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, jest as vi } from "@jest/globals";
 /**
  * Tests for storage routes — specifically the sub-router wildcard extraction
  * that broke when Hono's c.req.param('*') stopped working in mounted sub-routers.

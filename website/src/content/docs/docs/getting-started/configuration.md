@@ -15,7 +15,7 @@ All configuration is done via environment variables in your `.env` file at the p
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@localhost:5432/mydb` |
+| `DATABASE_URL` | Database connection string (PostgreSQL or MongoDB) | `postgresql://user:pass@localhost:5432/mydb` or `mongodb://localhost:27017/mydb` |
 | `JWT_SECRET` | Secret key for signing JWT tokens. Use a strong random string (min 32 chars). | `a1b2c3d4e5...` |
 
 ### Frontend
@@ -79,10 +79,9 @@ await initializeRebaseBackend({
     basePath: "/api",        // Base path for all API routes (default: "/api")
 
     bootstrappers: [         // Database and service bootstrappers
-        createPostgresBootstrapper({
-            connection: db,
-            schema: { tables, enums, relations }
-        })
+        isMongo
+            ? createMongoBootstrapper({ ... })
+            : createPostgresBootstrapper({ ... })
     ],
 
     auth: {                  // Authentication config

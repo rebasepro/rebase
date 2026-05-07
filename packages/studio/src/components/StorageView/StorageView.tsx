@@ -371,7 +371,7 @@ function FilePreviewPanel({
                                     URL
                                 </Typography>
                                 <div
-                                    className="p-2 rounded bg-surface-100 dark:bg-surface-800 cursor-pointer hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors"
+                                    className="p-2 rounded bg-surface-100 dark:bg-surface-950 cursor-pointer hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors"
                                     onClick={() => {
                                         navigator.clipboard.writeText(downloadUrl);
                                     }}
@@ -451,7 +451,7 @@ function StorageSidebar({
                         "flex items-center p-1.5 cursor-pointer rounded transition-colors",
                         currentPath === "" || !currentPath
                             ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light"
-                            : "hover:bg-surface-100 dark:hover:bg-surface-800 text-text-secondary dark:text-text-secondary-dark"
+                            : "hover:bg-surface-100 dark:hover:bg-surface-950 text-text-secondary dark:text-text-secondary-dark"
                     )}
                     onClick={() => onNavigate("")}
                 >
@@ -474,7 +474,7 @@ function StorageSidebar({
                                         "flex items-center p-1.5 cursor-pointer rounded transition-colors group",
                                         isSelected
                                             ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light"
-                                            : "hover:bg-surface-100 dark:hover:bg-surface-800 text-text-secondary dark:text-text-secondary-dark"
+                                            : "hover:bg-surface-100 dark:hover:bg-surface-950 text-text-secondary dark:text-text-secondary-dark"
                                     )}
                                     onClick={() => onNavigate(folder.fullPath)}
                                 >
@@ -713,7 +713,7 @@ message: e instanceof Error ? e.message : String(e) });
                             {folders.map(folder => (
                                 <tr
                                     key={folder.fullPath}
-                                    className="hover:bg-surface-100 dark:hover:bg-surface-800 cursor-pointer transition-colors border-b border-surface-100 dark:border-surface-800/50"
+                                    className="hover:bg-surface-100 dark:hover:bg-surface-950 cursor-pointer transition-colors border-b border-surface-100 dark:border-surface-950/50"
                                     onClick={() => handleNavigate(folder.fullPath)}
                                 >
                                     <td className="px-4 py-2.5">
@@ -743,10 +743,10 @@ message: e instanceof Error ? e.message : String(e) });
                                     <tr
                                         key={file.fullPath}
                                         className={cls(
-                                            "cursor-pointer transition-colors border-b border-surface-100 dark:border-surface-800/50",
+                                            "cursor-pointer transition-colors border-b border-surface-100 dark:border-surface-950/50",
                                             isSelected
                                                 ? "bg-primary/5 dark:bg-primary/10"
-                                                : "hover:bg-surface-100 dark:hover:bg-surface-800"
+                                                : "hover:bg-surface-100 dark:hover:bg-surface-950"
                                         )}
                                         onClick={() => handleSelectFile(file)}
                                     >
@@ -793,7 +793,7 @@ message: e instanceof Error ? e.message : String(e) });
                                     className={cls(
                                         "rounded-lg p-3 cursor-pointer transition-all duration-150 border",
                                         defaultBorderMixin,
-                                        "hover:bg-surface-100 dark:hover:bg-surface-800 hover:shadow-sm",
+                                        "hover:bg-surface-100 dark:hover:bg-surface-950 hover:shadow-sm",
                                         "flex items-center gap-2"
                                     )}
                                     onClick={() => handleNavigate(folder.fullPath)}
@@ -833,7 +833,7 @@ message: e instanceof Error ? e.message : String(e) });
                                         onClick={() => handleSelectFile(file)}
                                     >
                                         {/* Thumbnail or icon */}
-                                        <div className="aspect-square relative overflow-hidden bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
+                                        <div className="aspect-square relative overflow-hidden bg-surface-100 dark:bg-surface-950 flex items-center justify-center">
                                             {isImage && file.downloadUrl ? (
                                                 <img
                                                     src={file.downloadUrl}
@@ -948,7 +948,7 @@ message: e instanceof Error ? e.message : String(e) });
                                         <IconButton
                                             size="small"
                                             onClick={() => setViewMode("grid")}
-                                            className={cls(viewMode === "grid" && "bg-surface-100 dark:bg-surface-800")}
+                                            className={cls(viewMode === "grid" && "bg-surface-100 dark:bg-surface-950")}
                                         >
                                             <LayoutGridIcon size={iconSize.smallest}/>
                                         </IconButton>
@@ -957,13 +957,13 @@ message: e instanceof Error ? e.message : String(e) });
                                         <IconButton
                                             size="small"
                                             onClick={() => setViewMode("list")}
-                                            className={cls(viewMode === "list" && "bg-surface-100 dark:bg-surface-800")}
+                                            className={cls(viewMode === "list" && "bg-surface-100 dark:bg-surface-950")}
                                         >
                                             <ListIcon size={iconSize.smallest}/>
                                         </IconButton>
                                     </Tooltip>
 
-                                    <div className="h-4 w-px bg-surface-200 dark:bg-surface-800 mx-0.5"/>
+                                    <div className="h-4 w-px bg-surface-200 dark:bg-surface-950 mx-0.5"/>
 
                                     <Tooltip title="Refresh">
                                         <IconButton size="small" onClick={handleRefresh} disabled={loading}>

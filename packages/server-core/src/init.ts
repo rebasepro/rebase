@@ -56,7 +56,7 @@ export interface RebaseAuthConfig {
     slack?: { clientId: string; clientSecret: string };
     spotify?: { clientId: string; clientSecret: string };
     defaultRole?: string;
-    providers?: OAuthProvider[];
+    providers?: OAuthProvider<any>[];
     [key: string]: unknown;
 }
 
@@ -342,7 +342,7 @@ collectionRegistry });
 
     // 4. Mount API Routes
     if (config.auth && authConfigResult) {
-        const oauthProviders: OAuthProvider[] = [...(config.auth.providers || [])];
+        const oauthProviders: OAuthProvider<any>[] = [...(config.auth.providers || [])];
 
         if (config.auth.google?.clientId) {
             const { createGoogleProvider } = await import("./auth");

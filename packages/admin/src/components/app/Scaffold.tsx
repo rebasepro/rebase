@@ -91,6 +91,7 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
         const adminModeController = useAdminModeController();
         const isStudioDark = adminModeController.mode === "studio";
 
+
         const hasAppBar = Boolean(appBarChildren.length > 0);
         const appContextValue = useMemo(() => ({
             hasDrawer: Boolean(includeDrawer),
@@ -106,7 +107,7 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
             <AppContext.Provider value={appContextValue}>
                 <div
                     className={cls("flex h-screen w-screen overflow-hidden",
-                        isStudioDark ? "bg-surface-50 dark:bg-surface-950" : "bg-surface-50 dark:bg-surface-900",
+                        "bg-surface-50 dark:bg-surface-900",
                         "text-surface-900 dark:text-white", className)}
                     style={{
                         paddingTop: "env(safe-area-inset-top)",
@@ -136,9 +137,9 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
                         {hasAppBar && <DrawerHeader/>}
 
                         <div
-                            className={cls(defaultBorderMixin, "bg-surface-50 dark:bg-surface-900 grow overflow-auto m-0", {
+                            className={cls(defaultBorderMixin, "bg-surface-50 dark:bg-surface-900", "grow overflow-auto m-0", {
                                 "lg:mt-4": !hasAppBar,
-                                "mt-1 lg:m-0 lg:mx-2 lg:mb-2 lg:rounded-lg lg:border lg:border-solid": padding,
+                                "mt-1 lg:m-0 lg:mx-2 lg:mb-2 lg:rounded-lg lg:border-t lg:border-x lg:border-solid": padding,
                                 "border-t": hasAppBar && !padding
                             })}>
 
@@ -178,12 +179,13 @@ function DrawerWrapper(props: {
     const visualWidth = !props.displayed ? 0 : ((props.open || props.hovered) ? DRAWER_WIDTH : 72);
 
     const isFloating = props.hovered && !props.open;
-    const darkBg = props.isStudioDark ? "dark:bg-surface-950" : "dark:bg-surface-900";
+    const darkBg = "dark:bg-surface-900";
+    const darkBgFloating = "dark:bg-surface-900";
     const { t } = useTranslation();
 
     const innerDrawer = <div
         className={cls("h-full no-scrollbar overflow-y-auto overflow-x-clip", defaultBorderMixin,
-            isFloating ? "absolute top-0 left-0 bottom-0 z-50 bg-surface-50 dark:bg-surface-950 shadow-2xl border-r" : `relative bg-surface-50 ${darkBg}`)}
+            isFloating ? `absolute top-0 left-0 bottom-0 z-50 bg-surface-50 ${darkBgFloating} shadow-2xl border-r` : `relative bg-surface-50 ${darkBg}`)}
         style={{
             width: visualWidth,
             transition: "left 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms, opacity 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms, width 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms"

@@ -97,7 +97,7 @@ export const BoardColumn = memo(function BoardColumn<M extends Record<string, un
         "flex items-center justify-between px-2 rounded-t-md transition-colors duration-200 ease-in-out",
         isColumnBeingDragged
             ? "bg-surface-100 dark:bg-surface-900"
-            : "bg-surface-50 hover:bg-surface-100 dark:bg-surface-950 dark:hover:bg-surface-900",
+            : "bg-surface-50 hover:bg-surface-100 dark:bg-surface-900 dark:hover:bg-surface-900",
         allowReorder ? "cursor-grab" : ""
     ), [isColumnBeingDragged, allowReorder]);
 

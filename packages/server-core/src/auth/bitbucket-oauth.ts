@@ -4,7 +4,7 @@ import { z } from "zod";
 /**
  * Creates a Bitbucket OAuth Provider integration (OAuth 2.0 consumer).
  */
-export function createBitbucketProvider(config: { clientId: string; clientSecret: string }): OAuthProvider {
+export function createBitbucketProvider(config: { clientId: string; clientSecret: string }): OAuthProvider<{ code: string; redirectUri: string }> {
     return {
         id: "bitbucket",
         schema: z.object({

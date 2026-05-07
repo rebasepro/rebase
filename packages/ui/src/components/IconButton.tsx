@@ -41,7 +41,7 @@ const IconButtonInner = <C extends React.ElementType = "button">({
                                                                      ...props
                                                                  }: IconButtonProps<C>, ref: React.ForwardedRef<HTMLButtonElement>) => {
 
-    const bgClasses = variant === "ghost" ? "bg-transparent" : "bg-surface-accent-200 bg-opacity-50 bg-surface-accent-200/50 dark:bg-surface-950 dark:bg-opacity-50 dark:bg-surface-950/50";
+    const bgClasses = variant === "ghost" ? "bg-transparent" : "bg-surface-accent-200 bg-opacity-50 bg-surface-accent-200/50 dark:bg-surface-900 dark:bg-opacity-50 dark:bg-surface-900/50";
     const Component: React.ElementType<any> = component || "button";
     const isNativeButton = Component === "button";
     return (

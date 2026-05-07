@@ -104,7 +104,7 @@ export const DefaultAppBar = function DefaultAppBar({
         avatarComponent = null;
     }
 
-    const isStudioDark = adminModeController.mode === "studio";
+
 
     return (
         <div
@@ -112,7 +112,7 @@ export const DefaultAppBar = function DefaultAppBar({
             role="banner"
             className={cls("w-full h-16 transition-all ease-in duration-75 absolute top-0 max-w-full overflow-x-auto no-scrollbar",
                 "flex flex-row gap-2 px-4 items-center",
-                isStudioDark ? "dark:bg-surface-950" : "",
+                "backdrop-blur-md bg-surface-50/80 dark:bg-surface-900/80",
                 {
                     "pl-[19rem]": drawerOpen && largeLayout,
                     "pl-24": hasDrawer && !(drawerOpen && largeLayout),
@@ -165,7 +165,7 @@ export const DefaultAppBar = function DefaultAppBar({
                                     {/* Show count badge for collection breadcrumbs: undefined = not applicable, null = loading, number = count */}
                                     {breadcrumb.count !== undefined && (
                                         breadcrumb.count !== null ? (
-                                            <span className="text-xs text-surface-accent-500 dark:text-surface-accent-400 bg-surface-100 dark:bg-surface-700 px-1 py-0 rounded">
+                                            <span className="text-xs text-surface-accent-500 dark:text-surface-accent-400 bg-surface-100 dark:bg-surface-800 px-1 py-0 rounded">
                                                 {breadcrumb.count}
                                             </span>
                                         ) : (

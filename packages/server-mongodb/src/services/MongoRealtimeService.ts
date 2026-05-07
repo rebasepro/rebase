@@ -11,8 +11,10 @@ import {
     FilterValues,
     RealtimeProvider,
     CollectionSubscriptionConfig,
-    EntitySubscriptionConfig
+    EntitySubscriptionConfig,
+    WebSocketMessage
 } from "@rebasepro/types";
+import { WebSocket } from "ws";
 import { MongoEntityService } from "../db/MongoEntityService";
 
 interface Subscription {
@@ -30,6 +32,7 @@ interface Subscription {
  */
 export class MongoRealtimeService implements RealtimeProvider {
     private subscriptions = new Map<string, Subscription>();
+    private clients = new Map<string, WebSocket>();
     private entityService: MongoEntityService;
 
     constructor(private db: Db) {
@@ -290,6 +293,102 @@ export class MongoRealtimeService implements RealtimeProvider {
     async closeAll(): Promise<void> {
         for (const [subscriptionId] of this.subscriptions) {
             this.unsubscribe(subscriptionId);
+        }
+    }
+
+    // =============================================================================
+    // WebSocket Client Management (parity with PostgreSQL RealtimeService)
+    // =============================================================================
+
+    /**
+     * Register a WebSocket client for real-time communication
+     */
+    addClient(clientId: string, ws: WebSocket) {
+        this.clients.set(clientId, ws);
+
+        ws.on("close", () => {
+            this.removeClient(clientId);
+        });
+
+        ws.on("error", (error) => {
+            console.error("WebSocket error for client", clientId, error);
+            this.removeClient(clientId);
+        });
+    }
+
+    /**
+     * Remove a WebSocket client and clean up its subscriptions
+     */
+    private removeClient(clientId: string) {
+        this.clients.delete(clientId);
+    }
+
+    /**
+     * Handle an incoming WebSocket message for subscription management
+     */
+    async handleClientMessage(
+        clientId: string,
+        message: { type: string; payload?: any; subscriptionId?: string },
+        _authContext?: { userId: string; roles: unknown[] }
+    ): Promise<void> {
+        const ws = this.clients.get(clientId);
+        if (!ws) return;
+
+        switch (message.type) {
+            case "subscribe_collection": {
+                const subscriptionId = message.payload?.subscriptionId ?? message.subscriptionId;
+                if (!subscriptionId) return;
+
+                this.subscribeToCollection(
+                    subscriptionId,
+                    {
+                        clientId,
+                        path: message.payload?.path,
+                        filter: message.payload?.filter,
+                        orderBy: message.payload?.orderBy,
+                        order: message.payload?.order,
+                        limit: message.payload?.limit,
+                        startAfter: message.payload?.startAfter,
+                        searchString: message.payload?.searchString
+                    },
+                    (entities) => {
+                        ws.send(JSON.stringify({
+                            type: "collection_update",
+                            subscriptionId,
+                            entities
+                        }));
+                    }
+                );
+                break;
+            }
+            case "subscribe_entity": {
+                const subscriptionId = message.payload?.subscriptionId ?? message.subscriptionId;
+                if (!subscriptionId) return;
+
+                this.subscribeToEntity(
+                    subscriptionId,
+                    {
+                        clientId,
+                        path: message.payload?.path,
+                        entityId: message.payload?.entityId
+                    },
+                    (entity) => {
+                        ws.send(JSON.stringify({
+                            type: "entity_update",
+                            subscriptionId,
+                            entity
+                        }));
+                    }
+                );
+                break;
+            }
+            case "unsubscribe": {
+                const subscriptionId = message.payload?.subscriptionId ?? message.subscriptionId;
+                if (subscriptionId) {
+                    this.unsubscribe(subscriptionId);
+                }
+                break;
+            }
         }
     }
 }

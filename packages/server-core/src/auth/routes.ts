@@ -81,6 +81,10 @@ function getPasswordResetExpiry(): Date {
 }
 
 export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
+    if (config.defaultRole === "admin") {
+        throw new Error("CRITICAL SECURITY ERROR: defaultRole cannot be 'admin'. Administrative privilege escalation via registration is strictly forbidden. Use the POST /admin/bootstrap endpoint to promote the initial administrator.");
+    }
+
     const router = new Hono<HonoEnv>();
 
     // Attach Rebase error handler to ensure ApiError exceptions are correctly
@@ -146,6 +150,7 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
      * First-user bootstrap must use POST /admin/bootstrap instead.
      */
     function isRegistrationAllowed(): boolean {
+        if (config.disableSelfRegistration) return false;
         return !!allowRegistration;
     }
 
@@ -169,6 +174,26 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         }).catch(err => {
             console.error("Failed to send welcome email:", err instanceof Error ? err.message : err);
         });
+    }
+
+    /**
+     * Helper to generate and store session tokens
+     */
+    async function createSessionAndTokens(userId: string, userAgent: string, ipAddress: string) {
+        const roles = await authRepo.getUserRoles(userId);
+        const roleIds = roles.map(r => r.id);
+        const accessToken = generateAccessToken(userId, roleIds);
+        const refreshToken = generateRefreshToken();
+
+        await authRepo.createRefreshToken(
+            userId,
+            hashRefreshToken(refreshToken),
+            getRefreshTokenExpiry(),
+            userAgent,
+            ipAddress
+        );
+
+        return { roleIds, accessToken, refreshToken };
     }
 
     /**
@@ -213,22 +238,10 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
             await authRepo.assignDefaultRole(user.id, config.defaultRole);
         }
 
-        // Generate tokens
-        const roles = await authRepo.getUserRoles(user.id);
-        const roleIds = roles.map(r => r.id);
-        const accessToken = generateAccessToken(user.id, roleIds);
-        const refreshToken = generateRefreshToken();
-
-        // Store refresh token
-        const userAgent = c.req.header("user-agent") || "unknown";
-        const ipAddress = c.req.header("x-forwarded-for") || "unknown";
-
-        await authRepo.createRefreshToken(
+        const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
-            hashRefreshToken(refreshToken),
-            getRefreshTokenExpiry(),
-            userAgent,
-            ipAddress
+            c.req.header("user-agent") || "unknown",
+            c.req.header("x-forwarded-for") || "unknown"
         );
 
         // Send welcome email (fire-and-forget, don't block registration)
@@ -259,23 +272,10 @@ displayName: user.displayName });
             throw ApiError.unauthorized("Invalid email or password", "INVALID_CREDENTIALS");
         }
 
-        // Generate tokens
-        const roles = await authRepo.getUserRoles(user.id);
-        const roleIds = roles.map(r => r.id);
-
-        const accessToken = generateAccessToken(user.id, roleIds);
-        const refreshToken = generateRefreshToken();
-
-        // Store refresh token
-        const userAgent = c.req.header("user-agent") || "unknown";
-        const ipAddress = c.req.header("x-forwarded-for") || "unknown";
-
-        await authRepo.createRefreshToken(
+        const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
-            hashRefreshToken(refreshToken),
-            getRefreshTokenExpiry(),
-            userAgent,
-            ipAddress
+            c.req.header("user-agent") || "unknown",
+            c.req.header("x-forwarded-for") || "unknown"
         );
 
         return c.json(buildAuthResponse(user, roleIds, accessToken, refreshToken));
@@ -337,22 +337,10 @@ displayName: user.displayName });
                     });
                 }
 
-                // Generate tokens
-                const roles = await authRepo.getUserRoles(user.id);
-                const roleIds = roles.map(r => r.id);
-                const accessToken = generateAccessToken(user.id, roleIds);
-                const refreshToken = generateRefreshToken();
-
-                // Store refresh token
-                const userAgent = c.req.header("user-agent") || "unknown";
-                const ipAddress = c.req.header("x-forwarded-for") || "unknown";
-
-                await authRepo.createRefreshToken(
+                const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
                     user.id,
-                    hashRefreshToken(refreshToken),
-                    getRefreshTokenExpiry(),
-                    userAgent,
-                    ipAddress
+                    c.req.header("user-agent") || "unknown",
+                    c.req.header("x-forwarded-for") || "unknown"
                 );
 
                 return c.json(buildAuthResponse(user, roleIds, accessToken, refreshToken));

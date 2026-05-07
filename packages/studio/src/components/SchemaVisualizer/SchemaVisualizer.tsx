@@ -257,7 +257,7 @@ duration: 400 }
                                             "flex items-center p-1.5 cursor-pointer rounded transition-colors group",
                                             isSelected
                                                 ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light"
-                                                : "hover:bg-surface-100 dark:hover:bg-surface-800 text-text-secondary dark:text-text-secondary-dark"
+                                                : "hover:bg-surface-100 dark:hover:bg-surface-950 text-text-secondary dark:text-text-secondary-dark"
                                         )}
                                     >
                                         <div className="shrink-0 mr-1.5 text-text-disabled dark:text-text-disabled-dark">
@@ -337,7 +337,7 @@ duration: 400 }
                                                     "flex items-center p-1.5 cursor-pointer rounded transition-colors",
                                                     isSelected
                                                         ? "bg-primary/10 text-primary dark:bg-primary/20"
-                                                        : "hover:bg-surface-100 dark:hover:bg-surface-800 text-text-disabled dark:text-text-disabled-dark"
+                                                        : "hover:bg-surface-100 dark:hover:bg-surface-950 text-text-disabled dark:text-text-disabled-dark"
                                                 )}
                                             >
                                                 <svg
@@ -441,7 +441,7 @@ duration: 400 }
                         </div>
                         <div className="flex shrink-0 items-center gap-1.5">
                             {/* Direction toggle */}
-                            <div className="flex items-center bg-surface-100 dark:bg-surface-800 rounded-md border border-surface-200/40 dark:border-surface-700/40">
+                            <div className="flex items-center bg-surface-100 dark:bg-surface-950 rounded-md border border-surface-200/40 dark:border-surface-700/40">
                                 <Tooltip title="Left to right layout">
                                     <button
                                         onClick={() => setDirection("LR")}
@@ -470,7 +470,7 @@ duration: 400 }
                                 </Tooltip>
                             </div>
 
-                            <div className="h-4 w-px bg-surface-200 dark:bg-surface-800 mx-0.5"/>
+                            <div className="h-4 w-px bg-surface-200 dark:bg-surface-950 mx-0.5"/>
 
                             {/* Fit view */}
                             <Tooltip title="Fit to view">

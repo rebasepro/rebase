@@ -22,3 +22,4 @@ export * from "./db/MongoConditionBuilder";
 // Services
 export * from "./services/MongoRealtimeService";
 export * from "./services/MongoDriver";
+export * from "./MongoBootstrapper";

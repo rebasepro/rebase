@@ -503,7 +503,7 @@ const TableGridPicker = ({
                                     "w-5 h-5 border rounded-sm cursor-pointer transition-colors duration-75",
                                     r <= hoveredRow && c <= hoveredCol
                                         ? "bg-blue-100 border-blue-400 dark:bg-blue-900 dark:border-blue-500"
-                                        : "bg-white dark:bg-surface-800 border-gray-200 dark:border-gray-700 hover:border-blue-300"
+                                        : "bg-white dark:bg-surface-900 border-gray-200 dark:border-gray-700 hover:border-blue-300"
                                 )}
                                 onMouseEnter={() => onHover(r, c)}
                                 onClick={() => onSelect(hoveredRow + 1, hoveredCol + 1)}

@@ -177,7 +177,7 @@ export function UserSettingsView() {
                                 </Button>
                             </div>
                             {sessions.map(session => (
-                                <div key={session.id} className="flex justify-between items-center p-4 bg-white dark:bg-surface-800 border rounded-lg dark:border-surface-700 shadow-sm">
+                                <div key={session.id} className="flex justify-between items-center p-4 bg-white dark:bg-surface-950 border rounded-lg dark:border-surface-700 shadow-sm">
                                     <div className="flex flex-col">
                                         <div className="flex items-center gap-2 mb-1">
                                             <Typography variant="body1">

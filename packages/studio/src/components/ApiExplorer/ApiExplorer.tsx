@@ -129,11 +129,11 @@ allEndpoints: [] };
     }
 
     const METHOD_COLORS: Record<string, string> = {
-        get: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-        post: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/20",
-        put: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20",
-        patch: "bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/20",
-        delete: "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/20"
+        get: "text-blue-600 dark:text-blue-400",
+        post: "text-emerald-600 dark:text-emerald-400",
+        put: "text-amber-600 dark:text-amber-400",
+        patch: "text-orange-600 dark:text-orange-400",
+        delete: "text-red-600 dark:text-red-400"
     };
 
     return (
@@ -191,23 +191,22 @@ allEndpoints: [] };
                                             setTryItOpen(false);
                                         }}
                                         className={cls(
-                                            "w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-sm transition-all",
-                                            "hover:bg-surface-200 dark:hover:bg-surface-700",
+                                            "w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-left text-sm transition-all",
+                                            "hover:bg-surface-200 dark:hover:bg-surface-800",
                                             isSelected
-                                                ? "bg-surface-200 dark:bg-surface-700 font-medium"
+                                                ? "bg-surface-200 dark:bg-surface-800 font-medium"
                                                 : "text-text-primary dark:text-text-primary-dark"
                                         )}
                                     >
+                                        <span className="truncate text-[13px] opacity-90">{ep.summary || ep.shortPath}</span>
                                         <span
                                             className={cls(
-                                                "text-[10px] font-bold uppercase w-12 text-center py-0.5 rounded border shrink-0",
-                                                defaultBorderMixin,
-                                                METHOD_COLORS[ep.method] ?? "bg-surface-200 text-text-secondary"
+                                                "text-[10px] font-bold uppercase shrink-0",
+                                                METHOD_COLORS[ep.method] ?? "text-text-secondary"
                                             )}
                                         >
                                             {ep.method}
                                         </span>
-                                        <span className="truncate text-xs font-mono opacity-80">{ep.shortPath}</span>
                                     </button>
                                 );
                             })}
@@ -231,16 +230,15 @@ allEndpoints: [] };
                         {/* Top bar */}
                         <div
                             className={cls(
-                                "flex items-center justify-between px-5 py-3 gap-4 shrink-0 border-b",
+                                "flex items-center justify-between px-5 py-3 gap-4 shrink-0 border-b z-10",
                                 defaultBorderMixin,
-                                "bg-surface-50/50 dark:bg-surface-900/50"
+                                "bg-surface-50/80 dark:bg-surface-950/80 backdrop-blur-md sticky top-0"
                             )}
                         >
                             <div className="flex items-center gap-3 min-w-0">
                                 <span
                                     className={cls(
-                                        "text-xs font-bold uppercase px-2.5 py-1 rounded border",
-                                        defaultBorderMixin,
+                                        "text-xs font-bold uppercase",
                                         METHOD_COLORS[selectedEndpoint.method] ?? ""
                                     )}
                                 >

@@ -13,7 +13,7 @@ export interface GoogleUserInfo {
 /**
  * Creates a Google OAuth Provider integration
  */
-export function createGoogleProvider(clientId: string): OAuthProvider {
+export function createGoogleProvider(clientId: string): OAuthProvider<{ idToken: string }> {
     const googleClient = new OAuth2Client(clientId);
 
     return {
