@@ -1,8 +1,8 @@
-import { EntityCollection, getDataSourceCapabilities, PostgresCollection, Property, Relation, RelationProperty } from "@rebasepro/types";
+import { EntityCollection, getDataSourceCapabilities, Property, Relation, RelationProperty } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { generateForeignKeyName } from "@rebasepro/utils";
 
-export function sanitizeRelation(relation: Partial<Relation>, sourceCollection: PostgresCollection): Relation {
+export function sanitizeRelation(relation: Partial<Relation>, sourceCollection: EntityCollection): Relation {
     if (!relation.target) {
         throw new Error("Relation is missing a `target` collection.");
     }
@@ -206,7 +206,7 @@ export function resolvePropertyRelation({
 }: {
     propertyKey: string;
     property: Property;
-    sourceCollection: PostgresCollection;
+    sourceCollection: EntityCollection;
 }): Relation | undefined {
     if (property.type !== "relation") return undefined;
 

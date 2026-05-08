@@ -1,7 +1,7 @@
 import { eq, SQL } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { PostgresCollection, Properties, Property, Relation, RelationProperty } from "@rebasepro/types";
+import { EntityCollection, Properties, Property, Relation, RelationProperty } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, findRelation, createRelationRef, DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { DrizzleConditionBuilder } from "./utils/drizzle-conditions";
@@ -87,7 +87,7 @@ export function sanitizeAndConvertDates(obj: unknown): unknown {
 export function serializeDataToServer<M extends Record<string, unknown>>(
     entity: M,
     properties: Properties,
-    collection?: PostgresCollection,
+    collection?: EntityCollection,
     registry?: PostgresCollectionRegistry
 ): SerializedEntityData {
     if (!entity || !properties) return { scalarData: entity ?? {}, inverseRelationUpdates: [], joinPathRelationUpdates: [] };
@@ -268,7 +268,7 @@ export function serializePropertyToServer(value: unknown, property: Property): u
  */
 export async function parseDataFromServer<M extends Record<string, unknown>>(
     data: M,
-    collection: PostgresCollection,
+    collection: EntityCollection,
     db?: NodePgDatabase<Record<string, unknown>>,
     registry?: PostgresCollectionRegistry
 ): Promise<M> {
@@ -441,7 +441,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
 /**
  * Parse a single property value from database format to frontend format
  */
-export function parsePropertyFromServer(value: unknown, property: Property, collection: PostgresCollection, propertyKey?: string): unknown {
+export function parsePropertyFromServer(value: unknown, property: Property, collection: EntityCollection, propertyKey?: string): unknown {
     if (value === null || value === undefined) {
         return value;
     }
@@ -555,7 +555,7 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
 function normalizeScalarValues<M extends Record<string, unknown>>(
     data: M,
     properties: Properties,
-    collection: PostgresCollection,
+    collection: EntityCollection,
     resolvedRelations: Record<string, Relation>,
     options: { skipRelations: boolean }
 ): Record<string, unknown> {
@@ -598,7 +598,7 @@ function normalizeScalarValues<M extends Record<string, unknown>>(
  */
 export function normalizeDbValues<M extends Record<string, unknown>>(
     data: M,
-    collection: PostgresCollection
+    collection: EntityCollection
 ): M {
     const properties = collection.properties;
     if (!data || !properties) return data;
