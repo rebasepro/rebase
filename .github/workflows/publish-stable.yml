@@ -80,7 +80,8 @@ jobs:
           pnpm exec lerna version "${{ steps.version.outputs.version }}" \
             --no-push \
             --yes \
-            --force-publish
+            --force-publish \
+            --sync-workspace-lock=false
 
           # Re-resolve workspace:* links after version bump
           pnpm install --no-frozen-lockfile

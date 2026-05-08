@@ -49,7 +49,7 @@ jobs:
           pnpm config set resolution-worker-threads false
 
           # Update all package versions without creating git tags or commits
-          pnpm exec lerna version "$CANARY_VERSION" --no-git-tag-version --no-push --yes
+          pnpm exec lerna version "$CANARY_VERSION" --no-git-tag-version --no-push --yes --sync-workspace-lock=false
 
           # Re-resolve workspace:* links after version bump so pnpm publish can resolve them
           pnpm install --no-frozen-lockfile

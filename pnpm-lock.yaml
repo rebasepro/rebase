@@ -246,25 +246,25 @@ importers:
         specifier: ^5.2.8
         version: 5.2.8
       '@rebasepro/admin':
-        specifier: ^0.0.1
+        specifier: workspace:*
         version: link:../../packages/admin
       '@rebasepro/auth':
-        specifier: ^0.0.1
+        specifier: workspace:*
         version: link:../../packages/auth
       '@rebasepro/client-firebase':
-        specifier: ^0.0.1
+        specifier: workspace:*
         version: link:../../packages/client-firebase
       '@rebasepro/common':
-        specifier: ^0.0.1
+        specifier: workspace:*
         version: link:../../packages/common
       '@rebasepro/core':
-        specifier: ^0.0.1
+        specifier: workspace:*
         version: link:../../packages/core
       '@rebasepro/types':
-        specifier: ^0.0.1
+        specifier: workspace:*
         version: link:../../packages/types
       '@rebasepro/ui':
-        specifier: ^0.0.1
+        specifier: workspace:*
         version: link:../../packages/ui
       firebase:
         specifier: ^12.9.0
@@ -343,7 +343,7 @@ importers:
   examples/sdk-demo:
     dependencies:
       '@rebasepro/client':
-        specifier: ^0.0.1
+        specifier: workspace:*
         version: link:../../packages/client
       react:
         specifier: ^19.2.4
