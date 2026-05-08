@@ -85,7 +85,7 @@ export class PostgresBackendDriver implements DataDriver {
      */
     get admin(): DatabaseAdmin {
         return {
-            executeSql: (...args: Parameters<DatabaseAdmin["executeSql"]>) => this.executeSql(...args),
+            executeSql: (...args: Parameters<NonNullable<DatabaseAdmin["executeSql"]>>) => this.executeSql(...args),
             fetchAvailableDatabases: () => this.fetchAvailableDatabases(),
             fetchAvailableRoles: () => this.fetchAvailableRoles(),
             fetchCurrentDatabase: () => this.fetchCurrentDatabase(),

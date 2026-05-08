@@ -497,4 +497,77 @@ describe("batchFetchRelatedEntitiesMany: M2M through junction table regression",
             consoleSpy.mockRestore();
         });
     });
+
+    // ━━━ ID type coercion (number vs string) ━━━━━━━━━━━━━━━━━━━━━━━━━
+    // Drizzle may return junction column values as strings even when the
+    // parent IDs are numeric.  The batch handler must not silently drop
+    // results due to `===` mismatches (the original parsedParentIds.includes
+    // bug).
+
+    describe("ID type coercion", () => {
+        it("owning M2M: should map results when junction returns string IDs but parent IDs are numbers", async () => {
+            // Junction data returns post_id as STRING, but we passed numeric parent IDs
+            const junctionRows = [
+                { posts_tags: { post_id: "1", tag_id: "5" }, tags: { id: 5, name: "Rust" } },
+                { posts_tags: { post_id: "2", tag_id: "5" }, tags: { id: 5, name: "Rust" } },
+            ];
+
+            const { db } = createMockDb(() => junctionRows);
+            const service = new RelationService(db, registry);
+            const relation = postsCollection.relations![0] as Relation;
+
+            // Pass numeric parent IDs (parseIdValues will return numbers for numeric PKs)
+            const results = await service.batchFetchRelatedEntitiesMany(
+                "posts", [1, 2], "tags", relation
+            );
+
+            // Both posts should have their tag despite the string/number mismatch
+            expect(results.get("1")).toHaveLength(1);
+            expect(results.get("1")![0].values.name).toBe("Rust");
+            expect(results.get("2")).toHaveLength(1);
+        });
+
+        it("inverse M2M: should map results when junction returns string IDs but parent IDs are numbers", async () => {
+            // Junction data returns tag_id (the parentId for inverse) as STRING
+            const joinedRows = [
+                { posts_tags: { post_id: 10, tag_id: "1" }, posts: { id: 10, title: "Post A" } },
+                { posts_tags: { post_id: 20, tag_id: "2" }, posts: { id: 20, title: "Post B" } },
+            ];
+
+            const { db } = createMockDb(() => joinedRows);
+            const service = new RelationService(db, registry);
+            const relation = tagsWithInversePosts.relations![0] as Relation;
+
+            // Pass numeric parent IDs
+            const results = await service.batchFetchRelatedEntitiesMany(
+                "tags_inv", [1, 2], "posts", relation
+            );
+
+            // Both tags should have their post despite string/number mismatch
+            expect(results.get("1")).toHaveLength(1);
+            expect(results.get("1")![0].values.title).toBe("Post A");
+            expect(results.get("2")).toHaveLength(1);
+            expect(results.get("2")![0].values.title).toBe("Post B");
+        });
+
+        it("owning M2M: should handle mixed string and number IDs in same batch", async () => {
+            // Some junction rows return numbers, others return strings
+            const junctionRows = [
+                { posts_tags: { post_id: 1, tag_id: 1 }, tags: { id: 1, name: "TypeScript" } },
+                { posts_tags: { post_id: "2", tag_id: "2" }, tags: { id: 2, name: "React" } },
+            ];
+
+            const { db } = createMockDb(() => junctionRows);
+            const service = new RelationService(db, registry);
+            const relation = postsCollection.relations![0] as Relation;
+
+            const results = await service.batchFetchRelatedEntitiesMany(
+                "posts", [1, 2], "tags", relation
+            );
+
+            expect(results.get("1")).toHaveLength(1);
+            expect(results.get("2")).toHaveLength(1);
+        });
+    });
 });
+

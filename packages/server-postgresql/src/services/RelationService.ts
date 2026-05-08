@@ -435,6 +435,11 @@ export class RelationService {
         const results = await query;
         const resultMap = new Map<string, Entity<Record<string, unknown>>>();
 
+        // Build a Set<string> for O(1) parent-ID lookups that is immune to
+        // number-vs-string type mismatches (Drizzle may return either depending
+        // on the column type and driver).
+        const parentIdSet = new Set(parsedParentIds.map(String));
+
         // Map results back to parent entities
         for (const row of results as Array<Record<string, unknown>>) {
             const targetEntity = (row[getTableName(targetCollection)] || row) as Record<string, unknown>;
@@ -449,7 +454,7 @@ export class RelationService {
                 parentId = targetEntity[inferredForeignKeyName] as string | number | undefined;
             }
 
-            if (parentId !== undefined && parsedParentIds.includes(parentId)) {
+            if (parentId !== undefined && parentIdSet.has(String(parentId))) {
                 const parsedValues = await parseDataFromServer(targetEntity, targetCollection);
                 resultMap.set(String(parentId), {
                     id: String(targetEntity[targetIdInfo.fieldName]),
@@ -608,6 +613,11 @@ export class RelationService {
         const results = await query;
         const resultMap = new Map<string, Entity<Record<string, unknown>>[]>();
 
+        // Build a Set<string> for O(1) parent-ID lookups that is immune to
+        // number-vs-string type mismatches (Drizzle may return either depending
+        // on the column type and driver).
+        const parentIdSet = new Set(parsedParentIds.map(String));
+
         for (const row of results as Array<Record<string, unknown>>) {
             const targetEntity = (row[getTableName(targetCollection)] || row) as Record<string, unknown>;
 
@@ -625,7 +635,7 @@ export class RelationService {
                 parentId = targetEntity[inferredForeignKeyName] as string | number | undefined;
             }
 
-            if (parentId !== undefined && parsedParentIds.includes(parentId)) {
+            if (parentId !== undefined && parentIdSet.has(String(parentId))) {
                 const parsedValues = await parseDataFromServer(targetEntity, targetCollection);
                 const key = String(parentId);
                 const arr = resultMap.get(key) || [];
@@ -764,6 +774,10 @@ export class RelationService {
                         await tx.insert(junctionTable).values(newLinks);
                     }
                 }
+            } else if (relation.through && relation.cardinality === "many" && relation.direction === "inverse") {
+                // Inverse M2M relations should be saved from the owning side.
+                // The owning collection manages the junction table rows.
+                console.warn(`[updateRelationsUsingJoins] Inverse M2M relation '${key}' in collection '${collection.slug}' should be saved from the owning side. Skipping.`);
             } else if (relation.cardinality === "many" && relation.direction === "inverse" && relation.foreignKeyOnTarget) {
                 // Handle one-to-many (inverse) by updating target FK to point to parent
                 const targetTable = getTableForCollection(targetCollection, this.registry);
