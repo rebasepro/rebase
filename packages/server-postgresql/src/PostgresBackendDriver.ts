@@ -76,15 +76,21 @@ export class PostgresBackendDriver implements DataDriver {
             this.branchService = new BranchService(db, poolManager);
         }
 
-        // Expose SQL + schema + branch admin capabilities via the typed `admin` property.
-        // The individual methods on `this` are kept for backwards compatibility.
-        this.admin = {
-            executeSql: this.executeSql.bind(this),
-            fetchAvailableDatabases: this.fetchAvailableDatabases.bind(this),
-            fetchAvailableRoles: this.fetchAvailableRoles.bind(this),
-            fetchCurrentDatabase: this.fetchCurrentDatabase.bind(this),
-            fetchUnmappedTables: this.fetchUnmappedTables.bind(this),
-            fetchTableMetadata: this.fetchTableMetadata.bind(this),
+    }
+
+    /**
+     * Typed admin capabilities (SQLAdmin + SchemaAdmin + BranchAdmin).
+     * Implemented as a getter so method references are resolved at call-time,
+     * allowing test spies applied after construction to take effect.
+     */
+    get admin(): DatabaseAdmin {
+        return {
+            executeSql: (...args: Parameters<DatabaseAdmin["executeSql"]>) => this.executeSql(...args),
+            fetchAvailableDatabases: () => this.fetchAvailableDatabases(),
+            fetchAvailableRoles: () => this.fetchAvailableRoles(),
+            fetchCurrentDatabase: () => this.fetchCurrentDatabase(),
+            fetchUnmappedTables: (...args: Parameters<NonNullable<DatabaseAdmin["fetchUnmappedTables"]>>) => this.fetchUnmappedTables(...args),
+            fetchTableMetadata: (...args: Parameters<NonNullable<DatabaseAdmin["fetchTableMetadata"]>>) => this.fetchTableMetadata(...args),
             // Branch operations (only available when poolManager is configured)
             ...(this.branchService ? {
                 createBranch: this.branchService.createBranch.bind(this.branchService),
@@ -94,11 +100,6 @@ export class PostgresBackendDriver implements DataDriver {
             } : {})
         };
     }
-
-    /**
-     * Typed admin capabilities (SQLAdmin + SchemaAdmin + BranchAdmin).
-     */
-    admin: DatabaseAdmin;
 
 
     private resolveCollectionCallbacks<M extends Record<string, unknown>>(collection: EntityCollection<M> | undefined, path: string) {

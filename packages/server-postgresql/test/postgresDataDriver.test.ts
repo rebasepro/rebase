@@ -362,7 +362,7 @@ email: "test@example.com" });
             const result = await authDelegate.admin.executeSql("SELECT 1");
 
             expect(mockDb.transaction).not.toHaveBeenCalled();
-            expect(delegate.executeSql).toHaveBeenCalledWith("SELECT 1", undefined);
+            expect(delegate.executeSql).toHaveBeenCalledWith("SELECT 1");
             expect(result).toEqual([{ id: 1 }]);
         });
 
