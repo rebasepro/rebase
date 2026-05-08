@@ -59,7 +59,7 @@ export function useBuildCollectionRegistryController(props: {
         };
         // Preserve subcollections if they exist
         if (subcollections && "subcollections" in result) {
-            (result as any).subcollections = (result as any).subcollections ?? subcollections;
+            (result as Record<string, unknown>).subcollections = (result as Record<string, unknown>).subcollections ?? subcollections;
         }
 
         return { ...overriddenCollection,
@@ -100,7 +100,7 @@ export function useBuildCollectionRegistryController(props: {
         }
         const cleanedPath = removeInitialAndTrailingSlashes(path);
         const strings = cleanedPath.split("/");
-        const oddPathSegments = strings.filter((_: any, i: number) => i % 2 === 0);
+        const oddPathSegments = strings.filter((_, i) => i % 2 === 0);
         oddPathSegments.pop();
 
         const result: string[][] = [];

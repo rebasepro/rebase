@@ -37,7 +37,8 @@ import {
     useFirebaseAuthController,
     useFirebaseStorageSource,
     useFirestoreDriver,
-    useInitialiseFirebase
+    useInitialiseFirebase,
+    useBuildUserManagement
 } from "../hooks";
 
 import { FirebaseAuthController } from "../types";
@@ -178,6 +179,13 @@ export function RebaseFirebaseApp({
         collectionRegistryController
     });
 
+    const defaultUserManagement = useBuildUserManagement({
+        authController,
+        dataSourceDelegate: firestoreDelegate
+    });
+    
+    const activeUserManagement = userManagement ?? defaultUserManagement;
+
     const navigationStateController = useBuildNavigationStateController({
         collections,
         views,
@@ -188,7 +196,7 @@ export function RebaseFirebaseApp({
         collectionRegistryController,
         urlController,
         adminMode: adminModeController.mode,
-        userManagement
+        userManagement: activeUserManagement as any
     });
 
     if (firebaseConfigLoading || !firebaseApp || loading) {
@@ -215,7 +223,7 @@ export function RebaseFirebaseApp({
                         dateTimeFormat={dateTimeFormat}
                         driver={firestoreDelegate}
                         storageSource={storageSource}
-                        userManagement={userManagement}
+                        userManagement={activeUserManagement}
                         entityLinkBuilder={({ entity }: { entity: Entity<any> }) => `https://console.firebase.google.com/project/${firebaseApp.options.projectId}/firestore/data/${entity.path}/${entity.id}`}
                         locale={locale}
                         onAnalyticsEvent={onAnalyticsEvent}

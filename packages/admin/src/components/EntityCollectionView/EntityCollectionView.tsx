@@ -920,8 +920,6 @@ export const EntityCollectionView = React.memo(
                 selectionController={usedSelectionController}
                 selectionEnabled={selectionEnabled}
                 highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
-                onScroll={tableController.onScroll}
-                initialScroll={tableController.initialScroll}
                 size={listSize}
                 emptyComponent={emptyComponent}
             />
@@ -1033,8 +1031,6 @@ export const EntityCollectionView = React.memo(
                                     selectionController={usedSelectionController}
                                     selectionEnabled={selectionEnabled}
                                     highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
-                                    onScroll={tableController.onScroll}
-                                    initialScroll={tableController.initialScroll}
                                     size={listSize}
                                     emptyComponent={emptyComponent}
                                     selectedEntityId={selectedEntityIdProp}

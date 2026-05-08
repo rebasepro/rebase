@@ -44,9 +44,9 @@ const ordersCollection: PostgresCollection = {
             relation: {
                 relationName: "customer",
                 cardinality: "one",
-                direction: "owning"
-            },
-            target: () => customersCollection
+                direction: "owning",
+                target: () => customersCollection
+            }
         },
         status: {
             name: "Status",

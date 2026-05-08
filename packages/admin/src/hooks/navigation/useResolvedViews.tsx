@@ -35,7 +35,7 @@ export type UseResolvedViewsProps<USER extends User> = {
     plugins?: RebasePlugin[];
     adminMode?: "content" | "studio" | "settings";
     effectiveRoleController?: EffectiveRoleController;
-    userManagement?: UserManagementDelegate;
+    userManagement?: UserManagementDelegate<USER>;
 };
 
 export type UseResolvedViewsResult = {

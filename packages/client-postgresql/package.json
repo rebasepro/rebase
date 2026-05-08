@@ -21,14 +21,12 @@
         "node": ">=14"
     },
     "keywords": [
-        "firebase",
-        "cms",
-        "admin",
-        "admin panel",
+        "rebase",
         "postgresql",
         "database",
-        "rebase",
-        "client"
+        "client",
+        "typescript",
+        "admin"
     ],
     "scripts": {
         "watch": "vite build --watch",

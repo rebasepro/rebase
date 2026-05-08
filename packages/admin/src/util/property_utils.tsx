@@ -7,6 +7,7 @@ import { isPropertyBuilder } from "@rebasepro/common";
 import { iconSize } from "@rebasepro/ui";
 import type { IconSize } from "@rebasepro/ui";
 import { CircleIcon, FlagIcon, FunctionSquareIcon, GlobeIcon, TextIcon, Rows3Icon, LinkIcon, VoteIcon, MailIcon, HashIcon, RepeatIcon, CalendarIcon, AlignLeftIcon, UploadIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 /**
  * Resolve a size value (string token or number) to a numeric pixel value
@@ -50,43 +51,43 @@ export function getIconForWidget(widget: PropertyConfig | undefined,
 }
 
 /**
- * Returns a default icon component based on property type.
+ * Returns a default Lucide icon component based on property type.
  * This provides a sensible fallback when no PropertyConfig is available.
  */
-function getDefaultIconForProperty(property: Property): React.ComponentType<{ size: number }> {
+function getDefaultIconForProperty(property: Property): LucideIcon {
     switch (property.type) {
         case "string": {
-            if (property.storage) return UploadIcon as any;
-            if (property.url) return GlobeIcon as any;
-            if (property.email) return MailIcon as any;
-            if (property.multiline || property.markdown) return AlignLeftIcon as any;
-            if (property.reference) return LinkIcon as any;
-            return TextIcon as any;
+            if (property.storage) return UploadIcon;
+            if (property.url) return GlobeIcon;
+            if (property.email) return MailIcon;
+            if (property.multiline || property.markdown) return AlignLeftIcon;
+            if (property.reference) return LinkIcon;
+            return TextIcon;
         }
         case "number":
-            return HashIcon as any;
+            return HashIcon;
         case "boolean":
-            return FlagIcon as any;
+            return FlagIcon;
         case "date":
-            return CalendarIcon as any;
+            return CalendarIcon;
         case "map":
-            return VoteIcon as any;
+            return VoteIcon;
         case "array": {
             const of = property.of;
             const oneOf = property.oneOf;
-            if (oneOf) return Rows3Icon as any;
+            if (oneOf) return Rows3Icon;
             if (of && !Array.isArray(of)) {
-                if (of.type === "reference") return LinkIcon as any;
-                if (of.type === "string" && of.storage) return UploadIcon as any;
+                if (of.type === "reference") return LinkIcon;
+                if (of.type === "string" && of.storage) return UploadIcon;
             }
-            return RepeatIcon as any;
+            return RepeatIcon;
         }
         case "reference":
-            return LinkIcon as any;
+            return LinkIcon;
         case "relation":
-            return LinkIcon as any;
+            return LinkIcon;
         default:
-            return CircleIcon as any;
+            return CircleIcon;
     }
 }
 

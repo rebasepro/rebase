@@ -1,6 +1,6 @@
 import { useUrlController } from "./_cms_internals";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Entity, EntityCollection, Property, TableMetadata, User } from "@rebasepro/types";
+import { Entity, EntityCollection, Property, TableMetadata, User, isPostgresCollection } from "@rebasepro/types";
 import { deepEqual as equal } from "fast-equals";
 
 import { CollectionsConfigController } from "./types/config_controller";
@@ -81,7 +81,7 @@ export const ConfigControllerProvider = React.memo(
 
         useEffect(() => {
             if (!databaseAdmin?.fetchUnmappedTables || authController.initialLoading || !authController.user) return;
-            const existingPaths = (collectionConfigController.collections ?? []).map(c => (c as any).table ?? c.slug ?? "").filter(Boolean);
+            const existingPaths = (collectionConfigController.collections ?? []).map(c => isPostgresCollection(c) ? c.table ?? c.slug ?? "" : c.slug ?? "").filter(Boolean);
             databaseAdmin.fetchUnmappedTables(existingPaths)
                 .then((tables: string[]) => setUnmappedTables(tables))
                 .catch((e: unknown) => console.warn("Could not fetch unmapped tables:", e));

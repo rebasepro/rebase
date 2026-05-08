@@ -47,11 +47,12 @@ const description = "Define your schema once in TypeScript. Get a production-rea
 
                 <!-- CTAs -->
                 <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-x-5 animate-on-scroll fade-in-up">
-                    <a href="/waitlist"
+                    <a href="https://demo.rebase.pro"
                        data-track
                        id="hero-start-building"
+                       target="_blank" rel="noopener noreferrer"
                        class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-8 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-primary-dark transition-all duration-200 ease-in-out btn-glow">
-                        Start Building
+                        Try the Demo
                         
 <svg
   class="lucide lucide-arrow-right"
@@ -594,15 +595,15 @@ const description = "Define your schema once in TypeScript. Get a production-rea
                         </div>
                     </div>
 
-                    <!-- Right: Placeholder for screenshots -->
-                    <div class="relative animate-on-scroll fade-in-up delay-100 lg:h-[600px] flex items-center justify-center mt-12 lg:mt-0">
+                    <!-- Right: Stacked app mockups -->
+                    <div class="relative animate-on-scroll fade-in-up delay-100 flex items-center justify-center mt-12 lg:mt-0">
                         <!-- Background glow -->
                         <div class="absolute inset-0 bg-gradient-to-tr from-primary/20 to-surface-800/20 blur-3xl rounded-full opacity-50"></div>
                         
                         <div class="relative w-full max-w-lg">
-                            <!-- Top screenshot (App) -->
-                            <div class="relative z-20 rounded-2xl overflow-hidden ring-1 ring-white/10 bg-surface-950/80 backdrop-blur-sm shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col justify-between min-h-[350px] mb-[-80px] w-5/6 mr-auto transform transition-transform hover:-translate-y-2 duration-500">
-                                <div class="px-4 py-3 border-b border-white/5 flex items-center gap-2 bg-surface-900/50">
+                            <!-- Top screenshot (App) — with fake job listing rows -->
+                            <div class="relative z-20 rounded-2xl overflow-hidden ring-1 ring-white/10 bg-surface-950/80 backdrop-blur-sm shadow-[0_20px_50px_rgba(0,0,0,0.5)] mb-[-60px] w-5/6 mr-auto transform transition-transform hover:-translate-y-2 duration-500">
+                                <div class="px-4 py-2.5 border-b border-white/5 flex items-center gap-2 bg-surface-900/50">
                                     <div class="flex gap-1.5">
                                         <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
                                         <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
@@ -610,33 +611,42 @@ const description = "Define your schema once in TypeScript. Get a production-rea
                                     </div>
                                     <div class="ml-4 text-xs font-mono text-surface-500">talent.sustentalent.com</div>
                                 </div>
-                                <div class="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gradient-to-b from-surface-900/50 to-transparent">
-                                    
-<svg
-  class="lucide lucide-store"
-  xmlns="http://www.w3.org/2000/svg"
-  width="24"
-  height="24"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5" />
-  <path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244" />
-  <path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05" />
-</svg>
-
-                                    <span class="text-surface-300 font-medium font-sans text-base">Frontend App</span>
-                                    <span class="text-surface-500 font-mono text-xs mt-2">Next.js / Tailwind</span>
+                                <!-- Fake app content -->
+                                <div class="p-4 space-y-3 bg-gradient-to-b from-surface-900/50 to-transparent">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-sm font-semibold text-white">Open Positions</span>
+                                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20">12 new</span>
+                                    </div>
+                                    <div class="rounded-lg border border-white/5 bg-surface-900/60 p-3 flex items-center gap-3">
+                                        <div class="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-none"><span class="text-primary text-xs font-bold">ST</span></div>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="text-xs font-medium text-white truncate">Sustainability Analyst</div>
+                                            <div class="text-[10px] text-surface-500">Berlin · Full-time</div>
+                                        </div>
+                                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary ring-1 ring-primary/20">New</span>
+                                    </div>
+                                    <div class="rounded-lg border border-white/5 bg-surface-900/60 p-3 flex items-center gap-3">
+                                        <div class="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-none"><span class="text-emerald-400 text-xs font-bold">EC</span></div>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="text-xs font-medium text-white truncate">ESG Compliance Lead</div>
+                                            <div class="text-[10px] text-surface-500">Remote · Contract</div>
+                                        </div>
+                                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20">Closing</span>
+                                    </div>
+                                    <div class="rounded-lg border border-white/5 bg-surface-900/60 p-3 flex items-center gap-3">
+                                        <div class="h-8 w-8 rounded-lg bg-violet-500/10 flex items-center justify-center flex-none"><span class="text-violet-400 text-xs font-bold">GE</span></div>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="text-xs font-medium text-white truncate">Green Energy PM</div>
+                                            <div class="text-[10px] text-surface-500">Milan · Full-time</div>
+                                        </div>
+                                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary ring-1 ring-primary/20">New</span>
+                                    </div>
                                 </div>
                             </div>
 
-                            <!-- Bottom screenshot (Admin Panel) -->
-                            <div class="relative z-10 rounded-2xl overflow-hidden ring-1 ring-white/10 bg-surface-900/90 backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col justify-between min-h-[300px] w-[90%] ml-auto transform transition-transform hover:translate-x-2 duration-500">
-                                <div class="px-4 py-3 border-b border-white/5 flex items-center gap-2 bg-surface-950/50">
+                            <!-- Bottom screenshot (Admin Panel) — with fake admin table rows -->
+                            <div class="relative z-10 rounded-2xl overflow-hidden ring-1 ring-white/10 bg-surface-900/90 backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.5)] w-[90%] ml-auto transform transition-transform hover:translate-x-2 duration-500">
+                                <div class="px-4 py-2.5 border-b border-white/5 flex items-center gap-2 bg-surface-950/50">
                                     <div class="flex gap-1.5">
                                         <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
                                         <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
@@ -644,27 +654,28 @@ const description = "Define your schema once in TypeScript. Get a production-rea
                                     </div>
                                     <div class="ml-4 text-xs font-mono text-surface-500">admin.sustentalent.com</div>
                                 </div>
-                                <div class="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gradient-to-t from-surface-950/50 to-transparent">
-                                    
-<svg
-  class="lucide lucide-shield-alert"
-  xmlns="http://www.w3.org/2000/svg"
-  width="24"
-  height="24"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
-  <path d="M12 8v4" />
-  <path d="M12 16h.01" />
-</svg>
-
-                                    <span class="text-surface-400 font-medium font-sans text-base">Rebase Admin Panel</span>
-                                    <span class="text-surface-600 font-mono text-xs mt-2">Auto-generated backend</span>
+                                <!-- Fake admin table -->
+                                <div class="bg-gradient-to-t from-surface-950/50 to-transparent">
+                                    <div class="px-4 py-2 flex items-center gap-4 text-[10px] font-medium text-surface-500 border-b border-white/5 bg-surface-950/30">
+                                        <span class="w-24">Company</span>
+                                        <span class="flex-1">Status</span>
+                                        <span class="w-16 text-right">Jobs</span>
+                                    </div>
+                                    <div class="px-4 py-2.5 flex items-center gap-4 border-b border-white/5">
+                                        <span class="w-24 text-xs text-white truncate">EcoVentures</span>
+                                        <span class="flex-1"><span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">Verified</span></span>
+                                        <span class="w-16 text-right text-xs text-surface-400">24</span>
+                                    </div>
+                                    <div class="px-4 py-2.5 flex items-center gap-4 border-b border-white/5">
+                                        <span class="w-24 text-xs text-white truncate">GreenTech AG</span>
+                                        <span class="flex-1"><span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">Pending</span></span>
+                                        <span class="w-16 text-right text-xs text-surface-400">8</span>
+                                    </div>
+                                    <div class="px-4 py-2.5 flex items-center gap-4">
+                                        <span class="w-24 text-xs text-white truncate">SolarWind EU</span>
+                                        <span class="flex-1"><span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">Verified</span></span>
+                                        <span class="w-16 text-right text-xs text-surface-400">15</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -680,7 +691,7 @@ const description = "Define your schema once in TypeScript. Get a production-rea
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
                     <!-- Punch 1: Your database, your rules -->
-                    <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-10 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 flex flex-col justify-between min-h-[380px]">
+                    <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-10 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 flex flex-col justify-between animate-on-scroll fade-in-up">
                         <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%);"></div>
                         <div class="relative z-10">
                             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-6">
@@ -737,7 +748,7 @@ const description = "Define your schema once in TypeScript. Get a production-rea
                     </div>
 
                     <!-- Punch 2: Code you own, deploy anywhere -->
-                    <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-10 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 flex flex-col justify-between min-h-[380px]">
+                    <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-10 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 flex flex-col justify-between animate-on-scroll fade-in-up delay-100">
                         <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%);"></div>
                         <div class="relative z-10">
                             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-6">
@@ -815,11 +826,11 @@ const description = "Define your schema once in TypeScript. Get a production-rea
                     <p class="mt-4 text-surface-400 text-lg leading-relaxed">Production-grade features, all driven by your TypeScript schema. Every view updates in real time.</p>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-5 max-w-5xl mx-auto">
                     <!-- Kanban board views -->
-                    <div class="lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up">
+                    <div class="md:col-span-2 lg:col-span-4 group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up">
                         <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                        <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
+                        <div class="relative z-10 flex flex-col aspect-[5/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
                             <!-- Window controls -->
                             <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
                                 <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
@@ -862,7 +873,7 @@ const description = "Define your schema once in TypeScript. Get a production-rea
                     </div>
 
                     <!-- Data history & audit -->
-                    <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up">
+                    <div class="lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-100">
                         <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
                         <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 border-b border-surface-800/80">
                             <!-- Window controls -->
@@ -910,7 +921,7 @@ const description = "Define your schema once in TypeScript. Get a production-rea
                     </div>
 
                     <!-- Import & export -->
-                    <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up">
+                    <div class="lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-200">
                         <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
                         <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 border-b border-surface-800/80">
                             <!-- Window controls -->
@@ -963,9 +974,9 @@ const description = "Define your schema once in TypeScript. Get a production-rea
                     </div>
 
                     <!-- Instant REST & GraphQL -->
-                    <div class="lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up">
+                    <div class="md:col-span-2 lg:col-span-4 group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-100">
                         <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                        <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
+                        <div class="relative z-10 flex flex-col aspect-[5/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
                             <!-- Window controls -->
                             <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
                                 <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
@@ -1009,7 +1020,7 @@ const description = "Define your schema once in TypeScript. Get a production-rea
                     </div>
 
                     <!-- TypeScript SDK -->
-                    <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up">
+                    <div class="lg:col-span-3 group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-200">
                         <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
                         <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
                             <!-- Window controls -->
@@ -1054,7 +1065,7 @@ const description = "Define your schema once in TypeScript. Get a production-rea
                     </div>
 
                     <!-- Real-time everywhere -->
-                    <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up">
+                    <div class="lg:col-span-3 group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-300">
                         <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
                         <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
                             <!-- Window controls -->
@@ -1217,11 +1228,12 @@ const description = "Define your schema once in TypeScript. Get a production-rea
                     </div>
                 </div>
                 <div class="flex flex-wrap items-center justify-center gap-4 animate-on-scroll fade-in-up delay-100">
-                    <a href="/waitlist"
+                    <a href="https://demo.rebase.pro"
                        data-track
                        id="cta-try-rebase"
+                       target="_blank" rel="noopener noreferrer"
                        class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-200 ease-in-out btn-glow">
-                        Start Building
+                        Try the Demo
                         
 <svg
   class="lucide lucide-arrow-right"

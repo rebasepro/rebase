@@ -21,15 +21,15 @@
         "node": ">=14"
     },
     "keywords": [
-        "firebase",
+        "rebase",
         "cms",
         "admin",
         "admin panel",
-        "firebase panel",
-        "firestore",
+        "typescript",
         "headless",
         "headless cms",
-        "content manager"
+        "content manager",
+        "react"
     ],
     "exports": {
         ".": {

@@ -1,4 +1,5 @@
-import type { NavigationEntry } from "@rebasepro/types";
+import type { NavigationEntry, EntityCollection } from "@rebasepro/types";
+import { isPostgresCollection } from "@rebasepro/types";
 import { useNavigate } from "react-router-dom";
 ;
 import { IconButton, Tooltip } from "@rebasepro/ui";
@@ -83,7 +84,7 @@ export function NavigationCardBinding({
         context
     });
 
-    if ((collection as any)?.isTableMissing) {
+    if (collection && isPostgresCollection(collection) && collection.isTableMissing) {
         actionsArray.unshift(
             <Tooltip key="warning" title={`Table mapped to "${collection?.slug || collection?.name}" is missing in the database. Run migrations.`}>
                 <div>

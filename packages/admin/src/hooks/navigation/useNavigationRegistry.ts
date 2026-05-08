@@ -52,7 +52,7 @@ export function useNavigationRegistry(userConfigPersistence?: UserConfigurationP
             callbacks: result?.callbacks ?? callbacks
         };
         if (subcollections && "subcollections" in result) {
-            (result as any).subcollections = (result as any).subcollections ?? subcollections;
+            (result as Record<string, unknown>).subcollections = (result as Record<string, unknown>).subcollections ?? subcollections;
         }
 
         return { ...overriddenCollection,

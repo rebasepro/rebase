@@ -16,6 +16,8 @@
         "@rebasepro/core": "workspace:*",
         "@rebasepro/types": "workspace:*",
         "@rebasepro/ui": "workspace:*",
+        "@rebasepro/utils": "workspace:^",
+        "react-fast-compare": "3.2.2",
         "react-router-dom": "^7.13.1"
     },
     "peerDependencies": {

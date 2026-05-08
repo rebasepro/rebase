@@ -118,7 +118,7 @@ export type RebaseProps<USER extends User> = {
      * If you are using the Rebase user management plugin, this
      * prop will be implemented automatically.
      */
-    userManagement?: UserManagementDelegate;
+    userManagement?: UserManagementDelegate<USER>;
 
     /**
      * Plugins loaded in the CMS

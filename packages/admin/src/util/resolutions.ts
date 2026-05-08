@@ -14,7 +14,7 @@ const BUILTIN_ENTITY_VIEWS: Record<string, EntityCustomView> = {
     "__rebase_history": {
         key: "__rebase_history",
         name: "History",
-        tabComponent: React.createElement(HistoryIcon as any, { size: 20 }),
+        tabComponent: React.createElement(HistoryIcon, { size: 20 }),
         Builder: EntityHistoryView,
         position: "end"
     }

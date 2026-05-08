@@ -6,15 +6,11 @@
         "access": "public"
     },
     "keywords": [
-        "firebase",
-        "cms",
-        "admin",
-        "admin panel",
-        "firebase panel",
-        "firestore",
-        "headless",
-        "headless cms",
-        "content manager"
+        "rebase",
+        "forms",
+        "typescript",
+        "react",
+        "admin"
     ],
     "exports": {
         ".": {

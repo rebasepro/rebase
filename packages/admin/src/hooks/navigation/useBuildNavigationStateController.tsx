@@ -25,7 +25,7 @@ export type BuildNavigationStateProps<EC extends EntityCollection, USER extends 
     urlController: UrlController;
     adminMode?: "content" | "studio" | "settings";
     effectiveRoleController?: EffectiveRoleController;
-    userManagement?: UserManagementDelegate;
+    userManagement?: UserManagementDelegate<USER>;
 };
 
 /**

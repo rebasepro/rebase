@@ -2,7 +2,7 @@
     "name": "@rebasepro/types",
     "type": "module",
     "version": "0.0.1-canary.4d4fb3e",
-    "description": "Rebase type definitions — shared interfaces and controller types",
+    "description": "Rebase type definitions \u2014 shared interfaces and controller types",
     "funding": {
         "url": "https://github.com/sponsors/rebaseco"
     },
@@ -21,12 +21,10 @@
         "node": ">=14"
     },
     "keywords": [
-        "firebase",
+        "rebase",
         "cms",
         "admin",
-        "admin panel",
-        "firebase panel",
-        "firestore",
+        "typescript",
         "headless",
         "headless cms",
         "content manager"
@@ -97,7 +95,9 @@
             "node"
         ],
         "testEnvironment": "node",
-        "testPathIgnorePatterns": ["/bivariance/"],
+        "testPathIgnorePatterns": [
+            "/bivariance/"
+        ],
         "moduleNameMapper": {
             "\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js"
         }

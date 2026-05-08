@@ -163,7 +163,7 @@ export type RebaseFirebaseAppProps = {
     /**
      * Delegate for user and role management. Provides the admin views if specified.
      */
-    userManagement?: UserManagementDelegate;
+    userManagement?: UserManagementDelegate<FirebaseUserWrapper>;
 
 };
 

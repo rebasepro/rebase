@@ -19,10 +19,11 @@ function toPascalCase(str: string): string {
     return str.split(/[-_]/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('');
 }
 
-function resolveIcon(iconKey: string): React.ComponentType<any> | null {
-    let icon = (lucideIcons as any)[iconKey];
+function resolveIcon(iconKey: string): React.ComponentType<{ size: number }> | null {
+    const allIcons = lucideIcons as Record<string, React.ComponentType<{ size: number }>>;
+    let icon = allIcons[iconKey];
     if (!icon) {
-        icon = (lucideIcons as any)[toPascalCase(iconKey)];
+        icon = allIcons[toPascalCase(iconKey)];
     }
     return icon ?? null;
 }
