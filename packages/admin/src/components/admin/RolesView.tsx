@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { useCollectionRegistryController } from "../../index";
 import { useSnackbarController, useTranslation } from "@rebasepro/core";
-import { isPostgresCollection, Role, SecurityRule, UserManagementDelegate } from "@rebasepro/types";
+import { getDataSourceCapabilities, Role, SecurityRule, UserManagementDelegate } from "@rebasepro/types";
 import { useBreadcrumbsController } from "../../index";
 import { Button, Chip, Container, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Paper, Table, TableBody, TableCell, TableHeader, TableRow, TextField, Typography, CircularProgress, CenteredView, Tooltip, Checkbox, LoadingButton, defaultBorderMixin , iconSize } from "@rebasepro/ui";
 import { PlusIcon, Trash2Icon } from "lucide-react";
@@ -386,7 +386,8 @@ function CollectionPermissionsMatrix({ roleId, isAdmin }: { roleId: string; isAd
                     </TableHeader>
                     <TableBody>
                         {topLevel.map((collection) => {
-                            const rules = isPostgresCollection(collection) ? collection.securityRules : undefined;
+                            const capabilities = getDataSourceCapabilities(collection.driver);
+                            const rules = capabilities.supportsRLS && 'securityRules' in collection ? collection.securityRules : undefined;
                             const noRules = !rules || rules.length === 0;
                             return (
                                 <TableRow key={collection.slug}>

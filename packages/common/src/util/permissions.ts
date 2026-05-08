@@ -1,4 +1,4 @@
-import { AuthController, Entity, EntityCollection, isPostgresCollection, SecurityRule, User } from "@rebasepro/types";
+import { AuthController, Entity, EntityCollection, getDataSourceCapabilities, SecurityRule, User } from "@rebasepro/types";
 
 function evaluateAST<USER extends User, M extends Record<string, unknown>>(sqlString: string, auth: AuthController<USER>, entity: Entity<M> | null): boolean {
     // This is a client-side SQL evaluator used *only* for optimistic UI updates.
@@ -141,7 +141,7 @@ function checkOperation<M extends Record<string, unknown>, USER extends User>(
     entity: Entity<M> | null,
     targetOperation: "select" | "insert" | "update" | "delete"
 ): boolean {
-    const securityRules = isPostgresCollection(collection) ? collection.securityRules : undefined;
+    const securityRules = getDataSourceCapabilities(collection.driver).supportsRLS ? collection.securityRules : undefined;
     if (!securityRules || securityRules.length === 0) {
         // According to our plan: Postgres RLS implicitly denies if enabled without rules.
         // But for Rebase we default to true if securityRules is undefined,

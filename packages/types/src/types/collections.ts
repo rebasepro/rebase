@@ -437,15 +437,34 @@ export interface FirebaseCollection<M extends Record<string, unknown> = Record<s
 }
 
 /**
+ * A collection backed by MongoDB.
+ *
+ * Use this type instead of {@link EntityCollection} when you want
+ * compile-time safety that only MongoDB-relevant fields appear.
+ *
+ * @group Models
+ */
+export interface MongoDBCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>
+    extends BaseEntityCollection<M, USER> {
+
+    /**
+     * The driver for this collection. Must be set to `"mongodb"`.
+     */
+    driver: "mongodb";
+}
+
+/**
  * A collection backed by any data source.
- * This is a discriminated union — use {@link PostgresCollection} or
- * {@link FirebaseCollection} for driver-specific type safety.
+ * This is a discriminated union — use {@link PostgresCollection},
+ * {@link FirebaseCollection}, or {@link MongoDBCollection} for
+ * driver-specific type safety.
  *
  * @group Models
  */
 export type EntityCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> =
     | PostgresCollection<M, USER>
-    | FirebaseCollection<M, USER>;
+    | FirebaseCollection<M, USER>
+    | MongoDBCollection<M, USER>;
 
 // ── Type guards ───────────────────────────────────────────────────────
 
@@ -468,6 +487,16 @@ export function isFirebaseCollection<M extends Record<string, unknown> = Record<
     collection: EntityCollection<M, USER>
 ): collection is FirebaseCollection<M, USER> {
     return collection.driver === "firestore";
+}
+
+/**
+ * Type guard for MongoDB collections.
+ * @group Models
+ */
+export function isMongoDBCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
+    collection: EntityCollection<M, USER>
+): collection is MongoDBCollection<M, USER> {
+    return collection.driver === "mongodb";
 }
 
 

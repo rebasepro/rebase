@@ -81,9 +81,7 @@ const extractColumns = (collection: EntityCollection): ColumnInfo[] => {
     // Add FK columns from owning relations
     if (isPostgresCollection(collection)) {
         try {
-            const resolvedRelations = resolveCollectionRelations(
-                collection as PostgresCollection<Record<string, unknown>>
-            );
+            const resolvedRelations = resolveCollectionRelations(collection);
             for (const rel of Object.values(resolvedRelations)) {
                 if (rel.direction === "owning" && rel.cardinality === "one" && rel.localKey) {
                     // Only add if not already present as a regular column
@@ -187,9 +185,7 @@ y: 0 },
 
         let resolvedRelations: Record<string, Relation>;
         try {
-            resolvedRelations = resolveCollectionRelations(
-                collection as PostgresCollection<Record<string, unknown>>
-            );
+            resolvedRelations = resolveCollectionRelations(collection);
         } catch {
             continue;
         }

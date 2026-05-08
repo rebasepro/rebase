@@ -8,7 +8,7 @@ import { CircularProgressCenter } from "@rebasepro/ui";
 import { ArrowLeftIcon, CheckIcon } from "lucide-react";
 import { Entity, EntityCollection, MapProperty, Properties, Property, PropertyConfig, User, getDataSourceCapabilities, isPostgresCollection } from "@rebasepro/types";
 import type { PostgresCollection } from "@rebasepro/types";
-import { getSubcollections, isPropertyBuilder, removeInitialAndTrailingSlashes } from "@rebasepro/common";
+import { getSubcollections, isPropertyBuilder, removeInitialAndTrailingSlashes, getTableName } from "@rebasepro/common";
 import { Button, cls, coolIconKeys, defaultBorderMixin, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, LoadingButton, Tab, Tabs, Typography } from "@rebasepro/ui";
 import { CollectionEditorSchema } from "./CollectionYupValidation";
 import { GeneralSettingsForm } from "./GeneralSettingsForm";
@@ -174,7 +174,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
     // Skip templates when duplicating (copyFrom is provided)
     const includeTemplates = !copyFromProp && !initialValuesProp?.slug && (props.parentCollectionIds ?? []).length === 0;
     const collectionsInThisLevel = (props.parentCollection ? getSubcollections(props.parentCollection) : collections) ?? [];
-    const existingPaths = collectionsInThisLevel.map(col => isPostgresCollection(col) ? col.table?.trim().toLowerCase() ?? col.slug?.trim().toLowerCase() : col.slug?.trim().toLowerCase()).filter(Boolean);
+    const existingPaths = collectionsInThisLevel.map(col => getTableName(col)?.trim().toLowerCase()).filter(Boolean);
     const existingIds = collectionsInThisLevel.map(col => col.slug?.trim().toLowerCase()).filter(Boolean) as string[];
     const [collection, setCollection] = React.useState<EntityCollection<any> | undefined>();
     const [initialLoadingCompleted, setInitialLoadingCompleted] = React.useState(false);
@@ -499,8 +499,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
 ...propertyErrorsRef.current };
         }
         if (currentView === "general") {
-            const table = isPostgresCollection(col) ? col.table : undefined;
-            const pathError = validatePath(table || col.slug, isNewCollection, existingPaths, col.slug);
+            const pathError = validatePath(getTableName(col), isNewCollection, existingPaths, col.slug);
             if (pathError) {
                 errors.slug = pathError;
             }
@@ -530,7 +529,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
         submitCount
     } = formController;
 
-    const usedPath = (isPostgresCollection(values) ? values.table : undefined) || values.slug;
+    const usedPath = getTableName(values);
     const pathError = validatePath(usedPath, isNewCollection, existingPaths, values.slug);
 
     const parentPaths = !pathError && parentCollectionIds ? collectionRegistry.convertIdsToPaths(parentCollectionIds) : undefined;

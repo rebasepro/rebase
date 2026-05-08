@@ -1,5 +1,5 @@
 import { CollectionRegistry } from "@rebasepro/common";
-import { type EntityCollection, isPostgresCollection } from "@rebasepro/types";
+import { type EntityCollection, getDataSourceCapabilities } from "@rebasepro/types";
 import { PgEnum, PgTable } from "drizzle-orm/pg-core";
 import { Relations } from "drizzle-orm";
 import { CollectionRegistryInterface } from "../interfaces";
@@ -88,7 +88,7 @@ export class PostgresCollectionRegistry extends CollectionRegistry implements Co
      */
     getRelationKeysForCollection(collectionPath: string): string[] {
         const collection = this.getCollectionByPath(collectionPath);
-        if (!collection || !isPostgresCollection(collection) || !collection.relations) return [];
+        if (!collection || !getDataSourceCapabilities(collection.driver).supportsRelations || !collection.relations) return [];
         return collection.relations.map(r => r.relationName || r.localKey || "").filter(Boolean);
     }
 

@@ -1,4 +1,4 @@
-import { EntityCollection, isPostgresCollection, PostgresCollection, Property, Relation, RelationProperty } from "@rebasepro/types";
+import { EntityCollection, getDataSourceCapabilities, PostgresCollection, Property, Relation, RelationProperty } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { generateForeignKeyName } from "@rebasepro/utils";
 
@@ -41,7 +41,7 @@ export function sanitizeRelation(relation: Partial<Relation>, sourceCollection: 
 
                 try {
                     // Look for an owning relation on the target that points back to this collection
-                    const targetRelations = (targetCollection as PostgresCollection).relations || [];
+                    const targetRelations = getDataSourceCapabilities(targetCollection.driver).supportsRelations ? (targetCollection.relations || []) : [];
                     for (const targetRel of targetRelations) {
                         if (targetRel.direction === "owning" &&
                             targetRel.cardinality === "one" &&
@@ -85,7 +85,7 @@ export function sanitizeRelation(relation: Partial<Relation>, sourceCollection: 
                     // Note: we intentionally do NOT require `through` here because the raw (unsanitized)
                     // relations won't have `through` populated yet — sanitizeRelation fills it in later.
                     // `cardinality: "many" + direction: "owning"` is sufficient to identify owning M2M.
-                    const targetRelations = (targetCollection as PostgresCollection).relations || [];
+                    const targetRelations = getDataSourceCapabilities(targetCollection.driver).supportsRelations ? (targetCollection.relations || []) : [];
                     for (const targetRel of targetRelations) {
                         if (targetRel.cardinality === "many" &&
                             (targetRel.direction === "owning" || !targetRel.direction) &&
@@ -141,7 +141,7 @@ export function resolveCollectionRelations(
     const cached = _resolvedRelationsCache.get(collection);
     if (cached) return cached;
 
-    if (!isPostgresCollection(collection)) return {};
+    if (!getDataSourceCapabilities(collection.driver).supportsRelations) return {};
     const relations: Record<string, Relation> = {};
 
     // Track which explicit relationName values have been registered so that
@@ -242,7 +242,7 @@ export function resolvePropertyRelation({
 }
 
 export function getTableName(collection: EntityCollection): string {
-    if (isPostgresCollection(collection)) {
+    if (getDataSourceCapabilities(collection.driver).supportsRelations) {
         return collection.table ?? toSnakeCase(collection.slug) ?? toSnakeCase(collection.name);
     }
     return toSnakeCase(collection.slug) ?? toSnakeCase(collection.name);

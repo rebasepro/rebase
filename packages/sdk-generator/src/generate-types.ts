@@ -73,7 +73,7 @@ export function generateTypedefs(collections: EntityCollection[]): string {
         // Resolve relations
         let resolvedRelations: Record<string, any> = {};
         try {
-            resolvedRelations = resolveCollectionRelations(collection as PostgresCollection);
+            resolvedRelations = resolveCollectionRelations(collection);
         } catch { /* ignore */ }
 
         lines.push(`  ${toSafeIdentifier(collection.slug)}: {`);

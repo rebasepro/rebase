@@ -5,6 +5,7 @@ import { deepEqual as equal } from "fast-equals";
 
 import { CollectionsConfigController } from "./types/config_controller";
 import { useCustomizationController, useRebaseContext, useAuthController, useSnackbarController } from "@rebasepro/core";
+import { getTableName } from "@rebasepro/common";
 import { useNavigate } from "react-router";
 import { CollectionEditorController } from "./types/collection_editor_controller";
 import { CollectionEditorPermissionsBuilder } from "./types/config_permissions";
@@ -81,7 +82,7 @@ export const ConfigControllerProvider = React.memo(
 
         useEffect(() => {
             if (!databaseAdmin?.fetchUnmappedTables || authController.initialLoading || !authController.user) return;
-            const existingPaths = (collectionConfigController.collections ?? []).map(c => isPostgresCollection(c) ? c.table ?? c.slug ?? "" : c.slug ?? "").filter(Boolean);
+            const existingPaths = (collectionConfigController.collections ?? []).map(c => getTableName(c) ?? "").filter(Boolean);
             databaseAdmin.fetchUnmappedTables(existingPaths)
                 .then((tables: string[]) => setUnmappedTables(tables))
                 .catch((e: unknown) => console.warn("Could not fetch unmapped tables:", e));

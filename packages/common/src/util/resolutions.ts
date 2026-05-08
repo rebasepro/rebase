@@ -10,8 +10,7 @@ import {
     Relation,
     RelationProperty,
     StringProperty,
-    isPostgresCollection,
-    isFirebaseCollection
+    getDataSourceCapabilities
 } from "@rebasepro/types";
 
 type PropertyConfig = { property: unknown; [key: string]: unknown };
@@ -345,11 +344,11 @@ export function getSubcollections<M extends Record<string, unknown> = Record<str
         return collection.childCollections() ?? [];
     }
 
-    if (isFirebaseCollection(collection) && collection.subcollections) {
+    if (getDataSourceCapabilities(collection.driver).supportsSubcollections && collection.subcollections) {
         return collection.subcollections() ?? [];
     }
 
-    if (isPostgresCollection(collection) && collection.relations) {
+    if (getDataSourceCapabilities(collection.driver).supportsRelations && collection.relations) {
         const manyRelations = collection.relations.filter(r => r.cardinality === "many");
         return manyRelations.map(r => {
             const target = r.target();

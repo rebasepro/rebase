@@ -11,7 +11,8 @@ import {
     RelationProperty,
     StringProperty,
     OnAction,
-    JoinStep
+    JoinStep,
+    getDataSourceCapabilities
 } from "@rebasepro/types";
 import { deepEqual } from "fast-equals";
 
@@ -164,7 +165,7 @@ export class CollectionRegistry {
         const extractedRelations = this.extractRelationsFromProperties(result.properties);
 
         // 2. Merge with manual relations[] (manual entries win on name conflict)
-        const manualRelations = isPostgresCollection(result) ? (result.relations ?? []) : [];
+        const manualRelations = getDataSourceCapabilities(result.driver).supportsRelations ? (result.relations ?? []) : [];
         const mergedRelationsRaw = [...extractedRelations];
         for (const manual of manualRelations) {
             const name = manual.relationName;
@@ -173,25 +174,26 @@ export class CollectionRegistry {
             }
         }
 
+        let mergedRelations = mergedRelationsRaw;
+
         // 2b. Sanitize each relation so derived fields (through, localKey,
         //     foreignKeyOnTarget, etc.) are populated. Without this the
         //     property.relation stamp is missing junction-table metadata and
         //     the backend cannot fetch many-to-many data.
-        const mergedRelations = isPostgresCollection(result)
-            ? mergedRelationsRaw.map(r => {
+        if (getDataSourceCapabilities(result.driver).supportsRelations) {
+            const pgResult = result;
+            mergedRelations = mergedRelationsRaw.map(r => {
                 try {
-                    return sanitizeRelation(r, result as PostgresCollection);
+                    return sanitizeRelation(r, pgResult);
                 } catch {
                     // sanitizeRelation may throw for incomplete configs
                     // (e.g. missing target). Keep the raw relation as-is.
                     return r;
                 }
-            })
-            : mergedRelationsRaw;
+            });
 
-        // 3. Set the merged relations on the result copy
-        if (isPostgresCollection(result)) {
-            result.relations = mergedRelations;
+            // 3. Set the merged relations on the result copy
+            pgResult.relations = mergedRelations;
         }
 
         // 4. Normalize properties (which stamps relation on each property)
@@ -200,9 +202,9 @@ export class CollectionRegistry {
 
         // Populate childCollections from driver-specific fields
         if (!result.childCollections) {
-            if (isFirebaseCollection(result) && result.subcollections) {
+            if (getDataSourceCapabilities(result.driver).supportsSubcollections && result.subcollections) {
                 result.childCollections = result.subcollections;
-            } else if (isPostgresCollection(result) && result.relations) {
+            } else if (getDataSourceCapabilities(result.driver).supportsRelations && result.relations) {
                 const manyRelations = result.relations.filter(r => r.cardinality === "many");
                 if (manyRelations.length > 0) {
                     result.childCollections = () => manyRelations.map(r => {
@@ -363,8 +365,8 @@ export class CollectionRegistry {
             const relationKey = pathSegments[i];
 
             // Get relations for current collection
-            if (!isPostgresCollection(currentCollection)) {
-                throw new Error(`Relation path navigation requires a PostgreSQL collection, but '${currentCollection.slug}' uses driver '${currentCollection.driver}'`);
+            if (!getDataSourceCapabilities(currentCollection.driver).supportsRelations) {
+                throw new Error(`Relation path navigation requires a collection that supports relations, but '${currentCollection.slug}' uses driver '${currentCollection.driver}'`);
             }
             const resolvedRelations = resolveCollectionRelations(currentCollection);
             const relation = findRelation(resolvedRelations, relationKey);
