@@ -60,7 +60,7 @@ jobs:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
       - name: Configure npm auth
-        run: echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" >> .npmrc
+        run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
