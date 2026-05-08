@@ -538,6 +538,57 @@ export class RelationService {
             return resultMap;
         }
 
+        // Handle many-to-many owning relations with junction table (relation.through)
+        // This is the standard path for posts→tags style relations where
+        // sanitizeRelation populated the `through` config.
+        if (relation.through && relation.cardinality === "many" && relation.direction === "owning") {
+            const junctionTable = this.registry.getTable(relation.through.table);
+            if (!junctionTable) {
+                console.warn(`[batchFetchRelatedEntitiesMany] Junction table '${relation.through.table}' not found`);
+                return new Map();
+            }
+
+            const sourceJunctionCol = junctionTable[relation.through.sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
+            const targetJunctionCol = junctionTable[relation.through.targetColumn as keyof typeof junctionTable] as AnyPgColumn;
+
+            if (!sourceJunctionCol || !targetJunctionCol) {
+                console.warn(`[batchFetchRelatedEntitiesMany] Junction columns not found in '${relation.through.table}'`);
+                return new Map();
+            }
+
+            // SELECT target.*, junction.sourceColumn FROM junction
+            // INNER JOIN target ON junction.targetColumn = target.id
+            // WHERE junction.sourceColumn IN (parentIds)
+            const query = this.db
+                .select()
+                .from(junctionTable)
+                .innerJoin(targetTable, eq(targetJunctionCol, targetIdField))
+                .where(inArray(sourceJunctionCol, parsedParentIds));
+
+            const results = await query;
+            const resultMap = new Map<string, Entity<Record<string, unknown>>[]>();
+            const targetTableName = getTableName(targetCollection);
+
+            for (const row of results as Array<Record<string, unknown>>) {
+                // The junction table data is namespaced under its table name
+                const junctionData = (row[relation.through.table] || row) as Record<string, unknown>;
+                const targetData = (row[targetTableName] || row) as Record<string, unknown>;
+
+                const parentId = String(junctionData[relation.through.sourceColumn]);
+                const parsedValues = await parseDataFromServer(targetData, targetCollection);
+
+                const arr = resultMap.get(parentId) || [];
+                arr.push({
+                    id: String(targetData[targetIdInfo.fieldName]),
+                    path: targetCollection.slug,
+                    values: parsedValues as Record<string, unknown>
+                });
+                resultMap.set(parentId, arr);
+            }
+
+            return resultMap;
+        }
+
         // Handle FK-based relations (one-to-many inverse)
         let query = this.db.select().from(targetTable).$dynamic();
 
@@ -562,7 +613,12 @@ export class RelationService {
 
             let parentId: string | number | undefined;
 
-            if (relation.direction === "inverse" && relation.foreignKeyOnTarget) {
+            if (relation.through && relation.direction === "inverse") {
+                // Inverse many-to-many via junction table: the junction's targetColumn
+                // references the parent (since from the inverse perspective, source/target are swapped).
+                const junctionData = (row[relation.through.table] || row) as Record<string, unknown>;
+                parentId = junctionData[relation.through.targetColumn] as string | number | undefined;
+            } else if (relation.direction === "inverse" && relation.foreignKeyOnTarget) {
                 parentId = targetEntity[relation.foreignKeyOnTarget] as string | number | undefined;
             } else if (relation.direction === "inverse" && relation.inverseRelationName) {
                 const inferredForeignKeyName = `${relation.inverseRelationName}_id`;

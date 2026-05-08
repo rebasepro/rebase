@@ -1,0 +1,500 @@
+/**
+ * Regression tests for batchFetchRelatedEntitiesMany
+ *
+ * Root cause of the original bug:
+ *   `batchFetchRelatedEntitiesMany` only had two code paths:
+ *     1. `relation.joinPath` — custom multi-hop join path
+ *     2. FK-based fallback — delegated to `buildRelationQuery`, then extracted
+ *        parentId from `foreignKeyOnTarget` / `inverseRelationName`
+ *
+ *   Many-to-many owning relations (e.g. posts→tags via posts_tags junction)
+ *   use `relation.through` — NOT `joinPath`, and NOT an inverse FK.
+ *   The FK fallback would:
+ *     - Correctly JOIN through the junction table (via buildRelationQuery)
+ *     - But FAIL to extract parentId from the result rows because
+ *       `relation.direction === "owning"`, so lines checking
+ *       `direction === "inverse"` were skipped
+ *     - parentId stayed `undefined`, all results were silently dropped
+ *
+ *   The same gap existed for inverse M2M with `through`.
+ *
+ *   Fix: Added a dedicated `through` handler before the FK fallback that
+ *   queries junction→target directly and extracts parentId from the junction
+ *   table's sourceColumn/targetColumn.
+ */
+import { RelationService } from "../src/services/RelationService";
+import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { EntityCollection, Relation } from "@rebasepro/types";
+import { NodePgDatabase } from "drizzle-orm/node-postgres";
+
+// ─── Mock Tables ──────────────────────────────────────────────────────
+const mockPostsTable = {
+    id: { name: "id", dataType: "number" },
+    title: { name: "title" },
+    _def: { tableName: "posts" }
+};
+
+const mockTagsTable = {
+    id: { name: "id", dataType: "number" },
+    name: { name: "name" },
+    _def: { tableName: "tags" }
+};
+
+const mockPostsTagsTable = {
+    post_id: { name: "post_id", dataType: "number" },
+    tag_id: { name: "tag_id", dataType: "number" },
+    _def: { tableName: "posts_tags" }
+};
+
+const mockAuthorsTable = {
+    id: { name: "id", dataType: "number" },
+    name: { name: "name" },
+    _def: { tableName: "authors" }
+};
+
+const mockAuthorPostsTable = {
+    author_id: { name: "author_id", dataType: "number" },
+    post_id: { name: "post_id", dataType: "number" },
+    _def: { tableName: "author_posts" }
+};
+
+// ─── Mock Collections ─────────────────────────────────────────────────
+
+const tagsCollection: EntityCollection = {
+    slug: "tags",
+    name: "Tags",
+    table: "tags",
+    properties: {
+        id: { type: "number" },
+        name: { type: "string" }
+    },
+    idField: "id"
+};
+
+const postsCollection: EntityCollection = {
+    slug: "posts",
+    name: "Posts",
+    table: "posts",
+    properties: {
+        id: { type: "number" },
+        title: { type: "string" },
+        tags: { type: "relation", relationName: "tags" }
+    },
+    relations: [
+        {
+            relationName: "tags",
+            target: () => tagsCollection,
+            cardinality: "many",
+            direction: "owning",
+            through: {
+                table: "posts_tags",
+                sourceColumn: "post_id",
+                targetColumn: "tag_id"
+            }
+        }
+    ],
+    idField: "id"
+};
+
+const authorsCollection: EntityCollection = {
+    slug: "authors",
+    name: "Authors",
+    table: "authors",
+    properties: {
+        id: { type: "number" },
+        name: { type: "string" }
+    },
+    idField: "id"
+};
+
+// Inverse M2M: tags → posts (from tag's perspective, "which posts use this tag?")
+const tagsWithInversePosts: EntityCollection = {
+    slug: "tags_inv",
+    name: "Tags (inverse)",
+    table: "tags",
+    properties: {
+        id: { type: "number" },
+        name: { type: "string" },
+        posts: { type: "relation", relationName: "posts" }
+    },
+    relations: [
+        {
+            relationName: "posts",
+            target: () => postsCollection,
+            cardinality: "many",
+            direction: "inverse",
+            through: {
+                table: "posts_tags",
+                sourceColumn: "post_id",
+                targetColumn: "tag_id"
+            }
+        }
+    ],
+    idField: "id"
+};
+
+// JoinPath-based M2M: authors → posts via author_posts
+const authorsWithJoinPath: EntityCollection = {
+    slug: "authors_jp",
+    name: "Authors (joinPath)",
+    table: "authors",
+    properties: {
+        id: { type: "number" },
+        name: { type: "string" },
+        posts: { type: "relation", relationName: "posts" }
+    },
+    relations: [
+        {
+            relationName: "posts",
+            target: () => postsCollection,
+            cardinality: "many",
+            direction: "owning",
+            joinPath: [
+                { table: "author_posts", on: { from: "id", to: "author_id" } },
+                { table: "posts", on: { from: "post_id", to: "id" } }
+            ]
+        }
+    ],
+    idField: "id"
+};
+
+// ─── Test Data Generators ─────────────────────────────────────────────
+
+function generateJunctionRows(
+    postIds: number[],
+    tagIds: number[],
+    junctionTableName: string,
+    targetTableName: string,
+    sourceCol: string,
+    targetCol: string,
+    targetData: Record<string, unknown>[]
+) {
+    // Create junction results that look like what Drizzle returns from
+    // FROM junction INNER JOIN target
+    const rows: Record<string, unknown>[] = [];
+    for (const postId of postIds) {
+        for (const tagId of tagIds) {
+            const targetRow = targetData.find(t => t.id === tagId);
+            if (targetRow) {
+                rows.push({
+                    [junctionTableName]: {
+                        [sourceCol]: postId,
+                        [targetCol]: tagId,
+                    },
+                    [targetTableName]: { ...targetRow }
+                });
+            }
+        }
+    }
+    return rows;
+}
+
+// ─── Tests ────────────────────────────────────────────────────────────
+
+describe("batchFetchRelatedEntitiesMany: M2M through junction table regression", () => {
+    let registry: PostgresCollectionRegistry;
+
+    function createMockDb(resolveResults: () => unknown[]) {
+        let queryRecorder = {
+            selectCount: 0,
+            innerJoinCount: 0,
+            fromTable: undefined as string | undefined,
+        };
+
+        function makeChainable(): Record<string, unknown> {
+            const chain: Record<string, unknown> = {
+                select: jest.fn(() => {
+                    queryRecorder.selectCount++;
+                    return chain;
+                }),
+                from: jest.fn((table: Record<string, unknown>) => {
+                    const tableDef = table._def as { tableName: string } | undefined;
+                    queryRecorder.fromTable = tableDef?.tableName ?? "unknown";
+                    return chain;
+                }),
+                where: jest.fn(() => chain),
+                $dynamic: jest.fn(() => chain),
+                limit: jest.fn(() => chain),
+                offset: jest.fn(() => chain),
+                orderBy: jest.fn(() => chain),
+                innerJoin: jest.fn(() => {
+                    queryRecorder.innerJoinCount++;
+                    return chain;
+                }),
+                then: (resolve: (val: unknown[]) => void) => {
+                    resolve(resolveResults());
+                }
+            };
+            return chain;
+        }
+
+        return {
+            db: makeChainable() as unknown as jest.Mocked<NodePgDatabase>,
+            recorder: queryRecorder,
+        };
+    }
+
+    beforeEach(() => {
+        registry = new PostgresCollectionRegistry();
+
+        jest.spyOn(registry, "getCollectionByPath").mockImplementation(path => {
+            if (path?.startsWith("posts")) return postsCollection;
+            if (path?.startsWith("tags_inv")) return tagsWithInversePosts;
+            if (path?.startsWith("tags")) return tagsCollection;
+            if (path?.startsWith("authors_jp")) return authorsWithJoinPath;
+            if (path?.startsWith("authors")) return authorsCollection;
+            return undefined;
+        });
+
+        jest.spyOn(registry, "getTable").mockImplementation(tableName => {
+            if (tableName === "posts") return mockPostsTable as any;
+            if (tableName === "tags") return mockTagsTable as any;
+            if (tableName === "posts_tags") return mockPostsTagsTable as any;
+            if (tableName === "authors") return mockAuthorsTable as any;
+            if (tableName === "author_posts") return mockAuthorPostsTable as any;
+            return undefined;
+        });
+
+        jest.spyOn(registry, "getCollections").mockReturnValue([
+            postsCollection, tagsCollection, authorsCollection
+        ]);
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+    });
+
+    // ━━━ Owning M2M with `through` ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    describe("Owning M2M with `through` (posts → tags)", () => {
+        const mockTags = [
+            { id: 1, name: "TypeScript" },
+            { id: 2, name: "React" },
+            { id: 3, name: "Node.js" },
+        ];
+
+        it("should return tags for each post via junction table", async () => {
+            // Post 1 → tags 1,2; Post 2 → tags 2,3; Post 3 → tag 1
+            const junctionRows = [
+                { posts_tags: { post_id: 1, tag_id: 1 }, tags: { id: 1, name: "TypeScript" } },
+                { posts_tags: { post_id: 1, tag_id: 2 }, tags: { id: 2, name: "React" } },
+                { posts_tags: { post_id: 2, tag_id: 2 }, tags: { id: 2, name: "React" } },
+                { posts_tags: { post_id: 2, tag_id: 3 }, tags: { id: 3, name: "Node.js" } },
+                { posts_tags: { post_id: 3, tag_id: 1 }, tags: { id: 1, name: "TypeScript" } },
+            ];
+
+            const { db } = createMockDb(() => junctionRows);
+            const service = new RelationService(db, registry);
+            const relation = postsCollection.relations![0] as Relation;
+
+            const results = await service.batchFetchRelatedEntitiesMany(
+                "posts", [1, 2, 3], "tags", relation
+            );
+
+            // Post 1 should have 2 tags
+            expect(results.get("1")).toHaveLength(2);
+            expect(results.get("1")!.map(e => e.values.name)).toEqual(
+                expect.arrayContaining(["TypeScript", "React"])
+            );
+
+            // Post 2 should have 2 tags
+            expect(results.get("2")).toHaveLength(2);
+            expect(results.get("2")!.map(e => e.values.name)).toEqual(
+                expect.arrayContaining(["React", "Node.js"])
+            );
+
+            // Post 3 should have 1 tag
+            expect(results.get("3")).toHaveLength(1);
+            expect(results.get("3")![0].values.name).toBe("TypeScript");
+        });
+
+        it("should set correct entity id and path on each relation result", async () => {
+            const junctionRows = [
+                { posts_tags: { post_id: 1, tag_id: 42 }, tags: { id: 42, name: "GraphQL" } },
+            ];
+
+            const { db } = createMockDb(() => junctionRows);
+            const service = new RelationService(db, registry);
+            const relation = postsCollection.relations![0] as Relation;
+
+            const results = await service.batchFetchRelatedEntitiesMany(
+                "posts", [1], "tags", relation
+            );
+
+            const tags = results.get("1")!;
+            expect(tags).toHaveLength(1);
+            expect(tags[0].id).toBe("42");
+            expect(tags[0].path).toBe("tags");
+        });
+
+        it("should use exactly 1 SQL query (junction JOIN target)", async () => {
+            const junctionRows = [
+                { posts_tags: { post_id: 1, tag_id: 1 }, tags: { id: 1, name: "TypeScript" } },
+            ];
+
+            const { db, recorder } = createMockDb(() => junctionRows);
+            const service = new RelationService(db, registry);
+            const relation = postsCollection.relations![0] as Relation;
+
+            await service.batchFetchRelatedEntitiesMany(
+                "posts", [1, 2, 3], "tags", relation
+            );
+
+            // Single SELECT from junction with innerJoin to target
+            expect(recorder.selectCount).toBe(1);
+            expect(recorder.innerJoinCount).toBe(1);
+        });
+
+        it("should return empty map when no junction rows exist", async () => {
+            const { db } = createMockDb(() => []);
+            const service = new RelationService(db, registry);
+            const relation = postsCollection.relations![0] as Relation;
+
+            const results = await service.batchFetchRelatedEntitiesMany(
+                "posts", [1, 2, 3], "tags", relation
+            );
+
+            expect(results.size).toBe(0);
+        });
+
+        it("should return empty map for empty parent IDs", async () => {
+            const { db, recorder } = createMockDb(() => []);
+            const service = new RelationService(db, registry);
+            const relation = postsCollection.relations![0] as Relation;
+
+            const results = await service.batchFetchRelatedEntitiesMany(
+                "posts", [], "tags", relation
+            );
+
+            expect(results.size).toBe(0);
+            // No queries should fire
+            expect(recorder.selectCount).toBe(0);
+        });
+
+        it("should handle posts where some have tags and some don't", async () => {
+            const junctionRows = [
+                { posts_tags: { post_id: 1, tag_id: 1 }, tags: { id: 1, name: "TypeScript" } },
+                // Post 2 has no junction rows
+                { posts_tags: { post_id: 3, tag_id: 2 }, tags: { id: 2, name: "React" } },
+            ];
+
+            const { db } = createMockDb(() => junctionRows);
+            const service = new RelationService(db, registry);
+            const relation = postsCollection.relations![0] as Relation;
+
+            const results = await service.batchFetchRelatedEntitiesMany(
+                "posts", [1, 2, 3], "tags", relation
+            );
+
+            expect(results.get("1")).toHaveLength(1);
+            expect(results.has("2")).toBe(false); // No tags for post 2
+            expect(results.get("3")).toHaveLength(1);
+        });
+    });
+
+    // ━━━ Inverse M2M with `through` ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    describe("Inverse M2M with `through` (tags → posts, inverse perspective)", () => {
+        it("should return posts for each tag via junction table", async () => {
+            // For the inverse direction, buildRelationQuery JOINs through the junction.
+            // Result rows contain junction + target data.
+            // The parentId (tag) is in the junction's targetColumn.
+            const joinedRows = [
+                { posts_tags: { post_id: 10, tag_id: 1 }, posts: { id: 10, title: "Post A" } },
+                { posts_tags: { post_id: 20, tag_id: 1 }, posts: { id: 20, title: "Post B" } },
+                { posts_tags: { post_id: 30, tag_id: 2 }, posts: { id: 30, title: "Post C" } },
+            ];
+
+            const { db } = createMockDb(() => joinedRows);
+            const service = new RelationService(db, registry);
+            const relation = tagsWithInversePosts.relations![0] as Relation;
+
+            const results = await service.batchFetchRelatedEntitiesMany(
+                "tags_inv", [1, 2], "posts", relation
+            );
+
+            // Tag 1 should have 2 posts
+            expect(results.get("1")).toHaveLength(2);
+            expect(results.get("1")!.map(e => e.values.title)).toEqual(
+                expect.arrayContaining(["Post A", "Post B"])
+            );
+
+            // Tag 2 should have 1 post
+            expect(results.get("2")).toHaveLength(1);
+            expect(results.get("2")![0].values.title).toBe("Post C");
+        });
+
+        it("should return empty map when no junction rows exist for inverse", async () => {
+            const { db } = createMockDb(() => []);
+            const service = new RelationService(db, registry);
+            const relation = tagsWithInversePosts.relations![0] as Relation;
+
+            const results = await service.batchFetchRelatedEntitiesMany(
+                "tags_inv", [1, 2], "posts", relation
+            );
+
+            expect(results.size).toBe(0);
+        });
+    });
+
+    // ━━━ JoinPath (existing path, ensure no regression) ━━━━━━━━━━━━━━
+
+    describe("JoinPath M2M (authors → posts via author_posts)", () => {
+        it("should return posts for each author via joinPath", async () => {
+            // joinPath results are namespaced differently — parent data under parent table name
+            const joinedRows = [
+                { authors: { id: 1, name: "Alice" }, posts: { id: 10, title: "Post X" } },
+                { authors: { id: 1, name: "Alice" }, posts: { id: 20, title: "Post Y" } },
+                { authors: { id: 2, name: "Bob" }, posts: { id: 30, title: "Post Z" } },
+            ];
+
+            const { db } = createMockDb(() => joinedRows);
+            const service = new RelationService(db, registry);
+            const relation = authorsWithJoinPath.relations![0] as Relation;
+
+            const results = await service.batchFetchRelatedEntitiesMany(
+                "authors_jp", [1, 2], "posts", relation
+            );
+
+            // Author 1 should have 2 posts
+            expect(results.get("1")).toHaveLength(2);
+            expect(results.get("1")!.map(e => e.values.title)).toEqual(
+                expect.arrayContaining(["Post X", "Post Y"])
+            );
+
+            // Author 2 should have 1 post
+            expect(results.get("2")).toHaveLength(1);
+            expect(results.get("2")![0].values.title).toBe("Post Z");
+        });
+    });
+
+    // ━━━ Error handling ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    describe("Error handling", () => {
+        it("should return empty map when junction table is not found", async () => {
+            // Override getTable to return undefined for junction
+            jest.spyOn(registry, "getTable").mockImplementation(tableName => {
+                if (tableName === "posts_tags") return undefined;
+                if (tableName === "posts") return mockPostsTable as any;
+                if (tableName === "tags") return mockTagsTable as any;
+                return undefined;
+            });
+
+            const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
+            const { db } = createMockDb(() => []);
+            const service = new RelationService(db, registry);
+            const relation = postsCollection.relations![0] as Relation;
+
+            const results = await service.batchFetchRelatedEntitiesMany(
+                "posts", [1], "tags", relation
+            );
+
+            expect(results.size).toBe(0);
+            expect(consoleSpy).toHaveBeenCalledWith(
+                expect.stringContaining("Junction table 'posts_tags' not found")
+            );
+
+            consoleSpy.mockRestore();
+        });
+    });
+});

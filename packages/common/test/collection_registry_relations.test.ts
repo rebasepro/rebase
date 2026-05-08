@@ -899,3 +899,152 @@ describe("Layer 10 – recursive _registerRecursively with deep chains", () => {
         // Products is a "one" relation, not a subcollection ("many"), so it won't be auto-registered
     });
 });
+
+// ══════════════════════════════════════════════════════════════════════
+// REGRESSION: sanitizeRelation must be called during normalizeCollection
+// Without this, derived fields (through, localKey, foreignKeyOnTarget)
+// are missing from both collection.relations[] and property.relation,
+// breaking junction-table (many-to-many) data fetching on the backend.
+// ══════════════════════════════════════════════════════════════════════
+
+describe("Regression – normalizeCollection sanitizes relations (derived fields)", () => {
+
+    it("populates `through` on many-to-many owning relations in collection.relations[]", () => {
+        const tags = makeTagsCollection();
+        const authors = makeAuthorsCollection();
+        const posts = makePostsWithInlineRelations(tags, authors);
+
+        const registry = new CollectionRegistry();
+        const normalized = registry.normalizeCollection({ ...posts }) as PostgresCollection;
+        const tagsRel = normalized.relations!.find(r => r.relationName === "tags");
+
+        expect(tagsRel).toBeDefined();
+        expect(tagsRel!.through).toBeDefined();
+        expect(tagsRel!.through!.table).toBe("posts_tags");
+        expect(tagsRel!.through!.sourceColumn).toBe("post_id");
+        expect(tagsRel!.through!.targetColumn).toBe("tag_id");
+    });
+
+    it("populates `through` on property.relation for many-to-many owning properties", () => {
+        const tags = makeTagsCollection();
+        const authors = makeAuthorsCollection();
+        const posts = makePostsWithInlineRelations(tags, authors);
+
+        const registry = new CollectionRegistry();
+        const normalized = registry.normalizeCollection({ ...posts });
+        const tagsProp = normalized.properties.tags as RelationProperty;
+
+        expect(tagsProp.relation).toBeDefined();
+        expect(tagsProp.relation!.through).toBeDefined();
+        expect(tagsProp.relation!.through!.table).toBe("posts_tags");
+        expect(tagsProp.relation!.through!.sourceColumn).toBe("post_id");
+        expect(tagsProp.relation!.through!.targetColumn).toBe("tag_id");
+    });
+
+    it("populates `localKey` on one-to-one owning relations in collection.relations[]", () => {
+        const tags = makeTagsCollection();
+        const authors = makeAuthorsCollection();
+        const posts = makePostsWithInlineRelations(tags, authors);
+
+        const registry = new CollectionRegistry();
+        const normalized = registry.normalizeCollection({ ...posts }) as PostgresCollection;
+        const authorRel = normalized.relations!.find(r => r.relationName === "author");
+
+        expect(authorRel).toBeDefined();
+        expect(authorRel!.localKey).toBe("author_id");
+    });
+
+    it("populates `localKey` on property.relation for one-to-one owning properties", () => {
+        const tags = makeTagsCollection();
+        const authors = makeAuthorsCollection();
+        const posts = makePostsWithInlineRelations(tags, authors);
+
+        const registry = new CollectionRegistry();
+        const normalized = registry.normalizeCollection({ ...posts });
+        const authorProp = normalized.properties.author as RelationProperty;
+
+        expect(authorProp.relation).toBeDefined();
+        expect(authorProp.relation!.localKey).toBe("author_id");
+    });
+
+    it("preserves explicit `through` config and does not override it", () => {
+        const tags = makeTagsCollection();
+        const authors = makeAuthorsCollection();
+
+        const postsWithExplicitThrough: PostgresCollection = {
+            name: "Posts",
+            slug: "posts",
+            table: "posts",
+            properties: {
+                id: { type: "number", isId: "increment" },
+                title: { type: "string" },
+                tags: {
+                    name: "Tags",
+                    type: "relation",
+                    target: () => tags,
+                    cardinality: "many",
+                    direction: "owning",
+                    through: {
+                        table: "custom_junction",
+                        sourceColumn: "src",
+                        targetColumn: "tgt",
+                    },
+                } as RelationProperty,
+            },
+        };
+
+        const registry = new CollectionRegistry();
+        const normalized = registry.normalizeCollection({ ...postsWithExplicitThrough }) as PostgresCollection;
+        const tagsRel = normalized.relations!.find(r => r.relationName === "tags");
+
+        expect(tagsRel!.through!.table).toBe("custom_junction");
+        expect(tagsRel!.through!.sourceColumn).toBe("src");
+        expect(tagsRel!.through!.targetColumn).toBe("tgt");
+    });
+
+    it("derived fields survive full registry registration (registerMultiple)", () => {
+        const tags = makeTagsCollection();
+        const authors = makeAuthorsCollection();
+        const posts = makePostsWithInlineRelations(tags, authors);
+
+        const registry = new CollectionRegistry();
+        registry.registerMultiple([posts, tags, authors]);
+
+        const stored = registry.get("posts") as PostgresCollection;
+        expect(stored).toBeDefined();
+
+        // collection.relations[] must have through
+        const tagsRel = stored.relations!.find(r => r.relationName === "tags");
+        expect(tagsRel!.through).toBeDefined();
+        expect(tagsRel!.through!.table).toBe("posts_tags");
+
+        // property.relation must also have through
+        const tagsProp = stored.properties.tags as RelationProperty;
+        expect(tagsProp.relation!.through).toBeDefined();
+        expect(tagsProp.relation!.through!.table).toBe("posts_tags");
+
+        // author must have localKey
+        const authorRel = stored.relations!.find(r => r.relationName === "author");
+        expect(authorRel!.localKey).toBe("author_id");
+        const authorProp = stored.properties.author as RelationProperty;
+        expect(authorProp.relation!.localKey).toBe("author_id");
+    });
+
+    it("resolveCollectionRelations returns consistent through with property.relation", () => {
+        const tags = makeTagsCollection();
+        const authors = makeAuthorsCollection();
+        const posts = makePostsWithInlineRelations(tags, authors);
+
+        const registry = new CollectionRegistry();
+        registry.registerMultiple([posts, tags, authors]);
+
+        const stored = registry.get("posts")!;
+        const { resolveCollectionRelations } = require("../src/util/relations");
+        const resolved = resolveCollectionRelations(stored);
+
+        // resolveCollectionRelations and property.relation must agree
+        const tagsProp = stored.properties.tags as RelationProperty;
+        expect(resolved.tags.through).toEqual(tagsProp.relation!.through);
+        expect(resolved.author.localKey).toEqual((stored.properties.author as RelationProperty).relation!.localKey);
+    });
+});

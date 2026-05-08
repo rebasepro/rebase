@@ -15,7 +15,7 @@ import {
 } from "@rebasepro/types";
 import { deepEqual } from "fast-equals";
 
-import { enumToObjectEntries, getSubcollections, getTableName, resolveCollectionRelations, findRelation } from "../util";
+import { enumToObjectEntries, getSubcollections, getTableName, resolveCollectionRelations, findRelation, sanitizeRelation } from "../util";
 import cloneDeep from "lodash/cloneDeep.js";
 import { removeFunctions, mergeDeep } from "@rebasepro/utils";
 
@@ -165,13 +165,29 @@ export class CollectionRegistry {
 
         // 2. Merge with manual relations[] (manual entries win on name conflict)
         const manualRelations = isPostgresCollection(result) ? (result.relations ?? []) : [];
-        const mergedRelations = [...extractedRelations];
+        const mergedRelationsRaw = [...extractedRelations];
         for (const manual of manualRelations) {
             const name = manual.relationName;
-            if (!name || !mergedRelations.find(r => r.relationName === name)) {
-                mergedRelations.push(manual);
+            if (!name || !mergedRelationsRaw.find(r => r.relationName === name)) {
+                mergedRelationsRaw.push(manual);
             }
         }
+
+        // 2b. Sanitize each relation so derived fields (through, localKey,
+        //     foreignKeyOnTarget, etc.) are populated. Without this the
+        //     property.relation stamp is missing junction-table metadata and
+        //     the backend cannot fetch many-to-many data.
+        const mergedRelations = isPostgresCollection(result)
+            ? mergedRelationsRaw.map(r => {
+                try {
+                    return sanitizeRelation(r, result as PostgresCollection);
+                } catch {
+                    // sanitizeRelation may throw for incomplete configs
+                    // (e.g. missing target). Keep the raw relation as-is.
+                    return r;
+                }
+            })
+            : mergedRelationsRaw;
 
         // 3. Set the merged relations on the result copy
         if (isPostgresCollection(result)) {
