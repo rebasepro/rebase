@@ -340,8 +340,8 @@ export function getFieldConfig(property: Property, propertyConfigs: Record<strin
         console.error("No field id found for property", property);
         return undefined;
     }
-    const defaultFieldConfig = DEFAULT_FIELD_CONFIGS[defaultFieldId];
-    const customField = fieldId ? propertyConfigs[fieldId] : undefined;
+    const defaultFieldConfig = defaultFieldId ? DEFAULT_FIELD_CONFIGS[defaultFieldId] : undefined;
+    const customField = fieldId && propertyConfigs ? propertyConfigs[fieldId] : undefined;
     return mergeDeep(defaultFieldConfig ?? {}, customField ?? {} as PropertyConfig);
 }
 

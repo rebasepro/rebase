@@ -396,7 +396,7 @@ c: 0 });
                 style={{ position: "fixed",
 zIndex: 9999,
 visibility: "hidden" }}
-                className={cls("text-surface-900 dark:text-white rounded-md border bg-white dark:bg-surface-900 p-2 shadow transition-none", defaultBorderMixin)}
+                className={cls("text-surface-900 dark:text-white rounded-md border bg-white dark:bg-surface-800 p-2 shadow transition-none", defaultBorderMixin)}
             >
                 <TableGridPicker
                     hoveredRow={tableGridCoords.r}
@@ -428,7 +428,7 @@ c })}
             style={{ position: "fixed",
 zIndex: 9999,
 visibility: "hidden" }}
-            className={cls("text-surface-900 dark:text-white max-h-[280px] w-72 overflow-y-auto rounded-md border bg-white dark:bg-surface-900 px-1 py-2 shadow transition-none", defaultBorderMixin)}
+            className={cls("text-surface-900 dark:text-white max-h-[280px] w-72 overflow-y-auto rounded-md border bg-white dark:bg-surface-800 px-1 py-2 shadow transition-none", defaultBorderMixin)}
         >
             {filteredItems.map((item, index) => (
                 <button
@@ -446,7 +446,7 @@ visibility: "hidden" }}
                     className={cls("flex w-full items-center space-x-2 rounded-md px-2 py-1 text-left text-sm hover:bg-blue-50 hover:dark:bg-surface-700",
                         index === selectedIndex ? "bg-blue-100 dark:bg-surface-accent-950" : "")}
                 >
-                    <div className={cls("flex h-10 w-10 shrink-0 items-center justify-center rounded-md border bg-white dark:bg-surface-900", defaultBorderMixin)}>
+                    <div className={cls("flex h-10 w-10 shrink-0 items-center justify-center rounded-md border bg-white dark:bg-surface-800", defaultBorderMixin)}>
                         {item.icon}
                     </div>
                     <div className="flex flex-col overflow-hidden">
@@ -503,7 +503,7 @@ const TableGridPicker = ({
                                     "w-5 h-5 border rounded-sm cursor-pointer transition-colors duration-75",
                                     r <= hoveredRow && c <= hoveredCol
                                         ? "bg-blue-100 border-blue-400 dark:bg-blue-900 dark:border-blue-500"
-                                        : "bg-white dark:bg-surface-900 border-gray-200 dark:border-gray-700 hover:border-blue-300"
+                                        : "bg-white dark:bg-surface-800 border-gray-200 dark:border-gray-700 hover:border-blue-300"
                                 )}
                                 onMouseEnter={() => onHover(r, c)}
                                 onClick={() => onSelect(hoveredRow + 1, hoveredCol + 1)}

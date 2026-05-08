@@ -164,7 +164,6 @@ export function FiltersDialog({
             maxWidth="3xl"
             fullWidth
             containerClassName={isAnyFieldHidden ? "hidden" : undefined}
-            className="dark:bg-surface-800"
         >
             <DialogTitle className="flex items-center gap-2" variant="h6">
                 {t("filters")}

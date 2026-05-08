@@ -99,12 +99,13 @@ export class CollectionRegistry {
         });
 
         // Phase 2: Now recurse into subcollections (relations, etc.)
-        normalizedCollections.forEach((c, index) => {
+        normalizedCollections.forEach((c) => {
             const subcollections = getSubcollections(c);
-            const rawSubcollections = getSubcollections(collections[index]);
-            if (subcollections && rawSubcollections) {
-                subcollections.forEach((subCollection, subIndex) => {
-                    this._registerRecursively(this.normalizeCollection(subCollection), cloneDeep(rawSubcollections[subIndex]));
+            if (subcollections && subcollections.length > 0) {
+                subcollections.forEach((subCollection) => {
+                    if (!subCollection) return;
+                    // Spread to avoid mutating the original target() return value
+                    this._registerRecursively(this.normalizeCollection({ ...subCollection }), cloneDeep(subCollection));
                 });
             }
         });
@@ -140,22 +141,30 @@ export class CollectionRegistry {
             this.rawCollectionsBySlug.set(rawCollection.slug, rawCollection);
         }
 
-        const subcollections = getSubcollections(collection);
-        const rawSubcollections = getSubcollections(rawCollection);
+        // Use the normalized collection for subcollection discovery so that
+        // both inline-extracted and explicit relations are considered.
+        const subcollections = getSubcollections(normalizedCollection);
 
-        if (subcollections && rawSubcollections) {
-            subcollections.forEach((subCollection, index) => {
-                this._registerRecursively(this.normalizeCollection(subCollection), cloneDeep(rawSubcollections[index]));
+        if (subcollections && subcollections.length > 0) {
+            subcollections.forEach((subCollection) => {
+                if (!subCollection) return;
+                // Spread to avoid mutating the original target() return value
+                this._registerRecursively(this.normalizeCollection({ ...subCollection }), cloneDeep(subCollection));
             });
         }
     }
 
     public normalizeCollection(collection: EntityCollection): EntityCollection {
+        // Work on a shallow copy to avoid mutating the caller's reference.
+        // This is critical for idempotency (the raw input must not be changed)
+        // and for preventing mutation of module-level collection singletons.
+        const result = { ...collection } as EntityCollection;
+
         // 1. Extract relations from properties that have inline config (target set)
-        const extractedRelations = this.extractRelationsFromProperties(collection.properties);
+        const extractedRelations = this.extractRelationsFromProperties(result.properties);
 
         // 2. Merge with manual relations[] (manual entries win on name conflict)
-        const manualRelations = isPostgresCollection(collection) ? (collection.relations ?? []) : [];
+        const manualRelations = isPostgresCollection(result) ? (result.relations ?? []) : [];
         const mergedRelations = [...extractedRelations];
         for (const manual of manualRelations) {
             const name = manual.relationName;
@@ -164,23 +173,23 @@ export class CollectionRegistry {
             }
         }
 
-        // 3. Set the merged relations on the collection
-        if (isPostgresCollection(collection)) {
-            collection.relations = mergedRelations;
+        // 3. Set the merged relations on the result copy
+        if (isPostgresCollection(result)) {
+            result.relations = mergedRelations;
         }
 
         // 4. Normalize properties (which stamps relation on each property)
-        const properties: Properties = this.normalizeProperties(collection.properties, mergedRelations);
-        collection.properties = properties;
+        const properties: Properties = this.normalizeProperties(result.properties, mergedRelations);
+        result.properties = properties;
 
         // Populate childCollections from driver-specific fields
-        if (!collection.childCollections) {
-            if (isFirebaseCollection(collection) && collection.subcollections) {
-                collection.childCollections = collection.subcollections;
-            } else if (isPostgresCollection(collection) && collection.relations) {
-                const manyRelations = collection.relations.filter(r => r.cardinality === "many");
+        if (!result.childCollections) {
+            if (isFirebaseCollection(result) && result.subcollections) {
+                result.childCollections = result.subcollections;
+            } else if (isPostgresCollection(result) && result.relations) {
+                const manyRelations = result.relations.filter(r => r.cardinality === "many");
                 if (manyRelations.length > 0) {
-                    collection.childCollections = () => manyRelations.map(r => {
+                    result.childCollections = () => manyRelations.map(r => {
                         const target = r.target();
                         return r.overrides ? mergeDeep(target, r.overrides) : target;
                     });
@@ -188,7 +197,7 @@ export class CollectionRegistry {
             }
         }
 
-        return collection;
+        return result;
     }
 
     /**
@@ -201,23 +210,29 @@ export class CollectionRegistry {
         for (const [key, property] of Object.entries(properties as Record<string, Property>)) {
             if (property.type === "relation") {
                 const relProp = property as RelationProperty;
-                if (relProp.target) {
-                    const relationName = relProp.relationName || key;
+                // Support both inline config (target directly on property)
+                // and nested config (target inside property.relation)
+                const target = relProp.target ?? relProp.relation?.target;
+                if (target) {
+                    const relationName = relProp.relationName ?? relProp.relation?.relationName ?? key;
                     relations.push({
                         relationName,
-                        target: relProp.target,
-                        cardinality: relProp.cardinality || "one",
-                        direction: relProp.direction || "owning",
-                        inverseRelationName: relProp.inverseRelationName,
-                        localKey: relProp.localKey,
-                        foreignKeyOnTarget: relProp.foreignKeyOnTarget,
-                        through: relProp.through,
-                        joinPath: relProp.joinPath,
-                        onUpdate: relProp.onUpdate,
-                        onDelete: relProp.onDelete,
-                        overrides: relProp.overrides,
+                        target,
+                        cardinality: relProp.cardinality ?? relProp.relation?.cardinality ?? "one",
+                        direction: relProp.direction ?? relProp.relation?.direction ?? "owning",
+                        inverseRelationName: relProp.inverseRelationName ?? relProp.relation?.inverseRelationName,
+                        localKey: relProp.localKey ?? relProp.relation?.localKey,
+                        foreignKeyOnTarget: relProp.foreignKeyOnTarget ?? relProp.relation?.foreignKeyOnTarget,
+                        through: relProp.through ?? relProp.relation?.through,
+                        joinPath: relProp.joinPath ?? relProp.relation?.joinPath,
+                        onUpdate: relProp.onUpdate ?? relProp.relation?.onUpdate,
+                        onDelete: relProp.onDelete ?? relProp.relation?.onDelete,
+                        overrides: relProp.overrides ?? relProp.relation?.overrides,
                     });
                 }
+            } else if (property.type === "map" && property.properties) {
+                // Recurse into map children to extract nested inline relations
+                relations.push(...this.extractRelationsFromProperties(property.properties));
             }
         }
         return relations;

@@ -128,7 +128,7 @@ direction: "owning" });
                             <DialogTitle className="flex justify-between items-center w-full" variant="h6">
                                 {editingRelationIndex === -1 ? "New Relation" : "Edit Relation"}
                             </DialogTitle>
-                            <DialogContent includeMargin={false} className="p-4 md:p-6 border-t dark:border-surface-800 bg-surface-50 dark:bg-surface-900">
+                            <DialogContent includeMargin={false} className="p-4 md:p-6 border-t dark:border-surface-700 bg-surface-50 dark:bg-surface-800">
                                 <div className="flex flex-col gap-4 max-w-2xl mx-auto">
                                     <TextField
                                         label="Relation Name"

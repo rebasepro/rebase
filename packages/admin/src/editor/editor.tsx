@@ -149,6 +149,37 @@ onJsonContentChange };
     handleImageUpload
   });
 
+  // When `version` changes externally (e.g. form discard/reset), re-parse the
+  // `content` prop and replace the ProseMirror document so the editor reflects
+  // the reverted value.
+  const versionRef = useRef(version);
+  useEffect(() => {
+    if (versionRef.current === version) return;   // skip initial render
+    versionRef.current = version;
+    if (!view) return;
+    try {
+      const newDoc = typeof content === "string"
+        ? parser.parse(content ?? "")
+        : content
+          ? schema.nodeFromJSON(content)
+          : schema.node("doc", null, [schema.node("paragraph")]);
+      if (newDoc) {
+        const tr = view.state.tr.replaceWith(0, view.state.doc.content.size, newDoc.content);
+        view.dispatch(tr);
+      }
+    } catch (e) {
+      console.warn("[RebaseEditor] Could not reset editor content:", e);
+    }
+    // Also reset raw-markdown textarea if the user is in source mode
+    if (isMarkdownMode) {
+      setInternalMarkdown(typeof content === "string" ? content : "");
+    }
+    // Reset the settling window so the replacement dispatch above is NOT
+    // treated as a user edit (which would fire onChange back to the form).
+    mountTimeRef.current = Date.now();
+    hasUserEditedRef.current = false;
+  }, [version]);
+
   const doc = state?.doc;
   // Use a time-based settling window instead of a single-skip flag.
   // The trailingNodePlugin fires appendTransaction on mount (adding a trailing
@@ -231,7 +262,7 @@ view }), [state, view])}>
                 placement: "top",
                 offset: 6
               }}
-              className={cls("flex w-fit max-w-[90vw] h-10 overflow-hidden rounded border bg-white dark:bg-surface-900 shadow", defaultBorderMixin)}
+              className={cls("flex w-fit max-w-[90vw] h-10 overflow-hidden rounded border bg-white dark:bg-surface-800 shadow", defaultBorderMixin)}
             >
               <NodeSelector portalContainer={editorRef.current} open={openNode} onOpenChange={setOpenNode}/>
               <Separator orientation="vertical"/>

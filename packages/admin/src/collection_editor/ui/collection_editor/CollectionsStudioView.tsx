@@ -46,15 +46,15 @@ export function CollectionsStudioView({ configController }: CollectionsStudioVie
     const collections = configController.collections || [];
 
     return (
-        <div className="flex h-full w-full bg-white dark:bg-surface-900 overflow-hidden text-text-primary dark:text-text-primary-dark">
+        <div className="flex h-full w-full bg-white dark:bg-surface-800 overflow-hidden text-text-primary dark:text-text-primary-dark">
             <ResizablePanels
                 orientation="horizontal"
                 panelSizePercent={sidebarSize}
                 onPanelSizeChange={setSidebarSize}
                 minPanelSizePx={220}
                 firstPanel={
-                    <div className={cls("flex flex-col h-full w-full bg-white dark:bg-surface-900 border-r", defaultBorderMixin)}>
-                        <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
+                    <div className={cls("flex flex-col h-full w-full bg-white dark:bg-surface-800 border-r", defaultBorderMixin)}>
+                        <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-800 min-h-[48px]", defaultBorderMixin)}>
                             <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
                                 Collections
                             </Typography>

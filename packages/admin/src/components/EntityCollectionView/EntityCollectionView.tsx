@@ -578,6 +578,7 @@ export const EntityCollectionView = React.memo(
                 property = getPropertyInPath(resolvedCollection.properties, propertyKey);
             }
 
+
             // In v4, properties are already resolved, so we return them directly
             return property ?? null;
         }, [collection.properties, resolvedCollection.properties]);
@@ -1210,7 +1211,7 @@ function EntityIdHeaderWidget({
                     </IconButton>
                 }>
                 <div
-                    className={cls("my-2 rounded-lg bg-surface-50 dark:bg-surface-900 text-surface-900 dark:text-white")}>
+                    className={cls("my-2 rounded-lg bg-surface-50 dark:bg-surface-800 text-surface-900 dark:text-white")}>
                     <form noValidate={true}
                         onSubmit={(e) => {
                             e.preventDefault();
@@ -1239,7 +1240,7 @@ function EntityIdHeaderWidget({
                                     setSearchString(e.target.value);
                                 }}
                                 value={searchString}
-                                className={"rounded-lg bg-white dark:bg-surface-900 flex-grow bg-transparent outline-none p-2 " + focusedDisabled}/>
+                                className={"rounded-lg bg-white dark:bg-surface-900 flex-grow outline-none p-2 " + focusedDisabled}/>
                             <Button variant={"text"}
                                 disabled={!(searchString.trim())}
                                 type={"submit"}

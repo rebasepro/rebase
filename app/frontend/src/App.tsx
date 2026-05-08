@@ -1,6 +1,10 @@
 import React from "react";
 import "@fontsource/jetbrains-mono";
 import "typeface-rubik";
+import type { AnalyticsEvent } from "@rebasepro/types";
+
+// Global gtag function injected by the GA4 script in index.html
+declare function gtag(...args: any[]): void;
 
 import { useRebaseAuthController, useBackendUserManagement, RebaseAuth } from "@rebasepro/auth";
 import { Rebase } from "@rebasepro/core";
@@ -23,6 +27,13 @@ export function App() {
     const rebaseClient = React.useMemo(() => createRebaseClient({
         baseUrl: API_URL
     }), []);
+
+    // Forward all Rebase analytics events to GA4
+    const onAnalyticsEvent = React.useCallback((event: AnalyticsEvent, data?: object) => {
+        if (typeof gtag === "function") {
+            gtag("event", event, data);
+        }
+    }, []);
 
     const authController = useRebaseAuthController({
         client: rebaseClient,
@@ -202,6 +213,7 @@ export function App() {
             authController={authController}
             userManagement={userManagement}
             plugins={plugins}
+            onAnalyticsEvent={onAnalyticsEvent}
         >
             <RebaseAuth loginView={<DemoLoginView authController={authController} googleEnabled={true} googleClientId={GOOGLE_CLIENT_ID}/>}/>
             <RebaseCMS

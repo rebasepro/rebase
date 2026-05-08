@@ -116,7 +116,7 @@ export const TableBubble = forwardRef<HTMLDivElement, TableBubbleProps>(
                 style={{ visibility: "hidden",
 position: "fixed",
 zIndex: 50 }}
-                className={cls("flex flex-row gap-1 p-1 rounded-lg border bg-white dark:bg-surface-900 shadow-lg", defaultBorderMixin, className)}
+                className={cls("flex flex-row gap-1 p-1 rounded-lg border bg-white dark:bg-surface-800 shadow-lg", defaultBorderMixin, className)}
                 onMouseDown={(e) => {
                     // Prevent mousedown from stealing focus from the editor
                     e.preventDefault();

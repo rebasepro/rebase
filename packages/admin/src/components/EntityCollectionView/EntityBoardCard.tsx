@@ -82,12 +82,12 @@ function EntityBoardCardInner<M extends Record<string, unknown> = Record<string,
     // Memoize className computations
     const backgroundColor = useMemo((): string => {
         if (isDragging) {
-            return "bg-surface-100 dark:bg-surface-900";
+            return "bg-surface-100 dark:bg-surface-800";
         }
         if (isGroupedOver) {
-            return "bg-surface-200";
+            return "bg-surface-200 dark:bg-surface-700";
         }
-        return "bg-white dark:bg-surface-900 hover:bg-surface-50 dark:hover:bg-surface-800";
+        return "bg-white dark:bg-surface-800 hover:bg-surface-50 dark:hover:bg-surface-700";
     }, [isDragging, isGroupedOver]);
 
     const borderColor = useMemo((): string =>

@@ -595,7 +595,7 @@ export function EntityForm<M extends Record<string, unknown>>({
         return (
             <FormLayout>
                 {formFieldKeys.map((key) => {
-                    const property = collection.properties[key];
+                    const property = collection.properties?.[key];
                     if (property) {
 
                         const underlyingValueHasChanged: boolean =

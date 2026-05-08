@@ -126,6 +126,7 @@ export function MarkdownEditorFieldBinding({
     useEffect(() => {
         if (internalValue.current !== value) {
             internalValue.current = value;
+            canonicalRef.current = canonicalizeMarkdown(value);
             setFieldVersion(v => v + 1);
         }
     }, [value]);

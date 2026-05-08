@@ -70,7 +70,7 @@ export function resolveProperty<M extends Record<string, unknown> = Record<strin
     }
 
     // Apply dynamic properties if they exist
-    if (resultProperty.dynamicProps && rest.path) {
+    if (resultProperty?.dynamicProps && rest.path) {
         const path = rest.path;
         const usedPropertyValue = rest.propertyKey ? getIn(rest.values, rest.propertyKey) : undefined;
         const dynamicPropsResult = resultProperty.dynamicProps({
@@ -353,6 +353,7 @@ export function getSubcollections<M extends Record<string, unknown> = Record<str
         const manyRelations = collection.relations.filter(r => r.cardinality === "many");
         return manyRelations.map(r => {
             const target = r.target();
+            if (!target) return undefined;
             const relationKey = r.relationName || target.slug;
 
             // Try to find corresponding property to get custom name
@@ -372,10 +373,9 @@ export function getSubcollections<M extends Record<string, unknown> = Record<str
                 baseOverrides.singularName = customName;
             }
 
-            const targetWithOverrides = { ...target,
-...baseOverrides };
+            const targetWithOverrides = { ...target, ...baseOverrides };
             return (r.overrides ? mergeDeep(targetWithOverrides, r.overrides) : targetWithOverrides) as EntityCollection<Record<string, unknown>>;
-        });
+        }).filter(c => Boolean(c)) as EntityCollection<Record<string, unknown>>[];
     }
 
     return [];

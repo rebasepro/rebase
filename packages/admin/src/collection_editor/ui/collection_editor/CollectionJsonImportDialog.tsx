@@ -102,7 +102,7 @@ export function CollectionJsonImportDialog({
                     rows={12}
                     className={cls(
                         "w-full p-3 font-mono text-sm rounded-md border resize-none overflow-y-auto",
-                        "bg-surface-50 dark:bg-surface-900",
+                        "bg-surface-50 dark:bg-surface-800",
                         "focus:outline-none focus:ring-2 focus:ring-primary",
                         "h-[300px]",
                         errors.length > 0 && touched

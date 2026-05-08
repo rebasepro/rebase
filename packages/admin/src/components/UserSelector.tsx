@@ -236,7 +236,7 @@ export const UserSelector = React.forwardRef<
                         <PopoverPrimitive.Content
                             ref={contentRef}
                             data-user-selector-content
-                            className={cls("z-50 overflow-hidden border bg-white dark:bg-surface-900 rounded-lg min-w-72", defaultBorderMixin)}
+                            className={cls("z-50 overflow-hidden border bg-white dark:bg-surface-800 rounded-lg min-w-72", defaultBorderMixin)}
                             align="start"
                             sideOffset={8}
                             side="bottom"

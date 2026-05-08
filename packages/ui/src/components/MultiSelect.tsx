@@ -302,7 +302,7 @@ export const MultiSelect = React.forwardRef<
                     </PopoverPrimitive.Trigger>
                     <PopoverPrimitive.Portal container={finalContainer}>
                         <PopoverPrimitive.Content
-                            className={cls("z-50 overflow-hidden border bg-white dark:bg-surface-900 rounded-lg w-[400px]", defaultBorderMixin)}
+                            className={cls("z-50 overflow-hidden border bg-white dark:bg-surface-800 rounded-lg w-[400px]", defaultBorderMixin)}
                             align="start"
                             sideOffset={8}
                             onEscapeKeyDown={() => onPopoverOpenChange(false)}

@@ -134,7 +134,7 @@ export function CollectionRLSTab() {
                     <div className="flex flex-col gap-3">
                         {rules.map((rule: SecurityRule) => (
                             <Paper key={rule.name}
-                                className={"p-4 border border-transparent hover:border-surface-200 dark:hover:border-surface-800 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors bg-white dark:bg-surface-900 shadow-sm"}>
+                                className={"p-4 border border-transparent hover:border-surface-200 dark:hover:border-surface-700 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors bg-white dark:bg-surface-800 shadow-sm"}>
                                 <div className="flex flex-col gap-1.5 min-w-0">
                                     <div className="flex items-center gap-2">
                                         <KeyIcon size={iconSize.smallest} className="text-text-disabled dark:text-text-disabled-dark shrink-0"/>
@@ -271,8 +271,8 @@ function InlinePolicyEditor({
                     Define RLS rules for <span className="font-mono text-primary bg-primary-bg dark:bg-primary-bg-dark px-1 py-0.5 rounded">public.{table}</span>
                 </div>
             </DialogTitle>
-            <DialogContent className="p-4 md:p-6 border-t dark:border-surface-800 bg-surface-50 dark:bg-surface-900" includeMargin={false}>
-                <Paper className={cls("p-4 md:p-6 flex flex-col gap-6 bg-white dark:bg-surface-900 border-none sm:border-solid rounded-none sm:rounded-xl", defaultBorderMixin)}>
+            <DialogContent className="p-4 md:p-6 border-t dark:border-surface-700 bg-surface-50 dark:bg-surface-800" includeMargin={false}>
+                <Paper className={cls("p-4 md:p-6 flex flex-col gap-6 bg-white dark:bg-surface-800 border-none sm:border-solid rounded-none sm:rounded-xl", defaultBorderMixin)}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="flex flex-col gap-1.5">
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">Policy Name</Typography>

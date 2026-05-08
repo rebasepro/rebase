@@ -62,7 +62,7 @@ export function Autocomplete({
         <div ref={autocompleteRef}
              className={cls(
                  open ? paperMixin : "",
-                 "bg-surface-50 dark:bg-surface-900",
+                 "bg-surface-50 dark:bg-surface-800",
                  className
              )}>
             {children}

@@ -45,6 +45,7 @@ export function useBuildCollectionRegistryController(props: {
             return undefined;
         }
 
+
         const userOverride = includeUserOverride ? userConfigPersistence?.getCollectionConfig(slugOrPath) : undefined;
         const overriddenCollection = collection ? mergeDeep(collection, userOverride ?? {}) : undefined;
 

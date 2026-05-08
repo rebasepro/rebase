@@ -137,7 +137,7 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
                         {hasAppBar && <DrawerHeader/>}
 
                         <div
-                            className={cls(defaultBorderMixin, "bg-surface-50 dark:bg-surface-900", "grow overflow-auto m-0", {
+                            className={cls(defaultBorderMixin, "bg-white dark:bg-surface-800", "grow overflow-auto m-0", {
                                 "lg:mt-4": !hasAppBar,
                                 "mt-1 lg:m-0 lg:mx-2 lg:mb-2 lg:rounded-lg lg:border-t lg:border-x lg:border-solid": padding,
                                 "border-t": hasAppBar && !padding

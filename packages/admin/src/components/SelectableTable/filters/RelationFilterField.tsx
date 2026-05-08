@@ -118,7 +118,7 @@ export function RelationFilterField({
                 />
 
                 {!manyRelation && <Label
-                    className="border cursor-pointer rounded-md p-2 flex items-center gap-2 [&:has(:checked)]:bg-surface-100 dark:[&:has(:checked)]:bg-surface-900"
+                    className="border cursor-pointer rounded-md p-2 flex items-center gap-2 bg-surface-50 dark:bg-surface-900 hover:bg-surface-100 dark:hover:bg-surface-800"
                     htmlFor="null-filter"
                 >
                     <Checkbox

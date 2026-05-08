@@ -208,7 +208,7 @@ export function getColumnKeysForProperty(property: Property, key: string, disabl
 }
 
 export function getFormFieldKeys(collection: EntityCollection): string[] {
-    const propertyKeys = Object.keys(collection.properties);
+    const propertyKeys = collection.properties ? Object.keys(collection.properties) : [];
     const additionalFields = collection.additionalFields ?? [];
     const allKeys = [
         ...propertyKeys,
