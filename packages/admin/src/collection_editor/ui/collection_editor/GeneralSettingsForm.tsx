@@ -6,7 +6,7 @@ import { useAuthController, useCustomizationController } from "@rebasepro/core";
 import { SearchIconsView } from "../../_cms_internals";
 import type { EntityCollection, PostgresCollection } from "@rebasepro/types";
 import { BooleanSwitchWithLabel, Chip, cls, Container, DebouncedTextField, Dialog, ExpandablePanel, IconButton, Select, SelectItem, TextField, Tooltip, Typography , iconSize } from "@rebasepro/ui";
-import { HistoryIcon, SearchIcon, AlertTriangleIcon } from "lucide-react";
+import { HistoryIcon, SearchIcon } from "lucide-react";
 import { Field, getIn, useFormex } from "@rebasepro/formex";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
 import { singular, toSnakeCase } from "@rebasepro/utils";
@@ -128,17 +128,8 @@ export function GeneralSettingsForm({
                                     ? errors.table
                                     : isSubcollection ? "Relative path to the parent (no need to include the parent path)" : "PostgreSQL table name for this collection"}
                             </FieldCaption>
-
-                            {values.isTableMissing && (
-                                <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800/30 rounded-md text-sm font-medium flex gap-2">
-                                    <div className="mt-0.5"><AlertTriangleIcon size={iconSize.smallest}/></div>
-                                    <span>
-                                        The table <b>&quot;{values.table}&quot;</b> does not exist in the database schema.
-                                        If you&apos;ve recently created it, make sure to generate and run your database migrations.
-                                    </span>
-                                </div>
-                            )}
                         </div>
+
 
                         {/* Singular Name */}
                         <div className={"col-span-12"}>

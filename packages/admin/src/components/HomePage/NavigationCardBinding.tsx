@@ -1,10 +1,8 @@
 import type { NavigationEntry, EntityCollection } from "@rebasepro/types";
-import { isPostgresCollection } from "@rebasepro/types";
 import { useNavigate } from "react-router-dom";
 ;
 import { IconButton, Tooltip } from "@rebasepro/ui";
-import { AlertTriangleIcon, StarIcon } from "lucide-react";
-import { iconSize } from "@rebasepro/ui";
+import { StarIcon } from "lucide-react";
 import { NavigationCard } from "./NavigationCard";
 import { SmallNavigationCard } from "./SmallNavigationCard";
 import React from "react";
@@ -84,15 +82,6 @@ export function NavigationCardBinding({
         context
     });
 
-    if (collection && isPostgresCollection(collection) && collection.isTableMissing) {
-        actionsArray.unshift(
-            <Tooltip key="warning" title={`Table mapped to "${collection?.slug || collection?.name}" is missing in the database. Run migrations.`}>
-                <div>
-                    <AlertTriangleIcon className="text-red-600 dark:text-red-400" size={iconSize.small}/>
-                </div>
-            </Tooltip>
-        );
-    }
 
     const actions: React.ReactNode | undefined = <>
         {actionsArray}

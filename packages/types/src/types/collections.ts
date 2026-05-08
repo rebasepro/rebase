@@ -382,12 +382,6 @@ export interface PostgresCollection<M extends Record<string, unknown> = Record<s
     table: string;
 
     /**
-     * Set by the backend when the resolved table name doesn't match
-     * an actual table in the database schema.
-     */
-    isTableMissing?: boolean;
-
-    /**
      * For SQL databases, you can define the relations between collections here.
      * Relations describe JOINs, foreign keys, and junction tables.
      */

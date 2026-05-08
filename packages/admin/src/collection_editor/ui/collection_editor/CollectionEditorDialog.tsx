@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { ConfirmationDialog, ErrorView, useAuthController, useCustomizationController, useSnackbarController } from "@rebasepro/core";
 import { CircularProgressCenter } from "@rebasepro/ui";
 import { ArrowLeftIcon, CheckIcon } from "lucide-react";
-import { Entity, EntityCollection, MapProperty, Properties, Property, PropertyConfig, User, getDataSourceCapabilities, isPostgresCollection } from "@rebasepro/types";
+import { Entity, EntityCollection, MapProperty, Properties, Property, PropertyConfig, User, getDataSourceCapabilities } from "@rebasepro/types";
 import type { PostgresCollection } from "@rebasepro/types";
 import { getSubcollections, isPropertyBuilder, removeInitialAndTrailingSlashes, getTableName } from "@rebasepro/common";
 import { Button, cls, coolIconKeys, defaultBorderMixin, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, LoadingButton, Tab, Tabs, Typography } from "@rebasepro/ui";

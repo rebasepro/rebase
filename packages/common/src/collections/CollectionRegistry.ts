@@ -1,8 +1,6 @@
 import {
     ArrayProperty,
     EntityCollection,
-    isPostgresCollection,
-    isFirebaseCollection,
     NumberProperty,
     PostgresCollection,
     Properties,
