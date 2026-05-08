@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import { getIcon } from "@rebasepro/core";
-;;;
 import type { DataRow, ScorecardConfig, ScorecardFormat } from "../types";
 
 function formatNumber(value: number, format?: ScorecardFormat): string {
@@ -122,7 +121,7 @@ export function InsightsScorecardView({
         : `rounded-lg flex flex-col min-w-0 bg-transparent border border-surface-200 dark:border-surface-800 ${isSmall ? "px-3.5 py-3" : "px-5 py-4"}`;
 
     return (
-        <div ref={containerRef} className={baseClass}>
+        <div ref={containerRef} className={baseClass} style={embedded ? undefined : { minHeight: isSmall ? 68 : 92 }}>
             {/* Title row */}
             <div className={`flex items-center justify-between ${isSmall ? "mb-1" : "mb-2"}`}>
                 <div className="flex flex-col min-w-0">

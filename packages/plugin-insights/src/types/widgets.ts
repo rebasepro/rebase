@@ -6,44 +6,6 @@
 export type DataRow = Record<string, string | number | boolean | null>;
 
 /**
- * Vega/Vega-Lite chart specification after hydration with actual data.
- * Supports both Vega-Lite (mark/encoding) and full Vega (marks/scales/signals).
- */
-export type HydratedChartConfig = {
-    $schema?: string;
-    // Vega-Lite properties
-    data?: { values: DataRow[] } | unknown[];
-    mark?: string | { type: string; [key: string]: unknown };
-    encoding?: Record<string, unknown>;
-    layer?: unknown[];
-    // Vega properties
-    marks?: unknown[];
-    scales?: unknown[];
-    axes?: unknown[];
-    signals?: unknown[];
-    legends?: unknown[];
-    // Common properties
-    projection?: Record<string, unknown>;
-    datasets?: Record<string, DataRow[]>;
-    config?: {
-        mark?: unknown;
-        axis?: unknown;
-        legend?: unknown;
-        title?: unknown;
-        view?: unknown;
-        background?: unknown;
-    };
-    transform?: unknown[];
-    width?: number;
-    height?: number;
-    autosize?: string | { type: string; contains?: string; resize?: boolean };
-    padding?: unknown;
-    background?: string;
-    description?: string;
-    title?: unknown;
-};
-
-/**
  * Formatting options for scorecard numbers.
  * Uses Intl.NumberFormat standard.
  */

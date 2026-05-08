@@ -1,4 +1,4 @@
-import type { DataRow, HydratedChartConfig, ScorecardConfig } from "./widgets";
+import type { DataRow, ScorecardConfig } from "./widgets";
 
 /**
  * Result returned by an insight's data callback.
@@ -22,8 +22,6 @@ export interface InsightDefinition {
     title: string;
     /** Optional description */
     description?: string;
-    /** Type of visualization */
-    type: "chart" | "scorecard";
 
     /**
      * Async callback that fetches data for this insight.
@@ -49,31 +47,37 @@ export interface InsightDefinition {
      */
     data: () => Promise<InsightDataResult>;
 
-    /** Vega-Lite chart spec (merged with fetched data). Required when type is "chart". */
-    chart?: Partial<HydratedChartConfig>;
-    /** Scorecard field mapping. Required when type is "scorecard". */
-    scorecard?: ScorecardConfig;
+    /** Scorecard field mapping + formatting. */
+    scorecard: ScorecardConfig;
 }
 
 /**
  * Full plugin configuration passed to `useInsightsPlugin`.
  *
- * The developer defines insight widgets by placement and provides
+ * The developer defines scorecard widgets by placement and provides
  * their own data callbacks. No global fetch function needed — each
  * widget is self-contained.
+ *
+ * Collection-level insights (`collections.<slug>`) are rendered in two places
+ * automatically:
+ * - **Collection list view**: Scorecards appear inline below the title and
+ *   above the data list.
+ * - **Home page cards**: Scorecards are auto-extracted and rendered as compact
+ *   widgets inside each collection's card on the home page.
+ *
+ * This eliminates the need to duplicate definitions across different locations.
  */
 export interface InsightsPluginConfig {
     /**
      * Insight definitions keyed by placement.
      *
      * - `home`: Rendered at the top of the home page via `home.children.start`.
-     * - `collections.<slug>`: Rendered above that collection's view via `collection.insights`.
-     * - `cards.<slug>`: Rendered inline in the home page card for that collection.
+     * - `collections.<slug>`: Rendered inline in that collection's list view
+     *   and auto-extracted as compact scorecards on the home card.
      */
     insights: {
         home?: InsightDefinition[];
         collections?: Record<string, InsightDefinition[]>;
-        cards?: Record<string, InsightDefinition[]>;
     };
 
     /** Optional cache TTL in milliseconds (default: 60_000) */

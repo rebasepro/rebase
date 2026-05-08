@@ -46,11 +46,9 @@ export function App() {
         cacheTTL: 120_000,
         insights: {
             home: [
-                // ── Scorecards ──────────────────────────────────────
                 {
                     id: "total-revenue",
                     title: "Total Revenue",
-                    type: "scorecard",
                     data: async () => {
                         const res = await rebaseClient.data.collection("orders").find({ limit: 500 });
                         const total = res.data.reduce((sum: number, e) => sum + (Number(e.values?.total) || 0), 0);
@@ -67,7 +65,6 @@ export function App() {
                 {
                     id: "total-orders",
                     title: "Orders",
-                    type: "scorecard",
                     data: async () => {
                         const res = await rebaseClient.data.collection("orders").find({ limit: 1 });
                         const diff = 0.124; // Mock comparison +12.4%
@@ -83,7 +80,6 @@ export function App() {
                 {
                     id: "avg-order-value",
                     title: "Avg. Order Value",
-                    type: "scorecard",
                     data: async () => {
                         const res = await rebaseClient.data.collection("orders").find({ limit: 500 });
                         const total = res.data.reduce((sum: number, e) => sum + (Number(e.values?.total) || 0), 0);
@@ -101,7 +97,6 @@ export function App() {
                 {
                     id: "refunded-orders",
                     title: "Refunded Orders",
-                    type: "scorecard",
                     data: async () => {
                         const res = await rebaseClient.data.collection("orders").find({
                             limit: 1,
@@ -117,111 +112,16 @@ export function App() {
                         dateRange: "vs Previous 30 Days",
                     },
                 },
-
-                // ── Charts ──────────────────────────────────────────
-                {
-                    id: "orders-by-status",
-                    title: "Orders by Status",
-                    type: "chart",
-                    data: async () => {
-                        const res = await rebaseClient.data.collection("orders").find({ limit: 500 });
-                        const counts: Record<string, number> = {};
-                        for (const e of res.data) {
-                            const status = String(e.values?.status || "unknown");
-                            counts[status] = (counts[status] || 0) + 1;
-                        }
-                        return {
-                            rows: Object.entries(counts).map(([status, count]) => ({ status, count })),
-                        };
-                    },
-                    chart: {
-                        $schema: "https://vega.github.io/schema/vega-lite/v5.json",
-                        mark: { type: "bar", cornerRadiusEnd: 4 },
-                        encoding: {
-                            x: { field: "status", type: "nominal", axis: { title: null, labelAngle: 0 }, sort: "-y" },
-                            y: { field: "count", type: "quantitative", axis: { title: null, grid: true } },
-                            color: { field: "status", type: "nominal", legend: null },
-                            tooltip: [
-                                { field: "status", type: "nominal", title: "Status" },
-                                { field: "count", type: "quantitative", title: "Orders" }
-                            ],
-                        },
-                    },
-                },
-                {
-                    id: "revenue-by-status",
-                    title: "Revenue by Status",
-                    type: "chart",
-                    data: async () => {
-                        const res = await rebaseClient.data.collection("orders").find({ limit: 500 });
-                        const sums: Record<string, number> = {};
-                        for (const e of res.data) {
-                            const status = String(e.values?.status || "unknown");
-                            sums[status] = (sums[status] || 0) + (Number(e.values?.total) || 0);
-                        }
-                        return {
-                            rows: Object.entries(sums).map(([status, revenue]) => ({ status, revenue: Math.round(revenue) })),
-                        };
-                    },
-                    chart: {
-                        $schema: "https://vega.github.io/schema/vega-lite/v5.json",
-                        mark: { type: "arc", innerRadius: 50 },
-                        encoding: {
-                            theta: { field: "revenue", type: "quantitative", stack: true },
-                            color: { field: "status", type: "nominal", legend: { orient: "right" } },
-                            tooltip: [
-                                { field: "status", type: "nominal" },
-                                { field: "revenue", type: "quantitative", format: "$," },
-                            ],
-                        },
-                    },
-                },
             ],
 
             // ── Collection-level insights ───────────────────────────
+            // Scorecards are auto-extracted for the home page cards
+            // and rendered inline in the collection list view.
             collections: {
                 orders: [
                     {
-                        id: "orders-daily-trend",
-                        title: "Daily Orders",
-                        type: "chart",
-                        data: async () => {
-                            const res = await rebaseClient.data.collection("orders").find({ limit: 500 });
-                            const byDay: Record<string, number> = {};
-                            for (const e of res.data) {
-                                const d = String(e.values?.order_date || e.values?.created_at || "").slice(0, 10);
-                                if (d) byDay[d] = (byDay[d] || 0) + 1;
-                            }
-                            return {
-                                rows: Object.entries(byDay)
-                                    .sort(([a], [b]) => a.localeCompare(b))
-                                    .slice(-30)
-                                    .map(([date, count]) => ({ date, count })),
-                            };
-                        },
-                        chart: {
-                            $schema: "https://vega.github.io/schema/vega-lite/v5.json",
-                            mark: { type: "area", line: true, opacity: 0.3, interpolate: "monotone" },
-                            encoding: {
-                                x: { field: "date", type: "temporal", axis: { title: null, format: "%b %d" } },
-                                y: { field: "count", type: "quantitative", axis: { title: null } },
-                                tooltip: [
-                                    { field: "date", type: "temporal", title: "Date", format: "%b %d, %Y" },
-                                    { field: "count", type: "quantitative", title: "Orders" }
-                                ],
-                            },
-                        },
-                    },
-                ],
-            },
-
-            // ── Inline card widgets ─────────────────────────────────
-            cards: {
-                orders: [
-                    {
-                        id: "card-orders-count",
+                        id: "orders-total-count",
                         title: "Total",
-                        type: "scorecard",
                         data: async () => {
                             const res = await rebaseClient.data.collection("orders").find({ limit: 1 });
                             return { rows: [{ value: res.meta.total }] };
@@ -231,9 +131,8 @@ export function App() {
                         },
                     },
                     {
-                        id: "card-orders-revenue",
+                        id: "orders-revenue",
                         title: "Revenue",
-                        type: "scorecard",
                         data: async () => {
                             const res = await rebaseClient.data.collection("orders").find({ limit: 500 });
                             const total = res.data.reduce((sum: number, e) => sum + (Number(e.values?.total) || 0), 0);
@@ -246,9 +145,8 @@ export function App() {
                 ],
                 products: [
                     {
-                        id: "card-products-count",
+                        id: "products-catalog-count",
                         title: "Catalog",
-                        type: "scorecard",
                         data: async () => {
                             const res = await rebaseClient.data.collection("products").find({ limit: 1 });
                             return { rows: [{ value: res.meta.total }] };
@@ -260,9 +158,8 @@ export function App() {
                 ],
                 tickets: [
                     {
-                        id: "card-tickets-open",
+                        id: "tickets-open-count",
                         title: "Open",
-                        type: "scorecard",
                         data: async () => {
                             const res = await rebaseClient.data.collection("tickets").find({
                                 limit: 1,

@@ -2,17 +2,21 @@ import React from "react";
 import type { RebasePlugin, SlotContribution } from "@rebasepro/types";
 import type { InsightsPluginConfig } from "./types";
 import { InsightsProvider } from "./engine/InsightsProvider";
-import { CollectionInsightsToolbarButton } from "./components/CollectionInsightsToolbarButton";
 import { HomeCardInsightSlot } from "./components/HomeCardInsightSlot";
 import { HomeInsightsSlot } from "./components/HomeInsightsSlot";
+import { CollectionInsightsInline } from "./components/CollectionInsightsInline";
 
 /**
  * Creates the Insights plugin for Rebase.
  *
- * This plugin injects data-driven widgets (charts, scorecards) into key UI locations:
- * - **Home page header**: Dashboard-style overview via `home.children.start` slot
- * - **Collection headers**: Detailed analytics via `collection.toolbar` slot (drawer)
- * - **Home page cards**: Compact inline metrics within collection cards via `home.card.insight` slot
+ * This plugin injects scorecard widgets into key UI locations:
+ * - **Home page header**: KPI overview via `home.children.start` slot
+ * - **Collection list view**: Scorecards inline (below title, above list) via `collection.insights` slot
+ * - **Home page cards**: Compact scorecard metrics auto-extracted from collection insights via `home.card.insight` slot
+ *
+ * Collection-level insights (`collections.<slug>`) are the single source of truth:
+ * scorecards render in the collection list view and are automatically extracted
+ * to show as compact widgets on the corresponding home page card.
  *
  * Each insight owns its own `data()` callback — use the Rebase client SDK,
  * call a custom function, or hit any external API. Full flexibility, zero new endpoints.
@@ -24,9 +28,14 @@ import { HomeInsightsSlot } from "./components/HomeInsightsSlot";
  * const insightsPlugin = useInsightsPlugin({
  *     cacheTTL: 120_000,
  *     insights: {
- *         home: [ ... ],
- *         collections: { orders: [ ... ] },
- *         cards: { orders: [ ... ] },
+ *         home: [
+ *             { id: "revenue", title: "Revenue", data: async () => ..., scorecard: { ... } },
+ *         ],
+ *         collections: {
+ *             orders: [
+ *                 { id: "total", title: "Total Orders", data: async () => ..., scorecard: { ... } },
+ *             ],
+ *         },
  *     },
  * });
  * ```
@@ -50,20 +59,24 @@ export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
         });
     }
 
-    // ── Collection header insights ────────────────────────────────────
+    // ── Per-collection insights ───────────────────────────────────────
+    // A single `collections.<slug>` definition serves two slots:
+    // 1. collection.insights  → inline scorecards in the list view
+    // 2. home.card.insight    → compact scorecards on the home card
     if (insights.collections) {
         for (const [slug, defs] of Object.entries(insights.collections)) {
             if (defs.length === 0) continue;
             const collectionInsights = defs;
+
+            // 1. Inline in collection list view
             slots.push({
-                slot: "collection.toolbar" as const,
+                slot: "collection.insights" as const,
                 Component: (props: Record<string, unknown>) => {
-                    // Only render for matching collection
                     const path = props.path as string;
                     const collectionSlug = path?.split("/").filter(Boolean).pop() ?? "";
                     if (collectionSlug !== slug) return null;
                     return (
-                        <CollectionInsightsToolbarButton
+                        <CollectionInsightsInline
                             {...props as { path: string; collection: unknown; parentCollectionIds: string[] }}
                             insights={collectionInsights}
                         />
@@ -71,14 +84,8 @@ export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
                 },
                 order: 10,
             });
-        }
-    }
 
-    // ── Home card inline insights ─────────────────────────────────────
-    if (insights.cards) {
-        for (const [slug, defs] of Object.entries(insights.cards)) {
-            if (defs.length === 0) continue;
-            const cardInsights = defs;
+            // 2. Auto-extract scorecards for home page card
             slots.push({
                 slot: "home.card.insight" as const,
                 Component: (props: Record<string, unknown>) => {
@@ -87,7 +94,7 @@ export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
                     return (
                         <HomeCardInsightSlot
                             {...props as { slug: string; collection: unknown; context: unknown }}
-                            insights={cardInsights}
+                            insights={collectionInsights}
                         />
                     );
                 },

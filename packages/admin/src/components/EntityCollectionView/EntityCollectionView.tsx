@@ -967,11 +967,6 @@ export const EntityCollectionView = React.memo(
 
                 {countFetcher}
 
-                {pluginInsights.length > 0 && (
-                    <div className="px-2 flex-shrink-0">
-                        {pluginInsights}
-                    </div>
-                )}
 
                 {/* When isSplitLayout, SplitListView is ALWAYS mounted — regardless
                     of viewMode. The toolbar + current view live in the left panel;
@@ -1025,6 +1020,11 @@ export const EntityCollectionView = React.memo(
                                         </Typography>
                                     </div>
                                 </div>
+                                {pluginInsights.length > 0 && (
+                                    <div className="flex-shrink-0">
+                                        {pluginInsights}
+                                    </div>
+                                )}
                                 <EntityCollectionListView
                                     key={`list-view-${path}`}
                                     collection={collection}
@@ -1047,6 +1047,11 @@ export const EntityCollectionView = React.memo(
                 ) : (
                     <>
                         {toolbarNode}
+                        {pluginInsights.length > 0 && (
+                            <div className="px-3 md:px-4 lg:px-6 max-w-6xl mx-auto w-full flex-shrink-0">
+                                {pluginInsights}
+                            </div>
+                        )}
                         {innerView}
                     </>
                 )}

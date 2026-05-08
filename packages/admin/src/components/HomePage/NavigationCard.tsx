@@ -70,10 +70,7 @@ export const NavigationCard = React.memo(function NavigationCard({
                 </div>
 
                 {additionalContent && (
-                    <div className="pl-[44px]" onClick={(e: React.MouseEvent) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                    }}>
+                    <div className="pl-[44px] pointer-events-none">
                         {additionalContent}
                     </div>
                 )}

@@ -11,8 +11,8 @@ import { RealtimeMiniDemo } from "../components/demos/RealtimeMiniDemo";
 import RoadmapSection from "../components/RoadmapSection.astro";
 import ClientLogos from "../components/ClientLogos.astro";
 
-const title = "Rebase — Ship your back-office in a sprint. Extend it forever.";
-const description = "Open-source Postgres platform — admin panel, REST & GraphQL APIs, and typed TypeScript SDK, all generated from your schema. Self-hosted, no vendor lock-in.";
+const title = "Rebase — The Schema-Driven App Platform for Postgres";
+const description = "Define your schema once in TypeScript. Get a production-ready admin panel, REST & GraphQL APIs, a typed SDK, and real-time sync — all generated instantly. Open-source, self-hosted.";
 
 ---
 <Layout title={title} description={description}>
@@ -32,17 +32,16 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
                 <div class="mb-8 flex items-center justify-center gap-3 animate-on-scroll fade-in">
                     <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-surface-700 bg-surface-900/60 text-sm font-medium text-surface-300">
                         <span class="inline-block text-base">🇪🇺</span>
-                        Open-source · Postgres-native · Built in Europe
+                        Open-source · Schema-driven · Built in Europe
                     </span>
                 </div>
 
                 <!-- Headline -->
                 <h1 class="mb-6 text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.1] text-white animate-on-scroll fade-in-up">
-                    Ship your back-office in a <span class="text-primary subtle-shimmer">sprint</span>.<br/>
-                    Extend it <span class="text-primary subtle-shimmer">forever</span>.
+                    Your Postgres,<br/><span class="text-primary subtle-shimmer">Fully Realized.</span>
                 </h1>
                 <p class="mb-8 text-lg leading-8 text-surface-400 lg:text-xl sm:px-10 xl:px-40 animate-on-scroll fade-in-up">
-                    Admin panel, APIs, and typed SDK — generated from a <b class="text-white font-medium">single TypeScript schema</b>.
+                    Define your schema once in TypeScript. Get a <b class="text-white font-medium">production-ready admin panel</b>, <b class="text-white font-medium">typed APIs</b>, and a <b class="text-white font-medium">full SDK</b> — instantly.
                 </p>
                 
 
@@ -52,7 +51,7 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
                        data-track
                        id="hero-start-building"
                        class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-8 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-primary-dark transition-all duration-200 ease-in-out btn-glow">
-                        Get Early Access
+                        Start Building
                         
 <svg
   class="lucide lucide-arrow-right"
@@ -95,9 +94,9 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
 
             <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-14 sm:pt-18">
                 <div class="max-w-3xl mx-auto text-center animate-on-scroll fade-in-up">
-                    <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">Watch the workflow</p>
+                    <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">Three commands. Zero boilerplate.</p>
                     <h2 class="mt-3 text-2xl sm:text-3xl font-semibold tracking-tight text-white">
-                        Connect · Introspect · Ship
+                        Schema In · Platform Out
                     </h2>
                     <div class="mt-8 max-w-2xl mx-auto">
                         <div class="rounded-2xl bg-surface-900/80 border border-surface-800/80 shadow-[0_0_0_1px_rgba(15,23,42,0.6),0_24px_80px_rgba(0,0,0,0.65)] text-left relative overflow-hidden group hover:border-primary/40 transition-colors duration-300">
@@ -272,7 +271,7 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
         <!-- Social proof -->
         <section class="bg-black py-12 sm:py-16">
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
-                <p class="text-center text-sm text-surface-500 mb-8 animate-on-scroll fade-in">Trusted by developers and teams at</p>
+                <p class="text-center text-sm text-surface-500 mb-8 animate-on-scroll fade-in">Trusted by developers and startups building on Postgres</p>
                 <ClientLogos />
             </div>
         </section>
@@ -283,10 +282,10 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
                 <div class="max-w-3xl mx-auto text-center mb-12 sm:mb-16 animate-on-scroll fade-in-up">
                     <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase">Zero to production</h2>
                     <p class="mt-4 text-3xl md:text-5xl font-semibold tracking-tight text-white">
-                        From zero to <span class="text-primary">admin panel</span> in minutes
+                        One schema. <span class="text-primary">Full stack.</span>
                     </p>
                     <p class="mt-5 text-base sm:text-lg text-surface-400 leading-relaxed">
-                        Connect your database, get instant APIs and UI, and customize with code.
+                        Define it once in TypeScript — Rebase generates the rest.
                     </p>
                 </div>
 
@@ -317,9 +316,9 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
 
                                 </div>
                                 <div>
-                                    <h3 class="text-white font-semibold">Connect your Postgres</h3>
+                                    <h3 class="text-white font-semibold">Define your schema</h3>
                                     <p class="mt-1 text-sm text-surface-400 leading-relaxed">
-                                        Point Rebase at any existing Postgres database. It introspects your schema — tables, types, relations — instantly.
+                                        Point Rebase at any existing Postgres database, or define your schema in TypeScript. Tables, types, relations — understood instantly.
                                     </p>
                                     <div class="mt-4 rounded-lg bg-surface-900/80 border border-surface-800/80 shadow-[0_4px_12px_rgba(0,0,0,0.2)] overflow-hidden relative z-10 group-hover:border-primary/40 transition-colors duration-300">
                                         <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-500" aria-hidden="true" style="background: radial-gradient(120px 80px at 50% 100%, rgba(0,112,244,0.1), transparent 100%);"></div>
@@ -407,9 +406,9 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
 
                                 </div>
                                 <div>
-                                    <h3 class="text-white font-semibold">Get everything, instantly</h3>
+                                    <h3 class="text-white font-semibold">Generate everything, instantly</h3>
                                     <p class="mt-1 text-sm text-surface-400 leading-relaxed">
-                                        Admin panel, entity forms, REST & GraphQL APIs, typed SDK, and real-time subscriptions — all generated from your schema.
+                                        Admin panel, entity forms, REST & GraphQL APIs, typed SDK, and real-time subscriptions — all generated from a single source of truth.
                                     </p>
                                 </div>
                             </div>
@@ -439,9 +438,9 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
 
                                 </div>
                                 <div>
-                                    <h3 class="text-white font-semibold">Extend forever</h3>
+                                    <h3 class="text-white font-semibold">Extend with real code</h3>
                                     <p class="mt-1 text-sm text-surface-400 leading-relaxed">
-                                        Customize with TypeScript. Add callbacks, custom views, business logic, and granular permissions — all version-controlled.
+                                        Add callbacks, custom views, business logic, and granular permissions in TypeScript — all version-controlled, no platform lock-in.
                                     </p>
                                 </div>
                             </div>
@@ -461,13 +460,13 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
         <section class="relative isolate bg-black py-32 sm:py-48 overflow-hidden">
             <div class="mx-auto max-w-7xl px-4">
                 <div class="mx-auto max-w-3xl lg:text-center animate-on-scroll fade-in-up">
-                    <p class="text-base font-semibold leading-7 text-primary">Solve Real Business Problems</p>
+                    <p class="text-base font-semibold leading-7 text-primary">Built for Real Products</p>
                     <h2 class="mt-2 text-4xl sm:text-5xl font-bold tracking-tight text-white">
-                        How Teams Use <span class="text-primary font-mono font-bold">REBASE</span>
+                        Teams Ship Faster with <span class="text-primary font-mono font-bold">REBASE</span>
                     </h2>
                     <p class="mt-6 text-lg leading-8 text-surface-400">
-                        From <b>marketplaces</b> to <b>internal tools</b> and <b>SaaS platforms</b>, Rebase helps
-                        teams ship production-grade back-offices in record time.
+                        From <b>marketplaces</b> to <b>SaaS platforms</b> and <b>internal tools</b>, Rebase eliminates
+                        the glue code between database, API, and UI.
                     </p>
                 </div>
             </div>
@@ -705,10 +704,10 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
                                 Security-first
                             </div>
                             <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-4">
-                                Your database, your rules.
+                                Your schema, your rules.
                             </h2>
                             <p class="text-lg text-surface-400 leading-relaxed">
-                                Row-level security defined in TypeScript. Granular permissions per collection, per field, per role.
+                                Row-level security defined right in your TypeScript schema. Granular permissions per collection, per field, per role.
                                 No hand-written SQL policies — just clean code that lives in version control.
                             </p>
                         </div>
@@ -765,11 +764,11 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
                                 Open source
                             </div>
                             <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-4">
-                                Code you own.<br/>Deploy anywhere.
+                                Your code. Your infra.<br/>Zero lock-in.
                             </h2>
                             <p class="text-lg text-surface-400 leading-relaxed">
                                 MIT-licensed. Self-host on Docker, Railway, Fly, or bare metal.
-                                Your data stays in your Postgres — no vendor lock-in, no surprises, no per-seat pricing.
+                                Your data stays in your Postgres — no vendor dependency, no surprises, no per-seat pricing.
                             </p>
                         </div>
                         <div class="relative z-10 mt-8 flex items-center gap-6">
@@ -812,8 +811,8 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
             <SectionBackgroundAccents blob={{ position: "bottom", size: "lg" }}/>
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
                 <div class="mx-auto max-w-2xl text-center mb-16 animate-on-scroll fade-in-up">
-                    <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">Production-grade, out of the box</h2>
-                    <p class="mt-4 text-surface-400 text-lg leading-relaxed">Every feature included. Every view updates in real time.</p>
+                    <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">Everything your schema generates</h2>
+                    <p class="mt-4 text-surface-400 text-lg leading-relaxed">Production-grade features, all driven by your TypeScript schema. Every view updates in real time.</p>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
@@ -1151,10 +1150,10 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
             <SectionBackgroundAccents topLine={true} blob={{ position: "top", size: "lg" }}/>
             <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
                 <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-4 animate-on-scroll fade-in-up">
-                    Your Postgres deserves a real platform.
+                    Stop writing glue code.
                 </h2>
                 <p class="text-surface-400 mb-6 text-lg max-w-xl mx-auto animate-on-scroll fade-in-up">
-                    Admin panel, APIs, and SDK — ready in minutes.<br class="hidden sm:block"/>
+                    Define your schema. Get your platform.<br class="hidden sm:block"/>
                     Open-source, self-hosted, no per-seat pricing.
                 </p>
                 <div class="mb-10 animate-on-scroll fade-in-up">
@@ -1222,7 +1221,7 @@ const description = "Open-source Postgres platform — admin panel, REST & Graph
                        data-track
                        id="cta-try-rebase"
                        class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-200 ease-in-out btn-glow">
-                        Get Early Access
+                        Start Building
                         
 <svg
   class="lucide lucide-arrow-right"

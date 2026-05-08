@@ -1,66 +1,54 @@
 import React from "react";
 
 /**
- * Skeleton loader for insight widgets — displays animated shimmer lines
- * to provide visual feedback while data is loading.
+ * Skeleton loader for scorecard insight widgets — displays animated
+ * shimmer lines to provide visual feedback while data is loading.
  */
 export function InsightWidgetSkeleton({
-    type = "scorecard",
     compact = false,
     embedded = false,
 }: {
-    type?: "chart" | "scorecard";
     compact?: boolean;
     /** When true, skip own border since the parent card provides it. */
     embedded?: boolean;
 }) {
-    if (type === "chart") {
+    // ── Compact scorecard skeleton — matches InsightsScorecardView compact layout exactly ──
+    if (compact) {
         return (
             <div
                 className={embedded
-                    ? "overflow-hidden animate-pulse h-full"
-                    : `rounded-lg overflow-hidden animate-pulse bg-transparent border border-surface-200 dark:border-surface-800`
+                    ? "animate-pulse h-full px-2.5 py-2"
+                    : "flex flex-col gap-0.5 rounded-md animate-pulse bg-transparent border border-surface-200 dark:border-surface-800 min-w-0 px-2.5 py-2"
                 }
-                style={embedded ? undefined : { height: compact ? 120 : 200 }}
             >
-                <div style={{
-                    display: "flex",
-                    alignItems: "flex-end",
-                    justifyContent: "space-around",
-                    height: "100%",
-                    padding: "24px 16px 16px",
-                    gap: 8,
-                }}>
-                    {[0.6, 0.85, 0.45, 0.72, 0.9, 0.55, 0.78].map((h, i) => (
-                        <div
-                            key={i}
-                            className="bg-surface-200 dark:bg-surface-700"
-                            style={{
-                                flex: 1,
-                                height: `${h * 100}%`,
-                                borderRadius: 4,
-                            }}
-                        />
-                    ))}
-                </div>
+                {/* Title line — matches text-[10px] uppercase */}
+                <div className="bg-surface-200 dark:bg-surface-700"
+                    style={{ height: 10, width: 48, borderRadius: 4 }}
+                />
+                {/* Value line — matches text-sm font-semibold */}
+                <div className="bg-surface-200 dark:bg-surface-700"
+                    style={{ height: 16, width: 40, borderRadius: 4, marginTop: 2 }}
+                />
             </div>
         );
     }
 
+    // ── Standard scorecard skeleton ──
     return (
         <div
             className={embedded
-                ? `animate-pulse h-full ${compact ? "px-3.5 py-3" : "px-5 py-4"}`
-                : `rounded-lg animate-pulse bg-transparent border border-surface-200 dark:border-surface-800 ${compact ? "px-3.5 py-3" : "px-5 py-4"}`
+                ? `animate-pulse h-full px-5 py-4`
+                : `rounded-lg animate-pulse bg-transparent border border-surface-200 dark:border-surface-800 px-5 py-4`
             }
+            style={embedded ? undefined : { minHeight: 92 }}
         >
             {/* Title line */}
-            <div className={`bg-surface-200 dark:bg-surface-700 ${compact ? "mb-2" : "mb-3"}`}
+            <div className="bg-surface-200 dark:bg-surface-700 mb-3"
                 style={{ height: 12, width: "60%", borderRadius: 6 }}
             />
             {/* Value line */}
-            <div className={`bg-surface-200 dark:bg-surface-700 ${compact ? "mb-1" : "mb-2"}`}
-                style={{ height: compact ? 24 : 32, width: "40%", borderRadius: 6 }}
+            <div className="bg-surface-200 dark:bg-surface-700 mb-2"
+                style={{ height: 32, width: "40%", borderRadius: 6 }}
             />
             {/* Comparison line */}
             <div className="bg-surface-200/80 dark:bg-surface-700/80"

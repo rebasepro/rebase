@@ -1,7 +1,6 @@
 // ── Types ─────────────────────────────────────────────────────────────
 export type {
     DataRow,
-    HydratedChartConfig,
     ScorecardFormat,
     ScorecardConfig,
     InsightDataResult,
@@ -18,7 +17,6 @@ export { InsightsCache } from "./engine/InsightsCache";
 export { useInsightsData } from "./engine/useInsightsData";
 
 // ── Widget components (for custom layouts) ────────────────────────────
-export { InsightsChartView } from "./components/InsightsChartView";
 export { InsightsScorecardView } from "./components/InsightsScorecardView";
 export { InsightWidget } from "./components/InsightWidget";
 export { InsightWidgetSkeleton } from "./components/InsightWidgetSkeleton";

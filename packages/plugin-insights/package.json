@@ -16,34 +16,14 @@
         "./package.json": "./package.json"
     },
     "dependencies": {
-        "@rebasepro/admin": "workspace:*",
-        "@rebasepro/common": "workspace:*",
         "@rebasepro/core": "workspace:*",
         "@rebasepro/types": "workspace:*",
-        "@rebasepro/ui": "workspace:*",
-        "@rebasepro/utils": "workspace:*",
-        "date-fns": "^3.6.0",
-        "html-to-image": "1.11.13",
-        "jspdf": "4.2.1",
         "lucide-react": "1.14.0",
-        "monaco-editor": "0.55.1",
-        "node-sql-parser": "5.4.0",
-        "react-compiler-runtime": "1.0.0",
-        "react-datepicker": "9.1.0",
-        "react-fast-compare": "3.2.2",
-        "react-grid-layout": "2.2.3",
-        "sql-formatter": "15.7.3"
+        "react-compiler-runtime": "1.0.0"
     },
     "peerDependencies": {
         "react": ">=19.0.0",
-        "react-dom": ">=19.0.0",
-        "react-router-dom": ">=7.0.0",
-        "vega-embed": ">=6.0.0"
-    },
-    "peerDependenciesMeta": {
-        "vega-embed": {
-            "optional": true
-        }
+        "react-dom": ">=19.0.0"
     },
     "scripts": {
         "dev": "vite",
@@ -66,9 +46,7 @@
         "@testing-library/jest-dom": "^6.9.1",
         "@types/jest": "^29.5.14",
         "@types/react": "^19.0.8",
-        "@types/react-datepicker": "7.0.0",
         "@types/react-dom": "^19.0.3",
-        "@types/react-grid-layout": "2.1.0",
         "@vitejs/plugin-react": "^4.3.4",
         "babel-jest": "^29.7.0",
         "babel-plugin-react-compiler": "^19.0.0-beta-af1b7da-20250417",
