@@ -50,28 +50,28 @@ export function resolveProperty<M extends Record<string, unknown> = Record<strin
 
     if (isPropertyBuilder(property)) {
         const path = rest.path;
-        if (!path)
-            throw Error("Trying to resolve a property builder without specifying the entity path");
-
-        const usedPropertyValue = rest.propertyKey ? getIn(rest.values, rest.propertyKey) : undefined;
-        const dynamicProps = property.dynamicProps?.({
-            ...rest,
-            path,
-            propertyValue: usedPropertyValue,
-            values: rest.values ?? {},
-            previousValues: rest.previousValues ?? rest.values ?? {}
-        });
-        resultProperty = mergeDeep(property, dynamicProps ?? {});
+        if (!path) {
+            // When path is not available (e.g. in preview contexts), skip dynamic
+            // resolution and use the property as-is without dynamic modifications.
+            resultProperty = property as Property;
+        } else {
+            const usedPropertyValue = rest.propertyKey ? getIn(rest.values, rest.propertyKey) : undefined;
+            const dynamicProps = property.dynamicProps?.({
+                ...rest,
+                path,
+                propertyValue: usedPropertyValue,
+                values: rest.values ?? {},
+                previousValues: rest.previousValues ?? rest.values ?? {}
+            });
+            resultProperty = mergeDeep(property, dynamicProps ?? {});
+        }
     } else {
         resultProperty = property as Property;
     }
 
     // Apply dynamic properties if they exist
-    if (resultProperty.dynamicProps) {
+    if (resultProperty.dynamicProps && rest.path) {
         const path = rest.path;
-        if (!path)
-            throw Error("Trying to resolve dynamicProps without specifying the entity path");
-
         const usedPropertyValue = rest.propertyKey ? getIn(rest.values, rest.propertyKey) : undefined;
         const dynamicPropsResult = resultProperty.dynamicProps({
             ...rest,

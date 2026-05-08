@@ -80,7 +80,6 @@ export function RebaseLoginView({
 
     const modeState = useModeController();
     const { mode: colorMode, setMode: setColorMode } = modeState;
-    const isDark = colorMode === "dark";
     const { t } = useTranslation();
 
     const [mode, setMode] = useState<AuthMode>("buttons");
@@ -188,7 +187,6 @@ export function RebaseLoginView({
                             registrationMode={true}
                             onClose={() => {}}
                             onForgotPassword={() => {}}
-                            mode={modeState.mode}
                             noUserComponent={noUserComponent}
                             disableSignupScreen={false}
                             bootstrapMode={true}
@@ -222,7 +220,7 @@ export function RebaseLoginView({
                                                     type="button"
                                                     className={cls(
                                                         "font-semibold hover:underline cursor-pointer",
-                                                        isDark ? "text-primary-400" : "text-primary-600"
+                                                        "text-primary-600 dark:text-primary-400"
                                                     )}
                                                     onClick={() => switchMode("register")}
                                                 >
@@ -241,7 +239,6 @@ export function RebaseLoginView({
                                     registrationMode={false}
                                     onClose={() => switchMode("buttons")}
                                     onForgotPassword={() => switchMode("forgot")}
-                                    mode={modeState.mode}
                                     noUserComponent={noUserComponent}
                                     disableSignupScreen={disableSignupScreen}
                                     switchToRegister={showRegistration ? () => switchMode("register") : undefined}
@@ -255,7 +252,6 @@ export function RebaseLoginView({
                                     registrationMode={true}
                                     onClose={() => switchMode("buttons")}
                                     onForgotPassword={() => switchMode("forgot")}
-                                    mode={modeState.mode}
                                     noUserComponent={noUserComponent}
                                     disableSignupScreen={disableSignupScreen}
                                     switchToLogin={() => switchMode("login")}
@@ -362,7 +358,6 @@ function LoginForm({
     onClose,
     onForgotPassword,
     authController,
-    mode,
     registrationMode,
     noUserComponent,
     disableSignupScreen,
@@ -373,7 +368,6 @@ function LoginForm({
     onClose: () => void,
     onForgotPassword: () => void,
     authController: RebaseAuthController,
-    mode: "light" | "dark",
     registrationMode: boolean,
     noUserComponent?: ReactNode,
     disableSignupScreen: boolean,
@@ -381,7 +375,6 @@ function LoginForm({
     switchToRegister?: () => void,
     switchToLogin?: () => void
 }) {
-    const isDark = mode === "dark";
     const passwordRef = useRef<HTMLInputElement | null>(null);
 
     const [email, setEmail] = useState<string>();
@@ -513,7 +506,7 @@ function LoginForm({
                         type="button"
                         className={cls(
                             "text-xs font-medium hover:underline cursor-pointer",
-                            isDark ? "text-primary-400" : "text-primary-600"
+                            "text-primary-600 dark:text-primary-400"
                         )}
                         onClick={onForgotPassword}
                     >
@@ -542,7 +535,7 @@ function LoginForm({
                             type="button"
                             className={cls(
                                 "font-semibold hover:underline cursor-pointer",
-                                isDark ? "text-primary-400" : "text-primary-600"
+                                "text-primary-600 dark:text-primary-400"
                             )}
                             onClick={switchToRegister}
                         >
@@ -560,7 +553,7 @@ function LoginForm({
                             type="button"
                             className={cls(
                                 "font-semibold hover:underline cursor-pointer",
-                                isDark ? "text-primary-400" : "text-primary-600"
+                                "text-primary-600 dark:text-primary-400"
                             )}
                             onClick={switchToLogin}
                         >
@@ -580,8 +573,6 @@ function ForgotPasswordForm({
     onClose: () => void,
     authController: RebaseAuthController
 }) {
-    const modeState = useModeController();
-    const isDark = modeState.mode === "dark";
     const [email, setEmail] = useState<string>("");
     const [submitted, setSubmitted] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -633,7 +624,7 @@ function ForgotPasswordForm({
 
                 <div className={cls(
                     "text-center rounded-xl p-6",
-                    isDark ? "bg-surface-950" : "bg-surface-50"
+                    "bg-surface-50 dark:bg-surface-950"
                 )}>
                     <div className="text-3xl mb-3">📧</div>
                     <Typography variant="subtitle1" className="mb-2">

@@ -47,7 +47,7 @@ export function getEntitySchema<M extends Record<string, unknown>>(
 export function mapPropertyToZod(propertyContext: PropertyContext<Property>): ZodTypeAny {
 
     const property = propertyContext.property;
-    if (isPropertyBuilder(property)) {
+    if (isPropertyBuilder(property) && !property.type) {
         console.error("Error in property", propertyContext);
         // Return a schema that always fails
         return z.any().refine(

@@ -103,7 +103,6 @@ export function LoginView({
 
     const modeState = useModeController();
     const { mode: colorMode, setMode: setColorMode } = modeState;
-    const isDark = colorMode === "dark";
     const { t } = useTranslation();
 
     const [mode, setMode] = useState<AuthMode>("buttons");
@@ -218,7 +217,6 @@ export function LoginView({
                             registrationMode={true}
                             onClose={() => {}}
                             onForgotPassword={() => {}}
-                            mode={modeState.mode}
                             noUserComponent={noUserComponent}
                             disableSignupScreen={false}
                             bootstrapMode={true}
@@ -250,10 +248,7 @@ export function LoginView({
                                                 Don&apos;t have an account?{" "}
                                                 <button
                                                     type="button"
-                                                    className={cls(
-                                                        "font-semibold hover:underline cursor-pointer",
-                                                        isDark ? "text-primary-400" : "text-primary-600"
-                                                    )}
+                                                    className="font-semibold hover:underline cursor-pointer text-primary-600 dark:text-primary-400"
                                                     onClick={() => switchMode("register")}
                                                 >
                                                     Create one
@@ -271,7 +266,6 @@ export function LoginView({
                                     registrationMode={false}
                                     onClose={() => switchMode("buttons")}
                                     onForgotPassword={hasPasswordReset ? () => switchMode("forgot") : undefined}
-                                    mode={modeState.mode}
                                     noUserComponent={noUserComponent}
                                     disableSignupScreen={disableSignupScreen}
                                     switchToRegister={showRegistration ? () => switchMode("register") : undefined}
@@ -285,7 +279,6 @@ export function LoginView({
                                     registrationMode={true}
                                     onClose={() => switchMode("buttons")}
                                     onForgotPassword={hasPasswordReset ? () => switchMode("forgot") : undefined}
-                                    mode={modeState.mode}
                                     noUserComponent={noUserComponent}
                                     disableSignupScreen={disableSignupScreen}
                                     switchToLogin={() => switchMode("login")}
@@ -394,7 +387,6 @@ function LoginForm({
     onClose,
     onForgotPassword,
     authController,
-    mode,
     registrationMode,
     noUserComponent,
     disableSignupScreen,
@@ -405,7 +397,6 @@ function LoginForm({
     onClose: () => void,
     onForgotPassword?: () => void,
     authController: AuthControllerExtended,
-    mode: "light" | "dark",
     registrationMode: boolean,
     noUserComponent?: ReactNode,
     disableSignupScreen: boolean,
@@ -413,7 +404,6 @@ function LoginForm({
     switchToRegister?: () => void,
     switchToLogin?: () => void
 }) {
-    const isDark = mode === "dark";
     const passwordRef = useRef<HTMLInputElement | null>(null);
 
     const [email, setEmail] = useState<string>();
@@ -543,10 +533,7 @@ function LoginForm({
                 <div className="w-full text-right mb-3">
                     <button
                         type="button"
-                        className={cls(
-                            "text-xs font-medium hover:underline cursor-pointer",
-                            isDark ? "text-primary-400" : "text-primary-600"
-                        )}
+                        className="text-xs font-medium hover:underline cursor-pointer text-primary-600 dark:text-primary-400"
                         onClick={onForgotPassword}
                     >
                         Forgot password?
@@ -572,10 +559,7 @@ function LoginForm({
                         Don&apos;t have an account?{" "}
                         <button
                             type="button"
-                            className={cls(
-                                "font-semibold hover:underline cursor-pointer",
-                                isDark ? "text-primary-400" : "text-primary-600"
-                            )}
+                            className="font-semibold hover:underline cursor-pointer text-primary-600 dark:text-primary-400"
                             onClick={switchToRegister}
                         >
                             Create one
@@ -590,10 +574,7 @@ function LoginForm({
                         Already have an account?{" "}
                         <button
                             type="button"
-                            className={cls(
-                                "font-semibold hover:underline cursor-pointer",
-                                isDark ? "text-primary-400" : "text-primary-600"
-                            )}
+                            className="font-semibold hover:underline cursor-pointer text-primary-600 dark:text-primary-400"
                             onClick={switchToLogin}
                         >
                             Sign in
@@ -612,8 +593,6 @@ function ForgotPasswordForm({
     onClose: () => void,
     authController: AuthControllerExtended
 }) {
-    const modeState = useModeController();
-    const isDark = modeState.mode === "dark";
     const [email, setEmail] = useState<string>("");
     const [submitted, setSubmitted] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -668,10 +647,7 @@ function ForgotPasswordForm({
                     </IconButton>
                 </div>
 
-                <div className={cls(
-                    "text-center rounded-xl p-6",
-                    isDark ? "bg-surface-950" : "bg-surface-50"
-                )}>
+                <div className="text-center rounded-xl p-6 bg-surface-50 dark:bg-surface-950">
                     <div className="text-3xl mb-3">📧</div>
                     <Typography variant="subtitle1" className="mb-2">
                         Check your email

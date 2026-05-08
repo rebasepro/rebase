@@ -84,7 +84,6 @@ export function DemoLoginView({
 
     const modeState = useModeController();
     const { mode: colorMode, setMode: setColorMode } = modeState;
-    const isDark = colorMode === "dark";
     const { t } = useTranslation();
 
     const [mode, setMode] = useState<AuthMode>("buttons");
@@ -193,7 +192,6 @@ export function DemoLoginView({
                             registrationMode={true}
                             onClose={() => {}}
                             onForgotPassword={() => {}}
-                            mode={modeState.mode}
                             noUserComponent={noUserComponent}
                             disableSignupScreen={false}
                             bootstrapMode={true}
@@ -210,7 +208,7 @@ export function DemoLoginView({
                                     {/* Demo info */}
                                     <div className={cls(
                                         "rounded-lg px-4 py-3 text-sm",
-                                        isDark ? "bg-surface-950 text-surface-300" : "bg-surface-100 text-surface-600"
+                                        "bg-surface-100 text-surface-600 dark:bg-surface-900 dark:text-surface-300"
                                     )}>
                                         No account needed — demo credentials are pre-filled. Just click <strong>Sign in with email</strong>.
                                     </div>
@@ -230,7 +228,7 @@ export function DemoLoginView({
                                                 rel="noopener noreferrer"
                                                 className={cls(
                                                     "underline",
-                                                    isDark ? "text-primary-400" : "text-primary-600"
+                                                    "text-primary-600 dark:text-primary-400"
                                                 )}
                                             >
                                                 Privacy Policy
@@ -261,7 +259,6 @@ export function DemoLoginView({
                                     registrationMode={false}
                                     onClose={() => switchMode("buttons")}
                                     onForgotPassword={() => switchMode("forgot")}
-                                    mode={modeState.mode}
                                     noUserComponent={noUserComponent}
                                     disableSignupScreen={disableSignupScreen}
                                     switchToRegister={showRegistration ? () => switchMode("register") : undefined}
@@ -275,7 +272,6 @@ export function DemoLoginView({
                                     registrationMode={true}
                                     onClose={() => switchMode("buttons")}
                                     onForgotPassword={() => switchMode("forgot")}
-                                    mode={modeState.mode}
                                     noUserComponent={noUserComponent}
                                     disableSignupScreen={disableSignupScreen}
                                     switchToLogin={() => switchMode("login")}
@@ -385,7 +381,6 @@ function DemoLoginForm({
     onClose,
     onForgotPassword,
     authController,
-    mode,
     registrationMode,
     noUserComponent,
     disableSignupScreen,
@@ -396,7 +391,6 @@ function DemoLoginForm({
     onClose: () => void,
     onForgotPassword: () => void,
     authController: RebaseAuthController,
-    mode: "light" | "dark",
     registrationMode: boolean,
     noUserComponent?: ReactNode,
     disableSignupScreen: boolean,
@@ -404,7 +398,6 @@ function DemoLoginForm({
     switchToRegister?: () => void,
     switchToLogin?: () => void
 }) {
-    const isDark = mode === "dark";
     const passwordRef = useRef<HTMLInputElement | null>(null);
 
     // Pre-populated with demo credentials
@@ -537,7 +530,7 @@ function DemoLoginForm({
                         type="button"
                         className={cls(
                             "text-xs font-medium hover:underline cursor-pointer",
-                            isDark ? "text-primary-400" : "text-primary-600"
+                            "text-primary-600 dark:text-primary-400"
                         )}
                         onClick={onForgotPassword}
                     >
@@ -566,7 +559,7 @@ function DemoLoginForm({
                             type="button"
                             className={cls(
                                 "font-semibold hover:underline cursor-pointer",
-                                isDark ? "text-primary-400" : "text-primary-600"
+                                "text-primary-600 dark:text-primary-400"
                             )}
                             onClick={switchToRegister}
                         >
@@ -584,7 +577,7 @@ function DemoLoginForm({
                             type="button"
                             className={cls(
                                 "font-semibold hover:underline cursor-pointer",
-                                isDark ? "text-primary-400" : "text-primary-600"
+                                "text-primary-600 dark:text-primary-400"
                             )}
                             onClick={switchToLogin}
                         >
@@ -604,8 +597,6 @@ function ForgotPasswordForm({
     onClose: () => void,
     authController: RebaseAuthController
 }) {
-    const modeState = useModeController();
-    const isDark = modeState.mode === "dark";
     const [email, setEmail] = useState<string>("");
     const [submitted, setSubmitted] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -657,7 +648,7 @@ function ForgotPasswordForm({
 
                 <div className={cls(
                     "text-center rounded-xl p-6",
-                    isDark ? "bg-surface-950" : "bg-surface-50"
+                    "bg-surface-50 dark:bg-surface-950"
                 )}>
                     <div className="text-3xl mb-3">📧</div>
                     <Typography variant="subtitle1" className="mb-2">

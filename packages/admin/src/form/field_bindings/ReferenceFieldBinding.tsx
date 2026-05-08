@@ -60,7 +60,6 @@ function ReferenceFieldBindingInternal({
     });
 
     const validValue = value && value.isEntityReference && value.isEntityReference();
-    console.log('[ReferenceFieldBinding] render', { propertyKey, value, validValue, isEntityRef: value?.isEntityReference?.() });
 
     const collectionRegistryController = useCollectionRegistryController();
     const collection: EntityCollection | undefined = useMemo(() => {

@@ -262,9 +262,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
             )}
             style={{ transitionDuration: `${TRANSITION_DURATION}ms` }}
         >
-            <div className="sticky top-0 z-10 bg-surface-900">
-                {toolbar}
-            </div>
+            {toolbar}
             {children}
         </div>
     );

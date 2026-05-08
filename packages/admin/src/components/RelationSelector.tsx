@@ -76,9 +76,13 @@ export const RelationSelector = React.forwardRef<
         const multiple = relation.cardinality === "many";
 
         const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+        const isPopoverOpenRef = useRef(false);
         const [selectedItems, setSelectedItems] = useState<RelationItem[]>([]);
         const [isLoadingSelectedItems, setIsLoadingSelectedItems] = useState(false);
         const [searchString, setSearchString] = useState<string>("");
+        // Track IDs that were set via local user interaction (onItemClick / handleClear / handleRemoveItem).
+        // When an incoming value change matches these IDs exactly, we skip async re-resolution.
+        const localSelectionIdsRef = useRef<string | null>(null);
 
         const {
             items: availableItems,
@@ -153,6 +157,15 @@ export const RelationSelector = React.forwardRef<
                 return;
             }
 
+            // FAST PATH: If the incoming IDs match what we just set locally via user interaction,
+            // our selectedItems already have the correct data — no re-resolution needed.
+            if (localSelectionIdsRef.current !== null && incomingIds === localSelectionIdsRef.current) {
+                resolvedIdsRef.current = incomingIds;
+                hasResolvedItemsRef.current = true;
+                // Do NOT call setSelectedItems or setIsLoadingSelectedItems — they are already correct.
+                return;
+            }
+
             const currentSelected = selectedItemsRef.current;
             const currentSelectedMap = new Map(currentSelected.map(item => [String(item.id), item]));
 
@@ -188,8 +201,11 @@ export const RelationSelector = React.forwardRef<
                 return;
             }
 
-            // SLOW PATH: fetch missing data
-            setIsLoadingSelectedItems(true);
+            // SLOW PATH: fetch missing data — but don't show loading if popover is open
+            // (user is actively interacting; showing a spinner is disruptive)
+            if (!isPopoverOpenRef.current) {
+                setIsLoadingSelectedItems(true);
+            }
             const client = dataClientRef.current;
 
             Promise.all(
@@ -290,6 +306,12 @@ relation } as RelationItem;
             else onValueChange?.(selected[0]?.relation);
         }, [onValueChange, multiple]);
 
+        // Helper: compute the "IDs fingerprint" for a set of RelationItems
+        // so we can mark it in localSelectionIdsRef and skip re-resolution.
+        const computeSelectionFingerprint = useCallback((items: RelationItem[]): string => {
+            return items.map(i => String(i.id)).sort().join(",");
+        }, []);
+
         const onItemClick = useCallback((item: RelationItem) => {
             let newSelected: RelationItem[];
             if (multiple) {
@@ -300,26 +322,35 @@ relation } as RelationItem;
             } else {
                 newSelected = [item];
                 setIsPopoverOpen(false);
+                isPopoverOpenRef.current = false;
             }
             setSelectedItems(newSelected);
+            // Mark this fingerprint so the resolution effect skips async work
+            // when the parent echoes the same IDs back via props.
+            localSelectionIdsRef.current = computeSelectionFingerprint(newSelected);
             emitValueChange(newSelected);
-        }, [multiple, selectedItems, emitValueChange]);
+        }, [multiple, selectedItems, emitValueChange, computeSelectionFingerprint]);
 
         const handleClear = useCallback(() => {
             setSelectedItems([]);
+            localSelectionIdsRef.current = "";
             onValueChange?.(undefined);
         }, [onValueChange]);
 
         const handleRemoveItem = useCallback((itemToRemove: RelationItem) => {
             const newSelected = selectedItems.filter(v => String(v.id) !== String(itemToRemove.id));
             setSelectedItems(newSelected);
+            localSelectionIdsRef.current = computeSelectionFingerprint(newSelected);
             emitValueChange(newSelected);
-        }, [selectedItems, emitValueChange]);
+        }, [selectedItems, emitValueChange, computeSelectionFingerprint]);
 
         const handleRootOpenChange = useCallback((next: boolean) => {
             if (disabled) return;
             // We control open manually; only allow opening attempts from Radix (e.g. trigger press)
-            if (next) setIsPopoverOpen(true);
+            if (next) {
+                setIsPopoverOpen(true);
+                isPopoverOpenRef.current = true;
+            }
             // Ignore close attempts here; outside click/Escape handled manually; single select closes explicitly on selection.
         }, [disabled]);
 
@@ -335,10 +366,14 @@ relation } as RelationItem;
                 if (contentEl?.contains(target)) return;
                 // Outside
                 setIsPopoverOpen(false);
+                isPopoverOpenRef.current = false;
             }
 
             function handleKey(ev: KeyboardEvent) {
-                if (ev.key === "Escape") setIsPopoverOpen(false);
+                if (ev.key === "Escape") {
+                    setIsPopoverOpen(false);
+                    isPopoverOpenRef.current = false;
+                }
             }
 
             document.addEventListener("mousedown", handlePointerDown, true);
@@ -353,6 +388,7 @@ relation } as RelationItem;
 
         const closePopover = useCallback(() => {
             setIsPopoverOpen(false);
+            isPopoverOpenRef.current = false;
         }, []);
 
         const resolvedPlaceholder = placeholder || emptyPlaceholder || <EmptyValue className={"ml-2"}/>;
@@ -373,7 +409,11 @@ relation } as RelationItem;
                             disabled={disabled}
                             onClick={() => {
                                 if (disabled) return;
-                                setIsPopoverOpen(o => !o);
+                                setIsPopoverOpen(o => {
+                                    const next = !o;
+                                    isPopoverOpenRef.current = next;
+                                    return next;
+                                });
                             }}
                             className={cls(
                                 {
