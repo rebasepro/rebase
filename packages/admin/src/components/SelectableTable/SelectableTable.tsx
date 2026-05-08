@@ -1,3 +1,4 @@
+import { createSelectionStore } from "./SelectionStore";
 import type { Property } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { CollectionSize, Entity, EntityTableController, FilterValues, SelectedCellProps } from "@rebasepro/types";
@@ -167,7 +168,10 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
 
     const ref = useRef<HTMLDivElement>(null);
 
-    const [selectedCell, setSelectedCell] = React.useState<SelectedCellProps<M> | undefined>(undefined);
+    // Create the selection store once
+    const selectionStore = useMemo(() => createSelectionStore(), []);
+    // We still keep local state for side-effects like outside-alerter, but we don't put it in context
+    const [localSelectedCell, setLocalSelectedCell] = React.useState<SelectedCellProps<M> | undefined>(undefined);
 
     const loadNextPage = useCallback(() => {
         if (!paginationEnabled || dataLoading || noMoreToLoad)
@@ -188,21 +192,23 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
         return onEntityClick && onEntityClick(rowData);
     }, [onEntityClick, inlineEditing]);
 
+    const select = useCallback((cell?: SelectedCellProps<M>) => {
+        setLocalSelectedCell(cell);
+        selectionStore.select(cell);
+    }, [selectionStore]);
+
+    const unselect = useCallback(() => {
+        setLocalSelectedCell(undefined);
+        selectionStore.select(undefined);
+    }, [selectionStore]);
+
     useOutsideAlerter(ref,
         () => {
-            if (selectedCell) {
+            if (localSelectedCell) {
                 unselect();
             }
         },
-        Boolean(selectedCell));
-
-    const select = useCallback((cell?: SelectedCellProps<M>) => {
-        setSelectedCell(cell);
-    }, []);
-
-    const unselect = useCallback(() => {
-        setSelectedCell(undefined);
-    }, []);
+        Boolean(localSelectedCell));
 
     // on ESC key press
     useEffect(() => {
@@ -227,8 +233,8 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
         select,
         onValueChange,
         size: size ?? "m",
-        selectedCell
-    } as unknown as EntityCollectionTableController<any>), [setPopupCell, select, onValueChange, size, selectedCell]);
+        selectionStore
+    } as unknown as EntityCollectionTableController<any>), [setPopupCell, select, onValueChange, size, selectionStore]);
 
     return (
         <SelectableTableContext.Provider

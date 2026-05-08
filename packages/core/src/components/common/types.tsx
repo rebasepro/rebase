@@ -8,6 +8,10 @@ export type EntityCollectionTableController<M extends Record<string, any>> = {
      */
     selectedCell?: SelectedCellProps<any>;
     /**
+     * Store used to sync selection state across cells efficiently.
+     */
+    selectionStore?: any;
+    /**
      * Select a table cell
      * @param cell
      */
