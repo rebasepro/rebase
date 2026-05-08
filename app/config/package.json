@@ -12,7 +12,7 @@
         "clean": "rm -rf dist"
     },
     "dependencies": {
-        "@rebasepro/types": "^0.0.1"
+        "@rebasepro/types": "workspace:*"
     },
     "devDependencies": {
         "typescript": "^5.9.2"

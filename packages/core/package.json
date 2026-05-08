@@ -54,11 +54,11 @@
         "./package.json": "./package.json"
     },
     "dependencies": {
-        "@rebasepro/common": "^0.0.1",
-        "@rebasepro/formex": "^0.0.1",
-        "@rebasepro/types": "^0.0.1",
-        "@rebasepro/ui": "^0.0.1",
-        "@rebasepro/utils": "^0.0.1",
+        "@rebasepro/common": "workspace:*",
+        "@rebasepro/formex": "workspace:*",
+        "@rebasepro/types": "workspace:*",
+        "@rebasepro/ui": "workspace:*",
+        "@rebasepro/utils": "workspace:*",
         "compressorjs": "^1.2.1",
         "fast-equals": "5.3.0",
         "fuse.js": "^7.1.0",

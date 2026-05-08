@@ -11,8 +11,8 @@
     },
     "dependencies": {
         "{{PROJECT_NAME}}-config": "0.0.1",
-        "@rebasepro/server-core": "^0.0.1",
-        "@rebasepro/server-postgresql": "^0.0.1",
+        "@rebasepro/server-core": "workspace:*",
+        "@rebasepro/server-postgresql": "workspace:*",
         "drizzle-orm": "^0.44.4",
         "hono": "^4.2.0",
         "@hono/node-server": "^1.11.0",

@@ -76,10 +76,14 @@ jobs:
 
       - name: Bump versions
         run: |
+          pnpm config set frozen-lockfile false
           pnpm exec lerna version "${{ steps.version.outputs.version }}" \
             --no-push \
             --yes \
             --force-publish
+
+          # Re-resolve workspace:* links after version bump
+          pnpm install --no-frozen-lockfile
 
       - name: Configure npm auth
         run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc

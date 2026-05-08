@@ -12,9 +12,9 @@
     },
     "dependencies": {
         "@hono/node-server": "^1.11.0",
-        "@rebasepro/server-core": "^0.0.1",
-        "@rebasepro/server-mongodb": "^0.0.1",
-        "@rebasepro/server-postgresql": "^0.0.1",
+        "@rebasepro/server-core": "workspace:*",
+        "@rebasepro/server-mongodb": "workspace:*",
+        "@rebasepro/server-postgresql": "workspace:*",
         "dotenv": "^16.0.0",
         "drizzle-orm": "^0.44.4",
         "hono": "^4.2.0",

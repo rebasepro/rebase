@@ -51,6 +51,9 @@ jobs:
           # Update all package versions without creating git tags or commits
           pnpm exec lerna version "$CANARY_VERSION" --no-git-tag-version --no-push --yes
 
+          # Re-resolve workspace:* links after version bump so pnpm publish can resolve them
+          pnpm install --no-frozen-lockfile
+
           # Commit version changes locally so pnpm publish doesn't complain about dirty git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
