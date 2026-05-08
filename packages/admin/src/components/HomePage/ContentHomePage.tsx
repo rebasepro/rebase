@@ -312,7 +312,7 @@ export function ContentHomePage({
        Render
        ─────────────────────────────────────────────────────────────── */
     return (
-        <div ref={containerRef} className="py-2 overflow-auto h-full w-full">
+        <div ref={containerRef} className="py-2 overflow-auto h-full w-full dark:bg-surface-800">
             <Container maxWidth="6xl">
                 {/* search & actions */}
                 <div

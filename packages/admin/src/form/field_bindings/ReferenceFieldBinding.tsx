@@ -60,6 +60,7 @@ function ReferenceFieldBindingInternal({
     });
 
     const validValue = value && value.isEntityReference && value.isEntityReference();
+    console.log('[ReferenceFieldBinding] render', { propertyKey, value, validValue, isEntityRef: value?.isEntityReference?.() });
 
     const collectionRegistryController = useCollectionRegistryController();
     const collection: EntityCollection | undefined = useMemo(() => {
@@ -71,8 +72,9 @@ function ReferenceFieldBindingInternal({
     }
 
     const onSingleEntitySelected = useCallback((e: Entity<any> | null) => {
-        setValue(e ? getReferenceFrom(e) : null);
-    }, [setValue]);
+        const ref = e ? getReferenceFrom(e) : null;
+        setValue(ref);
+    }, [setValue, propertyKey]);
 
     const referenceDialogController = useEntitySelectionDialog({
         multiselect: false,

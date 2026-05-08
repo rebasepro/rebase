@@ -706,6 +706,8 @@ export function cmsToFirestoreModel(data: any, firestore: Firestore, inArray = f
     } else if (data.isEntityReference && data.isEntityReference()) {
         const targetFirestore = data.databaseId ? getFirestore(firestore.app, data.databaseId) : firestore;
         return doc(targetFirestore, data.path, data.id);
+    } else if (data && typeof data === "object" && data.__type === "relation" && data.path && data.id) {
+        return doc(firestore, data.path, String(data.id));
     } else if (data instanceof GeoPoint) {
         return new FirestoreGeoPoint(data.latitude, data.longitude);
     } else if (data instanceof Date) {

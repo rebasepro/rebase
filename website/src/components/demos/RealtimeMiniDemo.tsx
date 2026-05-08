@@ -7,82 +7,117 @@ export function RealtimeMiniDemo() {
         let isMounted = true;
         const loop = async () => {
             while (isMounted) {
-                setSyncState(0);
-                await new Promise(r => setTimeout(r, 600));
+                setSyncState(0); // initial table state
+                await new Promise(r => setTimeout(r, 1200));
                 if (!isMounted) return;
-                setSyncState(1); // User 1 types 'H'
-                await new Promise(r => setTimeout(r, 200));
-                if (!isMounted) return;
-                setSyncState(2); // Types 'i'
-                await new Promise(r => setTimeout(r, 500));
-                if (!isMounted) return;
-                setSyncState(3); // Syncs to User 2
-                await new Promise(r => setTimeout(r, 1500));
-                if (!isMounted) return;
-                setSyncState(4); // User 2 types '!'
+                setSyncState(1); // row update arrives
                 await new Promise(r => setTimeout(r, 300));
                 if (!isMounted) return;
-                setSyncState(5); // Syncs to User 1
-                await new Promise(r => setTimeout(r, 1500));
+                setSyncState(2); // row highlighted, value changed
+                await new Promise(r => setTimeout(r, 2000));
+                if (!isMounted) return;
+                setSyncState(3); // new row insert pulse
+                await new Promise(r => setTimeout(r, 300));
+                if (!isMounted) return;
+                setSyncState(4); // new row visible
+                await new Promise(r => setTimeout(r, 2000));
+                if (!isMounted) return;
+                setSyncState(5); // delete row pulse
+                await new Promise(r => setTimeout(r, 300));
+                if (!isMounted) return;
+                setSyncState(6); // row removed
+                await new Promise(r => setTimeout(r, 2000));
             }
         };
         loop();
         return () => { isMounted = false; };
     }, []);
 
+    const headerCols = ["id", "name", "status", "updated"];
+
+    const rows = [
+        { id: "1", name: "Alice", status: syncState >= 2 ? "active" : "pending", updated: syncState >= 2 ? "just now" : "2m ago" },
+        { id: "2", name: "Bob", status: "active", updated: "5m ago" },
+        { id: "3", name: "Carol", status: "inactive", updated: "1h ago" },
+    ];
+
+    const showNewRow = syncState >= 4 && syncState < 6;
+    const newRow = { id: "4", name: "Dave", status: "active", updated: "just now" };
+
+    const statusColor = (s: string) => {
+        if (s === "active") return "text-emerald-400 bg-emerald-400/10";
+        if (s === "pending") return "text-amber-400 bg-amber-400/10";
+        return "text-surface-500 bg-surface-800";
+    };
+
     return (
-        <div className="h-full w-full bg-surface-950 flex gap-2 p-2 pointer-events-none select-none relative">
-            {/* Syncing line graphic in background */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-                <svg className="w-full h-full text-primary/20" preserveAspectRatio="none" viewBox="0 0 100 100">
-                    <path d="M25,50 Q50,50 75,50" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="2,2">
-                        {syncState === 3 && <animate attributeName="stroke-dashoffset" from="10" to="0" dur="0.5s" fill="freeze"/>}
-                        {syncState === 5 && <animate attributeName="stroke-dashoffset" from="-10" to="0" dur="0.5s" fill="freeze"/>}
-                    </path>
-                </svg>
+        <div className="h-full w-full bg-surface-950 flex flex-col pointer-events-none select-none overflow-hidden relative font-mono">
+            {/* Connection status bar */}
+            <div className="flex items-center gap-2 px-3 py-1.5 border-b border-surface-800/60 bg-[#161618] shrink-0">
+                <div className={`w-1.5 h-1.5 rounded-full ${syncState === 1 || syncState === 3 || syncState === 5 ? "bg-amber-400 animate-pulse" : "bg-emerald-400"}`}></div>
+                <span className="text-[8px] text-surface-500 uppercase tracking-wider font-semibold">
+                    {syncState === 1 || syncState === 3 || syncState === 5 ? "syncing..." : "connected"}
+                </span>
+                <span className="text-[8px] text-surface-600 ml-auto">ws://localhost:3000/realtime</span>
             </div>
 
-            {/* Window 1 (User A) */}
-            <div className="flex-1 rounded border border-surface-800 bg-[#161618] flex flex-col overflow-hidden z-10 shadow-lg">
-                <div className="flex gap-1 items-center px-2 py-1.5 border-b border-surface-800 bg-surface-900">
-                    <div className="h-1.5 w-1.5 rounded-full bg-rose-500/80"></div>
-                    <div className="h-1.5 w-1.5 rounded-full bg-amber-400/80"></div>
-                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-400/80"></div>
-                    <span className="text-[7px] text-surface-400 ml-1 font-mono tracking-wider">alice</span>
-                </div>
-                <div className="p-2 flex-1 flex flex-col gap-1 items-center justify-center text-[10px] text-white">
-                    <div className={`p-1.5 rounded bg-surface-800 w-full flex items-center transition-all ${syncState === 5 ? "ring-1 ring-primary/50 shadow-[0_0_10px_rgba(var(--color-primary),0.2)]" : ""}`}>
-                        <div className="w-3 h-3 rounded bg-blue-500/20 text-blue-400 flex items-center justify-center text-[8px] mr-1.5 shrink-0">Aa</div>
-                        <span className="font-mono text-[9px]">
-                            {syncState === 0 && <span className="opacity-0">.</span>}
-                            {syncState === 1 && "H"}
-                            {(syncState >= 2 && syncState < 4) && "Hi"}
-                            {syncState >= 4 && "Hi!"}
-                            {(syncState >= 1 && syncState <= 2) && <div className="inline-block w-[1px] h-2 bg-primary animate-pulse ml-[1px]"></div>}
-                        </span>
-                    </div>
-                </div>
+            {/* Event log */}
+            <div className="flex items-center gap-1.5 px-3 py-1 border-b border-surface-800/40 bg-surface-900/30 shrink-0 overflow-hidden">
+                {syncState >= 2 && (
+                    <span className="text-[8px] text-primary bg-primary/10 px-1.5 py-0.5 rounded-sm animate-[fade-in_0.2s_ease-out]">
+                        UPDATE users SET status=&apos;active&apos; WHERE id=1
+                    </span>
+                )}
+                {syncState >= 4 && syncState < 6 && (
+                    <span className="text-[8px] text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded-sm animate-[fade-in_0.2s_ease-out]">
+                        INSERT users (Dave)
+                    </span>
+                )}
+                {syncState >= 6 && (
+                    <span className="text-[8px] text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded-sm animate-[fade-in_0.2s_ease-out]">
+                        DELETE users WHERE id=4
+                    </span>
+                )}
+                {syncState < 2 && (
+                    <span className="text-[8px] text-surface-600 italic">Listening for changes...</span>
+                )}
             </div>
 
-            {/* Window 2 (User B) */}
-            <div className="flex-1 rounded border border-surface-800 bg-[#161618] flex flex-col overflow-hidden z-10 shadow-lg">
-                <div className="flex gap-1 items-center px-2 py-1.5 border-b border-surface-800 bg-surface-900">
-                    <div className="h-1.5 w-1.5 rounded-full bg-rose-500/80"></div>
-                    <div className="h-1.5 w-1.5 rounded-full bg-amber-400/80"></div>
-                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-400/80"></div>
-                    <span className="text-[7px] text-surface-400 ml-1 font-mono tracking-wider">bob</span>
+            {/* Table */}
+            <div className="flex-1 overflow-hidden">
+                {/* Header */}
+                <div className="flex px-3 py-1.5 border-b border-surface-800/60 bg-surface-900/20">
+                    {headerCols.map(col => (
+                        <div key={col} className="flex-1 text-[8px] font-semibold text-surface-500 uppercase tracking-wider">{col}</div>
+                    ))}
                 </div>
-                <div className="p-2 flex-1 flex flex-col gap-1 items-center justify-center text-[10px] text-white">
-                    <div className={`p-1.5 rounded bg-surface-800 w-full flex items-center transition-all ${syncState === 3 ? "ring-1 ring-primary/50 shadow-[0_0_10px_rgba(var(--color-primary),0.2)]" : ""}`}>
-                        <div className="w-3 h-3 rounded bg-purple-500/20 text-purple-400 flex items-center justify-center text-[8px] mr-1.5 shrink-0">Aa</div>
-                        <span className="font-mono text-[9px]">
-                            {syncState < 3 && <span className="opacity-0">.</span>}
-                            {syncState === 3 && "Hi"}
-                            {syncState >= 4 && "Hi!"}
-                            {syncState === 4 && <div className="inline-block w-[1px] h-2 bg-primary animate-pulse ml-[1px]"></div>}
-                        </span>
+
+                {/* Rows */}
+                {rows.map((row, i) => {
+                    const isUpdated = i === 0 && syncState >= 1 && syncState <= 2;
+                    return (
+                        <div key={row.id} className={`flex px-3 py-2 border-b border-surface-800/30 transition-all duration-300 ${isUpdated ? "bg-primary/5 ring-1 ring-inset ring-primary/20" : ""}`}>
+                            <div className="flex-1 text-[9px] text-surface-500">{row.id}</div>
+                            <div className="flex-1 text-[9px] text-white">{row.name}</div>
+                            <div className="flex-1">
+                                <span className={`text-[8px] px-1.5 py-0.5 rounded ${statusColor(row.status)}`}>{row.status}</span>
+                            </div>
+                            <div className={`flex-1 text-[9px] ${isUpdated ? "text-primary" : "text-surface-600"}`}>{row.updated}</div>
+                        </div>
+                    );
+                })}
+
+                {/* New row insertion */}
+                {showNewRow && (
+                    <div className="flex px-3 py-2 border-b border-surface-800/30 bg-emerald-500/5 ring-1 ring-inset ring-emerald-500/20 animate-[fade-in_0.3s_ease-out]">
+                        <div className="flex-1 text-[9px] text-surface-500">{newRow.id}</div>
+                        <div className="flex-1 text-[9px] text-white">{newRow.name}</div>
+                        <div className="flex-1">
+                            <span className={`text-[8px] px-1.5 py-0.5 rounded ${statusColor(newRow.status)}`}>{newRow.status}</span>
+                        </div>
+                        <div className="flex-1 text-[9px] text-emerald-400">{newRow.updated}</div>
                     </div>
-                </div>
+                )}
             </div>
         </div>
     );

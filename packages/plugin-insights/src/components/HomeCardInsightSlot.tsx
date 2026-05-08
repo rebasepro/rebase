@@ -20,7 +20,7 @@ export function HomeCardInsightSlot({
     if (!insights || insights.length === 0) return null;
 
     return (
-        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+        <div className="flex flex-wrap items-center gap-1.5 mt-2" style={{ minHeight: 46 }}>
             {insights.map((def) => (
                 <InsightWidget
                     key={def.id}

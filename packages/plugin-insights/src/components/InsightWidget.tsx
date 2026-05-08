@@ -27,7 +27,7 @@ export function InsightWidget({
     const { data, loading, error } = useInsightsData(definition, collectionSlug);
 
     if (loading) {
-        return <InsightWidgetSkeleton compact={compact} embedded={embedded} />;
+        return <InsightWidgetSkeleton config={definition.scorecard} compact={compact} embedded={embedded} />;
     }
 
     if (error) {

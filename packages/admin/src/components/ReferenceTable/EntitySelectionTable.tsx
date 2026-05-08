@@ -1,5 +1,5 @@
 import type { EntityCollection } from "@rebasepro/types";
-import React, { MouseEventHandler, useCallback, useEffect, useMemo, useState } from "react";
+import React, { MouseEventHandler, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CollectionSize, Entity, FilterValues } from "@rebasepro/types";
 
 import {
@@ -115,31 +115,21 @@ export function EntitySelectionTable<M extends Record<string, unknown>>(
 
     const [entitiesDisplayedFirst, setEntitiesDisplayedFirst] = useState<Entity<any>[]>([]);
 
-    const toggleEntitySelection = (entity: Entity<any>) => {
-        let newValue;
-        const selectedEntities = selectionController.selectedEntities;
+    const selectionController = useSelectionController();
 
-        analyticsController.onAnalyticsEvent?.("reference_selection_toggle", {
-            path,
-            entityId: entity.id
-        });
-        if (selectedEntities) {
+    // Track whether the selection has been initialized to avoid
+    // firing onMultipleEntitiesSelected during the initial mount/fetch.
+    const selectionInitializedRef = useRef(false);
 
-            if (selectedEntities.map((e) => e.id).indexOf(entity.id) > -1) {
-                newValue = selectedEntities.filter((item: Entity<any>) => item.id !== entity.id);
-            } else {
-                if (maxSelection && selectedEntities.length >= maxSelection)
-                    return;
-                newValue = [...selectedEntities, entity];
-            }
-            selectionController.setSelectedEntities(newValue);
-
-            if (onMultipleEntitiesSelected)
-                onMultipleEntitiesSelected(newValue);
+    // Propagate selection changes to the parent callback.
+    // This runs after the selectionController state updates, ensuring
+    // we always send the correct, non-stale selection to the parent.
+    useEffect(() => {
+        if (!selectionInitializedRef.current) return;
+        if (onMultipleEntitiesSelected) {
+            onMultipleEntitiesSelected(selectionController.selectedEntities);
         }
-    };
-
-    const selectionController = useSelectionController(toggleEntitySelection);
+    }, [selectionController.selectedEntities]);
 
     /**
      * Fetch initially selected ids
@@ -147,7 +137,7 @@ export function EntitySelectionTable<M extends Record<string, unknown>>(
     useEffect(() => {
         let unmounted = false;
         const selectedEntityIds = selectedEntityIdsProp?.map(id => id?.toString()).filter(Boolean);
-        if (selectedEntityIds && collection) {
+        if (selectedEntityIds && selectedEntityIds.length > 0 && collection) {
             Promise.all(
                 selectedEntityIds.map((entityId) =>
                     dataClient.collection(path).findById(entityId))
@@ -157,11 +147,14 @@ export function EntitySelectionTable<M extends Record<string, unknown>>(
                         const result = entities.filter((e): e is Entity<any> => !!e);
                         selectionController.setSelectedEntities(result);
                         setEntitiesDisplayedFirst(result);
+                        // Mark initialized after the initial fetch completes
+                        selectionInitializedRef.current = true;
                     }
                 });
         } else {
             selectionController.setSelectedEntities([]);
             setEntitiesDisplayedFirst([]);
+            selectionInitializedRef.current = true;
         }
         return () => {
             unmounted = true;
@@ -175,12 +168,10 @@ export function EntitySelectionTable<M extends Record<string, unknown>>(
         selectionController.setSelectedEntities([]);
         if (!multiselect && onSingleEntitySelected) {
             onSingleEntitySelected(null);
-        } else if (onMultipleEntitiesSelected) {
-            onMultipleEntitiesSelected([]);
         }
     };
 
-    const onEntityClick = (entity: Entity<any>) => {
+    const onEntityClick = useCallback((entity: Entity<any>) => {
         if (!multiselect && onSingleEntitySelected) {
             analyticsController.onAnalyticsEvent?.("reference_selected_single", {
                 path,
@@ -189,9 +180,23 @@ export function EntitySelectionTable<M extends Record<string, unknown>>(
             onSingleEntitySelected(entity);
             sideDialogContext.close(false);
         } else {
-            toggleEntitySelection(entity);
+            // For multiselect, delegate to the selection controller's toggle.
+            // The useEffect above will propagate the change to onMultipleEntitiesSelected.
+            analyticsController.onAnalyticsEvent?.("reference_selection_toggle", {
+                path,
+                entityId: entity.id
+            });
+            const selectedEntities = selectionController.selectedEntities;
+            if (selectedEntities.map((e) => e.id).indexOf(entity.id) > -1) {
+                selectionController.setSelectedEntities(
+                    selectedEntities.filter((item: Entity<any>) => item.id !== entity.id)
+                );
+            } else {
+                if (maxSelection && selectedEntities.length >= maxSelection) return;
+                selectionController.setSelectedEntities([...selectedEntities, entity]);
+            }
         }
-    };
+    }, [multiselect, onSingleEntitySelected, analyticsController, path, sideDialogContext, selectionController, maxSelection]);
 
     // create a new entity from within the reference dialog
     const onNewClick = () => {

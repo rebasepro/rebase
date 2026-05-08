@@ -66,7 +66,8 @@ export function ArrayOfReferencesFieldBinding({
     }
 
     const onMultipleEntitiesSelected = useCallback((entities: Entity<any>[]) => {
-        setValue(entities.map(e => getReferenceFrom(e)));
+        const refs = entities.map(e => getReferenceFrom(e));
+        setValue(refs);
     }, [setValue]);
 
     const referenceDialogController = useEntitySelectionDialog({
@@ -139,7 +140,7 @@ export function ArrayOfReferencesFieldBinding({
                 variant="text"
                 disabled={isSubmitting}
                 onClick={onEntryClick}>
-                <PencilIcon/>
+                <PencilIcon size={16}/>
                 {t("edit")} {property.name}
             </Button>
         </div>}

@@ -60,7 +60,7 @@ export const TableHeader = React.memo(({
         className={cls(
             defaultBorderMixin,
             "text-sm font-medium text-surface-700 dark:text-surface-accent-300",
-            "bg-surface-accent-50 border-b dark:bg-surface-900",
+            "bg-surface-accent-50 border-b dark:bg-surface-800",
             className
         )}
     >

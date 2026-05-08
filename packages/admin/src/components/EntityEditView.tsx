@@ -6,7 +6,7 @@ import { Entity, EntityStatus } from "@rebasepro/types";
 import { PluginProviderStack } from "@rebasepro/core";
 
 import { EntityCollectionView, EntityView } from "../components";
-import { CircularProgressCenter , iconSize } from "@rebasepro/ui";
+import { CircularProgressCenter, iconSize } from "@rebasepro/ui";
 import { CodeIcon, HistoryIcon, Maximize2Icon } from "lucide-react";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { ErrorView } from "@rebasepro/core";
@@ -116,7 +116,7 @@ export function EntityEditView<M extends Record<string, unknown>>({
 
     if (!dataLoading && dataLoadingError) {
         return <CenteredView>
-            <ErrorView error={dataLoadingError}/>
+            <ErrorView error={dataLoadingError} />
         </CenteredView>
     }
 
@@ -294,7 +294,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
         role="tabpanel">
         <ErrorBoundary>
             <EntityJsonPreview
-                values={formContext?.values ?? entity?.values ?? {}}/>
+                values={formContext?.values ?? entity?.values ?? {}} />
         </ErrorBoundary>
     </div>;
 
@@ -304,7 +304,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
         key={"history_view"}
         role="tabpanel">
         <ErrorBoundary>
-            <Suspense fallback={<CircularProgressCenter/>}>
+            <Suspense fallback={<CircularProgressCenter />}>
                 <EntityHistoryView
                     collection={collection}
                     entity={usedEntity}
@@ -326,7 +326,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                 key={`subcol_${subcollectionId}`}
                 role="tabpanel">
 
-                {globalLoading && <CircularProgressCenter/>}
+                {globalLoading && <CircularProgressCenter />}
 
                 {!globalLoading &&
                     (usedEntity && newFullPath
@@ -335,7 +335,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                             parentCollectionIds={[...parentCollectionIds, collection.slug]}
                             updateUrl={false}
                             {...subcollection}
-                            openEntityMode={layout}/>
+                            openEntityMode={layout} />
                         : <div className="flex items-center justify-center w-full h-full p-3">
                             <Typography variant={"label"}>
                                 You need to save your entity before
@@ -371,8 +371,8 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                 className={"px-8 h-full overflow-auto"}
                 entity={entity}
                 path={path}
-                collection={collection}/>
-            <div className="h-16"/>
+                collection={collection} />
+            <div className="h-16" />
         </div>
     </div> : null;
 
@@ -452,7 +452,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                     navigate(`${entityUrl}#full`);
                 }}
             >
-                <Maximize2Icon size={iconSize.smallest}/>
+                <Maximize2Icon size={iconSize.smallest} />
             </IconButton>
         </Tooltip>
     ) : null;
@@ -485,10 +485,10 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
         return `${matchedSubcollection.name} of ${titleValue}`;
     }, [selectedTab, subcollections, resolvedEntityViews, collection, customizationController.propertyConfigs, usedEntity?.values]);
 
-    let result = <div className="relative flex flex-col h-full w-full bg-white dark:bg-surface-900">
+    let result = <div className="relative flex flex-col h-full w-full bg-white dark:bg-surface-800">
 
         {shouldShowTopBar && <div
-            className={cls("h-14 items-center flex overflow-hidden w-full h-14 border-b pl-2 pr-2 pt-1 flex bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
+            className={cls("h-[52px] items-center flex overflow-hidden w-full border-b pl-2 pr-2 flex bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
 
             {fullScreenButton}
 
@@ -522,14 +522,14 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                         disabled={!hasAdditionalViews}
                         value={JSON_TAB_VALUE}
                         className={"text-sm"}>
-                        <CodeIcon size={iconSize.small}/>
+                        <CodeIcon size={iconSize.small} />
                     </Tab>}
 
                     {includeHistoryView && <Tab
                         disabled={!hasAdditionalViews}
                         value={HISTORY_TAB_VALUE}
                         className={"text-sm"}>
-                        <HistoryIcon size={iconSize.small}/>
+                        <HistoryIcon size={iconSize.small} />
                     </Tab>}
 
                     <Tab
@@ -549,7 +549,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
         </div>}
 
         {globalLoading
-            ? <EntityFormSkeleton collection={collection}/>
+            ? <EntityFormSkeleton collection={collection} />
             : <>
                 {entityReadOnlyView}
                 {entityView}
@@ -593,33 +593,33 @@ function EntityFormSkeleton({ collection }: { collection: EntityCollection<any> 
                 <div className="flex flex-col w-full pt-12 pb-16 px-4 sm:px-8 md:px-10">
 
                     <div className="flex flex-row gap-4 self-end sticky top-4 z-10">
-                        <Skeleton height={24} className="w-8 rounded-full"/>
+                        <Skeleton height={24} className="w-8 rounded-full" />
                     </div>
 
                     <div className="w-full flex flex-col items-start my-4 lg:my-6">
                         <div className={`py-1 my-4 w-2/3 ${collection.hideIdFromForm ? "mb-6" : ""}`}>
-                            <Skeleton height={28} className="w-full rounded-md"/>
+                            <Skeleton height={28} className="w-full rounded-md" />
                         </div>
-                        <Skeleton height={32} className="w-full rounded-md"/>
+                        <Skeleton height={32} className="w-full rounded-md" />
                     </div>
 
                     <div className="mt-12 flex flex-col gap-8">
                         <div className="flex flex-wrap gap-x-4 w-full space-y-8">
 
                             <div className="relative w-full">
-                                <Skeleton height={60} className="w-full rounded-md"/>
+                                <Skeleton height={60} className="w-full rounded-md" />
                             </div>
 
                             <div className="relative w-full">
-                                <Skeleton height={60} className="w-full rounded-md"/>
+                                <Skeleton height={60} className="w-full rounded-md" />
                             </div>
 
                             <div className="relative w-full">
-                                <Skeleton height={60} className="w-full rounded-md"/>
+                                <Skeleton height={60} className="w-full rounded-md" />
                             </div>
 
                             <div className="relative w-full">
-                                <Skeleton height={60} className="w-full rounded-md"/>
+                                <Skeleton height={60} className="w-full rounded-md" />
                             </div>
 
                         </div>

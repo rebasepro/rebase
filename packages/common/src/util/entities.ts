@@ -161,7 +161,9 @@ export function normalizeToEntityRelation(value: unknown): EntityRelation | null
     const obj = value as Record<string, unknown>;
     const isRelationLike =
         obj.__type === "relation" ||
-        (typeof obj.isEntityRelation === "function" && (obj.isEntityRelation as () => boolean)());
+        obj.__type === "reference" ||
+        (typeof obj.isEntityRelation === "function" && (obj.isEntityRelation as () => boolean)()) ||
+        (typeof obj.isEntityReference === "function" && (obj.isEntityReference as () => boolean)());
 
     if (!isRelationLike) return null;
 

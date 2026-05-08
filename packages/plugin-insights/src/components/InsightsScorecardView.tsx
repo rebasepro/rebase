@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { getIcon } from "@rebasepro/core";
+import { cls, defaultBorderMixin } from "@rebasepro/ui";
 import type { DataRow, ScorecardConfig, ScorecardFormat } from "../types";
 
 function formatNumber(value: number, format?: ScorecardFormat): string {
@@ -47,10 +48,12 @@ export function InsightsScorecardView({
     embedded?: boolean;
 }) {
     const containerRef = useRef<HTMLDivElement>(null);
-    const [containerWidth, setContainerWidth] = useState(300);
+    const [containerWidth, setContainerWidth] = useState<number | null>(null);
 
-    useEffect(() => {
+    React.useLayoutEffect(() => {
         if (!containerRef.current) return;
+        // Read initial width synchronously before paint
+        setContainerWidth(containerRef.current.offsetWidth);
         const observer = new ResizeObserver((entries) => {
             for (const entry of entries) {
                 setContainerWidth(entry.contentRect.width);
@@ -91,7 +94,7 @@ export function InsightsScorecardView({
         }
     }
 
-    const isSmall = compact || containerWidth < 200;
+    const isSmall = compact || (containerWidth !== null && containerWidth < 200);
 
     // Resolve icon via getIcon (Lucide-based resolution)
     const iconElement = config.icon
@@ -101,7 +104,7 @@ export function InsightsScorecardView({
     // ── Compact card-inline layout ──────────────────────────────────────
     if (compact) {
         return (
-            <div className="flex flex-col gap-0.5 px-2.5 py-2 rounded-md bg-transparent border border-surface-200 dark:border-surface-800 min-w-0">
+            <div className={cls("flex flex-col gap-0.5 px-2.5 py-2 rounded-md bg-transparent border min-w-0", defaultBorderMixin)}>
                 <span className="text-[10px] uppercase tracking-wider text-surface-400 dark:text-surface-500 truncate">
                     {title}
                 </span>
@@ -118,7 +121,7 @@ export function InsightsScorecardView({
     // ── Standard scorecard layout ───────────────────────────────────────
     const baseClass = embedded
         ? `flex flex-col min-w-0 h-full ${isSmall ? "px-3.5 py-3" : "px-5 py-4"}`
-        : `rounded-lg flex flex-col min-w-0 bg-transparent border border-surface-200 dark:border-surface-800 ${isSmall ? "px-3.5 py-3" : "px-5 py-4"}`;
+        : cls("rounded-lg flex flex-col min-w-0 bg-transparent border", defaultBorderMixin, isSmall ? "px-3.5 py-3" : "px-5 py-4");
 
     return (
         <div ref={containerRef} className={baseClass} style={embedded ? undefined : { minHeight: isSmall ? 68 : 92 }}>
@@ -140,7 +143,7 @@ export function InsightsScorecardView({
             </div>
 
             {/* Main value */}
-            <div className={`font-semibold leading-tight tracking-tight break-all text-surface-800 dark:text-surface-100 ${isSmall ? "text-lg" : containerWidth < 300 ? "text-xl" : "text-2xl"}`}>
+            <div className={`font-semibold leading-tight tracking-tight break-all text-surface-800 dark:text-surface-100 ${isSmall ? "text-lg" : (containerWidth !== null && containerWidth < 300) ? "text-xl" : "text-2xl"}`}>
                 {formattedValue}
             </div>
 

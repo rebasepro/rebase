@@ -6,8 +6,7 @@
 
 @source "../index.html";
 @source "../src/**/*.{js,ts,jsx,tsx}";
-@source "../../../node_modules/@rebasepro/**/src/**/*.{js,ts,jsx,tsx}";
-@source "./node_modules/@rebasepro/**/*.{js,ts,jsx,tsx}";
+@source "../../../packages/**/src/**/*.{js,ts,jsx,tsx}";
 
 :root {
     --color-primary: #0070F4;

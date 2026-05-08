@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Entity, SelectionController } from "@rebasepro/types";
 
 export function useSelectionController<M extends Record<string, unknown> = Record<string, unknown>>(
@@ -7,28 +7,24 @@ export function useSelectionController<M extends Record<string, unknown> = Recor
 
     const [selectedEntities, setSelectedEntities] = useState<Entity<M>[]>([]);
 
+    const onSelectionChangeRef = useRef(onSelectionChange);
+    onSelectionChangeRef.current = onSelectionChange;
+
     const toggleEntitySelection = useCallback((entity: Entity<M>, newSelectedState?: boolean) => {
-        let newValue;
-        if (newSelectedState === undefined) {
-            const isSelected = Boolean(selectedEntities.find(e => e.id === entity.id && e.path === entity.path));
-            if (isSelected) {
-                onSelectionChange?.(entity, false);
-                newValue = selectedEntities.filter((item: Entity<M>) => !(item.id === entity.id && item.path === entity.path));
-            } else {
-                onSelectionChange?.(entity, true);
-                newValue = [...selectedEntities, entity];
+        setSelectedEntities(prev => {
+            const isSelected = Boolean(prev.find(e => e.id === entity.id && e.path === entity.path));
+            const shouldSelect = newSelectedState ?? !isSelected;
+
+            if (shouldSelect && !isSelected) {
+                onSelectionChangeRef.current?.(entity, true);
+                return [...prev, entity];
+            } else if (!shouldSelect && isSelected) {
+                onSelectionChangeRef.current?.(entity, false);
+                return prev.filter((item: Entity<M>) => !(item.id === entity.id && item.path === entity.path));
             }
-        } else {
-            if (newSelectedState) {
-                onSelectionChange?.(entity, true);
-                newValue = [...selectedEntities, entity];
-            } else {
-                onSelectionChange?.(entity, false);
-                newValue = selectedEntities.filter((item: Entity<M>) => !(item.id === entity.id && item.path === entity.path));
-            }
-        }
-        setSelectedEntities(newValue);
-    }, [selectedEntities]);
+            return prev;
+        });
+    }, []);
 
     const isEntitySelected = useCallback((entity: Entity<M>) => {
         return Boolean(selectedEntities.find(e => e.id === entity.id && e.path === entity.path));

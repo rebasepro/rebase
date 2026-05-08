@@ -960,7 +960,7 @@ export const EntityCollectionView = React.memo(
         );
 
         return (
-            <div className={cls("overflow-hidden h-full w-full rounded-md flex flex-col", className)}
+            <div className={cls("overflow-hidden h-full w-full rounded-md flex flex-col dark:bg-surface-800", className)}
                 ref={containerRef}>
 
                 {countFetcher}
@@ -1043,7 +1043,7 @@ export const EntityCollectionView = React.memo(
                 ) : (
                     <>
                         {toolbarNode}
-                        {pluginInsights.length > 0 && (
+                        {pluginInsights.length > 0 && (viewMode === "list" || viewMode === "table") && (
                             <div className="px-3 md:px-4 lg:px-6 max-w-6xl mx-auto w-full flex-shrink-0">
                                 {pluginInsights}
                             </div>

@@ -53,10 +53,10 @@ y });
     }, []);
 
     return (
-        <div className="w-full h-full bg-surface-950 overflow-hidden pointer-events-none select-none relative font-sans p-4">
-            <div className="flex gap-4 h-full pointer-events-none">
-                {/* Column 1 */}
-                <div className="w-[160px] flex-shrink-0 flex flex-col gap-2">
+        <div className="w-full h-full bg-surface-950 overflow-hidden pointer-events-none select-none relative font-sans p-3">
+            <div className="flex gap-3 h-full pointer-events-none">
+                {/* Column 1: In Progress */}
+                <div className="flex-1 min-w-0 flex flex-col gap-2">
                     <div className="flex items-center gap-1.5 px-1 py-0.5">
                         <div className="w-2 h-2 rounded-full bg-amber-500"></div>
                         <span className="text-[10px] font-semibold text-surface-400 uppercase tracking-widest">In Progress</span>
@@ -99,12 +99,12 @@ y });
                     </div>
                 </div>
 
-                {/* Column 2 */}
-                <div className="w-[160px] flex-shrink-0 flex flex-col gap-2">
+                {/* Column 2: Review */}
+                <div className="flex-1 min-w-0 flex flex-col gap-2">
                     <div className="flex items-center gap-1.5 px-1 py-0.5">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                        <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                         <span className="text-[10px] font-semibold text-surface-400 uppercase tracking-widest">Review</span>
-                        <span className="ml-auto text-[10px] text-surface-600">1</span>
+                        <span className="ml-auto text-[10px] text-surface-600">2</span>
                     </div>
                     <div className="flex flex-col gap-2 relative">
                         <div className="bg-surface-800 rounded-lg p-2 ring-1 ring-surface-700/50 shadow-md">
@@ -113,7 +113,44 @@ y });
                                 <span className="text-[9px] text-surface-500 font-mono">legal-4</span>
                             </div>
                         </div>
-                        {draggedCard === null && <div className="h-4"/>} {/* Spacer */}
+                        <div className="bg-surface-800 rounded-lg p-2 ring-1 ring-surface-700/50 shadow-md">
+                            <div className="text-xs text-white font-medium mb-1 line-clamp-2">Payment gateway tests</div>
+                            <div className="flex justify-between items-center mt-2">
+                                <span className="text-[9px] text-surface-500 font-mono">pay-17</span>
+                                <div className="w-4 h-4 rounded-full bg-sky-500 text-[8px] flex items-center justify-center text-white font-bold tracking-tighter">MR</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Column 3: Done */}
+                <div className="flex-1 min-w-0 flex flex-col gap-2">
+                    <div className="flex items-center gap-1.5 px-1 py-0.5">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                        <span className="text-[10px] font-semibold text-surface-400 uppercase tracking-widest">Done</span>
+                        <span className="ml-auto text-[10px] text-surface-600">3</span>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                        <div className="bg-surface-800/60 rounded-lg p-2 ring-1 ring-surface-700/30 shadow-sm">
+                            <div className="text-xs text-surface-400 font-medium mb-1 line-clamp-2">Database migration v2</div>
+                            <div className="flex justify-between items-center mt-2">
+                                <span className="text-[9px] text-surface-600 font-mono">db-08</span>
+                                <div className="w-4 h-4 rounded-full bg-orange-500 text-[8px] flex items-center justify-center text-white font-bold tracking-tighter">LS</div>
+                            </div>
+                        </div>
+                        <div className="bg-surface-800/60 rounded-lg p-2 ring-1 ring-surface-700/30 shadow-sm">
+                            <div className="text-xs text-surface-400 font-medium mb-1 line-clamp-2">Role permissions audit</div>
+                            <div className="flex justify-between items-center mt-2">
+                                <span className="text-[9px] text-surface-600 font-mono">sec-11</span>
+                                <div className="w-4 h-4 rounded-full bg-purple-500 text-[8px] flex items-center justify-center text-white font-bold tracking-tighter">FK</div>
+                            </div>
+                        </div>
+                        <div className="bg-surface-800/60 rounded-lg p-2 ring-1 ring-surface-700/30 shadow-sm">
+                            <div className="text-xs text-surface-400 font-medium mb-1 line-clamp-2">Email template setup</div>
+                            <div className="flex justify-between items-center mt-2">
+                                <span className="text-[9px] text-surface-600 font-mono">msg-03</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

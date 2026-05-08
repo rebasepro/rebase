@@ -129,7 +129,7 @@ export function MultipleRelationFieldBinding({
                 color="primary"
                 disabled={isSubmitting}
                 onClick={onEntryClick}>
-                <PencilIcon/>
+                <PencilIcon size={16}/>
                 {t("edit")} {property.name}
             </Button>
         </div>}

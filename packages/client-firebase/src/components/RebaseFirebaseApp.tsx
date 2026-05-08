@@ -23,12 +23,14 @@ import {
     useBuildNavigationStateController,
     CollectionRegistryContext,
     UrlContext,
-    NavigationStateContext
+    NavigationStateContext,
+    SideEntityProvider,
+    RebaseRoute
 } from "@rebasepro/admin";
 import { Entity, PropertyConfig } from "@rebasepro/types";
 import { CenteredView, CircularProgressCenter } from "@rebasepro/ui";
 import { buildRebaseData } from "@rebasepro/common";
-import { Route, Routes, Outlet } from "react-router-dom";
+import { Route, Outlet, Navigate } from "react-router-dom";
 
 import { RebaseFirebaseAppProps } from "./RebaseFirebaseAppProps";
 import { FirebaseLoginView } from "./FirebaseLoginView";
@@ -251,22 +253,27 @@ export function RebaseFirebaseApp({
                                             notAllowedError={notAllowedError}/>
                                     );
                                 } else {
+                                    const firstCollectionEntry = navigationStateController.topLevelNavigation?.navigationEntries.find(e => e.type === "collection");
+                                    const fallbackRoute = firstCollectionEntry ? <Navigate to={urlController.buildUrlCollectionPath(firstCollectionEntry.id)} replace /> : <CenteredView>No home page or collections provided.</CenteredView>;
+
                                     component = (
-                                        <Routes>
-                                            <Route element={
-                                                <Scaffold
-                                                    logo={usedLogo}
-                                                    autoOpenDrawer={autoOpenDrawer}>
-                                                    <AppBar title={name} logo={usedLogo}/>
-                                                    <Drawer/>
-                                                    <Outlet/>
-                                                    <SideDialogs/>
-                                                </Scaffold>
-                                            }>
-                                                {components?.HomePage && <Route path="/" element={<components.HomePage/>}/>}
-                                                <Route path="/c/*" element={<RebaseRoutes/>}/>
-                                            </Route>
-                                        </Routes>
+                                        <SideEntityProvider>
+                                            <RebaseRoutes>
+                                                <Route element={
+                                                    <Scaffold
+                                                        logo={usedLogo}
+                                                        autoOpenDrawer={autoOpenDrawer}>
+                                                        <AppBar title={name} logo={usedLogo}/>
+                                                        <Drawer/>
+                                                        <Outlet/>
+                                                        <SideDialogs/>
+                                                    </Scaffold>
+                                                }>
+                                                    <Route path="/" element={components?.HomePage ? <components.HomePage/> : fallbackRoute}/>
+                                                    <Route path="/c/*" element={<RebaseRoute/>}/>
+                                                </Route>
+                                            </RebaseRoutes>
+                                        </SideEntityProvider>
                                     );
                                 }
                             }

@@ -30,10 +30,9 @@ export function InsightsProvider({
 
 /**
  * Access the insights cache (for advanced usage).
- * Must be called within an `InsightsProvider`.
+ * Returns null when called outside of an `InsightsProvider`
+ * (e.g. during auth-loading phase before plugin providers mount).
  */
-export function useInsightsEngine(): InsightsContextValue {
-    const ctx = useContext(InsightsContext);
-    if (!ctx) throw new Error("useInsightsEngine must be used within InsightsProvider");
-    return ctx;
+export function useInsightsEngine(): InsightsContextValue | null {
+    return useContext(InsightsContext);
 }

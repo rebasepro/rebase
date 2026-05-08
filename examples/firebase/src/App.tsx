@@ -6,6 +6,9 @@ import "@fontsource/jetbrains-mono";
 import { Authenticator } from "@rebasepro/types";
 import { FirebaseUserWrapper, RebaseFirebaseApp } from "@rebasepro/client-firebase";
 import { demoCollection } from "./collections/demo";
+import { productsCollection } from "./collections/products";
+import { blogCollection } from "./collections/blog";
+import { usersCollection } from "./collections/users";
 
 export const firebaseConfig = {
     apiKey: "AIzaSyBzt-JvcXvpDrdNU7jYX3fC3v0EAHjTKEw",
@@ -41,6 +44,9 @@ function App() {
     }, []);
 
     const collections = useMemo(() => [
+        productsCollection,
+        blogCollection,
+        usersCollection,
         demoCollection
     ], []);
 

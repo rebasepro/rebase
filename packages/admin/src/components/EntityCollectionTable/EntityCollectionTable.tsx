@@ -350,7 +350,7 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
 
         <div ref={ref}
             style={style}
-            className={cls("h-full w-full flex flex-col bg-white dark:bg-surface-900", className)}>
+            className={cls("h-full w-full flex flex-col bg-white dark:bg-surface-800", className)}>
 
             {!hideToolbar && <CollectionTableToolbar
                 onTextSearch={onTextSearch}
@@ -376,7 +376,8 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
                 emptyComponent={emptyComponent}
                 endAdornment={endAdornment}
                 AddColumnComponent={AddColumnComponent}
-                onColumnsOrderChange={onColumnsOrderChange}/>
+                onColumnsOrderChange={onColumnsOrderChange}
+                extraData={useMemo(() => ({ selectedEntityIds: selectedEntities?.map(e => e.id) }), [selectedEntities])}/>
 
         </div>
     );

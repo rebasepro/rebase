@@ -22,7 +22,8 @@ export function useInsightsData(
     loading: boolean;
     error: Error | null;
 } {
-    const { cache } = useInsightsEngine();
+    const engine = useInsightsEngine();
+    const cache = engine?.cache ?? null;
     const { initialLoading, authLoading, user, loginSkipped } = useAuthController();
     const authReady = !initialLoading && !authLoading && (Boolean(user) || loginSkipped);
     const [data, setData] = useState<InsightDataResult | null>(null);
@@ -32,7 +33,8 @@ export function useInsightsData(
     const cacheKey = `${definition.id}:${collectionSlug ?? "global"}`;
 
     useEffect(() => {
-        if (!authReady) {
+        // Keep showing skeleton until both auth and engine are ready
+        if (!authReady || !cache) {
             return;
         }
 

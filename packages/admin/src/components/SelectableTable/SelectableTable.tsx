@@ -93,6 +93,13 @@ export type SelectableTableProps<M extends Record<string, unknown>> = {
      * Callback when columns are reordered via drag-and-drop
      */
     onColumnsOrderChange?: (columns: VirtualTableColumn[]) => void;
+
+    /**
+     * Extra data passed to VirtualTable cells. Changes to this object
+     * bust the cell memo comparator, triggering re-render of cells
+     * even when rowData hasn't changed.
+     */
+    extraData?: Record<string, any>;
 }
 
 /**
@@ -154,7 +161,8 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
         highlightedRow,
         endAdornment,
         AddColumnComponent,
-        onColumnsOrderChange
+        onColumnsOrderChange,
+        extraData
     }: SelectableTableProps<M>) {
 
     const ref = useRef<HTMLDivElement>(null);
@@ -225,7 +233,7 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
     return (
         <SelectableTableContext.Provider
             value={contextValue}>
-            <div className="h-full w-full flex flex-col bg-white dark:bg-surface-900"
+            <div className="h-full w-full flex flex-col bg-white dark:bg-surface-800"
                 ref={ref}>
 
                 <VirtualTable
@@ -250,13 +258,14 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
                     checkFilterCombination={checkFilterCombination}
                     createFilterField={filterable ? createFilterField : undefined}
                     rowClassName={useCallback((entity: Entity<M>) => {
-                        return highlightedRow?.(entity) ? "bg-surface-50/75 bg-surface-100/75 dark:bg-surface-900/75 dark:bg-surface-900/75" : "";
+                        return highlightedRow?.(entity) ? "bg-surface-50/75 bg-surface-100/75 dark:!bg-surface-800/60" : "";
                     }, [highlightedRow])}
                     className="grow"
                     emptyComponent={emptyComponent}
                     endAdornment={endAdornment}
                     AddColumnComponent={AddColumnComponent}
                     onColumnsOrderChange={onColumnsOrderChange}
+                    extraData={extraData}
                 />
 
             </div>
