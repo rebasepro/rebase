@@ -47,7 +47,7 @@
         "./package.json": "./package.json"
     },
     "dependencies": {
-        "@rebasepro/types": "workspace:*",
+        "@rebasepro/types": "^0.0.1",
         "object-hash": "^3.0.0"
     },
     "devDependencies": {

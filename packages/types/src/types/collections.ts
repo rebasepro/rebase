@@ -354,34 +354,6 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
      */
     Actions?: React.ComponentType<any>[];
 
-    // ── Optional driver-agnostic accessors ─────────────────────────────
-    // These fields are owned by specific drivers but declared here as
-    // optional so that cross-driver code in `common` can access them
-    // without runtime type guards.  Driver-specific interfaces below
-    // override them with required/refined signatures.
-
-    /**
-     * The database table or path name.
-     * Required for PostgreSQL collections; absent for Firestore/MongoDB.
-     */
-    table?: string;
-
-    /**
-     * SQL-style relation definitions (JOINs, foreign keys, junction tables).
-     * Only meaningful for SQL-backed drivers.
-     */
-    relations?: Relation[];
-
-    /**
-     * Row-level security rules (Postgres-only).
-     */
-    securityRules?: SecurityRule[];
-
-    /**
-     * Subcollections (Firestore-only).
-     * Returns child collections displayed when opening an entity's side dialog.
-     */
-    subcollections?: () => EntityCollection<Record<string, unknown>>[];
 
 }
 
@@ -488,6 +460,19 @@ export type EntityCollection<M extends Record<string, unknown> = Record<string, 
     | PostgresCollection<M, USER>
     | FirebaseCollection<M, USER>
     | MongoDBCollection<M, USER>;
+
+// ── Capability intersection types ─────────────────────────────────────
+// Use these after a `getDataSourceCapabilities()` guard to safely access
+// driver-specific fields without coupling to a concrete driver type.
+
+/** An EntityCollection that supports SQL-style relations (e.g. Postgres). */
+export type CollectionWithRelations<M extends Record<string, unknown> = Record<string, unknown>> =
+    EntityCollection<M> & { table?: string; relations?: Relation[]; securityRules?: SecurityRule[] };
+
+/** An EntityCollection that supports subcollections (e.g. Firestore). */
+export type CollectionWithSubcollections<M extends Record<string, unknown> = Record<string, unknown>> =
+    EntityCollection<M> & { subcollections?: () => EntityCollection<Record<string, unknown>>[] };
+
 
 // ── Type guards ───────────────────────────────────────────────────────
 

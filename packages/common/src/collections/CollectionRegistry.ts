@@ -1,8 +1,9 @@
 import {
     ArrayProperty,
+    CollectionWithRelations,
+    CollectionWithSubcollections,
     EntityCollection,
     NumberProperty,
-    PostgresCollection,
     Properties,
     Property,
     Relation,
@@ -163,7 +164,8 @@ export class CollectionRegistry {
         const extractedRelations = this.extractRelationsFromProperties(result.properties);
 
         // 2. Merge with manual relations[] (manual entries win on name conflict)
-        const manualRelations = getDataSourceCapabilities(result.driver).supportsRelations ? (result.relations ?? []) : [];
+        const relResult = result as CollectionWithRelations;
+        const manualRelations = getDataSourceCapabilities(result.driver).supportsRelations ? (relResult.relations ?? []) : [];
         const mergedRelationsRaw = [...extractedRelations];
         for (const manual of manualRelations) {
             const name = manual.relationName;
@@ -179,10 +181,9 @@ export class CollectionRegistry {
         //     property.relation stamp is missing junction-table metadata and
         //     the backend cannot fetch many-to-many data.
         if (getDataSourceCapabilities(result.driver).supportsRelations) {
-            const pgResult = result;
             mergedRelations = mergedRelationsRaw.map(r => {
                 try {
-                    return sanitizeRelation(r, pgResult);
+                    return sanitizeRelation(r, result);
                 } catch {
                     // sanitizeRelation may throw for incomplete configs
                     // (e.g. missing target). Keep the raw relation as-is.
@@ -191,7 +192,7 @@ export class CollectionRegistry {
             });
 
             // 3. Set the merged relations on the result copy
-            pgResult.relations = mergedRelations;
+            relResult.relations = mergedRelations;
         }
 
         // 4. Normalize properties (which stamps relation on each property)
@@ -200,12 +201,12 @@ export class CollectionRegistry {
 
         // Populate childCollections from driver-specific fields
         if (!result.childCollections) {
-            if (getDataSourceCapabilities(result.driver).supportsSubcollections && result.subcollections) {
-                result.childCollections = result.subcollections;
-            } else if (getDataSourceCapabilities(result.driver).supportsRelations && result.relations) {
-                const manyRelations = result.relations.filter(r => r.cardinality === "many");
+            if (getDataSourceCapabilities(result.driver).supportsSubcollections && (result as CollectionWithSubcollections).subcollections) {
+                result.childCollections = (result as CollectionWithSubcollections).subcollections;
+            } else if (getDataSourceCapabilities(result.driver).supportsRelations && relResult.relations) {
+                const manyRelations = relResult.relations.filter((r: Relation) => r.cardinality === "many");
                 if (manyRelations.length > 0) {
-                    result.childCollections = () => manyRelations.map(r => {
+                    result.childCollections = () => manyRelations.map((r: Relation) => {
                         const target = r.target();
                         return r.overrides ? mergeDeep(target, r.overrides) : target;
                     });

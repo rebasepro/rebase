@@ -1,4 +1,4 @@
-import { AuthController, Entity, EntityCollection, getDataSourceCapabilities, SecurityRule, User } from "@rebasepro/types";
+import { AuthController, CollectionWithRelations, Entity, EntityCollection, getDataSourceCapabilities, SecurityRule, User } from "@rebasepro/types";
 
 function evaluateAST<USER extends User, M extends Record<string, unknown>>(sqlString: string, auth: AuthController<USER>, entity: Entity<M> | null): boolean {
     // This is a client-side SQL evaluator used *only* for optimistic UI updates.
@@ -141,7 +141,7 @@ function checkOperation<M extends Record<string, unknown>, USER extends User>(
     entity: Entity<M> | null,
     targetOperation: "select" | "insert" | "update" | "delete"
 ): boolean {
-    const securityRules = getDataSourceCapabilities(collection.driver).supportsRLS ? collection.securityRules : undefined;
+    const securityRules = getDataSourceCapabilities(collection.driver).supportsRLS ? (collection as CollectionWithRelations).securityRules : undefined;
     if (!securityRules || securityRules.length === 0) {
         // According to our plan: Postgres RLS implicitly denies if enabled without rules.
         // But for Rebase we default to true if securityRules is undefined,
@@ -161,7 +161,7 @@ function checkOperation<M extends Record<string, unknown>, USER extends User>(
     // In Postgres, policies ONLY apply if the user matching the targeted roles.
     const userRoleIds = authController.user?.roles ?? [];
     const userRoles = [...userRoleIds, "public"];
-    const roleApplicableRules = applicableRules.filter(rule => {
+    const roleApplicableRules = applicableRules.filter((rule: SecurityRule) => {
         if (!rule.roles || rule.roles.length === 0) return true; // APPLIES TO PUBLIC
         return rule.roles.some((r: string) => userRoles.includes(r));
     });
@@ -188,7 +188,7 @@ function checkOperation<M extends Record<string, unknown>, USER extends User>(
 
     if (deniedByRestrictive) return false;
 
-    const hasPermissive = roleApplicableRules.some(r => (r.mode || "permissive") === "permissive");
+    const hasPermissive = roleApplicableRules.some((r: SecurityRule) => (r.mode || "permissive") === "permissive");
     if (hasPermissive) {
         return grantedByPermissive;
     } else {

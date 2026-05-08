@@ -11,12 +11,12 @@
     "source": "src/index.ts",
     "dependencies": {
         "@firebase/auth": "*",
-        "@rebasepro/admin": "workspace:*",
-        "@rebasepro/common": "workspace:*",
-        "@rebasepro/core": "workspace:*",
-        "@rebasepro/types": "workspace:*",
-        "@rebasepro/ui": "workspace:*",
-        "@rebasepro/utils": "workspace:^",
+        "@rebasepro/admin": "^0.0.1",
+        "@rebasepro/common": "^0.0.1",
+        "@rebasepro/core": "^0.0.1",
+        "@rebasepro/types": "^0.0.1",
+        "@rebasepro/ui": "^0.0.1",
+        "@rebasepro/utils": "^0.0.1",
         "react-fast-compare": "3.2.2",
         "react-router-dom": "^7.13.1"
     },

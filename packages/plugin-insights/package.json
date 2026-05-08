@@ -16,8 +16,8 @@
         "./package.json": "./package.json"
     },
     "dependencies": {
-        "@rebasepro/core": "workspace:*",
-        "@rebasepro/types": "workspace:*",
+        "@rebasepro/core": "^0.0.1",
+        "@rebasepro/types": "^0.0.1",
         "lucide-react": "1.14.0",
         "react-compiler-runtime": "1.0.0"
     },

@@ -37,8 +37,8 @@
         "./package.json": "./package.json"
     },
     "dependencies": {
-        "@rebasepro/types": "workspace:*",
-        "@rebasepro/utils": "workspace:*"
+        "@rebasepro/types": "^0.0.1",
+        "@rebasepro/utils": "^0.0.1"
     },
     "devDependencies": {
         "@jest/globals": "^29.7.0",

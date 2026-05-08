@@ -30,9 +30,9 @@
     "author": "rebase.pro",
     "license": "MIT",
     "dependencies": {
-        "@rebasepro/sdk-generator": "workspace:*",
-        "@rebasepro/server-core": "workspace:*",
-        "@rebasepro/types": "workspace:*",
+        "@rebasepro/sdk-generator": "^0.0.1",
+        "@rebasepro/server-core": "^0.0.1",
+        "@rebasepro/types": "^0.0.1",
         "arg": "^5.0.2",
         "chalk": "^4.1.2",
         "dotenv": "^16.0.0",

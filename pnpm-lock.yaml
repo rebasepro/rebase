@@ -69,10 +69,10 @@ importers:
   app:
     devDependencies:
       '@rebasepro/cli':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../packages/cli
       '@rebasepro/types':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../packages/types
       concurrently:
         specifier: ^8.2.2
@@ -87,13 +87,13 @@ importers:
         specifier: ^1.11.0
         version: 1.19.12(hono@4.12.10)
       '@rebasepro/server-core':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../../packages/server-core
       '@rebasepro/server-mongodb':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../../packages/server-mongodb
       '@rebasepro/server-postgresql':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../../packages/server-postgresql
       dotenv:
         specifier: ^16.0.0
@@ -130,7 +130,7 @@ importers:
   app/config:
     dependencies:
       '@rebasepro/types':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../../packages/types
     devDependencies:
       typescript:
@@ -143,31 +143,31 @@ importers:
         specifier: ^5.2.5
         version: 5.2.8
       '@rebasepro/admin':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../../packages/admin
       '@rebasepro/auth':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../../packages/auth
       '@rebasepro/client':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../../packages/client
       '@rebasepro/core':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../../packages/core
       '@rebasepro/plugin-data-enhancement':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../../packages/plugin-data-enhancement
       '@rebasepro/plugin-insights':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../../packages/plugin-insights
       '@rebasepro/studio':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../../packages/studio
       '@rebasepro/types':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../../packages/types
       '@rebasepro/ui':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../../packages/ui
       react:
         specifier: ^19.0.0
@@ -246,25 +246,25 @@ importers:
         specifier: ^5.2.8
         version: 5.2.8
       '@rebasepro/admin':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../../packages/admin
       '@rebasepro/auth':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../../packages/auth
       '@rebasepro/client-firebase':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../../packages/client-firebase
       '@rebasepro/common':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../../packages/common
       '@rebasepro/core':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../../packages/core
       '@rebasepro/types':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../../packages/types
       '@rebasepro/ui':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../../packages/ui
       firebase:
         specifier: ^12.9.0
@@ -343,7 +343,7 @@ importers:
   examples/sdk-demo:
     dependencies:
       '@rebasepro/client':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../../packages/client
       react:
         specifier: ^19.2.4
@@ -410,25 +410,25 @@ importers:
         specifier: ^1.2.4
         version: 1.2.4(@types/react@19.2.14)(react@19.2.4)
       '@rebasepro/common':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../common
       '@rebasepro/core':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../core
       '@rebasepro/formex':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../formex
       '@rebasepro/schema-inference':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../schema-inference
       '@rebasepro/types':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../types
       '@rebasepro/ui':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../ui
       '@rebasepro/utils':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../utils
       date-fns:
         specifier: ^3.6.0
@@ -588,13 +588,13 @@ importers:
   packages/auth:
     dependencies:
       '@rebasepro/core':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../core
       '@rebasepro/types':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../types
       '@rebasepro/ui':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../ui
       react:
         specifier: '>=19.0.0'
@@ -622,13 +622,13 @@ importers:
   packages/cli:
     dependencies:
       '@rebasepro/sdk-generator':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../sdk-generator
       '@rebasepro/server-core':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../server-core
       '@rebasepro/types':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../types
       arg:
         specifier: ^5.0.2
@@ -671,10 +671,10 @@ importers:
   packages/client:
     dependencies:
       '@rebasepro/types':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../types
       '@rebasepro/utils':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../utils
     devDependencies:
       '@jest/globals':
@@ -717,22 +717,22 @@ importers:
         specifier: '*'
         version: 1.12.1(@firebase/app@0.14.9)
       '@rebasepro/admin':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../admin
       '@rebasepro/common':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../common
       '@rebasepro/core':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../core
       '@rebasepro/types':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../types
       '@rebasepro/ui':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../ui
       '@rebasepro/utils':
-        specifier: workspace:^
+        specifier: ^0.0.1
         version: link:../utils
       firebase:
         specifier: ^10.12.2 || ^11.0.0 || ^12.0.0
@@ -778,10 +778,10 @@ importers:
   packages/client-postgresql:
     dependencies:
       '@rebasepro/client':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../client
       '@rebasepro/types':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../types
       react:
         specifier: '>=19.0.0'
@@ -815,10 +815,10 @@ importers:
   packages/common:
     dependencies:
       '@rebasepro/types':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../types
       '@rebasepro/utils':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../utils
       fast-equals:
         specifier: 5.3.0
@@ -894,19 +894,19 @@ importers:
   packages/core:
     dependencies:
       '@rebasepro/common':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../common
       '@rebasepro/formex':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../formex
       '@rebasepro/types':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../types
       '@rebasepro/ui':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../ui
       '@rebasepro/utils':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../utils
       compressorjs:
         specifier: ^1.2.1
@@ -1055,7 +1055,7 @@ importers:
         specifier: ^1.2.0
         version: 1.29.0(zod@4.3.6)
       '@rebasepro/client':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../client
       dotenv:
         specifier: ^16.0.0
@@ -1071,22 +1071,22 @@ importers:
   packages/plugin-data-enhancement:
     dependencies:
       '@rebasepro/admin':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../admin
       '@rebasepro/common':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../common
       '@rebasepro/core':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../core
       '@rebasepro/types':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../types
       '@rebasepro/ui':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../ui
       '@rebasepro/utils':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../utils
       react:
         specifier: '>=19.0.0'
@@ -1144,10 +1144,10 @@ importers:
   packages/plugin-insights:
     dependencies:
       '@rebasepro/core':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../core
       '@rebasepro/types':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../types
       lucide-react:
         specifier: 1.14.0
@@ -1202,10 +1202,10 @@ importers:
   packages/schema-inference:
     devDependencies:
       '@rebasepro/types':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../types
       '@rebasepro/utils':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../utils
       '@types/node':
         specifier: ^20.17.14
@@ -1220,14 +1220,14 @@ importers:
   packages/sdk-generator:
     dependencies:
       '@rebasepro/client':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../client
     devDependencies:
       '@rebasepro/common':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../common
       '@rebasepro/types':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../types
       '@types/jest':
         specifier: ^29.5.14
@@ -1263,16 +1263,16 @@ importers:
         specifier: 1.19.12
         version: 1.19.12(hono@4.12.10)
       '@rebasepro/client':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../client
       '@rebasepro/common':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../common
       '@rebasepro/types':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../types
       '@rebasepro/utils':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../utils
       google-auth-library:
         specifier: ^9.0.0
@@ -1336,10 +1336,10 @@ importers:
   packages/server-mongodb:
     dependencies:
       '@rebasepro/server-core':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../server-core
       '@rebasepro/types':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../types
       mongodb:
         specifier: ^6.12.0
@@ -1373,16 +1373,16 @@ importers:
   packages/server-postgresql:
     dependencies:
       '@rebasepro/common':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../common
       '@rebasepro/server-core':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../server-core
       '@rebasepro/types':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../types
       '@rebasepro/utils':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../utils
       arg:
         specifier: ^5.0.2
@@ -1431,25 +1431,25 @@ importers:
         specifier: ^4.7.0
         version: 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@rebasepro/admin':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../admin
       '@rebasepro/client':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../client
       '@rebasepro/common':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../common
       '@rebasepro/core':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../core
       '@rebasepro/types':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../types
       '@rebasepro/ui':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../ui
       '@rebasepro/utils':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../utils
       '@types/dagre':
         specifier: 0.7.54
@@ -1627,7 +1627,7 @@ importers:
         specifier: ^1.2.4
         version: 1.2.4(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@rebasepro/types':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../types
       clsx:
         specifier: ^2.1.1
@@ -1739,7 +1739,7 @@ importers:
   packages/utils:
     dependencies:
       '@rebasepro/types':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../types
       object-hash:
         specifier: ^3.0.0
@@ -1870,19 +1870,19 @@ importers:
         specifier: ^5.2.8
         version: 5.2.8
       '@rebasepro/admin':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../packages/admin
       '@rebasepro/client-firebase':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../packages/client-firebase
       '@rebasepro/core':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../packages/core
       '@rebasepro/plugin-data-enhancement':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../packages/plugin-data-enhancement
       '@rebasepro/ui':
-        specifier: workspace:*
+        specifier: ^0.0.1
         version: link:../packages/ui
       '@rollup/plugin-yaml':
         specifier: ^4.1.2

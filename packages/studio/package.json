@@ -8,12 +8,12 @@
     "source": "src/index.ts",
     "dependencies": {
         "@monaco-editor/react": "^4.7.0",
-        "@rebasepro/client": "workspace:*",
-        "@rebasepro/common": "workspace:*",
-        "@rebasepro/core": "workspace:*",
-        "@rebasepro/types": "workspace:*",
-        "@rebasepro/ui": "workspace:*",
-        "@rebasepro/utils": "workspace:*",
+        "@rebasepro/client": "^0.0.1",
+        "@rebasepro/common": "^0.0.1",
+        "@rebasepro/core": "^0.0.1",
+        "@rebasepro/types": "^0.0.1",
+        "@rebasepro/ui": "^0.0.1",
+        "@rebasepro/utils": "^0.0.1",
         "@types/dagre": "0.7.54",
         "@xyflow/react": "12.10.2",
         "dagre": "0.8.5",
@@ -21,7 +21,7 @@
         "prism-react-renderer": "^2.4.1"
     },
     "peerDependencies": {
-        "@rebasepro/admin": "workspace:*",
+        "@rebasepro/admin": "^0.0.1",
         "react": ">=19.0.0",
         "react-dom": ">=19.0.0",
         "react-router": "^7.0.0",

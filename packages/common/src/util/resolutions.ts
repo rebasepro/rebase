@@ -1,6 +1,8 @@
 import {
     ArrayProperty,
     AuthController,
+    CollectionWithRelations,
+    CollectionWithSubcollections,
     EntityCollection,
     EnumValueConfig,
     EnumValues,
@@ -344,13 +346,13 @@ export function getSubcollections<M extends Record<string, unknown> = Record<str
         return collection.childCollections() ?? [];
     }
 
-    if (getDataSourceCapabilities(collection.driver).supportsSubcollections && collection.subcollections) {
-        return collection.subcollections() ?? [];
+    if (getDataSourceCapabilities(collection.driver).supportsSubcollections && (collection as CollectionWithSubcollections).subcollections) {
+        return (collection as CollectionWithSubcollections).subcollections!() ?? [];
     }
 
-    if (getDataSourceCapabilities(collection.driver).supportsRelations && collection.relations) {
-        const manyRelations = collection.relations.filter(r => r.cardinality === "many");
-        return manyRelations.map(r => {
+    if (getDataSourceCapabilities(collection.driver).supportsRelations && (collection as CollectionWithRelations).relations) {
+        const manyRelations = (collection as CollectionWithRelations).relations!.filter((r: Relation) => r.cardinality === "many");
+        return manyRelations.map((r: Relation) => {
             const target = r.target();
             if (!target) return undefined;
             const relationKey = r.relationName || target.slug;
@@ -374,7 +376,7 @@ export function getSubcollections<M extends Record<string, unknown> = Record<str
 
             const targetWithOverrides = { ...target, ...baseOverrides };
             return (r.overrides ? mergeDeep(targetWithOverrides, r.overrides) : targetWithOverrides) as EntityCollection<Record<string, unknown>>;
-        }).filter(c => Boolean(c)) as EntityCollection<Record<string, unknown>>[];
+        }).filter((c): c is EntityCollection<Record<string, unknown>> => Boolean(c));
     }
 
     return [];
