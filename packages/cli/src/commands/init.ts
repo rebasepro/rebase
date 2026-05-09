@@ -36,6 +36,7 @@ export interface InitOptions {
     targetDirectory: string;
     templateDirectory: string;
     databaseUrl?: string;
+    introspect?: boolean;
 }
 
 export async function createRebaseApp(rawArgs: string[]) {
@@ -107,6 +108,14 @@ async function promptForOptions(rawArgs: string[]): Promise<InitOptions> {
         default: ""
     });
 
+    questions.push({
+        type: "confirm",
+        name: "introspect",
+        message: "Would you like to introspect this database to automatically generate collections?",
+        default: true,
+        when: (answers: any) => !!(answers.databaseUrl as string)?.trim()
+    });
+
     const answers = await inquirer.prompt(questions as unknown as Parameters<typeof inquirer.prompt>[0]);
 
     const targetDirectory = path.resolve(process.cwd(), nameArg || answers.projectName);
@@ -119,7 +128,8 @@ async function promptForOptions(rawArgs: string[]): Promise<InitOptions> {
         installDeps: args["--install"] || answers.installDeps || false,
         targetDirectory,
         templateDirectory,
-        databaseUrl: (answers.databaseUrl as string)?.trim() || undefined
+        databaseUrl: (answers.databaseUrl as string)?.trim() || undefined,
+        introspect: answers.introspect || false
     };
 }
 
@@ -216,6 +226,27 @@ async function createProject(options: InitOptions) {
             });
         } catch {
             console.warn(chalk.yellow("  Warning: Failed to install dependencies. You may need to run `pnpm install` manually."));
+        }
+    }
+
+    if (options.introspect) {
+        console.log("");
+        if (options.installDeps) {
+            console.log(chalk.gray("  Introspecting database and generating collections..."));
+            console.log("");
+            try {
+                await execa("pnpm", ["exec", "rebase", "schema", "introspect"], {
+                    cwd: options.targetDirectory,
+                    stdio: "inherit"
+                });
+                console.log(chalk.green("  Database successfully introspected!"));
+            } catch {
+                console.warn(chalk.yellow("  Warning: Failed to introspect database automatically."));
+                console.warn(chalk.yellow("  You can run `pnpm exec rebase schema introspect` manually after setup."));
+            }
+        } else {
+            console.warn(chalk.yellow("  Skipping introspection because dependencies were not installed."));
+            console.warn(chalk.yellow("  Run `pnpm install` then `pnpm exec rebase schema introspect` manually."));
         }
     }
 
