@@ -1,4 +1,4 @@
-import { RealtimeProvider, DataDriver, FetchCollectionProps, FetchEntityProps, SaveEntityProps, DeleteEntityProps, TableMetadata, DatabaseAdmin, isSchemaAdmin } from "@rebasepro/types";
+import { RealtimeProvider, DataDriver, FetchCollectionProps, FetchEntityProps, SaveEntityProps, DeleteEntityProps, TableMetadata, DatabaseAdmin, isSchemaAdmin, isDocumentAdmin } from "@rebasepro/types";
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
@@ -6,6 +6,14 @@ import { inspect } from "util";
 import { extractUserFromToken, AccessTokenPayload, AuthConfig } from "@rebasepro/server-core";
 import { MongoRealtimeService } from "./services/MongoRealtimeService";
 import { MongoDriver } from "./services/MongoDriver";
+
+interface DriverWithAuth extends DataDriver {
+    withAuth(user: Record<string, unknown>): Promise<DataDriver>;
+}
+
+function isDriverWithAuth(driver: DataDriver): driver is DriverWithAuth {
+    return "withAuth" in driver && typeof (driver as Record<string, unknown>).withAuth === "function";
+}
 
 interface ClientSession {
     ws: WebSocket;
@@ -138,13 +146,13 @@ export function createMongoWebSocket(
 
                 const getScopedDelegate = async (): Promise<DataDriver> => {
                     const session = clientSessions.get(clientId);
-                    if (session?.user && "withAuth" in driver && typeof (driver as any).withAuth === "function") {
+                    if (session?.user && isDriverWithAuth(driver)) {
                         try {
                             const userForAuth: Record<string, unknown> = {
                                 uid: session.user.userId,
                                 roles: session.user.roles ?? []
                             };
-                            return await (driver as any).withAuth(userForAuth);
+                            return await driver.withAuth(userForAuth);
                         } catch (e) {
                             console.error("Failed to create authenticated delegate for WS request", e);
                             return driver;
@@ -198,8 +206,8 @@ export function createMongoWebSocket(
                     }
                     case "EXECUTE_SQL": {
                         const { sql, options } = payload;
-                        if (admin && "executeAggregate" in admin && typeof (admin as any).executeAggregate === "function") {
-                            const result = await (admin as any).executeAggregate(sql);
+                        if (admin && isDocumentAdmin(admin) && admin.executeAggregate) {
+                            const result = await admin.executeAggregate(sql as Record<string, unknown>[]);
                             ws.send(JSON.stringify({ type: "EXECUTE_SQL_SUCCESS", payload: { result }, requestId }));
                         } else {
                             ws.send(JSON.stringify({ type: "ERROR", requestId, payload: { error: { message: "SQL execution not supported for this driver", code: "NOT_SUPPORTED" } } }));

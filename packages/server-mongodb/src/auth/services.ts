@@ -1,7 +1,7 @@
 import { Db, ObjectId } from "mongodb";
 
 /** Loose document type that allows string _id values (Rebase convention). */
-interface MongoDoc { _id?: any; [key: string]: any; }
+export interface MongoDoc { _id?: string; [key: string]: any; }
 import {
     UserRepository,
     RoleRepository,
@@ -69,7 +69,7 @@ export class MongoUserService implements UserRepository {
             createdAt: now,
             updatedAt: now
         };
-        await this.collection.insertOne(doc as any);
+        await this.collection.insertOne(doc);
         return toUser(doc);
     }
 
@@ -125,8 +125,8 @@ export class MongoUserService implements UserRepository {
     }
 
     async updateUser(id: string, data: Partial<Omit<CreateUserData, "id">>): Promise<UserData | null> {
-        const updateData: any = { ...data, updatedAt: new Date() };
-        if (updateData.email) updateData.email = updateData.email.toLowerCase();
+        const updateData: Record<string, unknown> = { ...data, updatedAt: new Date() };
+        if (typeof updateData.email === "string") updateData.email = updateData.email.toLowerCase();
         
         await this.collection.updateOne({ id }, { $set: updateData });
         return this.getUserById(id);
@@ -151,7 +151,7 @@ export class MongoUserService implements UserRepository {
         const orderDir = options?.orderDir || "desc";
         const roleId = options?.roleId;
 
-        const query: any = {};
+        const query: Record<string, unknown> = {};
         
         if (search) {
             query.$or = [
@@ -166,7 +166,7 @@ export class MongoUserService implements UserRepository {
             query.id = { $in: userIds };
         }
 
-        const sort: any = {};
+        const sort: Record<string, 1 | -1> = {};
         sort[orderBy] = orderDir === "asc" ? 1 : -1;
 
         const total = await this.collection.countDocuments(query);
@@ -229,13 +229,13 @@ export class MongoUserService implements UserRepository {
 
     async setUserRoles(userId: string, roleIds: string[]): Promise<void> {
         await this.userRolesCollection.deleteMany({ userId });
-        if (roleIds.length > 0) {
+            if (roleIds.length > 0) {
             const docs = roleIds.map(roleId => ({
                 _id: new ObjectId().toString(),
                 userId,
                 roleId
             }));
-            await this.userRolesCollection.insertMany(docs as any);
+            await this.userRolesCollection.insertMany(docs);
         }
     }
 
@@ -297,7 +297,7 @@ export class MongoRoleService implements RoleRepository {
             collectionPermissions: data.collectionPermissions ?? null,
             config: data.config ?? null
         };
-        await this.collection.insertOne(doc as any);
+        await this.collection.insertOne(doc);
         return { ...doc } as RoleData;
     }
 
@@ -338,7 +338,7 @@ export class MongoRefreshTokenService {
             createdAt: new Date(),
             userAgent: safeUserAgent,
             ipAddress: safeIpAddress
-        } as any);
+        });
     }
 
     async findByHash(tokenHash: string): Promise<RefreshTokenInfo | null> {
@@ -397,7 +397,7 @@ export class MongoPasswordResetTokenService {
             tokenHash,
             expiresAt,
             usedAt: null
-        } as any);
+        });
     }
 
     async findValidByHash(tokenHash: string): Promise<{ userId: string; expiresAt: Date } | null> {

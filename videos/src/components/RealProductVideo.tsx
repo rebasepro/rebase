@@ -28,7 +28,7 @@ export const RealProductVideo: React.FC = () => {
         >
           {/* Actual Product Video (Live Puppeteer Recording) */}
           <Video
-            src={staticFile("live_app_editing.mp4")}
+            src={staticFile("live_app_editing_dark.mp4")}
             className="absolute inset-0 w-full h-full object-cover"
           />
         </div>

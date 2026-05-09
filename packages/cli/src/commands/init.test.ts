@@ -243,9 +243,9 @@ describe("template package.json contracts", () => {
     it("root package.json has all expected scripts", () => {
         const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "package.json"), "utf-8"));
         expect(pkg.scripts.dev).toBe("rebase dev");
-        expect(pkg.scripts["db:push"]).toBe("rebase db push");
-        expect(pkg.scripts["db:generate"]).toBe("rebase db generate");
-        expect(pkg.scripts["schema:generate"]).toBe("rebase schema generate");
+        expect(pkg.scripts["db:push"]).toBe("rebase db push --collections ../config/collections");
+        expect(pkg.scripts["db:generate"]).toBe("rebase db generate --collections ../config/collections");
+        expect(pkg.scripts["schema:generate"]).toBe("rebase schema generate --collections ../config/collections");
     });
 
     it("root package.json is marked as private", () => {

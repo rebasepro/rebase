@@ -79,7 +79,7 @@ export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): Backend
 
             // @ts-ignore
             const { createEmailService } = await import("@rebasepro/server-core");
-            const authConfig = config as any;
+            const authConfig = config as { email?: any } | undefined;
             let emailService: any;
             if (authConfig?.email) {
                 emailService = createEmailService(authConfig.email);
@@ -98,7 +98,7 @@ export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): Backend
         },
 
         async initializeHistory(config: unknown, driverResult: InitializedDriver): Promise<{ historyService: any } | undefined> {
-            const historyConfig = config as any;
+            const historyConfig = config as { retention?: number } | undefined;
             if (!historyConfig) return undefined;
 
             const internals = driverResult.internals as MongoDriverInternals;
@@ -127,7 +127,7 @@ export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): Backend
             const admin: DatabaseAdmin = {
                 async executeAggregate(pipeline: Record<string, unknown>[]) {
                     const firstStage = pipeline[0];
-                    const collName = (firstStage as any)?.$from ?? "__admin__";
+                    const collName = (firstStage as { $from?: string })?.$from ?? "__admin__";
                     const cursor = db.collection(collName).aggregate(pipeline);
                     return await cursor.toArray() as Record<string, unknown>[];
                 },
@@ -169,7 +169,7 @@ export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): Backend
                 server as import("http").Server,
                 realtimeService as MongoRealtimeService,
                 driver as MongoDriver,
-                config as any,
+                config as Record<string, unknown> | undefined,
                 cachedAdmin
             );
         }

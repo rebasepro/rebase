@@ -5,6 +5,7 @@ import { HowItWorks } from "./components/HowItWorks";
 import { FeatureShowcase } from "./components/FeatureShowcase";
 import { ProductUIReveal } from "./components/ProductUIReveal";
 import { RealProductVideo } from "./components/RealProductVideo";
+import { BentoBoxAnimation } from "./components/BentoBoxAnimation";
 
 /**
  * Full product video — all scenes stitched together via Series.
@@ -20,6 +21,9 @@ const ProductVideo: React.FC = () => {
       </Series.Sequence>
       <Series.Sequence durationInFrames={150}>
         <ProductUIReveal/>
+      </Series.Sequence>
+      <Series.Sequence durationInFrames={150}>
+        <BentoBoxAnimation/>
       </Series.Sequence>
       <Series.Sequence durationInFrames={120}>
         <HowItWorks/>
@@ -38,7 +42,7 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="ProductVideo"
         component={ProductVideo}
-        durationInFrames={840}
+        durationInFrames={990}
         fps={30}
         width={1440}
         height={810}
@@ -56,6 +60,14 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="ProductUIReveal"
         component={ProductUIReveal}
+        durationInFrames={150}
+        fps={30}
+        width={1440}
+        height={810}
+      />
+      <Composition
+        id="BentoBoxAnimation"
+        component={BentoBoxAnimation}
         durationInFrames={150}
         fps={30}
         width={1440}

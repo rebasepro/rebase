@@ -137,7 +137,7 @@ export function createMongoBackend(config: MongoBackendConfig): MongoBackendInst
             // Run aggregation on a collection — requires a target collection
             // from the pipeline's $match or $lookup stage:
             const firstStage = pipeline[0];
-            const collName = (firstStage as any)?.$from ?? "__admin__";
+            const collName = typeof firstStage.$from === "string" ? firstStage.$from : "__admin__";
             const cursor = db.collection(collName).aggregate(pipeline);
             return await cursor.toArray() as Record<string, unknown>[];
         },

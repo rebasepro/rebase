@@ -408,9 +408,16 @@ async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> 
 
     const interactive = ["generate", "push"].includes(action);
 
+    // For push: always use --strict (prompts before destructive ops) and --verbose
+    // (shows all SQL). This ensures unmapped tables are never silently dropped.
+    const drizzleKitArgs = [action];
+    if (action === "push") {
+        drizzleKitArgs.push("--strict", "--verbose");
+    }
+
     try {
         if (interactive) {
-            await execa(drizzleKitBin, [action], {
+            await execa(drizzleKitBin, drizzleKitArgs, {
                 cwd: process.cwd(),
                 stdio: "inherit",
                 env
@@ -531,7 +538,10 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
         const argsList = arg(
             {
                 "--output": String,
-                "-o": "--output"
+                "--force": Boolean,
+                "--schema": String,
+                "-o": "--output",
+                "-f": "--force"
             },
             {
                 argv: rawArgs.slice(2),
@@ -560,7 +570,9 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
         const cmdParts = [
             tsxBin,
             introspectScript,
-            `--output=${outputPath}`
+            `--output=${outputPath}`,
+            ...(argsList["--force"] ? ["--force"] : []),
+            ...(argsList["--schema"] ? [`--schema=${argsList["--schema"]}`] : [])
         ];
 
         try {

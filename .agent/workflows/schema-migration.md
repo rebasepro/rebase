@@ -174,9 +174,17 @@ const postsCollection: PostgresCollection = {
 
 ## Important Notes
 
-### Tables Not in Schema Are Ignored
+### Unmapped Tables Are Never Touched
 
-The `drizzle.config.ts` is configured to **only manage tables defined in your schema**. Other tables in the database (like internal Rebase tables in the `rebase` schema, or any custom tables) are completely ignored and will not be affected by migrations.
+The `drizzle.config.ts` includes multiple layers of safety to ensure tables/objects in the database that are **not** part of the Rebase schema are never modified or dropped:
+
+1. **`tablesFilter`** — Only tables exported from `schema.generated.ts` are managed. All other tables are invisible to drizzle-kit.
+2. **`schemaFilter: ["public"]`** — Restricts drizzle-kit to the `public` PostgreSQL schema. Tables in other schemas (e.g. `rebase`, extension schemas) are untouched.
+3. **`entities.roles: false`** — Prevents drizzle-kit from managing database roles.
+4. **`extensionsFilters: ["postgis"]`** — Ignores helper tables created by PostGIS and similar extensions.
+5. **`--strict --verbose` flags on `db push`** — Always prompts before destructive operations and shows all SQL being executed.
+
+This means you can safely have additional tables in your database (from other applications, legacy systems, manual SQL, etc.) and Rebase will never attempt to modify or drop them.
 
 ### Never Use `db pull` Then `db migrate`
 
@@ -206,6 +214,9 @@ If you see errors about migrations already existing:
 
 ### Tables Being Dropped Unexpectedly
 
-This shouldn't happen with the current config, but if it does:
-- Check that `tablesFilter` in `drizzle.config.ts` includes your tables
+This should not happen with the current config. If it does:
+- Verify `tablesFilter` in `drizzle.config.ts` includes your tables
 - Ensure the schema file exports a `tables` object with all your tables
+- Check that `schemaFilter` is set to `["public"]`
+- Review the generated migration SQL before applying
+
