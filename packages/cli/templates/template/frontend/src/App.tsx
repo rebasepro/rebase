@@ -1,47 +1,23 @@
-import React, { useCallback } from "react";
+import React from "react";
 
 import "@fontsource/jetbrains-mono";
 import "typeface-rubik";
 
-import {
-    RebaseLoginView,
-    useBackendUserManagement,
-    useRebaseAuthController
-} from "@rebasepro/auth";
-import {
-    AppBar,
-    Drawer,
-    Rebase,
-    ModeControllerProvider,
-    NotFoundPage,
-    Scaffold,
-    SideDialogs,
-    RebaseRoutes,
-    SnackbarProvider,
-    ContentHomePage,
-    useBuildUrlController,
-    useBuildCollectionRegistryController,
-    useBuildLocalConfigurationPersistence,
-    useBuildModeController,
-    useBuildNavigationStateController
-} from "@rebasepro/core";
-import { RebaseRoute } from "@rebasepro/admin";
-import { CircularProgressCenter } from "@rebasepro/ui";
-import { collections } from "virtual:rebase-collections";
-import { Route, Outlet } from "react-router-dom";
+import { useRebaseAuthController, useBackendUserManagement, RebaseAuth } from "@rebasepro/auth";
+import { Rebase } from "@rebasepro/core";
+import { RebaseCMS, RebaseShell } from "@rebasepro/admin";
+import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
+import { collections } from "virtual:rebase-collections";
 
 // Configuration from environment
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:3001" : undefined);
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 export function App() {
-    const modeController = useBuildModeController();
-    const userConfigPersistence = useBuildLocalConfigurationPersistence();
-
     const rebaseClient = React.useMemo(() => createRebaseClient({
         baseUrl: API_URL
-    }), [API_URL]);
+    }), []);
 
     const authController = useRebaseAuthController({
         client: rebaseClient,
@@ -53,73 +29,18 @@ export function App() {
         currentUser: authController.user
     });
 
-    const collectionsBuilder = useCallback(() => {
-        return [...collections];
-    }, []);
-
-    const collectionRegistryController = useBuildCollectionRegistryController({ userConfigPersistence });
-    const urlController = useBuildUrlController({
-        basePath: "/",
-        baseCollectionPath: "/c",
-        collectionRegistryController
-    });
-
-    const navigationStateController = useBuildNavigationStateController({
-        collections: collectionsBuilder,
-        authController,
-        data: rebaseClient.data,
-        collectionRegistryController,
-        urlController,
-        userManagement
-    });
-
     return (
-        <SnackbarProvider>
-            <ModeControllerProvider value={modeController}>
-                <Rebase
-                    client={rebaseClient}
-                    apiUrl={API_URL}
-                    collectionRegistryController={collectionRegistryController}
-                    urlController={urlController}
-                    navigationStateController={navigationStateController}
-                    authController={authController}
-                    userConfigPersistence={userConfigPersistence}
-                    storageSource={rebaseClient.storage}
-                >
-                    {({ loading }) => {
-                        if (loading || authController.initialLoading) {
-                            return <CircularProgressCenter/>;
-                        }
-
-                        if (!authController.user) {
-                            return (
-                                <RebaseLoginView
-                                    authController={authController}
-                                    googleEnabled={!!GOOGLE_CLIENT_ID}
-                                    googleClientId={GOOGLE_CLIENT_ID}
-                                />
-                            );
-                        }
-
-                        return (
-                            <RebaseRoutes>
-                                <Route element={
-                                    <Scaffold autoOpenDrawer={false}>
-                                        <AppBar/>
-                                        <Drawer/>
-                                        <Outlet/>
-                                        <SideDialogs/>
-                                    </Scaffold>
-                                }>
-                                    <Route path={"/"} element={<ContentHomePage/>}/>
-                                    <Route path={"/c/*"} element={<RebaseRoute/>}/>
-                                    <Route path={"*"} element={<NotFoundPage/>}/>
-                                </Route>
-                            </RebaseRoutes>
-                        );
-                    }}
-                </Rebase>
-            </ModeControllerProvider>
-        </SnackbarProvider>
+        <Rebase
+            client={rebaseClient}
+            authController={authController}
+            userManagement={userManagement}
+        >
+            <RebaseAuth />
+            <RebaseCMS
+                collections={collections}
+            />
+            <RebaseStudio/>
+            <RebaseShell title="Rebase"/>
+        </Rebase>
     );
 }
