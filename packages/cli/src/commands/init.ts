@@ -243,13 +243,70 @@ async function replacePlaceholders(options: InitOptions) {
         cliVersion = pkg.version || "latest";
     }
 
+    const versionCache = new Map<string, string>();
+
+    const getPackageVersion = async (pkgName: string) => {
+        if (versionCache.has(pkgName)) return versionCache.get(pkgName)!;
+        let versionToUse = cliVersion;
+        try {
+            // First try to check if the specific cliVersion exists for this package
+            const { stdout } = await execa("npm", ["--loglevel", "error", "info", `${pkgName}@${cliVersion}`, "version"]);
+            if (!stdout.trim()) throw new Error("Not found");
+            versionToUse = stdout.trim();
+        } catch {
+            try {
+                // If specific version doesn't exist, try the matching tag (canary or latest)
+                const tag = cliVersion.includes("canary") ? "canary" : "latest";
+                const { stdout } = await execa("npm", ["--loglevel", "error", "info", `${pkgName}@${tag}`, "version"]);
+                if (!stdout.trim()) throw new Error("Not found");
+                versionToUse = stdout.trim();
+            } catch {
+                try {
+                    // Fallback to absolute latest
+                    const { stdout } = await execa("npm", ["--loglevel", "error", "info", pkgName, "version"]);
+                    versionToUse = stdout.trim() || "latest";
+                } catch {
+                    versionToUse = "latest";
+                }
+            }
+        }
+        versionCache.set(pkgName, versionToUse);
+        return versionToUse;
+    };
+
+    // First, find all unique @rebasepro packages across all files to process in parallel
+    const allPackages = new Set<string>();
+    const fileContents = new Map<string, string>();
+    
     for (const file of filesToProcess) {
         const fullPath = path.resolve(options.targetDirectory, file);
         if (!fs.existsSync(fullPath)) continue;
+        const content = fs.readFileSync(fullPath, "utf-8");
+        fileContents.set(fullPath, content);
+        
+        const matches = [...content.matchAll(/"(@rebasepro\/[^"]+)":\s*"workspace:\*"/g)];
+        for (const match of matches) {
+            allPackages.add(match[1]);
+        }
+    }
 
-        let content = fs.readFileSync(fullPath, "utf-8");
-        content = content.replace(/\{\{PROJECT_NAME\}\}/g, options.projectName);
-        content = content.replace(/("@rebasepro\/[^"]+":\s*)"workspace:\*"/g, `$1"${cliVersion}"`);
+    console.log(chalk.gray("  Resolving package versions..."));
+    
+    // Resolve all versions in parallel
+    await Promise.all(Array.from(allPackages).map(getPackageVersion));
+
+    // Perform replacements
+    for (const [fullPath, originalContent] of fileContents.entries()) {
+        let content = originalContent.replace(/\{\{PROJECT_NAME\}\}/g, options.projectName);
+        
+        // Replace workspace:* with the dynamically resolved version
+        const matches = [...content.matchAll(/"(@rebasepro\/[^"]+)":\s*"workspace:\*"/g)];
+        for (const match of matches) {
+            const pkgName = match[1];
+            const resolvedVersion = versionCache.get(pkgName) || "latest";
+            content = content.replace(new RegExp(`"${pkgName}":\\s*"workspace:\\*"`, "g"), `"${pkgName}": "${resolvedVersion}"`);
+        }
+        
         fs.writeFileSync(fullPath, content, "utf-8");
     }
 }
