@@ -14,10 +14,10 @@
 
 ### What is Rebase?
 
-Rebase is an **open-source Backend-as-a-Service (BaaS)** and **admin panel** built with React and TypeScript. It gives you everything you need to build production-ready back-office applications on top of **PostgreSQL** or **MongoDB**:
+Rebase is an **open-source Backend-as-a-Service (BaaS)** and **admin panel** built with React and TypeScript. It gives you everything you need to build production-ready back-office applications on top of **PostgreSQL**:
 
-- **Schema as Code** — Define your data models as TypeScript collections. Rebase generates a full CRUD UI, REST API endpoints, and type-safe client SDKs from a single source of truth. (Also generates PostgreSQL tables if using Postgres).
-- **Instant Admin Panel** — A beautiful, fast React-based admin UI with spreadsheet tables, forms, Kanban boards, inline editing, and real-time sync.
+- **Schema as Code** — Define your data models as TypeScript collections. Rebase generates PostgreSQL tables, a full CRUD UI, REST API endpoints, and type-safe client SDKs from a single source of truth.
+- **Instant Admin Panel** — A beautiful, fast React-based admin UI with spreadsheet tables, lists, forms, Kanban boards, inline editing, and real-time sync.
 - **Integrated Backend** — Authentication (JWT + Google OAuth), file storage (local or S3), Row Level Security, entity history, and WebSocket real-time — all built in.
 - **Radically Extensible** — If you can build it in React, you can add it to Rebase. Custom fields, custom views, plugins, and full access to internal hooks.
 
@@ -32,7 +32,7 @@ Rebase is **not** a hosted SaaS. You self-host it, you own your data, and you ow
 │                 Client Applications                  │
 │  ┌──────────────┐  ┌───────────────────────────────┐ │
 │  │   Your App   │  │   Rebase Admin UI             │ │
-│  │  (Any Tech)  │  │   Tables / Forms / Kanban     │ │
+│  │  (Any Tech)  │  │   Tables / Lists / Kanban     │ │
 │  └──────┬───────┘  └──────────────┬────────────────┘ │
 └─────────┼──────────────────────────┼─────────────────┘
           │  HTTP + WebSocket        │
@@ -46,7 +46,7 @@ Rebase is **not** a hosted SaaS. You self-host it, you own your data, and you ow
         │         │          │             │
         ▼         ▼          ▼             ▼
 ┌──────────────────────────────────────────────────────┐
-│        PostgreSQL (Drizzle) OR MongoDB               │
+│              PostgreSQL (Drizzle ORM)                 │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -61,7 +61,6 @@ Configure your database in `.env`:
 
 ```bash
 DATABASE_URL=postgresql://user:password@localhost:5432/mydb
-## OR DATABASE_URL=mongodb://localhost:27017/mydb
 JWT_SECRET=your-secret-key
 ```
 
@@ -80,6 +79,7 @@ That's it. Your admin panel is running at `http://localhost:5173` and the API at
 | Feature | Description |
 |---------|-------------|
 | **Spreadsheet Views** | Fast, virtualized table with inline editing, filtering, sorting, and text search |
+| **List View** | Clean, responsive vertical list view for collections |
 | **Kanban Board** | Drag-and-drop board view grouped by any enum property |
 | **Relations** | One-to-one, one-to-many, many-to-many with junction tables and multi-hop joins |
 | **Row Level Security** | Supabase-style RLS policies defined in your collection config |
@@ -122,7 +122,7 @@ This scaffolds a project with three packages:
 ### Prerequisites
 
 - **Node.js** 18+
-- **PostgreSQL or MongoDB** — local install, Docker, or any managed database (Neon, Supabase, Atlas, etc.)
+- **PostgreSQL** — local install, Docker, or any managed database (Neon, Supabase, etc.)
 - **pnpm** (recommended) or npm
 
 ### Configure Your Environment
@@ -130,9 +130,8 @@ This scaffolds a project with three packages:
 After scaffolding, edit the `.env` file at the project root:
 
 ```bash
-## Database connection string (PostgreSQL or MongoDB)
+## PostgreSQL connection string
 DATABASE_URL=postgresql://username:password@localhost:5432/your_database
-## DATABASE_URL=mongodb://localhost:27017/your_database
 
 ## JWT secret for authentication (generate a strong random string)
 JWT_SECRET=change-me-to-a-random-secret
@@ -371,7 +370,7 @@ All configuration is done via environment variables in your `.env` file at the p
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `DATABASE_URL` | Database connection string (PostgreSQL or MongoDB) | `postgresql://user:pass@localhost:5432/mydb` or `mongodb://localhost:27017/mydb` |
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@localhost:5432/mydb` |
 | `JWT_SECRET` | Secret key for signing JWT tokens. Use a strong random string (min 32 chars). | `a1b2c3d4e5...` |
 
 #### Frontend
@@ -434,9 +433,10 @@ await initializeRebaseBackend({
     basePath: "/api",        // Base path for all API routes (default: "/api")
 
     bootstrappers: [         // Database and service bootstrappers
-        isMongo
-            ? createMongoBootstrapper({ ... })
-            : createPostgresBootstrapper({ ... })
+        createPostgresBootstrapper({
+            connection: db,
+            schema: { tables, enums, relations }
+        })
     ],
 
     auth: {                  // Authentication config
@@ -616,11 +616,11 @@ Rebase is a full-stack platform with four layers:
 │  Hono HTTP Server  •  REST API  •  Auth  •  Storage  •  WS     │
 │  @rebasepro/backend                                             │
 └───────────────────────────┬─────────────────────────────────────┘
-                            │ Drizzle ORM (Postgres) / Native Driver (Mongo)
+                            │ Drizzle ORM
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                       Database Layer                            │
-│  PostgreSQL / MongoDB  •  Tables/Collections  •  Realtime sync  │
+│  PostgreSQL  •  Tables  •  RLS Policies  •  Realtime sync       │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -628,32 +628,38 @@ Rebase is a full-stack platform with four layers:
 
 #### Bootstrapper System
 
-The backend initializes through a plugin-based bootstrapper system. Database-specific logic is decoupled into its own package, and bootstrappers handle initialization of databases, authentication, and internal services.
+The backend initializes through a plugin-based bootstrapper system. Database-specific logic is decoupled into its own package, and bootstrappers handle initialization of the database, authentication, and internal services.
 
 ```typescript
 
 bootstrappers: [
-    isMongo ? createMongoBootstrapper({ ... }) : createPostgresBootstrapper({ ... })
+    createPostgresBootstrapper({
+        connectionString: process.env.DATABASE_URL!
+    })
 ]
 ```
 
 Collections automatically resolve against the configured bootstrapper through the internal dependency injection registry.
 
+:::tip
+The `createPostgresBootstrapper` handles database connection pooling, schema resolution, and real-time `LISTEN/NOTIFY` setup automatically.
+:::
+
 #### Collection Registry
 
-The `BackendCollectionRegistry` is the runtime index of all collections, their database tables, enums, and Drizzle relations. It's populated at startup from your collection definitions.
+The `BackendCollectionRegistry` is the runtime index of all collections, their PostgreSQL tables, enums, and Drizzle relations. It's populated at startup from your collection definitions.
 
 #### Realtime Service
 
-Real-time sync uses database-native mechanisms:
+Real-time sync uses PostgreSQL's native `LISTEN/NOTIFY` mechanism:
 
 1. A data mutation happens (insert, update, delete)
-2. For Postgres: backend emits a `NOTIFY` on a channel. For Mongo: Change Streams detect the mutation.
-3. The `RealtimeService` receives the notification/change event
+2. The backend emits a `NOTIFY` on a channel
+3. The `RealtimeService` receives the notification
 4. It broadcasts the change to all connected WebSocket clients
 5. React components re-render with the new data
 
-For **multi-instance deployments** (e.g., Cloud Run with multiple replicas), provide a `connectionString` in your PostgresBootstrapper, or ensure MongoDB is a replica set to use Change Streams.
+For **multi-instance deployments** (e.g., Cloud Run with multiple replicas), provide a `connectionString` in your PostgresBootstrapper so all replicas share the same `LISTEN` connection.
 
 #### Storage Registry
 
@@ -681,7 +687,7 @@ Like drivers, storage backends are registered in a registry. You can have multip
 #### Read Flow
 1. User opens a collection in the admin UI
 2. Client SDK sends `GET /api/data/:slug` + opens a WebSocket subscription
-3. Backend queries PostgreSQL via Drizzle ORM, or MongoDB via its native driver
+3. Backend queries PostgreSQL via Drizzle ORM
 4. Data transformer deserializes database records into entity format
 5. Response sent to frontend, components render
 6. WebSocket keeps the view synced in real-time
@@ -888,26 +894,33 @@ export const productsCollection: EntityCollection = {
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `defaultViewMode` | `"table" \| "cards" \| "kanban"` | `"table"` | Default view mode |
-| `enabledViews` | `ViewMode[]` | All three | Which view modes are available |
+| `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"table"` | Default view mode |
+| `enabledViews` | `ViewMode[]` | All four | Which view modes are available |
 | `kanban` | `KanbanConfig` | — | Kanban configuration (column property) |
-| `openEntityMode` | `"side_panel" \| "full_screen"` | `"full_screen"` | How entities open for editing |
+| `openEntityMode` | `"side_panel" \| "full_screen" \| "split"` | `"full_screen"` | How entities open for editing |
+| `sideDialogWidth` | `number \| string` | — | Width of the side dialog |
 | `inlineEditing` | `boolean` | `true` | Enable inline editing in the spreadsheet view |
 | `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Default row height in the table |
 | `pagination` | `boolean \| number` | `true` (50) | Enable pagination and/or set page size |
+| `listProperties` | `string[]` | — | Properties to display in the list view |
 | `propertiesOrder` | `string[]` | — | Column order in the table view |
+| `selectionEnabled` | `boolean` | `true` | Enable row selection |
 | `hideFromNavigation` | `boolean` | `false` | Hide from the sidebar navigation |
+| `defaultSelectedView` | `string \| function` | — | Default view or subcollection to open |
 
 #### Entity Options
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `formAutoSave` | `boolean` | `false` | Auto-save on field change |
+| `localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Backup unsaved changes |
 | `hideIdFromForm` | `boolean` | `false` | Hide the entity ID from the form |
 | `hideIdFromCollection` | `boolean` | `false` | Hide the ID column from the table |
 | `includeJsonView` | `boolean` | `false` | Show a JSON tab in the entity view |
 | `history` | `boolean` | `false` | Track changes in entity history |
-| `alwaysApplyDefaultValues` | `boolean` | `false` | Apply default values on every save, not just creation |
+| `alwaysApplyDefaultValues` | `boolean` | `false` | Apply default values on every save |
+| `previewProperties` | `string[]` | — | Properties to display in reference previews |
+| `titleProperty` | `string` | — | Property to use as the entity title |
 
 #### Advanced
 
@@ -918,9 +931,13 @@ export const productsCollection: EntityCollection = {
 | `Actions` | `React.ComponentType` | Custom toolbar actions component |
 | `entityViews` | `EntityCustomView[]` | Custom tabs in the entity detail view |
 | `additionalFields` | `AdditionalFieldDelegate[]` | Computed/virtual columns |
+| `childCollections` | `() => EntityCollection[]` | Nested child collections |
 | `subcollections` | `() => EntityCollection[]` | Nested collections (e.g., order → line items) |
 | `exportable` | `boolean \| ExportConfig` | Enable data export |
+| `ownerId` | `string` | Owner user ID (used by plugins/custom code) |
+| `overrides` | `EntityOverrides` | Overrides for the entity view |
 | `driver` | `string` | Database driver to use (default: `"(default)"`) |
+| `databaseId` | `string` | Database/schema ID within the driver |
 
 ### Collection Builder
 
@@ -961,7 +978,7 @@ You can set default or forced filters:
 - **[Properties](/docs/collections/properties)** — All property types and options
 - **[Relations](/docs/collections/relations)** — Foreign keys, junction tables, joins
 - **[Security Rules](/docs/collections/security-rules)** — Row Level Security
-- **[View Modes](/docs/frontend/view-modes)** — Table, Cards, Kanban
+- **[View Modes](/docs/frontend/view-modes)** — List, Table, Cards, Kanban
 
 ## Properties
 
@@ -1071,6 +1088,8 @@ avatar: {
 | `columnType` | `string` | Database column: `"varchar"`, `"text"` |
 | `isId` | `string` | ID generation: `"uuid"`, `"cuid"`, `"increment"`, `"manual"` |
 | `userSelect` | `boolean` | Render as a user picker |
+| `previewAsTag` | `boolean` | Render this string as a tag in previews |
+| `clearable` | `boolean` | Add an icon to clear the value (set to null) |
 
 ### Number Properties
 
@@ -1095,6 +1114,7 @@ quantity: {
 | `enum` | `EnumValues` | Render as select with numeric values |
 | `columnType` | `string` | `"integer"`, `"bigint"`, `"numeric"`, `"serial"`, `"smallint"` |
 | `isId` | `string` | ID generation strategy |
+| `clearable` | `boolean` | Add an icon to clear the value (set to null) |
 
 ### Boolean Properties
 
@@ -1140,6 +1160,8 @@ event_date: {
 | `mode` | `"date" \| "date_time"` | Date only or date + time (default: `"date_time"`) |
 | `autoValue` | `"on_create" \| "on_update"` | Auto-set timestamps |
 | `columnType` | `string` | `"timestamp"`, `"date"` |
+| `timezone` | `string` | Timezone string to evaluate the date in |
+| `clearable` | `boolean` | Add an icon to clear the value (set to null) |
 
 ### Array Properties
 
@@ -1185,6 +1207,17 @@ content: {
 
 ![Block field](/img/fields/Block.png)
 
+#### Array Options
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `of` | `Property \| Property[]` | Property schema for array items |
+| `oneOf` | `object` | Array of typed objects with multiple discriminator types |
+| `expanded` | `boolean` | Should the field be initially expanded (default: true) |
+| `minimalistView` | `boolean` | Display child properties directly without extendable panel |
+| `sortable` | `boolean` | Can elements be reordered (default: true) |
+| `canAddElements` | `boolean` | Can new elements be added (default: true) |
+
 ### Map Properties
 
 ```typescript
@@ -1207,6 +1240,19 @@ metadata: {
 ```
 
 ![Group field](/img/fields/Group.png)
+
+#### Map Options
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `properties` | `Properties` | Record of properties included in the map |
+| `propertiesOrder` | `string[]` | Ordered keys for rendering |
+| `previewProperties` | `string[]` | Which properties to show in the table preview |
+| `pickOnlySomeKeys` | `boolean` | Let the user selectively add keys in the UI |
+| `spreadChildren` | `boolean` | Render child properties as separate columns in table view |
+| `minimalistView` | `boolean` | Display properties without a wrapping panel |
+| `expanded` | `boolean` | Should the field be initially expanded (default: true) |
+| `keyValue` | `boolean` | Render as arbitrary key-value pairs editor |
 
 ### Enum Values
 
@@ -1261,14 +1307,43 @@ validation: {
 
 ### Conditional Fields
 
-Dynamically change property config based on entity values:
+You can make fields dynamic so they react to the entity's values. There are two ways to do this:
+
+#### 1. JSON Logic Conditions (Declarative)
+
+You can use the `conditions` property to define declarative JSON Logic rules that can be serialized and modified visually in the collection editor.
 
 ```typescript
 price: {
     type: "number",
     name: "Price",
-    dynamicProps: ({ values }) => ({
-        disabled: values.is_free === true,
+    conditions: {
+        disabled: { "==": [{ "var": "values.is_free" }, true] },
+        required: { "!=": [{ "var": "values.is_free" }, true] },
+        min: 0,
+        clearOnDisabled: true // Set to null if field gets disabled
+    }
+}
+```
+
+The conditions object gives you access to:
+- `disabled`, `hidden`, `readOnly`
+- `required`, `min`, `max`
+- `defaultValue`
+- `enumConditions`, `allowedEnumValues`, `excludedEnumValues`
+- `referencePath`, `referenceFilter`
+- `canAddElements`, `sortable` (for arrays)
+
+#### 2. Property Builders (Programmatic)
+
+For complex behavior that can't be expressed via JSON Logic, you can use `dynamicProps` which evaluates a Javascript function.
+
+```typescript
+price: {
+    type: "number",
+    name: "Price",
+    dynamicProps: ({ values, user }) => ({
+        disabled: values.is_free === true || !user.roles.includes("admin"),
         validation: values.is_free ? {} : { required: true, min: 0 }
     })
 }
@@ -1291,7 +1366,35 @@ Relations define how collections are connected at the database level. They enabl
 - Generate **foreign key constraints** in the Drizzle schema
 - Support **cascade delete/update** behaviors
 
-Relations are defined in the `relations` array of a collection:
+Relations can be defined either inline within the property, or explicitly in the `relations` array of a collection:
+
+#### 1. Inline Relations (Recommended)
+
+You can define the relation directly on the property. The framework automatically extracts these into the collection's `relations[]` at normalization time, so you no longer need a separate `relations[]` entry for properties.
+
+```typescript
+const postsCollection: EntityCollection = {
+    slug: "posts",
+    name: "Posts",
+    table: "posts",
+    properties: {
+        title: { type: "string", name: "Title" },
+        content: { type: "string", name: "Content", multiline: true },
+        author: { 
+            type: "relation", 
+            name: "Author", 
+            target: () => usersCollection,
+            cardinality: "one",
+            direction: "owning",
+            localKey: "author_id"
+        }
+    }
+};
+```
+
+#### 2. Explicit Relations Array
+
+For advanced use cases or when a relation doesn't map directly to a form field, you can define it in the `relations` array:
 
 ```typescript
 const postsCollection: EntityCollection = {
@@ -1390,11 +1493,17 @@ properties: {
     author: {
         type: "relation",
         name: "Author",
-        relationName: "author",    // Must match a relation in the relations array
+        target: () => usersCollection, // Target collection
         widget: "select"           // "select" (dropdown) or "dialog" (full picker)
     }
 }
 ```
+
+![Relation field in form](/img/features/relation-form-field.png)
+
+When rendering a preview (like in a table cell or a reference chip), Rebase handles hydration automatically:
+
+![Relation preview in table](/img/features/relation-table-preview.png)
 
 ### Multi-Hop Joins
 
@@ -3558,15 +3667,16 @@ Rebase uses **Tailwind CSS v4** and supports light/dark modes. Customize via:
 
 - **[Custom Fields](/docs/frontend/custom-fields)** — Build custom form fields
 - **[Entity Views](/docs/frontend/entity-views)** — Add tabs to entity editors
-- **[View Modes](/docs/frontend/view-modes)** — Table, Cards, Kanban
+- **[View Modes](/docs/frontend/view-modes)** — List, Table, Cards, Kanban
 - **[Plugins](/docs/plugins)** — Extend the framework
 
 ## View Modes
 
 ### Overview
 
-Every collection can be displayed in three view modes:
+Every collection can be displayed in four view modes:
 
+- **List** — Simple, clean list view (the classic CMS default)
 - **Table** — Spreadsheet-style grid with inline editing, sorting, filtering
 - **Cards** — Card grid for visual content (images, previews)
 - **Kanban** — Drag-and-drop board grouped by an enum property
@@ -3577,7 +3687,7 @@ Every collection can be displayed in three view modes:
 const productsCollection: EntityCollection = {
     slug: "products",
     defaultViewMode: "table",            // Default view
-    enabledViews: ["table", "kanban"],    // Available views
+    enabledViews: ["list", "table", "kanban"],    // Available views
     kanban: {
         columnProperty: "status",        // Enum property for columns
         orderProperty: "sort_order"      // Property for drag-and-drop ordering
@@ -3586,7 +3696,15 @@ const productsCollection: EntityCollection = {
 };
 ```
 
+### List View
+
+![List View screenshot placeholder](/img/features/list-view.png)
+
+The list view is the classic, clean CMS default view mode, showing entities in a straightforward list format without the density of a spreadsheet.
+
 ### Table View
+
+![Table View screenshot placeholder](/img/features/table-view.png)
 
 The default view is a high-performance virtualized spreadsheet with:
 
@@ -3611,6 +3729,8 @@ Control row height with `defaultSize`:
 | `"xl"` | 260 | Rich content previews |
 
 ### Kanban View
+
+![Kanban View screenshot placeholder](/img/features/kanban-view.png)
 
 Configure a Kanban board by specifying which enum property to use as columns:
 
@@ -3642,6 +3762,8 @@ const tasksCollection: EntityCollection = {
 Drag-and-drop between columns automatically updates the enum field and sort order.
 
 ### Cards View
+
+![Cards View screenshot placeholder](/img/features/cards-view.png)
 
 Cards display entities as visual cards — useful for image-heavy content:
 
@@ -4182,14 +4304,14 @@ function ThemeToggle() {
 }
 ```
 
-### `useReferenceDialog`
+### `useEntitySelectionDialog`
 
-Open a reference selection dialog:
+Open a side dialog for selecting entities from a collection. This is the same hook used internally when a relation property is rendered:
 
 ```typescript
 
 function SelectProduct() {
-    const referenceDialog = useReferenceDialog({
+    const selectionDialog = useEntitySelectionDialog({
         path: "products",
         collection: productsCollection,
         onSingleEntitySelected: (entity) => {
@@ -4197,7 +4319,7 @@ function SelectProduct() {
         }
     });
 
-    return <button onClick={referenceDialog.open}>Select Product</button>;
+    return <button onClick={selectionDialog.open}>Select Product</button>;
 }
 ```
 

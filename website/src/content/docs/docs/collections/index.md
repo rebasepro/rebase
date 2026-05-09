@@ -92,23 +92,30 @@ export const productsCollection: EntityCollection = {
 | `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"table"` | Default view mode |
 | `enabledViews` | `ViewMode[]` | All four | Which view modes are available |
 | `kanban` | `KanbanConfig` | — | Kanban configuration (column property) |
-| `openEntityMode` | `"side_panel" \| "full_screen"` | `"full_screen"` | How entities open for editing |
+| `openEntityMode` | `"side_panel" \| "full_screen" \| "split"` | `"full_screen"` | How entities open for editing |
+| `sideDialogWidth` | `number \| string` | — | Width of the side dialog |
 | `inlineEditing` | `boolean` | `true` | Enable inline editing in the spreadsheet view |
 | `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Default row height in the table |
 | `pagination` | `boolean \| number` | `true` (50) | Enable pagination and/or set page size |
+| `listProperties` | `string[]` | — | Properties to display in the list view |
 | `propertiesOrder` | `string[]` | — | Column order in the table view |
+| `selectionEnabled` | `boolean` | `true` | Enable row selection |
 | `hideFromNavigation` | `boolean` | `false` | Hide from the sidebar navigation |
+| `defaultSelectedView` | `string \| function` | — | Default view or subcollection to open |
 
 ### Entity Options
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `formAutoSave` | `boolean` | `false` | Auto-save on field change |
+| `localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Backup unsaved changes |
 | `hideIdFromForm` | `boolean` | `false` | Hide the entity ID from the form |
 | `hideIdFromCollection` | `boolean` | `false` | Hide the ID column from the table |
 | `includeJsonView` | `boolean` | `false` | Show a JSON tab in the entity view |
 | `history` | `boolean` | `false` | Track changes in entity history |
-| `alwaysApplyDefaultValues` | `boolean` | `false` | Apply default values on every save, not just creation |
+| `alwaysApplyDefaultValues` | `boolean` | `false` | Apply default values on every save |
+| `previewProperties` | `string[]` | — | Properties to display in reference previews |
+| `titleProperty` | `string` | — | Property to use as the entity title |
 
 ### Advanced
 
@@ -119,9 +126,13 @@ export const productsCollection: EntityCollection = {
 | `Actions` | `React.ComponentType` | Custom toolbar actions component |
 | `entityViews` | `EntityCustomView[]` | Custom tabs in the entity detail view |
 | `additionalFields` | `AdditionalFieldDelegate[]` | Computed/virtual columns |
+| `childCollections` | `() => EntityCollection[]` | Nested child collections |
 | `subcollections` | `() => EntityCollection[]` | Nested collections (e.g., order → line items) |
 | `exportable` | `boolean \| ExportConfig` | Enable data export |
+| `ownerId` | `string` | Owner user ID (used by plugins/custom code) |
+| `overrides` | `EntityOverrides` | Overrides for the entity view |
 | `driver` | `string` | Database driver to use (default: `"(default)"`) |
+| `databaseId` | `string` | Database/schema ID within the driver |
 
 ## Collection Builder
 

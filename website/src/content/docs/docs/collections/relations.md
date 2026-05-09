@@ -14,7 +14,35 @@ Relations define how collections are connected at the database level. They enabl
 - Generate **foreign key constraints** in the Drizzle schema
 - Support **cascade delete/update** behaviors
 
-Relations are defined in the `relations` array of a collection:
+Relations can be defined either inline within the property, or explicitly in the `relations` array of a collection:
+
+### 1. Inline Relations (Recommended)
+
+You can define the relation directly on the property. The framework automatically extracts these into the collection's `relations[]` at normalization time, so you no longer need a separate `relations[]` entry for properties.
+
+```typescript
+const postsCollection: EntityCollection = {
+    slug: "posts",
+    name: "Posts",
+    table: "posts",
+    properties: {
+        title: { type: "string", name: "Title" },
+        content: { type: "string", name: "Content", multiline: true },
+        author: { 
+            type: "relation", 
+            name: "Author", 
+            target: () => usersCollection,
+            cardinality: "one",
+            direction: "owning",
+            localKey: "author_id"
+        }
+    }
+};
+```
+
+### 2. Explicit Relations Array
+
+For advanced use cases or when a relation doesn't map directly to a form field, you can define it in the `relations` array:
 
 ```typescript
 const postsCollection: EntityCollection = {
@@ -113,11 +141,17 @@ properties: {
     author: {
         type: "relation",
         name: "Author",
-        relationName: "author",    // Must match a relation in the relations array
+        target: () => usersCollection, // Target collection
         widget: "select"           // "select" (dropdown) or "dialog" (full picker)
     }
 }
 ```
+
+![Relation field in form](/img/features/relation-form-field.png)
+
+When rendering a preview (like in a table cell or a reference chip), Rebase handles hydration automatically:
+
+![Relation preview in table](/img/features/relation-table-preview.png)
 
 ## Multi-Hop Joins
 

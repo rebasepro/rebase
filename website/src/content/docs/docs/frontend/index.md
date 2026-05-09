@@ -165,5 +165,5 @@ Rebase uses **Tailwind CSS v4** and supports light/dark modes. Customize via:
 
 - **[Custom Fields](/docs/frontend/custom-fields)** — Build custom form fields
 - **[Entity Views](/docs/frontend/entity-views)** — Add tabs to entity editors
-- **[View Modes](/docs/frontend/view-modes)** — Table, Cards, Kanban
+- **[View Modes](/docs/frontend/view-modes)** — List, Table, Cards, Kanban
 - **[Plugins](/docs/plugins)** — Extend the framework

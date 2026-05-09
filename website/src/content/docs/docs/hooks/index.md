@@ -141,7 +141,7 @@ function ThemeToggle() {
 
 ## `useEntitySelectionDialog`
 
-Open a side dialog for selecting entities from a collection. This is the same hook used internally when a reference property is rendered:
+Open a side dialog for selecting entities from a collection. This is the same hook used internally when a relation property is rendered:
 
 ```typescript
 import { useEntitySelectionDialog } from "@rebasepro/core";

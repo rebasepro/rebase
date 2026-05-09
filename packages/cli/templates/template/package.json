@@ -8,13 +8,14 @@
         "dev": "rebase dev",
         "build": "pnpm -r run build",
         "start": "pnpm --filter \"*-backend\" start",
-        "db:generate": "rebase db generate",
+        "db:generate": "rebase db generate --collections ../config/collections",
         "db:migrate": "rebase db migrate",
         "db:pull": "rebase db pull",
-        "db:push": "rebase db push",
+        "db:push": "rebase db push --collections ../config/collections",
         "db:studio": "rebase db studio",
-        "schema:generate": "rebase schema generate",
-        "generate:sdk": "rebase generate-sdk"
+        "schema:generate": "rebase schema generate --collections ../config/collections",
+        "generate:sdk": "rebase generate-sdk",
+        "deploy": "pnpm run build && pnpm run start"
     },
     "devDependencies": {
         "@rebasepro/cli": "workspace:*",

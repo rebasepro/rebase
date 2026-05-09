@@ -111,6 +111,8 @@ avatar: {
 | `columnType` | `string` | Database column: `"varchar"`, `"text"` |
 | `isId` | `string` | ID generation: `"uuid"`, `"cuid"`, `"increment"`, `"manual"` |
 | `userSelect` | `boolean` | Render as a user picker |
+| `previewAsTag` | `boolean` | Render this string as a tag in previews |
+| `clearable` | `boolean` | Add an icon to clear the value (set to null) |
 
 ## Number Properties
 
@@ -135,6 +137,7 @@ quantity: {
 | `enum` | `EnumValues` | Render as select with numeric values |
 | `columnType` | `string` | `"integer"`, `"bigint"`, `"numeric"`, `"serial"`, `"smallint"` |
 | `isId` | `string` | ID generation strategy |
+| `clearable` | `boolean` | Add an icon to clear the value (set to null) |
 
 ## Boolean Properties
 
@@ -180,6 +183,8 @@ event_date: {
 | `mode` | `"date" \| "date_time"` | Date only or date + time (default: `"date_time"`) |
 | `autoValue` | `"on_create" \| "on_update"` | Auto-set timestamps |
 | `columnType` | `string` | `"timestamp"`, `"date"` |
+| `timezone` | `string` | Timezone string to evaluate the date in |
+| `clearable` | `boolean` | Add an icon to clear the value (set to null) |
 
 ## Array Properties
 
@@ -225,6 +230,17 @@ content: {
 
 ![Block field](/img/fields/Block.png)
 
+### Array Options
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `of` | `Property \| Property[]` | Property schema for array items |
+| `oneOf` | `object` | Array of typed objects with multiple discriminator types |
+| `expanded` | `boolean` | Should the field be initially expanded (default: true) |
+| `minimalistView` | `boolean` | Display child properties directly without extendable panel |
+| `sortable` | `boolean` | Can elements be reordered (default: true) |
+| `canAddElements` | `boolean` | Can new elements be added (default: true) |
+
 ## Map Properties
 
 ```typescript
@@ -247,6 +263,19 @@ metadata: {
 ```
 
 ![Group field](/img/fields/Group.png)
+
+### Map Options
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `properties` | `Properties` | Record of properties included in the map |
+| `propertiesOrder` | `string[]` | Ordered keys for rendering |
+| `previewProperties` | `string[]` | Which properties to show in the table preview |
+| `pickOnlySomeKeys` | `boolean` | Let the user selectively add keys in the UI |
+| `spreadChildren` | `boolean` | Render child properties as separate columns in table view |
+| `minimalistView` | `boolean` | Display properties without a wrapping panel |
+| `expanded` | `boolean` | Should the field be initially expanded (default: true) |
+| `keyValue` | `boolean` | Render as arbitrary key-value pairs editor |
 
 ## Enum Values
 
@@ -301,14 +330,43 @@ validation: {
 
 ## Conditional Fields
 
-Dynamically change property config based on entity values:
+You can make fields dynamic so they react to the entity's values. There are two ways to do this:
+
+### 1. JSON Logic Conditions (Declarative)
+
+You can use the `conditions` property to define declarative JSON Logic rules that can be serialized and modified visually in the collection editor.
 
 ```typescript
 price: {
     type: "number",
     name: "Price",
-    dynamicProps: ({ values }) => ({
-        disabled: values.is_free === true,
+    conditions: {
+        disabled: { "==": [{ "var": "values.is_free" }, true] },
+        required: { "!=": [{ "var": "values.is_free" }, true] },
+        min: 0,
+        clearOnDisabled: true // Set to null if field gets disabled
+    }
+}
+```
+
+The conditions object gives you access to:
+- `disabled`, `hidden`, `readOnly`
+- `required`, `min`, `max`
+- `defaultValue`
+- `enumConditions`, `allowedEnumValues`, `excludedEnumValues`
+- `referencePath`, `referenceFilter`
+- `canAddElements`, `sortable` (for arrays)
+
+### 2. Property Builders (Programmatic)
+
+For complex behavior that can't be expressed via JSON Logic, you can use `dynamicProps` which evaluates a Javascript function.
+
+```typescript
+price: {
+    type: "number",
+    name: "Price",
+    dynamicProps: ({ values, user }) => ({
+        disabled: values.is_free === true || !user.roles.includes("admin"),
         validation: values.is_free ? {} : { required: true, min: 0 }
     })
 }

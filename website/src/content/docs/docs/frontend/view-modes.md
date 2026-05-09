@@ -31,9 +31,13 @@ const productsCollection: EntityCollection = {
 
 ## List View
 
+![List View screenshot placeholder](/img/features/list-view.png)
+
 The list view is the classic, clean CMS default view mode, showing entities in a straightforward list format without the density of a spreadsheet.
 
 ## Table View
+
+![Table View screenshot placeholder](/img/features/table-view.png)
 
 The default view is a high-performance virtualized spreadsheet with:
 
@@ -58,6 +62,8 @@ Control row height with `defaultSize`:
 | `"xl"` | 260 | Rich content previews |
 
 ## Kanban View
+
+![Kanban View screenshot placeholder](/img/features/kanban-view.png)
 
 Configure a Kanban board by specifying which enum property to use as columns:
 
@@ -89,6 +95,8 @@ const tasksCollection: EntityCollection = {
 Drag-and-drop between columns automatically updates the enum field and sort order.
 
 ## Cards View
+
+![Cards View screenshot placeholder](/img/features/cards-view.png)
 
 Cards display entities as visual cards — useful for image-heavy content:
 

@@ -12,9 +12,38 @@ export default defineConfig({
     },
     build: {
         minify: true,
-        outDir: "./build",
+        outDir: "./dist",
         target: "ESNEXT",
-        sourcemap: true
+        sourcemap: true,
+        rollupOptions: {
+            output: {
+                manualChunks(id) {
+                    // Heavy vendor libraries — split into individually cached chunks
+                    if (id.includes("xlsx")) return "vendor-xlsx";
+                    if (id.includes("prosemirror")) return "vendor-prosemirror";
+                    if (id.includes("monaco-editor") || id.includes("@monaco-editor")) return "vendor-monaco";
+                    if (id.includes("@xyflow") || id.includes("dagre")) return "vendor-xyflow";
+                    if (id.includes("@dnd-kit")) return "vendor-dnd";
+                    if (id.includes("prism-react-renderer")) return "vendor-prism";
+                    if (id.includes("markdown-it")) return "vendor-markdown";
+                    if (id.includes("react-dropzone")) return "vendor-dropzone";
+                    if (id.includes("date-fns")) return "vendor-datefns";
+                    if (id.includes("fuse.js")) return "vendor-fuse";
+                    if (id.includes("node_modules/react-dom/")) return "vendor-react-dom";
+                    if (id.includes("node_modules/react-router") || id.includes("node_modules/@remix-run")) return "vendor-react-router";
+                    if (id.includes("node_modules/@radix-ui/")) return "vendor-radix";
+                    if (id.includes("node_modules/framer-motion/")) return "vendor-framer-motion";
+                    if (id.includes("node_modules/zod/")) return "vendor-zod";
+                    if (id.includes("node_modules/i18next") || id.includes("node_modules/react-i18next")) return "vendor-i18next";
+                    if (id.includes("node_modules/@floating-ui/")) return "vendor-floating-ui";
+                    if (id.includes("node_modules/tailwind-merge/")) return "vendor-tailwind-merge";
+                    if (id.includes("node_modules/notistack/")) return "vendor-notistack";
+                    if (id.includes("node_modules/lucide-react/")) return "vendor-lucide-react";
+
+                    return undefined;
+                }
+            }
+        }
     },
     optimizeDeps: { include: ["react/jsx-runtime"] },
     plugins: [
