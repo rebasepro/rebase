@@ -89,8 +89,8 @@ export const productsCollection: EntityCollection = {
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `defaultViewMode` | `"table" \| "cards" \| "kanban"` | `"table"` | Default view mode |
-| `enabledViews` | `ViewMode[]` | All three | Which view modes are available |
+| `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"table"` | Default view mode |
+| `enabledViews` | `ViewMode[]` | All four | Which view modes are available |
 | `kanban` | `KanbanConfig` | — | Kanban configuration (column property) |
 | `openEntityMode` | `"side_panel" \| "full_screen"` | `"full_screen"` | How entities open for editing |
 | `inlineEditing` | `boolean` | `true` | Enable inline editing in the spreadsheet view |
@@ -162,4 +162,4 @@ You can set default or forced filters:
 - **[Properties](/docs/collections/properties)** — All property types and options
 - **[Relations](/docs/collections/relations)** — Foreign keys, junction tables, joins
 - **[Security Rules](/docs/collections/security-rules)** — Row Level Security
-- **[View Modes](/docs/frontend/view-modes)** — Table, Cards, Kanban
+- **[View Modes](/docs/frontend/view-modes)** — List, Table, Cards, Kanban

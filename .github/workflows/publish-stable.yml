@@ -28,7 +28,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # full history for lerna version detection
+          fetch-depth: 1
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup pnpm
@@ -65,8 +65,8 @@ jobs:
           if [ -n "${{ inputs.version }}" ]; then
             VERSION="${{ inputs.version }}"
           else
-            # Auto-bump: read current version from lerna.json or root package.json
-            CURRENT=$(node -e "console.log(require('./lerna.json').version)" 2>/dev/null || echo "0.0.0")
+            # Auto-bump: read current version from root package.json
+            CURRENT=$(node -e "console.log(require('./package.json').version)" 2>/dev/null || echo "0.0.0")
             # Bump patch
             IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
             VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
@@ -76,15 +76,18 @@ jobs:
 
       - name: Bump versions
         run: |
-          pnpm config set frozen-lockfile false
-          pnpm exec lerna version "${{ steps.version.outputs.version }}" \
-            --no-push \
-            --yes \
-            --force-publish \
-            --sync-workspace-lock=false
+          VERSION="${{ steps.version.outputs.version }}"
 
-          # Re-resolve workspace:* links after version bump
-          pnpm install --no-frozen-lockfile
+          # Bump version in all publishable packages
+          pnpm --filter './packages/*' -r exec npm version "$VERSION" --no-git-tag-version --allow-same-version
+
+          # Also bump root package.json to track the current version
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+
+          # Commit and tag
+          git add -A
+          git commit -m "chore: release v$VERSION" --no-verify
+          git tag "v$VERSION"
 
       - name: Configure npm auth
         run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc

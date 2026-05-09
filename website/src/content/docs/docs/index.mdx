@@ -2,7 +2,7 @@
 title: Introduction
 sidebar_label: Introduction
 slug: docs/index
-description: Rebase is an open-source Backend-as-a-Service and admin panel built with React and TypeScript. Define your schema in TypeScript, and Rebase generates a full CRUD UI, REST API, authentication, storage, and real-time sync — all backed by PostgreSQL or MongoDB.
+description: Rebase is an open-source Backend-as-a-Service and admin panel built with React and TypeScript. Define your schema in TypeScript, and Rebase generates a full CRUD UI, REST API, authentication, storage, and real-time sync — powered by PostgreSQL.
 ---
 
 <video className="intro_video" loop autoPlay muted>
@@ -11,9 +11,9 @@ description: Rebase is an open-source Backend-as-a-Service and admin panel built
 
 ## What is Rebase?
 
-Rebase is an **open-source Backend-as-a-Service (BaaS)** and **admin panel** built with React and TypeScript. It gives you everything you need to build production-ready back-office applications on top of **PostgreSQL** or **MongoDB**:
+Rebase is an **open-source Backend-as-a-Service (BaaS)** and **admin panel** built with React and TypeScript. It gives you everything you need to build production-ready back-office applications on top of **PostgreSQL**:
 
-- **Schema as Code** — Define your data models as TypeScript collections. Rebase generates a full CRUD UI, REST API endpoints, and type-safe client SDKs from a single source of truth. (Also generates PostgreSQL tables if using Postgres).
+- **Schema as Code** — Define your data models as TypeScript collections. Rebase generates PostgreSQL tables, a full CRUD UI, REST API endpoints, and type-safe client SDKs from a single source of truth.
 - **Instant Admin Panel** — A beautiful, fast React-based admin UI with spreadsheet tables, forms, Kanban boards, inline editing, and real-time sync.
 - **Integrated Backend** — Authentication (JWT + Google OAuth), file storage (local or S3), Row Level Security, entity history, and WebSocket real-time — all built in.
 - **Radically Extensible** — If you can build it in React, you can add it to Rebase. Custom fields, custom views, plugins, and full access to internal hooks.
@@ -43,7 +43,7 @@ Rebase is **not** a hosted SaaS. You self-host it, you own your data, and you ow
         │         │          │             │
         ▼         ▼          ▼             ▼
 ┌──────────────────────────────────────────────────────┐
-│        PostgreSQL (Drizzle) OR MongoDB               │
+│              PostgreSQL (Drizzle ORM)                 │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -58,7 +58,6 @@ Configure your database in `.env`:
 
 ```bash
 DATABASE_URL=postgresql://user:password@localhost:5432/mydb
-# OR DATABASE_URL=mongodb://localhost:27017/mydb
 JWT_SECRET=your-secret-key
 ```
 

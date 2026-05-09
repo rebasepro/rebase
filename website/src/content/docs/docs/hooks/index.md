@@ -139,15 +139,15 @@ function ThemeToggle() {
 }
 ```
 
-## `useReferenceDialog`
+## `useEntitySelectionDialog`
 
-Open a reference selection dialog:
+Open a side dialog for selecting entities from a collection. This is the same hook used internally when a reference property is rendered:
 
 ```typescript
-import { useReferenceDialog } from "@rebasepro/core";
+import { useEntitySelectionDialog } from "@rebasepro/core";
 
 function SelectProduct() {
-    const referenceDialog = useReferenceDialog({
+    const selectionDialog = useEntitySelectionDialog({
         path: "products",
         collection: productsCollection,
         onSingleEntitySelected: (entity) => {
@@ -155,7 +155,7 @@ function SelectProduct() {
         }
     });
 
-    return <button onClick={referenceDialog.open}>Select Product</button>;
+    return <button onClick={selectionDialog.open}>Select Product</button>;
 }
 ```
 

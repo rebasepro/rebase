@@ -7,8 +7,9 @@ description: Configure table, cards, and Kanban board views for your collections
 
 ## Overview
 
-Every collection can be displayed in three view modes:
+Every collection can be displayed in four view modes:
 
+- **List** — Simple, clean list view (the classic CMS default)
 - **Table** — Spreadsheet-style grid with inline editing, sorting, filtering
 - **Cards** — Card grid for visual content (images, previews)
 - **Kanban** — Drag-and-drop board grouped by an enum property
@@ -19,7 +20,7 @@ Every collection can be displayed in three view modes:
 const productsCollection: EntityCollection = {
     slug: "products",
     defaultViewMode: "table",            // Default view
-    enabledViews: ["table", "kanban"],    // Available views
+    enabledViews: ["list", "table", "kanban"],    // Available views
     kanban: {
         columnProperty: "status",        // Enum property for columns
         orderProperty: "sort_order"      // Property for drag-and-drop ordering
@@ -27,6 +28,10 @@ const productsCollection: EntityCollection = {
     // ...
 };
 ```
+
+## List View
+
+The list view is the classic, clean CMS default view mode, showing entities in a straightforward list format without the density of a spreadsheet.
 
 ## Table View
 

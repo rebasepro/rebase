@@ -22,11 +22,11 @@ Rebase is a full-stack platform with four layers:
 │  Hono HTTP Server  •  REST API  •  Auth  •  Storage  •  WS     │
 │  @rebasepro/backend                                             │
 └───────────────────────────┬─────────────────────────────────────┘
-                            │ Drizzle ORM (Postgres) / Native Driver (Mongo)
+                            │ Drizzle ORM
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                       Database Layer                            │
-│  PostgreSQL / MongoDB  •  Tables/Collections  •  Realtime sync  │
+│  PostgreSQL  •  Tables  •  RLS Policies  •  Realtime sync       │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -34,34 +34,39 @@ Rebase is a full-stack platform with four layers:
 
 ### Bootstrapper System
 
-The backend initializes through a plugin-based bootstrapper system. Database-specific logic is decoupled into its own package, and bootstrappers handle initialization of databases, authentication, and internal services.
+The backend initializes through a plugin-based bootstrapper system. Database-specific logic is decoupled into its own package, and bootstrappers handle initialization of the database, authentication, and internal services.
 
 ```typescript
 import { createPostgresBootstrapper } from "@rebasepro/server-postgresql";
-import { createMongoBootstrapper } from "@rebasepro/server-mongodb";
 
 bootstrappers: [
-    isMongo ? createMongoBootstrapper({ ... }) : createPostgresBootstrapper({ ... })
+    createPostgresBootstrapper({
+        connectionString: process.env.DATABASE_URL!
+    })
 ]
 ```
 
 Collections automatically resolve against the configured bootstrapper through the internal dependency injection registry.
 
+:::tip
+The `createPostgresBootstrapper` handles database connection pooling, schema resolution, and real-time `LISTEN/NOTIFY` setup automatically.
+:::
+
 ### Collection Registry
 
-The `BackendCollectionRegistry` is the runtime index of all collections, their database tables, enums, and Drizzle relations. It's populated at startup from your collection definitions.
+The `BackendCollectionRegistry` is the runtime index of all collections, their PostgreSQL tables, enums, and Drizzle relations. It's populated at startup from your collection definitions.
 
 ### Realtime Service
 
-Real-time sync uses database-native mechanisms:
+Real-time sync uses PostgreSQL's native `LISTEN/NOTIFY` mechanism:
 
 1. A data mutation happens (insert, update, delete)
-2. For Postgres: backend emits a `NOTIFY` on a channel. For Mongo: Change Streams detect the mutation.
-3. The `RealtimeService` receives the notification/change event
+2. The backend emits a `NOTIFY` on a channel
+3. The `RealtimeService` receives the notification
 4. It broadcasts the change to all connected WebSocket clients
 5. React components re-render with the new data
 
-For **multi-instance deployments** (e.g., Cloud Run with multiple replicas), provide a `connectionString` in your PostgresBootstrapper, or ensure MongoDB is a replica set to use Change Streams.
+For **multi-instance deployments** (e.g., Cloud Run with multiple replicas), provide a `connectionString` in your PostgresBootstrapper so all replicas share the same `LISTEN` connection.
 
 ### Storage Registry
 
@@ -89,7 +94,7 @@ Like drivers, storage backends are registered in a registry. You can have multip
 ### Read Flow
 1. User opens a collection in the admin UI
 2. Client SDK sends `GET /api/data/:slug` + opens a WebSocket subscription
-3. Backend queries PostgreSQL via Drizzle ORM, or MongoDB via its native driver
+3. Backend queries PostgreSQL via Drizzle ORM
 4. Data transformer deserializes database records into entity format
 5. Response sent to frontend, components render
 6. WebSocket keeps the view synced in real-time

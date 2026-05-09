@@ -44,23 +44,14 @@ jobs:
           echo "CANARY_VERSION=$CANARY_VERSION" >> $GITHUB_ENV
           echo "Publishing canary version: $CANARY_VERSION"
 
-          # Configure pnpm natively to allow lockfile updates during canary version bump
-          pnpm config set frozen-lockfile false
-          pnpm config set resolution-worker-threads false
-
-          # Update all package versions without creating git tags or commits
-          pnpm exec lerna version "$CANARY_VERSION" --no-git-tag-version --no-push --yes --sync-workspace-lock=false
-
-          # Re-resolve workspace:* links after version bump so pnpm publish can resolve them
-          pnpm install --no-frozen-lockfile
+          # Bump version in all publishable packages
+          pnpm --filter './packages/*' -r exec npm version "$CANARY_VERSION" --no-git-tag-version --allow-same-version
 
           # Commit version changes locally so pnpm publish doesn't complain about dirty git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "chore: canary version $CANARY_VERSION" --no-verify
-        env:
-          NODE_OPTIONS: "--max_old_space_size=4096"
 
       - name: Configure npm auth
         run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
