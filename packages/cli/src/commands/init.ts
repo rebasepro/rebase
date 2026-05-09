@@ -101,8 +101,8 @@ async function promptForOptions(rawArgs: string[]): Promise<InitOptions> {
 
     const answers = await inquirer.prompt(questions as unknown as Parameters<typeof inquirer.prompt>[0]);
 
-    const projectName = nameArg || answers.projectName;
-    const targetDirectory = path.resolve(process.cwd(), projectName);
+    const targetDirectory = path.resolve(process.cwd(), nameArg || answers.projectName);
+    const projectName = path.basename(targetDirectory);
     const templateDirectory = path.resolve(cliRoot!, "templates", "template");
 
     return {
@@ -236,12 +236,20 @@ async function replacePlaceholders(options: InitOptions) {
         "frontend/index.html"
     ];
 
+    const packageJsonPath = path.resolve(cliRoot!, "package.json");
+    let cliVersion = "latest";
+    if (fs.existsSync(packageJsonPath)) {
+        const pkg = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
+        cliVersion = pkg.version || "latest";
+    }
+
     for (const file of filesToProcess) {
         const fullPath = path.resolve(options.targetDirectory, file);
         if (!fs.existsSync(fullPath)) continue;
 
         let content = fs.readFileSync(fullPath, "utf-8");
         content = content.replace(/\{\{PROJECT_NAME\}\}/g, options.projectName);
+        content = content.replace(/("@rebasepro\/[^"]+":\s*)"workspace:\*"/g, `$1"${cliVersion}"`);
         fs.writeFileSync(fullPath, content, "utf-8");
     }
 }
