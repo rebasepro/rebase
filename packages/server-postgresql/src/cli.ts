@@ -527,6 +527,52 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
             console.error(chalk.red(`✗ Failed to run schema generator: ${err instanceof Error ? err.message : String(err)}`));
             process.exit(1);
         }
+    } else if (subcommand === "introspect") {
+        const argsList = arg(
+            {
+                "--output": String,
+                "-o": "--output"
+            },
+            {
+                argv: rawArgs.slice(2),
+                permissive: true
+            }
+        );
+
+        const introspectScript = path.join(__dirname, "schema", "introspect-db.ts");
+        if (!fs.existsSync(introspectScript)) {
+            console.error(chalk.red(`✗ Could not find introspect-db.ts at ${introspectScript}`));
+            process.exit(1);
+        }
+
+        const tsxBin = resolveLocalBin("tsx");
+        if (!tsxBin) {
+            console.error(chalk.red("✗ Could not find tsx binary."));
+            process.exit(1);
+        }
+
+        const outputPath = argsList["--output"] || path.join("config", "collections");
+
+        console.log("");
+        console.log(chalk.bold("  🔍 Rebase Schema Introspector"));
+        console.log("");
+
+        const cmdParts = [
+            tsxBin,
+            introspectScript,
+            `--output=${outputPath}`
+        ];
+
+        try {
+            await execa(cmdParts[0], cmdParts.slice(1), {
+                cwd: process.cwd(),
+                stdio: "inherit",
+                env: { ...process.env as Record<string, string> }
+            });
+        } catch (err: unknown) {
+            console.error(chalk.red(`✗ Failed to run schema introspector: ${err instanceof Error ? err.message : String(err)}`));
+            process.exit(1);
+        }
     } else {
         console.error(chalk.red("Unknown schema command."));
         process.exit(1);

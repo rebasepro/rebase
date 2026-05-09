@@ -76,10 +76,14 @@ ${chalk.green.bold("Usage")}
 ${chalk.green.bold("Commands")}
   ${chalk.gray("(Commands are provided by your active database driver plugin)")}
   ${chalk.blue.bold("generate")}    Generate Schema from collection definitions
+  ${chalk.blue.bold("introspect")}  Introspect an existing database to generate collection definitions
 
 ${chalk.green.bold("generate Options")}
   ${chalk.blue("--collections, -c")}  Path to collections directory
   ${chalk.blue("--output, -o")}       Output path for generated schema
   ${chalk.blue("--watch, -w")}        Watch for changes and regenerate automatically
+
+${chalk.green.bold("introspect Options")}
+  ${chalk.blue("--output, -o")}       Output directory for generated collection files
 `);
 }
