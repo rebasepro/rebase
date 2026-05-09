@@ -1,105 +1,105 @@
 {
-    "name": "@rebasepro/types",
-    "type": "module",
-    "version": "0.0.1-canary.4d4fb3e",
-    "description": "Rebase type definitions \u2014 shared interfaces and controller types",
-    "funding": {
-        "url": "https://github.com/sponsors/rebaseco"
+  "name": "@rebasepro/types",
+  "type": "module",
+  "version": "0.0.1-canary.09e5ec54d",
+  "description": "Rebase type definitions — shared interfaces and controller types",
+  "funding": {
+    "url": "https://github.com/sponsors/rebaseco"
+  },
+  "author": "Rebase",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rebasepro/rebase.git",
+    "directory": "packages/types"
+  },
+  "main": "./dist/index.umd.js",
+  "module": "./dist/index.es.js",
+  "types": "./dist/index.d.ts",
+  "source": "src/index.ts",
+  "engines": {
+    "node": ">=14"
+  },
+  "keywords": [
+    "rebase",
+    "cms",
+    "admin",
+    "typescript",
+    "headless",
+    "headless cms",
+    "content manager"
+  ],
+  "scripts": {
+    "watch": "vite build --watch",
+    "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json",
+    "test:lint": "eslint \"src/**\" --quiet",
+    "test": "jest --passWithNoTests",
+    "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "development": "./src/index.ts",
+      "import": "./dist/index.es.js",
+      "require": "./dist/index.umd.js"
     },
-    "author": "Rebase",
-    "license": "MIT",
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/rebasepro/rebase.git",
-        "directory": "packages/types"
+    "./package.json": "./package.json"
+  },
+  "devDependencies": {
+    "@jest/globals": "^29.7.0",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^20.17.14",
+    "@types/object-hash": "^3.0.6",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "@types/react-measure": "^2.0.12",
+    "@vitejs/plugin-react": "^4.3.4",
+    "babel-plugin-react-compiler": "beta",
+    "cross-env": "^7.0.3",
+    "eslint-plugin-react-compiler": "beta",
+    "jest": "^29.7.0",
+    "npm-run-all": "^4.1.5",
+    "ts-jest": "^29.3.1",
+    "ts-node": "^10.9.2",
+    "tsd": "^0.31.2",
+    "typescript": "^5.8.3",
+    "vite": "^5.4.17"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "gitHead": "d935eefa5aa8d1009a2398cfac2c1e4ee9aeb6b6",
+  "publishConfig": {
+    "access": "public"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "jest": {
+    "transform": {
+      "^.+\\.tsx?$": "ts-jest"
     },
-    "main": "./dist/index.umd.js",
-    "module": "./dist/index.es.js",
-    "types": "./dist/index.d.ts",
-    "source": "src/index.ts",
-    "engines": {
-        "node": ">=14"
-    },
-    "keywords": [
-        "rebase",
-        "cms",
-        "admin",
-        "typescript",
-        "headless",
-        "headless cms",
-        "content manager"
+    "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "jsx",
+      "json",
+      "node"
     ],
-    "scripts": {
-        "watch": "vite build --watch",
-        "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json",
-        "test:lint": "eslint \"src/**\" --quiet",
-        "test": "jest --passWithNoTests",
-        "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f"
-    },
-    "exports": {
-        ".": {
-            "types": "./dist/index.d.ts",
-            "development": "./src/index.ts",
-            "import": "./dist/index.es.js",
-            "require": "./dist/index.umd.js"
-        },
-        "./package.json": "./package.json"
-    },
-    "devDependencies": {
-        "@jest/globals": "^29.7.0",
-        "@testing-library/react": "^16.3.0",
-        "@testing-library/user-event": "^14.6.1",
-        "@types/jest": "^29.5.14",
-        "@types/node": "^20.17.14",
-        "@types/object-hash": "^3.0.6",
-        "@types/react": "^19.0.8",
-        "@types/react-dom": "^19.0.3",
-        "@types/react-measure": "^2.0.12",
-        "@vitejs/plugin-react": "^4.3.4",
-        "babel-plugin-react-compiler": "beta",
-        "cross-env": "^7.0.3",
-        "eslint-plugin-react-compiler": "beta",
-        "jest": "^29.7.0",
-        "npm-run-all": "^4.1.5",
-        "ts-jest": "^29.3.1",
-        "ts-node": "^10.9.2",
-        "tsd": "^0.31.2",
-        "typescript": "^5.8.3",
-        "vite": "^5.4.17"
-    },
-    "files": [
-        "dist",
-        "src"
+    "testEnvironment": "node",
+    "testPathIgnorePatterns": [
+      "/bivariance/"
     ],
-    "gitHead": "d935eefa5aa8d1009a2398cfac2c1e4ee9aeb6b6",
-    "publishConfig": {
-        "access": "public"
-    },
-    "eslintConfig": {
-        "extends": [
-            "react-app",
-            "react-app/jest"
-        ]
-    },
-    "jest": {
-        "transform": {
-            "^.+\\.tsx?$": "ts-jest"
-        },
-        "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
-        "moduleFileExtensions": [
-            "ts",
-            "tsx",
-            "js",
-            "jsx",
-            "json",
-            "node"
-        ],
-        "testEnvironment": "node",
-        "testPathIgnorePatterns": [
-            "/bivariance/"
-        ],
-        "moduleNameMapper": {
-            "\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js"
-        }
+    "moduleNameMapper": {
+      "\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js"
     }
+  }
 }

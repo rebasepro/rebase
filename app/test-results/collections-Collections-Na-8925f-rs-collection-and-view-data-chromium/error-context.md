@@ -39,21 +39,25 @@ Call log:
       - img [ref=e11]
   - generic [ref=e17]:
     - img [ref=e19]
-    - generic [ref=e24]:
-      - generic [ref=e25]:
-        - text: No account needed — demo credentials are pre-filled. Just click
-        - strong [ref=e26]: Sign in with email
-        - text: .
-      - generic [ref=e27] [cursor=pointer]:
-        - checkbox "I accept the Privacy Policy" [ref=e28]
-        - paragraph [ref=e31]:
-          - text: I accept the
-          - link "Privacy Policy" [ref=e32]:
-            - /url: https://rebase.pro/policy/privacy_policy/
-      - button "Sign in with email" [disabled] [ref=e33]:
-        - generic [ref=e34]:
-          - img [ref=e36]
-          - generic [ref=e39]: Sign in with email
+    - generic [ref=e25]:
+      - img [ref=e26]
+      - paragraph [ref=e29]: Internal Server Error
+    - generic [ref=e31]:
+      - button [ref=e33] [cursor=pointer]:
+        - img [ref=e34]
+      - heading "Sign in" [level=6] [ref=e36]
+      - paragraph [ref=e37]: Enter your credentials to continue
+      - generic [ref=e38]:
+        - text: Email
+        - textbox "you@example.com" [ref=e40]: demo@rebase.pro
+      - generic [ref=e41]:
+        - text: Password
+        - textbox "••••••••" [ref=e43]: DemoRebase2026!
+      - button "Forgot password?" [ref=e45] [cursor=pointer]
+      - button "Sign in" [ref=e46]
+      - paragraph [ref=e48]:
+        - text: Don't have an account?
+        - button "Create one" [ref=e49] [cursor=pointer]
 ```
 
 # Test source
