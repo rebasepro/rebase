@@ -78,11 +78,11 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
 
-          # Bump version in all publishable packages
-          pnpm --filter './packages/*' -r exec npm version "$VERSION" --no-git-tag-version --allow-same-version
+          # Bump version in all publishable packages (node, not npm, to avoid workspace:* validation)
+          pnpm --filter './packages/*' -r exec node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version='$VERSION';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
 
           # Also bump root package.json to track the current version
-          npm version "$VERSION" --no-git-tag-version --allow-same-version
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version='$VERSION';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
 
           # Commit and tag
           git add -A
