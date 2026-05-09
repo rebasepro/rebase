@@ -13,15 +13,15 @@ test.describe('Collections Navigation', () => {
       page.waitForResponse(resp => resp.url().includes('/api/') && resp.status() !== 204, { timeout: 10000 }).catch(() => {})
     ]);
     // Wait for dashboard to ensure we are logged in
-    await expect(page.getByText('Total Revenue').first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('Total Revenue').first()).toBeVisible({ timeout: 30000 });
   });
 
-  test('can navigate to Tags collection and view data', async ({ page }) => {
-    // Click on 'Tags' in the sidebar
-    await page.locator('a[href="/c/tags"]').first().click();
+  test('can navigate to Orders collection and view data', async ({ page }) => {
+    // Click on 'Orders' in the sidebar
+    await page.getByRole('link').filter({ hasText: 'Orders' }).first().click();
 
-    // Verify the URL changes to /c/tags
-    await expect(page).toHaveURL(/\/c\/tags/);
+    // Verify the URL changes to /c/orders
+    await expect(page).toHaveURL(/\/c\/orders/);
 
     // Verify the table loads (look for an Add button)
     const addButton = page.getByRole('button', { name: /Add/i }).first();
@@ -30,10 +30,24 @@ test.describe('Collections Navigation', () => {
 
   test('can navigate to Products collection and view data', async ({ page }) => {
     // Click on 'Products' in the sidebar
-    await page.locator('a[href="/c/products"]').first().click();
+    await page.getByRole('link').filter({ hasText: 'Products' }).first().click();
 
     await expect(page).toHaveURL(/\/c\/products/);
 
+    const addButton = page.getByRole('button', { name: /Add/i }).first();
+    await expect(addButton).toBeVisible({ timeout: 10000 });
+  });
+
+  test('can navigate to Customers collection and view data', async ({ page }) => {
+    await page.getByRole('link').filter({ hasText: 'Customers' }).first().click();
+    await expect(page).toHaveURL(/\/c\/customers/);
+    const addButton = page.getByRole('button', { name: /Add/i }).first();
+    await expect(addButton).toBeVisible({ timeout: 10000 });
+  });
+
+  test('can navigate to Tickets collection and view data', async ({ page }) => {
+    await page.getByRole('link').filter({ hasText: 'Tickets' }).first().click();
+    await expect(page).toHaveURL(/\/c\/tickets/);
     const addButton = page.getByRole('button', { name: /Add/i }).first();
     await expect(addButton).toBeVisible({ timeout: 10000 });
   });

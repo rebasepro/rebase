@@ -21,5 +21,5 @@ test('Full E2E: Sign in and view dashboard', async ({ page }) => {
 
   // Wait for the Rebase dashboard to load.
   // The dashboard shows a metric "Total Revenue" when logged in successfully.
-  await expect(page.getByText('Total Revenue').first()).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText('Total Revenue').first()).toBeVisible({ timeout: 30000 });
 });

@@ -234,7 +234,7 @@ export function RebaseFirebaseApp({
                         {({
                             context,
                             loading
-                        }) => {
+                        }: { context: any, loading: boolean }) => {
 
                             let component;
                             if (loading || authLoading) {

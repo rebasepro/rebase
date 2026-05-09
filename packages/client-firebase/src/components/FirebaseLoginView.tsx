@@ -282,7 +282,7 @@ export function FirebaseLoginView({
 
                 {(!passwordLoginSelected && !phoneLoginSelected) && <div className={"my-4 w-full"}>
 
-                    {buildOauthLoginButtons(authController, resolvedSignInOptions, modeState.mode, disabled)}
+                    {buildOauthLoginButtons(authController, resolvedSignInOptions, modeState.mode as "light" | "dark", disabled)}
 
                     {resolvedSignInOptions.includes("password") &&
                         <LoginButton
@@ -321,7 +321,7 @@ export function FirebaseLoginView({
                 {passwordLoginSelected && <LoginForm
                     authController={authController}
                     onClose={() => setPasswordLoginSelected(false)}
-                    mode={modeState.mode}
+                    mode={modeState.mode as "light" | "dark"}
                     noUserComponent={noUserComponent}
                     disableSignupScreen={disableSignupScreen}
                     disableResetPassword={disableResetPassword}
