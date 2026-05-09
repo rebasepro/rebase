@@ -35,6 +35,7 @@ export interface InitOptions {
     installDeps: boolean;
     targetDirectory: string;
     templateDirectory: string;
+    databaseUrl?: string;
 }
 
 export async function createRebaseApp(rawArgs: string[]) {
@@ -99,6 +100,13 @@ async function promptForOptions(rawArgs: string[]): Promise<InitOptions> {
         });
     }
 
+    questions.push({
+        type: "input",
+        name: "databaseUrl",
+        message: "Enter your PostgreSQL database connection string (leave blank to use a local default):",
+        default: ""
+    });
+
     const answers = await inquirer.prompt(questions as unknown as Parameters<typeof inquirer.prompt>[0]);
 
     const targetDirectory = path.resolve(process.cwd(), nameArg || answers.projectName);
@@ -110,7 +118,8 @@ async function promptForOptions(rawArgs: string[]): Promise<InitOptions> {
         git: args["--git"] || answers.git || false,
         installDeps: args["--install"] || answers.installDeps || false,
         targetDirectory,
-        templateDirectory
+        templateDirectory,
+        databaseUrl: (answers.databaseUrl as string)?.trim() || undefined
     };
 }
 
@@ -161,20 +170,27 @@ async function createProject(options: InitOptions) {
 
         // Generate secure random strings
         const jwtSecret = crypto.randomBytes(32).toString("hex");
-        const dbPassword = crypto.randomBytes(16).toString("hex");
 
         let envContent = fs.readFileSync(envPath, "utf-8");
-        envContent = envContent.replace(
-            "postgresql://rebase:password@localhost:5432/rebase",
-            `postgresql://rebase:${dbPassword}@localhost:5432/rebase`
-        );
         envContent = envContent.replace(
             "change-this-to-a-secure-random-string",
             jwtSecret
         );
 
-        // Append POSTGRES_PASSWORD for docker-compose interpolation
-        envContent += `\n# Docker Compose Database Password\nPOSTGRES_PASSWORD=${dbPassword}\n`;
+        if (options.databaseUrl) {
+            envContent = envContent.replace(
+                "postgresql://rebase:password@localhost:5432/rebase",
+                options.databaseUrl
+            );
+        } else {
+            const dbPassword = crypto.randomBytes(16).toString("hex");
+            envContent = envContent.replace(
+                "postgresql://rebase:password@localhost:5432/rebase",
+                `postgresql://rebase:${dbPassword}@localhost:5432/rebase`
+            );
+            // Append POSTGRES_PASSWORD for docker-compose interpolation
+            envContent += `\n# Docker Compose Database Password\nPOSTGRES_PASSWORD=${dbPassword}\n`;
+        }
 
         fs.writeFileSync(envPath, envContent, "utf-8");
     }
@@ -214,8 +230,15 @@ async function createProject(options: InitOptions) {
         console.log(`  ${chalk.cyan("pnpm install")}`);
     }
     console.log("");
-    console.log(chalk.gray("  # Set up your database connection in .env"));
-    console.log(chalk.gray("  # Then run:"));
+    if (options.databaseUrl) {
+        console.log(chalk.gray("  # Your database is configured! Start the dev server:"));
+    } else {
+        console.log(chalk.gray("  # A local database configuration has been generated in .env"));
+        console.log(chalk.gray("  # If using the included docker-compose.yml, start it with:"));
+        console.log(`  ${chalk.cyan("docker compose up -d")}`);
+        console.log("");
+        console.log(chalk.gray("  # Then start the dev server:"));
+    }
     console.log("");
     console.log(`  ${chalk.cyan("pnpm dev")}`);
     console.log("");
