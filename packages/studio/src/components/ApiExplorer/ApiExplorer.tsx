@@ -8,7 +8,7 @@ import {
     Button,
     Chip,
     defaultBorderMixin,
-    SearchBar,
+    DebouncedTextField,
     iconSize
 } from "@rebasepro/ui";
 import { BookOpenIcon, PlayIcon } from "lucide-react";
@@ -161,10 +161,11 @@ allEndpoints: [] };
                     )}
                     {/* Search */}
                     <div className="mb-2">
-                        <SearchBar
+                        <DebouncedTextField
                             placeholder="Filter endpoints…"
                             size="small"
-                            onTextSearch={(val) => setSidebarFilter(val || "")}
+                            type="search"
+                            onChange={(e) => setSidebarFilter(e.target.value)}
                         />
                     </div>
 

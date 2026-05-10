@@ -173,37 +173,7 @@ async function createProject(options: InitOptions) {
     await replacePlaceholders(options);
 
     // Rename .env.template to .env if it exists and randomize secrets
-    const envTemplatePath = path.join(options.targetDirectory, ".env.template");
-    const envPath = path.join(options.targetDirectory, ".env");
-    if (fs.existsSync(envTemplatePath) && !fs.existsSync(envPath)) {
-        fs.renameSync(envTemplatePath, envPath);
-
-        // Generate secure random strings
-        const jwtSecret = crypto.randomBytes(32).toString("hex");
-
-        let envContent = fs.readFileSync(envPath, "utf-8");
-        envContent = envContent.replace(
-            "change-this-to-a-secure-random-string",
-            jwtSecret
-        );
-
-        if (options.databaseUrl) {
-            envContent = envContent.replace(
-                "postgresql://rebase:password@localhost:5432/rebase",
-                options.databaseUrl
-            );
-        } else {
-            const dbPassword = crypto.randomBytes(16).toString("hex");
-            envContent = envContent.replace(
-                "postgresql://rebase:password@localhost:5432/rebase",
-                `postgresql://rebase:${dbPassword}@localhost:5432/rebase`
-            );
-            // Append POSTGRES_PASSWORD for docker-compose interpolation
-            envContent += `\n# Docker Compose Database Password\nPOSTGRES_PASSWORD=${dbPassword}\n`;
-        }
-
-        fs.writeFileSync(envPath, envContent, "utf-8");
-    }
+    configureEnvFile(options.targetDirectory, options.databaseUrl);
 
     // Initialize git
     if (options.git) {
@@ -362,5 +332,42 @@ async function replacePlaceholders(options: InitOptions) {
         }
         
         fs.writeFileSync(fullPath, content, "utf-8");
+    }
+}
+
+export function configureEnvFile(targetDirectory: string, databaseUrl?: string) {
+    const envTemplatePath = path.join(targetDirectory, ".env.template");
+    const envPath = path.join(targetDirectory, ".env");
+    if (fs.existsSync(envTemplatePath) && !fs.existsSync(envPath)) {
+        fs.renameSync(envTemplatePath, envPath);
+
+        // Generate secure random strings
+        const jwtSecret = crypto.randomBytes(32).toString("hex");
+
+        let envContent = fs.readFileSync(envPath, "utf-8");
+        
+        envContent = envContent.replace(
+            /^JWT_SECRET=.*$/m,
+            `JWT_SECRET=${jwtSecret}`
+        );
+
+        if (databaseUrl) {
+            envContent = envContent.replace(
+                /^DATABASE_URL=.*$/m,
+                `DATABASE_URL=${databaseUrl}`
+            );
+        } else {
+            const dbPassword = crypto.randomBytes(16).toString("hex");
+            envContent = envContent.replace(
+                /^POSTGRES_PASSWORD=.*$/m,
+                `POSTGRES_PASSWORD=${dbPassword}`
+            );
+            envContent = envContent.replace(
+                /^DATABASE_URL=.*$/m,
+                `DATABASE_URL=postgresql://rebase:${dbPassword}@localhost:5432/rebase`
+            );
+        }
+
+        fs.writeFileSync(envPath, envContent, "utf-8");
     }
 }

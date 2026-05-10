@@ -10,6 +10,7 @@ import path from "path";
 import os from "os";
 import { promisify } from "util";
 import ncp from "ncp";
+import { configureEnvFile } from "./init.js";
 
 const copy = promisify(ncp);
 
@@ -307,10 +308,44 @@ describe(".env.template", () => {
         expect(envContent).toContain("REQUIRED");
         expect(envContent).toContain("openssl rand");
     });
-
     it("has optional SMTP section commented out", () => {
         const envContent = fs.readFileSync(path.join(TEMPLATE_DIR, ".env.template"), "utf-8");
         expect(envContent).toContain("# SMTP_HOST");
+    });
+
+    it("configureEnvFile successfully generates a valid .env without REQUIRED placeholders", async () => {
+        const targetDir = await simulateInit("env-test-app");
+        // simulateInit does not call configureEnvFile, so we call it manually
+        configureEnvFile(targetDir);
+
+        const envPath = path.join(targetDir, ".env");
+        expect(fs.existsSync(envPath)).toBe(true);
+
+        const envContent = fs.readFileSync(envPath, "utf-8");
+        // Ensure no "REQUIRED" placeholders remain for the generated secrets
+        expect(envContent).not.toMatch(/^JWT_SECRET=REQUIRED$/m);
+        expect(envContent).not.toMatch(/^DATABASE_URL=REQUIRED$/m);
+
+        // Verify that JWT_SECRET is properly replaced (it should be 64 hex characters, so > 32 length)
+        const jwtMatch = envContent.match(/^JWT_SECRET=(.*)$/m);
+        expect(jwtMatch).toBeTruthy();
+        expect(jwtMatch![1].length).toBeGreaterThanOrEqual(32);
+        
+        // Verify local default DB url
+        const dbMatch = envContent.match(/^DATABASE_URL=(.*)$/m);
+        expect(dbMatch).toBeTruthy();
+        expect(dbMatch![1]).toContain("postgresql://rebase:");
+    });
+
+    it("configureEnvFile correctly uses provided databaseUrl", async () => {
+        const targetDir = await simulateInit("env-custom-db-app");
+        const customDbUrl = "postgresql://user:pass@remote:5432/db";
+        configureEnvFile(targetDir, customDbUrl);
+
+        const envContent = fs.readFileSync(path.join(targetDir, ".env"), "utf-8");
+        const dbMatch = envContent.match(/^DATABASE_URL=(.*)$/m);
+        expect(dbMatch).toBeTruthy();
+        expect(dbMatch![1]).toBe(customDbUrl);
     });
 });
 
