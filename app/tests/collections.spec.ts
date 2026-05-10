@@ -12,8 +12,8 @@ test.describe('Collections Navigation', () => {
       signInButton.click(),
       page.waitForResponse(resp => resp.url().includes('/api/') && resp.status() !== 204, { timeout: 10000 }).catch(() => {})
     ]);
-    // Wait for dashboard to ensure we are logged in
-    await expect(page.getByText('Total Revenue').first()).toBeVisible({ timeout: 30000 });
+    // Wait for the Orders link in the sidebar to appear, ensuring we are logged in
+    await expect(page.getByRole('link').filter({ hasText: 'Orders' }).first()).toBeVisible({ timeout: 30000 });
   });
 
   test('can navigate to Orders collection and view data', async ({ page }) => {

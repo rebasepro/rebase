@@ -282,6 +282,9 @@ export class CronScheduler {
         const job = this.jobs.get(id);
         if (!job || !job.enabled || !this.started) return;
 
+        // Clear any previously scheduled timer to prevent double-firing
+        this.stopJob(id);
+
         try {
             const now = new Date();
             const nextRun = parseCronExpression(job.definition.schedule, now);
@@ -342,11 +345,16 @@ export class CronScheduler {
             // Race with timeout
             const timeout = (job.definition.timeoutSeconds ?? 300) * 1000;
             const handlerPromise = Promise.resolve(job.definition.handler(ctx));
+            let timeoutHandle: ReturnType<typeof setTimeout>;
             const timeoutPromise = new Promise<never>((_, reject) => {
-                setTimeout(() => reject(new Error(`Cron job "${job.id}" timed out after ${timeout}ms`)), timeout);
+                timeoutHandle = setTimeout(() => reject(new Error(`Cron job "${job.id}" timed out after ${timeout}ms`)), timeout);
             });
 
-            result = await Promise.race([handlerPromise, timeoutPromise]);
+            try {
+                result = await Promise.race([handlerPromise, timeoutPromise]);
+            } finally {
+                clearTimeout(timeoutHandle!);
+            }
         } catch (err: unknown) {
             success = false;
             error = err instanceof Error ? err.message : String(err);

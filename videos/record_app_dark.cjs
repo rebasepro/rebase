@@ -50,7 +50,12 @@ const fs = require("fs");
     }
 
     console.log("Waiting for login to complete...");
-    await page.waitForFunction('window.location.pathname.includes("/c/")', { timeout: 15000 }).catch(() => {});
+    await new Promise(r => setTimeout(r, 4000));
+    // Wait for the login screen to be gone
+    await page.waitForFunction(() => {
+      return !document.body.innerHTML.includes("Sign in with email");
+    }, { timeout: 15000 }).catch(() => {});
+    await new Promise(r => setTimeout(r, 2000));
   }
 
   // Go to table view

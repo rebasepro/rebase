@@ -11,8 +11,6 @@ const DEMO_DISPLAY_NAME = "Demo User";
  * 1. Wipes all collection data (TRUNCATE CASCADE)
  * 2. Deletes all users except re-creates the demo user
  * 3. Re-runs the seed data
- *
- * Only runs when DEMO_MODE=true.
  */
 const job: CronJobDefinition = {
     schedule: "0 * * * *",
@@ -20,12 +18,6 @@ const job: CronJobDefinition = {
     description: "Wipes and re-seeds all data and users every hour for the demo environment.",
 
     async handler(ctx) {
-        // Only run in demo mode
-        if (process.env.DEMO_MODE !== "true") {
-            ctx.log("DEMO_MODE is not enabled, skipping reset.");
-            return { skipped: true };
-        }
-
         ctx.log("🔄 Starting demo data reset...");
 
         // ── Step 1: Truncate all collection tables ────────────────────

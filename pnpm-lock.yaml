@@ -343,156 +343,6 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0(rollup@4.59.0)(typescript@5.9.3)(vite@5.4.21(@types/node@24.12.2)(lightningcss@1.32.0)(terser@5.46.2))
 
-  examples/medmot-staging:
-    devDependencies:
-      '@rebasepro/cli':
-        specifier: 0.0.1-canary.4f204c2
-        version: 0.0.1-canary.4f204c2(@rebasepro/common@0.0.1-canary.4f204c2)(@types/node@24.12.2)
-      concurrently:
-        specifier: ^8.2.2
-        version: 8.2.2
-      typescript:
-        specifier: ^5.9.2
-        version: 5.9.3
-
-  examples/medmot-staging/backend:
-    dependencies:
-      '@hono/node-server':
-        specifier: 1.19.12
-        version: 1.19.12(hono@4.12.10)
-      '@rebasepro/server-core':
-        specifier: workspace:*
-        version: link:../../../packages/server-core
-      '@rebasepro/server-postgresql':
-        specifier: workspace:*
-        version: link:../../../packages/server-postgresql
-      dotenv:
-        specifier: ^16.0.0
-        version: 16.6.1
-      drizzle-orm:
-        specifier: ^0.44.4
-        version: 0.44.7(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(pg@8.20.0)
-      hono:
-        specifier: 4.12.10
-        version: 4.12.10
-      medmot-staging-config:
-        specifier: workspace:*
-        version: link:../config
-      pg:
-        specifier: ^8.11.3
-        version: 8.20.0
-      ws:
-        specifier: ^8.16.0
-        version: 8.19.0
-      zod:
-        specifier: ^3.22.4
-        version: 3.25.76
-    devDependencies:
-      '@types/node':
-        specifier: ^20.10.5
-        version: 20.19.17
-      '@types/pg':
-        specifier: ^8.6.5
-        version: 8.18.0
-      '@types/ws':
-        specifier: ^8.5.10
-        version: 8.18.1
-      drizzle-kit:
-        specifier: ^0.31.4
-        version: 0.31.9
-      tsx:
-        specifier: ^4.20.6
-        version: 4.21.0
-      typescript:
-        specifier: ^5.9.2
-        version: 5.9.3
-
-  examples/medmot-staging/config:
-    dependencies:
-      '@rebasepro/types':
-        specifier: 0.0.1-canary.4f204c2
-        version: 0.0.1-canary.4f204c2
-    devDependencies:
-      typescript:
-        specifier: ^5.9.2
-        version: 5.9.3
-
-  examples/medmot-staging/frontend:
-    dependencies:
-      '@fontsource/jetbrains-mono':
-        specifier: ^5.2.5
-        version: 5.2.8
-      '@rebasepro/admin':
-        specifier: workspace:*
-        version: link:../../../packages/admin
-      '@rebasepro/auth':
-        specifier: workspace:*
-        version: link:../../../packages/auth
-      '@rebasepro/client':
-        specifier: workspace:*
-        version: link:../../../packages/client
-      '@rebasepro/core':
-        specifier: workspace:*
-        version: link:../../../packages/core
-      '@rebasepro/plugin-data-enhancement':
-        specifier: workspace:*
-        version: link:../../../packages/plugin-data-enhancement
-      '@rebasepro/studio':
-        specifier: workspace:*
-        version: link:../../../packages/studio
-      '@rebasepro/types':
-        specifier: workspace:*
-        version: link:../../../packages/types
-      '@rebasepro/ui':
-        specifier: workspace:*
-        version: link:../../../packages/ui
-      medmot-staging-config:
-        specifier: workspace:*
-        version: link:../config
-      react:
-        specifier: ^19.0.0
-        version: 19.2.4
-      react-dom:
-        specifier: ^19.0.0
-        version: 19.2.4(react@19.2.4)
-      react-router:
-        specifier: ^7.0.0
-        version: 7.13.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      react-router-dom:
-        specifier: ^7.0.0
-        version: 7.13.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      typeface-rubik:
-        specifier: ^1.1.13
-        version: 1.1.13
-    devDependencies:
-      '@tailwindcss/typography':
-        specifier: ^0.5.16
-        version: 0.5.19(tailwindcss@4.2.1)
-      '@tailwindcss/vite':
-        specifier: ^4.1.12
-        version: 4.2.1(vite@5.4.21(@types/node@24.12.2)(lightningcss@1.32.0)(terser@5.46.2))
-      '@types/react':
-        specifier: ^19.0.8
-        version: 19.2.14
-      '@types/react-dom':
-        specifier: ^19.0.3
-        version: 19.2.3(@types/react@19.2.14)
-      '@vitejs/plugin-react':
-        specifier: ^4.3.4
-        version: 4.7.0(vite@5.4.21(@types/node@24.12.2)(lightningcss@1.32.0)(terser@5.46.2))
-      tailwindcss:
-        specifier: ^4.1.3
-        version: 4.2.1
-      typescript:
-        specifier: ^5.9.2
-        version: 5.9.3
-      vite:
-        specifier: ^5.4.17
-        version: 5.4.21(@types/node@24.12.2)(lightningcss@1.32.0)(terser@5.46.2)
-      vite-plugin-svgr:
-        specifier: ^4.3.0
-        version: 4.5.0(rollup@4.59.0)(typescript@5.9.3)(vite@5.4.21(@types/node@24.12.2)(lightningcss@1.32.0)(terser@5.46.2))
-
   examples/sdk-demo:
     dependencies:
       '@rebasepro/client':
@@ -724,7 +574,7 @@ importers:
         version: 7.13.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       ts-jest:
         specifier: ^29.4.5
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@29.7.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(@types/node@20.19.17))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@29.7.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(@types/node@20.19.17)(ts-node@10.9.2(@types/node@20.19.17)(typescript@5.9.3)))(typescript@5.9.3)
       ts-node:
         specifier: ^10.9.2
         version: 10.9.2(@types/node@20.19.17)(typescript@5.9.3)
@@ -850,7 +700,7 @@ importers:
         version: 4.1.5
       ts-jest:
         specifier: ^29.3.1
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@29.7.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(@types/node@20.19.17))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@29.7.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(@types/node@20.19.17)(ts-node@10.9.2(@types/node@20.19.17)(typescript@5.9.3)))(typescript@5.9.3)
       ts-node:
         specifier: ^10.9.2
         version: 10.9.2(@types/node@20.19.17)(typescript@5.9.3)
@@ -1033,7 +883,7 @@ importers:
         version: 4.1.5
       ts-jest:
         specifier: ^29.3.1
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@29.7.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(@types/node@20.19.17))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@29.7.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(@types/node@20.19.17)(ts-node@10.9.2(@types/node@20.19.17)(typescript@5.9.3)))(typescript@5.9.3)
       ts-node:
         specifier: ^10.9.2
         version: 10.9.2(@types/node@20.19.17)(typescript@5.9.3)
@@ -1142,7 +992,7 @@ importers:
         version: 7.13.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       ts-jest:
         specifier: ^29.4.5
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@29.7.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(@types/node@20.19.17))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@29.7.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(@types/node@20.19.17)(ts-node@10.9.2(@types/node@20.19.17)(typescript@5.9.3)))(typescript@5.9.3)
       ts-node:
         specifier: ^10.9.2
         version: 10.9.2(@types/node@20.19.17)(typescript@5.9.3)
@@ -1194,7 +1044,7 @@ importers:
         version: 19.1.0-rc.2(eslint@9.39.4(jiti@2.6.1))
       jest:
         specifier: ^29.7.0
-        version: 29.7.0(@types/node@20.19.17)(ts-node@10.9.2(@types/node@20.19.17)(typescript@5.9.3))
+        version: 29.7.0(@types/node@20.19.17)
       ts-jest:
         specifier: ^29.4.5
         version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@29.7.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(@types/node@20.19.17))(typescript@5.9.3)
@@ -1393,7 +1243,7 @@ importers:
         version: 20.19.17
       jest:
         specifier: ^29.7.0
-        version: 29.7.0(@types/node@20.19.17)(ts-node@10.9.2(@types/node@20.19.17)(typescript@5.9.3))
+        version: 29.7.0(@types/node@20.19.17)
       ts-jest:
         specifier: ^29.3.4
         version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@29.7.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(@types/node@20.19.17))(typescript@5.9.3)
@@ -1437,7 +1287,7 @@ importers:
         specifier: ^16.8.1
         version: 16.13.1
       hono:
-        specifier: 4.12.10
+        specifier: ^4.12.10
         version: 4.12.10
       jose:
         specifier: ^6.1.3
@@ -1481,7 +1331,7 @@ importers:
         version: 8.18.1
       jest:
         specifier: ^29.7.0
-        version: 29.7.0(@types/node@20.19.17)(ts-node@10.9.2(@types/node@20.19.17)(typescript@5.9.3))
+        version: 29.7.0(@types/node@20.19.17)
       ts-jest:
         specifier: 29.4.1
         version: 29.4.1(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@29.7.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(@types/node@20.19.17))(typescript@5.9.3)
@@ -1515,7 +1365,7 @@ importers:
         version: 20.19.17
       jest:
         specifier: ^29.7.0
-        version: 29.7.0(@types/node@20.19.17)(ts-node@10.9.2(@types/node@20.19.17)(typescript@5.9.3))
+        version: 29.7.0(@types/node@20.19.17)
       mongodb-memory-server:
         specifier: ^10.0.0
         version: 10.4.3(socks@2.8.7)
@@ -1576,7 +1426,7 @@ importers:
         version: 0.31.9
       jest:
         specifier: ^29.7.0
-        version: 29.7.0(@types/node@20.19.17)(ts-node@10.9.2(@types/node@20.19.17)(typescript@5.9.3))
+        version: 29.7.0(@types/node@20.19.17)
       ts-jest:
         specifier: ^29.4.5
         version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@29.7.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(@types/node@20.19.17))(typescript@5.9.3)
@@ -1721,7 +1571,7 @@ importers:
         version: 4.1.5
       ts-jest:
         specifier: ^29.3.1
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@29.7.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(@types/node@20.19.17))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@29.7.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(@types/node@20.19.17)(ts-node@10.9.2(@types/node@20.19.17)(typescript@5.9.3)))(typescript@5.9.3)
       ts-node:
         specifier: ^10.9.2
         version: 10.9.2(@types/node@20.19.17)(typescript@5.9.3)
@@ -1881,7 +1731,7 @@ importers:
         version: 4.2.1
       ts-jest:
         specifier: ^29.4.5
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@29.7.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(@types/node@20.19.17))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@29.7.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(@types/node@20.19.17)(ts-node@10.9.2(@types/node@20.19.17)(typescript@5.9.3)))(typescript@5.9.3)
       ts-node:
         specifier: ^10.9.2
         version: 10.9.2(@types/node@20.19.17)(typescript@5.9.3)
@@ -1957,7 +1807,7 @@ importers:
         version: 4.1.5
       ts-jest:
         specifier: ^29.3.1
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@29.7.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(@types/node@20.19.17))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@29.7.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(@types/node@20.19.17)(ts-node@10.9.2(@types/node@20.19.17)(typescript@5.9.3)))(typescript@5.9.3)
       ts-node:
         specifier: ^10.9.2
         version: 10.9.2(@types/node@20.19.17)(typescript@5.9.3)
@@ -5267,36 +5117,6 @@ packages:
 
   '@realm/common@0.1.4':
     resolution: {integrity: sha512-bKpIRZIQ4ykribFi0igCwuvf7P4+Ex2XYKqDw1JDe6sCGAaPMwhazooyM6h32fUjtXRTbdAWH2S9JH8Xh/LrqQ==}
-
-  '@rebasepro/cli@0.0.1-canary.4f204c2':
-    resolution: {integrity: sha512-jYEO714MwjetHUt8/11EYnYKnES8nvvZMpl2X12yq7hTNEJ6XI0DG+kNe3wlZR15Ar83EoRcu5KurhZR/vGm9w==}
-    hasBin: true
-
-  '@rebasepro/client@0.0.1-canary.4f204c2':
-    resolution: {integrity: sha512-/aEqJuNTQTIAHnbXHYK/I4mRHCSbiEV5nW1nrQzoVFel1r0Iv7KCKV0tcjQ3OrA2LDVBTVKWXz7eRrZ1zhf+lQ==}
-    engines: {node: '>=14'}
-
-  '@rebasepro/common@0.0.1-canary.4f204c2':
-    resolution: {integrity: sha512-gJ9+P7DtjSssTEYONqaNy//ztTx9xBwDL6aKjawaNHe5QQLm1WWBwWr6hCfrlZki/yC5ObJNmadotuLQXArQYA==}
-    engines: {node: '>=14'}
-
-  '@rebasepro/sdk-generator@0.0.1-canary.4f204c2':
-    resolution: {integrity: sha512-0yWqm/IvBI74QBLUJiWMV3JMOeMa++pn6qoLCpckg4z+nzWs8kgf3s4jFxCYAWXjDTmM/GngbGnrqa4A9Mk0Qg==}
-    peerDependencies:
-      '@rebasepro/common': 0.0.1-canary.4f204c2
-      '@rebasepro/types': 0.0.1-canary.4f204c2
-
-  '@rebasepro/server-core@0.0.1-canary.4f204c2':
-    resolution: {integrity: sha512-Ad7OCcyLUfZbe4sGPmMDNrL/OXnia/cETpqevgiNWPRQmeEH/tPgtuOIgyDPoXdBueb/Bo94C/92tCs8vFA9HA==}
-    engines: {node: '>=14'}
-
-  '@rebasepro/types@0.0.1-canary.4f204c2':
-    resolution: {integrity: sha512-UwwAH6+AOZvV7umnADkbO6xv+ZkfdijFiupdg3XNo4Ji8lHy6EWn0U4gvy4X8Ngj/SzdC0QZPAZaptQUkpJcbQ==}
-    engines: {node: '>=14'}
-
-  '@rebasepro/utils@0.0.1-canary.4f204c2':
-    resolution: {integrity: sha512-NEgOUhAVnA2il6apz4DkQ2/5O9T0OdM5Rf+VCH71pysD7zUMGlYxZzdgRYPCwr+avO2Ars6BkGa+EmMV+/mgFg==}
-    engines: {node: '>=14'}
 
   '@remix-run/router@1.23.2':
     resolution: {integrity: sha512-Ic6m2U/rMjTkhERIa/0ZtXJP17QUi2CbWE7cqx4J58M8aA3QTfW+2UlQ4psvTX9IO1RfNVhK3pcpdjej7L+t2w==}
@@ -16965,79 +16785,6 @@ snapshots:
 
   '@realm/common@0.1.4': {}
 
-  '@rebasepro/cli@0.0.1-canary.4f204c2(@rebasepro/common@0.0.1-canary.4f204c2)(@types/node@24.12.2)':
-    dependencies:
-      '@rebasepro/sdk-generator': 0.0.1-canary.4f204c2(@rebasepro/common@0.0.1-canary.4f204c2)(@rebasepro/types@0.0.1-canary.4f204c2)
-      '@rebasepro/server-core': 0.0.1-canary.4f204c2
-      '@rebasepro/types': 0.0.1-canary.4f204c2
-      arg: 5.0.2
-      chalk: 4.1.2
-      dotenv: 16.6.1
-      execa: 4.1.0
-      inquirer: 12.11.1(@types/node@24.12.2)
-      jiti: 2.6.1
-      ncp: 2.0.0
-      pnpm: 9.15.9
-    transitivePeerDependencies:
-      - '@rebasepro/common'
-      - '@types/node'
-      - aws-crt
-      - bufferutil
-      - encoding
-      - supports-color
-      - utf-8-validate
-
-  '@rebasepro/client@0.0.1-canary.4f204c2':
-    dependencies:
-      '@rebasepro/types': 0.0.1-canary.4f204c2
-      '@rebasepro/utils': 0.0.1-canary.4f204c2
-
-  '@rebasepro/common@0.0.1-canary.4f204c2':
-    dependencies:
-      '@rebasepro/types': 0.0.1-canary.4f204c2
-      '@rebasepro/utils': 0.0.1-canary.4f204c2
-      fast-equals: 5.3.0
-      json-logic-js: 2.0.5
-      lodash: 4.17.23
-
-  '@rebasepro/sdk-generator@0.0.1-canary.4f204c2(@rebasepro/common@0.0.1-canary.4f204c2)(@rebasepro/types@0.0.1-canary.4f204c2)':
-    dependencies:
-      '@rebasepro/client': 0.0.1-canary.4f204c2
-      '@rebasepro/common': 0.0.1-canary.4f204c2
-      '@rebasepro/types': 0.0.1-canary.4f204c2
-
-  '@rebasepro/server-core@0.0.1-canary.4f204c2':
-    dependencies:
-      '@aws-sdk/client-s3': 3.1006.0
-      '@aws-sdk/s3-request-presigner': 3.1006.0
-      '@hono/graphql-server': 0.7.0(hono@4.12.10)
-      '@hono/node-server': 1.19.12(hono@4.12.10)
-      '@rebasepro/client': 0.0.1-canary.4f204c2
-      '@rebasepro/common': 0.0.1-canary.4f204c2
-      '@rebasepro/types': 0.0.1-canary.4f204c2
-      '@rebasepro/utils': 0.0.1-canary.4f204c2
-      google-auth-library: 9.15.1(encoding@0.1.13)
-      graphql: 16.13.1
-      hono: 4.12.10
-      jose: 6.2.2
-      jsonwebtoken: 9.0.3
-      nodemailer: 6.10.1
-      ws: 8.19.0
-      zod: 3.25.76
-    transitivePeerDependencies:
-      - aws-crt
-      - bufferutil
-      - encoding
-      - supports-color
-      - utf-8-validate
-
-  '@rebasepro/types@0.0.1-canary.4f204c2': {}
-
-  '@rebasepro/utils@0.0.1-canary.4f204c2':
-    dependencies:
-      '@rebasepro/types': 0.0.1-canary.4f204c2
-      object-hash: 3.0.0
-
   '@remix-run/router@1.23.2': {}
 
   '@remotion/bundler@4.0.456(@swc/helpers@0.5.21)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
@@ -21534,18 +21281,6 @@ snapshots:
     optionalDependencies:
       '@types/node': 20.19.17
 
-  inquirer@12.11.1(@types/node@24.12.2):
-    dependencies:
-      '@inquirer/ansi': 1.0.2
-      '@inquirer/core': 10.3.2(@types/node@24.12.2)
-      '@inquirer/prompts': 7.10.1(@types/node@24.12.2)
-      '@inquirer/type': 3.0.10(@types/node@24.12.2)
-      mute-stream: 2.0.0
-      run-async: 4.0.6
-      rxjs: 7.8.2
-    optionalDependencies:
-      '@types/node': 24.12.2
-
   inquirer@12.9.6(@types/node@24.12.2):
     dependencies:
       '@inquirer/ansi': 1.0.2
@@ -21856,6 +21591,25 @@ snapshots:
     transitivePeerDependencies:
       - babel-plugin-macros
       - supports-color
+
+  jest-cli@29.7.0(@types/node@20.19.17):
+    dependencies:
+      '@jest/core': 29.7.0(ts-node@10.9.2(@types/node@20.19.17)(typescript@5.9.3))
+      '@jest/test-result': 29.7.0
+      '@jest/types': 29.6.3
+      chalk: 4.1.2
+      create-jest: 29.7.0(@types/node@20.19.17)(ts-node@10.9.2(@types/node@20.19.17)(typescript@5.9.3))
+      exit: 0.1.2
+      import-local: 3.2.0
+      jest-config: 29.7.0(@types/node@20.19.17)(ts-node@10.9.2(@types/node@20.19.17)(typescript@5.9.3))
+      jest-util: 29.7.0
+      jest-validate: 29.7.0
+      yargs: 17.7.2
+    transitivePeerDependencies:
+      - '@types/node'
+      - babel-plugin-macros
+      - supports-color
+      - ts-node
 
   jest-cli@29.7.0(@types/node@20.19.17)(ts-node@10.9.2(@types/node@20.19.17)(typescript@5.9.3)):
     dependencies:
@@ -22278,6 +22032,18 @@ snapshots:
       jest-util: 30.3.0
       merge-stream: 2.0.0
       supports-color: 8.1.1
+
+  jest@29.7.0(@types/node@20.19.17):
+    dependencies:
+      '@jest/core': 29.7.0(ts-node@10.9.2(@types/node@20.19.17)(typescript@5.9.3))
+      '@jest/types': 29.6.3
+      import-local: 3.2.0
+      jest-cli: 29.7.0(@types/node@20.19.17)
+    transitivePeerDependencies:
+      - '@types/node'
+      - babel-plugin-macros
+      - supports-color
+      - ts-node
 
   jest@29.7.0(@types/node@20.19.17)(ts-node@10.9.2(@types/node@20.19.17)(typescript@5.9.3)):
     dependencies:
@@ -25755,6 +25521,26 @@ snapshots:
       bs-logger: 0.2.6
       fast-json-stable-stringify: 2.1.0
       handlebars: 4.7.8
+      jest: 29.7.0(@types/node@20.19.17)
+      json5: 2.2.3
+      lodash.memoize: 4.1.2
+      make-error: 1.3.6
+      semver: 7.7.4
+      type-fest: 4.41.0
+      typescript: 5.9.3
+      yargs-parser: 21.1.1
+    optionalDependencies:
+      '@babel/core': 7.29.0
+      '@jest/transform': 30.3.0
+      '@jest/types': 30.3.0
+      babel-jest: 29.7.0(@babel/core@7.29.0)
+      jest-util: 30.3.0
+
+  ts-jest@29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@29.7.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(@types/node@20.19.17)(ts-node@10.9.2(@types/node@20.19.17)(typescript@5.9.3)))(typescript@5.9.3):
+    dependencies:
+      bs-logger: 0.2.6
+      fast-json-stable-stringify: 2.1.0
+      handlebars: 4.7.8
       jest: 29.7.0(@types/node@20.19.17)(ts-node@10.9.2(@types/node@20.19.17)(typescript@5.9.3))
       json5: 2.2.3
       lodash.memoize: 4.1.2
@@ -25775,7 +25561,7 @@ snapshots:
       bs-logger: 0.2.6
       fast-json-stable-stringify: 2.1.0
       handlebars: 4.7.8
-      jest: 29.7.0(@types/node@20.19.17)(ts-node@10.9.2(@types/node@20.19.17)(typescript@5.9.3))
+      jest: 29.7.0(@types/node@20.19.17)
       json5: 2.2.3
       lodash.memoize: 4.1.2
       make-error: 1.3.6
