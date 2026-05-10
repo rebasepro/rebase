@@ -4,7 +4,7 @@
   "version": "0.0.1-canary.09e5ec54d",
   "main": "./dist/index.umd.js",
   "module": "./dist/index.es.js",
-  "types": "dist/index.d.ts",
+  "types": "dist/studio/src/index.d.ts",
   "source": "src/index.ts",
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -34,7 +34,7 @@
   },
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./dist/studio/src/index.d.ts",
       "development": "./src/index.ts",
       "import": "./dist/index.es.js",
       "require": "./dist/index.umd.js"
