@@ -35,17 +35,17 @@ const postsCollection: EntityCollection = {
                 {
                     id: "draft",
                     label: "Draft",
-                    color: "grayLight"
+                    color: "gray"
                 },
                 {
                     id: "review",
                     label: "In Review",
-                    color: "orangeLight"
+                    color: "orange"
                 },
                 {
                     id: "published",
                     label: "Published",
-                    color: "greenLight"
+                    color: "green"
                 }
             ]
         },
