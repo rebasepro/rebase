@@ -1448,6 +1448,9 @@ importers:
       nodemailer:
         specifier: ^6.9.0
         version: 6.10.1
+      ts-morph:
+        specifier: 27.0.2
+        version: 27.0.2
       ws:
         specifier: ^8.16.0
         version: 8.19.0
@@ -18053,7 +18056,7 @@ snapshots:
     dependencies:
       minimatch: 10.2.5
       path-browserify: 1.0.1
-      tinyglobby: 0.2.15
+      tinyglobby: 0.2.16
 
   '@tsconfig/node10@1.0.12': {}
 
