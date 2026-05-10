@@ -190,14 +190,14 @@ describe("mapPgType", () => {
             expect(mapPgType(t)).toBe("date");
         }
     });
-    it("maps JSON types to json", () => {
-        expect(mapPgType("json")).toBe("json");
-        expect(mapPgType("jsonb")).toBe("json");
+    it("maps JSON types to map", () => {
+        expect(mapPgType("json")).toBe("map");
+        expect(mapPgType("jsonb")).toBe("map");
     });
-    it("maps ARRAY and underscore-prefixed types to json", () => {
-        expect(mapPgType("ARRAY")).toBe("json");
-        expect(mapPgType("_int4")).toBe("json");
-        expect(mapPgType("_text")).toBe("json");
+    it("maps ARRAY and underscore-prefixed types to array", () => {
+        expect(mapPgType("ARRAY")).toBe("array");
+        expect(mapPgType("_int4")).toBe("array");
+        expect(mapPgType("_text")).toBe("array");
     });
     it("maps string-like types to string", () => {
         for (const t of ["text", "varchar", "character varying", "char", "character", "uuid", "bytea", "inet", "cidr", "macaddr", "macaddr8", "interval"]) {
@@ -350,9 +350,12 @@ describe("generateIndexContent", () => {
         expect(lines[2]).toContain("zebra");
     });
 
-    it("each line is a default re-export", () => {
+    it("generates import statements and collections array", () => {
         const result = generateIndexContent(["users"]);
-        expect(result).toBe('export { default as users } from "./users";\n');
+        expect(result).toContain('import usersCollection from "./users";');
+        expect(result).toContain('export const collections = [');
+        expect(result).toContain('    usersCollection,');
+        expect(result).toContain('];');
     });
 });
 
@@ -361,16 +364,16 @@ describe("generateIndexContent", () => {
 // ═══════════════════════════════════════════════════════════════════════
 describe("mergeIndexContent", () => {
     it("adds new exports without duplicating existing ones", () => {
-        const existing = 'export { default as users } from "./users";\n';
+        const existing = 'import usersCollection from "./users";\n\nexport const collections = [\n    usersCollection,\n];\n';
         const result = mergeIndexContent(existing, ["users", "posts"]);
-        expect(result.match(/users/g)!.length).toBe(2); // one in existing, one mention in "users" still just 1 export line
-        expect(result).toContain('export { default as posts } from "./posts";');
-        // users should appear exactly once as an export statement
-        expect(result.match(/export.*users.*from/g)!.length).toBe(1);
+        expect(result.match(/import usersCollection from ".\/users";/g)!.length).toBe(1);
+        expect(result).toContain('import postsCollection from "./posts";');
+        expect(result).toContain('usersCollection,');
+        expect(result).toContain('postsCollection,');
     });
 
     it("returns existing content trimmed + newline when no new files", () => {
-        const existing = 'export { default as a } from "./a";\n';
+        const existing = 'import aCollection from "./a";\n\nexport const collections = [\n    aCollection,\n];\n';
         const result = mergeIndexContent(existing, ["a"]);
         expect(result.trim()).toBe(existing.trim());
     });

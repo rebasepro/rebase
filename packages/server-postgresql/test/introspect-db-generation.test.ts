@@ -49,7 +49,7 @@ describe("generateCollectionFile", () => {
             expect(result).toContain('type: "number"');
             expect(result).toContain('type: "boolean"');
             expect(result).toContain('type: "date"');
-            expect(result).toContain('type: "json"');
+            expect(result).toContain('type: "map"');
         });
 
         it("skips FK columns from properties (they become relations)", () => {
