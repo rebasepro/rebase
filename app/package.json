@@ -1,6 +1,6 @@
 {
     "name": "@rebasepro/app-example",
-    "version": "0.0.1-canary.4d4fb3e",
+    "version": "workspace:*",
     "description": "Complete Rebase application example with PostgreSQL backend",
     "private": true,
     "type": "module",
@@ -11,7 +11,7 @@
     ],
     "scripts": {
         "dev": "rebase dev",
-        "build": "pnpm -r run build",
+        "build": "pnpm --filter \"./frontend\" --filter \"./backend\" --filter \"./config\" -r run build",
         "start": "pnpm --filter \"*-backend\" start",
         "db:generate": "rebase db generate --collections ../config/collections",
         "db:migrate": "rebase db migrate",
