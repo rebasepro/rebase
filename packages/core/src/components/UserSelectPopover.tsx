@@ -1,6 +1,6 @@
 
 import React, { useCallback, useMemo, useRef, useState } from "react";
-import { cls, defaultBorderMixin, Popover, Typography, CircularProgress, IconButton , iconSize } from "@rebasepro/ui";
+import { cls, defaultBorderMixin, Popover, Typography, CircularProgress, IconButton , iconSize, SearchBar } from "@rebasepro/ui";
 import { CircleUserIcon, SearchIcon, XIcon } from "lucide-react";
 import { User } from "@rebasepro/types";
 
@@ -228,40 +228,14 @@ export function UserSelectPopover({
                     )}
                 </div>
 
-                {/* SearchIcon input */}
+                {/* Search input */}
                 <div className={cls("px-2 py-1.5 border-b shrink-0", defaultBorderMixin)}>
-                    <div className="relative">
-                        <SearchIcon
-                            size={"smallest"}
-                            className="absolute left-2 top-1/2 -translate-y-1/2 text-text-disabled dark:text-text-disabled-dark pointer-events-none"
-                        />
-                        <input
-                            ref={inputRef}
-                            type="text"
-                            value={searchText}
-                            onChange={(e) => setSearchText(e.target.value)}
-                            placeholder="SearchIcon by name, email, or role…"
-                            className={cls(
-                                "w-full pl-7 pr-7 py-1.5 text-xs rounded-md",
-                                "bg-surface-100 dark:bg-surface-950 border",
-                                defaultBorderMixin,
-                                "outline-none focus:ring-1 focus:ring-primary/40",
-                                "placeholder-text-disabled dark:placeholder-text-disabled-dark",
-                                "text-text-primary dark:text-text-primary-dark"
-                            )}
-                        />
-                        {searchText && (
-                            <button
-                                onClick={() => {
-                                    setSearchText("");
-                                    inputRef.current?.focus();
-                                }}
-                                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-surface-200 dark:hover:bg-surface-700 text-text-disabled"
-                            >
-                                <XIcon size={iconSize.smallest}/>
-                            </button>
-                        )}
-                    </div>
+                    <SearchBar
+                        inputRef={inputRef}
+                        size="smallest"
+                        placeholder="Search by name, email, or role…"
+                        onTextSearch={(val) => setSearchText(val ?? "")}
+                    />
                 </div>
 
                 {/* User list */}

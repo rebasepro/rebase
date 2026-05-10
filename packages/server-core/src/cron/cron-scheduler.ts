@@ -9,23 +9,95 @@ import type { RebaseClient } from "@rebasepro/client";
 import type { LoadedCronJob } from "./cron-loader";
 import type { CronStore } from "./cron-store";
 
-/**
- * Validates a standard cron expression.
- */
-function isValidCronExpression(schedule: string): boolean {
-    if (!schedule) return false;
-    const parts = schedule.trim().split(/\s+/);
-    // Typical cron has 5 fields.
-    return parts.length === 5 && parts.every(p => p.length > 0);
-}
-
 // ─── Cron expression parser (minimal, no external dependency) ────────
 // Supports standard 5-field cron (minute hour dom month dow).
 // Returns the next Date after `after` that matches the expression.
 
+/**
+ * Expand a single cron field into an ordered array of allowed values.
+ * Supports: `*`, `N`, `N-M`, `N/S`, `N-M/S`, `*​/S`, and comma-separated combinations.
+ */
+function expandCronField(field: string, min: number, max: number): number[] {
+    const results = new Set<number>();
+    for (const segment of field.split(",")) {
+        const trimmed = segment.trim();
+        if (trimmed === "*") {
+            for (let i = min; i <= max; i++) results.add(i);
+        } else if (trimmed.includes("/")) {
+            const [rangeStr, stepStr] = trimmed.split("/");
+            const step = parseInt(stepStr, 10);
+            if (isNaN(step) || step <= 0) {
+                throw new Error(`Invalid step value "${stepStr}" in cron field "${field}"`);
+            }
+            let start = min;
+            let end = max;
+            if (rangeStr !== "*") {
+                if (rangeStr.includes("-")) {
+                    const [a, b] = rangeStr.split("-").map(Number);
+                    start = a;
+                    end = b;
+                } else {
+                    start = parseInt(rangeStr, 10);
+                }
+            }
+            for (let i = start; i <= end; i += step) results.add(i);
+        } else if (trimmed.includes("-")) {
+            const [a, b] = trimmed.split("-").map(Number);
+            for (let i = a; i <= b; i++) results.add(i);
+        } else {
+            const val = parseInt(trimmed, 10);
+            if (isNaN(val)) {
+                throw new Error(`Invalid value "${trimmed}" in cron field "${field}"`);
+            }
+            results.add(val);
+        }
+    }
+    return [...results].sort((a, b) => a - b);
+}
+
+/**
+ * Validates a standard 5-field cron expression structurally and semantically.
+ * Returns `{ valid: true }` or `{ valid: false, reason: string }`.
+ */
+export function validateCronExpression(schedule: string): { valid: true } | { valid: false; reason: string } {
+    if (!schedule || typeof schedule !== "string") {
+        return { valid: false, reason: "Schedule must be a non-empty string" };
+    }
+    const parts = schedule.trim().split(/\s+/);
+    if (parts.length !== 5) {
+        return { valid: false, reason: `Expected 5 fields, got ${parts.length}` };
+    }
+    const fieldRanges: [string, number, number][] = [
+        ["minute", 0, 59],
+        ["hour", 0, 23],
+        ["day of month", 1, 31],
+        ["month", 1, 12],
+        ["day of week", 0, 6],
+    ];
+    for (let i = 0; i < 5; i++) {
+        const [name, min, max] = fieldRanges[i];
+        try {
+            const values = expandCronField(parts[i], min, max);
+            if (values.length === 0) {
+                return { valid: false, reason: `${name} field "${parts[i]}" produces no values` };
+            }
+            for (const v of values) {
+                if (v < min || v > max) {
+                    return { valid: false, reason: `${name} field value ${v} out of range [${min}–${max}]` };
+                }
+            }
+        } catch (err) {
+            return { valid: false, reason: `${name} field: ${err instanceof Error ? err.message : String(err)}` };
+        }
+    }
+    return { valid: true };
+}
+
+/**
+ * Calculate the next Date after `after` that matches the cron expression.
+ * Throws on invalid expressions.
+ */
 function parseCronExpression(expression: string, after: Date): Date {
-    // We implement a simple forward-search. For production-grade parsing
-    // one would use a library, but we avoid adding dependencies.
     const parts = expression.trim().split(/\s+/);
     if (parts.length < 5) {
         throw new Error(`Invalid cron expression: "${expression}". Expected 5 fields.`);
@@ -33,41 +105,11 @@ function parseCronExpression(expression: string, after: Date): Date {
 
     const [minField, hourField, domField, monField, dowField] = parts;
 
-    const expand = (field: string, min: number, max: number): number[] => {
-        const results = new Set<number>();
-        for (const segment of field.split(",")) {
-            if (segment === "*") {
-                for (let i = min; i <= max; i++) results.add(i);
-            } else if (segment.includes("/")) {
-                const [rangeStr, stepStr] = segment.split("/");
-                const step = parseInt(stepStr, 10);
-                let start = min;
-                let end = max;
-                if (rangeStr !== "*") {
-                    if (rangeStr.includes("-")) {
-                        const [a, b] = rangeStr.split("-").map(Number);
-                        start = a;
-                        end = b;
-                    } else {
-                        start = parseInt(rangeStr, 10);
-                    }
-                }
-                for (let i = start; i <= end; i += step) results.add(i);
-            } else if (segment.includes("-")) {
-                const [a, b] = segment.split("-").map(Number);
-                for (let i = a; i <= b; i++) results.add(i);
-            } else {
-                results.add(parseInt(segment, 10));
-            }
-        }
-        return [...results].sort((a, b) => a - b);
-    };
-
-    const minutes = expand(minField, 0, 59);
-    const hours = expand(hourField, 0, 23);
-    const doms = expand(domField, 1, 31);
-    const months = expand(monField, 1, 12);
-    const dows = expand(dowField, 0, 6); // 0=Sunday
+    const minutes = expandCronField(minField, 0, 59);
+    const hours = expandCronField(hourField, 0, 23);
+    const doms = expandCronField(domField, 1, 31);
+    const months = expandCronField(monField, 1, 12);
+    const dows = expandCronField(dowField, 0, 6); // 0=Sunday
 
     // Forward-search from `after + 1 minute`
     const candidate = new Date(after);
@@ -104,6 +146,12 @@ function parseCronExpression(expression: string, after: Date): Date {
 
 const MAX_LOGS_PER_JOB = 50;
 
+/**
+ * Minimum milliseconds between scheduled executions of the same job.
+ * Prevents tight re-execution loops caused by jitter or clock drift.
+ */
+const MIN_SCHEDULE_INTERVAL_MS = 5_000; // 5 seconds
+
 // ─── CronScheduler ───────────────────────────────────────────────────
 
 interface RegisteredJob {
@@ -119,6 +167,8 @@ interface RegisteredJob {
     totalFailures: number;
     timerId?: ReturnType<typeof setTimeout>;
     logs: CronJobLogEntry[];
+    /** True while a handler is actively executing (prevents concurrent runs). */
+    executing: boolean;
 }
 
 export class CronScheduler {
@@ -145,24 +195,47 @@ export class CronScheduler {
 
     /**
      * Register a batch of loaded cron jobs.
+     *
+     * If the scheduler is already started, newly registered jobs are
+     * automatically scheduled (so late-registered jobs don't sit idle).
+     *
+     * Validates the cron schedule on registration — invalid schedules
+     * are rejected with a warning and the job is NOT registered.
      */
     registerJobs(loadedJobs: LoadedCronJob[]): void {
         for (const loaded of loadedJobs) {
+            // Validate schedule up-front — reject invalid schedules
+            const validation = validateCronExpression(loaded.definition.schedule);
+            if (!validation.valid) {
+                console.error(
+                    `[cron] Rejecting job "${loaded.id}": invalid schedule "${loaded.definition.schedule}" — ${validation.reason}`
+                );
+                continue;
+            }
+
             const existing = this.jobs.get(loaded.id);
             if (existing) {
                 console.warn(`[cron] Duplicate cron job id: "${loaded.id}". Overwriting.`);
                 this.stopJob(loaded.id);
             }
 
+            const enabled = loaded.definition.enabled !== false;
+
             this.jobs.set(loaded.id, {
                 id: loaded.id,
                 definition: loaded.definition,
-                enabled: loaded.definition.enabled !== false,
-                state: loaded.definition.enabled !== false ? "idle" : "disabled",
+                enabled,
+                state: enabled ? "idle" : "disabled",
                 totalRuns: 0,
                 totalFailures: 0,
-                logs: []
+                logs: [],
+                executing: false
             });
+
+            // If the scheduler is already running, auto-schedule new jobs
+            if (this.started && enabled) {
+                this.scheduleNext(loaded.id);
+            }
         }
     }
 
@@ -201,6 +274,9 @@ export class CronScheduler {
 
     /**
      * Stop the scheduler and clear all timers.
+     *
+     * Currently-executing handlers run to completion (they are async),
+     * but no further scheduling occurs after stop.
      */
     stop(): void {
         this.started = false;
@@ -269,15 +345,48 @@ export class CronScheduler {
 
     /**
      * Manually trigger a job execution immediately.
+     *
+     * Returns `undefined` if the job doesn't exist.
+     * If the job is currently executing, returns the log entry with
+     * a `skipped: true` result rather than running concurrently.
      */
     async triggerJob(id: string): Promise<CronJobLogEntry | undefined> {
         const job = this.jobs.get(id);
         if (!job) return undefined;
+
+        // Concurrency guard — don't run two instances simultaneously
+        if (job.executing) {
+            console.warn(`[cron] Skipping manual trigger of "${id}" — already executing`);
+            const logEntry: CronJobLogEntry = {
+                jobId: id,
+                startedAt: new Date().toISOString(),
+                finishedAt: new Date().toISOString(),
+                durationMs: 0,
+                success: true,
+                result: { skipped: true, reason: "already_executing" },
+                logs: ["Skipped: job is already running"],
+                manual: true
+            };
+            job.logs.push(logEntry);
+            if (job.logs.length > MAX_LOGS_PER_JOB) job.logs.shift();
+            return logEntry;
+        }
+
         return this.executeJob(job, true);
     }
 
     // ─── Internal ────────────────────────────────────────────────────
 
+    /**
+     * Schedule the next execution for a job.
+     *
+     * Safety guarantees:
+     * 1. Clears any existing timer first (prevents leaked/duplicate timers)
+     * 2. Enforces a minimum delay to prevent tight loops from jitter
+     * 3. Unref's the timer so it doesn't prevent process exit
+     * 4. Re-checks enabled & started state before executing
+     * 5. Concurrency guard prevents overlapping handler executions
+     */
     private scheduleNext(id: string): void {
         const job = this.jobs.get(id);
         if (!job || !job.enabled || !this.started) return;
@@ -290,14 +399,39 @@ export class CronScheduler {
             const nextRun = parseCronExpression(job.definition.schedule, now);
             job.nextRunAt = nextRun;
 
-            const delay = Math.max(nextRun.getTime() - now.getTime(), 0);
+            const rawDelay = nextRun.getTime() - now.getTime();
+            // Enforce a minimum delay to prevent tight re-execution loops
+            // from event loop jitter or near-zero setTimeout drift
+            const delay = Math.max(rawDelay, MIN_SCHEDULE_INTERVAL_MS);
 
-            job.timerId = setTimeout(async () => {
+            const timer = setTimeout(async () => {
+                // Re-check state: scheduler may have been stopped or job disabled
+                // between when we scheduled and when we fire
                 if (!job.enabled || !this.started) return;
+
+                // Concurrency guard: if somehow we're already executing, skip
+                if (job.executing) {
+                    console.warn(`[cron] Skipping scheduled run of "${id}" — still executing from previous run`);
+                    // Re-schedule to try again later
+                    this.scheduleNext(id);
+                    return;
+                }
+
                 await this.executeJob(job, false);
-                // Schedule the next tick
-                this.scheduleNext(id);
+
+                // Schedule the next tick (only if still started + enabled)
+                if (this.started && job.enabled) {
+                    this.scheduleNext(id);
+                }
             }, delay);
+
+            // Unref the timer so it doesn't prevent Node.js from exiting
+            // during graceful shutdown
+            if (timer && typeof timer === "object" && "unref" in timer) {
+                timer.unref();
+            }
+
+            job.timerId = timer;
         } catch (err: unknown) {
             console.error(`[cron] Failed to schedule "${id}":`, err);
             job.state = "error";
@@ -305,6 +439,9 @@ export class CronScheduler {
         }
     }
 
+    /**
+     * Stop a single job's timer and clear its next run state.
+     */
     private stopJob(id: string): void {
         const job = this.jobs.get(id);
         if (job?.timerId) {
@@ -314,12 +451,24 @@ export class CronScheduler {
         }
     }
 
+    /**
+     * Execute a job's handler with full isolation and safety.
+     *
+     * - Sets a concurrency flag to prevent overlapping runs
+     * - Wraps handler in a timeout race
+     * - Captures all logs, errors, and results
+     * - Persists to store (non-blocking) if available
+     * - Always restores state even on catastrophic errors
+     */
     private async executeJob(
         job: RegisteredJob,
         manual: boolean
     ): Promise<CronJobLogEntry> {
         const startedAt = new Date();
         const capturedLogs: string[] = [];
+
+        // Set executing flag — prevents concurrent runs
+        job.executing = true;
 
         const ctx: CronJobContext = {
             jobId: job.id,
@@ -347,7 +496,10 @@ export class CronScheduler {
             const handlerPromise = Promise.resolve(job.definition.handler(ctx));
             let timeoutHandle: ReturnType<typeof setTimeout>;
             const timeoutPromise = new Promise<never>((_, reject) => {
-                timeoutHandle = setTimeout(() => reject(new Error(`Cron job "${job.id}" timed out after ${timeout}ms`)), timeout);
+                timeoutHandle = setTimeout(
+                    () => reject(new Error(`Cron job "${job.id}" timed out after ${timeout}ms`)),
+                    timeout
+                );
             });
 
             try {
@@ -359,6 +511,9 @@ export class CronScheduler {
             success = false;
             error = err instanceof Error ? err.message : String(err);
             job.totalFailures++;
+        } finally {
+            // Always clear executing flag — even on catastrophic errors
+            job.executing = false;
         }
 
         const finishedAt = new Date();
@@ -388,8 +543,8 @@ export class CronScheduler {
 
         // Persist to database (non-blocking)
         if (this.store) {
-            this.store.insertLog(logEntry).catch((err) => {
-                console.error(`[cron] Failed to persist log for "${job.id}":`, err);
+            this.store.insertLog(logEntry).catch((persistErr) => {
+                console.error(`[cron] Failed to persist log for "${job.id}":`, persistErr);
             });
         }
 
