@@ -159,7 +159,7 @@ export function mapPgType(dataType: string): string {
     if (dt === "interval") return "string";
 
     // Array types MUST be checked before numeric ("_int4" contains "int")
-    if (dt === "array" || dt.startsWith("_")) return "json";
+    if (dt === "array" || dt.startsWith("_")) return "array";
 
     // Numeric types
     if (
@@ -183,7 +183,7 @@ export function mapPgType(dataType: string): string {
     if (dt.includes("time") || dt.includes("date")) return "date";
 
     // JSON
-    if (dt === "json" || dt === "jsonb") return "json";
+    if (dt === "json" || dt === "jsonb") return "map";
 
     // Binary
     if (dt === "bytea") return "string";
@@ -319,6 +319,20 @@ export function generateCollectionFile(
             } else if (col.column_default && (col.column_default.includes("now()") || col.column_default.includes("CURRENT_TIMESTAMP"))) {
                 extra = `\n            autoValue: "on_create",\n            readOnly: true,`;
             }
+        }
+
+        // Array/Map heuristics
+        if (propType === "array") {
+            let innerType = "string";
+            if (col.udt_name.startsWith("_")) {
+                const baseType = col.udt_name.substring(1);
+                // Simple recursive check or hardcoded for inner type:
+                // We'll just call mapPgType on the baseType
+                innerType = mapPgType(baseType);
+            }
+            extra = `\n            of: { type: "${innerType}" },`;
+        } else if (propType === "map") {
+            extra = `\n            keyValue: true,`;
         }
 
         // String sub-type heuristics (skip if already handled as enum)
@@ -509,11 +523,14 @@ export default ${tableName}Collection;
  */
 export function generateIndexContent(fileNames: string[]): string {
     const sorted = [...fileNames].sort();
-    let content = "";
+    let imports = "";
+    let arrayElements = "";
     for (const f of sorted) {
-        content += `export { default as ${f} } from "./${f}";\n`;
+        const varName = toCollectionVarName(f);
+        imports += `import ${varName} from "./${f}";\n`;
+        arrayElements += `    ${varName},\n`;
     }
-    return content;
+    return `${imports}\nexport const collections = [\n${arrayElements}];\n`;
 }
 
 /**
@@ -521,17 +538,50 @@ export function generateIndexContent(fileNames: string[]): string {
  * Returns the merged content string.
  */
 export function mergeIndexContent(existingContent: string, newFileNames: string[]): string {
-    const existingExports = new Set(
-        [...existingContent.matchAll(/export\s+\{[^}]+\}\s+from\s+"\.\/([^"]+)"/g)].map((m) => m[1])
+    const existingImports = new Set(
+        [...existingContent.matchAll(/import\s+([a-zA-Z0-9_]+)\s+from\s+"\.\/([^"]+)"/g)].map((m) => m[2])
     );
     const sorted = [...newFileNames].sort();
-    let merged = existingContent.trimEnd() + "\n";
+    
+    let newImports = "";
+    let newElements = "";
+    
     for (const f of sorted) {
-        if (!existingExports.has(f)) {
-            merged += `export { default as ${f} } from "./${f}";\n`;
+        if (!existingImports.has(f)) {
+            const varName = toCollectionVarName(f);
+            newImports += `import ${varName} from "./${f}";\n`;
+            newElements += `    ${varName},\n`;
         }
     }
-    return merged;
+    
+    if (!newImports) return existingContent;
+    
+    // Simple injection logic:
+    // Add new imports below the last import or at the top
+    const importRegex = /import\s+.*?;/g;
+    let lastImportMatch;
+    let match;
+    while ((match = importRegex.exec(existingContent)) !== null) {
+        lastImportMatch = match;
+    }
+    
+    let contentWithImports = existingContent;
+    if (lastImportMatch) {
+        const pos = lastImportMatch.index + lastImportMatch[0].length;
+        contentWithImports = existingContent.slice(0, pos) + "\n" + newImports.trimEnd() + existingContent.slice(pos);
+    } else {
+        contentWithImports = newImports + "\n" + existingContent;
+    }
+    
+    // Inject into the `collections = [...]` array
+    const arrayRegex = /export\s+const\s+collections\s*=\s*\[([\s\S]*?)\];/;
+    return contentWithImports.replace(arrayRegex, (fullMatch, arrayContent) => {
+        let mergedArray = arrayContent.trimEnd();
+        if (mergedArray && !mergedArray.endsWith(",")) mergedArray += ",";
+        if (mergedArray) mergedArray += "\n";
+        mergedArray += newElements.trimEnd();
+        return `export const collections = [\n    ${mergedArray.trim()}\n];`;
+    });
 }
 
 /**

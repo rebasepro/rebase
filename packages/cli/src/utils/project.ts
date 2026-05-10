@@ -90,6 +90,7 @@ export function resolvePluginCliScript(backendDir: string, pluginName: string): 
         path.join(backendDir, "node_modules", pluginName, "src", "cli.ts"),
         path.join(backendDir, "node_modules", pluginName, "dist", "cli.js"),
         // For monorepo dev mode:
+        path.resolve(backendDir, "..", "..", "..", "packages", pluginName.replace("@rebasepro/", ""), "src", "cli.ts"),
         path.resolve(backendDir, "..", "..", "packages", pluginName.replace("@rebasepro/", ""), "src", "cli.ts"),
         path.resolve(backendDir, "..", "packages", pluginName.replace("@rebasepro/", ""), "src", "cli.ts")
     ];
