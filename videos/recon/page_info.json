@@ -1,0 +1,21 @@
+{
+  "sidebarText": "Blog posts",
+  "buttons": [
+    "D",
+    "Content",
+    "Studio",
+    "Cards",
+    "Filters",
+    "(0)",
+    "Add Blog post"
+  ],
+  "tabs": [],
+  "inputCount": 1,
+  "inputs": [
+    {
+      "type": "text",
+      "placeholder": "Search",
+      "name": ""
+    }
+  ]
+}

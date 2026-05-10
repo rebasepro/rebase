@@ -262,7 +262,7 @@ export async function runSeed() {
         console.log("📸 Downloading hero images to local storage...");
         const heroImagePaths: string[] = [];
         for (let i = 0; i < heroImageUrls.length; i++) {
-            const p = await downloadAndStore(heroImageUrls[i], "blog_images/", `hero_${i + 1}.jpg`);
+            const p = await downloadAndStore(heroImageUrls[i], "posts/hero/", `hero_${i + 1}.jpg`);
             heroImagePaths.push(p);
             process.stdout.write(`  ✅ ${i + 1}/${heroImageUrls.length}\r`);
         }
@@ -271,7 +271,7 @@ export async function runSeed() {
         console.log("📸 Downloading content images to local storage...");
         const contentImagePaths: string[] = [];
         for (let i = 0; i < contentImageUrls.length; i++) {
-            const p = await downloadAndStore(contentImageUrls[i], "blog_content/", `content_${i + 1}.jpg`);
+            const p = await downloadAndStore(contentImageUrls[i], "posts/content/", `content_${i + 1}.jpg`);
             contentImagePaths.push(p);
         }
         console.log(`  ✅ Downloaded ${contentImagePaths.length} content images`);

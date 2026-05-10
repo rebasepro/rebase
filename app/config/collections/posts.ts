@@ -42,7 +42,7 @@ const postsCollection: PostgresCollection = {
             name: "Hero Image",
             type: "string",
             storage: {
-                storagePath: "blog_images/"
+                storagePath: "posts/hero/"
             },
             description: "Header image displayed at the top of the blog post"
         },
@@ -72,7 +72,7 @@ const postsCollection: PostgresCollection = {
                         name: "Image",
                         type: "string",
                         storage: {
-                            storagePath: "blog_content/"
+                            storagePath: "posts/content/"
                         }
                     }
                 }

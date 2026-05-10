@@ -13,13 +13,16 @@ import {
 import type { Node, Edge, NodeChange, EdgeChange } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
-    Typography,
+    Button,
+    SearchBar,
     TextField,
+    Tooltip,
+    Alert,
+    Typography,
     cls,
     defaultBorderMixin,
     CircularProgress,
     ResizablePanels,
-    Tooltip,
     IconButton
 } from "@rebasepro/ui";
 import {
@@ -230,12 +233,11 @@ duration: 400 }
 
                     {/* Search */}
                     <div className="px-2 py-1.5 border-b border-surface-200/40 dark:border-surface-700/40">
-                        <TextField
+                        <SearchBar
                             size="smallest"
                             placeholder="Filter tables…"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            inputClassName="text-xs"
+                            onTextSearch={(val) => setSearchQuery(val || "")}
+                            innerClassName="text-xs"
                         />
                     </div>
 
