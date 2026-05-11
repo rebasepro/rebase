@@ -12,17 +12,13 @@ patchedDependencies:
 importers:
 
   .:
-    dependencies:
-      fractional-indexing:
-        specifier: 3.2.0
-        version: 3.2.0
-      lucide-react:
-        specifier: 1.14.0
-        version: 1.14.0(react@19.2.4)
     devDependencies:
       '@eslint/js':
         specifier: ^9.24.0
         version: 9.39.4
+      '@playwright/test':
+        specifier: 1.59.1
+        version: 1.59.1
       '@types/eslint__js':
         specifier: ^8.42.3
         version: 8.42.3
@@ -68,9 +64,6 @@ importers:
 
   app:
     devDependencies:
-      '@playwright/test':
-        specifier: 1.59.1
-        version: 1.59.1
       '@rebasepro/cli':
         specifier: workspace:*
         version: link:../packages/cli
@@ -437,8 +430,8 @@ importers:
         specifier: ^3.6.0
         version: 3.6.0
       fast-equals:
-        specifier: 5.3.0
-        version: 5.3.0
+        specifier: 6.0.0
+        version: 6.0.0
       fractional-indexing:
         specifier: 3.2.0
         version: 3.2.0
@@ -773,7 +766,7 @@ importers:
         version: 5.9.3
       typesense:
         specifier: ^2.1.0
-        version: 2.1.0(@babel/runtime@7.28.6)
+        version: 2.1.0(@babel/runtime@7.29.2)
       vite:
         specifier: ^7.2.4
         version: 7.3.1(@types/node@20.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3)
@@ -824,8 +817,8 @@ importers:
         specifier: workspace:*
         version: link:../utils
       fast-equals:
-        specifier: 5.3.0
-        version: 5.3.0
+        specifier: 6.0.0
+        version: 6.0.0
       json-logic-js:
         specifier: ^2.0.5
         version: 2.0.5
@@ -918,8 +911,8 @@ importers:
         specifier: ^1.2.1
         version: 1.2.1
       fast-equals:
-        specifier: 5.3.0
-        version: 5.3.0
+        specifier: 6.0.0
+        version: 6.0.0
       fuse.js:
         specifier: ^7.1.0
         version: 7.1.0
@@ -1009,8 +1002,8 @@ importers:
   packages/formex:
     dependencies:
       fast-equals:
-        specifier: 5.3.0
-        version: 5.3.0
+        specifier: 6.0.0
+        version: 6.0.0
       react:
         specifier: '>=19.0.0'
         version: 19.2.4
@@ -1354,7 +1347,7 @@ importers:
         specifier: ^6.12.0
         version: 6.21.0(socks@2.8.7)
       realm-web:
-        specifier: ^2.0.0
+        specifier: ^2.0.1
         version: 2.0.1
     devDependencies:
       '@types/jest':
@@ -1648,8 +1641,8 @@ importers:
         specifier: ^1.1.1
         version: 1.1.1(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       fast-equals:
-        specifier: 5.3.0
-        version: 5.3.0
+        specifier: 6.0.0
+        version: 6.0.0
       lucide-react:
         specifier: 1.14.0
         version: 1.14.0(react@19.2.4)
@@ -2395,6 +2388,10 @@ packages:
 
   '@babel/runtime@7.28.6':
     resolution: {integrity: sha512-05WQkdpL9COIMz4LjTxGpPNCdlpyimKppYNoJ5Di5EUObifl8t4tuLuUBBZEpoLYOmfvIWrsp9fCl0HoPRVTdA==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/runtime@7.29.2':
+    resolution: {integrity: sha512-JiDShH45zKHWyGe4ZNVRrCjBz8Nh9TMmZG1kh4QTK8hCBTWBi8Da+i7s1fJw7/lYpM4ccepSNfqzZ/QvABBi5g==}
     engines: {node: '>=6.9.0'}
 
   '@babel/template@7.28.6':
@@ -8124,10 +8121,9 @@ packages:
   fast-deep-equal@3.1.3:
     resolution: {integrity: sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q==}
 
-  fast-equals@5.3.0:
-    resolution: {integrity: sha512-xwP+dG/in/nJelMOUEQBiIYeOoHKihWPB2sNZ8ZeDbZFoGb1OwTGMggGRgg6CRitNx7kmHgtIz2dOHDQ8Ap7Bw==}
+  fast-equals@6.0.0:
+    resolution: {integrity: sha512-PFhhIGgdM79r5Uztdj9Zb6Tt1zKafqVfdMGwVca1z5z6fbX7DmsySSuJd8HiP6I1j505DCS83cLxo5rmSNeVEA==}
     engines: {node: '>=6.0.0'}
-    deprecated: Please upgrade to `5.3.1`; this version incorrectly installs the internal `.yarn` package, which balloons installation size, and can cause errors with pnpm installs.
 
   fast-fifo@1.3.2:
     resolution: {integrity: sha512-/d9sfos4yxzpwkDkuN7k2SqFKtYNmCTzgfEpz82x34IM9/zc8KGxQoXg1liNC/izpRM/MBdt44Nmx41ZWqk+FQ==}
@@ -13773,6 +13769,8 @@ snapshots:
 
   '@babel/runtime@7.28.6': {}
 
+  '@babel/runtime@7.29.2': {}
+
   '@babel/template@7.28.6':
     dependencies:
       '@babel/code-frame': 7.29.0
@@ -17766,7 +17764,7 @@ snapshots:
   '@testing-library/dom@10.4.1':
     dependencies:
       '@babel/code-frame': 7.29.0
-      '@babel/runtime': 7.28.6
+      '@babel/runtime': 7.29.2
       '@types/aria-query': 5.0.4
       aria-query: 5.3.0
       dom-accessibility-api: 0.5.16
@@ -20404,7 +20402,7 @@ snapshots:
 
   fast-deep-equal@3.1.3: {}
 
-  fast-equals@5.3.0: {}
+  fast-equals@6.0.0: {}
 
   fast-fifo@1.3.2: {}
 
@@ -25762,9 +25760,9 @@ snapshots:
 
   typescript@5.9.3: {}
 
-  typesense@2.1.0(@babel/runtime@7.28.6):
+  typesense@2.1.0(@babel/runtime@7.29.2):
     dependencies:
-      '@babel/runtime': 7.28.6
+      '@babel/runtime': 7.29.2
       axios: 1.13.5
       loglevel: 1.9.2
       tslib: 2.8.1

@@ -44,11 +44,12 @@
         "build:stream": "lerna run build --stream --loglevel=info",
         "clean": "lerna run clean",
         "release": "git push origin main:release",
-        "e2e": "npx tsx e2e/runner.ts",
+        "e2e": "npx playwright test -c e2e/playwright.config.ts",
         "kill": "pkill -f 'rebase.*dev' || true; pkill -f 'tsx watch' || true; pkill -f vite || true"
     },
     "devDependencies": {
         "@eslint/js": "^9.24.0",
+        "@playwright/test": "1.59.1",
         "@types/eslint__js": "^8.42.3",
         "@types/json-logic-js": "2.0.8",
         "@typescript-eslint/eslint-plugin": "^8.17.0",
@@ -64,9 +65,5 @@
         "typescript": "^5.8.3",
         "typescript-eslint": "^8.29.0"
     },
-    "packageManager": "pnpm@10.15.1+sha512.34e538c329b5553014ca8e8f4535997f96180a1d0f614339357449935350d924e22f8614682191264ec33d1462ac21561aff97f6bb18065351c162c7e8f6de67",
-    "dependencies": {
-        "fractional-indexing": "3.2.0",
-        "lucide-react": "1.14.0"
-    }
+    "packageManager": "pnpm@10.15.1+sha512.34e538c329b5553014ca8e8f4535997f96180a1d0f614339357449935350d924e22f8614682191264ec33d1462ac21561aff97f6bb18065351c162c7e8f6de67"
 }

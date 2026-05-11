@@ -60,7 +60,7 @@
     "@rebasepro/ui": "workspace:*",
     "@rebasepro/utils": "workspace:*",
     "compressorjs": "^1.2.1",
-    "fast-equals": "5.3.0",
+    "fast-equals": "6.0.0",
     "fuse.js": "^7.1.0",
     "i18next": "^23.16.4",
     "notistack": "^3.0.2",
