@@ -22,9 +22,8 @@ import type { EntityAction } from "./entity_actions";
 export interface BaseEntityCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> {
 
     /**
-     * You can set an alias that will be used internally instead of the `path`.
-     * The `alias` value will be used to determine the URL of the collection,
-     * while `path` will still be used in the driver.
+     * You can set an alias that will be used internally instead of the collection name.
+     * The `slug` value will be used to determine the URL of the collection.
      * Note that you can use this value in reference properties too.
      */
     slug: string;
@@ -184,18 +183,18 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
     /**
      * Force a filter in this view. If applied, the rest of the filters will
      * be disabled. Filters applied with this prop cannot be changed.
-     * e.g. `forceFilter: { age: [">", 18] }`
-     * e.g. `forceFilter: { related_user: ["==", new EntityReference("sdc43dsw2", "users")] }`
+     * e.g. `fixedFilter: { age: [">", 18] }`
+     * e.g. `fixedFilter: { related_user: ["==", new EntityReference("sdc43dsw2", "users")] }`
      */
-    readonly forceFilter?: FilterValues<Extract<keyof M, string> | (string & {})>;
+    readonly fixedFilter?: FilterValues<Extract<keyof M, string> | (string & {})>;
 
     /**
      * Initial filters applied to the collection this collection is related to.
      * Defaults to none. Filters applied with this prop can be changed.
-     * e.g. `filter: { age: [">", 18] }`
-     * e.g. `filter: { related_user: ["==", new EntityReference("sdc43dsw2", "users")] }`
+     * e.g. `defaultFilter: { age: [">", 18] }`
+     * e.g. `defaultFilter: { related_user: ["==", new EntityReference("sdc43dsw2", "users")] }`
      */
-    readonly filter?: FilterValues<Extract<keyof M, string> | (string & {})>; // setting FilterValues<M> can break defining collections by code
+    readonly defaultFilter?: FilterValues<Extract<keyof M, string> | (string & {})>; // setting FilterValues<M> can break defining collections by code
 
     /**
      * Default sort applied to this collection.

@@ -250,7 +250,7 @@ export function applyPropertyConditions(
             (result as ReferenceProperty).path = evaluateCondition(conditions.referencePath, context) as string;
         }
         if (conditions.referenceFilter) {
-            (result as ReferenceProperty).forceFilter = evaluateCondition(conditions.referenceFilter, context) as ReferenceProperty["forceFilter"];
+            (result as ReferenceProperty).fixedFilter = evaluateCondition(conditions.referenceFilter, context) as ReferenceProperty["fixedFilter"];
         }
     }
 

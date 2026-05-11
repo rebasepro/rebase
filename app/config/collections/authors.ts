@@ -106,7 +106,7 @@ const authorsCollection: EntityCollection = {
         }
     },
 
-    filter: undefined,
+    defaultFilter: undefined,
     sort: [
         "email",
         "asc"

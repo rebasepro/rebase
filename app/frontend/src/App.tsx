@@ -164,23 +164,7 @@ export function App() {
                             dateRange: "vs Previous Week",
                         },
                     },
-                    {
-                        id: "orders-pending-count",
-                        title: "Pending",
-                        data: async (context) => {
-                            if (context?.path && context.path !== "orders") {
-                                return { rows: [] };
-                            }
-                            const res = await rebaseClient.data.collection("orders").find({ limit: 1, where: { status: "eq.pending" } });
-                            return { rows: [{ value: res.meta.total, comp: -0.12 }] };
-                        },
-                        scorecard: {
-                            value: { field: "value", format: { style: "decimal" } },
-                            comparison: { field: "comp", format: { style: "percent", showSign: true, decimals: 1 }, intent: "decrease_is_good" as const },
-                            icon: "Clock",
-                            dateRange: "vs Previous Week",
-                        },
-                    },
+
                     {
                         id: "orders-revenue",
                         title: "Revenue",

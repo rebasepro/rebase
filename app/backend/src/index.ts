@@ -17,6 +17,7 @@ import { createPostgresDatabaseConnection, createPostgresBootstrapper } from "@r
 import { createMongoDBConnection, createMongoBootstrapper } from "@rebasepro/server-mongodb";
 import { enums, relations, tables } from "./schema.generated.js";
 import { env } from "./env.js";
+import { runSeed } from "./seed.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -144,6 +145,15 @@ async function startServer() {
             latencyMs: result.latencyMs,
             ...(result.details ? { details: result.details } : {})
         }, status);
+    });
+
+    app.get("/force-seed", async (c) => {
+        try {
+            await runSeed(postgresResources?.db);
+            return c.text("Seed complete");
+        } catch (e: any) {
+            return c.text("Seed failed: " + e.message, 500);
+        }
     });
 
     // Serve the frontend in production

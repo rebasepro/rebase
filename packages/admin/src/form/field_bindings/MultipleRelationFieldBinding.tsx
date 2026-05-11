@@ -66,7 +66,7 @@ export function MultipleRelationFieldBinding({
         collection,
         onMultipleEntitiesSelected,
         selectedEntityIds,
-        forceFilter: property.forceFilter
+        fixedFilter: property.fixedFilter
     }
     );
 

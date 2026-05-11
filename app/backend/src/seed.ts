@@ -14,12 +14,27 @@ import path from "path";
 import { fileURLToPath } from "url";
 import https from "https";
 import http from "http";
-import { randomUUID } from "crypto";
+import { createHash } from "crypto";
 import { createRequire } from "module";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const UPLOADS_DIR = path.resolve(__dirname, "../../uploads/default");
+
+// ── Deterministic RNG & UUIDs ─────────────────────────────────────────
+let _seed = 1337;
+function random() {
+    let t = _seed += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+}
+Math.random = random;
+
+function generateUUID(prefix: string, index: number): string {
+    const hash = createHash("sha256").update(`${prefix}-${index}`).digest("hex");
+    return `${hash.substring(0, 8)}-${hash.substring(8, 12)}-4${hash.substring(13, 16)}-a${hash.substring(17, 20)}-${hash.substring(20, 32)}`;
+}
 
 // ── Image download helpers ────────────────────────────────────────────
 function randomId(len = 5): string {
@@ -309,13 +324,13 @@ export async function runSeed() {
             imageUrls: p.images || (p.main_image ? [p.main_image] : [])
         }));
 
-        const authorIds = Array.from({ length: NUM_AUTHORS }, () => randomUUID());
-        const tagIds = Array.from({ length: NUM_TAGS }, () => randomUUID());
-        const postIds = Array.from({ length: POST_COUNT }, () => randomUUID());
-        const customerIds = Array.from({ length: 40 }, () => randomUUID());
-        const productIds = Array.from({ length: firecmsDemoProducts.length }, () => randomUUID());
-        const orderIds = Array.from({ length: 80 }, () => randomUUID());
-        const ticketIds = Array.from({ length: 60 }, () => randomUUID());
+        const authorIds = Array.from({ length: NUM_AUTHORS }, (_, i) => generateUUID("author", i));
+        const tagIds = Array.from({ length: NUM_TAGS }, (_, i) => generateUUID("tag", i));
+        const postIds = Array.from({ length: POST_COUNT }, (_, i) => generateUUID("post", i));
+        const customerIds = Array.from({ length: 40 }, (_, i) => generateUUID("customer", i));
+        const productIds = Array.from({ length: firecmsDemoProducts.length }, (_, i) => generateUUID("product", i));
+        const orderIds = Array.from({ length: 80 }, (_, i) => generateUUID("order", i));
+        const ticketIds = Array.from({ length: 60 }, (_, i) => generateUUID("ticket", i));
 
         console.log("🧹 Clearing existing data...");
         await db.execute("TRUNCATE TABLE posts, authors, tags, products, orders, order_items, customers, tickets, posts_tags, product_locales RESTART IDENTITY CASCADE;");
@@ -513,7 +528,7 @@ console.log("📸 Downloading product images...");
             const locales = p.locales || ["en"];
             for (const locale of locales) {
                 productLocalesValues.push({
-                    id: randomUUID(),
+                    id: generateUUID("locale", productLocalesValues.length),
                     product_id: pid,
                     locale: locale,
                     name: p.name + ` (${locale.toUpperCase()})`,
@@ -556,7 +571,7 @@ console.log("📸 Downloading product images...");
                 const lineTotal = prod.price * qty;
                 subtotal += lineTotal;
                 allOrderItems.push({
-                    id: randomUUID(),
+                    id: generateUUID("orderitem", allOrderItems.length),
                     order_id: orderIds[i - 1],
                     product_id: productIds[pIdx],
                     product_name: prod.name,

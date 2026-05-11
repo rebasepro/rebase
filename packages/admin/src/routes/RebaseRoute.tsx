@@ -315,9 +315,10 @@ function EntityFullScreenRoute({
         return <NotFoundPage/>;
     }
 
-    const collection = isNew
+    const rawCollection = isNew
         ? (lastCollectionEntry && "collection" in lastCollectionEntry ? lastCollectionEntry.collection : undefined)!
         : (lastEntityEntry && "parentCollection" in lastEntityEntry ? lastEntityEntry.parentCollection : undefined)!;
+    const collection = collectionRegistry.getCollection(rawCollection.slug) || rawCollection;
     const fullIdPath = isNew ? lastCollectionEntry!.slug : lastEntityEntry!.slug;
     const collectionPath = urlController.resolveDatabasePathsFrom(fullIdPath);
     return <>

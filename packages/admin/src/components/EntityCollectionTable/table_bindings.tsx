@@ -81,7 +81,7 @@ path: referenceProperty.path as string }) : undefined;
                         includeId={referenceProperty.includeId}
                         includeEntityLink={referenceProperty.includeEntityLink}
                         title={property.name}
-                        forceFilter={referenceProperty.forceFilter}
+                        fixedFilter={referenceProperty.fixedFilter}
                     />
                 );
             },
@@ -242,7 +242,7 @@ path: referenceProperty.path as string }) : undefined;
                         includeId={property.includeId}
                         includeEntityLink={property.includeEntityLink}
                         title={property.name ?? propertyKey}
-                        forceFilter={property.forceFilter}
+                        fixedFilter={property.fixedFilter}
                     />
                 ),
                 allowScroll: false
@@ -265,7 +265,7 @@ path: referenceProperty.path as string }) : undefined;
                             includeId={property.includeId}
                             includeEntityLink={property.includeEntityLink}
                             title={property.name ?? propertyKey}
-                            forceFilter={property.forceFilter}
+                            fixedFilter={property.fixedFilter}
                         />
                     ),
                     allowScroll: false
@@ -280,7 +280,7 @@ path: referenceProperty.path as string }) : undefined;
                             disabled={disabled}
                             size={"small"}
                             relation={property.relation!}
-                            forceFilter={property.forceFilter}
+                            fixedFilter={property.fixedFilter}
                         />
                     ),
                     allowScroll: false
@@ -330,7 +330,7 @@ path: referenceProperty.path as string }) : undefined;
                                 path={ofProp.path}
                                 previewProperties={ofProp.previewProperties}
                                 title={arrayProperty.name}
-                                forceFilter={ofProp.forceFilter}
+                                fixedFilter={ofProp.fixedFilter}
                                 includeId={ofProp.includeId}
                                 includeEntityLink={ofProp.includeEntityLink}
                             />

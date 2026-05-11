@@ -25,7 +25,7 @@ type TableRelationFieldProps = {
     previewProperties?: string[];
     title?: string;
     relation: Relation;
-    forceFilter?: FilterValues<string>;
+    fixedFilter?: FilterValues<string>;
     includeId?: boolean;
     includeEntityLink?: boolean;
 };
@@ -46,7 +46,7 @@ export function TableRelationField(props: TableRelationFieldProps) {
             previewProperties={props.previewProperties}
             title={props.title}
             relation={props.relation}
-            forceFilter={props.forceFilter}
+            fixedFilter={props.fixedFilter}
             includeId={props.includeId}
             includeEntityLink={props.includeEntityLink}
         />;
@@ -69,7 +69,7 @@ export const TableRelationFieldInternal = React.memo(
             previewProperties,
             title,
             disabled,
-            forceFilter,
+            fixedFilter,
             collection,
             includeId,
             includeEntityLink
@@ -96,7 +96,7 @@ export const TableRelationFieldInternal = React.memo(
             onMultipleEntitiesSelected,
             onSingleEntitySelected,
             selectedEntityIds,
-            forceFilter
+            fixedFilter
         }
         );
 

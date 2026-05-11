@@ -81,7 +81,7 @@ path });
         collection,
         onSingleEntitySelected,
         selectedEntityIds: value ? [value] : undefined,
-        forceFilter: property.reference.forceFilter
+        fixedFilter: property.reference.fixedFilter
     }
     );
 

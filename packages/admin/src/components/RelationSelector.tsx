@@ -37,7 +37,7 @@ export interface RelationSelectorProps {
     invisible?: boolean;
 
     relation: Relation;
-    forceFilter?: FilterValues<string>;
+    fixedFilter?: FilterValues<string>;
     pageSize?: number;
     emptyPlaceholder?: string;
     searchPlaceholder?: string;
@@ -60,7 +60,7 @@ export const RelationSelector = React.forwardRef<
             useChips = true,
             className,
             relation,
-            forceFilter,
+            fixedFilter,
             pageSize,
             emptyPlaceholder,
             searchPlaceholder = "Search...",
@@ -94,7 +94,7 @@ export const RelationSelector = React.forwardRef<
         } = useRelationSelector({
             path: collection.slug,
             collection,
-            forceFilter,
+            fixedFilter,
             pageSize
         });
 

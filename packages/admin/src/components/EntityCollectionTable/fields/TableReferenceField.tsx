@@ -25,7 +25,7 @@ type TableReferenceFieldProps = {
     previewProperties?: string[];
     title?: string;
     path: string;
-    forceFilter?: FilterValues<string>;
+    fixedFilter?: FilterValues<string>;
     includeId?: boolean;
     includeEntityLink?: boolean;
 };
@@ -60,7 +60,7 @@ export const TableReferenceFieldInternal = React.memo(
             previewProperties,
             title,
             disabled,
-            forceFilter,
+            fixedFilter,
             collection,
             includeId,
             includeEntityLink
@@ -87,7 +87,7 @@ export const TableReferenceFieldInternal = React.memo(
             onMultipleEntitiesSelected,
             onSingleEntitySelected,
             selectedEntityIds,
-            forceFilter
+            fixedFilter
         }
         );
 

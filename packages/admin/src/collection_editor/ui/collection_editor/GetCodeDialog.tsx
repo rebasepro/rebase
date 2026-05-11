@@ -124,7 +124,7 @@ function collectionToCode(collection: EntityCollection): object {
 
         icon: collection.icon,
         group: collection.group,
-        filter: collection.filter,
+        defaultFilter: collection.defaultFilter,
         sort: collection.sort,
         properties: Object.entries({
             ...(collection.properties ?? {})

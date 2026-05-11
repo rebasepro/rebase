@@ -66,7 +66,7 @@ export type SelectableTableProps<M extends Record<string, unknown>> = {
 
     inlineEditing?: boolean;
 
-    forceFilter?: FilterValues<keyof M extends string ? keyof M : never>;
+    fixedFilter?: FilterValues<keyof M extends string ? keyof M : never>;
 
     highlightedRow?: (data: Entity<M>) => boolean;
 
@@ -158,7 +158,7 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
         initialScroll,
         emptyComponent,
         columns,
-        forceFilter,
+        fixedFilter,
         highlightedRow,
         endAdornment,
         AddColumnComponent,
@@ -225,8 +225,8 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
 
     const onFilterUpdate = useCallback((updatedFilterValues?: FilterValues<any>) => {
         setFilterValues?.({ ...updatedFilterValues,
-...forceFilter } as FilterValues<any>);
-    }, [forceFilter]);
+...fixedFilter } as FilterValues<any>);
+    }, [fixedFilter]);
 
     const contextValue = useMemo(() => ({
         setPopupCell: setPopupCell as ((cell?: SelectedCellProps<M>) => void),

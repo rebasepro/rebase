@@ -375,7 +375,10 @@ export class CollectionRegistry {
             }
 
             // Move to the target collection
-            currentCollection = relation.target();
+            const target = relation.target();
+            const targetRelationKey = relation.relationName || target.slug;
+            const targetSlug = relation.overrides?.slug ?? targetRelationKey;
+            currentCollection = this.get(targetSlug) || this.normalizeCollection(target);
 
             // If there are more segments, continue navigation
             if (i + 1 < pathSegments.length) {
@@ -447,7 +450,7 @@ export class CollectionRegistry {
                 if (!subcollection) {
                     throw new Error(`Subcollection '${subcollectionSlug}' not found in ${currentCollection.slug}`);
                 }
-                currentCollection = subcollection;
+                currentCollection = this.get(subcollection.slug) || this.normalizeCollection(subcollection);
                 collections.push(currentCollection);
             }
         }

@@ -21,7 +21,7 @@ export function buildIdColumn(largeLayout?: boolean): VirtualTableColumn {
 export interface PropertiesToColumnsParams<M extends Record<string, unknown>> {
     properties: Properties;
     sortable?: boolean;
-    forceFilter?: FilterValues<keyof M extends string ? keyof M : never>;
+    fixedFilter?: FilterValues<keyof M extends string ? keyof M : never>;
     AdditionalHeaderWidget?: React.ComponentType<{
         property: Property,
         propertyKey: string,
@@ -29,8 +29,8 @@ export interface PropertiesToColumnsParams<M extends Record<string, unknown>> {
     }>;
 }
 
-export function propertiesToColumns<M extends Record<string, unknown>>({ properties, sortable, forceFilter, AdditionalHeaderWidget }: PropertiesToColumnsParams<M>): VirtualTableColumn[] {
-    const disabledFilter = Boolean(forceFilter);
+export function propertiesToColumns<M extends Record<string, unknown>>({ properties, sortable, fixedFilter, AdditionalHeaderWidget }: PropertiesToColumnsParams<M>): VirtualTableColumn[] {
+    const disabledFilter = Boolean(fixedFilter);
     return Object.entries<Property>(properties)
         .flatMap(([key, property]) => getColumnKeysForProperty(property, key))
         .map(({

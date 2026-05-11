@@ -34,7 +34,7 @@ export function EditorCollectionActionStart({
         : true;
 
     let saveDefaultFilterButton = null;
-    if (!equal(getObjectOrNull(tableController.filterValues), getObjectOrNull(collection.filter)) ||
+    if (!equal(getObjectOrNull(tableController.filterValues), getObjectOrNull(collection.defaultFilter)) ||
         !equal(getObjectOrNull(tableController.sortBy), getObjectOrNull(collection.sort))) {
         saveDefaultFilterButton = <>
             <Tooltip
@@ -49,7 +49,7 @@ export function EditorCollectionActionStart({
                             parentCollectionSlugs, parentEntityIds,
                             collectionData: mergeDeep(collection as EntityCollection,
                                 {
-                                    filter: tableController.filterValues ?? null,
+                                    defaultFilter: tableController.filterValues ?? null,
                                     sort: tableController.sortBy ?? null
                                 })
                         }).then(() => {
@@ -62,15 +62,15 @@ export function EditorCollectionActionStart({
                 </Button>
             </Tooltip>
 
-            {(collection.filter || collection.sort) && <Tooltip
+            {(collection.defaultFilter || collection.sort) && <Tooltip
                 title={t("studio_editor_collection_start_reset_filter")}>
                 <Button
                     size={"small"}
                     variant={"text"}
                     onClick={() => {
                         tableController.clearFilter?.();
-                        if (collection?.filter)
-                            tableController.setFilterValues?.(collection?.filter);
+                        if (collection?.defaultFilter)
+                            tableController.setFilterValues?.(collection?.defaultFilter);
                         if (collection?.sort)
                             tableController.setSortBy?.(collection?.sort);
                     }}>

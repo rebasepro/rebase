@@ -22,7 +22,7 @@ export interface UseRelationSelectorProps<M extends Record<string, any> = any> {
     /**
      * Force filter to be applied to the relation search
      */
-    forceFilter?: FilterValues<string>;
+    fixedFilter?: FilterValues<string>;
     /**
      * Page size for pagination
      */
@@ -60,7 +60,7 @@ export function useRelationSelector<M extends Record<string, any> = any>(
     {
         path,
         collection,
-        forceFilter,
+        fixedFilter,
         pageSize = DEFAULT_PAGE_SIZE,
         getLabelFromEntity,
         getDescriptionFromEntity,
@@ -138,10 +138,10 @@ export function useRelationSelector<M extends Record<string, any> = any>(
         setError(undefined);
         setLoading(true);
 
-        // Convert forceFilter to PostgREST where clause
+        // Convert fixedFilter to PostgREST where clause
         const whereMap: Record<string, string> = {};
-        if (forceFilter) {
-            Object.entries(forceFilter).forEach(([key, value]) => {
+        if (fixedFilter) {
+            Object.entries(fixedFilter).forEach(([key, value]) => {
                 if (value && Array.isArray(value)) {
                     const [op, val] = value;
                     const postgrestOp = op === "==" ? "eq" : op === "!=" ? "neq" : op === ">" ? "gt" : op === ">=" ? "gte" : op === "<" ? "lt" : op === "<=" ? "lte" : op === "in" ? "in" : op === "not-in" ? "nin" : op === "array-contains" ? "cs" : op === "array-contains-any" ? "csa" : "eq";
@@ -196,7 +196,7 @@ export function useRelationSelector<M extends Record<string, any> = any>(
         }
 
         unsubscribeRef.current = unsubscribe || null;
-    }, [dataClient, path, forceFilter, limit, currentSearch, entityToRelationItem, cleanupSubscription, setLoading]);
+    }, [dataClient, path, fixedFilter, limit, currentSearch, entityToRelationItem, cleanupSubscription, setLoading]);
 
     // Search function with debouncing
     const search = useCallback((searchString: string) => {

@@ -1009,7 +1009,7 @@ describe("BUG: count() not implemented", () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
         // CollectionAccessor type declares count?() as optional, but
         // createCollectionClient doesn't implement it
-        expect((c as any).count).toBeUndefined();
+        expect((c as any).count).toBeDefined();
     });
 });
 

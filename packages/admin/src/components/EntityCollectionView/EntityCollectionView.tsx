@@ -174,9 +174,10 @@ export const EntityCollectionView = React.memo(
         const scrollRestoration = useScrollRestoration();
 
         const collection = useMemo(() => {
+            const registryCollection = collectionRegistry.getCollection(path) || collectionProp;
             const userOverride = userConfigPersistence?.getCollectionConfig<M>(path);
-            return (userOverride ? mergeDeep(collectionProp, userOverride) : collectionProp) as EntityCollection<M>;
-        }, [collectionProp, path, userConfigPersistence?.getCollectionConfig]);
+            return (userOverride ? mergeDeep(registryCollection, userOverride) : registryCollection) as EntityCollection<M>;
+        }, [collectionProp, path, userConfigPersistence, collectionRegistry]);
 
         const collectionRef = React.useRef(collection);
         useEffect(() => {
@@ -1131,7 +1132,7 @@ export const EntityCollectionView = React.memo(
             equal(a.openEntityMode, b.openEntityMode) &&
             equal(a.exportable, b.exportable) &&
             equal(a.history, b.history) &&
-            equal(a.forceFilter, b.forceFilter) &&
+            equal(a.fixedFilter, b.fixedFilter) &&
             equal(a.selectedEntityId, b.selectedEntityId) &&
             equal(a.selectedTab, b.selectedTab);
     }) as React.FunctionComponent<EntityCollectionViewProps<any>>

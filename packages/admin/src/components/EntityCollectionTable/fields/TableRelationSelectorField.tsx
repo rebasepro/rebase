@@ -14,7 +14,7 @@ interface RelationSelectorFieldProps {
     /** The relation configuration */
     relation: Relation;
     /** Force filter to be applied to the relation search */
-    forceFilter?: FilterValues<string>;
+    fixedFilter?: FilterValues<string>;
     /** Collection size for display */
     size?: "small" | "medium";
 }
@@ -25,7 +25,7 @@ export function TableRelationSelectorField({
     internalValue,
     updateValue,
     relation,
-    forceFilter,
+    fixedFilter,
     size = "medium"
 }: RelationSelectorFieldProps) {
 
@@ -36,7 +36,7 @@ export function TableRelationSelectorField({
             value={internalValue || null}
             onValueChange={(newVal) => updateValue(newVal ?? null)}
             relation={relation}
-            forceFilter={forceFilter}
+            fixedFilter={fixedFilter}
         />
     );
 }

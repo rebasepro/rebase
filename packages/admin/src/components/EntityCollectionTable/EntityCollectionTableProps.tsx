@@ -111,7 +111,7 @@ export type EntityCollectionTableProps<M extends Record<string, unknown>,
 
         displayedColumnIds?: PropertyColumnConfig[];
 
-        forceFilter?: FilterValues<Extract<keyof M, string>>;
+        fixedFilter?: FilterValues<Extract<keyof M, string>>;
 
         inlineEditing?: boolean;
 

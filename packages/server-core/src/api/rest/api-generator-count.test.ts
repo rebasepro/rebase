@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { jest } from "@jest/globals";
 import { RestApiGenerator } from "./api-generator";
 import type { DataDriver, EntityCollection, FetchCollectionProps } from "@rebasepro/types";
 
@@ -7,11 +7,11 @@ import type { DataDriver, EntityCollection, FetchCollectionProps } from "@rebase
  */
 function createMockDriver(overrides?: Partial<DataDriver>): DataDriver {
     return {
-        fetchCollection: vi.fn().mockResolvedValue([]),
-        fetchEntity: vi.fn().mockResolvedValue(null),
-        saveEntity: vi.fn().mockResolvedValue({ id: "1", path: "test", values: {} }),
-        deleteEntity: vi.fn().mockResolvedValue(undefined),
-        countEntities: vi.fn().mockResolvedValue(0),
+        fetchCollection: jest.fn().mockResolvedValue([]),
+        fetchEntity: jest.fn().mockResolvedValue(null),
+        saveEntity: jest.fn().mockResolvedValue({ id: "1", path: "test", values: {} }),
+        deleteEntity: jest.fn().mockResolvedValue(undefined),
+        countEntities: jest.fn().mockResolvedValue(0),
         ...overrides,
     } as unknown as DataDriver;
 }
@@ -31,7 +31,7 @@ describe("RestApiGenerator - Count Endpoint", () => {
 
     beforeEach(() => {
         driver = createMockDriver({
-            countEntities: vi.fn().mockResolvedValue(42),
+            countEntities: jest.fn().mockResolvedValue(42),
         });
         collection = createTestCollection("products");
     });
@@ -59,7 +59,7 @@ describe("RestApiGenerator - Count Endpoint", () => {
 
         // Verify countEntities was called with the filter
         expect(driver.countEntities).toHaveBeenCalled();
-        const callArgs = (driver.countEntities as ReturnType<typeof vi.fn>).mock.calls[0][0] as FetchCollectionProps;
+        const callArgs = (driver.countEntities as ReturnType<typeof jest.fn>).mock.calls[0][0] as FetchCollectionProps;
         expect(callArgs.path).toBe("products");
         expect(callArgs.filter).toHaveProperty("status");
     });
@@ -75,7 +75,7 @@ describe("RestApiGenerator - Count Endpoint", () => {
         expect(json.count).toBe(42);
 
         expect(driver.countEntities).toHaveBeenCalled();
-        const callArgs = (driver.countEntities as ReturnType<typeof vi.fn>).mock.calls[0][0] as FetchCollectionProps;
+        const callArgs = (driver.countEntities as ReturnType<typeof jest.fn>).mock.calls[0][0] as FetchCollectionProps;
         expect(callArgs.searchString).toBe("widget");
     });
 
@@ -93,9 +93,9 @@ describe("RestApiGenerator - Count Endpoint", () => {
 
     it("GET /products/count should not be confused with GET /products/:id", async () => {
         // Ensure the count route is registered before the :id route
-        const fetchEntity = vi.fn().mockResolvedValue(null);
+        const fetchEntity = jest.fn().mockResolvedValue(null);
         const driverCustom = createMockDriver({
-            countEntities: vi.fn().mockResolvedValue(99),
+            countEntities: jest.fn().mockResolvedValue(99),
             fetchEntity,
         });
         const generator = new RestApiGenerator([collection], driverCustom);

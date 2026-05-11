@@ -111,7 +111,7 @@ export class EntityPersistService {
                             targetColumnName = relation.localKey;
                         } else if (relation.foreignKeyOnTarget) {
                             targetColumnName = relation.foreignKeyOnTarget;
-                        } else if (relation.joinPath && relation.joinPath.length > 0) {
+                        } else if (relation.joinPath && relation.joinPath.length === 1) {
                             const targetTableName = getTableName(targetCollection);
                             const relevantJoinStep = relation.joinPath.find(joinStep => joinStep.table === targetTableName);
 
@@ -123,6 +123,12 @@ export class EntityPersistService {
                                 const targetColumnNames = DrizzleConditionBuilder.getColumnNamesFromColumns(relation.joinPath[0].on.to);
                                 targetColumnName = targetColumnNames[0];
                             }
+                        } else if (relation.joinPath && relation.joinPath.length > 1) {
+                            // For multi-hop relations (like many-to-many through a junction table),
+                            // there is no direct foreign key on the target table pointing to the parent.
+                            // The relationship is managed via the junction table.
+                            // We shouldn't inject the parent ID directly into the target entity payload.
+                            break;
                         } else {
                             throw new Error(`Relation '${relationKey}' lacks configuration for path-based saving.`);
                         }

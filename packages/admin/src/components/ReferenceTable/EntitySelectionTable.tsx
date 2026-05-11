@@ -72,7 +72,7 @@ export interface EntitySelectionProps<M extends Record<string, unknown>> {
     /**
      * Allow selection of entities that pass the given filter only.
      */
-    forceFilter?: FilterValues<string>;
+    fixedFilter?: FilterValues<string>;
 
     /**
      * Use this description to indicate the user what to do in this dialog.
@@ -100,7 +100,7 @@ export function EntitySelectionTable<M extends Record<string, unknown>>(
         path: pathInput,
         selectedEntityIds: selectedEntityIdsProp,
         description,
-        forceFilter,
+        fixedFilter,
         maxSelection
     }: EntitySelectionProps<M>) {
 
@@ -259,7 +259,7 @@ export function EntitySelectionTable<M extends Record<string, unknown>>(
         path,
         collection,
         entitiesDisplayedFirst,
-        forceFilter,
+        fixedFilter,
         updateUrl: false
     });
 
@@ -288,7 +288,7 @@ export function EntitySelectionTable<M extends Record<string, unknown>>(
                         </Typography>}
                         defaultSize={collection.defaultSize}
                         properties={collection.properties}
-                        forceFilter={forceFilter}
+                        fixedFilter={fixedFilter}
                         inlineEditing={false}
                         selectionController={selectionController}
                         actions={<EntitySelectionDialogActions

@@ -76,7 +76,7 @@ export function ArrayOfReferencesFieldBinding({
         collection,
         onMultipleEntitiesSelected,
         selectedEntityIds,
-        forceFilter: ofProperty.forceFilter
+        fixedFilter: ofProperty.fixedFilter
     }
     );
 

@@ -18,7 +18,7 @@ export interface FiltersDialogProps {
     properties: Record<string, Property>;
     filterValues: FilterValues<any> | undefined;
     setFilterValues: (filterValues?: FilterValues<any>) => void;
-    forceFilter?: FilterValues<any>;
+    fixedFilter?: FilterValues<any>;
 }
 
 /**
@@ -31,7 +31,7 @@ export function FiltersDialog({
     properties,
     filterValues,
     setFilterValues,
-    forceFilter
+    fixedFilter
 }: FiltersDialogProps) {
     const { t } = useTranslation();
     // Local state for filters being edited
@@ -52,13 +52,13 @@ export function FiltersDialog({
         return Object.entries(properties).filter(([key, property]) => {
             if (!property) return false;
             // Force filter properties should not be editable
-            if (forceFilter && key in forceFilter) return false;
+            if (fixedFilter && key in fixedFilter) return false;
             // Check if property type is filterable
             const baseProperty = property.type === "array" ? property.of : property;
             if (!baseProperty || Array.isArray(baseProperty)) return false;
             return ["string", "number", "boolean", "date", "reference"].includes(baseProperty.type);
         });
-    }, [properties, forceFilter]);
+    }, [properties, fixedFilter]);
 
     const handleFilterChange = useCallback((propertyKey: string, value?: [VirtualTableWhereFilterOp, any]) => {
         setLocalFilters(prev => {
@@ -75,9 +75,9 @@ export function FiltersDialog({
     const handleApply = useCallback(() => {
         const hasFilters = Object.keys(localFilters).length > 0;
         setFilterValues(hasFilters ? { ...localFilters,
-...forceFilter } : (forceFilter || undefined));
+...fixedFilter } : (fixedFilter || undefined));
         onOpenChange(false);
-    }, [localFilters, setFilterValues, forceFilter, onOpenChange]);
+    }, [localFilters, setFilterValues, fixedFilter, onOpenChange]);
 
     const handleClearAll = useCallback(() => {
         setLocalFilters({});

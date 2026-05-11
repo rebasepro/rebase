@@ -30,7 +30,7 @@ export type DataTableControllerProps<M extends Record<string, any> = any> = {
     /**
      * Force filter to be applied to the table.
      */
-    forceFilter?: FilterValues<string>;
+    fixedFilter?: FilterValues<string>;
 
     scrollRestoration?: ScrollRestorationController;
 
@@ -53,7 +53,7 @@ export type DataTableControllerProps<M extends Record<string, any> = any> = {
  * @param scrollRestoration
  * @param entitiesDisplayedFirst
  * @param lastDeleteTimestamp
- * @param forceFilterFromProps
+ * @param fixedFilterFromProps
  * @param updateUrl
  */
 export function useDataTableController<M extends Record<string, any> = any, USER extends User = User>(
@@ -63,21 +63,21 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         scrollRestoration,
         entitiesDisplayedFirst,
         lastDeleteTimestamp: _lastDeleteTimestamp,
-        forceFilter: forceFilterFromProps,
+        fixedFilter: fixedFilterFromProps,
         updateUrl
     }: DataTableControllerProps<M>)
     : EntityTableController<M> {
 
     const {
-        filter,
+        defaultFilter,
         sort,
-        forceFilter: forceFilterFromCollection
+        fixedFilter: fixedFilterFromCollection
     } = collection;
 
     const [popupCell, setPopupCell] = React.useState<SelectedCellProps<M> | undefined>(undefined);
     const dataClient = useData();
 
-    const forceFilter = forceFilterFromProps ?? forceFilterFromCollection;
+    const fixedFilter = fixedFilterFromProps ?? fixedFilterFromCollection;
     const paginationEnabled = collection.pagination === undefined || Boolean(collection.pagination);
     const pageSize = typeof collection.pagination === "number" ? collection.pagination : DEFAULT_PAGE_SIZE;
 
@@ -90,12 +90,12 @@ export function useDataTableController<M extends Record<string, any> = any, USER
     }, []);
 
     const sortInternal = useMemo(() => {
-        if (sort && forceFilter && !checkFilterCombination(forceFilter, sort)) {
+        if (sort && fixedFilter && !checkFilterCombination(fixedFilter, sort)) {
             console.warn("Initial sort is not compatible with the force filter. Ignoring initial sort");
             return undefined;
         }
         return sort;
-    }, [sort, forceFilter]);
+    }, [sort, fixedFilter]);
 
     const location = useLocation();
 
@@ -104,7 +104,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         sortBy: sortUrl
     } = parseFilterAndSort(location.search);
 
-    const [filterValues, setFilterValues] = React.useState<FilterValues<Extract<keyof M, string> | (string & {})> | undefined>(forceFilter ?? (updateUrl ? filterUrl : undefined) ?? filter ?? undefined);
+    const [filterValues, setFilterValues] = React.useState<FilterValues<Extract<keyof M, string> | (string & {})> | undefined>(fixedFilter ?? (updateUrl ? filterUrl : undefined) ?? defaultFilter ?? undefined);
     const [sortBy, setSortBy] = React.useState<[Extract<keyof M, string> | (string & {}), "asc" | "desc"] | undefined>((updateUrl ? sortUrl : undefined) ?? sortInternal);
 
     // Sync filter/sort state from URL on browser navigation (back/forward).
@@ -120,15 +120,15 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         initialSearchRef.current = null;
 
         const { filterValues: urlFilterValues, sortBy: urlSortBy } = parseFilterAndSort(location.search);
-        if (!forceFilter) {
+        if (!fixedFilter) {
             setFilterValues(urlFilterValues as FilterValues<Extract<keyof M, string> | (string & {})> | undefined);
         }
-        if (urlSortBy && forceFilter && !checkFilterCombination(forceFilter, urlSortBy)) {
+        if (urlSortBy && fixedFilter && !checkFilterCombination(fixedFilter, urlSortBy)) {
             console.warn("URL sort is not compatible with the force filter.");
         } else {
             setSortBy(urlSortBy as [Extract<keyof M, string> | (string & {}), "asc" | "desc"] | undefined);
         }
-    }, [location.search, updateUrl, forceFilter, checkFilterCombination]);
+    }, [location.search, updateUrl, fixedFilter, checkFilterCombination]);
 
     useUpdateUrl(filterValues, sortBy, searchString, updateUrl);
 
@@ -174,10 +174,10 @@ export function useDataTableController<M extends Record<string, any> = any, USER
     const [dataLoadingError, setDataLoadingError] = useState<Error | undefined>();
     const [noMoreToLoad, setNoMoreToLoad] = useState<boolean>(false);
 
-    const clearFilter = useCallback(() => setFilterValues(forceFilter ?? undefined), [forceFilter]);
+    const clearFilter = useCallback(() => setFilterValues(fixedFilter ?? undefined), [fixedFilter]);
 
     const updateFilterValues = useCallback((updatedFilter: FilterValues<Extract<keyof M, string> | (string & {})> | undefined) => {
-        if (forceFilter) {
+        if (fixedFilter) {
             console.warn("Filter is not compatible with the force filter. Ignoring filter");
             return;
         }
@@ -186,7 +186,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         } else {
             setFilterValues(updatedFilter);
         }
-    }, [forceFilter]);
+    }, [fixedFilter]);
 
     useEffect(() => {
 

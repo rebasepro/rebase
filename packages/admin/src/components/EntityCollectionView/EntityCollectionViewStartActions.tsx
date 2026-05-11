@@ -51,9 +51,9 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
 
     // Count active filters (excluding force filters)
     const filterValues = tableController.filterValues;
-    const forceFilter = collection.forceFilter;
+    const fixedFilter = collection.fixedFilter;
     const activeFilterCount = filterValues
-        ? Object.keys(filterValues).filter(key => !forceFilter || !(key in forceFilter)).length
+        ? Object.keys(filterValues).filter(key => !fixedFilter || !(key in fixedFilter)).length
         : 0;
 
     const actionProps: CollectionActionsProps<M> = {
@@ -121,7 +121,7 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
         <ClearFilterSortButton
             key={"clear_filter"}
             tableController={tableController}
-            enabled={!collection.forceFilter}/>
+            enabled={!collection.fixedFilter}/>
     ];
 
     const pluginActionsStart = useSlot("collection.actions.start", actionProps);
@@ -139,7 +139,7 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
                     properties={resolvedProperties}
                     filterValues={tableController.filterValues}
                     setFilterValues={(filterValues) => tableController.setFilterValues?.(filterValues ?? {})}
-                    forceFilter={collection.forceFilter}
+                    fixedFilter={collection.fixedFilter}
                 />
             )}
         </>

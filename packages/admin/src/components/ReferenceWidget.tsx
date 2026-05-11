@@ -27,7 +27,7 @@ export type ReferenceWidgetProps<M extends Record<string, unknown>> = {
     /**
      * Allow selection of entities that pass the given filter only.
      */
-    forceFilter?: FilterValues<string>;
+    fixedFilter?: FilterValues<string>;
     size: PreviewSize;
     className?: string;
     includeId?: boolean;
@@ -46,7 +46,7 @@ export function ReferenceWidget<M extends Record<string, unknown>>({
     onReferenceSelected,
     onMultipleReferenceSelected,
     previewProperties,
-    forceFilter,
+    fixedFilter,
     size,
     className,
     includeId,
@@ -89,7 +89,7 @@ export function ReferenceWidget<M extends Record<string, unknown>>({
         collection,
         onSingleEntitySelected,
         onMultipleEntitiesSelected,
-        forceFilter
+        fixedFilter
     }
     );
 

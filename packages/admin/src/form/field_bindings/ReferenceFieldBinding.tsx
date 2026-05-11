@@ -81,7 +81,7 @@ function ReferenceFieldBindingInternal({
         collection,
         onSingleEntitySelected,
         selectedEntityIds: validValue ? [value.id] : undefined,
-        forceFilter: property.forceFilter
+        fixedFilter: property.fixedFilter
     }
     );
 

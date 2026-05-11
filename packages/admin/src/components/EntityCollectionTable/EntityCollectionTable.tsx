@@ -46,7 +46,7 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
     ({
         className,
         style,
-        forceFilter,
+        fixedFilter,
         actionsStart,
         actions,
         viewModeToggle,
@@ -248,7 +248,7 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
         const columnsResult: VirtualTableColumn[] = propertiesToColumns({
             properties,
             sortable,
-            forceFilter,
+            fixedFilter,
             AdditionalHeaderWidget
         });
 
@@ -269,7 +269,7 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
                 }))
             : [];
         return [...columnsResult, ...additionalTableColumns];
-    }, [properties, sortable, forceFilter, AdditionalHeaderWidget, additionalFields]);
+    }, [properties, sortable, fixedFilter, AdditionalHeaderWidget, additionalFields]);
 
     const idColumn: VirtualTableColumn = useMemo(() => ({
         key: "id_ewcfedcswdf3",

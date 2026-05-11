@@ -22,7 +22,7 @@ type TableMultipleRelationFieldProps = {
     previewProperties?: string[];
     title?: string;
     relation: Relation;
-    forceFilter?: FilterValues<string>;
+    fixedFilter?: FilterValues<string>;
     includeId?: boolean;
     includeEntityLink?: boolean;
 };
@@ -43,7 +43,7 @@ export const TableMultipleRelationFieldInternal = React.memo(
             previewProperties,
             title,
             disabled,
-            forceFilter,
+            fixedFilter,
             collection,
             includeId,
             includeEntityLink
@@ -63,7 +63,7 @@ export const TableMultipleRelationFieldInternal = React.memo(
             collection,
             onMultipleEntitiesSelected,
             selectedEntityIds,
-            forceFilter
+            fixedFilter
         }
         );
 

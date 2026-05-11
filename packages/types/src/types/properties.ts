@@ -447,9 +447,9 @@ export interface ReferenceProperty extends BaseProperty {
     path?: string;
     /**
      * Allow selection of entities that pass the given filter only.
-     * e.g. `forceFilter: { age: [">=", 18] }`
+     * e.g. `fixedFilter: { age: [">=", 18] }`
      */
-    forceFilter?: FilterValues<string>;
+    fixedFilter?: FilterValues<string>;
     /**
      * Properties that need to be rendered when displaying a preview of this
      * reference. If not specified the first 3 are used. Only the first 3
@@ -579,9 +579,9 @@ export interface RelationProperty extends BaseProperty {
 
     /**
      * Allow selection of entities that pass the given filter only.
-     * e.g. `forceFilter: { age: [">=", 18] }`
+     * e.g. `fixedFilter: { age: [">=", 18] }`
      */
-    forceFilter?: FilterValues<string>;
+    fixedFilter?: FilterValues<string>;
     /**
      * Properties that need to be rendered when displaying a preview of this
      * reference. If not specified the first 3 are used. Only the first 3

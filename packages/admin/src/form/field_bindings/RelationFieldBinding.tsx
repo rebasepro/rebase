@@ -74,7 +74,7 @@ export function RelationFieldBinding({
                         }
                     }}
                     disabled={disabled || isSubmitting}
-                    forceFilter={property.forceFilter}
+                    fixedFilter={property.fixedFilter}
                     size={selectorSize}
                 />
 
@@ -123,7 +123,7 @@ export function RelationFieldBinding({
             collection,
             onSingleEntitySelected,
             selectedEntityIds: validValue && normalizedValue ? [normalizedValue.id] : undefined,
-            forceFilter: property.forceFilter
+            fixedFilter: property.fixedFilter
         }
         );
 
