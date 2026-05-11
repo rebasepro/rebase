@@ -67,10 +67,9 @@ export const SchemaBrowser = ({
                                             <svg className="w-3.5 h-3.5 mr-1 shrink-0 text-text-disabled dark:text-text-disabled-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                                             <Typography variant="body2" className="text-text-secondary dark:text-text-secondary-dark text-xs truncate flex-1 min-w-0">{table.tableName}</Typography>
 
-                                            <div className="flex opacity-0 group-hover:opacity-100 focus-within:opacity-100 absolute right-1 items-center bg-surface-100 dark:bg-surface-950 px-1 gap-1 rounded transition-opacity">
+                                            <div className="flex opacity-0 group-hover:opacity-100 focus-within:opacity-100 absolute right-1 items-center bg-surface-100 dark:bg-surface-800 px-1 gap-1 rounded transition-opacity">
                                                 <IconButton
                                                     size="small"
-                                                    className="transition-colors text-text-secondary hover:text-text-primary pointer-events-auto"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         navigator.clipboard.writeText(table.tableName);
@@ -84,7 +83,6 @@ export const SchemaBrowser = ({
                                                     trigger={
                                                         <IconButton
                                                             size={"small"}
-                                                            className="transition-colors text-text-secondary hover:text-text-primary pointer-events-auto"
                                                             onClick={(e) => e.stopPropagation()}
                                                             title="Generate SQL templates"
                                                         >
@@ -133,7 +131,7 @@ export const SchemaBrowser = ({
                                                         <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark text-[9px] truncate mr-1 uppercase shrink-0" title={col.dataType}>{col.dataType}</Typography>
                                                         <IconButton
                                                             size="smallest"
-                                                            className="opacity-0 group-hover:opacity-100 absolute right-1 bg-surface-50 dark:bg-surface-950 transition-colors pointer-events-auto"
+                                                            className="opacity-0 group-hover:opacity-100 absolute right-1 bg-surface-50 dark:bg-surface-800 transition-colors pointer-events-auto"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 navigator.clipboard.writeText(col.name);

@@ -1,6 +1,18 @@
 
 import { EntityCollection } from "@rebasepro/types";
 import React, { useState, useEffect } from "react";
+
+/**
+ * Validates and double-quotes a SQL identifier to prevent injection.
+ * Only allows safe Postgres identifiers (letters, digits, underscores).
+ * Throws if the identifier contains unsafe characters.
+ */
+function sanitizeSqlIdentifier(name: string): string {
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+        throw new Error(`Invalid SQL identifier: "${name}". Only letters, digits, and underscores are allowed.`);
+    }
+    return `"${name}"`;
+}
 import { Button, IconButton, Typography, cls, defaultBorderMixin, Chip, Paper, Container, Tooltip, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, SelectItem, MultiSelect, MultiSelectItem , iconSize } from "@rebasepro/ui";
 import { KeyIcon, Trash2Icon } from "lucide-react";
 import { useFormex } from "@rebasepro/formex";
@@ -51,10 +63,13 @@ export function CollectionRLSTab() {
 
             setIsLoadingDb(true);
             try {
+                const safeTableName = sanitizeSqlIdentifier(tableName);
+                // safeTableName is validated to be [a-zA-Z_][a-zA-Z0-9_]* — safe for string literal
+                const quotedName = safeTableName.slice(1, -1); // strip double quotes to get raw name
                 const sql = `
                     SELECT policyname, permissive, roles, cmd, qual, with_check
                     FROM pg_policies
-                    WHERE tablename = '${tableName}' AND schemaname NOT IN ('information_schema', 'pg_catalog');
+                    WHERE tablename = '${quotedName}' AND schemaname NOT IN ('information_schema', 'pg_catalog');
                 `;
                 const result = await databaseAdmin.executeSql(sql);
                 const extractRows = (res: unknown): Record<string, unknown>[] => {
@@ -280,7 +295,7 @@ function InlinePolicyEditor({
                         </div>
                         <div className="flex flex-col gap-1.5">
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">Behavior</Typography>
-                            <Select value={behavior} onValueChange={(val: string) => setBehavior(val as any)} position="item-aligned">
+                            <Select value={behavior} onValueChange={(val: string) => setBehavior(val as "PERMISSIVE" | "RESTRICTIVE")} position="item-aligned">
                                 <SelectItem value="PERMISSIVE">Permissive</SelectItem>
                                 <SelectItem value="RESTRICTIVE">Restrictive</SelectItem>
                             </Select>

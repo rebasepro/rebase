@@ -666,6 +666,53 @@ using: "{is_locked} = false" }
             expect(result).toContain('as: "restrictive"');
         });
 
+        it("should enable RLS on every table even without any security rules", async () => {
+            const collections: EntityCollection[] = [{
+                slug: "public_data",
+                table: "public_data",
+                name: "Public Data",
+                properties: { title: { type: "string" } }
+                // No securityRules defined — table should still have .enableRLS()
+            }];
+
+            const result = await generateSchema(collections);
+            expect(result).toContain(".enableRLS()");
+            // No policies should be generated
+            expect(result).not.toContain("pgPolicy(");
+        });
+
+        it("should enable RLS on tables that do have security rules", async () => {
+            const collections: EntityCollection[] = [{
+                slug: "secure_data",
+                table: "secure_data",
+                name: "Secure Data",
+                properties: { title: { type: "string" } },
+                securityRules: [
+                    { operation: "select", access: "public" }
+                ]
+            }];
+
+            const result = await generateSchema(collections);
+            expect(result).toContain(".enableRLS()");
+            expect(result).toContain("pgPolicy(");
+        });
+
+        it("should fall back to deny-all (sql`false`) when no USING clause can be generated", async () => {
+            const collections: EntityCollection[] = [{
+                slug: "deny_test",
+                table: "deny_test",
+                name: "Deny Test",
+                properties: { title: { type: "string" } },
+                securityRules: [
+                    { operation: "select" }
+                    // No access, ownerField, or using — should produce sql`false`
+                ]
+            }];
+
+            const result = await generateSchema(collections);
+            expect(result).toContain("sql`false`");
+        });
+
     });
 });
 // V2 improvements tests

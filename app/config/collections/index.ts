@@ -1,5 +1,4 @@
 import authorsCollection from "./authors";
-import profilesCollection from "./profiles";
 import postsCollection from "./posts";
 import tagsCollection from "./tags";
 import customersCollection from "./customers";
@@ -10,7 +9,6 @@ import ticketsCollection from "./tickets";
 
 export const collections = [
     authorsCollection,
-    profilesCollection,
     postsCollection,
     tagsCollection,
     customersCollection,

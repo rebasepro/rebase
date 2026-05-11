@@ -440,27 +440,36 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
     isEntitySelectedRef.current = isEntitySelected;
     const handleSelectionChangeRef = useRef(handleSelectionChange);
     handleSelectionChangeRef.current = handleSelectionChange;
+    const selectionEnabledRef = useRef(selectionEnabled);
+    selectionEnabledRef.current = selectionEnabled;
 
-    // Build a single, stable component reference via useMemo.
-    // This prevents SortableItem (wrapped in React.memo) from seeing a
-    // new ItemComponent on every render, which was causing cards to
-    // unmount/remount and flash images + checkboxes.
+    // Stable callback wrappers — identity never changes, delegates to refs.
+    const stableOnClick = useCallback((entity: Entity<M>) => {
+        handleEntityClickRef.current(entity);
+    }, []);
+    const stableOnSelectionChange = useCallback((entity: Entity<M>, sel: boolean) => {
+        handleSelectionChangeRef.current(entity, sel);
+    }, []);
+
+    // Build a single, truly stable component reference.
+    // Uses refs for ALL dynamic values so the component type never changes.
+    // When ItemComponent identity changes, React.memo'd SortableItem remounts
+    // the card → DOM is destroyed/recreated → CSS :hover state is lost → flicker.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     const ItemComponent = useMemo(() => {
-        const StableItemComponent = (props: BoardItemViewProps<M>) => {
-            return (
-                <EntityBoardCard
-                    {...props}
-                    collection={collection}
-                    onClick={handleEntityClickRef.current}
-                    selected={isEntitySelectedRef.current(props.item.entity)}
-                    onSelectionChange={handleSelectionChangeRef.current}
-                    selectionEnabled={selectionEnabled}
-                />
-            );
-        };
-        StableItemComponent.displayName = "KanbanItemComponent";
-        return StableItemComponent;
-    }, [collection, selectionEnabled]);
+        const Comp = (props: BoardItemViewProps<M>) => (
+            <EntityBoardCard
+                {...props}
+                collection={collectionRef.current as EntityCollection<M>}
+                onClick={stableOnClick}
+                selected={isEntitySelectedRef.current(props.item.entity)}
+                onSelectionChange={stableOnSelectionChange}
+                selectionEnabled={selectionEnabledRef.current}
+            />
+        );
+        Comp.displayName = "KanbanItemComponent";
+        return Comp;
+    }, []);
 
     // Get KanbanSetupComponent from plugin slots
     const kanbanSetupSlots = useSlot("kanban.setup", {

@@ -1226,7 +1226,7 @@ id: String(ra.entityId) })}
                             </div>
                             <div className="flex shrink-0 items-center justify-end pr-2 gap-1.5">
                                 <Tooltip title={t("studio_sql_format_sql")}>
-                                    <IconButton size="small" onClick={handlePrettify} className="text-text-secondary hover:text-text-primary transition-colors">
+                                    <IconButton size="small" onClick={handlePrettify}>
                                         <MenuIcon size={iconSize.smallest}/>
                                     </IconButton>
                                 </Tooltip>

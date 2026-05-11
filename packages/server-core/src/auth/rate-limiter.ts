@@ -101,11 +101,15 @@ export function createRateLimiter(options: RateLimiterOptions = {}): MiddlewareH
  * Default key generator: extract client IP from standard headers.
  */
 function defaultKeyGenerator(c: Parameters<MiddlewareHandler<HonoEnv>>[0]): string {
-    return (
-        c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
-        c.req.header("x-real-ip") ||
-        "unknown"
-    );
+    const forwardedFor = c.req.header("x-forwarded-for");
+    if (forwardedFor) {
+        const ips = forwardedFor.split(",");
+        // The leftmost IP can be easily spoofed by the client in the initial request.
+        // Reverse proxies append to the right. We take the rightmost IP as the most
+        // reliable indicator of the true client IP (the one closest to our server).
+        return ips[ips.length - 1].trim();
+    }
+    return c.req.header("x-real-ip") || "unknown";
 }
 
 /**

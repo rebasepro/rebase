@@ -42,8 +42,14 @@ const ticketsCollection: PostgresCollection = {
         description: {
             name: "Description",
             type: "string",
-            multiline: true,
-            description: "Detailed description of the ticket"
+            markdown: true,
+            description: "Detailed description of the ticket in Markdown"
+        },
+        resolution_notes: {
+            name: "Resolution Notes",
+            type: "string",
+            markdown: true,
+            description: "Internal notes about how the issue was resolved"
         },
         status: {
             name: "Status",
@@ -129,6 +135,7 @@ const ticketsCollection: PostgresCollection = {
         "customer",
         "assigned_to",
         "description",
+        "resolution_notes",
         "created_at",
         "updated_at",
         "__order"

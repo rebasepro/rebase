@@ -29,7 +29,6 @@ const job: CronJobDefinition = {
             "products",
             "customers",
             "tickets",
-            "profiles",
             "authors",
             "tags"
         ];

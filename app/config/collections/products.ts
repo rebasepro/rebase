@@ -35,8 +35,8 @@ const productsCollection: EntityCollection = {
         description: {
             name: "Description",
             type: "string",
-            multiline: true,
-            description: "Detailed product description"
+            markdown: true,
+            description: "Detailed product description in Markdown"
         },
         image: {
             name: "Product Image",
@@ -44,6 +44,11 @@ const productsCollection: EntityCollection = {
             storage: {
                 storagePath: "product_images/"
             }
+        },
+        brand: {
+            name: "Brand",
+            type: "string",
+            description: "Product brand or manufacturer"
         },
         category: {
             name: "Category",
@@ -117,6 +122,16 @@ color: "cyan" }
             type: "number",
             description: "Product weight in grams for shipping"
         },
+        rating: {
+            name: "Rating",
+            type: "number",
+            description: "Average customer rating (1-5)"
+        },
+        review_count: {
+            name: "Reviews",
+            type: "number",
+            description: "Total number of customer reviews"
+        },
         status: {
             name: "Status",
             type: "string",
@@ -160,11 +175,14 @@ color: "red" }
         "name",
         "sku",
         "image",
+        "brand",
         "status",
         "category",
         "price",
         "compare_at_price",
         "cost",
+        "rating",
+        "review_count",
         "stock_quantity",
         "low_stock_threshold",
         "weight_grams",

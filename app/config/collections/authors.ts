@@ -1,5 +1,4 @@
 import { EntityCollection } from "@rebasepro/types";
-import profilesCollection from "./profiles";
 import postsCollection from "./posts";
 
 const authorsCollection: EntityCollection = {
@@ -37,16 +36,6 @@ const authorsCollection: EntityCollection = {
             callbacks: {
                 beforeSave: ({ value }) => {
                     return typeof value === "string" ? value.trim() : value;
-                },
-                afterRead: ({ value }) => {
-                    // Sample logic to obscure the email for testing
-                    // if (value && typeof value === "string") {
-                    //     const parts = value.split("@");
-                    //     if (parts.length === 2) {
-                    //         return `${parts[0].slice(0, 2)}***@${parts[1]}`;
-                    //     }
-                    // }
-                    return value;
                 }
             }
         },
@@ -60,20 +49,32 @@ const authorsCollection: EntityCollection = {
                 storagePath: "author_pictures/"
             }
         },
+        bio: {
+            name: "Bio",
+            type: "string",
+            markdown: true,
+            description: "Author biography in Markdown format"
+        },
+        twitter: {
+            name: "Twitter / X",
+            type: "string",
+            description: "Twitter/X handle (e.g. @username)"
+        },
+        github: {
+            name: "GitHub",
+            type: "string",
+            description: "GitHub username"
+        },
+        website: {
+            name: "Website",
+            type: "string",
+            description: "Personal website URL"
+        },
         userId: {
             name: "Linked User",
             type: "string",
             userSelect: true,
             description: "Link to a Rebase user"
-        },
-        profile: {
-            name: "Profile",
-            type: "relation",
-            description: "Profile of the author",
-            target: () => profilesCollection,
-            cardinality: "one",
-            direction: "inverse",
-            inverseRelationName: "author"
         }
     },
     // Headless relation: no property for "posts", only used for subcollection tab
@@ -88,11 +89,14 @@ const authorsCollection: EntityCollection = {
     ],
     propertiesOrder: [
         "id",
+        "name",
         "email",
         "picture",
-        "userId",
-        "profile",
-        "name"
+        "bio",
+        "twitter",
+        "github",
+        "website",
+        "userId"
     ],
     callbacks: {
         beforeSave: ({ values }) => {

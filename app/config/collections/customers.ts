@@ -41,9 +41,32 @@ const customersCollection: PostgresCollection = {
             name: "Phone",
             type: "string"
         },
+        avatar: {
+            name: "Avatar",
+            type: "string",
+            storage: {
+                storagePath: "customer_avatars/"
+            },
+            description: "Customer profile picture"
+        },
         company: {
             name: "Company",
             type: "string"
+        },
+        is_vip: {
+            name: "VIP",
+            type: "boolean",
+            description: "Whether this customer has VIP status"
+        },
+        lifetime_value: {
+            name: "Lifetime Value",
+            type: "number",
+            description: "Total amount spent across all orders"
+        },
+        total_orders: {
+            name: "Total Orders",
+            type: "number",
+            description: "Number of orders placed"
         },
         shipping_address: {
             name: "Shipping Address",
@@ -81,7 +104,11 @@ const customersCollection: PostgresCollection = {
         "last_name",
         "email",
         "phone",
+        "avatar",
         "company",
+        "is_vip",
+        "lifetime_value",
+        "total_orders",
         "shipping_address",
         "billing_address",
         "notes",

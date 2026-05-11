@@ -147,29 +147,28 @@ function EntityBoardCardInner<M extends Record<string, unknown> = Record<string,
                         </div>
                     )}
 
-                    {/* Selection checkbox overlay — visible on hover or when selected */}
-                    {selectionEnabled && (
+                    {/* Selection checkbox overlay — always in the DOM, visibility controlled by CSS */}
+                    <div className={cls(
+                        "absolute inset-0 flex items-center justify-center rounded-md transition-[opacity,background-color] duration-200",
+                        !selectionEnabled && "invisible pointer-events-none",
+                        selectionEnabled && (selected
+                            ? "opacity-100 bg-primary/10 dark:bg-primary/20"
+                            : "opacity-0 group-hover/card:opacity-100")
+                    )}>
                         <div className={cls(
-                            "absolute inset-0 flex items-center justify-center rounded-md transition-all duration-200",
+                            "transition-transform duration-200",
                             selected
-                                ? "opacity-100 bg-primary/10 dark:bg-primary/20"
-                                : "opacity-0 group-hover/card:opacity-100"
+                                ? "scale-100"
+                                : "scale-75 group-hover/card:scale-100"
                         )}>
-                            <div className={cls(
-                                "transition-transform duration-200",
-                                selected
-                                    ? "scale-100"
-                                    : "scale-75 group-hover/card:scale-100"
-                            )}>
-                                <Checkbox
-                                    checked={selected ?? false}
-                                    onCheckedChange={handleSelectionChange}
-                                    size="small"
-                                    padding={false}
-                                />
-                            </div>
+                            <Checkbox
+                                checked={selected ?? false}
+                                onCheckedChange={handleSelectionChange}
+                                size="small"
+                                padding={false}
+                            />
                         </div>
-                    )}
+                    </div>
                 </div>
 
                 {/* Content */}

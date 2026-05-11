@@ -178,10 +178,11 @@ export class RebaseApiServer {
             if (process.env.NODE_ENV === "production") {
                 console.warn("[RebaseApiServer] Schema Editor is disabled in production environments for security.");
             } else {
+                // Auth middlewares applied to schema-editor via the router prefix
+                // MUST be declared before .route() so they execute first
+                this.router.use(`${basePath}/schema-editor/*`, requireAuth, requireAdmin);
                 const schemaEditorRoutes = createSchemaEditorRoutes(this.config.collectionsDir);
                 this.router.route(`${basePath}/schema-editor`, schemaEditorRoutes);
-                // Auth middlewares applied to schema-editor via the router prefix
-                this.router.use(`${basePath}/schema-editor/*`, requireAuth, requireAdmin);
             }
         }
 

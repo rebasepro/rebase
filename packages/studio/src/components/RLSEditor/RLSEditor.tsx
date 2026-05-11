@@ -7,6 +7,18 @@ import { useRebaseContext, useSnackbarController, ErrorView, useTranslation } fr
 import { isPostgresCollection } from "@rebasepro/types";
 import { PolicyEditor } from "./PolicyEditor";
 
+/**
+ * Validates and double-quotes a SQL identifier to prevent injection.
+ * Only allows safe Postgres identifiers (letters, digits, underscores).
+ * Throws if the identifier contains unsafe characters.
+ */
+function sanitizeSqlIdentifier(name: string): string {
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+        throw new Error(`Invalid SQL identifier: "${name}". Only letters, digits, and underscores are allowed.`);
+    }
+    return `"${name}"`;
+}
+
 export interface PostgresPolicy {
     policyname: string;
     tablename: string;
@@ -402,6 +414,35 @@ totalPolicies };
                                                 <Typography variant="body2" className="font-mono text-[13px] font-medium">{rlsStats.totalPolicies}</Typography>
                                             </div>
                                         </div>
+
+                                        {/* Security health indicators */}
+                                        {rlsStats.total - rlsStats.enabled > 0 && (
+                                            <div className={cls("p-2.5 rounded border border-yellow-200 dark:border-yellow-900/50 bg-yellow-50 dark:bg-yellow-900/20 flex items-start gap-2", defaultBorderMixin)}>
+                                                <AlertTriangleIcon size={14} className="text-yellow-600 dark:text-yellow-500 mt-0.5 shrink-0"/>
+                                                <div>
+                                                    <Typography variant="caption" className="text-yellow-800 dark:text-yellow-400 text-[11px] font-semibold block">
+                                                        {rlsStats.total - rlsStats.enabled} table{rlsStats.total - rlsStats.enabled > 1 ? "s" : ""} without RLS
+                                                    </Typography>
+                                                    <Typography variant="caption" className="text-yellow-700 dark:text-yellow-600 text-[10px] block mt-0.5">
+                                                        These tables have no row-level access control. If auth enforcement is disabled, data may be publicly accessible.
+                                                    </Typography>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {rlsStats.enabled > 0 && rlsStats.enabled - rlsStats.withPolicies > 0 && (
+                                            <div className={cls("p-2.5 rounded border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-900/20 flex items-start gap-2", defaultBorderMixin)}>
+                                                <ShieldIcon size={14} className="text-blue-600 dark:text-blue-400 mt-0.5 shrink-0"/>
+                                                <div>
+                                                    <Typography variant="caption" className="text-blue-800 dark:text-blue-300 text-[11px] font-semibold block">
+                                                        {rlsStats.enabled - rlsStats.withPolicies} table{rlsStats.enabled - rlsStats.withPolicies > 1 ? "s" : ""} with RLS but no policies
+                                                    </Typography>
+                                                    <Typography variant="caption" className="text-blue-700 dark:text-blue-500 text-[10px] block mt-0.5">
+                                                        RLS is enabled but no permissive policies exist. All access is denied by default (Postgres deny-all).
+                                                    </Typography>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -437,7 +478,7 @@ totalPolicies };
                                                 const action = activeTableData.rlsEnabled ? "DISABLE" : "ENABLE";
                                                 if (!confirm(`Are you sure you want to ${action.toLowerCase()} Row Level Security on "${table}"?`)) return;
                                                 try {
-                                                    await databaseAdmin!.executeSql!(`ALTER TABLE "${table}" ${action} ROW LEVEL SECURITY`);
+                                                    await databaseAdmin!.executeSql!(`ALTER TABLE ${sanitizeSqlIdentifier(table)} ${action} ROW LEVEL SECURITY`);
                                                     snackbarController.open({ type: "success",
 message: `RLS ${action.toLowerCase()}d on ${table}` });
                                                     fetchRLSData();
@@ -476,7 +517,11 @@ message: e instanceof Error ? e.message : String(e) });
                             </div>
                         </div>
 
-                        {error ? (
+                        {isLoading && !activeTableData ? (
+                            <div className="flex-grow flex items-center justify-center h-full">
+                                <CircularProgress size="small"/>
+                            </div>
+                        ) : error ? (
                             <div className="p-6 h-full flex items-center justify-center">
                                 <ErrorView title={t("studio_rls_error")} error={error} onRetry={fetchRLSData}/>
                             </div>
@@ -660,7 +705,7 @@ message: e instanceof Error ? e.message : String(e) });
                                                                         const table = activeTableData!.tableName;
                                                                         if (!confirm(`Drop policy "${policy.policyname}" from table "${table}"?`)) return;
                                                                         try {
-                                                                            await databaseAdmin!.executeSql!(`DROP POLICY "${policy.policyname}" ON "${table}"`);
+                                                                            await databaseAdmin!.executeSql!(`DROP POLICY ${sanitizeSqlIdentifier(policy.policyname)} ON ${sanitizeSqlIdentifier(table)}`);
                                                                             snackbarController.open({ type: "success",
 message: `Policy "${policy.policyname}" dropped` });
                                                                             fetchRLSData();
@@ -677,6 +722,40 @@ message: e instanceof Error ? e.message : String(e) });
                                                     </div>
                                                 </Paper>
                                             ))}
+                                        </div>
+                                    )}
+
+                                    {activeTableData && mergedPolicies.length === 0 && activeTableData.rlsEnabled && (
+                                        <div className="flex flex-col items-center justify-center py-12 text-center">
+                                            <ShieldIcon size={40} className="text-surface-300 dark:text-surface-600 mb-4"/>
+                                            <Typography variant="subtitle2" className="text-text-secondary dark:text-text-secondary-dark mb-2">
+                                                No policies defined
+                                            </Typography>
+                                            <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark max-w-sm mb-4">
+                                                RLS is enabled on this table but no policies exist. All access is denied by default (Postgres deny-all). Create a policy to allow specific access.
+                                            </Typography>
+                                            {activeCollection && (
+                                                <Button
+                                                    size="small"
+                                                    variant="filled"
+                                                    color="primary"
+                                                    onClick={() => setEditingPolicy("new")}
+                                                >
+                                                    {t("studio_rls_create_policy")}
+                                                </Button>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {activeTableData && mergedPolicies.length === 0 && !activeTableData.rlsEnabled && activeCollection && (
+                                        <div className="flex flex-col items-center justify-center py-12 text-center">
+                                            <AlertTriangleIcon size={40} className="text-yellow-400 dark:text-yellow-600 mb-4"/>
+                                            <Typography variant="subtitle2" className="text-text-secondary dark:text-text-secondary-dark mb-2">
+                                                No access control
+                                            </Typography>
+                                            <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark max-w-sm">
+                                                This table has neither RLS nor policies. Enable RLS and create policies to restrict row-level access.
+                                            </Typography>
                                         </div>
                                     )}
 
