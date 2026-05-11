@@ -187,6 +187,15 @@ export interface DataDriver {
      */
     needsInitTextSearch?: boolean;
 
+    // ── REST fetch capabilities ─────────────────────────────────────────
+
+    /**
+     * Optional REST-optimised fetch service. When present, the REST API
+     * generator uses these methods instead of the generic `fetchEntity` /
+     * `fetchCollection` pipeline, enabling include-aware eager-loading.
+     */
+    restFetchService?: RestFetchService;
+
     // ── Admin capabilities ─────────────────────────────────────────────
     //
     // Admin operations are now modelled as capability-specific interfaces
@@ -204,4 +213,43 @@ export interface DataDriver {
      */
     admin?: import("../types/backend").DatabaseAdmin;
 
+}
+
+/**
+ * REST-optimised fetch service exposed by drivers that support
+ * eager-loading of relations via `include`.
+ *
+ * The methods return flattened rows (`{ id, ...columns }`) rather
+ * than the `Entity<M>` wrapper used by the generic DataDriver API.
+ *
+ * @group DataDriver
+ */
+export interface RestFetchService {
+    /**
+     * Fetch a collection of flattened entities with optional relation includes.
+     */
+    fetchCollectionForRest(
+        collectionPath: string,
+        options?: {
+            filter?: FilterValues<string>;
+            orderBy?: string;
+            order?: "desc" | "asc";
+            limit?: number;
+            offset?: number;
+            startAfter?: Record<string, unknown>;
+            searchString?: string;
+            databaseId?: string;
+        },
+        include?: string[]
+    ): Promise<Record<string, unknown>[]>;
+
+    /**
+     * Fetch a single flattened entity with optional relation includes.
+     */
+    fetchEntityForRest(
+        collectionPath: string,
+        entityId: string | number,
+        include?: string[],
+        databaseId?: string
+    ): Promise<Record<string, unknown> | null>;
 }

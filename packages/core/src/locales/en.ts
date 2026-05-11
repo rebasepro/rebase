@@ -487,6 +487,11 @@ export const en: RebaseTranslations = {
     reset_password: "Reset Password",
     reset_password_success: "Password reset successfully",
     reset_password_confirmation: "Are you sure you want to reset this user's password?",
+
+    /** Permission-denied empty states */
+    no_permission_to_view_users: "You don't have permission to view users",
+    no_permission_to_view_roles: "You don't have permission to view roles",
+    no_permission_description: "Contact an administrator if you need access to this section.",
     error_resetting_password: "Error resetting password",
 
     /** Editor table-bubble */

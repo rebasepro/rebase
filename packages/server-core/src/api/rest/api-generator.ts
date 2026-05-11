@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { DataDriver, Entity, EntityCollection, FetchCollectionProps } from "@rebasepro/types";
+import { DataDriver, Entity, EntityCollection, FetchCollectionProps, DataHooks, BackendHookContext, RestFetchService } from "@rebasepro/types";
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError } from "../errors";
 import { parseQueryOptions } from "./query-parser";
@@ -13,11 +13,22 @@ export class RestApiGenerator {
     private collections: EntityCollection[];
     private router: Hono<HonoEnv>;
     private driver: DataDriver;
+    private dataHooks?: DataHooks;
 
-    constructor(collections: EntityCollection[], driver: DataDriver) {
+    constructor(collections: EntityCollection[], driver: DataDriver, dataHooks?: DataHooks) {
         this.collections = collections;
         this.driver = driver;
+        this.dataHooks = dataHooks;
         this.router = new Hono<HonoEnv>();
+    }
+
+    /** Build a BackendHookContext from a Hono context */
+    private buildHookContext(c: { get: (key: string) => unknown }, method: BackendHookContext["method"]): BackendHookContext {
+        const user = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        return {
+            requestUser: user ? { userId: user.userId, roles: user.roles ?? [] } : undefined,
+            method
+        };
     }
 
     /**
@@ -37,16 +48,10 @@ export class RestApiGenerator {
     }
 
     /**
-     * Get the EntityFetchService from a driver if it exposes one (for include support)
+     * Get the typed RestFetchService from a driver if it exposes one (for include support).
      */
-    private getFetchService(driver: DataDriver): Record<string, (...args: unknown[]) => unknown> | null {
-        if ("entityService" in driver && typeof driver.entityService === "object" && driver.entityService) {
-            const es = driver.entityService as Record<string, unknown>;
-            if (typeof es.getFetchService === "function") {
-                return es.getFetchService();
-            }
-        }
-        return null;
+    private getFetchService(driver: DataDriver): RestFetchService | undefined {
+        return driver.restFetchService;
     }
 
     /**
@@ -75,11 +80,12 @@ export class RestApiGenerator {
 
             const driver = c.get("driver") || this.driver;
             const fetchService = this.getFetchService(driver);
+            const hookCtx = this.buildHookContext(c, "GET");
 
             // Use include-aware path when available
             if (fetchService) {
                 const collectionPath = collection.slug;
-                const entities = await fetchService.fetchCollectionForRest(
+                let entities = await fetchService.fetchCollectionForRest(
                     collectionPath,
                     {
                         filter: queryOptions.where as FetchCollectionProps["filter"],
@@ -92,6 +98,8 @@ export class RestApiGenerator {
                     queryOptions.include
                 );
 
+                entities = await this.applyAfterReadBatch(collection.slug, entities, hookCtx);
+
                 const total = await this.countRawEntities(driver, resolvedCollection, queryOptions, searchString);
 
                 return c.json({
@@ -100,13 +108,15 @@ export class RestApiGenerator {
                         total,
                         limit: queryOptions.limit,
                         offset: queryOptions.offset,
-                        hasMore: (queryOptions.offset || 0) + (entities as unknown[]).length < total
+                        hasMore: (queryOptions.offset || 0) + entities.length < total
                     }
                 });
             }
 
             // Fallback path
-            const entities = await this.fetchRawCollection(driver, resolvedCollection, queryOptions, searchString);
+            let entities = await this.fetchRawCollection(driver, resolvedCollection, queryOptions, searchString);
+
+            entities = await this.applyAfterReadBatch(collection.slug, entities, hookCtx);
 
             const total = await this.countRawEntities(driver, resolvedCollection, queryOptions, searchString);
 
@@ -116,7 +126,7 @@ export class RestApiGenerator {
                     total,
                     limit: queryOptions.limit,
                     offset: queryOptions.offset,
-                    hasMore: (queryOptions.offset || 0) + (entities as unknown[]).length < total
+                    hasMore: (queryOptions.offset || 0) + entities.length < total
                 }
             });
         });
@@ -128,11 +138,12 @@ export class RestApiGenerator {
             const queryOptions = parseQueryOptions(queryDict);
             const driver = c.get("driver") || this.driver;
             const fetchService = this.getFetchService(driver);
+            const hookCtx = this.buildHookContext(c, "GET");
 
             // Use include-aware path when available
             if (fetchService) {
                 const collectionPath = collection.slug;
-                const entity = await fetchService.fetchEntityForRest(
+                let entity = await fetchService.fetchEntityForRest(
                     collectionPath,
                     String(id),
                     queryOptions.include
@@ -142,12 +153,22 @@ export class RestApiGenerator {
                     throw ApiError.notFound("Entity not found");
                 }
 
+                entity = await this.applyAfterRead(collection.slug, entity, hookCtx);
+                if (!entity) {
+                    throw ApiError.notFound("Entity not found");
+                }
+
                 return c.json(entity);
             }
 
             // Fallback
-            const entity = await this.fetchRawEntity(driver, resolvedCollection, String(id));
+            let entity = await this.fetchRawEntity(driver, resolvedCollection, String(id));
 
+            if (!entity) {
+                throw ApiError.notFound("Entity not found");
+            }
+
+            entity = await this.applyAfterRead(collection.slug, entity, hookCtx);
             if (!entity) {
                 throw ApiError.notFound("Entity not found");
             }
@@ -160,8 +181,13 @@ export class RestApiGenerator {
             try {
                 const driver = c.get("driver") || this.driver;
                 const path = collection.slug;
+                const hookCtx = this.buildHookContext(c, "POST");
 
-                const body = await c.req.json().catch(() => ({}));
+                let body = await c.req.json().catch(() => ({}));
+
+                if (this.dataHooks?.beforeSave) {
+                    body = await this.dataHooks.beforeSave(path, body, undefined, hookCtx);
+                }
 
                 const entity = await driver.saveEntity({
                     path,
@@ -170,7 +196,15 @@ export class RestApiGenerator {
                     status: "new"
                 });
 
-                return c.json(this.formatResponse(entity), 201);
+                const response = this.formatResponse(entity);
+
+                if (this.dataHooks?.afterSave) {
+                    Promise.resolve(this.dataHooks.afterSave(path, response as Record<string, unknown>, hookCtx)).catch(err => {
+                        console.error("[BackendHooks] data.afterSave error:", err instanceof Error ? err.message : err);
+                    });
+                }
+
+                return c.json(response, 201);
             } catch (error) {
                 const err = error as Error & { code?: string };
                 err.code = err.code || "BAD_REQUEST";
@@ -183,6 +217,7 @@ export class RestApiGenerator {
             try {
                 const id = c.req.param("id");
                 const driver = c.get("driver") || this.driver;
+                const hookCtx = this.buildHookContext(c, "PUT");
 
                 const existingEntity = await driver.fetchEntity({
                     path: collection.slug,
@@ -194,7 +229,11 @@ export class RestApiGenerator {
                     throw ApiError.notFound("Entity not found");
                 }
 
-                const body = await c.req.json().catch(() => ({}));
+                let body = await c.req.json().catch(() => ({}));
+
+                if (this.dataHooks?.beforeSave) {
+                    body = await this.dataHooks.beforeSave(collection.slug, body, String(id), hookCtx);
+                }
 
                 const entity = await driver.saveEntity({
                     path: collection.slug,
@@ -204,7 +243,15 @@ export class RestApiGenerator {
                     status: "existing"
                 });
 
-                return c.json(this.formatResponse(entity));
+                const response = this.formatResponse(entity);
+
+                if (this.dataHooks?.afterSave) {
+                    Promise.resolve(this.dataHooks.afterSave(collection.slug, response as Record<string, unknown>, hookCtx)).catch(err => {
+                        console.error("[BackendHooks] data.afterSave error:", err instanceof Error ? err.message : err);
+                    });
+                }
+
+                return c.json(response);
             } catch (error) {
                 const err = error as Error & { code?: string };
                 err.code = err.code || "BAD_REQUEST";
@@ -216,6 +263,7 @@ export class RestApiGenerator {
         this.router.delete(`${basePath}/:id`, async (c) => {
             const id = c.req.param("id");
             const driver = c.get("driver") || this.driver;
+            const hookCtx = this.buildHookContext(c, "DELETE");
 
             const existingEntity = await driver.fetchEntity({
                 path: collection.slug,
@@ -227,10 +275,20 @@ export class RestApiGenerator {
                 throw ApiError.notFound("Entity not found");
             }
 
+            if (this.dataHooks?.beforeDelete) {
+                await this.dataHooks.beforeDelete(collection.slug, String(id), hookCtx);
+            }
+
             await driver.deleteEntity({
                 entity: existingEntity,
                 collection: resolvedCollection
             });
+
+            if (this.dataHooks?.afterDelete) {
+                Promise.resolve(this.dataHooks.afterDelete(collection.slug, String(id), hookCtx)).catch(err => {
+                    console.error("[BackendHooks] data.afterDelete error:", err instanceof Error ? err.message : err);
+                });
+            }
 
             return new Response(null, { status: 204 });
         });
@@ -479,5 +537,25 @@ entityId };
         });
 
         return entity ? this.flattenEntity(entity) : null;
+    }
+
+    /**
+     * Apply data.afterRead hook to a single entity.
+     * Returns the transformed entity, or null to filter it out.
+     */
+    private async applyAfterRead(slug: string, entity: Record<string, unknown>, ctx: BackendHookContext): Promise<Record<string, unknown> | null> {
+        if (!this.dataHooks?.afterRead) return entity;
+        return this.dataHooks.afterRead(slug, entity, ctx);
+    }
+
+    /**
+     * Apply data.afterRead hook to an array of entities, filtering out nulls.
+     */
+    private async applyAfterReadBatch(slug: string, entities: Record<string, unknown>[], ctx: BackendHookContext): Promise<Record<string, unknown>[]> {
+        if (!this.dataHooks?.afterRead) return entities;
+        const results = await Promise.all(
+            entities.map(e => this.applyAfterRead(slug, e, ctx))
+        );
+        return results.filter((e): e is Record<string, unknown> => e !== null);
     }
 }

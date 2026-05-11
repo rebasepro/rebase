@@ -73,6 +73,7 @@ export function CollectionStudioView({ collectionId, ...props }: CollectionStudi
                             Select a collection or create a new one
                         </Typography>
                         <Button
+                            disabled={props.configController?.readOnly}
                             onClick={() => navigate(urlController.buildAppUrlPath("schema/new"))}
                         >
                             <PlusIcon/>

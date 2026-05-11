@@ -8,6 +8,7 @@ import { rebaseCollectionsPlugin } from "@rebasepro/core/vitePlugin";
 import { visualizer } from "rollup-plugin-visualizer";
 
 export default defineConfig({
+    envDir: path.resolve(__dirname, ".."),
     server: {
         port: 5173,
         strictPort: true,

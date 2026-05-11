@@ -858,7 +858,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                                     color="primary"
                                     type="submit"
                                     loading={isSubmitting}
-                                    disabled={isSubmitting || (currentView === "general" && !validValues)}
+                                    disabled={isSubmitting || (currentView === "general" && !validValues) || configController?.readOnly}
                                     startIcon={currentView === "properties"
                                         ? <CheckIcon/>
                                         : undefined}

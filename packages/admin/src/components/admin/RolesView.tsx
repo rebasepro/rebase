@@ -13,7 +13,7 @@ import { ConfirmationDialog } from "@rebasepro/core";
 // RolesView Component
 // ============================================
 export function RolesView({ userManagement }: { userManagement: UserManagementDelegate }) {
-    const { roles, saveRole, deleteRole, loading, allowDefaultRolesCreation } = userManagement;
+    const { roles, saveRole, deleteRole, loading, allowDefaultRolesCreation, rolesError } = userManagement;
     const snackbarController = useSnackbarController();
     const { t } = useTranslation();
     const breadcrumbs = useBreadcrumbsController();
@@ -139,9 +139,16 @@ isAdmin: false }
                                 <TableCell colspan={3}>
                                     <CenteredView className="flex flex-col gap-4 my-8 items-center">
                                          <Typography variant="label">
-                                            {t("no_roles_yet")}
+                                            {rolesError
+                                                ? t("no_permission_to_view_roles")
+                                                : t("no_roles_yet")}
                                         </Typography>
-                                        {allowDefaultRolesCreation && saveRole && (
+                                        {rolesError && (
+                                            <Typography variant="caption" color="secondary">
+                                                {t("no_permission_description")}
+                                            </Typography>
+                                        )}
+                                        {!rolesError && allowDefaultRolesCreation && saveRole && (
                                             <Button onClick={createDefaultRoles}>
                                                 {t("create_default_roles")}
                                             </Button>

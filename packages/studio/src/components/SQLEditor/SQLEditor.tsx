@@ -1253,7 +1253,6 @@ id: String(ra.entityId) })}
                                             onCheckedChange={setAutoLimit}
                                             size="smallest"
                                             padding={false}
-                                            className="cursor-pointer"
                                         />
                                     </div>
                                 </div>

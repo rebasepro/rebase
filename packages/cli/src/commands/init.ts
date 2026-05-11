@@ -172,7 +172,7 @@ async function createProject(options: InitOptions) {
     // Replace placeholder project name in package.json files
     await replacePlaceholders(options);
 
-    // Rename .env.template to .env if it exists and randomize secrets
+    // Rename .env.example to .env if it exists and randomize secrets
     configureEnvFile(options.targetDirectory, options.databaseUrl);
 
     // Initialize git
@@ -234,7 +234,7 @@ async function createProject(options: InitOptions) {
     if (options.databaseUrl) {
         console.log(chalk.gray("  # Your database is configured! Start the dev server:"));
     } else {
-        console.log(chalk.gray("  # A local database configuration has been generated in .env"));
+        console.log(chalk.gray("  # A local database configuration has been generated in .env."));
         console.log(chalk.gray("  # If using the included docker-compose.yml, start it with:"));
         console.log(`  ${chalk.cyan("docker compose up -d")}`);
         console.log("");
@@ -336,16 +336,18 @@ async function replacePlaceholders(options: InitOptions) {
 }
 
 export function configureEnvFile(targetDirectory: string, databaseUrl?: string) {
-    const envTemplatePath = path.join(targetDirectory, ".env.template");
+    const envExamplePath = path.join(targetDirectory, ".env.example");
     const envPath = path.join(targetDirectory, ".env");
-    if (fs.existsSync(envTemplatePath) && !fs.existsSync(envPath)) {
-        fs.renameSync(envTemplatePath, envPath);
+    if (fs.existsSync(envExamplePath) && !fs.existsSync(envPath)) {
+        // Copy .env.example → .env (keep .env.example as a reference in the repo)
+        fs.copyFileSync(envExamplePath, envPath);
 
         // Generate secure random strings
         const jwtSecret = crypto.randomBytes(32).toString("hex");
+        const dbPassword = crypto.randomBytes(16).toString("hex");
 
         let envContent = fs.readFileSync(envPath, "utf-8");
-        
+
         envContent = envContent.replace(
             /^JWT_SECRET=.*$/m,
             `JWT_SECRET=${jwtSecret}`
@@ -357,11 +359,6 @@ export function configureEnvFile(targetDirectory: string, databaseUrl?: string) 
                 `DATABASE_URL=${databaseUrl}`
             );
         } else {
-            const dbPassword = crypto.randomBytes(16).toString("hex");
-            envContent = envContent.replace(
-                /^POSTGRES_PASSWORD=.*$/m,
-                `POSTGRES_PASSWORD=${dbPassword}`
-            );
             envContent = envContent.replace(
                 /^DATABASE_URL=.*$/m,
                 `DATABASE_URL=postgresql://rebase:${dbPassword}@localhost:5432/rebase`

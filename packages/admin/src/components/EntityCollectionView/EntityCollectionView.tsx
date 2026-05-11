@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { deepEqual as equal } from "fast-equals"
 
 const EMPTY_ARRAY: any[] = [];
+const DEFAULT_ENTITY_OPEN_MODE = "split";
 
 import { CollectionSize, Entity, EntityReference, EntityTableController, FilterValues, PartialEntityCollection, SaveEntityProps, ViewMode } from "@rebasepro/types";
 import {
@@ -714,9 +715,11 @@ export const EntityCollectionView = React.memo(
         }, [updateLastDeleteTimestamp, usedSelectionController]);
 
         // Update breadcrumb count when count changes
+        const updateCountRef = React.useRef(breadcrumbs.updateCount);
+        updateCountRef.current = breadcrumbs.updateCount;
         useEffect(() => {
-            breadcrumbs.updateCount(path, docsCount);
-        }, [docsCount, path, breadcrumbs.updateCount]);
+            updateCountRef.current(path, docsCount);
+        }, [docsCount, path]);
 
         // EntitiesCount fetches count and updates breadcrumb - no visual rendering needed here
         const countFetcher = <EntitiesCount
@@ -1044,7 +1047,7 @@ export const EntityCollectionView = React.memo(
                 ) : (
                     <>
                         {toolbarNode}
-                        {pluginInsights.length > 0 && (viewMode === "list" || viewMode === "table") && (
+                        {pluginInsights.length > 0 && viewMode === "list" && (
                             <div className="px-3 md:px-4 lg:px-6 max-w-6xl mx-auto w-full flex-shrink-0">
                                 {pluginInsights}
                             </div>
@@ -1119,52 +1122,61 @@ function EntitiesCount({
 }) {
 
     const dataClient = useData();
-    const navigation = useCollectionRegistryController();
 
     const sortByProperty = sortBy ? sortBy[0] : undefined;
     const currentSort = sortBy ? sortBy[1] : undefined;
-    // v4: use path directly instead of resolveIdsFrom
-    const resolvedPath = path;
+
+    // Use refs for values that should NOT trigger re-fetches
+    const dataClientRef = React.useRef(dataClient);
+    dataClientRef.current = dataClient;
+    const onCountChangeRef = React.useRef(onCountChange);
+    onCountChangeRef.current = onCountChange;
+
+    // Serialize filter to a stable string to avoid re-fetches on object identity changes
+    const filterKey = React.useMemo(() => filter ? JSON.stringify(filter) : "", [filter]);
 
     useEffect(() => {
-        const accessor = dataClient.collection(resolvedPath);
-        if (accessor.count) {
-            if (onCountChange) onCountChange(null);
-
-            // Convert filterValues to PostgREST where clause
-            const whereMap: Record<string, string> = {};
-            if (filter) {
-                Object.entries(filter).forEach(([key, value]) => {
-                    if (value && Array.isArray(value)) {
-                        const [op, val] = value;
-                        const postgrestOp = op === "==" ? "eq" : op === "!=" ? "neq" : op === ">" ? "gt" : op === ">=" ? "gte" : op === "<" ? "lt" : op === "<=" ? "lte" : op === "in" ? "in" : op === "not-in" ? "nin" : op === "array-contains" ? "cs" : op === "array-contains-any" ? "csa" : "eq";
-
-                        let stringVal: string;
-                        if (Array.isArray(val)) {
-                            stringVal = `(${val.join(",")})`;
-                        } else {
-                            stringVal = String(val);
-                        }
-                        whereMap[key] = `${postgrestOp}.${stringVal}`;
-                    }
-                });
-            }
-            const whereParams = Object.keys(whereMap).length > 0 ? whereMap : undefined;
-            const orderByParams = sortByProperty ? `${String(sortByProperty)}:${currentSort}` : undefined;
-
-            accessor.count({
-                where: whereParams,
-                orderBy: orderByParams
-            }).then((c) => {
-                if (onCountChange) onCountChange(c);
-            }).catch((e) => {
-                console.warn("Error fetching count", e);
-                if (onCountChange) onCountChange(undefined);
-            });
-        } else {
-            if (onCountChange) onCountChange(undefined);
+        const accessor = dataClientRef.current.collection(path);
+        if (!accessor.count) {
+            onCountChangeRef.current?.(undefined);
+            return;
         }
-    }, [path, resolvedPath, collection, filter, sortByProperty, currentSort, dataClient]);
+
+        let cancelled = false;
+
+        // Convert filterValues to PostgREST where clause
+        const whereMap: Record<string, string> = {};
+        if (filter) {
+            Object.entries(filter).forEach(([key, value]) => {
+                if (value && Array.isArray(value)) {
+                    const [op, val] = value;
+                    const postgrestOp = op === "==" ? "eq" : op === "!=" ? "neq" : op === ">" ? "gt" : op === ">=" ? "gte" : op === "<" ? "lt" : op === "<=" ? "lte" : op === "in" ? "in" : op === "not-in" ? "nin" : op === "array-contains" ? "cs" : op === "array-contains-any" ? "csa" : "eq";
+
+                    let stringVal: string;
+                    if (Array.isArray(val)) {
+                        stringVal = `(${val.join(",")})`;
+                    } else {
+                        stringVal = String(val);
+                    }
+                    whereMap[key] = `${postgrestOp}.${stringVal}`;
+                }
+            });
+        }
+        const whereParams = Object.keys(whereMap).length > 0 ? whereMap : undefined;
+        const orderByParams = sortByProperty ? `${String(sortByProperty)}:${currentSort}` : undefined;
+
+        accessor.count({
+            where: whereParams,
+            orderBy: orderByParams
+        }).then((c) => {
+            if (!cancelled) onCountChangeRef.current?.(c);
+        }).catch((e) => {
+            console.warn("Error fetching count", e);
+            if (!cancelled) onCountChangeRef.current?.(undefined);
+        });
+
+        return () => { cancelled = true; };
+    }, [path, filterKey, sortByProperty, currentSort]);
 
     // Count is now displayed in the breadcrumb bar, this component only fetches and reports
     return null;

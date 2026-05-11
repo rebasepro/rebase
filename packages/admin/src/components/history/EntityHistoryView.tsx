@@ -80,8 +80,19 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
     async function doRevert(historyId: string) {
         setIsReverting(true);
         try {
-            await revert(historyId);
+            const revertedValues = await revert(historyId);
             setRevertHistoryId(undefined);
+
+            // Reset the form with the reverted values so the UI updates
+            // immediately without requiring a page refresh.
+            if (formContext?.formex?.resetForm && revertedValues) {
+                formContext.formex.resetForm({
+                    values: revertedValues as M,
+                    submitCount: 0,
+                    touched: {}
+                });
+            }
+
             snackbarController.open({
                 message: "Reverted to selected version",
                 type: "info"

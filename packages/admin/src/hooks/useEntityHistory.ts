@@ -20,7 +20,7 @@ export interface UseEntityHistoryResult {
     hasMore: boolean;
     error?: Error;
     loadMore: () => void;
-    revert: (historyId: string) => Promise<void>;
+    revert: (historyId: string) => Promise<Record<string, unknown>>;
 }
 
 /**
@@ -129,7 +129,7 @@ signal });
         }
     }, [isLoading, hasMore, pageSize, offset, entries.length, total]);
 
-    const revert = useCallback(async (historyId: string) => {
+    const revert = useCallback(async (historyId: string): Promise<Record<string, unknown>> => {
         if (!apiConfig?.apiUrl || !entityId) {
             throw new Error("Cannot revert: missing API configuration or entity ID");
         }
@@ -149,10 +149,15 @@ headers });
             throw new Error(errorData.error?.message || `Failed to revert (${response.status})`);
         }
 
+        const result = await response.json();
+
         // Refresh the history list after revert by resetting the entity ref
         // and triggering the effect.
         currentEntityRef.current = undefined;
         setRefreshTrigger(prev => prev + 1);
+
+        // Return the reverted entity data so callers can update the form
+        return result.data as Record<string, unknown>;
     }, [apiConfig, slug, entityId]);
 
     return useMemo(() => ({

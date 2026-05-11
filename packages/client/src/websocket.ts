@@ -190,7 +190,7 @@ export class RebaseWebSocketClient {
         this.getAuthToken = getAuthToken;
         // Auto-authenticate if we are already connected but didn't have the token getter yet
         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
-            console.log("WebSocket auto-authenticating after token getter set");
+            console.debug("WebSocket auto-authenticating after token getter set");
             this.getAuthToken().then(token => {
                 if (!this.ws) return; // Prevent memory leaks / actions after disconnect
                 if (token) {
@@ -230,7 +230,7 @@ export class RebaseWebSocketClient {
             this.ws = new this.WebSocketConstructor(this.websocketUrl);
 
             this.ws!.onopen = async () => {
-                console.log("Connected to PostgreSQL backend");
+                console.debug("Connected to PostgreSQL backend");
                 const wasReconnect = this.reconnectAttempts > 0;
                 this.isConnected = true;
                 this.reconnectAttempts = 0;
@@ -241,7 +241,7 @@ export class RebaseWebSocketClient {
                         const token = await this.getAuthToken();
                         if (token) {
                             await this.authenticate(token);
-                            console.log("WebSocket auto-authenticated");
+                            console.debug("WebSocket auto-authenticated");
                         }
                     } catch (error) {
                         console.warn("WebSocket auto-auth failed, requests may fail:", error);
@@ -269,7 +269,7 @@ export class RebaseWebSocketClient {
             };
 
             this.ws!.onclose = () => {
-                console.log("Disconnected from PostgreSQL backend");
+                console.debug("Disconnected from PostgreSQL backend");
                 this.isConnected = false;
                 this.isAuthenticated = false;
                 this.authPromise = null;
@@ -319,7 +319,7 @@ export class RebaseWebSocketClient {
         this.reconnectAttempts++;
         const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
 
-        console.log(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
+        console.debug(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
         
         if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout);
@@ -534,7 +534,7 @@ export class RebaseWebSocketClient {
                 this.authPromise = this.authenticate(token);
                 await this.authPromise;
                 this.authPromise = null;
-                console.log("WebSocket authenticated on demand");
+                console.debug("WebSocket authenticated on demand");
                 return; // Success
             } catch (error: unknown) {
                 this.authPromise = null;
@@ -560,7 +560,7 @@ export class RebaseWebSocketClient {
                 // For other errors, retry with backoff
                 if (attempt < retryCount - 1) {
                     const delay = Math.min(1000 * (attempt + 1), 3000);
-                    console.log(`WebSocket auth attempt ${attempt + 1} failed, retrying in ${delay}ms...`);
+                    console.debug(`WebSocket auth attempt ${attempt + 1} failed, retrying in ${delay}ms...`);
                     await new Promise(resolve => setTimeout(resolve, delay));
                 }
             }
@@ -580,7 +580,7 @@ export class RebaseWebSocketClient {
         try {
             const token = await this.getAuthToken();
             await this.authenticate(token);
-            console.log("WebSocket reauthenticated successfully");
+            console.debug("WebSocket reauthenticated successfully");
         } catch (error) {
             console.error("WebSocket reauthentication failed:", error);
             throw error;
@@ -891,7 +891,7 @@ options }
 incoming: normIncoming[key] };
                         }
                     }
-                    console.log(`[RebaseWS] Row ${incomingEntity.id} refetch mismatch:\n`, JSON.stringify(mismatches, null, 2));
+                    console.debug(`[RebaseWS] Row ${incomingEntity.id} refetch mismatch:\n`, JSON.stringify(mismatches, null, 2));
                 }
             }
             return incomingEntity;
@@ -1101,7 +1101,7 @@ onError });
      * we need to re-register everything to resume receiving updates.
      */
     private resubscribeAll(): void {
-        console.log(`[WS] Re-subscribing: ${this.collectionSubscriptions.size} collection(s), ${this.entitySubscriptions.size} entity(ies)`);
+        console.debug(`[WS] Re-subscribing: ${this.collectionSubscriptions.size} collection(s), ${this.entitySubscriptions.size} entity(ies)`);
 
         // Re-subscribe collection subscriptions
         for (const [key, sub] of this.collectionSubscriptions.entries()) {

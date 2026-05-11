@@ -522,6 +522,11 @@ export interface RebaseTranslations {
     reset_password_confirmation?: string;
     error_resetting_password?: string;
 
+    /** Permission-denied empty states */
+    no_permission_to_view_users?: string;
+    no_permission_to_view_roles?: string;
+    no_permission_description?: string;
+
     /** Editor table-bubble */
     add_row_before: string;
     add_row_after: string;

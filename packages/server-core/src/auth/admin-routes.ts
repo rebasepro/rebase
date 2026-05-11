@@ -4,6 +4,7 @@ import type { AuthRepository } from "./interfaces";
 import { requireAuth, requireAdmin, createRequireAuth } from "./middleware";
 import { hashPassword, validatePasswordStrength } from "./password";
 import { AuthModuleConfig } from "./routes";
+import type { BackendHooks, AdminUser, AdminRole, BackendHookContext } from "@rebasepro/types";
 
 interface AdminRouteOptions extends AuthModuleConfig {
     serviceKey?: string;
@@ -12,6 +13,10 @@ interface AdminRouteOptions extends AuthModuleConfig {
      * Invoked after the first admin user is promoted via POST /admin/bootstrap.
      */
     setBootstrapCompleted?: () => Promise<void>;
+    /**
+     * Backend-level hooks for intercepting admin data.
+     */
+    hooks?: BackendHooks;
 }
 import { HonoEnv } from "../api/types";
 import { randomBytes, createHash } from "crypto";
@@ -63,7 +68,50 @@ function hashToken(token: string): string {
 export function createAdminRoutes(config: AdminRouteOptions): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
     const authRepo = config.authRepo;
-    const { emailService, emailConfig } = config;
+    const { emailService, emailConfig, hooks } = config;
+
+    /** Build a BackendHookContext from Hono's context object */
+    function buildHookContext(c: { get: (key: string) => unknown }, method: BackendHookContext["method"]): BackendHookContext {
+        const user = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        return {
+            requestUser: user ? { userId: user.userId, roles: user.roles ?? [] } : undefined,
+            method
+        };
+    }
+
+    /** Apply users.afterRead hook to an AdminUser, returning null to filter out */
+    async function applyUserAfterRead(user: AdminUser, ctx: BackendHookContext): Promise<AdminUser | null> {
+        if (!hooks?.users?.afterRead) return user;
+        return hooks.users.afterRead(user, ctx);
+    }
+
+    /** Apply users.afterRead hook to an array and filter nulls */
+    async function applyUserAfterReadBatch(users: AdminUser[], ctx: BackendHookContext): Promise<AdminUser[]> {
+        if (!hooks?.users?.afterRead) return users;
+        const results = await Promise.all(users.map(u => applyUserAfterRead(u, ctx)));
+        return results.filter((u): u is AdminUser => u !== null);
+    }
+
+    /** Apply roles.afterRead hook to an array and filter nulls */
+    async function applyRoleAfterReadBatch(roles: AdminRole[], ctx: BackendHookContext): Promise<AdminRole[]> {
+        if (!hooks?.roles?.afterRead) return roles;
+        const results = await Promise.all(roles.map(r => hooks!.roles!.afterRead!(r, ctx)));
+        return results.filter((r): r is AdminRole => r !== null);
+    }
+
+    /** Convert a DB user record + role IDs into the AdminUser API shape */
+    function toAdminUser(u: { id: string; email: string; displayName?: string | null; photoUrl?: string | null; createdAt?: Date | string; updatedAt?: Date | string }, roles: string[]): AdminUser {
+        return {
+            uid: u.id,
+            email: u.email,
+            displayName: u.displayName ?? null,
+            photoURL: u.photoUrl ?? null,
+            provider: "custom",
+            roles,
+            createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : (u.createdAt ?? new Date().toISOString()),
+            updatedAt: u.updatedAt instanceof Date ? u.updatedAt.toISOString() : (u.updatedAt ?? new Date().toISOString())
+        };
+    }
 
     // Attach Rebase error handler to ensure exceptions are correctly formatted
     // instead of caught by Hono's default error handler from the sub-router.
@@ -142,6 +190,7 @@ export function createAdminRoutes(config: AdminRouteOptions): Hono<HonoEnv> {
         const search = c.req.query("search");
         const orderBy = c.req.query("orderBy");
         const orderDir = c.req.query("orderDir") as "asc" | "desc" | undefined;
+        const hookCtx = buildHookContext(c, "GET");
 
         // If pagination params are provided, use the paginated path
         if (limitParam !== undefined || search) {
@@ -157,20 +206,14 @@ export function createAdminRoutes(config: AdminRouteOptions): Hono<HonoEnv> {
                 roleId: c.req.query("role") || undefined
             });
 
-            const usersWithRoles = await Promise.all(
+            let usersWithRoles: AdminUser[] = await Promise.all(
                 result.users.map(async (u) => {
                     const roles = await authRepo.getUserRoleIds(u.id);
-                    return {
-                        uid: u.id,
-                        email: u.email,
-                        displayName: u.displayName,
-                        photoURL: u.photoUrl,
-                        roles,
-                        createdAt: u.createdAt,
-                        updatedAt: u.updatedAt
-                    };
+                    return toAdminUser(u, roles);
                 })
             );
+
+            usersWithRoles = await applyUserAfterReadBatch(usersWithRoles, hookCtx);
 
             return c.json({
                 users: usersWithRoles,
@@ -182,20 +225,15 @@ export function createAdminRoutes(config: AdminRouteOptions): Hono<HonoEnv> {
 
         // Legacy: return all users (no pagination)
         const users = await authRepo.listUsers();
-        const usersWithRoles = await Promise.all(
+        let usersWithRoles: AdminUser[] = await Promise.all(
             users.map(async (u) => {
                 const roles = await authRepo.getUserRoleIds(u.id);
-                return {
-                    uid: u.id,
-                    email: u.email,
-                    displayName: u.displayName,
-                    photoURL: u.photoUrl,
-                    roles,
-                    createdAt: u.createdAt,
-                    updatedAt: u.updatedAt
-                };
+                return toAdminUser(u, roles);
             })
         );
+
+        usersWithRoles = await applyUserAfterReadBatch(usersWithRoles, hookCtx);
+
         return c.json({ users: usersWithRoles });
     });
 
@@ -207,25 +245,32 @@ export function createAdminRoutes(config: AdminRouteOptions): Hono<HonoEnv> {
             throw ApiError.notFound("User not found");
         }
 
-        return c.json({
-            user: {
-                uid: result.user.id,
-                email: result.user.email,
-                displayName: result.user.displayName,
-                photoURL: result.user.photoUrl,
-                roles: result.roles.map(r => r.id),
-                createdAt: result.user.createdAt,
-                updatedAt: result.user.updatedAt
-            }
-        });
+        const hookCtx = buildHookContext(c, "GET");
+        let adminUser: AdminUser | null = toAdminUser(result.user, result.roles.map(r => r.id));
+
+        adminUser = await applyUserAfterRead(adminUser, hookCtx);
+        if (!adminUser) {
+            throw ApiError.notFound("User not found");
+        }
+
+        return c.json({ user: adminUser });
     });
 
     router.post("/users", requireAdmin, async (c) => {
         const body = await c.req.json();
-        const { email, displayName, password, roles } = body;
+        let { email, displayName, password, roles } = body;
 
         if (!email) {
             throw ApiError.badRequest("Email is required", "INVALID_INPUT");
+        }
+
+        // Apply beforeSave hook
+        const hookCtx = buildHookContext(c, "POST");
+        if (hooks?.users?.beforeSave) {
+            const hooked = await hooks.users.beforeSave({ email, displayName, roles }, hookCtx);
+            email = hooked.email ?? email;
+            displayName = hooked.displayName ?? displayName;
+            roles = hooked.roles ?? roles;
         }
 
         const existing = await authRepo.getUserByEmail(email);
@@ -299,13 +344,17 @@ displayName: user.displayName }, appName);
         }
         // If admin provided a password explicitly, don't return it or send email
 
+        const createdAdminUser: AdminUser = toAdminUser(user, userRoles);
+
+        // Fire afterSave hook (fire-and-forget for side-effects)
+        if (hooks?.users?.afterSave) {
+            Promise.resolve(hooks.users.afterSave(createdAdminUser, hookCtx)).catch(err => {
+                console.error("[BackendHooks] users.afterSave error:", err instanceof Error ? err.message : err);
+            });
+        }
+
         return c.json({
-            user: {
-                uid: user.id,
-                email: user.email,
-                displayName: user.displayName,
-                roles: userRoles
-            },
+            user: createdAdminUser,
             invitationSent,
             ...(temporaryPassword ? { temporaryPassword } : {})
         }, 201);
@@ -381,11 +430,20 @@ displayName: existing.displayName }, appName);
     router.put("/users/:userId", requireAdmin, async (c) => {
         const userId = c.req.param("userId");
         const body = await c.req.json();
-        const { email, displayName, password, roles } = body;
+        let { email, displayName, password, roles } = body;
 
         const existing = await authRepo.getUserById(userId);
         if (!existing) {
             throw ApiError.notFound("User not found");
+        }
+
+        // Apply beforeSave hook
+        const hookCtx = buildHookContext(c, "PUT");
+        if (hooks?.users?.beforeSave) {
+            const hooked = await hooks.users.beforeSave({ email, displayName, roles }, hookCtx);
+            email = hooked.email ?? email;
+            displayName = hooked.displayName ?? displayName;
+            roles = hooked.roles ?? roles;
         }
 
         const updates: Record<string, unknown> = {};
@@ -410,14 +468,16 @@ displayName: existing.displayName }, appName);
 
         const result = await authRepo.getUserWithRoles(userId);
 
-        return c.json({
-            user: {
-                uid: result!.user.id,
-                email: result!.user.email,
-                displayName: result!.user.displayName,
-                roles: result!.roles.map(r => r.id)
-            }
-        });
+        const updatedAdminUser: AdminUser = toAdminUser(result!.user, result!.roles.map(r => r.id));
+
+        // Fire afterSave hook (fire-and-forget)
+        if (hooks?.users?.afterSave) {
+            Promise.resolve(hooks.users.afterSave(updatedAdminUser, hookCtx)).catch(err => {
+                console.error("[BackendHooks] users.afterSave error:", err instanceof Error ? err.message : err);
+            });
+        }
+
+        return c.json({ user: updatedAdminUser });
     });
 
     router.delete("/users/:userId", requireAdmin, async (c) => {
@@ -434,23 +494,39 @@ displayName: existing.displayName }, appName);
             throw ApiError.notFound("User not found");
         }
 
+        // Apply beforeDelete hook (throw to abort)
+        const hookCtx = buildHookContext(c, "DELETE");
+        if (hooks?.users?.beforeDelete) {
+            await hooks.users.beforeDelete(userId, hookCtx);
+        }
+
         await authRepo.deleteUser(userId);
+
+        // Fire afterDelete hook (fire-and-forget)
+        if (hooks?.users?.afterDelete) {
+            Promise.resolve(hooks.users.afterDelete(userId, hookCtx)).catch(err => {
+                console.error("[BackendHooks] users.afterDelete error:", err instanceof Error ? err.message : err);
+            });
+        }
 
         return c.json({ success: true });
     });
 
     router.get("/roles", requireAdmin, async (c) => {
         const roles = await authRepo.listRoles();
+        const hookCtx = buildHookContext(c, "GET");
 
-        return c.json({
-            roles: roles.map(r => ({
-                id: r.id,
-                name: r.name,
-                isAdmin: r.isAdmin,
-                defaultPermissions: r.defaultPermissions,
-                config: r.config
-            }))
-        });
+        let adminRoles: AdminRole[] = roles.map(r => ({
+            id: r.id,
+            name: r.name,
+            isAdmin: r.isAdmin,
+            defaultPermissions: r.defaultPermissions,
+            config: r.config
+        }));
+
+        adminRoles = await applyRoleAfterReadBatch(adminRoles, hookCtx);
+
+        return c.json({ roles: adminRoles });
     });
 
     router.get("/roles/:roleId", requireAdmin, async (c) => {

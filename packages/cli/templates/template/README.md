@@ -7,8 +7,8 @@ A [Rebase](https://rebase.pro) project with a PostgreSQL backend.
 ### Option 1: Docker (recommended for production)
 
 ```bash
-cp .env.template .env
-# Edit .env — set POSTGRES_PASSWORD and JWT_SECRET (see comments for generators)
+cp .env.example .env
+# Edit .env — set JWT_SECRET and DATABASE_URL (see comments for generators)
 
 docker compose up -d
 ```
@@ -37,7 +37,7 @@ pnpm install
 2. Configure environment:
 
 ```bash
-cp .env.template .env
+cp .env.example .env
 # Edit .env — set DATABASE_URL, JWT_SECRET
 ```
 
@@ -69,7 +69,7 @@ Backend (Hono + PostgreSQL) on port 3001, frontend (Vite + React) on port 5173.
 ├── config/             # Shared collection definitions
 │   └── collections/    # Schema-as-Code TypeScript files
 ├── docker-compose.yml  # Production stack (Postgres + Backend + Frontend)
-├── .env.template       # Environment variable template
+├── .env.example        # Environment variable reference
 └── package.json        # Root workspace config
 ```
 
@@ -93,6 +93,16 @@ Call from the client SDK: `client.call("functions/hello", { name: "World" })`
 ### Shared Collections
 
 Collections are defined once in `config/collections/` and used by both the frontend and backend. This ensures your schema stays in sync across the stack.
+
+## Environment Configuration
+
+All configuration is managed through a single `.env` file in the project root. Both the backend and frontend read from this file:
+
+- **Backend**: loads via `dotenv` from `../../.env` (relative to `backend/src/`)
+- **Frontend**: Vite reads `VITE_*` variables via `envDir` pointing to the project root
+- **Scripts**: load via `dotenv` from the project root
+
+Copy `.env.example` to `.env` to get started. See the comments in `.env.example` for details on each variable.
 
 ## Production Deployment
 

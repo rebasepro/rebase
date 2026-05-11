@@ -4,7 +4,7 @@ import { IconForView } from "@rebasepro/core";
 import { useUrlController } from "../../_cms_internals";
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { cls, defaultBorderMixin, ResizablePanels, Typography, IconButton, Button , iconSize } from "@rebasepro/ui";
+import { cls, defaultBorderMixin, ResizablePanels, Typography, IconButton, Button , iconSize, Tooltip } from "@rebasepro/ui";
 import { PlusIcon } from "lucide-react";
 ;
 import { CollectionsConfigController } from "../../types/config_controller";
@@ -58,13 +58,18 @@ export function CollectionsStudioView({ configController }: CollectionsStudioVie
                             <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
                                 Collections
                             </Typography>
-                            <IconButton
-                                size="small"
-                                onClick={() => navigate(urlController.buildAppUrlPath("schema/new"))}
-                                className={activeCollectionId === "new" ? "text-primary dark:text-primary-dark" : "text-text-secondary dark:text-text-secondary-dark"}
-                            >
-                                <PlusIcon size={iconSize.smallest}/>
-                            </IconButton>
+                            <Tooltip title={configController.readOnly ? configController.readOnlyReason || "Read only" : "Add collection"}>
+                                <div>
+                                    <IconButton
+                                        size="small"
+                                        disabled={configController.readOnly}
+                                        onClick={() => navigate(urlController.buildAppUrlPath("schema/new"))}
+                                        className={activeCollectionId === "new" ? "text-primary dark:text-primary-dark" : "text-text-secondary dark:text-text-secondary-dark"}
+                                    >
+                                        <PlusIcon size={iconSize.smallest}/>
+                                    </IconButton>
+                                </div>
+                            </Tooltip>
                         </div>
 
                         <div className="flex-grow overflow-y-auto w-full no-scrollbar p-2 space-y-0.5">
@@ -118,6 +123,7 @@ export function CollectionsStudioView({ configController }: CollectionsStudioVie
                                     Select a collection or create a new one to start editing
                                 </Typography>
                                 <Button
+                                    disabled={configController.readOnly}
                                     onClick={() => navigate(urlController.buildAppUrlPath("schema/new"))}
                                 >
                                     <PlusIcon/>

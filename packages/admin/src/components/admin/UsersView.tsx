@@ -17,7 +17,7 @@ const PAGE_SIZE = 25;
 export function UsersView({ userManagement }: {
     userManagement: UserManagementDelegate;
 }) {
-    const { roles, saveUser, createUser, deleteUser, resetPassword, loading: delegateLoading, bootstrapAdmin } = userManagement;
+    const { roles, saveUser, createUser, deleteUser, resetPassword, loading: delegateLoading, bootstrapAdmin, usersError } = userManagement;
     const snackbarController = useSnackbarController();
     const { user: loggedInUser } = useAuthController();
     const { t } = useTranslation();
@@ -247,14 +247,10 @@ message: error instanceof Error ? error.message : t("error_resetting_password") 
         }
     };
 
-    if (delegateLoading) {
-        return <CenteredView><CircularProgress/></CenteredView>;
-    }
-
     return (
         <Container className="w-full flex flex-col py-4 gap-4" maxWidth={"6xl"}>
             {/* Bootstrap warning when no admins */}
-            {!hasAdmin && loggedInUser && bootstrapAdmin && (
+            {!delegateLoading && !hasAdmin && !usersError && loggedInUser && bootstrapAdmin && (
                 <div className="bg-yellow-100 dark:bg-yellow-900 border border-yellow-400 dark:border-yellow-700 rounded p-4 flex items-center justify-between">
                     <div>
                         <Typography variant="label" className="text-yellow-800 dark:text-yellow-200">
@@ -310,7 +306,7 @@ message: error instanceof Error ? error.message : t("error_resetting_password") 
                         <TableCell header className="w-24 text-right">{t("actions")}</TableCell>
                     </TableHeader>
                     <TableBody>
-                        {tableLoading ? (
+                        {(tableLoading || delegateLoading) ? (
                             [
                                 { email: "w-48",
 name: "w-32",
@@ -394,13 +390,20 @@ roles: ["w-16", "w-16"] }
                             </TableRow>
                         )))}
 
-                        {displayUsers.length === 0 && !tableLoading && (
+                        {displayUsers.length === 0 && !tableLoading && !delegateLoading && (
                             <TableRow>
                                 <TableCell colspan={5}>
                                     <CenteredView className="flex flex-col gap-4 my-8 items-center">
                                         <Typography variant="label">
-                                            {searchQuery ? t("no_users_found") : t("no_users_yet")}
+                                            {usersError
+                                                ? t("no_permission_to_view_users")
+                                                : searchQuery ? t("no_users_found") : t("no_users_yet")}
                                         </Typography>
+                                        {usersError && (
+                                            <Typography variant="caption" color="secondary">
+                                                {t("no_permission_description")}
+                                            </Typography>
+                                        )}
                                     </CenteredView>
                                 </TableCell>
                             </TableRow>

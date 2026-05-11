@@ -13,7 +13,8 @@ const tagsCollection: EntityCollection = {
     properties: {
         id: {
             name: "ID",
-            type: "number",
+            type: "string",
+            isId: "uuid",
             validation: {
                 required: true
             }

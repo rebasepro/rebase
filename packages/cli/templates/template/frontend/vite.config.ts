@@ -7,6 +7,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { rebaseCollectionsPlugin } from "@rebasepro/core/vitePlugin";
 
 export default defineConfig({
+    envDir: path.resolve(__dirname, ".."),
     esbuild: {
         logOverride: { "this-is-undefined-in-esm": "silent" }
     },

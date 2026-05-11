@@ -71,6 +71,7 @@ export function UsersView({ userManagement, apiUrl, getAuthToken }: {
     getAuthToken: () => Promise<string>;
 }) {
     const { users, roles, saveUser, deleteUser, loading } = userManagement;
+    const usersError = 'usersError' in userManagement ? (userManagement as { usersError?: Error }).usersError : undefined;
     const snackbarController = useSnackbarController();
     const { user: loggedInUser } = useAuthController();
 
@@ -152,7 +153,7 @@ message: error instanceof Error ? error.message : "Error deleting user" });
     return (
         <Container className="w-full flex flex-col py-4 gap-4" maxWidth={"6xl"}>
             {/* Bootstrap warning when no admins */}
-            {!hasAdmin && loggedInUser && (
+            {!hasAdmin && !usersError && loggedInUser && (
                 <div className="bg-yellow-100 dark:bg-yellow-900 border border-yellow-400 dark:border-yellow-700 rounded p-4 flex items-center justify-between">
                     <div>
                         <Typography variant="label" className="text-yellow-800 dark:text-yellow-200">
@@ -219,8 +220,15 @@ message: error instanceof Error ? error.message : "Error deleting user" });
                                 <TableCell colspan={4}>
                                     <CenteredView className="flex flex-col gap-4 my-8 items-center">
                                         <Typography variant="label">
-                                            There are no users yet
+                                            {usersError
+                                                ? "You don't have permission to view users"
+                                                : "There are no users yet"}
                                         </Typography>
+                                        {usersError && (
+                                            <Typography variant="caption" className="text-surface-500">
+                                                Contact an administrator if you need access to this section.
+                                            </Typography>
+                                        )}
                                     </CenteredView>
                                 </TableCell>
                             </TableRow>
@@ -405,6 +413,7 @@ height: "100%" }}>
 // ============================================
 export function RolesView({ userManagement, collections = [] }: { userManagement: UserManagement, collections?: EntityCollection[] }) {
     const { roles, saveRole, deleteRole, loading, allowDefaultRolesCreation } = userManagement;
+    const rolesError = 'rolesError' in userManagement ? (userManagement as { rolesError?: Error }).rolesError : undefined;
     const snackbarController = useSnackbarController();
 
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -516,9 +525,16 @@ isAdmin: false }
                                 <TableCell colspan={4}>
                                     <CenteredView className="flex flex-col gap-4 my-8 items-center">
                                         <Typography variant="label">
-                                            You don&apos;t have any roles yet.
+                                            {rolesError
+                                                ? "You don't have permission to view roles"
+                                                : "You don\u0026apos;t have any roles yet."}
                                         </Typography>
-                                        {allowDefaultRolesCreation && (
+                                        {rolesError && (
+                                            <Typography variant="caption" className="text-surface-500">
+                                                Contact an administrator if you need access to this section.
+                                            </Typography>
+                                        )}
+                                        {!rolesError && allowDefaultRolesCreation && (
                                             <Button onClick={createDefaultRoles}>
                                                 Create default roles
                                             </Button>

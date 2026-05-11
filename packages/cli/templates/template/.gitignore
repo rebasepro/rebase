@@ -5,9 +5,10 @@ node_modules/
 dist/
 build/
 
-# Environment
+# Environment (secrets — .env.example is tracked)
 .env
 .env.local
+!.env.example
 
 # IDE
 .idea/

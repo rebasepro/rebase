@@ -131,20 +131,63 @@ export function App() {
             collections: {
                 orders: [
                     {
-                        id: "orders-total-count",
-                        title: "Total",
-                        data: async () => {
-                            const res = await rebaseClient.data.collection("orders").find({ limit: 1 });
-                            return { rows: [{ value: res.meta.total }] };
+                        id: "orders-confirmed-count",
+                        title: "Confirmed",
+                        data: async (context) => {
+                            if (context?.path && context.path !== "orders") {
+                                return { rows: [] }; // Filtering by join table not supported in demo yet
+                            }
+                            const res = await rebaseClient.data.collection("orders").find({ limit: 1, where: { status: "eq.confirmed" } });
+                            return { rows: [{ value: res.meta.total, comp: 0.18 }] };
                         },
                         scorecard: {
                             value: { field: "value", format: { style: "decimal" } },
+                            comparison: { field: "comp", format: { style: "percent", showSign: true, decimals: 1 }, intent: "increase_is_good" as const },
+                            icon: "CheckCircle",
+                            dateRange: "vs Previous Week",
+                        },
+                    },
+                    {
+                        id: "orders-shipped-count",
+                        title: "Shipped",
+                        data: async (context) => {
+                            if (context?.path && context.path !== "orders") {
+                                return { rows: [] };
+                            }
+                            const res = await rebaseClient.data.collection("orders").find({ limit: 1, where: { status: "eq.shipped" } });
+                            return { rows: [{ value: res.meta.total, comp: 0.074 }] };
+                        },
+                        scorecard: {
+                            value: { field: "value", format: { style: "decimal" } },
+                            comparison: { field: "comp", format: { style: "percent", showSign: true, decimals: 1 }, intent: "increase_is_good" as const },
+                            icon: "Truck",
+                            dateRange: "vs Previous Week",
+                        },
+                    },
+                    {
+                        id: "orders-pending-count",
+                        title: "Pending",
+                        data: async (context) => {
+                            if (context?.path && context.path !== "orders") {
+                                return { rows: [] };
+                            }
+                            const res = await rebaseClient.data.collection("orders").find({ limit: 1, where: { status: "eq.pending" } });
+                            return { rows: [{ value: res.meta.total, comp: -0.12 }] };
+                        },
+                        scorecard: {
+                            value: { field: "value", format: { style: "decimal" } },
+                            comparison: { field: "comp", format: { style: "percent", showSign: true, decimals: 1 }, intent: "decrease_is_good" as const },
+                            icon: "Clock",
+                            dateRange: "vs Previous Week",
                         },
                     },
                     {
                         id: "orders-revenue",
                         title: "Revenue",
-                        data: async () => {
+                        data: async (context) => {
+                            if (context?.path && context.path !== "orders") {
+                                return { rows: [] };
+                            }
                             const res = await rebaseClient.data.collection("orders").find({ limit: 500 });
                             const total = res.data.reduce((sum: number, e) => sum + (Number(e.values?.total) || 0), 0);
                             return { rows: [{ value: total }] };

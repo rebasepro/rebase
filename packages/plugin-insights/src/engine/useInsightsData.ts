@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { InsightDefinition, InsightDataResult } from "../types";
+import type { InsightDefinition, InsightDataResult, InsightContext } from "../types";
 import { useInsightsEngine } from "./InsightsProvider";
 import { useAuthController } from "@rebasepro/core";
 
@@ -16,7 +16,7 @@ import { useAuthController } from "@rebasepro/core";
  */
 export function useInsightsData(
     definition: InsightDefinition,
-    collectionSlug?: string
+    context: InsightContext
 ): {
     data: InsightDataResult | null;
     loading: boolean;
@@ -30,7 +30,7 @@ export function useInsightsData(
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
 
-    const cacheKey = `${definition.id}:${collectionSlug ?? "global"}`;
+    const cacheKey = `${definition.id}:${context.path ?? context.collectionSlug ?? "global"}`;
 
     useEffect(() => {
         // Keep showing skeleton until both auth and engine are ready
@@ -71,7 +71,7 @@ export function useInsightsData(
         setLoading(true);
         setError(null);
 
-        const promise = definition.data();
+        const promise = definition.data(context);
 
         cache.setInflight(cacheKey, promise);
 
@@ -94,7 +94,7 @@ export function useInsightsData(
         return () => {
             cancelled = true;
         };
-    }, [definition.id, definition.data, collectionSlug, cacheKey, cache, authReady]);
+    }, [definition.id, definition.data, context.path, context.collectionSlug, cacheKey, cache, authReady]);
 
     return { data, loading, error };
 }

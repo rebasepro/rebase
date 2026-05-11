@@ -12,6 +12,7 @@ export * from "./entity_callbacks";
 export * from "./entity_overrides";
 export * from "./export_import";
 export * from "./modify_collections";
+export * from "./formex";
 export * from "./websockets";
 export * from "./backend";
 export * from "./translations";

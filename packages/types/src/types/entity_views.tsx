@@ -1,11 +1,10 @@
 import React from "react";
 import type { Entity, EntityValues } from "./entities";
 import type { EntityCollection } from "./collections";
+import type { FormexController } from "./formex";
 
 /**
  * Context passed to custom fields and entity views.
- * This is the base definition — `@rebasepro/admin` re-exports a
- * fully-typed version that narrows the `formex` field.
  * @group Form custom fields
  */
 export interface FormContext<M extends Record<string, unknown> = Record<string, unknown>> {
@@ -50,10 +49,8 @@ export interface FormContext<M extends Record<string, unknown> = Record<string, 
 
     /**
      * The underlying formex controller that powers the form.
-     * Prefer importing `FormContext` from `@rebasepro/admin` for the
-     * fully-typed `FormexController<M>` version.
      */
-    formex: Record<string, unknown>;
+    formex: FormexController<M>;
 
     disabled: boolean;
 }

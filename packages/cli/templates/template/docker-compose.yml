@@ -1,8 +1,8 @@
 # ─── Rebase — Production Docker Compose ──────────────────────────────
 #
 # Quick start:
-#   cp .env.template .env    # Edit with your secrets
-#   docker compose up -d     # Start everything
+#   cp .env.example .env    # Edit with your secrets
+#   docker compose up -d    # Start everything
 #
 # This runs:
 #   1. PostgreSQL 18 with persistent data
@@ -18,15 +18,15 @@ services:
     image: postgres:18-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-rebase}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-      POSTGRES_DB: ${POSTGRES_DB:-rebase}
+      POSTGRES_USER: rebase
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-changeme}
+      POSTGRES_DB: rebase
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rebase} -d ${POSTGRES_DB:-rebase}"]
+      test: ["CMD-SHELL", "pg_isready -U rebase -d rebase"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -53,38 +53,13 @@ services:
     restart: unless-stopped
     ports:
       - "${PORT:-3001}:3001"
+    env_file: .env
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-rebase}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-rebase}
-      ADMIN_CONNECTION_STRING: postgresql://${POSTGRES_USER:-rebase}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-rebase}
-      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
-      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-1h}
-      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-30d}
+      # Override DATABASE_URL to point to the Docker network service
+      DATABASE_URL: postgresql://rebase:${DATABASE_PASSWORD:-changeme}@db:5432/rebase
+      ADMIN_CONNECTION_STRING: postgresql://rebase:${DATABASE_PASSWORD:-changeme}@db:5432/rebase
       NODE_ENV: production
       PORT: "3001"
-      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
-      CORS_ORIGINS: ${CORS_ORIGINS:-}
-      # Optional Google OAuth
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      # Optional SMTP
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-}
-      SMTP_SECURE: ${SMTP_SECURE:-}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASS: ${SMTP_PASS:-}
-      SMTP_FROM: ${SMTP_FROM:-}
-      APP_NAME: ${APP_NAME:-Rebase}
-      # Storage
-      STORAGE_TYPE: ${STORAGE_TYPE:-local}
-      STORAGE_PATH: ${STORAGE_PATH:-/app/backend/uploads}
-      S3_BUCKET: ${S3_BUCKET:-}
-      S3_REGION: ${S3_REGION:-}
-      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
-      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
-      S3_ENDPOINT: ${S3_ENDPOINT:-}
-      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-}
-      # Service key for scripts & server-to-server admin access
-      REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY:-}
     depends_on:
       db:
         condition: service_healthy
@@ -98,7 +73,7 @@ services:
       dockerfile: frontend/Dockerfile
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT:-80}:80"
+      - "80:80"
     depends_on:
       - backend
 

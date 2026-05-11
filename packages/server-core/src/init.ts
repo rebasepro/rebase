@@ -1,4 +1,4 @@
-import { DataDriver, EntityCollection, BackendBootstrapper, BootstrappedAuth, RealtimeProvider, HealthCheckResult, InitializedDriver, isSQLAdmin } from "@rebasepro/types";
+import { DataDriver, EntityCollection, BackendBootstrapper, BootstrappedAuth, RealtimeProvider, HealthCheckResult, InitializedDriver, isSQLAdmin, BackendHooks } from "@rebasepro/types";
 import { BackendCollectionRegistry } from "./collections/BackendCollectionRegistry";
 import { loadCollectionsFromDirectory } from "./collections/loader";
 import { DriverRegistry, DEFAULT_DRIVER_ID, DefaultDriverRegistry } from "./services/driver-registry";
@@ -107,6 +107,15 @@ export interface RebaseBackendConfig {
         /** Allowed origins for CSRF validation. */
         origin: string | string[] | ((origin: string) => boolean);
     };
+    /**
+     * Backend-level hooks for intercepting admin data (users, roles)
+     * at the API boundary. These run server-side after database reads
+     * and before API responses are sent.
+     *
+     * Complement the per-collection `EntityCallbacks` system which
+     * handles collection CRUD operations.
+     */
+    hooks?: BackendHooks;
 }
 
 export interface RebaseBackendInstance {
@@ -418,7 +427,8 @@ collectionRegistry });
             authRepo: authConfigResult.authRepository as import("./auth/interfaces").AuthRepository ?? authConfigResult.userService as import("./auth/interfaces").AuthRepository,
             emailService: authConfigResult.emailService as import("./email").EmailService,
             emailConfig: config.auth.email,
-            serviceKey
+            serviceKey,
+            hooks: config.hooks
         });
         config.app.route(`${basePath}/admin`, adminRoutes);
     }
@@ -502,7 +512,7 @@ collectionRegistry });
             dataRouter.route("/", historyRoutes);
         }
 
-        const restGenerator = new RestApiGenerator(activeCollections, defaultDriver);
+        const restGenerator = new RestApiGenerator(activeCollections, defaultDriver, config.hooks?.data);
         dataRouter.route("/", restGenerator.generateRoutes());
 
         config.app.route(`${basePath}/data`, dataRouter);

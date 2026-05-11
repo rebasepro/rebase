@@ -1,7 +1,15 @@
-import "dotenv/config";
+import * as dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 import { defineConfig } from "drizzle-kit";
 import { tables } from "./src/schema.generated";
 import { getTableName, Table } from "drizzle-orm";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load .env from the project root (single file for the entire project)
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL is not set. Make sure .env file exists in the project root and contains DATABASE_URL");

@@ -1,6 +1,8 @@
-import { EntityCollection } from "@rebasepro/types";
+import { PostgresCollection } from "@rebasepro/types";
+import ordersCollection from "./orders";
+import productLocalesCollection from "./product_locales";
 
-const productsCollection: EntityCollection = {
+const productsCollection: PostgresCollection = {
     name: "Products",
     singularName: "Product",
     slug: "products",
@@ -13,8 +15,8 @@ const productsCollection: EntityCollection = {
     properties: {
         id: {
             name: "ID",
-            type: "number",
-            isId: "increment"
+            type: "string",
+            isId: "uuid"
         },
         name: {
             name: "Product Name",
@@ -38,11 +40,23 @@ const productsCollection: EntityCollection = {
             markdown: true,
             description: "Detailed product description in Markdown"
         },
-        image: {
-            name: "Product Image",
-            type: "string",
-            storage: {
-                storagePath: "product_images/"
+        images: {
+            name: "Product Images",
+            type: "array",
+            of: {
+                name: "Image",
+                type: "string",
+                storage: {
+                    storagePath: "product_images/"
+                }
+            }
+        },
+        available_locales: {
+            name: "Available Locales",
+            type: "array",
+            of: {
+                name: "Locale",
+                type: "string"
             }
         },
         brand: {
@@ -174,7 +188,7 @@ color: "red" }
     propertiesOrder: [
         "name",
         "sku",
-        "image",
+        "images",
         "brand",
         "status",
         "category",
@@ -188,8 +202,41 @@ color: "red" }
         "weight_grams",
         "is_featured",
         "description",
+        "available_locales",
         "created_at",
         "updated_at"
+    ],
+    // Headless relation: shows related orders (through order_items) as a subcollection tab
+    relations: [
+        {
+            relationName: "orders",
+            target: () => ordersCollection,
+            cardinality: "many",
+            direction: "inverse",
+            joinPath: [
+                {
+                    table: "order_items",
+                    on: {
+                        from: "id",          // products.id
+                        to: "product_id"     // order_items.product_id
+                    }
+                },
+                {
+                    table: "orders",
+                    on: {
+                        from: "order_id",    // order_items.order_id
+                        to: "id"             // orders.id
+                    }
+                }
+            ]
+        },
+        {
+            relationName: "locales",
+            target: () => productLocalesCollection,
+            cardinality: "many",
+            direction: "inverse",
+            inverseRelationName: "product"
+        }
     ]
 };
 

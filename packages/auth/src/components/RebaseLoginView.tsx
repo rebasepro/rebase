@@ -518,6 +518,7 @@ function LoginForm({
             <LoadingButton
                 type="submit"
                 variant="filled"
+                color="primary"
                 className="w-full mt-1"
                 size="large"
                 loading={authController.authLoading}
@@ -681,6 +682,7 @@ function ForgotPasswordForm({
             <LoadingButton
                 type="submit"
                 variant="filled"
+                color="primary"
                 className="w-full"
                 size="large"
                 loading={authController.authLoading}

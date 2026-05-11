@@ -12,8 +12,8 @@ const customersCollection: PostgresCollection = {
     properties: {
         id: {
             name: "ID",
-            type: "number",
-            isId: "increment"
+            type: "string",
+            isId: "uuid"
         },
         first_name: {
             name: "First Name",

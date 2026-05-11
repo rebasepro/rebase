@@ -15,16 +15,20 @@ import { InsightWidgetSkeleton } from "./InsightWidgetSkeleton";
 export function InsightWidget({
     definition,
     collectionSlug,
+    path,
+    parentCollectionIds,
     compact = false,
     embedded = false,
 }: {
     definition: InsightDefinition;
     collectionSlug?: string;
+    path?: string;
+    parentCollectionIds?: string[];
     compact?: boolean;
     /** When true, inner views skip their own borders since the parent card provides them. */
     embedded?: boolean;
 }) {
-    const { data, loading, error } = useInsightsData(definition, collectionSlug);
+    const { data, loading, error } = useInsightsData(definition, { path, collectionSlug, parentCollectionIds });
 
     if (loading) {
         return <InsightWidgetSkeleton config={definition.scorecard} compact={compact} embedded={embedded} />;

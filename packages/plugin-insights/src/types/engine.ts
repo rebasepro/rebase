@@ -1,5 +1,14 @@
 import type { DataRow, ScorecardConfig } from "./widgets";
 
+export interface InsightContext {
+    /** The resolved path of the collection (e.g., "products/123/orders" or "orders") */
+    path?: string;
+    /** The parent collection ids if this is a subcollection (e.g., ["products"]) */
+    parentCollectionIds?: string[];
+    /** The collection slug if this is an insight at the collection level */
+    collectionSlug?: string;
+}
+
 /**
  * Result returned by an insight's data callback.
  */
@@ -45,7 +54,7 @@ export interface InsightDefinition {
      * }
      * ```
      */
-    data: () => Promise<InsightDataResult>;
+    data: (context: InsightContext) => Promise<InsightDataResult>;
 
     /** Scorecard field mapping + formatting. */
     scorecard: ScorecardConfig;

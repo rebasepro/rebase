@@ -101,6 +101,15 @@ export class PostgresBackendDriver implements DataDriver {
         };
     }
 
+    /**
+     * REST-optimised fetch service (include-aware eager-loading).
+     * Delegates to the underlying EntityFetchService which already
+     * implements the matching method signatures.
+     */
+    get restFetchService() {
+        return this.entityService.getFetchService();
+    }
+
 
     private resolveCollectionCallbacks<M extends Record<string, unknown>>(collection: EntityCollection<M> | undefined, path: string) {
         if (!collection && !path) return { collection: undefined,

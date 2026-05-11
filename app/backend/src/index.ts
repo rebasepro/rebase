@@ -117,7 +117,22 @@ async function startServer() {
         history: true,
         csrf: isProduction
             ? { origin: allowedOrigins }
-            : undefined // dev defaults are applied by server-core
+            : undefined, // dev defaults are applied by server-core
+        hooks: {
+            users: {
+                afterRead(user) {
+                    // Mask user emails in the demo: "alice@gmail.com" → "a***@gmail.com"
+                    if (user.email) {
+                        const [local, domain] = user.email.split("@");
+                        if (local && domain) {
+                            const masked = local[0] + "***";
+                            user = { ...user, email: `${masked}@${domain}` };
+                        }
+                    }
+                    return user;
+                }
+            }
+        }
     });
 
     // ─── Health check ─────────────────────────────────────────────

@@ -133,6 +133,7 @@ export interface CollectionClient<M extends Record<string, unknown> = Record<str
     offset(count: number): QueryBuilder<M>;
     search(searchString: string): QueryBuilder<M>;
     include(...relations: string[]): QueryBuilder<M>;
+    count(params?: FindParams): Promise<number>;
 }
 
 export function createCollectionClient<M extends Record<string, unknown> = Record<string, unknown>>(transport: Transport, slug: string, ws?: RebaseWebSocketClient): CollectionClient<M> {

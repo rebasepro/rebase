@@ -4,6 +4,7 @@ import { Typography, cls, defaultBorderMixin, Button, IconButton, Tooltip, Circu
 import { VideoIcon, Music2Icon, RefreshCwIcon, Trash2Icon, XIcon, PlusIcon, DownloadIcon, UploadCloudIcon, FolderIcon, FileTextIcon, ImageIcon, ArrowLeftIcon, FileIcon, HomeIcon, LayoutGridIcon, ListIcon } from "lucide-react";
 import { useStorageSource, useSnackbarController, ErrorView } from "@rebasepro/core";
 import type { StorageListResult } from "@rebasepro/types";
+import { useSearchParams } from "react-router-dom";
 
 // ──────────────────────────────────────────────
 // Types
@@ -420,79 +421,6 @@ function FilePreviewPanel({
 }
 
 // ──────────────────────────────────────────────
-// Sidebar (folder tree)
-// ──────────────────────────────────────────────
-
-function StorageSidebar({
-    folders,
-    currentPath,
-    onNavigate,
-    loading
-}: {
-    folders: StorageFile[];
-    currentPath: string;
-    onNavigate: (path: string) => void;
-    loading: boolean;
-}) {
-    const segments = breadcrumbSegments(currentPath);
-
-    return (
-        <div className={cls("flex flex-col h-full w-full bg-white dark:bg-surface-950 border-r", defaultBorderMixin)}>
-            <div className={cls("p-3 border-b flex justify-between items-center bg-surface-50 dark:bg-surface-900 shrink-0", defaultBorderMixin)}>
-                <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
-                    Folders
-                </Typography>
-            </div>
-
-            <div className="flex-grow overflow-y-auto no-scrollbar p-1">
-                {/* Folder tree */}
-                <div
-                    className={cls(
-                        "flex items-center p-1.5 cursor-pointer rounded transition-colors",
-                        currentPath === "" || !currentPath
-                            ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light"
-                            : "hover:bg-surface-100 dark:hover:bg-surface-950 text-text-secondary dark:text-text-secondary-dark"
-                    )}
-                    onClick={() => onNavigate("")}
-                >
-                    <HomeIcon size={iconSize.smallest} className="mr-1.5 shrink-0"/>
-                    <Typography variant="body2" className="text-xs truncate">Root</Typography>
-                </div>
-
-                {loading && folders.length === 0 ? (
-                    <div className="flex justify-center p-4">
-                        <CircularProgress size="small"/>
-                    </div>
-                ) : (
-                    <div className="mt-1 space-y-0.5">
-                        {folders.map(folder => {
-                            const isSelected = currentPath === folder.fullPath;
-                            return (
-                                <div
-                                    key={folder.fullPath}
-                                    className={cls(
-                                        "flex items-center p-1.5 cursor-pointer rounded transition-colors group",
-                                        isSelected
-                                            ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light"
-                                            : "hover:bg-surface-100 dark:hover:bg-surface-950 text-text-secondary dark:text-text-secondary-dark"
-                                    )}
-                                    onClick={() => onNavigate(folder.fullPath)}
-                                >
-                                    <FolderIcon size={iconSize.smallest} className="mr-1.5 shrink-0 text-amber-500 dark:text-amber-400"/>
-                                    <Typography variant="body2" className="text-xs truncate flex-1 min-w-0">
-                                        {folder.name}
-                                    </Typography>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-}
-
-// ──────────────────────────────────────────────
 // Main StorageView Export
 // ──────────────────────────────────────────────
 
@@ -501,7 +429,8 @@ export const StorageView = () => {
     const snackbarController = useSnackbarController();
 
     // Navigation
-    const [currentPath, setCurrentPath] = useState("");
+    const [searchParams, setSearchParams] = useSearchParams();
+    const currentPath = searchParams.get("path") || "";
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -519,30 +448,17 @@ export const StorageView = () => {
     // View mode
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
-    // Resizable panels
-
-    // Resizable panels
-    const [sidebarSize, setSidebarSize] = useState(() => {
-        try {
-            const saved = localStorage.getItem("rebase_storage_sidebar_size");
-            return saved !== null ? parseFloat(saved) : 18;
-        } catch {
-            return 18;
-        }
-    });
-
+    const storageSourceRef = React.useRef(storageSource);
     useEffect(() => {
-        try {
-            localStorage.setItem("rebase_storage_sidebar_size", sidebarSize.toString());
-        } catch { /* noop */ }
-    }, [sidebarSize]);
+        storageSourceRef.current = storageSource;
+    }, [storageSource]);
 
     // ── Fetch directory contents ──
     const fetchContents = useCallback(async (path: string) => {
         setLoading(true);
         setError(null);
         try {
-            const result: StorageListResult = await storageSource.listObjects(path);
+            const result: StorageListResult = await storageSourceRef.current.listObjects(path);
 
             const folderItems: StorageFile[] = (result.prefixes ?? []).map(ref => ({
                 name: ref.name,
@@ -554,7 +470,7 @@ export const StorageView = () => {
             const fileItems: StorageFile[] = await Promise.all(
                 (result.items ?? []).map(async (ref) => {
                     try {
-                        const downloadConfig = await storageSource.getSignedUrl(ref.fullPath);
+                        const downloadConfig = await storageSourceRef.current.getSignedUrl(ref.fullPath);
                         return {
                             name: ref.name,
                             fullPath: ref.fullPath,
@@ -581,7 +497,7 @@ export const StorageView = () => {
         } finally {
             setLoading(false);
         }
-    }, [storageSource]);
+    }, []);
 
     useEffect(() => {
         fetchContents(currentPath);
@@ -589,10 +505,14 @@ export const StorageView = () => {
 
     // Navigate to path
     const handleNavigate = useCallback((path: string) => {
-        setCurrentPath(path);
+        if (!path) {
+            setSearchParams({});
+        } else {
+            setSearchParams({ path });
+        }
         setSelectedFile(null);
         setSelectedDownloadUrl(null);
-    }, []);
+    }, [setSearchParams]);
 
     // Navigate up one level
     const handleNavigateUp = useCallback(() => {
@@ -608,19 +528,19 @@ export const StorageView = () => {
             setSelectedDownloadUrl(file.downloadUrl);
         } else {
             try {
-                const config = await storageSource.getSignedUrl(file.fullPath);
+                const config = await storageSourceRef.current.getSignedUrl(file.fullPath);
                 setSelectedDownloadUrl(config.url);
             } catch {
                 setSelectedDownloadUrl(null);
             }
         }
-    }, [storageSource]);
+    }, []);
 
     // Upload files
     const handleUpload = useCallback(async (uploadFiles: File[]) => {
         for (const file of uploadFiles) {
             const key = currentPath ? `${currentPath}/${file.name}` : file.name;
-            await storageSource.putObject({
+            await storageSourceRef.current.putObject({
                 file,
                 key
             });
@@ -630,12 +550,12 @@ export const StorageView = () => {
             message: `${uploadFiles.length} file${uploadFiles.length > 1 ? "s" : ""} uploaded successfully`
         });
         fetchContents(currentPath);
-    }, [storageSource, currentPath, snackbarController, fetchContents]);
+    }, [currentPath, snackbarController, fetchContents]);
 
     // Delete a file
     const handleDeleteFile = useCallback(async (file: StorageFile) => {
         try {
-            await storageSource.deleteObject(file.fullPath);
+            await storageSourceRef.current.deleteObject(file.fullPath);
             snackbarController.open({ type: "success",
 message: `"${file.name}" deleted` });
             setSelectedFile(null);
@@ -645,7 +565,7 @@ message: `"${file.name}" deleted` });
             snackbarController.open({ type: "error",
 message: e instanceof Error ? e.message : String(e) });
         }
-    }, [storageSource, currentPath, snackbarController, fetchContents]);
+    }, [currentPath, snackbarController, fetchContents]);
 
     // Handle refresh
     const handleRefresh = useCallback(() => {
@@ -786,7 +706,7 @@ message: e instanceof Error ? e.message : String(e) });
                         <Typography variant="caption" className="text-[10px] uppercase tracking-wider font-bold text-text-disabled dark:text-text-disabled-dark mb-2 block">
                             Folders
                         </Typography>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                        <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
                             {folders.map(folder => (
                                 <div
                                     key={folder.fullPath}
@@ -814,7 +734,7 @@ message: e instanceof Error ? e.message : String(e) });
                         <Typography variant="caption" className="text-[10px] uppercase tracking-wider font-bold text-text-disabled dark:text-text-disabled-dark mb-2 block">
                             Files ({files.length})
                         </Typography>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                        <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
                             {files.map(file => {
                                 const FileIconComp = getFileIcon(file.contentType);
                                 const ext = getExtension(file.name)?.toLowerCase() || "";
@@ -838,8 +758,7 @@ message: e instanceof Error ? e.message : String(e) });
                                                 <img
                                                     src={file.downloadUrl}
                                                     alt={file.name}
-                                                    className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
-                                                    loading="lazy"
+                                                    className="w-full h-full object-cover"
                                                 />
                                             ) : (
                                                 <FileIconComp className="text-surface-accent-400 dark:text-surface-accent-500 w-8 h-8"/>
@@ -855,7 +774,7 @@ message: e instanceof Error ? e.message : String(e) });
                                             {/* Hover overlay */}
                                             <div className={cls(
                                                 "absolute inset-0 bg-black/0 group-hover:bg-black/10",
-                                                "transition-colors duration-200"
+                                                "transition-colors duration-200 pointer-events-none"
                                             )}/>
                                         </div>
 
@@ -880,23 +799,9 @@ message: e instanceof Error ? e.message : String(e) });
 
     return (
         <div className="flex h-full w-full bg-white dark:bg-surface-950 overflow-hidden text-text-primary dark:text-text-primary-dark">
-            <ResizablePanels
-                orientation="horizontal"
-                panelSizePercent={sidebarSize}
-                onPanelSizeChange={setSidebarSize}
-                minPanelSizePx={180}
-                firstPanel={
-                    <StorageSidebar
-                        folders={folders}
-                        currentPath={currentPath}
-                        onNavigate={handleNavigate}
-                        loading={loading}
-                    />
-                }
-                secondPanel={
-                    <div className="flex h-full w-full">
-                        {/* Main content */}
-                        <div className="flex-grow flex flex-col min-w-0 h-full">
+            <div className="flex h-full w-full">
+                {/* Main content */}
+                <div className="flex-grow flex flex-col min-w-0 h-full">
                             {/* Toolbar */}
                             <div className={cls("flex items-center justify-between pr-2 border-b bg-white dark:bg-surface-950 shrink-0", defaultBorderMixin)}>
                                 <div className="flex items-center gap-1.5 flex-grow overflow-hidden px-3 py-2">
@@ -1019,9 +924,7 @@ message: e instanceof Error ? e.message : String(e) });
                                 />
                             </div>
                         )}
-                    </div>
-                }
-            />
+            </div>
 
             {/* Upload Dialog */}
             <UploadDialog

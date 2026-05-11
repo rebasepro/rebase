@@ -20,8 +20,8 @@ const ordersCollection: PostgresCollection = {
     properties: {
         id: {
             name: "ID",
-            type: "number",
-            isId: "increment"
+            type: "string",
+            isId: "uuid"
         },
         order_number: {
             name: "Order #",
@@ -35,16 +35,11 @@ const ordersCollection: PostgresCollection = {
         customer: {
             name: "Customer",
             type: "relation",
+            target: () => customersCollection,
             cardinality: "one",
             direction: "owning",
             validation: {
                 required: true
-            },
-            relation: {
-                relationName: "customer",
-                cardinality: "one",
-                direction: "owning",
-                target: () => customersCollection
             }
         },
         status: {

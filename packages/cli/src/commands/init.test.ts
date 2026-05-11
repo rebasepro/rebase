@@ -88,7 +88,7 @@ describe("template structure", () => {
 
     it("contains essential config files", () => {
         expect(fs.existsSync(path.join(TEMPLATE_DIR, "package.json"))).toBe(true);
-        expect(fs.existsSync(path.join(TEMPLATE_DIR, ".env.template"))).toBe(true);
+        expect(fs.existsSync(path.join(TEMPLATE_DIR, ".env.example"))).toBe(true);
         expect(fs.existsSync(path.join(TEMPLATE_DIR, "docker-compose.yml"))).toBe(true);
         expect(fs.existsSync(path.join(TEMPLATE_DIR, "pnpm-workspace.yaml"))).toBe(true);
         expect(fs.existsSync(path.join(TEMPLATE_DIR, ".gitignore"))).toBe(true);
@@ -290,12 +290,12 @@ describe("template package.json contracts", () => {
 });
 
 // =============================================================================
-// .env.template
+// .env.example
 // =============================================================================
 
-describe(".env.template", () => {
+describe(".env.example", () => {
     it("contains all required environment variables", () => {
-        const envContent = fs.readFileSync(path.join(TEMPLATE_DIR, ".env.template"), "utf-8");
+        const envContent = fs.readFileSync(path.join(TEMPLATE_DIR, ".env.example"), "utf-8");
         expect(envContent).toContain("DATABASE_URL");
         expect(envContent).toContain("JWT_SECRET");
         expect(envContent).toContain("PORT");
@@ -304,16 +304,25 @@ describe(".env.template", () => {
     });
 
     it("contains setup instructions for required values", () => {
-        const envContent = fs.readFileSync(path.join(TEMPLATE_DIR, ".env.template"), "utf-8");
-        expect(envContent).toContain("REQUIRED");
-        expect(envContent).toContain("openssl rand");
+        const envContent = fs.readFileSync(path.join(TEMPLATE_DIR, ".env.example"), "utf-8");
+        expect(envContent).toContain("required");
     });
     it("has optional SMTP section commented out", () => {
-        const envContent = fs.readFileSync(path.join(TEMPLATE_DIR, ".env.template"), "utf-8");
+        const envContent = fs.readFileSync(path.join(TEMPLATE_DIR, ".env.example"), "utf-8");
         expect(envContent).toContain("# SMTP_HOST");
     });
 
-    it("configureEnvFile successfully generates a valid .env without REQUIRED placeholders", async () => {
+    it("does not contain Docker-specific POSTGRES_USER or POSTGRES_PASSWORD vars", () => {
+        const envContent = fs.readFileSync(path.join(TEMPLATE_DIR, ".env.example"), "utf-8");
+        // These should no longer appear — Docker Compose uses its own defaults
+        expect(envContent).not.toMatch(/^POSTGRES_USER=/m);
+        expect(envContent).not.toMatch(/^POSTGRES_PASSWORD=/m);
+        expect(envContent).not.toMatch(/^POSTGRES_DB=/m);
+        expect(envContent).not.toMatch(/^POSTGRES_PORT=/m);
+        expect(envContent).not.toMatch(/^FRONTEND_PORT=/m);
+    });
+
+    it("configureEnvFile successfully generates a valid .env", async () => {
         const targetDir = await simulateInit("env-test-app");
         // simulateInit does not call configureEnvFile, so we call it manually
         configureEnvFile(targetDir);
@@ -321,16 +330,17 @@ describe(".env.template", () => {
         const envPath = path.join(targetDir, ".env");
         expect(fs.existsSync(envPath)).toBe(true);
 
+        // .env.example should still exist (it's copied, not moved)
+        const envExamplePath = path.join(targetDir, ".env.example");
+        expect(fs.existsSync(envExamplePath)).toBe(true);
+
         const envContent = fs.readFileSync(envPath, "utf-8");
-        // Ensure no "REQUIRED" placeholders remain for the generated secrets
-        expect(envContent).not.toMatch(/^JWT_SECRET=REQUIRED$/m);
-        expect(envContent).not.toMatch(/^DATABASE_URL=REQUIRED$/m);
 
         // Verify that JWT_SECRET is properly replaced (it should be 64 hex characters, so > 32 length)
         const jwtMatch = envContent.match(/^JWT_SECRET=(.*)$/m);
         expect(jwtMatch).toBeTruthy();
         expect(jwtMatch![1].length).toBeGreaterThanOrEqual(32);
-        
+
         // Verify local default DB url
         const dbMatch = envContent.match(/^DATABASE_URL=(.*)$/m);
         expect(dbMatch).toBeTruthy();

@@ -103,7 +103,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         rebaseClient,
         resolvedCollections,
         collectionEditorEnabled ? {
-            readOnly: collectionEditorOptions?.readOnly,
+            readOnly: collectionEditorOptions?.readOnly ?? process.env.NODE_ENV === "production",
             getAuthToken: collectionEditorOptions?.getAuthToken ?? authController?.getAuthToken
         } : { readOnly: true }
     );

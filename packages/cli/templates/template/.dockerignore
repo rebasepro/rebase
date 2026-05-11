@@ -16,7 +16,7 @@ node_modules
 # Environment (secrets should be injected, not baked in)
 .env
 .env.local
-.env.*.local
+.env.example
 
 # Docker
 docker-compose*.yml
