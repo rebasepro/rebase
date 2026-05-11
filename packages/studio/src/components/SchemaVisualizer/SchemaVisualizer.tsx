@@ -14,7 +14,7 @@ import type { Node, Edge, NodeChange, EdgeChange } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
     Button,
-    DebouncedTextField,
+    SearchBar,
     TextField,
     Tooltip,
     Alert,
@@ -233,12 +233,11 @@ duration: 400 }
 
                     {/* Search */}
                     <div className="px-2 py-1.5 border-b border-surface-200/40 dark:border-surface-700/40">
-                        <DebouncedTextField
+                        <SearchBar
                             size="smallest"
                             placeholder="Filter tables…"
-                            type="search"
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            inputClassName="text-xs"
+                            onTextSearch={(val) => setSearchQuery(val ?? "")}
+                            innerClassName="text-xs"
                         />
                     </div>
 
@@ -446,30 +445,26 @@ duration: 400 }
                             {/* Direction toggle */}
                             <div className="flex items-center bg-surface-100 dark:bg-surface-950 rounded-md border border-surface-200/40 dark:border-surface-700/40">
                                 <Tooltip title="Left to right layout">
-                                    <button
+                                    <Button
+                                        size="small"
+                                        variant={direction === "LR" ? "filled" : "text"}
+                                        color={direction === "LR" ? "primary" : "neutral"}
                                         onClick={() => setDirection("LR")}
-                                        className={cls(
-                                            "px-2 py-1 text-[10px] font-mono rounded-l-md transition-colors",
-                                            direction === "LR"
-                                                ? "bg-primary text-white"
-                                                : "text-text-secondary dark:text-text-secondary-dark hover:bg-surface-200 dark:hover:bg-surface-700"
-                                        )}
+                                        className="!rounded-r-none !px-2 !py-1 !text-[10px] !font-mono"
                                     >
                                         LR
-                                    </button>
+                                    </Button>
                                 </Tooltip>
                                 <Tooltip title="Top to bottom layout">
-                                    <button
+                                    <Button
+                                        size="small"
+                                        variant={direction === "TB" ? "filled" : "text"}
+                                        color={direction === "TB" ? "primary" : "neutral"}
                                         onClick={() => setDirection("TB")}
-                                        className={cls(
-                                            "px-2 py-1 text-[10px] font-mono rounded-r-md transition-colors",
-                                            direction === "TB"
-                                                ? "bg-primary text-white"
-                                                : "text-text-secondary dark:text-text-secondary-dark hover:bg-surface-200 dark:hover:bg-surface-700"
-                                        )}
+                                        className="!rounded-l-none !px-2 !py-1 !text-[10px] !font-mono"
                                     >
                                         TB
-                                    </button>
+                                    </Button>
                                 </Tooltip>
                             </div>
 

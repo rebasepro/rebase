@@ -3,7 +3,7 @@ import { IconForView } from "@rebasepro/core";
 import { useStudioCollectionRegistry, useStudioSideEntityController } from "@rebasepro/core";
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Button, Paper, Typography, CircularProgress, cls, IconButton, InputLabel, Dialog, DialogContent, DialogActions, DialogTitle, TextField, Tooltip, Alert, Tabs, Tab, defaultBorderMixin, Select, SelectItem, Menu, MenuItem, ResizablePanels, Chip, VirtualTable, VirtualTableColumn , iconSize } from "@rebasepro/ui";
+import { Button, Paper, Typography, CircularProgress, cls, IconButton, InputLabel, Dialog, DialogContent, DialogActions, DialogTitle, TextField, Tooltip, Alert, Tabs, Tab, defaultBorderMixin, Select, SelectItem, Menu, MenuItem, ResizablePanels, Chip, VirtualTable, VirtualTableColumn , iconSize, Checkbox, TextareaAutosize } from "@rebasepro/ui";
 import { DatabaseIcon, TerminalIcon, XIcon, PlusIcon, PencilIcon, MoreVerticalIcon, MenuIcon, PlayIcon } from "lucide-react";
 // VirtualTableInput is conditionally loaded from CMS when available
 let VirtualTableInput: React.ComponentType<any> | null = null;
@@ -122,21 +122,15 @@ const FixedEditorOverlay = ({
                         maxWidth: Math.min(400, windowSize.width - left - 10)
                     }}
                 >
-                    <textarea
+                    <TextareaAutosize
                         className="w-full h-full bg-transparent outline-none border-none ring-0 font-mono text-[13px] text-text-primary dark:text-text-primary-dark px-4 py-1.5 resize-none overflow-y-auto"
                         defaultValue={displayValue}
                         autoFocus
-                        style={{ minHeight: '32px' }}
+                        style={{ minHeight: '32px', maxHeight: resolvedMaxHeight }}
                         onFocus={(e) => {
                             const val = e.target.value;
                             e.target.value = "";
                             e.target.value = val;
-                            e.target.style.height = 'auto';
-                            e.target.style.height = `${Math.min(e.target.scrollHeight, resolvedMaxHeight)}px`;
-                        }}
-                        onChange={(e) => {
-                            e.target.style.height = 'auto';
-                            e.target.style.height = `${Math.min(e.target.scrollHeight, resolvedMaxHeight)}px`;
                         }}
                         onBlur={(e) => {
                             onSave(e.target.value || null);
@@ -1248,15 +1242,20 @@ id: String(ra.entityId) })}
 
                                 <div className="h-4 w-px bg-surface-200 dark:bg-surface-950 mx-1"></div>
 
-                                <div className="flex items-center space-x-2 px-2 cursor-pointer" onClick={() => setAutoLimit(!autoLimit)}>
+                                <div className="flex items-center space-x-2 px-2" onClick={(e) => {
+                                    setAutoLimit(!autoLimit);
+                                    e.stopPropagation();
+                                }}>
                                     <Typography variant="caption" className="text-[11px] text-text-secondary cursor-pointer select-none">{t("studio_sql_limit_1000")}</Typography>
-                                    <input
-                                        type="checkbox"
-                                        checked={autoLimit}
-                                        onChange={(e) => setAutoLimit(e.target.checked)}
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="w-3.5 h-3.5 rounded border-surface-300 text-primary focus:ring-primary cursor-pointer"
-                                    />
+                                    <div onClick={(e) => e.stopPropagation()}>
+                                        <Checkbox
+                                            checked={autoLimit}
+                                            onCheckedChange={setAutoLimit}
+                                            size="smallest"
+                                            padding={false}
+                                            className="cursor-pointer"
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="h-4 w-px bg-surface-200 dark:bg-surface-950 mx-1"></div>

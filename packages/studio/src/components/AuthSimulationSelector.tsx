@@ -1,5 +1,5 @@
 import React from "react";
-import { Typography, cls, iconSize } from "@rebasepro/ui";
+import { Typography, cls, iconSize, Button } from "@rebasepro/ui";
 import { KeyRoundIcon } from "lucide-react";
 import { UserSelectPopover, SelectableUser } from "@rebasepro/core";
 
@@ -31,28 +31,24 @@ export function AuthSimulationSelector({
             >
                 Auth:
             </Typography>
-            <button
+            <Button
+                size="small"
+                variant={authMode === "jwt" ? "outlined" : "outlined"}
+                color={authMode === "jwt" ? "primary" : "neutral"}
                 onClick={() => setAuthMode("jwt")}
-                className={cls(
-                    "px-3 py-1 text-xs rounded-full border transition-all",
-                    authMode === "jwt"
-                        ? "bg-primary/15 text-primary dark:text-primary-dark border-primary/30 font-medium"
-                        : "border-surface-300 dark:border-surface-600 text-text-secondary dark:text-text-secondary-dark hover:border-primary/30"
-                )}
+                className="rounded-full !px-3 !py-1 !text-xs"
             >
                 JWT Token
-            </button>
-            <button
+            </Button>
+            <Button
+                size="small"
+                variant={authMode === "none" ? "outlined" : "outlined"}
+                color={authMode === "none" ? "error" : "neutral"}
                 onClick={() => setAuthMode("none")}
-                className={cls(
-                    "px-3 py-1 text-xs rounded-full border transition-all",
-                    authMode === "none"
-                        ? "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30 font-medium"
-                        : "border-surface-300 dark:border-surface-600 text-text-secondary dark:text-text-secondary-dark hover:border-red-500/30"
-                )}
+                className="rounded-full !px-3 !py-1 !text-xs"
             >
                 No Auth
-            </button>
+            </Button>
 
             {authMode === "jwt" && (
                 <>

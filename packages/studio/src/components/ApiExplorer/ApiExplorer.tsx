@@ -8,7 +8,7 @@ import {
     Button,
     Chip,
     defaultBorderMixin,
-    DebouncedTextField,
+    SearchBar,
     iconSize
 } from "@rebasepro/ui";
 import { BookOpenIcon, PlayIcon } from "lucide-react";
@@ -161,11 +161,10 @@ allEndpoints: [] };
                     )}
                     {/* Search */}
                     <div className="mb-2">
-                        <DebouncedTextField
+                        <SearchBar
                             placeholder="Filter endpoints…"
                             size="small"
-                            type="search"
-                            onChange={(e) => setSidebarFilter(e.target.value)}
+                            onTextSearch={(val) => setSidebarFilter(val ?? "")}
                         />
                     </div>
 
@@ -185,15 +184,17 @@ allEndpoints: [] };
                             {group.endpoints.map((ep) => {
                                 const isSelected = selectedEndpoint?.id === ep.id;
                                 return (
-                                    <button
+                                    <Button
                                         key={ep.id}
+                                        variant="text"
+                                        color="neutral"
+                                        fullWidth
                                         onClick={() => {
                                             setSelectedEndpoint(ep);
                                             setTryItOpen(false);
                                         }}
                                         className={cls(
-                                            "w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-left text-sm transition-all",
-                                            "hover:bg-surface-200 dark:hover:bg-surface-800",
+                                            "!justify-between !px-2.5 !py-1.5 !text-left !text-sm",
                                             isSelected
                                                 ? "bg-surface-200 dark:bg-surface-800 font-medium"
                                                 : "text-text-primary dark:text-text-primary-dark"
@@ -208,7 +209,7 @@ allEndpoints: [] };
                                         >
                                             {ep.method}
                                         </span>
-                                    </button>
+                                    </Button>
                                 );
                             })}
                         </div>

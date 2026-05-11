@@ -91,6 +91,8 @@ async function recordSegment(page, name, viewport, actions) {
   } catch (err) {
     console.error(`  ✗ ffmpeg failed: ${err.message}`);
   }
+  // Clean up frames immediately — we only need the mp4
+  fs.rmSync(`${SEGMENTS_DIR}/${name}`, { recursive: true, force: true });
 }
 
 // ─── Main ────────────────────────────────────────────────────────────
@@ -121,23 +123,34 @@ async function recordSegment(page, name, viewport, actions) {
   await waitForContent(page, "Total Revenue");
 
   await recordSegment(page, "01_dashboard", { width: 900, height: 650 }, async (p) => {
-    await new Promise(r => setTimeout(r, 800));
-    // Hover the scorecards
+    await new Promise(r => setTimeout(r, 1000));
+    // Hover each scorecard slowly
     const cards = await p.$$('[class*="scorecard"], [class*="Card"], [class*="stat"]');
     for (let i = 0; i < Math.min(4, cards.length); i++) {
       await cards[i].hover();
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 600));
     }
-    // Scroll down to collection links
-    await smoothScroll(p, "down", 4, 120);
-    await new Promise(r => setTimeout(r, 600));
-    // Click "Blog posts" collection card
+    await new Promise(r => setTimeout(r, 500));
+    // Scroll down to see collections
+    await smoothScroll(p, "down", 5, 80);
+    await new Promise(r => setTimeout(r, 800));
+    // Hover over collection links
+    const links = await p.$$('a[href*="/c/"]');
+    for (let i = 0; i < Math.min(3, links.length); i++) {
+      await links[i].hover();
+      await new Promise(r => setTimeout(r, 500));
+    }
+    await new Promise(r => setTimeout(r, 400));
+    // Click into Blog posts
     await p.evaluate(() => {
       const link = Array.from(document.querySelectorAll("a, button, [role='button']"))
         .find(el => el.textContent?.includes("Blog posts"));
       if (link) link.click();
     });
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise(r => setTimeout(r, 2500));
+    // Scroll the new page
+    await smoothScroll(p, "down", 3, 80);
+    await new Promise(r => setTimeout(r, 800));
   });
 
   // ═══════════════════════════════════════════════════════════════════
@@ -147,30 +160,42 @@ async function recordSegment(page, name, viewport, actions) {
   await new Promise(r => setTimeout(r, 3000));
 
   await recordSegment(page, "02_view_switch", { width: 900, height: 650 }, async (p) => {
-    await new Promise(r => setTimeout(r, 800));
-    // Scroll down to show more cards
-    await smoothScroll(p, "down", 3, 100);
+    await new Promise(r => setTimeout(r, 1000));
+    // Browse the card grid
+    await smoothScroll(p, "down", 4, 90);
+    await new Promise(r => setTimeout(r, 700));
+    await smoothScroll(p, "up", 4, 90);
     await new Promise(r => setTimeout(r, 600));
-    await smoothScroll(p, "up", 3, 100);
+    // Hover a few cards
+    const postCards = await p.$$('[class*="card"], [class*="Card"]');
+    for (let i = 0; i < Math.min(3, postCards.length); i++) {
+      await postCards[i].hover();
+      await new Promise(r => setTimeout(r, 500));
+    }
     await new Promise(r => setTimeout(r, 400));
-
-    // Click table icon/button
+    // Switch to table view
     await p.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, [role='tab']"));
       const tableBtn = btns.find(b => b.textContent?.includes("Table") || b.getAttribute("aria-label")?.includes("table"));
       if (tableBtn) tableBtn.click();
     });
     await new Promise(r => setTimeout(r, 1500));
-    // Scroll table
+    // Scroll and hover rows in table
     await smoothScroll(p, "down", 3, 80);
     await new Promise(r => setTimeout(r, 600));
+    const rows = await p.$$("tr");
+    for (let i = 1; i < Math.min(4, rows.length); i++) {
+      await rows[i].hover();
+      await new Promise(r => setTimeout(r, 400));
+    }
+    await new Promise(r => setTimeout(r, 500));
     // Switch back to cards
     await p.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, [role='tab']"));
       const cardsBtn = btns.find(b => b.textContent?.includes("Cards") || b.getAttribute("aria-label")?.includes("cards"));
       if (cardsBtn) cardsBtn.click();
     });
-    await new Promise(r => setTimeout(r, 1200));
+    await new Promise(r => setTimeout(r, 1500));
   });
 
   // ═══════════════════════════════════════════════════════════════════
@@ -180,19 +205,32 @@ async function recordSegment(page, name, viewport, actions) {
   await waitForContent(page, "ORD-2025");
 
   await recordSegment(page, "03_orders_table", { width: 1000, height: 650 }, async (p) => {
-    await new Promise(r => setTimeout(r, 800));
-    // Hover some table rows
+    await new Promise(r => setTimeout(r, 1000));
+    // Hover rows slowly
     const rows = await p.$$("tr");
-    for (let i = 1; i < Math.min(5, rows.length); i++) {
+    for (let i = 1; i < Math.min(6, rows.length); i++) {
       await rows[i].hover();
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 500));
     }
-    // Click a row to open side panel
+    await new Promise(r => setTimeout(r, 400));
+    // Click first order to open detail
     if (rows.length > 2) {
       await rows[2].click();
-      await new Promise(r => setTimeout(r, 1500));
-      await smoothScroll(p, "down", 4, 80);
+      await new Promise(r => setTimeout(r, 2000));
+      // Scroll the detail panel
+      await smoothScroll(p, "down", 5, 70);
+      await new Promise(r => setTimeout(r, 800));
+      await smoothScroll(p, "up", 3, 70);
       await new Promise(r => setTimeout(r, 600));
+    }
+    // Close and open another row
+    await p.keyboard.press("Escape");
+    await new Promise(r => setTimeout(r, 800));
+    if (rows.length > 4) {
+      await rows[4].click();
+      await new Promise(r => setTimeout(r, 2000));
+      await smoothScroll(p, "down", 4, 70);
+      await new Promise(r => setTimeout(r, 800));
     }
   });
 
@@ -253,20 +291,62 @@ async function recordSegment(page, name, viewport, actions) {
   await new Promise(r => setTimeout(r, 1500));
 
   await recordSegment(page, "05_kanban", { width: 1000, height: 600 }, async (p) => {
-    await new Promise(r => setTimeout(r, 600));
-    // Hover tickets in first column
-    const ticketCards = await p.$$('[class*="kanban"] [class*="card"], [class*="Column"] [class*="Card"], [class*="draggable"]');
+    await new Promise(r => setTimeout(r, 1000));
+    // Try multiple selector strategies for kanban cards
+    let ticketCards = await p.$$('[class*="kanban"] [class*="card"], [class*="Column"] [class*="Card"], [class*="draggable"]');
+    if (ticketCards.length === 0) ticketCards = await p.$$('[class*="ticket"], [class*="Ticket"]');
+    if (ticketCards.length === 0) ticketCards = await p.$$('[data-rfd-draggable-id]');
     console.log(`  Found ${ticketCards.length} kanban cards`);
-    for (let i = 0; i < Math.min(3, ticketCards.length); i++) {
+    // Hover cards across columns
+    for (let i = 0; i < Math.min(5, ticketCards.length); i++) {
       await ticketCards[i].hover();
       await new Promise(r => setTimeout(r, 500));
     }
-    // Click one to open detail
+    await new Promise(r => setTimeout(r, 400));
+    // Click first ticket to open detail
     if (ticketCards.length > 0) {
       await ticketCards[0].click();
-      await new Promise(r => setTimeout(r, 1500));
-      await smoothScroll(p, "down", 3, 80);
+      await new Promise(r => setTimeout(r, 2000));
+      await smoothScroll(p, "down", 4, 70);
       await new Promise(r => setTimeout(r, 600));
+      await smoothScroll(p, "up", 2, 70);
+      await new Promise(r => setTimeout(r, 500));
+      // Close
+      await p.keyboard.press("Escape");
+      await new Promise(r => setTimeout(r, 800));
+    }
+    // Re-query and click another ticket (DOM may have re-rendered)
+    let freshCards = await p.$$('[class*=\"kanban\"] [class*=\"card\"], [class*=\"Column\"] [class*=\"Card\"], [class*=\"draggable\"]');
+    if (freshCards.length === 0) freshCards = await p.$$('[class*=\"ticket\"], [class*=\"Ticket\"]');
+    if (freshCards.length > 2) {
+      try {
+        await freshCards[2].click();
+        await new Promise(r => setTimeout(r, 2000));
+        await smoothScroll(p, "down", 3, 70);
+        await new Promise(r => setTimeout(r, 800));
+      } catch {}
+    }
+    // If no kanban cards found, fall back to table rows interaction
+    if (ticketCards.length === 0) {
+      const rows = await p.$$("tr");
+      for (let i = 1; i < Math.min(6, rows.length); i++) {
+        await rows[i].hover();
+        await new Promise(r => setTimeout(r, 500));
+      }
+      if (rows.length > 2) {
+        await rows[2].click();
+        await new Promise(r => setTimeout(r, 2000));
+        await smoothScroll(p, "down", 5, 70);
+        await new Promise(r => setTimeout(r, 800));
+        await p.keyboard.press("Escape");
+        await new Promise(r => setTimeout(r, 800));
+        if (rows.length > 4) {
+          await rows[4].click();
+          await new Promise(r => setTimeout(r, 2000));
+          await smoothScroll(p, "down", 4, 70);
+          await new Promise(r => setTimeout(r, 800));
+        }
+      }
     }
   });
 
@@ -278,8 +358,14 @@ async function recordSegment(page, name, viewport, actions) {
   await new Promise(r => setTimeout(r, 2000));
 
   await recordSegment(page, "06_product_edit", { width: 700, height: 700 }, async (p) => {
-    // Click first row
+    await new Promise(r => setTimeout(r, 800));
+    // Hover rows first
     const rows = await p.$$("tr");
+    for (let i = 1; i < Math.min(4, rows.length); i++) {
+      await rows[i].hover();
+      await new Promise(r => setTimeout(r, 400));
+    }
+    // Click first product
     if (rows.length > 1) {
       await rows[1].click();
       await new Promise(r => setTimeout(r, 2000));
@@ -288,18 +374,35 @@ async function recordSegment(page, name, viewport, actions) {
     const input = await p.$('input[type="text"]');
     if (input) {
       await input.click({ clickCount: 3 });
-      await new Promise(r => setTimeout(r, 300));
-      await p.keyboard.type("Organic Protein Bar Box (12 pack)", { delay: 50 });
-      await new Promise(r => setTimeout(r, 600));
+      await new Promise(r => setTimeout(r, 400));
+      await p.keyboard.type("Organic Protein Bar Box (12 pack)", { delay: 55 });
+      await new Promise(r => setTimeout(r, 700));
     }
-    // Tab through fields
+    // Tab to next field and edit
     await p.keyboard.press("Tab");
-    await new Promise(r => setTimeout(r, 400));
-    // Scroll to see more fields
-    await smoothScroll(p, "down", 8, 80);
+    await new Promise(r => setTimeout(r, 500));
+    await p.keyboard.type("organic-protein-bar-12", { delay: 45 });
     await new Promise(r => setTimeout(r, 600));
-    await smoothScroll(p, "up", 4, 80);
-    await new Promise(r => setTimeout(r, 400));
+    // Scroll through fields
+    await smoothScroll(p, "down", 6, 70);
+    await new Promise(r => setTimeout(r, 700));
+    await smoothScroll(p, "down", 4, 70);
+    await new Promise(r => setTimeout(r, 600));
+    await smoothScroll(p, "up", 6, 80);
+    await new Promise(r => setTimeout(r, 500));
+    // Try switching tabs
+    await p.evaluate(() => {
+      const tabs = Array.from(document.querySelectorAll("button, [role='tab']"));
+      const t = tabs.find(t => t.textContent?.includes("<>"));
+      if (t) t.click();
+    });
+    await new Promise(r => setTimeout(r, 1200));
+    await p.evaluate(() => {
+      const tabs = Array.from(document.querySelectorAll("button, [role='tab']"));
+      const t = tabs.find(t => t.textContent?.includes("Product"));
+      if (t) t.click();
+    });
+    await new Promise(r => setTimeout(r, 800));
   });
 
   // ═══════════════════════════════════════════════════════════════════
@@ -309,26 +412,41 @@ async function recordSegment(page, name, viewport, actions) {
   await new Promise(r => setTimeout(r, 3000));
 
   await recordSegment(page, "07_search", { width: 850, height: 600 }, async (p) => {
+    await new Promise(r => setTimeout(r, 600));
     const searchInput = await p.$('input[placeholder="Search"]');
     if (searchInput) {
       await searchInput.click();
+      await new Promise(r => setTimeout(r, 500));
+      // Type "React" slowly
+      await p.keyboard.type("React", { delay: 140 });
+      await new Promise(r => setTimeout(r, 1800));
+      // Hover the filtered results
+      const cards = await p.$$('[class*="card"], [class*="Card"]');
+      for (let i = 0; i < Math.min(3, cards.length); i++) {
+        await cards[i].hover();
+        await new Promise(r => setTimeout(r, 500));
+      }
       await new Promise(r => setTimeout(r, 400));
-      // Type "React"
-      await p.keyboard.type("React", { delay: 130 });
-      await new Promise(r => setTimeout(r, 1500));
-      // Clear with triple-click + backspace
-      await searchInput.click({ clickCount: 3 });
-      await new Promise(r => setTimeout(r, 200));
-      await p.keyboard.press("Backspace");
-      await new Promise(r => setTimeout(r, 1200));
-      // Type "Type"
-      await p.keyboard.type("Type", { delay: 130 });
-      await new Promise(r => setTimeout(r, 1500));
       // Clear
       await searchInput.click({ clickCount: 3 });
       await new Promise(r => setTimeout(r, 200));
       await p.keyboard.press("Backspace");
-      await new Promise(r => setTimeout(r, 800));
+      await new Promise(r => setTimeout(r, 1200));
+      // Type "Hono"
+      await p.keyboard.type("Hono", { delay: 140 });
+      await new Promise(r => setTimeout(r, 1800));
+      // Clear and type "Type"
+      await searchInput.click({ clickCount: 3 });
+      await new Promise(r => setTimeout(r, 200));
+      await p.keyboard.press("Backspace");
+      await new Promise(r => setTimeout(r, 1000));
+      await p.keyboard.type("Type", { delay: 140 });
+      await new Promise(r => setTimeout(r, 1800));
+      // Clear to show full list again
+      await searchInput.click({ clickCount: 3 });
+      await new Promise(r => setTimeout(r, 200));
+      await p.keyboard.press("Backspace");
+      await new Promise(r => setTimeout(r, 1000));
     }
   });
 
@@ -346,23 +464,41 @@ async function recordSegment(page, name, viewport, actions) {
   await new Promise(r => setTimeout(r, 2000));
 
   await recordSegment(page, "08_table_wide", { width: 1050, height: 600 }, async (p) => {
-    await new Promise(r => setTimeout(r, 600));
+    await new Promise(r => setTimeout(r, 800));
     // Hover table headers
     const headers = await p.$$("th");
     for (let i = 0; i < Math.min(6, headers.length); i++) {
       await headers[i].hover();
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 400));
     }
+    await new Promise(r => setTimeout(r, 300));
     // Hover rows
     const rows = await p.$$("tr");
-    for (let i = 1; i < Math.min(6, rows.length); i++) {
+    for (let i = 1; i < Math.min(7, rows.length); i++) {
       await rows[i].hover();
-      await new Promise(r => setTimeout(r, 350));
+      await new Promise(r => setTimeout(r, 400));
     }
-    // Click a row
+    // Click a row to open detail panel
     if (rows.length > 3) {
       await rows[3].click();
-      await new Promise(r => setTimeout(r, 1500));
+      await new Promise(r => setTimeout(r, 2000));
+      await smoothScroll(p, "down", 4, 70);
+      await new Promise(r => setTimeout(r, 700));
+      // Close
+      await p.keyboard.press("Escape");
+      await new Promise(r => setTimeout(r, 800));
+    }
+    // Scroll the table
+    await smoothScroll(p, "down", 4, 80);
+    await new Promise(r => setTimeout(r, 600));
+    await smoothScroll(p, "up", 4, 80);
+    await new Promise(r => setTimeout(r, 500));
+    // Click another row
+    if (rows.length > 5) {
+      await rows[5].click();
+      await new Promise(r => setTimeout(r, 2000));
+      await smoothScroll(p, "down", 3, 70);
+      await new Promise(r => setTimeout(r, 800));
     }
   });
 
@@ -374,19 +510,46 @@ async function recordSegment(page, name, viewport, actions) {
   await new Promise(r => setTimeout(r, 2000));
 
   await recordSegment(page, "09_customers", { width: 900, height: 650 }, async (p) => {
-    await new Promise(r => setTimeout(r, 600));
-    // Hover rows
+    await new Promise(r => setTimeout(r, 800));
+    // Hover rows slowly
     const rows = await p.$$("tr");
-    for (let i = 1; i < Math.min(5, rows.length); i++) {
+    for (let i = 1; i < Math.min(6, rows.length); i++) {
       await rows[i].hover();
-      await new Promise(r => setTimeout(r, 350));
+      await new Promise(r => setTimeout(r, 500));
     }
-    // Click to open detail
+    await new Promise(r => setTimeout(r, 400));
+    // Click to open first customer detail
     if (rows.length > 2) {
       await rows[2].click();
-      await new Promise(r => setTimeout(r, 1500));
-      await smoothScroll(p, "down", 5, 80);
-      await new Promise(r => setTimeout(r, 600));
+      await new Promise(r => setTimeout(r, 2000));
+      // Browse the detail panel
+      await smoothScroll(p, "down", 5, 70);
+      await new Promise(r => setTimeout(r, 700));
+      await smoothScroll(p, "up", 3, 70);
+      await new Promise(r => setTimeout(r, 500));
+      // Close
+      await p.keyboard.press("Escape");
+      await new Promise(r => setTimeout(r, 800));
+    }
+    // Open another customer
+    if (rows.length > 4) {
+      await rows[4].click();
+      await new Promise(r => setTimeout(r, 2000));
+      await smoothScroll(p, "down", 4, 70);
+      await new Promise(r => setTimeout(r, 700));
+      // Try switching to JSON tab
+      await p.evaluate(() => {
+        const tabs = Array.from(document.querySelectorAll("button, [role='tab']"));
+        const t = tabs.find(t => t.textContent?.includes("<>"));
+        if (t) t.click();
+      });
+      await new Promise(r => setTimeout(r, 1200));
+      await p.evaluate(() => {
+        const tabs = Array.from(document.querySelectorAll("button, [role='tab']"));
+        const t = tabs.find(t => t.textContent?.includes("Customer"));
+        if (t) t.click();
+      });
+      await new Promise(r => setTimeout(r, 800));
     }
   });
 
@@ -398,40 +561,64 @@ async function recordSegment(page, name, viewport, actions) {
   await new Promise(r => setTimeout(r, 3000));
 
   await recordSegment(page, "10_fullscreen_editor", { width: 850, height: 750 }, async (p) => {
-    await new Promise(r => setTimeout(r, 800));
+    await new Promise(r => setTimeout(r, 1000));
 
     // Scroll down slowly to showcase the block editor content
-    await smoothScroll(p, "down", 4, 60);
-    await new Promise(r => setTimeout(r, 800));
+    await smoothScroll(p, "down", 5, 50);
+    await new Promise(r => setTimeout(r, 1000));
 
-    // Try clicking into a text block to show the editor cursor
+    // Find editable areas
     const textAreas = await p.$$('textarea, [contenteditable="true"], [class*="markdown"], [class*="editor"]');
     console.log(`  Found ${textAreas.length} editable areas`);
+
+    // Click into first editable and type
     if (textAreas.length > 0) {
       await textAreas[0].click();
       await new Promise(r => setTimeout(r, 600));
-      // Type some text
-      await p.keyboard.type("\n\n## New Section\n\nThis is a new paragraph added to the blog post.", { delay: 40 });
+      await p.keyboard.type("Building real-time collaborative dashboards with modern tooling.", { delay: 45 });
+      await new Promise(r => setTimeout(r, 1000));
+    }
+
+    // Scroll down to reveal more blocks
+    await smoothScroll(p, "down", 5, 70);
+    await new Promise(r => setTimeout(r, 800));
+
+    // Click another editable area if available
+    if (textAreas.length > 2) {
+      await textAreas[2].click();
+      await new Promise(r => setTimeout(r, 500));
+      await p.keyboard.type("## Architecture Overview\n\nThe system uses an event-driven pattern.", { delay: 40 });
+      await new Promise(r => setTimeout(r, 1000));
+    }
+
+    // Continue scrolling
+    await smoothScroll(p, "down", 6, 70);
+    await new Promise(r => setTimeout(r, 800));
+    await smoothScroll(p, "down", 4, 70);
+    await new Promise(r => setTimeout(r, 700));
+
+    // Scroll all the way back up
+    await smoothScroll(p, "up", 8, 100);
+    await new Promise(r => setTimeout(r, 800));
+
+    // Click into title field if visible
+    const titleInput = await p.$('input[type="text"]');
+    if (titleInput) {
+      await titleInput.click({ clickCount: 3 });
+      await new Promise(r => setTimeout(r, 400));
+      await p.keyboard.type("The Complete Guide to Edge Computing", { delay: 50 });
       await new Promise(r => setTimeout(r, 800));
     }
 
-    // Scroll more to show content blocks
-    await smoothScroll(p, "down", 6, 80);
-    await new Promise(r => setTimeout(r, 600));
-    await smoothScroll(p, "down", 4, 80);
-    await new Promise(r => setTimeout(r, 600));
-
-    // Scroll back up
-    await smoothScroll(p, "up", 6, 100);
-    await new Promise(r => setTimeout(r, 600));
-
-    // Try switching to JSON tab to show raw data view
+    // Switch to JSON tab
     await p.evaluate(() => {
       const tabs = Array.from(document.querySelectorAll("button, [role='tab']"));
-      const jsonTab = tabs.find(t => t.textContent?.includes("<>") || t.textContent?.includes("JSON") || t.getAttribute("aria-label")?.includes("json"));
+      const jsonTab = tabs.find(t => t.textContent?.includes("<>") || t.textContent?.includes("JSON"));
       if (jsonTab) jsonTab.click();
     });
-    await new Promise(r => setTimeout(r, 1200));
+    await new Promise(r => setTimeout(r, 1500));
+    await smoothScroll(p, "down", 4, 70);
+    await new Promise(r => setTimeout(r, 600));
 
     // Switch back to main tab
     await p.evaluate(() => {
@@ -439,6 +626,8 @@ async function recordSegment(page, name, viewport, actions) {
       const mainTab = tabs.find(t => t.textContent?.includes("Blog post") || t.textContent?.includes("Post"));
       if (mainTab) mainTab.click();
     });
+    await new Promise(r => setTimeout(r, 1000));
+    await smoothScroll(p, "down", 3, 60);
     await new Promise(r => setTimeout(r, 800));
   });
 
@@ -452,14 +641,8 @@ async function recordSegment(page, name, viewport, actions) {
 
   const mp4s = fs.readdirSync(SEGMENTS_DIR).filter(f => f.endsWith(".mp4")).sort();
   for (const f of mp4s) {
-    const p = `${SEGMENTS_DIR}/${f}`;
-    const st = fs.statSync(p);
-    const name = f.replace(".mp4", "");
-    const framesDir = `${SEGMENTS_DIR}/${name}/frames`;
-    let fcount = 0;
-    try { fcount = fs.readdirSync(framesDir).length; } catch {}
-    const secs = (fcount / FPS).toFixed(1);
-    console.log(`  📹 ${f.padEnd(28)} │ ${String(fcount).padStart(4)} frames │ ~${secs}s │ ${(st.size / 1024).toFixed(0)} KB`);
+    const st = fs.statSync(`${SEGMENTS_DIR}/${f}`);
+    console.log(`  📹 ${f.padEnd(28)} │ ${(st.size / 1024).toFixed(0)} KB`);
   }
   console.log(`\n  Total: ${mp4s.length} segments → ${SEGMENTS_DIR}/\n`);
 })();

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from "react";
-import { Typography, Button, cls, defaultBorderMixin, iconSize } from "@rebasepro/ui";
+import { Typography, Button, TextField, IconButton, cls, defaultBorderMixin, iconSize } from "@rebasepro/ui";
 import { LoaderIcon, SendIcon, PlusIcon, XIcon } from "lucide-react";
 import { useRebaseContext, UserSelectPopover, SelectableUser } from "@rebasepro/core";
 import { AuthSimulationSelector } from "../AuthSimulationSelector";
@@ -233,19 +233,15 @@ time: elapsed });
                         >
                             Request Body
                         </Typography>
-                        <textarea
+                        <TextField
+                            multiline
+                            minRows={10}
                             value={body}
                             onChange={(e) => { setBody(e.target.value); setValidationError(null); }}
-                            rows={10}
                             spellCheck={false}
-                            className={cls(
-                                "w-full font-mono text-xs p-3 rounded-lg resize-y",
-                                "bg-surface-50 dark:bg-surface-900",
-                                validationError ? "border-red-500 focus:ring-red-500/30" : cls("border focus:ring-primary/30 dark:focus:ring-primary-dark/30", defaultBorderMixin),
-                                "text-text-primary dark:text-text-primary-dark",
-                                "focus:outline-none focus:ring-2",
-                                "transition-all"
-                            )}
+                            error={!!validationError}
+                            className="w-full"
+                            inputClassName="font-mono text-xs p-3 resize-y"
                         />
                         {validationError && (
                             <Typography variant="caption" className="text-red-500 mt-1 block text-xs">
@@ -352,21 +348,13 @@ function ParamSection({
                             <code className="text-xs font-mono font-semibold">{p.name}</code>
                             {p.required && <span className="text-red-500 ml-0.5 text-xs">*</span>}
                         </label>
-                        <input
-                            type="text"
+                        <TextField
+                            size="small"
                             placeholder={p.description ?? p.name}
                             value={values[p.name] ?? ""}
                             onChange={(e) => onChange(p.name, e.target.value)}
-                            className={cls(
-                                "flex-1 px-3 py-1.5 text-xs rounded-lg font-mono",
-                                "bg-surface-50 dark:bg-surface-900",
-                                "border",
-                                defaultBorderMixin,
-                                "text-text-primary dark:text-text-primary-dark",
-                                "placeholder:text-text-secondary/50",
-                                "focus:outline-none focus:ring-2 focus:ring-primary/30",
-                                "transition-all"
-                            )}
+                            className="flex-1"
+                            inputClassName="font-mono text-xs"
                         />
                     </div>
                 ))}
@@ -397,55 +385,43 @@ function CustomKeyValueSection({
                 >
                     {title}
                 </Typography>
-                <button
+                <Button
+                    variant="text"
+                    size="small"
+                    color="primary"
                     onClick={onAdd}
-                    className="text-xs text-primary dark:text-primary-dark hover:underline flex items-center gap-1 font-medium"
+                    className="text-xs p-0 min-h-0"
                 >
                     <PlusIcon size={iconSize.small} className="mr-1" /> Add Header
-                </button>
+                </Button>
             </div>
             <div className="space-y-2">
                 {values.map((v, i) => (
                     <div key={i} className="flex items-center gap-2">
-                        <input
-                            type="text"
+                        <TextField
+                            size="small"
                             placeholder="Header name"
                             value={v.key}
                             onChange={(e) => onChange(i, e.target.value, v.value)}
-                            className={cls(
-                                "w-1/3 px-3 py-1.5 text-xs rounded-lg font-mono",
-                                "bg-surface-50 dark:bg-surface-900",
-                                "border",
-                                defaultBorderMixin,
-                                "text-text-primary dark:text-text-primary-dark",
-                                "placeholder:text-text-secondary/50",
-                                "focus:outline-none focus:ring-2 focus:ring-primary/30",
-                                "transition-all"
-                            )}
+                            className="w-1/3"
+                            inputClassName="font-mono text-xs"
                         />
-                        <input
-                            type="text"
+                        <TextField
+                            size="small"
                             placeholder="Value"
                             value={v.value}
                             onChange={(e) => onChange(i, v.key, e.target.value)}
-                            className={cls(
-                                "flex-1 px-3 py-1.5 text-xs rounded-lg font-mono",
-                                "bg-surface-50 dark:bg-surface-900",
-                                "border",
-                                defaultBorderMixin,
-                                "text-text-primary dark:text-text-primary-dark",
-                                "placeholder:text-text-secondary/50",
-                                "focus:outline-none focus:ring-2 focus:ring-primary/30",
-                                "transition-all"
-                            )}
+                            className="flex-1"
+                            inputClassName="font-mono text-xs"
                         />
-                        <button
+                        <IconButton
+                            size="small"
                             onClick={() => onRemove(i)}
-                            className="p-1.5 text-text-secondary hover:text-red-500 rounded transition-colors flex items-center justify-center shrink-0"
+                            className="text-text-secondary hover:text-red-500 shrink-0"
                             title="Remove"
                         >
                             <XIcon size={iconSize.small} />
-                        </button>
+                        </IconButton>
                     </div>
                 ))}
                 {values.length === 0 && (
