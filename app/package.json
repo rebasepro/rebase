@@ -20,11 +20,9 @@
         "db:studio": "rebase db studio",
         "schema:generate": "rebase schema generate --collections ../config/collections",
         "generate:sdk": "rebase generate-sdk",
-        "e2e": "npx playwright test",
         "deploy": "pnpm run build && pnpm run start"
     },
     "devDependencies": {
-        "@playwright/test": "1.59.1",
         "@rebasepro/cli": "workspace:*",
         "@rebasepro/types": "workspace:*",
         "concurrently": "^8.2.2",

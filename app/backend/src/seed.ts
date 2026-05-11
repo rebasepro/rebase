@@ -63,7 +63,7 @@ function downloadFile(url: string): Promise<Buffer> {
 async function downloadAndStore(url: string, storagePath: string, filename: string): Promise<string> {
     const dir = path.join(UPLOADS_DIR, storagePath);
     fs.mkdirSync(dir, { recursive: true });
-    const id = randomId();
+    const id = createHash("md5").update(url).digest("hex").substring(0, 5);
     const localName = `${id}_${filename}`;
     const filePath = path.join(dir, localName);
     const metaPath = filePath + ".metadata.json";
