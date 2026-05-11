@@ -5,6 +5,7 @@ import { UrlComponentPreview } from "./UrlComponentPreview";
 import { ErrorView, useStorageSource } from "@rebasepro/core";
 import { DownloadConfig, FileType } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
+import { Skeleton } from "@rebasepro/ui";
 type StorageThumbnailProps = {
     storagePathOrDownloadUrl: string;
     storeUrl: boolean;
@@ -76,7 +77,9 @@ export function StorageThumbnailInternal({
             size={size}
             fill={fill}
             hint={storagePathOrDownloadUrl}/>
-        : renderSkeletonImageThumbnail(size);
+        : fill
+            ? <Skeleton className="w-full h-full"/>
+            : renderSkeletonImageThumbnail(size);
 }
 
 function getFiletype(input: string): FileType {

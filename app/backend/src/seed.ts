@@ -268,6 +268,11 @@ function randomName() {
 
 // ── Main ──────────────────────────────────────────────────────────────
 export async function runSeed() {
+    // Reset the deterministic RNG so randomId() produces the same
+    // filenames on every run — this lets downloadAndStore's existsSync
+    // check skip images that are already on disk.
+    _seed = 1337;
+
     console.log("🌱 Connecting to database...");
     const { db, pool } = createPostgresDatabaseConnection(env.DATABASE_URL, undefined, { max: 1 });
 

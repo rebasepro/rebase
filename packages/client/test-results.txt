@@ -1,0 +1,772 @@
+npm warn Unknown project config "link-workspace-packages". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown project config "hoist". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown project config "public-hoist-pattern". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown project config "auto-install-peers". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown project config "prefer-workspace-packages". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+(node:35339) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+FAIL test/relations.test.ts
+  ● BUG: count() not implemented › count is not defined on CollectionClient
+
+    expect(received).toBeUndefined()
+
+    Received: [Function count]
+
+      1010 |         // CollectionAccessor type declares count?() as optional, but
+      1011 |         // createCollectionClient doesn't implement it
+    > 1012 |         expect((c as any).count).toBeUndefined();
+           |                                  ^
+      1013 |     });
+      1014 | });
+      1015 |
+
+      at Object.<anonymous> (test/relations.test.ts:1012:34)
+
+PASS test/websocket.test.ts
+  ● Console
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Disconnected from PostgreSQL backend
+
+      at MockWebSocket.ws.onclose (src/websocket.ts:272:25)
+
+    console.debug
+      Attempting to reconnect in 2000ms (attempt 1)
+
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:322:17)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      [RebaseWS] Row 1 refetch mismatch:
+       {
+        "author": {
+          "cached": {
+            "__type": "relation",
+            "id": "2",
+            "path": "users"
+          },
+          "incoming": {
+            "__type": "relation",
+            "id": "3",
+            "path": "users"
+          }
+        }
+      }
+
+      at src/websocket.ts:894:29
+          at Array.map (<anonymous>)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Disconnected from PostgreSQL backend
+
+      at MockWebSocket.ws.onclose (src/websocket.ts:272:25)
+
+    console.debug
+      Attempting to reconnect in 2000ms (attempt 1)
+
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:322:17)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Disconnected from PostgreSQL backend
+
+      at MockWebSocket.ws.onclose (src/websocket.ts:272:25)
+
+    console.debug
+      Attempting to reconnect in 2000ms (attempt 1)
+
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:322:17)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      [WS] Re-subscribing: 0 collection(s), 0 entity(ies)
+
+      at RebaseWebSocketClient.resubscribeAll (src/websocket.ts:1104:17)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Disconnected from PostgreSQL backend
+
+      at MockWebSocket.ws.onclose (src/websocket.ts:272:25)
+
+    console.debug
+      Attempting to reconnect in 2000ms (attempt 1)
+
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:322:17)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Disconnected from PostgreSQL backend
+
+      at MockWebSocket.ws.onclose (src/websocket.ts:272:25)
+
+    console.debug
+      Attempting to reconnect in 2000ms (attempt 1)
+
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:322:17)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      [WS] Re-subscribing: 0 collection(s), 0 entity(ies)
+
+      at RebaseWebSocketClient.resubscribeAll (src/websocket.ts:1104:17)
+
+    console.debug
+      Disconnected from PostgreSQL backend
+
+      at MockWebSocket.ws.onclose (src/websocket.ts:272:25)
+
+    console.debug
+      Attempting to reconnect in 2000ms (attempt 1)
+
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:322:17)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      [WS] Re-subscribing: 0 collection(s), 0 entity(ies)
+
+      at RebaseWebSocketClient.resubscribeAll (src/websocket.ts:1104:17)
+
+    console.debug
+      Disconnected from PostgreSQL backend
+
+      at MockWebSocket.ws.onclose (src/websocket.ts:272:25)
+
+    console.debug
+      Attempting to reconnect in 2000ms (attempt 1)
+
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:322:17)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      [WS] Re-subscribing: 0 collection(s), 0 entity(ies)
+
+      at RebaseWebSocketClient.resubscribeAll (src/websocket.ts:1104:17)
+
+    console.debug
+      Disconnected from PostgreSQL backend
+
+      at MockWebSocket.ws.onclose (src/websocket.ts:272:25)
+
+    console.debug
+      Attempting to reconnect in 2000ms (attempt 1)
+
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:322:17)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      [WS] Re-subscribing: 0 collection(s), 0 entity(ies)
+
+      at RebaseWebSocketClient.resubscribeAll (src/websocket.ts:1104:17)
+
+    console.debug
+      Disconnected from PostgreSQL backend
+
+      at MockWebSocket.ws.onclose (src/websocket.ts:272:25)
+
+    console.debug
+      Attempting to reconnect in 2000ms (attempt 1)
+
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:322:17)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      [WS] Re-subscribing: 0 collection(s), 0 entity(ies)
+
+      at RebaseWebSocketClient.resubscribeAll (src/websocket.ts:1104:17)
+
+    console.debug
+      Disconnected from PostgreSQL backend
+
+      at MockWebSocket.ws.onclose (src/websocket.ts:272:25)
+
+    console.debug
+      Attempting to reconnect in 2000ms (attempt 1)
+
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:322:17)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      [WS] Re-subscribing: 0 collection(s), 0 entity(ies)
+
+      at RebaseWebSocketClient.resubscribeAll (src/websocket.ts:1104:17)
+
+    console.debug
+      Disconnected from PostgreSQL backend
+
+      at MockWebSocket.ws.onclose (src/websocket.ts:272:25)
+
+    console.debug
+      Attempting to reconnect in 2000ms (attempt 1)
+
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:322:17)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      [WS] Re-subscribing: 0 collection(s), 0 entity(ies)
+
+      at RebaseWebSocketClient.resubscribeAll (src/websocket.ts:1104:17)
+
+    console.debug
+      Disconnected from PostgreSQL backend
+
+      at MockWebSocket.ws.onclose (src/websocket.ts:272:25)
+
+    console.debug
+      Attempting to reconnect in 2000ms (attempt 1)
+
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:322:17)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      [WS] Re-subscribing: 0 collection(s), 0 entity(ies)
+
+      at RebaseWebSocketClient.resubscribeAll (src/websocket.ts:1104:17)
+
+    console.debug
+      Disconnected from PostgreSQL backend
+
+      at MockWebSocket.ws.onclose (src/websocket.ts:272:25)
+
+    console.debug
+      Attempting to reconnect in 2000ms (attempt 1)
+
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:322:17)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      [WS] Re-subscribing: 0 collection(s), 0 entity(ies)
+
+      at RebaseWebSocketClient.resubscribeAll (src/websocket.ts:1104:17)
+
+    console.debug
+      Disconnected from PostgreSQL backend
+
+      at MockWebSocket.ws.onclose (src/websocket.ts:272:25)
+
+    console.debug
+      Attempting to reconnect in 2000ms (attempt 1)
+
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:322:17)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      [WS] Re-subscribing: 0 collection(s), 0 entity(ies)
+
+      at RebaseWebSocketClient.resubscribeAll (src/websocket.ts:1104:17)
+
+    console.debug
+      Disconnected from PostgreSQL backend
+
+      at MockWebSocket.ws.onclose (src/websocket.ts:272:25)
+
+    console.debug
+      Attempting to reconnect in 2000ms (attempt 1)
+
+      at RebaseWebSocketClient.attemptReconnect (src/websocket.ts:322:17)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      WebSocket auto-authenticating after token getter set
+
+      at RebaseWebSocketClient.setAuthTokenGetter (src/websocket.ts:193:21)
+
+    console.debug
+      WebSocket authenticated on demand
+
+      at RebaseWebSocketClient.ensureAuthenticated (src/websocket.ts:537:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      WebSocket auto-authenticating after token getter set
+
+      at RebaseWebSocketClient.setAuthTokenGetter (src/websocket.ts:193:21)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      WebSocket auto-authenticating after token getter set
+
+      at RebaseWebSocketClient.setAuthTokenGetter (src/websocket.ts:193:21)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      WebSocket auto-authenticating after token getter set
+
+      at RebaseWebSocketClient.setAuthTokenGetter (src/websocket.ts:193:21)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      WebSocket auto-authenticating after token getter set
+
+      at RebaseWebSocketClient.setAuthTokenGetter (src/websocket.ts:193:21)
+
+    console.debug
+      WebSocket auth attempt 1 failed, retrying in 1000ms...
+
+      at RebaseWebSocketClient.ensureAuthenticated (src/websocket.ts:563:29)
+
+    console.debug
+      WebSocket auth attempt 2 failed, retrying in 2000ms...
+
+      at RebaseWebSocketClient.ensureAuthenticated (src/websocket.ts:563:29)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      WebSocket auto-authenticated
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:244:37)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      WebSocket auto-authenticating after token getter set
+
+      at RebaseWebSocketClient.setAuthTokenGetter (src/websocket.ts:193:21)
+
+    console.debug
+      WebSocket authenticated on demand
+
+      at RebaseWebSocketClient.ensureAuthenticated (src/websocket.ts:537:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+    console.debug
+      Connected to PostgreSQL backend
+
+      at MockWebSocket.ws.onopen (src/websocket.ts:233:25)
+
+PASS test/index.test.ts
+PASS test/transport.test.ts
+PASS test/collection.test.ts
+PASS test/query_builder.test.ts
+PASS test/auth.test.ts
+PASS test/admin.test.ts
+PASS src/cron.test.ts
+PASS test/storage.test.ts
+FAIL src/collection.test.ts
+  ● Test suite failed to run
+
+    Vitest cannot be imported in a CommonJS module using require(). Please use "import" instead.
+
+    If you are using "import" in your source code, then it's possible it was bundled into require() automatically by your bundler. In that case, do not bundle CommonJS output since it will never work with Vitest, or use dynamic import() which is available in all CommonJS modules.
+
+    > 1 | import { describe, it, expect, vi, beforeEach } from "vitest";
+        | ^
+      2 | import { createCollectionClient } from "./collection";
+      3 | import type { Transport } from "./transport";
+      4 |
+
+      at Object.<anonymous> (../../node_modules/vitest/index.cjs:1:109)
+      at Object.<anonymous> (src/collection.test.ts:1:1)
+
+Test Suites: 2 failed, 9 passed, 11 total
+Tests:       1 failed, 483 passed, 484 total
+Snapshots:   0 total
+Time:        0.656 s, estimated 1 s
+Ran all test suites.
