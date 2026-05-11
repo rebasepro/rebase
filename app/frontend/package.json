@@ -14,6 +14,7 @@
         "@rebasepro/studio": "workspace:*",
         "@rebasepro/types": "workspace:*",
         "@rebasepro/ui": "workspace:*",
+        "@tailwindcss/typography": "^0.5.19",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
         "react-router-dom": "^7.0.0",
