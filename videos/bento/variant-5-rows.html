@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>Rebase — Bento Variant 5: Minimal Rows</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: #09090b;
+    font-family: 'Inter', system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 40px 60px;
+  }
+
+  .row {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .cell {
+    position: relative;
+    flex: 1;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #18181b;
+    border: 1px solid rgba(255,255,255,0.05);
+    opacity: 0;
+    animation: rowSlide 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+
+  .cell video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .cell::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    background: linear-gradient(to bottom, transparent 70%, rgba(0,0,0,0.3) 100%);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  /* Sizing overrides */
+  .wide   { flex: 2.5; }
+  .narrow { flex: 0.8; }
+  .medium { flex: 1.2; }
+
+  /* Stagger by row */
+  .row:nth-child(1) .cell { animation-delay: 0.1s; }
+  .row:nth-child(2) .cell { animation-delay: 0.25s; }
+  .row:nth-child(3) .cell { animation-delay: 0.4s; }
+
+  .row:nth-child(1) .cell:nth-child(2) { animation-delay: 0.15s; }
+  .row:nth-child(1) .cell:nth-child(3) { animation-delay: 0.2s; }
+  .row:nth-child(2) .cell:nth-child(2) { animation-delay: 0.3s; }
+  .row:nth-child(2) .cell:nth-child(3) { animation-delay: 0.35s; }
+  .row:nth-child(2) .cell:nth-child(4) { animation-delay: 0.4s; }
+  .row:nth-child(3) .cell:nth-child(2) { animation-delay: 0.45s; }
+  .row:nth-child(3) .cell:nth-child(3) { animation-delay: 0.5s; }
+
+  @keyframes rowSlide {
+    from { opacity: 0; transform: translateY(24px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  /* Labels */
+  .label {
+    position: absolute;
+    bottom: 8px;
+    left: 10px;
+    font-size: 9px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    z-index: 3;
+  }
+
+  .wide .label { font-size: 11px; bottom: 12px; left: 14px; }
+
+  /* Top accent line */
+  .cell::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20%;
+    right: 20%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(99,102,241,0.2), transparent);
+    z-index: 3;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<!-- Row 1: 3 cells -->
+<div class="row">
+  <div class="cell wide">
+    <video src="../segments/10_fullscreen_editor.mp4" autoplay loop muted playsinline></video>
+    <div class="label">Block Editor</div>
+  </div>
+  <div class="cell">
+    <video src="../segments/01_dashboard.mp4" autoplay loop muted playsinline></video>
+    <div class="label">Dashboard</div>
+  </div>
+  <div class="cell narrow">
+    <video src="../segments/09_customers.mp4" autoplay loop muted playsinline></video>
+    <div class="label">CRM</div>
+  </div>
+</div>
+
+<!-- Row 2: 4 cells -->
+<div class="row">
+  <div class="cell">
+    <video src="../segments/04_entity_edit.mp4" autoplay loop muted playsinline></video>
+    <div class="label">Entity Edit</div>
+  </div>
+  <div class="cell medium">
+    <video src="../segments/07_search.mp4" autoplay loop muted playsinline></video>
+    <div class="label">Search</div>
+  </div>
+  <div class="cell medium">
+    <video src="../segments/05_kanban.mp4" autoplay loop muted playsinline></video>
+    <div class="label">Kanban</div>
+  </div>
+  <div class="cell">
+    <video src="../segments/03_orders_table.mp4" autoplay loop muted playsinline></video>
+    <div class="label">Orders</div>
+  </div>
+</div>
+
+<!-- Row 3: 3 cells -->
+<div class="row">
+  <div class="cell narrow">
+    <video src="../segments/06_product_edit.mp4" autoplay loop muted playsinline></video>
+    <div class="label">Products</div>
+  </div>
+  <div class="cell wide">
+    <video src="../segments/08_table_wide.mp4" autoplay loop muted playsinline></video>
+    <div class="label">Data Table</div>
+  </div>
+  <div class="cell">
+    <video src="../segments/02_view_switch.mp4" autoplay loop muted playsinline></video>
+    <div class="label">Views</div>
+  </div>
+</div>
+
+</body>
+</html>

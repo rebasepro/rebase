@@ -1,0 +1,527 @@
+Scope: 26 of 27 workspace projects
+packages/formex build$ vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+videos build$ remotion bundle
+packages/types build$ vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+packages/types build: vite v5.4.21 building for production...
+packages/formex build: vite v7.3.1 building client environment for production...
+packages/formex build: transforming...
+packages/types build: transforming...
+packages/types build: ✓ 48 modules transformed.
+packages/types build: rendering chunks...
+packages/formex build: ✓ 6 modules transformed.
+packages/types build: computing gzip size...
+packages/types build: dist/index.es.js  5.31 kB │ gzip: 1.45 kB │ map: 71.00 kB
+packages/formex build: rendering chunks...
+packages/types build: dist/index.umd.js  6.59 kB │ gzip: 1.72 kB │ map: 71.12 kB
+packages/types build: ✓ built in 460ms
+packages/formex build: computing gzip size...
+packages/formex build: dist/index.es.js  14.19 kB │ gzip: 3.69 kB │ map: 33.68 kB
+packages/formex build: No name was provided for external module "react-compiler-runtime" in "output.globals" – guessing "reactCompilerRuntime".
+packages/formex build: No name was provided for external module "react" in "output.globals" – guessing "React".
+packages/formex build: No name was provided for external module "react/jsx-runtime" in "output.globals" – guessing "jsxRuntime".
+packages/formex build: dist/index.umd.js  16.66 kB │ gzip: 4.12 kB │ map: 34.02 kB
+packages/formex build: ✓ built in 449ms
+videos build: Bundling 6%
+videos build: Bundling 13%
+videos build: Bundling 49%
+videos build: Bundling 65%
+videos build: Bundling 71%
+videos build: Bundling 76%
+videos build: Bundling 81%
+videos build: Bundling 87%
+videos build: Bundling 92%
+videos build: Bundling 98%
+packages/types build: Done
+packages/formex build: Done
+videos build: ○ /Users/francesco/rebase/videos/build
+videos build: Done
+app/config build$ tsc
+packages/utils build$ vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+packages/ui build$ rm -rf dist || true && vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+packages/utils build: vite v5.4.21 building for production...
+packages/ui build: vite v7.3.1 building client environment for production...
+packages/ui build: transforming...
+packages/utils build: transforming...
+packages/utils build: ✓ 12 modules transformed.
+packages/utils build: rendering chunks...
+packages/utils build: computing gzip size...
+packages/utils build: dist/index.es.js  18.24 kB │ gzip: 5.16 kB │ map: 48.01 kB
+packages/utils build: No name was provided for external module "object-hash" in "output.globals" – guessing "hash".
+packages/utils build: No name was provided for external module "@rebasepro/types" in "output.globals" – guessing "types".
+packages/utils build: dist/index.umd.js  20.76 kB │ gzip: 5.53 kB │ map: 48.28 kB
+packages/utils build: ✓ built in 283ms
+app/config build: Done
+packages/utils build: Done
+packages/ui build: ✓ 81 modules transformed.
+packages/ui build: rendering chunks...
+packages/ui build: computing gzip size...
+packages/ui build: [vite-plugin-static-copy] Copied 1 items.
+packages/ui build: dist/index.es.js  287.12 kB │ gzip: 65.05 kB │ map: 542.11 kB
+packages/ui build: No name was provided for external module "react/jsx-runtime" in "output.globals" – guessing "jsxRuntime".
+packages/ui build: No name was provided for external module "react/jsx-runtime" in "output.globals" – guessing "jsxRuntime".
+packages/ui build: No name was provided for external module "react-compiler-runtime" in "output.globals" – guessing "reactCompilerRuntime".
+packages/ui build: No name was provided for external module "react-compiler-runtime" in "output.globals" – guessing "reactCompilerRuntime".
+packages/ui build: No name was provided for external module "clsx" in "output.globals" – guessing "clsx".
+packages/ui build: No name was provided for external module "clsx" in "output.globals" – guessing "clsx".
+packages/ui build: No name was provided for external module "tailwind-merge" in "output.globals" – guessing "tailwindMerge".
+packages/ui build: No name was provided for external module "tailwind-merge" in "output.globals" – guessing "tailwindMerge".
+packages/ui build: No name was provided for external module "react" in "output.globals" – guessing "React".
+packages/ui build: No name was provided for external module "react" in "output.globals" – guessing "React".
+packages/ui build: No name was provided for external module "@radix-ui/react-collapsible" in "output.globals" – guessing "Collapsible".
+packages/ui build: No name was provided for external module "@radix-ui/react-collapsible" in "output.globals" – guessing "Collapsible".
+packages/ui build: No name was provided for external module "lucide-react" in "output.globals" – guessing "lucideReact".
+packages/ui build: No name was provided for external module "lucide-react" in "output.globals" – guessing "lucideReact".
+packages/ui build: No name was provided for external module "@radix-ui/react-checkbox" in "output.globals" – guessing "CheckboxPrimitive".
+packages/ui build: No name was provided for external module "@radix-ui/react-checkbox" in "output.globals" – guessing "CheckboxPrimitive".
+packages/ui build: No name was provided for external module "@radix-ui/react-tooltip" in "output.globals" – guessing "TooltipPrimitive".
+packages/ui build: No name was provided for external module "@radix-ui/react-tooltip" in "output.globals" – guessing "TooltipPrimitive".
+packages/ui build: No name was provided for external module "@radix-ui/react-dialog" in "output.globals" – guessing "DialogPrimitive".
+packages/ui build: No name was provided for external module "@radix-ui/react-dialog" in "output.globals" – guessing "DialogPrimitive".
+packages/ui build: No name was provided for external module "@radix-ui/react-visually-hidden" in "output.globals" – guessing "VisuallyHidden".
+packages/ui build: No name was provided for external module "@radix-ui/react-visually-hidden" in "output.globals" – guessing "VisuallyHidden".
+packages/ui build: No name was provided for external module "react-dropzone" in "output.globals" – guessing "reactDropzone".
+packages/ui build: No name was provided for external module "react-dropzone" in "output.globals" – guessing "reactDropzone".
+packages/ui build: No name was provided for external module "@radix-ui/react-label" in "output.globals" – guessing "LabelPrimitive".
+packages/ui build: No name was provided for external module "@radix-ui/react-label" in "output.globals" – guessing "LabelPrimitive".
+packages/ui build: No name was provided for external module "markdown-it" in "output.globals" – guessing "MarkdownIt".
+packages/ui build: No name was provided for external module "markdown-it" in "output.globals" – guessing "MarkdownIt".
+packages/ui build: No name was provided for external module "@radix-ui/react-dropdown-menu" in "output.globals" – guessing "DropdownMenu".
+packages/ui build: No name was provided for external module "@radix-ui/react-dropdown-menu" in "output.globals" – guessing "DropdownMenu".
+packages/ui build: No name was provided for external module "@radix-ui/react-menubar" in "output.globals" – guessing "MenubarPrimitive".
+packages/ui build: No name was provided for external module "@radix-ui/react-menubar" in "output.globals" – guessing "MenubarPrimitive".
+packages/ui build: No name was provided for external module "@radix-ui/react-popover" in "output.globals" – guessing "PopoverPrimitive".
+packages/ui build: No name was provided for external module "@radix-ui/react-popover" in "output.globals" – guessing "PopoverPrimitive".
+packages/ui build: No name was provided for external module "cmdk" in "output.globals" – guessing "cmdk".
+packages/ui build: No name was provided for external module "cmdk" in "output.globals" – guessing "cmdk".
+packages/ui build: No name was provided for external module "@radix-ui/react-separator" in "output.globals" – guessing "SeparatorPrimitive".
+packages/ui build: No name was provided for external module "@radix-ui/react-separator" in "output.globals" – guessing "SeparatorPrimitive".
+packages/ui build: No name was provided for external module "@radix-ui/react-radio-group" in "output.globals" – guessing "RadioGroupPrimitive".
+packages/ui build: No name was provided for external module "@radix-ui/react-radio-group" in "output.globals" – guessing "RadioGroupPrimitive".
+packages/ui build: No name was provided for external module "@radix-ui/react-select" in "output.globals" – guessing "SelectPrimitive".
+packages/ui build: No name was provided for external module "@radix-ui/react-select" in "output.globals" – guessing "SelectPrimitive".
+packages/ui build: No name was provided for external module "@radix-ui/react-slider" in "output.globals" – guessing "SliderPrimitive".
+packages/ui build: No name was provided for external module "@radix-ui/react-slider" in "output.globals" – guessing "SliderPrimitive".
+packages/ui build: No name was provided for external module "react-dom" in "output.globals" – guessing "ReactDOM".
+packages/ui build: No name was provided for external module "react-dom" in "output.globals" – guessing "ReactDOM".
+packages/ui build: No name was provided for external module "@radix-ui/react-tabs" in "output.globals" – guessing "TabsPrimitive".
+packages/ui build: No name was provided for external module "@radix-ui/react-tabs" in "output.globals" – guessing "TabsPrimitive".
+packages/ui build: No name was provided for external module "react-window" in "output.globals" – guessing "reactWindow".
+packages/ui build: No name was provided for external module "react-window" in "output.globals" – guessing "reactWindow".
+packages/ui build: No name was provided for external module "react-use-measure" in "output.globals" – guessing "useMeasure".
+packages/ui build: No name was provided for external module "react-use-measure" in "output.globals" – guessing "useMeasure".
+packages/ui build: No name was provided for external module "@dnd-kit/sortable" in "output.globals" – guessing "sortable".
+packages/ui build: No name was provided for external module "@dnd-kit/sortable" in "output.globals" – guessing "sortable".
+packages/ui build: No name was provided for external module "@dnd-kit/core" in "output.globals" – guessing "core".
+packages/ui build: No name was provided for external module "@dnd-kit/core" in "output.globals" – guessing "core".
+packages/ui build: dist/index.umd.js  317.05 kB │ gzip: 67.39 kB │ map: 547.17 kB
+packages/ui build: ✓ built in 1.87s
+packages/ui build: Done
+packages/client build$ vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+packages/common build$ vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+packages/schema-inference build$ vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+packages/schema-inference build: vite v7.3.1 building client environment for production...
+packages/schema-inference build: transforming...
+packages/client build: vite v5.4.21 building for production...
+packages/schema-inference build: ✓ 7 modules transformed.
+packages/common build: vite v5.4.21 building for production...
+packages/client build: transforming...
+packages/schema-inference build: rendering chunks...
+packages/schema-inference build: computing gzip size...
+packages/schema-inference build: dist/index.es.js  16.72 kB │ gzip: 3.93 kB │ map: 35.43 kB
+packages/schema-inference build: No name was provided for external module "@rebasepro/utils" in "output.globals" – guessing "utils".
+packages/schema-inference build: dist/index.umd.cjs  18.86 kB │ gzip: 4.20 kB │ map: 35.70 kB
+packages/schema-inference build: ✓ built in 70ms
+packages/client build: ✓ 10 modules transformed.
+packages/client build: rendering chunks...
+packages/client build: computing gzip size...
+packages/client build: dist/index.es.js  72.10 kB │ gzip: 14.59 kB │ map: 161.87 kB
+packages/client build: No name was provided for external module "@rebasepro/types" in "output.globals" – guessing "types".
+packages/client build: No name was provided for external module "@rebasepro/utils" in "output.globals" – guessing "utils".
+packages/client build: dist/index.umd.js  77.42 kB │ gzip: 14.99 kB │ map: 162.27 kB
+packages/client build: ✓ built in 147ms
+packages/common build: transforming...
+packages/common build: ✓ 21 modules transformed.
+packages/common build: rendering chunks...
+packages/common build: computing gzip size...
+packages/common build: dist/index.es.js  75.32 kB │ gzip: 15.91 kB │ map: 189.65 kB
+packages/common build: No name was provided for external module "@rebasepro/types" in "output.globals" – guessing "types".
+packages/common build: No name was provided for external module "@rebasepro/utils" in "output.globals" – guessing "utils".
+packages/common build: dist/index.umd.js  82.45 kB │ gzip: 16.49 kB │ map: 190.55 kB
+packages/common build: ✓ built in 538ms
+packages/schema-inference build: Done
+packages/client build: Done
+packages/common build: Done
+packages/core build$ vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && pnpm exec esbuild src/vitePlugin.ts --platform=node --format=esm --outfile=dist/vitePlugin.js
+packages/sdk-generator build$ vite build && tsc --emitDeclarationOnly -p tsconfig.json
+packages/client-postgresql build$ vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+packages/mcp-server build$ tsc
+packages/sdk-generator build: vite v7.3.1 building client environment for production...
+packages/core build: vite v7.3.1 building client environment for production...
+packages/sdk-generator build: transforming...
+packages/sdk-generator build: ✓ 3 modules transformed.
+packages/client-postgresql build: vite v5.4.21 building for production...
+packages/sdk-generator build: rendering chunks...
+packages/sdk-generator build: computing gzip size...
+packages/sdk-generator build: dist/index.es.js  7.96 kB │ gzip: 2.14 kB │ map: 16.95 kB
+packages/sdk-generator build: No name was provided for external module "@rebasepro/common" in "output.globals" – guessing "common".
+packages/sdk-generator build: dist/index.cjs  8.93 kB │ gzip: 2.36 kB │ map: 17.06 kB
+packages/sdk-generator build: ✓ built in 62ms
+packages/core build: transforming...
+packages/client-postgresql build: transforming...
+packages/client-postgresql build: ✓ 2 modules transformed.
+packages/client-postgresql build: rendering chunks...
+packages/client-postgresql build: computing gzip size...
+packages/client-postgresql build: dist/index.es.js  4.30 kB │ gzip: 0.98 kB │ map: 9.57 kB
+packages/client-postgresql build: No name was provided for external module "react-compiler-runtime" in "output.globals" – guessing "reactCompilerRuntime".
+packages/client-postgresql build: dist/index.umd.js  5.17 kB │ gzip: 1.20 kB │ map: 9.61 kB
+packages/client-postgresql build: ✓ built in 424ms
+packages/mcp-server build: Done
+packages/server-core build$ vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+packages/server-core build: vite v5.4.21 building for production...
+packages/sdk-generator build: Done
+packages/server-core build: transforming...
+packages/client-postgresql build: Done
+packages/server-core build: [plugin:vite:resolve] [plugin vite:resolve] Module "querystring" has been externalized for browser compatibility, imported by "/Users/francesco/rebase/node_modules/google-auth-library/build/src/auth/oauth2client.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+packages/server-core build: [plugin:vite:resolve] [plugin vite:resolve] Module "querystring" has been externalized for browser compatibility, imported by "/Users/francesco/rebase/node_modules/google-auth-library/build/src/auth/refreshclient.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+packages/core build: ✓ 109 modules transformed.
+packages/server-core build: [plugin:vite:resolve] [plugin vite:resolve] Module "dns" has been externalized for browser compatibility, imported by "/Users/francesco/rebase/node_modules/nodemailer/lib/mailer/index.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+packages/server-core build: [plugin:vite:resolve] [plugin vite:resolve] Module "dns" has been externalized for browser compatibility, imported by "/Users/francesco/rebase/node_modules/nodemailer/lib/shared/index.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+packages/server-core build: [plugin:vite:resolve] [plugin vite:resolve] Module "zlib" has been externalized for browser compatibility, imported by "/Users/francesco/rebase/node_modules/nodemailer/lib/fetch/index.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+packages/server-core build: [plugin:vite:resolve] [plugin vite:resolve] Module "querystring" has been externalized for browser compatibility, imported by "/Users/francesco/rebase/node_modules/gaxios/build/src/gaxios.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+packages/server-core build: [plugin:vite:resolve] [plugin vite:resolve] Module "querystring" has been externalized for browser compatibility, imported by "/Users/francesco/rebase/node_modules/google-auth-library/build/src/auth/stscredentials.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+packages/core build: rendering chunks...
+packages/server-core build: [plugin:vite:resolve] [plugin vite:resolve] Module "querystring" has been externalized for browser compatibility, imported by "/Users/francesco/rebase/node_modules/google-auth-library/build/src/auth/oauth2common.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+packages/core build: computing gzip size...
+packages/core build: dist/index.es.js  861.90 kB │ gzip: 209.20 kB │ map: 1,380.23 kB
+packages/core build: No name was provided for external module "react/jsx-runtime" in "output.globals" – guessing "jsxRuntime".
+packages/core build: No name was provided for external module "react-compiler-runtime" in "output.globals" – guessing "reactCompilerRuntime".
+packages/core build: No name was provided for external module "react" in "output.globals" – guessing "React".
+packages/core build: No name was provided for external module "@rebasepro/ui" in "output.globals" – guessing "ui".
+packages/core build: No name was provided for external module "notistack" in "output.globals" – guessing "notistack".
+packages/core build: No name was provided for external module "@rebasepro/types" in "output.globals" – guessing "types".
+packages/core build: No name was provided for external module "react-router-dom" in "output.globals" – guessing "reactRouterDom".
+packages/core build: No name was provided for external module "@rebasepro/common" in "output.globals" – guessing "common".
+packages/core build: No name was provided for external module "@rebasepro/utils" in "output.globals" – guessing "utils".
+packages/core build: No name was provided for external module "react-i18next" in "output.globals" – guessing "reactI18next".
+packages/core build: No name was provided for external module "lucide-react" in "output.globals" – guessing "lucideReact".
+packages/core build: No name was provided for external module "i18next" in "output.globals" – guessing "i18next".
+packages/core build: No name was provided for external module "fuse.js" in "output.globals" – guessing "Fuse".
+packages/core build: No name was provided for external module "compressorjs" in "output.globals" – guessing "Compressor".
+packages/core build: dist/index.umd.js  912.15 kB │ gzip: 211.42 kB │ map: 1,392.37 kB
+packages/core build: ✓ built in 2.33s
+packages/server-core build: ✓ 1014 modules transformed.
+packages/server-core build: rendering chunks...
+packages/server-core build: [plugin:vite:reporter] [plugin vite:reporter] 
+packages/server-core build: (!) /Users/francesco/rebase/packages/server-core/src/api/schema-editor-routes.ts is dynamically imported by /Users/francesco/rebase/packages/server-core/src/init.ts but also statically imported by /Users/francesco/rebase/packages/server-core/src/api/server.ts, dynamic import will not move module into another chunk.
+packages/server-core build: [plugin:vite:reporter] [plugin vite:reporter] 
+packages/server-core build: (!) /Users/francesco/rebase/packages/server-core/src/api/openapi-generator.ts is dynamically imported by /Users/francesco/rebase/packages/server-core/src/init.ts but also statically imported by /Users/francesco/rebase/packages/server-core/src/api/server.ts, dynamic import will not move module into another chunk.
+packages/server-core build: [plugin:vite:reporter] [plugin vite:reporter] 
+packages/server-core build: (!) /Users/francesco/rebase/packages/server-core/src/functions/function-loader.ts is dynamically imported by /Users/francesco/rebase/packages/server-core/src/init.ts but also statically imported by /Users/francesco/rebase/packages/server-core/src/functions/index.ts, dynamic import will not move module into another chunk.
+packages/server-core build: [plugin:vite:reporter] [plugin vite:reporter] 
+packages/server-core build: (!) /Users/francesco/rebase/packages/server-core/src/functions/function-routes.ts is dynamically imported by /Users/francesco/rebase/packages/server-core/src/init.ts but also statically imported by /Users/francesco/rebase/packages/server-core/src/functions/index.ts, dynamic import will not move module into another chunk.
+packages/server-core build: [plugin:vite:reporter] [plugin vite:reporter] 
+packages/server-core build: (!) /Users/francesco/rebase/packages/server-core/src/cron/cron-loader.ts is dynamically imported by /Users/francesco/rebase/packages/server-core/src/init.ts but also statically imported by /Users/francesco/rebase/packages/server-core/src/cron/index.ts, dynamic import will not move module into another chunk.
+packages/server-core build: [plugin:vite:reporter] [plugin vite:reporter] 
+packages/server-core build: (!) /Users/francesco/rebase/packages/server-core/src/cron/cron-scheduler.ts is dynamically imported by /Users/francesco/rebase/packages/server-core/src/init.ts but also statically imported by /Users/francesco/rebase/packages/server-core/src/cron/index.ts, dynamic import will not move module into another chunk.
+packages/server-core build: [plugin:vite:reporter] [plugin vite:reporter] 
+packages/server-core build: (!) /Users/francesco/rebase/packages/server-core/src/cron/cron-routes.ts is dynamically imported by /Users/francesco/rebase/packages/server-core/src/init.ts but also statically imported by /Users/francesco/rebase/packages/server-core/src/cron/index.ts, dynamic import will not move module into another chunk.
+packages/server-core build: [plugin:vite:reporter] [plugin vite:reporter] 
+packages/server-core build: (!) /Users/francesco/rebase/packages/server-core/src/cron/cron-store.ts is dynamically imported by /Users/francesco/rebase/packages/server-core/src/init.ts but also statically imported by /Users/francesco/rebase/packages/server-core/src/cron/index.ts, dynamic import will not move module into another chunk.
+packages/server-core build: computing gzip size...
+packages/server-core build: dist/index-DXVBFp5V.js      1.48 kB │ gzip:   0.48 kB │ map:     0.10 kB
+packages/server-core build: dist/index.es.js        1,699.15 kB │ gzip: 350.80 kB │ map: 3,708.07 kB
+packages/server-core build: No name was provided for external module "fs" in "output.globals" – guessing "fs$4".
+packages/server-core build: No name was provided for external module "path" in "output.globals" – guessing "path$3".
+packages/server-core build: No name was provided for external module "url" in "output.globals" – guessing "require$$0$2".
+packages/server-core build: No name was provided for external module "hono" in "output.globals" – guessing "hono".
+packages/server-core build: No name was provided for external module "buffer" in "output.globals" – guessing "require$$0$3".
+packages/server-core build: No name was provided for external module "stream" in "output.globals" – guessing "require$$0$4".
+packages/server-core build: No name was provided for external module "util" in "output.globals" – guessing "require$$5".
+packages/server-core build: No name was provided for external module "crypto" in "output.globals" – guessing "require$$0$5".
+packages/server-core build: No name was provided for external module "hono/body-limit" in "output.globals" – guessing "bodyLimit".
+packages/server-core build: No name was provided for external module "hono/csrf" in "output.globals" – guessing "csrf".
+packages/server-core build: No name was provided for external module "child_process" in "output.globals" – guessing "require$$0$a".
+packages/server-core build: No name was provided for external module "https" in "output.globals" – guessing "require$$1".
+packages/server-core build: No name was provided for external module "net" in "output.globals" – guessing "require$$0$7".
+packages/server-core build: No name was provided for external module "tls" in "output.globals" – guessing "require$$1$1".
+packages/server-core build: No name was provided for external module "assert" in "output.globals" – guessing "require$$2".
+packages/server-core build: No name was provided for external module "http" in "output.globals" – guessing "require$$0$6".
+packages/server-core build: No name was provided for external module "os" in "output.globals" – guessing "require$$1$2".
+packages/server-core build: No name was provided for external module "node:events" in "output.globals" – guessing "require$$0$8".
+packages/server-core build: No name was provided for external module "node:process" in "output.globals" – guessing "require$$1$3".
+packages/server-core build: No name was provided for external module "node:util" in "output.globals" – guessing "require$$2$1".
+packages/server-core build: No name was provided for external module "events" in "output.globals" – guessing "require$$0$9".
+packages/server-core build: No name was provided for external module "@aws-sdk/client-s3" in "output.globals" – guessing "clientS3".
+packages/server-core build: No name was provided for external module "@aws-sdk/s3-request-presigner" in "output.globals" – guessing "s3RequestPresigner".
+packages/server-core build: No name was provided for external module "hono/cors" in "output.globals" – guessing "cors".
+packages/server-core build: No name was provided for external module "hono/secure-headers" in "output.globals" – guessing "secureHeaders".
+packages/server-core build: No name was provided for external module "@hono/node-server" in "output.globals" – guessing "nodeServer".
+packages/server-core build: No name was provided for external module "ts-morph" in "output.globals" – guessing "tsMorph".
+packages/server-core build: No name was provided for external module "drizzle-orm" in "output.globals" – guessing "drizzleOrm".
+packages/server-core build: No name was provided for external module "@hono/node-server/serve-static" in "output.globals" – guessing "serveStatic".
+packages/server-core build: Creating a browser bundle that depends on Node.js built-in modules ("fs", "path", "url", "buffer", "stream", "util", "crypto", "child_process", "https", "net", "tls", "assert", "http", "os", "node:events", "node:process", "node:util" and "events"). You might need to include https://github.com/FredKSchott/rollup-plugin-polyfill-node
+packages/server-core build: dist/index.umd.js  1,805.00 kB │ gzip: 357.19 kB │ map: 3,724.38 kB
+packages/server-core build: ✓ built in 2.91s
+packages/core build:   dist/vitePlugin.js  986b 
+packages/core build: ⚡ Done in 8ms
+packages/core build: Done
+packages/server-core build: Done
+packages/cli build$ vite build && tsc --emitDeclarationOnly -p tsconfig.json
+packages/auth build$ vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+packages/server-mongodb build$ vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+packages/admin build$ vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+packages/cli build: vite v7.3.1 building client environment for production...
+packages/server-mongodb build: vite v5.4.21 building for production...
+packages/cli build: transforming...
+packages/auth build: vite v7.3.1 building client environment for production...
+packages/admin build: vite v7.3.1 building client environment for production...
+packages/auth build: transforming...
+packages/server-mongodb build: transforming...
+packages/cli build: ✓ 11 modules transformed.
+packages/server-mongodb build: ✓ 7 modules transformed.
+packages/cli build: rendering chunks...
+packages/cli build: computing gzip size...
+packages/server-mongodb build: rendering chunks...
+packages/cli build: dist/index.es.js  40.63 kB │ gzip: 9.75 kB │ map: 86.03 kB
+packages/auth build: ✓ 7 modules transformed.
+packages/cli build: No name was provided for external module "chalk" in "output.globals" – guessing "chalk".
+packages/cli build: No name was provided for external module "arg" in "output.globals" – guessing "arg".
+packages/cli build: No name was provided for external module "inquirer" in "output.globals" – guessing "inquirer".
+packages/cli build: No name was provided for external module "path" in "output.globals" – guessing "path".
+packages/cli build: No name was provided for external module "fs" in "output.globals" – guessing "fs".
+packages/cli build: No name was provided for external module "util" in "output.globals" – guessing "util".
+packages/cli build: No name was provided for external module "execa" in "output.globals" – guessing "execa".
+packages/cli build: No name was provided for external module "ncp" in "output.globals" – guessing "ncp".
+packages/cli build: No name was provided for external module "url" in "output.globals" – guessing "url".
+packages/cli build: No name was provided for external module "crypto" in "output.globals" – guessing "crypto".
+packages/cli build: No name was provided for external module "@rebasepro/sdk-generator" in "output.globals" – guessing "sdkGenerator".
+packages/cli build: No name was provided for external module "child_process" in "output.globals" – guessing "child_process".
+packages/cli build: No name was provided for external module "os" in "output.globals" – guessing "os".
+packages/cli build: Creating a browser bundle that depends on Node.js built-in modules ("path", "fs", "util", "url", "crypto", "child_process" and "os"). You might need to include https://github.com/FredKSchott/rollup-plugin-polyfill-node
+packages/server-mongodb build: computing gzip size...
+packages/server-mongodb build: dist/index.es.js  24.84 kB │ gzip: 5.34 kB │ map: 61.39 kB
+packages/server-mongodb build: No name was provided for external module "mongodb" in "output.globals" – guessing "mongodb".
+packages/cli build: dist/index.cjs  45.15 kB │ gzip: 10.63 kB │ map: 86.42 kB
+packages/cli build: ✓ built in 114ms
+packages/auth build: rendering chunks...
+packages/server-mongodb build: dist/index.umd.js  27.53 kB │ gzip: 5.64 kB │ map: 61.61 kB
+packages/server-mongodb build: ✓ built in 110ms
+packages/auth build: computing gzip size...
+packages/auth build: dist/index.es.js  81.36 kB │ gzip: 15.04 kB │ map: 169.03 kB
+packages/auth build: No name was provided for external module "react" in "output.globals" – guessing "react".
+packages/auth build: No name was provided for external module "react/jsx-runtime" in "output.globals" – guessing "jsxRuntime".
+packages/auth build: No name was provided for external module "@rebasepro/ui" in "output.globals" – guessing "ui".
+packages/auth build: No name was provided for external module "lucide-react" in "output.globals" – guessing "lucideReact".
+packages/auth build: No name was provided for external module "@rebasepro/core" in "output.globals" – guessing "core".
+packages/admin build: transforming...
+packages/auth build: dist/index.umd.js  89.83 kB │ gzip: 15.39 kB │ map: 173.24 kB
+packages/auth build: ✓ built in 153ms
+packages/cli build: Done
+packages/server-postgresql build$ vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+packages/server-mongodb build: Done
+packages/auth build: Done
+packages/server-postgresql build: vite v5.4.21 building for production...
+packages/server-postgresql build: transforming...
+packages/server-postgresql build: ✓ 330 modules transformed.
+packages/server-postgresql build: [plugin:vite:reporter] [plugin vite:reporter] 
+packages/server-postgresql build: (!) /Users/francesco/rebase/packages/server-postgresql/src/websocket.ts is dynamically imported by /Users/francesco/rebase/packages/server-postgresql/src/PostgresBootstrapper.ts but also statically imported by /Users/francesco/rebase/packages/server-postgresql/src/index.ts, dynamic import will not move module into another chunk.
+packages/server-postgresql build: rendering chunks...
+packages/server-postgresql build: computing gzip size...
+packages/server-postgresql build: dist/index.es.js  466.71 kB │ gzip: 87.77 kB │ map: 1,118.19 kB
+packages/server-postgresql build: No name was provided for external module "pg" in "output.globals" – guessing "pg".
+packages/server-postgresql build: No name was provided for external module "drizzle-orm/node-postgres" in "output.globals" – guessing "nodePostgres".
+packages/server-postgresql build: No name was provided for external module "drizzle-orm" in "output.globals" – guessing "drizzleOrm".
+packages/server-postgresql build: No name was provided for external module "drizzle-orm/pg-core" in "output.globals" – guessing "pgCore".
+packages/server-postgresql build: No name was provided for external module "crypto" in "output.globals" – guessing "crypto".
+packages/server-postgresql build: No name was provided for external module "fs" in "output.globals" – guessing "fs".
+packages/server-postgresql build: No name was provided for external module "path" in "output.globals" – guessing "path".
+packages/server-postgresql build: No name was provided for external module "url" in "output.globals" – guessing "url".
+packages/server-postgresql build: No name was provided for external module "chokidar" in "output.globals" – guessing "chokidar".
+packages/server-postgresql build: No name was provided for external module "ws" in "output.globals" – guessing "ws".
+packages/server-postgresql build: No name was provided for external module "events" in "output.globals" – guessing "events".
+packages/server-postgresql build: No name was provided for external module "util" in "output.globals" – guessing "util".
+packages/server-postgresql build: No name was provided for external module "@rebasepro/server-core" in "output.globals" – guessing "serverCore".
+packages/server-postgresql build: Creating a browser bundle that depends on Node.js built-in modules ("crypto", "fs", "path", "url", "events" and "util"). You might need to include https://github.com/FredKSchott/rollup-plugin-polyfill-node
+packages/server-postgresql build: dist/index.umd.js  493.37 kB │ gzip: 89.37 kB │ map: 1,122.37 kB
+packages/server-postgresql build: ✓ built in 1.22s
+packages/server-postgresql build: Done
+packages/admin build: ✓ 329 modules transformed.
+packages/admin build: rendering chunks...
+packages/admin build: computing gzip size...
+packages/admin build: dist/index-VpKSp9nM.js                     0.28 kB │ gzip:   0.18 kB │ map:     0.10 kB
+packages/admin build: dist/collection_editor_ui.js               0.39 kB │ gzip:   0.22 kB │ map:     0.11 kB
+packages/admin build: dist/index-BeI_5DB4.js                     0.41 kB │ gzip:   0.23 kB │ map:     0.10 kB
+packages/admin build: dist/RoleChip-QtUFXeTp.js                  1.67 kB │ gzip:   0.57 kB │ map:     2.30 kB
+packages/admin build: dist/useEntityHistory-Dcj4zhGj.js          4.29 kB │ gzip:   1.43 kB │ map:    10.45 kB
+packages/admin build: dist/CollectionsStudioView-BkTZwr3U.js     9.70 kB │ gzip:   2.74 kB │ map:    17.94 kB
+packages/admin build: dist/markdown-CDig2yGF.js                 13.96 kB │ gzip:   3.56 kB │ map:    30.87 kB
+packages/admin build: dist/index-Bet-li55.js                    15.87 kB │ gzip:   4.51 kB │ map:    28.42 kB
+packages/admin build: dist/RolesView-Co8RVReN.js                15.93 kB │ gzip:   4.27 kB │ map:    30.84 kB
+packages/admin build: dist/ImportCollectionAction-Cjd12KmS.js   20.95 kB │ gzip:   5.23 kB │ map:    34.10 kB
+packages/admin build: dist/ExportCollectionAction-ojMARycd.js   21.07 kB │ gzip:   4.13 kB │ map:    42.85 kB
+packages/admin build: dist/index.js                             24.32 kB │ gzip:   6.80 kB │ map:    40.17 kB
+packages/admin build: dist/UsersView-DCmN7QQX.js                26.25 kB │ gzip:   6.11 kB │ map:    55.74 kB
+packages/admin build: dist/ContentHomePage-CCT4eBcJ.js          57.75 kB │ gzip:  13.60 kB │ map:   122.12 kB
+packages/admin build: dist/editor.js                           121.85 kB │ gzip:  27.67 kB │ map:   244.22 kB
+packages/admin build: dist/CollectionEditorDialog-CnAU6at4.js  174.44 kB │ gzip:  37.41 kB │ map:   356.06 kB
+packages/admin build: dist/PropertyEditView-DZ_3Awmp.js        240.56 kB │ gzip:  47.89 kB │ map:   402.11 kB
+packages/admin build: dist/util-DMKY_PZ_.js                    957.15 kB │ gzip: 199.15 kB │ map: 2,019.80 kB
+packages/admin build: ✓ built in 7.46s
+packages/admin build: Done
+app build$ pnpm -r run build
+app/backend build$ tsc
+packages/client-firebase build$ vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+packages/plugin-data-enhancement build$ vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+packages/plugin-data-enhancement build: vite v7.3.1 building client environment for production...
+packages/client-firebase build: vite v7.3.1 building client environment for production...
+packages/client-firebase build: transforming...
+app build: Scope: 26 of 27 workspace projects
+app build: ../packages/formex build$ vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+app build: ../videos build$ remotion bundle
+app build: ../packages/types build$ vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+packages/plugin-data-enhancement build: transforming...
+packages/plugin-data-enhancement build: ✓ 9 modules transformed.
+packages/plugin-data-enhancement build: rendering chunks...
+app build: ../packages/formex build: vite v7.3.1 building client environment for production...
+packages/plugin-data-enhancement build: computing gzip size...
+packages/plugin-data-enhancement build: dist/index.es.js  27.39 kB │ gzip: 6.88 kB │ map: 65.76 kB
+packages/plugin-data-enhancement build: No name was provided for external module "react-compiler-runtime" in "output.globals" – guessing "reactCompilerRuntime".
+packages/plugin-data-enhancement build: No name was provided for external module "react/jsx-runtime" in "output.globals" – guessing "jsxRuntime".
+packages/plugin-data-enhancement build: No name was provided for external module "react" in "output.globals" – guessing "React".
+packages/plugin-data-enhancement build: No name was provided for external module "@rebasepro/core" in "output.globals" – guessing "core".
+packages/plugin-data-enhancement build: No name was provided for external module "@rebasepro/admin" in "output.globals" – guessing "admin".
+packages/plugin-data-enhancement build: No name was provided for external module "@rebasepro/common" in "output.globals" – guessing "common".
+packages/plugin-data-enhancement build: No name was provided for external module "@rebasepro/utils" in "output.globals" – guessing "utils".
+packages/plugin-data-enhancement build: No name was provided for external module "@rebasepro/ui" in "output.globals" – guessing "ui".
+packages/plugin-data-enhancement build: No name was provided for external module "lucide-react" in "output.globals" – guessing "lucideReact".
+packages/plugin-data-enhancement build: dist/index.umd.js  29.87 kB │ gzip: 7.12 kB │ map: 66.53 kB
+packages/plugin-data-enhancement build: ✓ built in 423ms
+app build: ../packages/types build: vite v5.4.21 building for production...
+app build: ../packages/formex build: transforming...
+app build: ../packages/types build: transforming...
+app build: ../packages/formex build: ✓ 6 modules transformed.
+app build: ../packages/formex build: rendering chunks...
+app build: ../packages/formex build: computing gzip size...
+app build: ../packages/formex build: dist/index.es.js  14.19 kB │ gzip: 3.69 kB │ map: 33.68 kB
+app build: ../packages/formex build: No name was provided for external module "react-compiler-runtime" in "output.globals" – guessing "reactCompilerRuntime".
+app build: ../packages/formex build: No name was provided for external module "react" in "output.globals" – guessing "React".
+app build: ../packages/formex build: No name was provided for external module "react/jsx-runtime" in "output.globals" – guessing "jsxRuntime".
+app build: ../packages/formex build: dist/index.umd.js  16.66 kB │ gzip: 4.12 kB │ map: 34.02 kB
+app build: ../packages/formex build: ✓ built in 460ms
+packages/client-firebase build: ✓ 26 modules transformed.
+packages/client-firebase build: rendering chunks...
+packages/client-firebase build: computing gzip size...
+packages/client-firebase build: dist/index.es.js  104.51 kB │ gzip: 24.76 kB │ map: 222.96 kB
+app build: ../packages/types build: ✓ 48 modules transformed.
+packages/client-firebase build: No name was provided for external module "react" in "output.globals" – guessing "React".
+packages/client-firebase build: No name was provided for external module "@firebase/auth" in "output.globals" – guessing "auth".
+packages/client-firebase build: No name was provided for external module "@firebase/storage" in "output.globals" – guessing "storage".
+packages/client-firebase build: No name was provided for external module "@firebase/app" in "output.globals" – guessing "app".
+packages/client-firebase build: No name was provided for external module "@firebase/app-check" in "output.globals" – guessing "appCheck".
+packages/client-firebase build: No name was provided for external module "@rebasepro/types" in "output.globals" – guessing "types".
+packages/client-firebase build: No name was provided for external module "@firebase/firestore" in "output.globals" – guessing "firestore".
+packages/client-firebase build: No name was provided for external module "@rebasepro/common" in "output.globals" – guessing "common".
+packages/client-firebase build: No name was provided for external module "fuse.js" in "output.globals" – guessing "Fuse".
+packages/client-firebase build: No name was provided for external module "@firebase/functions" in "output.globals" – guessing "functions".
+packages/client-firebase build: No name was provided for external module "react-compiler-runtime" in "output.globals" – guessing "reactCompilerRuntime".
+packages/client-firebase build: No name was provided for external module "@firebase/database" in "output.globals" – guessing "database".
+packages/client-firebase build: No name was provided for external module "react/jsx-runtime" in "output.globals" – guessing "jsxRuntime".
+packages/client-firebase build: No name was provided for external module "@rebasepro/core" in "output.globals" – guessing "core".
+packages/client-firebase build: No name was provided for external module "@rebasepro/admin" in "output.globals" – guessing "admin".
+packages/client-firebase build: No name was provided for external module "@rebasepro/ui" in "output.globals" – guessing "ui".
+packages/client-firebase build: No name was provided for external module "react-router-dom" in "output.globals" – guessing "reactRouterDom".
+packages/client-firebase build: No name was provided for external module "lucide-react" in "output.globals" – guessing "lucideReact".
+app build: ../packages/types build: rendering chunks...
+app build: ../packages/types build: computing gzip size...
+app build: ../packages/types build: dist/index.es.js  5.31 kB │ gzip: 1.45 kB │ map: 71.00 kB
+app build: ../packages/types build: dist/index.umd.js  6.59 kB │ gzip: 1.72 kB │ map: 71.12 kB
+app build: ../packages/types build: ✓ built in 520ms
+packages/client-firebase build: dist/index.umd.js  113.83 kB │ gzip: 25.05 kB │ map: 226.26 kB
+packages/client-firebase build: ✓ built in 992ms
+app build: ../videos build: Bundling 6%
+app build: ../videos build: Bundling 13%
+app build: ../videos build: Bundling 51%
+app build: ../videos build: Bundling 65%
+app build: ../videos build: Bundling 71%
+app build: ../videos build: Bundling 76%
+app build: ../videos build: Bundling 81%
+app build: ../videos build: Bundling 87%
+app build: ../videos build: Bundling 92%
+app build: ../packages/formex build: Done
+app build: ../videos build: Bundling 98%
+app build: ../packages/types build: Done
+app build: ../videos build: ○ /Users/francesco/rebase/videos/build
+app build: ../videos build: Done
+app build: ../packages/utils build$ vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+app build: config build$ tsc
+app build: ../packages/ui build$ rm -rf dist || true && vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json
+app build: ../packages/ui build: vite v7.3.1 building client environment for production...
+app build: ../packages/utils build: vite v5.4.21 building for production...
+app build: ../packages/ui build: transforming...
+app build: ../packages/utils build: transforming...
+app build: ../packages/utils build: ✓ 12 modules transformed.
+app build: ../packages/utils build: rendering chunks...
+app build: ../packages/utils build: computing gzip size...
+app build: ../packages/utils build: dist/index.es.js  18.24 kB │ gzip: 5.16 kB │ map: 48.01 kB
+app build: ../packages/utils build: No name was provided for external module "object-hash" in "output.globals" – guessing "hash".
+app build: ../packages/utils build: No name was provided for external module "@rebasepro/types" in "output.globals" – guessing "types".
+app build: ../packages/utils build: dist/index.umd.js  20.76 kB │ gzip: 5.53 kB │ map: 48.28 kB
+app build: ../packages/utils build: ✓ built in 498ms
+packages/client-firebase build: src/components/FirebaseLoginView.tsx(510,68): error TS7006: Parameter 'availableProviders' implicitly has an 'any' type.
+packages/client-firebase build: src/components/FirebaseLoginView.tsx(511,75): error TS7006: Parameter 'p' implicitly has an 'any' type.
+packages/client-firebase build: src/components/RebaseFirebaseApp.tsx(28,10): error TS2305: Module '"@rebasepro/types"' has no exported member 'Entity'.
+packages/client-firebase build: src/components/RebaseFirebaseApp.tsx(28,18): error TS2305: Module '"@rebasepro/types"' has no exported member 'PropertyConfig'.
+packages/client-firebase build: src/components/RebaseFirebaseAppProps.tsx(3,10): error TS2305: Module '"@rebasepro/types"' has no exported member 'Authenticator'.
+packages/client-firebase build: src/components/RebaseFirebaseAppProps.tsx(3,25): error TS2305: Module '"@rebasepro/types"' has no exported member 'AnalyticsEvent'.
+packages/client-firebase build: src/components/RebaseFirebaseAppProps.tsx(3,41): error TS2305: Module '"@rebasepro/types"' has no exported member 'AppView'.
+packages/client-firebase build: src/components/RebaseFirebaseAppProps.tsx(3,50): error TS2305: Module '"@rebasepro/types"' has no exported member 'AppViewsBuilder'.
+packages/client-firebase build: src/components/RebaseFirebaseAppProps.tsx(3,67): error TS2305: Module '"@rebasepro/types"' has no exported member 'EntityCollection'.
+packages/client-firebase build: src/components/RebaseFirebaseAppProps.tsx(3,85): error TS2305: Module '"@rebasepro/types"' has no exported member 'EntityCollectionsBuilder'.
+packages/client-firebase build: src/components/RebaseFirebaseAppProps.tsx(3,111): error TS2305: Module '"@rebasepro/types"' has no exported member 'RebasePlugin'.
+packages/client-firebase build: src/components/RebaseFirebaseAppProps.tsx(3,125): error TS2305: Module '"@rebasepro/types"' has no exported member 'Locale'.
+packages/client-firebase build: src/components/RebaseFirebaseAppProps.tsx(3,133): error TS2305: Module '"@rebasepro/types"' has no exported member 'PropertyConfig'.
+packages/client-firebase build: src/components/RebaseFirebaseAppProps.tsx(4,10): error TS2305: Module '"@rebasepro/types"' has no exported member 'UserManagementDelegate'.
+packages/client-firebase build: src/hooks/useFirebaseAuthController.ts(27,10): error TS2305: Module '"@rebasepro/types"' has no exported member 'Role'.
+packages/client-firebase build: src/hooks/useFirebaseAuthController.ts(27,16): error TS2305: Module '"@rebasepro/types"' has no exported member 'User'.
+packages/client-firebase build: src/hooks/useFirebaseRealTimeDBDelegate.ts(18,10): error TS2305: Module '"@rebasepro/types"' has no exported member 'DataDriver'.
+packages/client-firebase build: src/hooks/useFirebaseRealTimeDBDelegate.ts(18,22): error TS2305: Module '"@rebasepro/types"' has no exported member 'DeleteEntityProps'.
+packages/client-firebase build: src/hooks/useFirebaseRealTimeDBDelegate.ts(18,41): error TS2305: Module '"@rebasepro/types"' has no exported member 'Entity'.
+packages/client-firebase build: src/hooks/useFirebaseRealTimeDBDelegate.ts(18,49): error TS2305: Module '"@rebasepro/types"' has no exported member 'FetchCollectionProps'.
+packages/client-firebase build: src/hooks/useFirebaseRealTimeDBDelegate.ts(18,71): error TS2305: Module '"@rebasepro/types"' has no exported member 'FetchEntityProps'.
+packages/client-firebase build: src/hooks/useFirebaseRealTimeDBDelegate.ts(18,89): error TS2305: Module '"@rebasepro/types"' has no exported member 'ListenCollectionProps'.
+packages/client-firebase build: src/hooks/useFirebaseRealTimeDBDelegate.ts(18,112): error TS2305: Module '"@rebasepro/types"' has no exported member 'ListenEntityProps'.
+packages/client-firebase build: src/hooks/useFirebaseRealTimeDBDelegate.ts(18,131): error TS2305: Module '"@rebasepro/types"' has no exported member 'SaveEntityProps'.
+packages/client-firebase build: src/hooks/useFirebaseStorageSource.ts(11,10): error TS2305: Module '"@rebasepro/types"' has no exported member 'DownloadConfig'.
+packages/client-firebase build: src/hooks/useFirebaseStorageSource.ts(11,26): error TS2305: Module '"@rebasepro/types"' has no exported member 'DownloadMetadata'.
+packages/client-firebase build: src/hooks/useFirebaseStorageSource.ts(11,44): error TS2305: Module '"@rebasepro/types"' has no exported member 'StorageListResult'.
+packages/client-firebase build: src/hooks/useFirebaseStorageSource.ts(11,63): error TS2305: Module '"@rebasepro/types"' has no exported member 'StorageSource'.
+packages/client-firebase build: src/hooks/useFirebaseStorageSource.ts(11,78): error TS2305: Module '"@rebasepro/types"' has no exported member 'UploadFileProps'.
+packages/client-firebase build: src/hooks/useFirestoreDriver.ts(1,10): error TS2305: Module '"@rebasepro/types"' has no exported member 'DataDriver'.
+packages/client-firebase build: src/hooks/useFirestoreDriver.ts(1,22): error TS2305: Module '"@rebasepro/types"' has no exported member 'DeleteEntityProps'.
+packages/client-firebase build: src/hooks/useFirestoreDriver.ts(1,41): error TS2305: Module '"@rebasepro/types"' has no exported member 'Entity'.
+packages/client-firebase build: src/hooks/useFirestoreDriver.ts(1,49): error TS2305: Module '"@rebasepro/types"' has no exported member 'EntityCollection'.
+packages/client-firebase build: src/hooks/useFirestoreDriver.ts(1,84): error TS2305: Module '"@rebasepro/types"' has no exported member 'FetchCollectionProps'.
+packages/client-firebase build: src/hooks/useFirestoreDriver.ts(1,106): error TS2305: Module '"@rebasepro/types"' has no exported member 'FetchEntityProps'.
+packages/client-firebase build: src/hooks/useFirestoreDriver.ts(1,124): error TS2305: Module '"@rebasepro/types"' has no exported member 'FilterCombination'.
+packages/client-firebase build: src/hooks/useFirestoreDriver.ts(1,143): error TS2305: Module '"@rebasepro/types"' has no exported member 'FilterValues'.
+packages/client-firebase build: src/hooks/useFirestoreDriver.ts(1,167): error TS2305: Module '"@rebasepro/types"' has no exported member 'ListenCollectionProps'.
+packages/client-firebase build: src/hooks/useFirestoreDriver.ts(1,190): error TS2305: Module '"@rebasepro/types"' has no exported member 'ListenEntityProps'.
+packages/client-firebase build: src/hooks/useFirestoreDriver.ts(1,209): error TS2305: Module '"@rebasepro/types"' has no exported member 'SaveEntityProps'.
+packages/client-firebase build: src/hooks/useFirestoreDriver.ts(1,226): error TS2305: Module '"@rebasepro/types"' has no exported member 'WhereFilterOp'.
+packages/client-firebase build: src/types/auth.tsx(3,10): error TS2305: Module '"@rebasepro/types"' has no exported member 'AuthController'.
+packages/client-firebase build: src/types/auth.tsx(3,26): error TS2305: Module '"@rebasepro/types"' has no exported member 'Role'.
+packages/client-firebase build: src/types/auth.tsx(3,32): error TS2305: Module '"@rebasepro/types"' has no exported member 'User'.
+packages/client-firebase build: src/types/text_search.ts(3,10): error TS2305: Module '"@rebasepro/types"' has no exported member 'EntityCollection'.
+packages/client-firebase build: src/utils/collections_firestore.ts(2,10): error TS2305: Module '"@rebasepro/types"' has no exported member 'EntityCollection'.
+packages/client-firebase build: src/utils/collections_firestore.ts(2,28): error TS2724: '"@rebasepro/types"' has no exported member named 'FirebaseCollection'. Did you mean 'isFirebaseCollection'?
+packages/client-firebase build: src/utils/collections_firestore.ts(2,48): error TS2305: Module '"@rebasepro/types"' has no exported member 'Properties'.
+packages/client-firebase build: src/utils/collections_firestore.ts(2,60): error TS2305: Module '"@rebasepro/types"' has no exported member 'Property'.
+packages/client-firebase build: src/utils/local_text_search_controller.ts(5,10): error TS2305: Module '"@rebasepro/types"' has no exported member 'EntityCollection'.
+packages/client-firebase build: src/utils/pinecone.ts(3,10): error TS2305: Module '"@rebasepro/types"' has no exported member 'EntityCollection'.
+packages/client-firebase build: src/utils/rebase_search_controller.ts(4,10): error TS2305: Module '"@rebasepro/types"' has no exported member 'EntityCollection'.
+packages/client-firebase build: src/utils/text_search_controller.ts(2,10): error TS2305: Module '"@rebasepro/types"' has no exported member 'EntityCollection'.
+packages/client-firebase build: Failed
+/Users/francesco/rebase/packages/client-firebase:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @rebasepro/client-firebase@0.0.1-canary.4d4fb3e build: `vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json`
+Exit status 2
+packages/studio build$ vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json

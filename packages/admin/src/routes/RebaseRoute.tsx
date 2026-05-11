@@ -1,10 +1,10 @@
-import type { EntityCollection } from "@rebasepro/types";
+import type { EntityCollection, ViewMode } from "@rebasepro/types";
 import { Blocker, useBlocker, useLocation } from "react-router";
 import { EntityEditView } from "../components/EntityEditView";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { EntityCollectionView } from "../components";
-import { NotFoundPage } from "@rebasepro/core";
+import { NotFoundPage, useUserConfigurationPersistence } from "@rebasepro/core";
 import { UnsavedChangesDialog } from "@rebasepro/core";
 import { CircularProgressCenter } from "@rebasepro/ui";
 import { getNavigationEntriesFromPath, NavigationViewCollectionInternal, NavigationViewEntityCustomInternal, NavigationViewInternal } from "@rebasepro/common";
@@ -18,6 +18,7 @@ export function RebaseRoute() {
     const collectionRegistry = useCollectionRegistryController();
     const urlController = useUrlController();
     const breadcrumbs = useBreadcrumbsController();
+    const userConfigPersistence = useUserConfigurationPersistence();
 
     const hash = location.hash;
     const isSidePanel = hash.includes("#side");
@@ -141,7 +142,25 @@ export function RebaseRoute() {
         collection = collectionRegistry.getCollection(firstCollectionEntry.id);
         if (!collection)
             collection = collectionRegistry.getCollection(firstCollectionEntry.slug);
-        if (collection && (collection.openEntityMode ?? "split") === "split") {
+
+        // Resolve the effective openEntityMode based on the current view mode.
+        // Priority: collection.openEntityMode (explicit) > view-mode-based default.
+        // View mode priority: URL __view param > saved user config > collection default.
+        let effectiveOpenMode: "side_panel" | "full_screen" | "split" | undefined = collection?.openEntityMode;
+        if (!effectiveOpenMode && collection) {
+            const urlViewParam = new URLSearchParams(location.search).get("__view");
+            let currentViewMode: ViewMode = collection.defaultViewMode ?? "list";
+            if (urlViewParam && ["list", "table", "kanban", "cards"].includes(urlViewParam)) {
+                currentViewMode = urlViewParam as ViewMode;
+            } else {
+                const savedView = userConfigPersistence?.getCollectionConfig(collection.slug)?.defaultViewMode;
+                if (savedView) currentViewMode = savedView as ViewMode;
+            }
+            if (currentViewMode === "kanban") effectiveOpenMode = "side_panel";
+            else if (currentViewMode === "table" || currentViewMode === "cards") effectiveOpenMode = "full_screen";
+            else effectiveOpenMode = "split";
+        }
+        if (collection && effectiveOpenMode === "split") {
             // Extract subcollection tab from the 3rd entry if present
             let selectedTab: string | undefined;
             if (navigationEntries.length === 3) {

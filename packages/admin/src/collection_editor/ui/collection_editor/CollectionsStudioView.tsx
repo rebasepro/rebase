@@ -46,15 +46,15 @@ export function CollectionsStudioView({ configController }: CollectionsStudioVie
     const collections = configController.collections || [];
 
     return (
-        <div className="flex h-full w-full bg-white dark:bg-surface-800 overflow-hidden text-text-primary dark:text-text-primary-dark">
+        <div className="flex h-full w-full bg-white dark:bg-surface-950 overflow-hidden text-text-primary dark:text-text-primary-dark">
             <ResizablePanels
                 orientation="horizontal"
                 panelSizePercent={sidebarSize}
                 onPanelSizeChange={setSidebarSize}
                 minPanelSizePx={220}
                 firstPanel={
-                    <div className={cls("flex flex-col h-full w-full bg-white dark:bg-surface-800 border-r", defaultBorderMixin)}>
-                        <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-800 min-h-[48px]", defaultBorderMixin)}>
+                    <div className={cls("flex flex-col h-full w-full bg-white dark:bg-surface-950 border-r", defaultBorderMixin)}>
+                        <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
                             <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
                                 Collections
                             </Typography>
@@ -86,7 +86,7 @@ export function CollectionsStudioView({ configController }: CollectionsStudioVie
                                             "flex items-center gap-3 px-3 py-2 cursor-pointer rounded-md text-sm transition-colors",
                                             isSelected
                                                 ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light"
-                                                : "hover:bg-surface-100 dark:hover:bg-surface-800 text-text-secondary dark:text-text-secondary-dark"
+                                                : "hover:bg-surface-100 dark:hover:bg-surface-900 text-text-secondary dark:text-text-secondary-dark"
                                         )}
                                     >
                                         <IconForView collectionOrView={collection} size={"small"} className={cls(

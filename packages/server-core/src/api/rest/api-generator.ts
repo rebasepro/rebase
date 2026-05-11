@@ -56,6 +56,17 @@ export class RestApiGenerator {
         const basePath = `/${collection.slug}`;
         const resolvedCollection = collection;
 
+        // GET /collection/count - Count entities (with optional filters)
+        this.router.get(`${basePath}/count`, async (c) => {
+            const queryDict = c.req.query();
+            const queryOptions = parseQueryOptions(queryDict);
+            const searchString = queryDict.searchString as string | undefined;
+            const driver = c.get("driver") || this.driver;
+
+            const total = await this.countRawEntities(driver, resolvedCollection, queryOptions, searchString);
+            return c.json({ count: total });
+        });
+
         // GET /collection - List entities
         this.router.get(basePath, async (c) => {
             const queryDict = c.req.query();

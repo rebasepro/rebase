@@ -7,6 +7,6 @@ export const fieldBackgroundDisabledMixin = "dark:bg-surface-900 bg-opacity-50 d
 export const fieldBackgroundHoverMixin = "hover:bg-opacity-70 dark:hover:bg-surface-700 dark:hover:bg-opacity-40 hover:bg-surface-accent-200/70 hover:dark:bg-surface-700/40";
 export const defaultBorderMixin = "border-surface-200/60 dark:border-surface-700/60 ";
 export const paperMixin = "bg-white rounded-md dark:bg-surface-800 border border-surface-200/60 dark:border-surface-700/60";
-export const cardMixin = "bg-white dark:bg-surface-800 rounded-md border border-surface-200/60 dark:border-surface-700/60 m-1 -p-1";
+export const cardMixin = "bg-white dark:bg-surface-900 rounded-md border border-surface-200/60 dark:border-surface-700/60 m-1 -p-1";
 export const cardClickableMixin = "hover:bg-surface-accent-100 dark:hover:bg-surface-800 hover:ring-2 hover:ring-primary cursor-pointer hover:bg-primary/20 dark:hover:bg-primary/10 ";
 export const cardSelectedMixin = "bg-primary-bg/30 dark:bg-primary-bg/10 ring-1 ring-primary/75";

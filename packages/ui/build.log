@@ -1,0 +1,65 @@
+vite v7.3.1 building client environment for production...
+transforming...
+✓ 2279 modules transformed.
+rendering chunks...
+computing gzip size...
+[vite-plugin-static-copy] Copied 1 items.
+dist/index.es.js  1,126.98 kB │ gzip: 121.79 kB │ map: 2,139.77 kB
+No name was provided for external module "react/jsx-runtime" in "output.globals" – guessing "jsxRuntime".
+No name was provided for external module "react/jsx-runtime" in "output.globals" – guessing "jsxRuntime".
+No name was provided for external module "react-compiler-runtime" in "output.globals" – guessing "reactCompilerRuntime".
+No name was provided for external module "react-compiler-runtime" in "output.globals" – guessing "reactCompilerRuntime".
+No name was provided for external module "clsx" in "output.globals" – guessing "clsx".
+No name was provided for external module "clsx" in "output.globals" – guessing "clsx".
+No name was provided for external module "tailwind-merge" in "output.globals" – guessing "tailwindMerge".
+No name was provided for external module "tailwind-merge" in "output.globals" – guessing "tailwindMerge".
+No name was provided for external module "react" in "output.globals" – guessing "React".
+No name was provided for external module "react" in "output.globals" – guessing "React".
+No name was provided for external module "@radix-ui/react-collapsible" in "output.globals" – guessing "Collapsible".
+No name was provided for external module "@radix-ui/react-collapsible" in "output.globals" – guessing "Collapsible".
+No name was provided for external module "lucide-react" in "output.globals" – guessing "lucideReact".
+No name was provided for external module "lucide-react" in "output.globals" – guessing "lucideReact".
+No name was provided for external module "@radix-ui/react-checkbox" in "output.globals" – guessing "CheckboxPrimitive".
+No name was provided for external module "@radix-ui/react-checkbox" in "output.globals" – guessing "CheckboxPrimitive".
+No name was provided for external module "@radix-ui/react-tooltip" in "output.globals" – guessing "TooltipPrimitive".
+No name was provided for external module "@radix-ui/react-tooltip" in "output.globals" – guessing "TooltipPrimitive".
+No name was provided for external module "@radix-ui/react-dialog" in "output.globals" – guessing "DialogPrimitive".
+No name was provided for external module "@radix-ui/react-dialog" in "output.globals" – guessing "DialogPrimitive".
+No name was provided for external module "@radix-ui/react-visually-hidden" in "output.globals" – guessing "VisuallyHidden".
+No name was provided for external module "@radix-ui/react-visually-hidden" in "output.globals" – guessing "VisuallyHidden".
+No name was provided for external module "react-dropzone" in "output.globals" – guessing "reactDropzone".
+No name was provided for external module "react-dropzone" in "output.globals" – guessing "reactDropzone".
+No name was provided for external module "@radix-ui/react-label" in "output.globals" – guessing "LabelPrimitive".
+No name was provided for external module "@radix-ui/react-label" in "output.globals" – guessing "LabelPrimitive".
+No name was provided for external module "markdown-it" in "output.globals" – guessing "MarkdownIt".
+No name was provided for external module "markdown-it" in "output.globals" – guessing "MarkdownIt".
+No name was provided for external module "@radix-ui/react-dropdown-menu" in "output.globals" – guessing "DropdownMenu".
+No name was provided for external module "@radix-ui/react-dropdown-menu" in "output.globals" – guessing "DropdownMenu".
+No name was provided for external module "@radix-ui/react-menubar" in "output.globals" – guessing "MenubarPrimitive".
+No name was provided for external module "@radix-ui/react-menubar" in "output.globals" – guessing "MenubarPrimitive".
+No name was provided for external module "@radix-ui/react-popover" in "output.globals" – guessing "PopoverPrimitive".
+No name was provided for external module "@radix-ui/react-popover" in "output.globals" – guessing "PopoverPrimitive".
+No name was provided for external module "cmdk" in "output.globals" – guessing "cmdk".
+No name was provided for external module "cmdk" in "output.globals" – guessing "cmdk".
+No name was provided for external module "@radix-ui/react-separator" in "output.globals" – guessing "SeparatorPrimitive".
+No name was provided for external module "@radix-ui/react-separator" in "output.globals" – guessing "SeparatorPrimitive".
+No name was provided for external module "@radix-ui/react-radio-group" in "output.globals" – guessing "RadioGroupPrimitive".
+No name was provided for external module "@radix-ui/react-radio-group" in "output.globals" – guessing "RadioGroupPrimitive".
+No name was provided for external module "@radix-ui/react-select" in "output.globals" – guessing "SelectPrimitive".
+No name was provided for external module "@radix-ui/react-select" in "output.globals" – guessing "SelectPrimitive".
+No name was provided for external module "@radix-ui/react-slider" in "output.globals" – guessing "SliderPrimitive".
+No name was provided for external module "@radix-ui/react-slider" in "output.globals" – guessing "SliderPrimitive".
+No name was provided for external module "react-dom" in "output.globals" – guessing "ReactDOM".
+No name was provided for external module "react-dom" in "output.globals" – guessing "ReactDOM".
+No name was provided for external module "@radix-ui/react-tabs" in "output.globals" – guessing "TabsPrimitive".
+No name was provided for external module "@radix-ui/react-tabs" in "output.globals" – guessing "TabsPrimitive".
+No name was provided for external module "react-window" in "output.globals" – guessing "reactWindow".
+No name was provided for external module "react-window" in "output.globals" – guessing "reactWindow".
+No name was provided for external module "react-use-measure" in "output.globals" – guessing "useMeasure".
+No name was provided for external module "react-use-measure" in "output.globals" – guessing "useMeasure".
+No name was provided for external module "@dnd-kit/sortable" in "output.globals" – guessing "sortable".
+No name was provided for external module "@dnd-kit/sortable" in "output.globals" – guessing "sortable".
+No name was provided for external module "@dnd-kit/core" in "output.globals" – guessing "core".
+No name was provided for external module "@dnd-kit/core" in "output.globals" – guessing "core".
+dist/index.umd.js  1,327.97 kB │ gzip: 130.70 kB │ map: 2,175.97 kB
+✓ built in 10.91s

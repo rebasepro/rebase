@@ -62,15 +62,15 @@ import { mergeDeep } from "@rebasepro/utils";
 import { useCollectionRegistryController, useUrlController, useSideEntityController, useCMSContext } from "../../index";
 import { useBreadcrumbsController } from "../../index";
 
-const DEFAULT_ENTITY_OPEN_MODE: "side_panel" | "full_screen" | "split" = "split";
-
 function getOpenEntityMode(
     viewMode: ViewMode,
     configuredMode?: "side_panel" | "full_screen" | "split"
 ): "side_panel" | "full_screen" | "split" {
     if (configuredMode) return configuredMode;
     if (viewMode === "kanban") return "side_panel";
-    return DEFAULT_ENTITY_OPEN_MODE;
+    if (viewMode === "table" || viewMode === "cards") return "full_screen";
+    // "list" view defaults to split
+    return "split";
 }
 
 /**

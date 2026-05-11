@@ -8,7 +8,6 @@ const productsCollection: EntityCollection = {
     icon: "Package",
     group: "E-Commerce",
     history: true,
-    openEntityMode: "split",
     defaultViewMode: "cards",
     enabledViews: ["table", "cards"],
     properties: {

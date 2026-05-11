@@ -615,11 +615,11 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
         }
     };
 
-    return <div className="h-full w-full flex flex-col bg-white dark:bg-surface-800">
+    return <div className="h-full w-full flex flex-col bg-white dark:bg-surface-950">
         <Formex value={formController}>
 
             <>
-                {!isNewCollection && <div className={cls("px-4 py-2 w-full flex shrink-0 items-center justify-between gap-4 bg-white dark:bg-surface-800 border-b", defaultBorderMixin)}>
+                {!isNewCollection && <div className={cls("px-4 py-2 w-full flex shrink-0 items-center justify-between gap-4 bg-white dark:bg-surface-950 border-b", defaultBorderMixin)}>
                     <div className="flex flex-1 items-center justify-end gap-4 min-w-0">
                         <Tabs value={currentView}
                             className="bg-transparent !w-fit max-w-full"
@@ -780,7 +780,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
 
                     </div>
                     {(!fullScreen || isNewCollection || !!error) && (
-                        <div className="shrink-0 w-full p-4 sm:px-6 sm:py-4 border-t border-surface-200 dark:border-surface-800 flex items-center justify-between gap-4 bg-white dark:bg-surface-800">
+                        <div className="shrink-0 w-full p-4 sm:px-6 sm:py-4 border-t border-surface-200 dark:border-surface-900 flex items-center justify-between gap-4 bg-white dark:bg-surface-950">
                             {error && <ErrorView error={error}/>}
 
                             {isNewCollection && includeTemplates && currentView === "import_data_mapping" &&

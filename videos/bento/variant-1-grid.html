@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>Rebase — Bento Variant 1: Grid</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: #09090b;
+    font-family: 'Inter', system-ui, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .bento {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    grid-template-rows: repeat(6, 1fr);
+    gap: 14px;
+    width: 1760px;
+    height: 960px;
+    padding: 0;
+  }
+
+  .cell {
+    position: relative;
+    border-radius: 20px;
+    overflow: hidden;
+    background: #18181b;
+    border: 1px solid rgba(255,255,255,0.06);
+    opacity: 0;
+    transform: scale(0.92) translateY(20px);
+    animation: cellReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.04) inset;
+  }
+
+  .cell::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 20px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .cell video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* ── Grid placement ── */
+  .cell-1  { grid-column: 1 / 6;   grid-row: 1 / 4;  animation-delay: 0.1s; }  /* dashboard — big hero */
+  .cell-2  { grid-column: 6 / 9;   grid-row: 1 / 3;  animation-delay: 0.2s; }  /* view switch */
+  .cell-3  { grid-column: 9 / 13;  grid-row: 1 / 3;  animation-delay: 0.3s; }  /* orders */
+  .cell-4  { grid-column: 6 / 9;   grid-row: 3 / 5;  animation-delay: 0.4s; }  /* entity edit */
+  .cell-5  { grid-column: 9 / 13;  grid-row: 3 / 5;  animation-delay: 0.35s; } /* kanban */
+  .cell-6  { grid-column: 1 / 4;   grid-row: 4 / 7;  animation-delay: 0.5s; }  /* product edit */
+  .cell-7  { grid-column: 4 / 6;   grid-row: 4 / 5;  animation-delay: 0.55s; } /* search */
+  .cell-8  { grid-column: 4 / 9;   grid-row: 5 / 7;  animation-delay: 0.6s; }  /* table wide */
+  .cell-9  { grid-column: 9 / 11;  grid-row: 5 / 7;  animation-delay: 0.65s; } /* customers */
+  .cell-10 { grid-column: 11 / 13; grid-row: 5 / 7;  animation-delay: 0.7s; }  /* fullscreen editor */
+
+  @keyframes cellReveal {
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  /* ── Shimmer effect on the large hero ── */
+  .cell-1::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: conic-gradient(from 180deg, transparent 0%, rgba(99,102,241,0.06) 10%, transparent 20%);
+    animation: shimmerRotate 8s linear infinite;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  @keyframes shimmerRotate {
+    to { transform: rotate(360deg); }
+  }
+
+  /* ── Floating label ── */
+  .label {
+    position: absolute;
+    bottom: 12px;
+    left: 14px;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 6px 14px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.7);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    z-index: 3;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .cell-1 .label { font-size: 13px; padding: 8px 18px; }
+
+  /* ── Watermark ── */
+  .watermark {
+    position: fixed;
+    bottom: 20px;
+    right: 40px;
+    font-size: 14px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.15);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    z-index: 10;
+  }
+</style>
+</head>
+<body>
+
+<div class="bento">
+  <div class="cell cell-1">
+    <video src="../segments/01_dashboard.mp4" autoplay loop muted playsinline></video>
+    <div class="label">Dashboard Overview</div>
+  </div>
+  <div class="cell cell-2">
+    <video src="../segments/02_view_switch.mp4" autoplay loop muted playsinline></video>
+    <div class="label">View Toggle</div>
+  </div>
+  <div class="cell cell-3">
+    <video src="../segments/03_orders_table.mp4" autoplay loop muted playsinline></video>
+    <div class="label">Orders</div>
+  </div>
+  <div class="cell cell-4">
+    <video src="../segments/04_entity_edit.mp4" autoplay loop muted playsinline></video>
+    <div class="label">Entity Editor</div>
+  </div>
+  <div class="cell cell-5">
+    <video src="../segments/05_kanban.mp4" autoplay loop muted playsinline></video>
+    <div class="label">Kanban Board</div>
+  </div>
+  <div class="cell cell-6">
+    <video src="../segments/06_product_edit.mp4" autoplay loop muted playsinline></video>
+    <div class="label">Product Edit</div>
+  </div>
+  <div class="cell cell-7">
+    <video src="../segments/07_search.mp4" autoplay loop muted playsinline></video>
+    <div class="label">Search</div>
+  </div>
+  <div class="cell cell-8">
+    <video src="../segments/08_table_wide.mp4" autoplay loop muted playsinline></video>
+    <div class="label">Data Table</div>
+  </div>
+  <div class="cell cell-9">
+    <video src="../segments/09_customers.mp4" autoplay loop muted playsinline></video>
+    <div class="label">Customers</div>
+  </div>
+  <div class="cell cell-10">
+    <video src="../segments/10_fullscreen_editor.mp4" autoplay loop muted playsinline></video>
+    <div class="label">Block Editor</div>
+  </div>
+</div>
+
+<div class="watermark">Rebase</div>
+
+</body>
+</html>

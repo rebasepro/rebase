@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>Rebase — Bento Variant 2: Hero Focus</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: #09090b;
+    font-family: 'Inter', system-ui, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .container {
+    display: flex;
+    gap: 14px;
+    width: 1760px;
+    height: 960px;
+  }
+
+  /* Left column: hero + small strip below */
+  .left {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+  }
+
+  .hero {
+    flex: 1;
+    position: relative;
+    border-radius: 24px;
+    overflow: hidden;
+    background: #18181b;
+    border: 1px solid rgba(255,255,255,0.06);
+    opacity: 0;
+    transform: scale(0.95);
+    animation: fadeIn 1s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards;
+    box-shadow: 0 16px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04) inset;
+  }
+
+  .hero video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 40%);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .hero-title {
+    position: absolute;
+    bottom: 28px;
+    left: 32px;
+    z-index: 3;
+    color: #fff;
+  }
+
+  .hero-title h2 {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+  }
+
+  .hero-title p {
+    font-size: 14px;
+    font-weight: 400;
+    color: rgba(255,255,255,0.5);
+  }
+
+  /* Bottom strip */
+  .strip {
+    display: flex;
+    gap: 14px;
+    height: 200px;
+    flex-shrink: 0;
+  }
+
+  .strip .cell {
+    flex: 1;
+  }
+
+  /* Right sidebar: vertical stack of small cells */
+  .sidebar {
+    width: 360px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    flex-shrink: 0;
+  }
+
+  .sidebar .cell {
+    flex: 1;
+  }
+
+  /* Shared cell styles */
+  .cell {
+    position: relative;
+    border-radius: 18px;
+    overflow: hidden;
+    background: #18181b;
+    border: 1px solid rgba(255,255,255,0.06);
+    opacity: 0;
+    transform: translateX(30px);
+    animation: slideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+  }
+
+  .cell video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .cell:nth-child(1) { animation-delay: 0.15s; }
+  .cell:nth-child(2) { animation-delay: 0.25s; }
+  .cell:nth-child(3) { animation-delay: 0.35s; }
+  .cell:nth-child(4) { animation-delay: 0.45s; }
+  .cell:nth-child(5) { animation-delay: 0.55s; }
+  .cell:nth-child(6) { animation-delay: 0.65s; }
+
+  .strip .cell:nth-child(1) { animation-delay: 0.3s; }
+  .strip .cell:nth-child(2) { animation-delay: 0.4s; }
+  .strip .cell:nth-child(3) { animation-delay: 0.5s; }
+
+  @keyframes fadeIn {
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  @keyframes slideIn {
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  /* Label pill */
+  .label {
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.6);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    z-index: 3;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+
+  /* Accent glow on hero */
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -80px;
+    right: -80px;
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, rgba(99,102,241,0.12), transparent 70%);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .watermark {
+    position: fixed;
+    top: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 13px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.08);
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    z-index: 10;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- LEFT: Hero + bottom strip -->
+  <div class="left">
+    <div class="hero">
+      <video src="../segments/10_fullscreen_editor.mp4" autoplay loop muted playsinline></video>
+      <div class="hero-title">
+        <h2>Block Editor</h2>
+        <p>Full-screen Notion-style content editing</p>
+      </div>
+    </div>
+    <div class="strip">
+      <div class="cell">
+        <video src="../segments/01_dashboard.mp4" autoplay loop muted playsinline></video>
+        <div class="label">Dashboard</div>
+      </div>
+      <div class="cell">
+        <video src="../segments/07_search.mp4" autoplay loop muted playsinline></video>
+        <div class="label">Live Search</div>
+      </div>
+      <div class="cell">
+        <video src="../segments/08_table_wide.mp4" autoplay loop muted playsinline></video>
+        <div class="label">Data Table</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Sidebar -->
+  <div class="sidebar">
+    <div class="cell">
+      <video src="../segments/02_view_switch.mp4" autoplay loop muted playsinline></video>
+      <div class="label">Views</div>
+    </div>
+    <div class="cell">
+      <video src="../segments/04_entity_edit.mp4" autoplay loop muted playsinline></video>
+      <div class="label">Editor</div>
+    </div>
+    <div class="cell">
+      <video src="../segments/05_kanban.mp4" autoplay loop muted playsinline></video>
+      <div class="label">Kanban</div>
+    </div>
+    <div class="cell">
+      <video src="../segments/06_product_edit.mp4" autoplay loop muted playsinline></video>
+      <div class="label">Product</div>
+    </div>
+    <div class="cell">
+      <video src="../segments/03_orders_table.mp4" autoplay loop muted playsinline></video>
+      <div class="label">Orders</div>
+    </div>
+    <div class="cell">
+      <video src="../segments/09_customers.mp4" autoplay loop muted playsinline></video>
+      <div class="label">Customers</div>
+    </div>
+  </div>
+</div>
+
+<div class="watermark">Rebase</div>
+
+</body>
+</html>

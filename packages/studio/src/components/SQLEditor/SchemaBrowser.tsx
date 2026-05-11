@@ -69,7 +69,7 @@ export const SchemaBrowser = ({
 
                                             <div className="flex opacity-0 group-hover:opacity-100 focus-within:opacity-100 absolute right-1 items-center bg-surface-100 dark:bg-surface-950 px-1 gap-1 rounded transition-opacity">
                                                 <IconButton
-                                                    size="smallest"
+                                                    size="small"
                                                     className="transition-colors text-text-secondary hover:text-text-primary pointer-events-auto"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -77,18 +77,18 @@ export const SchemaBrowser = ({
                                                     }}
                                                     title="CopyIcon table name"
                                                 >
-                                                    <CopyIcon size={iconSize.smallest}/>
+                                                    <CopyIcon size={iconSize.small}/>
                                                 </IconButton>
 
                                                 <Menu
                                                     trigger={
                                                         <IconButton
-                                                            size={"smallest"}
+                                                            size={"small"}
                                                             className="transition-colors text-text-secondary hover:text-text-primary pointer-events-auto"
                                                             onClick={(e) => e.stopPropagation()}
                                                             title="Generate SQL templates"
                                                         >
-                                                            <MoreVerticalIcon size={iconSize.smallest}/>
+                                                            <MoreVerticalIcon size={iconSize.small}/>
                                                         </IconButton>
                                                     }
                                                 >

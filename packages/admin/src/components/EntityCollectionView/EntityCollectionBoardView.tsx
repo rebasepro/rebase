@@ -432,18 +432,35 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
         return selectionController?.isEntitySelected(entity) ?? false;
     }, [selectionController]);
 
-    const ItemComponent = useCallback((props: BoardItemViewProps<M>) => {
-        return (
-            <EntityBoardCard
-                {...props}
-                collection={collection}
-                onClick={handleEntityClick}
-                selected={isEntitySelected(props.item.entity)}
-                onSelectionChange={handleSelectionChange}
-                selectionEnabled={selectionEnabled}
-            />
-        );
-    }, [collection, handleEntityClick, isEntitySelected, handleSelectionChange, selectionEnabled]);
+    // Store latest callbacks in refs so the stable ItemComponent always
+    // reads fresh values without changing its own identity.
+    const handleEntityClickRef = useRef(handleEntityClick);
+    handleEntityClickRef.current = handleEntityClick;
+    const isEntitySelectedRef = useRef(isEntitySelected);
+    isEntitySelectedRef.current = isEntitySelected;
+    const handleSelectionChangeRef = useRef(handleSelectionChange);
+    handleSelectionChangeRef.current = handleSelectionChange;
+
+    // Build a single, stable component reference via useMemo.
+    // This prevents SortableItem (wrapped in React.memo) from seeing a
+    // new ItemComponent on every render, which was causing cards to
+    // unmount/remount and flash images + checkboxes.
+    const ItemComponent = useMemo(() => {
+        const StableItemComponent = (props: BoardItemViewProps<M>) => {
+            return (
+                <EntityBoardCard
+                    {...props}
+                    collection={collection}
+                    onClick={handleEntityClickRef.current}
+                    selected={isEntitySelectedRef.current(props.item.entity)}
+                    onSelectionChange={handleSelectionChangeRef.current}
+                    selectionEnabled={selectionEnabled}
+                />
+            );
+        };
+        StableItemComponent.displayName = "KanbanItemComponent";
+        return StableItemComponent;
+    }, [collection, selectionEnabled]);
 
     // Get KanbanSetupComponent from plugin slots
     const kanbanSetupSlots = useSlot("kanban.setup", {

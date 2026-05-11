@@ -10,7 +10,6 @@ const postsCollection: PostgresCollection = {
     icon: "FileText",
     group: "Content",
     history: true,
-    openEntityMode: "split",
     defaultViewMode: "cards",
     enabledViews: ["table", "cards", "kanban"],
     kanban: {

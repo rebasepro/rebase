@@ -1,0 +1,68 @@
+src/components/dashboards/DashboardPageReadOnlyView.tsx(306,29): error TS2322: Type '{ children: Element[]; className: string; layout: LayoutItem[]; cols: number; rowHeight: number; width: number; isDraggable: boolean; isResizable: boolean; isDroppable: boolean; margin: [...]; containerPadding: [...]; compactType: string; preventCollision: boolean; }' is not assignable to type 'IntrinsicAttributes & GridLayoutProps'.
+  Property 'cols' does not exist on type 'IntrinsicAttributes & GridLayoutProps'.
+src/components/dashboards/DashboardPageView.tsx(744,48): error TS2345: Argument of type 'Layout' is not assignable to parameter of type 'LayoutItem[]'.
+  The type 'Layout' is 'readonly' and cannot be assigned to the mutable type 'LayoutItem[]'.
+src/components/dashboards/DashboardPageView.tsx(892,24): error TS18048: 'layoutItem' is possibly 'undefined'.
+src/components/dashboards/DashboardPageView.tsx(893,24): error TS18048: 'layoutItem' is possibly 'undefined'.
+src/components/dashboards/DashboardPageView.tsx(896,28): error TS18048: 'layoutItem' is possibly 'undefined'.
+src/components/dashboards/DashboardPageView.tsx(897,29): error TS18048: 'layoutItem' is possibly 'undefined'.
+src/components/dashboards/DashboardPageView.tsx(902,60): error TS2345: Argument of type 'Layout' is not assignable to parameter of type 'LayoutItem[]'.
+  The type 'Layout' is 'readonly' and cannot be assigned to the mutable type 'LayoutItem[]'.
+src/components/dashboards/DashboardPageView.tsx(933,24): error TS18048: 'layoutItem' is possibly 'undefined'.
+src/components/dashboards/DashboardPageView.tsx(934,24): error TS18048: 'layoutItem' is possibly 'undefined'.
+src/components/dashboards/DashboardPageView.tsx(937,28): error TS18048: 'layoutItem' is possibly 'undefined'.
+src/components/dashboards/DashboardPageView.tsx(938,29): error TS18048: 'layoutItem' is possibly 'undefined'.
+src/components/dashboards/DashboardPageView.tsx(942,60): error TS2345: Argument of type 'Layout' is not assignable to parameter of type 'LayoutItem[]'.
+  The type 'Layout' is 'readonly' and cannot be assigned to the mutable type 'LayoutItem[]'.
+src/components/dashboards/DashboardPageView.tsx(966,24): error TS18048: 'layoutItem' is possibly 'undefined'.
+src/components/dashboards/DashboardPageView.tsx(967,24): error TS18048: 'layoutItem' is possibly 'undefined'.
+src/components/dashboards/DashboardPageView.tsx(970,28): error TS18048: 'layoutItem' is possibly 'undefined'.
+src/components/dashboards/DashboardPageView.tsx(971,54): error TS18048: 'layoutItem' is possibly 'undefined'.
+src/components/dashboards/DashboardPageView.tsx(975,60): error TS2345: Argument of type 'Layout' is not assignable to parameter of type 'LayoutItem[]'.
+  The type 'Layout' is 'readonly' and cannot be assigned to the mutable type 'LayoutItem[]'.
+src/components/dashboards/DashboardPageView.tsx(1139,49): error TS2322: Type '{ i: string; w: number; h: number; } | undefined' is not assignable to type 'LayoutItem | undefined'.
+  Type '{ i: string; w: number; h: number; }' is missing the following properties from type 'LayoutItem': x, y
+src/components/dashboards/DashboardPreviewCard.tsx(77,33): error TS2322: Type '{ children: Element[]; trigger: Element; }' is not assignable to type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'.
+  Property 'trigger' does not exist on type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'.
+src/components/DatakiLogin.tsx(65,21): error TS2304: Cannot find name 'savePendingRedirect'.
+src/components/DatakiLogin.tsx(101,41): error TS2552: Cannot find name 'saveSubscribeToNewsletter'. Did you mean 'setSubscribeToNewsletter'?
+src/components/DatakiLogin.tsx(138,29): error TS2304: Cannot find name 'savePendingRedirect'.
+src/components/DataSourcesSelection.tsx(84,54): error TS7006: Parameter 'team' implicitly has an 'any' type.
+src/components/DataSourcesSelection.tsx(86,42): error TS7006: Parameter 'teamDs' implicitly has an 'any' type.
+src/components/DataSourcesSelection.tsx(175,29): error TS7006: Parameter 'team' implicitly has an 'any' type.
+src/components/DataSourcesSelection.tsx(599,27): error TS2739: Type 'Team' is missing the following properties from type '{ name: string; id: string; }': name, id
+src/components/DataTable.tsx(10,20): error TS2307: Cannot find module 'moment' or its corresponding type declarations.
+src/components/dialogs/DbConnectionDialog.tsx(2,42): error TS2307: Cannot find module '@dataki/common' or its corresponding type declarations.
+src/components/dialogs/DbConnectionDialog.tsx(14,8): error TS2307: Cannot find module '@firecms/ui' or its corresponding type declarations.
+src/components/dialogs/DbConnectionDialog.tsx(17,39): error TS2307: Cannot find module '@firecms/core' or its corresponding type declarations.
+src/components/dialogs/DbConnectionDialog.tsx(88,28): error TS7006: Parameter 'open' implicitly has an 'any' type.
+src/components/dialogs/DbConnectionDialog.tsx(120,36): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/dialogs/DbConnectionDialog.tsx(130,36): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/dialogs/DbConnectionDialog.tsx(141,36): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/dialogs/DbConnectionDialog.tsx(151,36): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/dialogs/DbConnectionDialog.tsx(161,36): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/dialogs/DbConnectionDialog.tsx(174,40): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/dialogs/DeleteDbConnectionDialog.tsx(2,42): error TS2307: Cannot find module '@dataki/common' or its corresponding type declarations.
+src/components/dialogs/DeleteDbConnectionDialog.tsx(11,8): error TS2307: Cannot find module '@firecms/ui' or its corresponding type declarations.
+src/components/FilterView.tsx(185,33): error TS2322: Type '{ children: (Element | undefined)[]; className: string; trigger: Element; }' is not assignable to type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'.
+  Property 'trigger' does not exist on type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'.
+src/components/FilterView.tsx(495,39): error TS2345: Argument of type '{ label: string | number | true; value: string | number | boolean | null; }[]' is not assignable to parameter of type 'SetStateAction<{ label: string; value: string | number | boolean; }[]>'.
+  Type '{ label: string | number | true; value: string | number | boolean | null; }[]' is not assignable to type '{ label: string; value: string | number | boolean; }[]'.
+    Type '{ label: string | number | true; value: string | number | boolean | null; }' is not assignable to type '{ label: string; value: string | number | boolean; }'.
+      Types of property 'label' are incompatible.
+        Type 'string | number | true' is not assignable to type 'string'.
+          Type 'number' is not assignable to type 'string'.
+src/components/FilterView.tsx(499,25): error TS2322: Type '{ label: string | number | true; value: string | number | boolean | null; }[]' is not assignable to type '{ label: string; value: string | number | boolean; }[]'.
+  Type '{ label: string | number | true; value: string | number | boolean | null; }' is not assignable to type '{ label: string; value: string | number | boolean; }'.
+    Types of property 'label' are incompatible.
+      Type 'string | number | true' is not assignable to type 'string'.
+        Type 'number' is not assignable to type 'string'.
+src/components/ShareDialog.tsx(230,49): error TS2740: Type 'DatakiUser & { type: "read" | "write"; }' is missing the following properties from type 'User': uid, displayName, email, photoURL, and 2 more.
+src/components/teams/TeamSheets.tsx(45,52): error TS7006: Parameter 'ds' implicitly has an 'any' type.
+src/components/widgets/ChartConfigView.tsx(279,21): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+src/components/widgets/ChartConfigView.tsx(287,21): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+src/components/widgets/TableConfigView.tsx(274,21): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+src/components/widgets/TableConfigView.tsx(282,21): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+src/DatakiContext.tsx(40,64): error TS2352: Conversion of type '{ dashboards: never[]; addDashboardWidget: () => any; duplicateDashboard: () => void; deleteDashboard: () => void; createDashboard: () => Promise<any>; apiEndpoint: string; getDatakiAuthToken: () => Promise<...>; onWidgetUpdate: () => undefined; updateDashboardText: () => Promise<...>; }' to type 'DatakiConfig' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  The types returned by 'duplicateDashboard(...)' are incompatible between these types.
+    Type 'void' is not comparable to type 'Promise<Dashboard>'.

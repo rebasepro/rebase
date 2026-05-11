@@ -9,7 +9,6 @@ const customersCollection: PostgresCollection = {
     icon: "Users",
     group: "E-Commerce",
     history: true,
-    openEntityMode: "split",
     properties: {
         id: {
             name: "ID",

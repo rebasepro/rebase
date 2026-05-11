@@ -10,7 +10,6 @@ const ordersCollection: PostgresCollection = {
     icon: "ShoppingCart",
     group: "E-Commerce",
     history: true,
-    openEntityMode: "split",
     enabledViews: [
         "table",
         "kanban"

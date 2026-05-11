@@ -180,6 +180,13 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             });
         },
 
+        async count(params?: FindParams): Promise<number> {
+            const countParams: FindParams = { ...params, limit: undefined, offset: undefined };
+            const qs = buildQueryString(countParams);
+            const raw = await transport.request<{ count: number }>(basePath + "/count" + qs, { method: "GET" });
+            return raw.count ?? 0;
+        },
+
         // Fluent builder instantiation
         where(column: keyof M & string, operator: FilterOperator, value: unknown) {
             return new QueryBuilder<M>(client).where(column, operator, value);
