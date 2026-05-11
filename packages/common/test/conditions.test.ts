@@ -268,7 +268,7 @@ roles: ["admin"] },
 
             const result = applyPropertyConditions(property, baseContext);
 
-            expect(result.disabled).toEqual({
+            expect(result.ui?.disabled).toEqual({
                 clearOnDisabled: false,
                 disabledMessage: "Cannot edit archived items",
                 hidden: false
@@ -288,7 +288,7 @@ roles: ["admin"] },
 
             const result = applyPropertyConditions(property, baseContext);
 
-            expect(result.disabled).toEqual(expect.objectContaining({
+            expect(result.ui?.disabled).toEqual(expect.objectContaining({
                 hidden: true
             }));
         });
@@ -322,7 +322,7 @@ roles: ["admin"] },
 
             const result = applyPropertyConditions(property, baseContext);
 
-            expect(result.disabled).toBeUndefined();
+            expect(result.ui?.disabled).toBeUndefined();
         });
 
         it("should apply enum conditions to filter values", () => {
@@ -458,13 +458,13 @@ values: { status: "draft" } };
             } as ResolvedProperty<string>;
 
             const resultArchived = applyPropertyConditions(property, baseContext);
-            expect(resultArchived.disabled).toBeDefined();
+            expect(resultArchived.ui?.disabled).toBeDefined();
             expect(resultArchived.validation?.required).toBeFalsy();
 
             const contextPublished = { ...baseContext,
 values: { status: "published" } };
             const resultPublished = applyPropertyConditions(property, contextPublished);
-            expect(resultPublished.disabled).toBeUndefined();
+            expect(resultPublished.ui?.disabled).toBeUndefined();
             expect(resultPublished.validation?.required).toBe(true);
         });
 
@@ -482,7 +482,7 @@ values: { status: "published" } };
 
             const result = applyPropertyConditions(property, baseContext);
 
-            expect(result.disabled).toEqual(expect.objectContaining({
+            expect(result.ui?.disabled).toEqual(expect.objectContaining({
                 clearOnDisabled: true
             }));
         });
@@ -516,7 +516,7 @@ roles: ["admin"] },
             } as ResolvedProperty<string>;
 
             const result = applyPropertyConditions(property, baseContext);
-            expect(result.readOnly).toBe(true);
+            expect(result.ui?.readOnly).toBe(true);
         });
 
         it("should not set readOnly when condition evaluates to false", () => {
@@ -531,7 +531,7 @@ roles: ["admin"] },
             } as ResolvedProperty<string>;
 
             const result = applyPropertyConditions(property, baseContext);
-            expect(result.readOnly).toBeUndefined();
+            expect(result.ui?.readOnly).toBeUndefined();
         });
     });
 

@@ -1,3 +1,5 @@
+import type { RebaseClient } from "../controllers/client";
+
 /**
  * Cron Job type definitions for Rebase.
  *
@@ -44,7 +46,6 @@ export interface CronJobDefinition {
     handler: (ctx: CronJobContext) => Promise<unknown> | unknown;
 }
 
-import type { RebaseClient } from "../controllers/client";
 
 /**
  * Context passed to each cron handler invocation.

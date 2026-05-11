@@ -606,10 +606,10 @@ export function EntityForm<M extends Record<string, unknown>>({
                         const isNew = status === "new" || status === "copy";
                         const isStringOrNumber = property.type === "string" || property.type === "number";
                         const isIdAndAuto = isStringOrNumber && "isId" in property && typeof property.isId === "string" && property.isId !== "manual";
-                        const disabled = disabledProp || (!autoSave && formex.isSubmitting) || isReadOnly(property) || Boolean(property.disabled) || (!isNew && "isId" in property && Boolean(property.isId)) || (isNew && isIdAndAuto);
+                        const disabled = disabledProp || (!autoSave && formex.isSubmitting) || isReadOnly(property) || Boolean(property.ui?.disabled) || (!isNew && "isId" in property && Boolean(property.isId)) || (isNew && isIdAndAuto);
                         const hidden = isHidden(property);
                         if (hidden) return null;
-                        const widthPercentage = property.widthPercentage ?? 100;
+                        const widthPercentage = property.ui?.widthPercentage ?? 100;
                         const cmsFormFieldProps: PropertyFieldBindingProps<M> = {
                             propertyKey: key,
                             disabled,

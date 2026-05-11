@@ -106,7 +106,7 @@ function ReferenceFieldBindingInternal({
 
                 {value && <ReferencePreview
                     disabled={!property.path}
-                    previewProperties={property.previewProperties}
+                    previewProperties={property.ui?.previewProperties}
                     hover={!disabled}
                     size={size}
                     onClick={disabled || isSubmitting ? undefined : onEntryClick}

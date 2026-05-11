@@ -56,8 +56,8 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
 
     if (property === null) {
         content = <EmptyValue/>;
-    } else if (property.Preview) {
-        content = createElement(property.Preview,
+    } else if (property.ui?.Preview) {
+        content = createElement(property.ui?.Preview,
             {
                 propertyKey,
                 value,
@@ -66,7 +66,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                 height,
                 width,
                 // entity,
-                customProps: property.customProps
+                customProps: property.ui?.customProps
             });
     } else if (value === undefined || value === null) {
         content = <EmptyValue/>;
@@ -81,20 +81,20 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                     size={props.size}
                     fill={fill}
                     storagePathOrDownloadUrl={filePath}/>;
-            } else if (stringProperty.url) {
-                if (typeof stringProperty.url === "boolean")
+            } else if (stringProperty.ui?.url) {
+                if (typeof stringProperty.ui?.url === "boolean")
                     content =
                         <UrlComponentPreview size={props.size}
                             url={value}
                             fill={fill}/>;
-                else if (typeof stringProperty.url === "string")
+                else if (typeof stringProperty.ui?.url === "string")
                     content =
                         <UrlComponentPreview size={props.size}
                             url={value}
                             interactive={interactive}
                             fill={fill}
-                            previewType={stringProperty.url}/>;
-            } else if (stringProperty.markdown) {
+                            previewType={stringProperty.ui?.url}/>;
+            } else if (stringProperty.ui?.markdown) {
                 content = <Markdown source={value} size={"small"}/>;
             } else if (stringProperty.userSelect) {
                 content = <UserPreview
@@ -107,7 +107,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                 if (typeof stringProperty.reference.path === "string") {
                     content = <ReferencePreview
                         disabled={!stringProperty.reference.path}
-                        previewProperties={stringProperty.reference.previewProperties}
+                        previewProperties={(stringProperty as any).reference?.previewProperties}
                         includeId={stringProperty.reference.includeId}
                         includeEntityLink={stringProperty.reference.includeEntityLink}
                         size={props.size}
@@ -204,7 +204,7 @@ path: stringProperty.reference.path })}
             if (typeof value === "object" && "isEntityReference" in value && value.isEntityReference()) {
                 content = <ReferencePreview
                     disabled={!property.path}
-                    previewProperties={property.previewProperties}
+                    previewProperties={property.ui?.previewProperties}
                     includeId={property.includeId}
                     includeEntityLink={property.includeEntityLink}
                     size={props.size}
@@ -232,7 +232,7 @@ path: stringProperty.reference.path })}
                                 key={`preview_rel_${propertyKey}_${index}`}>
                                 <RelationPreview
                                     disabled={!property.relation}
-                                    previewProperties={property.previewProperties}
+                                    previewProperties={property.ui?.previewProperties}
                                     includeId={property.includeId}
                                     includeEntityLink={property.includeEntityLink}
                                     size={"small"}
@@ -249,7 +249,7 @@ path: stringProperty.reference.path })}
             if (relationValue) {
                 content = <RelationPreview
                     disabled={!property.relation}
-                    previewProperties={property.previewProperties}
+                    previewProperties={property.ui?.previewProperties}
                     includeId={property.includeId}
                     includeEntityLink={property.includeEntityLink}
                     size={props.size}

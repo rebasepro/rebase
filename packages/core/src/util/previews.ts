@@ -59,7 +59,7 @@ export function getEntityTitlePropertyKey<M extends Record<string, any>>(collect
         const property = collection.properties[key];
         if (!isPropertyBuilder(property)) {
             const prop = property as Property;
-            if (prop.type === "string" && !prop.multiline && !prop.markdown && !prop.storage && !prop.isId) {
+            if (prop.type === "string" && !prop.ui?.multiline && !prop.ui?.markdown && !prop.storage && !prop.isId) {
                 return key;
             }
         }

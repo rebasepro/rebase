@@ -149,7 +149,7 @@ export function DataEnhancementControllerProvider({
             const value = getValueInPath(currentValues, propertyKey);
             const property = getPropertyFromKey(properties, propertyKey);
 
-            if (!property || suggestion === null || property.disabled) {
+            if (!property || suggestion === null || property?.disabled) {
                 return;
             }
 

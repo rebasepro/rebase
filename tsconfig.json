@@ -1,14 +1,14 @@
 {
   "compilerOptions": {
     "outDir": "dist",
-    "module": "Node16",
+    "module": "ESNEXT",
     "target": "ESNEXT",
     "lib": [
       "dom",
       "dom.iterable",
       "esnext"
     ],
-    "moduleResolution": "Node16",
+    "moduleResolution": "node",
     "jsx": "react-jsx",
     "noFallthroughCasesInSwitch": true,
     "declaration": true,

@@ -48,7 +48,7 @@ const postsCollection: PostgresCollection = {
         excerpt: {
             name: "Excerpt",
             type: "string",
-            multiline: true,
+            ui: { multiline: true },
             description: "Short summary displayed in previews and cards",
             validation: {
                 max: 300
@@ -65,7 +65,7 @@ const postsCollection: PostgresCollection = {
                     text: {
                         name: "Text",
                         type: "string",
-                        markdown: true
+                        ui: { markdown: true },
                     },
                     image: {
                         name: "Image",
@@ -111,22 +111,20 @@ const postsCollection: PostgresCollection = {
             name: "Publish date",
             type: "date",
             mode: "date_time",
-            clearable: true,
+            ui: { clearable: true },
             description: "When this post was or will be published"
         },
         created_at: {
             name: "Created at",
             type: "date",
             autoValue: "on_create",
-            readOnly: true,
-            hideFromCollection: true
+            ui: { readOnly: true, hideFromCollection: true },
         },
         updated_at: {
             name: "Updated at",
             type: "date",
             autoValue: "on_update",
-            readOnly: true,
-            hideFromCollection: true
+            ui: { readOnly: true, hideFromCollection: true },
         },
         author: {
             name: "Author",

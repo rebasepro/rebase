@@ -40,13 +40,13 @@ export function BlockFieldBinding({
     disabled
 }: FieldProps<ArrayProperty>) {
 
-    const minimalistView = minimalistViewProp || property.minimalistView;
+    const minimalistView = minimalistViewProp || property.ui?.minimalistView;
     const { t } = useTranslation();
 
     if (!property.oneOf)
         throw Error("ArrayOneOfField misconfiguration. Property `oneOf` not set");
 
-    const expanded = property.expanded === undefined ? true : property.expanded;
+    const expanded = property.ui?.expanded === undefined ? true : property.ui?.expanded;
     useClearRestoreValue({
         property,
         value,
@@ -92,8 +92,8 @@ export function BlockFieldBinding({
         addLabel={property.name ? t("add_to_field", { fieldName: property.name }) : t("add_entry")}
         buildEntry={buildEntry}
         onInternalIdAdded={setLastAddedId}
-        disabled={isSubmitting || Boolean(property.disabled)}
-        canAddElements={!property.disabled}
+        disabled={isSubmitting || Boolean(property.ui?.disabled)}
+        canAddElements={!property.ui?.disabled}
         onValueChange={(value) => setFieldValue(propertyKey, value)}
         newDefaultEntry={{
             [property.oneOf!.typeField ?? DEFAULT_ONE_OF_TYPE]: firstOneOfKey,

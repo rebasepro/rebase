@@ -32,7 +32,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         color: "#2d7ff9",
         property: {
             type: "string",
-            Field: TextFieldBinding
+            ui: { Field: TextFieldBinding }
         }
     },
     multiline: {
@@ -43,8 +43,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         color: "#2d7ff9",
         property: {
             type: "string",
-            multiline: true,
-            Field: TextFieldBinding
+            ui: { multiline: true, Field: TextFieldBinding }
         }
     },
     markdown: {
@@ -55,8 +54,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         color: "#2d7ff9",
         property: {
             type: "string",
-            markdown: true,
-            Field: MarkdownEditorFieldBinding
+            ui: { markdown: true, Field: MarkdownEditorFieldBinding }
         }
     },
     url: {
@@ -67,8 +65,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         color: "#154fb3",
         property: {
             type: "string",
-            url: true,
-            Field: TextFieldBinding
+            ui: { url: true, Field: TextFieldBinding }
         }
     },
     email: {
@@ -80,7 +77,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         property: {
             type: "string",
             email: true,
-            Field: TextFieldBinding
+            ui: { Field: TextFieldBinding }
         }
     },
     switch: {
@@ -91,7 +88,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         color: "#20d9d2",
         property: {
             type: "boolean",
-            Field: SwitchFieldBinding
+            ui: { Field: SwitchFieldBinding }
         }
     },
     select: {
@@ -103,7 +100,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         property: {
             type: "string",
             enum: [],
-            Field: SelectFieldBinding
+            ui: { Field: SelectFieldBinding }
         }
     },
     multi_select: {
@@ -118,7 +115,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
                 type: "string",
                 enum: []
             },
-            Field: MultiSelectFieldBinding
+            ui: { Field: MultiSelectFieldBinding }
         }
     },
     user_select: {
@@ -128,7 +125,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         Icon: UserIcon,
         property: {
             type: "string",
-            Field: UserSelectFieldBinding
+            ui: { Field: UserSelectFieldBinding }
         }
     },
     number_input: {
@@ -139,7 +136,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         color: "#bec920",
         property: {
             type: "number",
-            Field: TextFieldBinding
+            ui: { Field: TextFieldBinding }
         }
     },
     number_select: {
@@ -151,7 +148,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         property: {
             type: "number",
             enum: [],
-            Field: SelectFieldBinding
+            ui: { Field: SelectFieldBinding }
         }
     },
     multi_number_select: {
@@ -166,7 +163,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
                 type: "number",
                 enum: []
             },
-            Field: MultiSelectFieldBinding
+            ui: { Field: MultiSelectFieldBinding }
         }
     },
     file_upload: {
@@ -180,7 +177,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
             storage: {
                 storagePath: "{path}"
             },
-            Field: StorageUploadFieldBinding
+            ui: { Field: StorageUploadFieldBinding }
         }
     },
     multi_file_upload: {
@@ -197,7 +194,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
                     storagePath: "{path}"
                 }
             },
-            Field: StorageUploadFieldBinding
+            ui: { Field: StorageUploadFieldBinding }
         }
     },
     reference_as_string: {
@@ -208,7 +205,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         color: "#154fb3",
         property: {
             type: "string",
-            Field: ReferenceAsStringFieldBinding
+            ui: { Field: ReferenceAsStringFieldBinding }
         }
     },
     reference: {
@@ -219,7 +216,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         color: "#ff0042",
         property: {
             type: "reference",
-            Field: ReferenceFieldBinding
+            ui: { Field: ReferenceFieldBinding }
         }
     },
     multi_references: {
@@ -233,7 +230,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
             of: {
                 type: "reference"
             },
-            Field: ArrayOfReferencesFieldBinding
+            ui: { Field: ArrayOfReferencesFieldBinding }
         }
     },
     relation: {
@@ -245,7 +242,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         property: {
             relationName: "",
             type: "relation",
-            Field: RelationFieldBinding
+            ui: { Field: RelationFieldBinding }
         }
     },
     date_time: {
@@ -256,7 +253,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         color: "#8b46ff",
         property: {
             type: "date",
-            Field: DateTimeFieldBinding
+            ui: { Field: DateTimeFieldBinding }
         }
     },
     group: {
@@ -268,7 +265,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         property: {
             type: "map",
             properties: {},
-            Field: MapFieldBinding
+            ui: { Field: MapFieldBinding }
         }
     },
     key_value: {
@@ -280,7 +277,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         property: {
             type: "map",
             keyValue: true,
-            Field: KeyValueFieldBinding
+            ui: { Field: KeyValueFieldBinding }
         }
     },
     repeat: {
@@ -294,7 +291,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
             of: {
                 type: "string"
             },
-            Field: RepeatFieldBinding
+            ui: { Field: RepeatFieldBinding }
         }
     },
     custom_array: {
@@ -305,7 +302,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         color: "#ff9408",
         property: {
             type: "array",
-            Field: ArrayCustomShapedFieldBinding
+            ui: { Field: ArrayCustomShapedFieldBinding }
         }
     },
     block: {
@@ -319,7 +316,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
             oneOf: {
                 properties: {}
             },
-            Field: BlockFieldBinding
+            ui: { Field: BlockFieldBinding }
         }
     }
 };
@@ -347,13 +344,13 @@ export function getFieldConfig(property: Property, propertyConfigs: Record<strin
 
 export function getDefaultFieldId(property: Property) {
     if (property.type === "string") {
-        if (property.multiline) {
+        if (property.ui?.multiline) {
             return "multiline";
-        } else if (property.markdown) {
+        } else if (property.ui?.markdown) {
             return "markdown";
         } else if (property.storage) {
             return "file_upload";
-        } else if (property.url) {
+        } else if (property.ui?.url) {
             return "url";
         } else if (property.email) {
             return "email";
@@ -361,7 +358,7 @@ export function getDefaultFieldId(property: Property) {
             return "select";
         } else if (property.userSelect) {
             return "user_select";
-        } else if (property.reference) {
+        } else if ((property as any).reference) {
             return "reference_as_string";
         } else {
             return "text_field";

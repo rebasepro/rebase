@@ -42,13 +42,13 @@ const ticketsCollection: PostgresCollection = {
         description: {
             name: "Description",
             type: "string",
-            markdown: true,
+            ui: { markdown: true },
             description: "Detailed description of the ticket in Markdown"
         },
         resolution_notes: {
             name: "Resolution Notes",
             type: "string",
-            markdown: true,
+            ui: { markdown: true },
             description: "Internal notes about how the issue was resolved"
         },
         status: {
@@ -109,21 +109,18 @@ const ticketsCollection: PostgresCollection = {
             name: "Created at",
             type: "date",
             autoValue: "on_create",
-            readOnly: true,
-            hideFromCollection: true
+            ui: { readOnly: true, hideFromCollection: true },
         },
         updated_at: {
             name: "Updated at",
             type: "date",
             autoValue: "on_update",
-            readOnly: true,
-            hideFromCollection: true
+            ui: { readOnly: true, hideFromCollection: true },
         },
         __order: {
             name: "Order",
             type: "string",
-            disabled: true,
-            hideFromCollection: true
+            ui: { disabled: true, hideFromCollection: true },
         }
     },
     propertiesOrder: [

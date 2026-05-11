@@ -134,11 +134,11 @@ requiredMessage: "Please fill this field" }
         expect(invalid.success).toBe(false);
     });
 
-    it("validates URL format when property.url is set", async () => {
+    it("validates URL format when property.ui?.url is set", async () => {
         const property: StringProperty = {
             type: "string",
             name: "Website",
-            url: true,
+            ui: { url: true },
             validation: {}
         } as unknown as StringProperty;
         const schema = mapPropertyToZod({ property });

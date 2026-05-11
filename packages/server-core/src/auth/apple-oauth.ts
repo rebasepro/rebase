@@ -1,8 +1,6 @@
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
 import { z } from "zod";
-import { createPrivateKey } from "crypto";
-import { SignJWT } from "jose";
-
+import jwt from "jsonwebtoken";
 /**
  * Creates an Apple Sign In OAuth Provider integration.
  *
@@ -31,22 +29,14 @@ export function createAppleProvider(config: {
      * Apple requires this instead of a static client_secret.
      */
     async function generateClientSecret(): Promise<string> {
-        const key = createPrivateKey({
-            key: config.privateKey,
-            format: "pem"
+        return jwt.sign({}, config.privateKey, {
+            algorithm: "ES256",
+            keyid: config.keyId,
+            issuer: config.teamId,
+            expiresIn: "180d",
+            audience: "https://appleid.apple.com",
+            subject: config.clientId
         });
-
-        const now = Math.floor(Date.now() / 1000);
-
-        return new SignJWT({})
-            .setProtectedHeader({ alg: "ES256",
-kid: config.keyId })
-            .setIssuer(config.teamId)
-            .setIssuedAt(now)
-            .setExpirationTime(now + 86400 * 180) // 6 months max
-            .setAudience("https://appleid.apple.com")
-            .setSubject(config.clientId)
-            .sign(key);
     }
 
     return {

@@ -280,7 +280,7 @@ export function resolveArrayProperties<M>({
             }).filter(e => Boolean(e)) as Property[]
             : [];
         return resolvedProperties;
-    } else if (!("Field" in property && property.Field)) {
+    } else if (!("Field" in (property.ui || {}) && property.ui?.Field)) {
         throw Error(`The array property (${propertyKey}) needs to declare an 'of' or a 'oneOf' property, or provide a custom \`Field\` component`);
     } else {
         return [];
@@ -350,8 +350,8 @@ export function getSubcollections<M extends Record<string, unknown> = Record<str
         return (collection as CollectionWithSubcollections).subcollections!() ?? [];
     }
 
-    if (getDataSourceCapabilities(collection.driver).supportsRelations && (collection as CollectionWithRelations).relations) {
-        const manyRelations = (collection as CollectionWithRelations).relations!.filter((r: Relation) => r.cardinality === "many");
+    if (getDataSourceCapabilities(collection.driver).supportsRelations && ((collection as any).relations)) {
+        const manyRelations = ((collection as any).relations)!.filter((r: Relation) => r.cardinality === "many");
         return manyRelations.map((r: Relation) => {
             const target = r.target();
             if (!target) return undefined;
@@ -376,7 +376,7 @@ export function getSubcollections<M extends Record<string, unknown> = Record<str
 
             const targetWithOverrides = { ...target, ...baseOverrides };
             return (r.overrides ? mergeDeep(targetWithOverrides, r.overrides) : targetWithOverrides) as EntityCollection<Record<string, unknown>>;
-        }).filter((c): c is EntityCollection<Record<string, unknown>> => Boolean(c));
+        }).filter((c: any): c is EntityCollection<Record<string, unknown>> => Boolean(c));
     }
 
     return [];

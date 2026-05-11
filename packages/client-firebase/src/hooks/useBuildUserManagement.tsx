@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect } from "react";
-import equal from "react-fast-compare"
+import { deepEqual as equal } from "fast-equals";
 
 import { removeUndefined } from "@rebasepro/utils";
 import {

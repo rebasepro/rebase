@@ -63,7 +63,7 @@ const orderItemsCollection: PostgresCollection = {
         line_total: {
             name: "Line Total",
             type: "number",
-            readOnly: true,
+            ui: { readOnly: true },
             description: "quantity × unit_price"
         }
     },

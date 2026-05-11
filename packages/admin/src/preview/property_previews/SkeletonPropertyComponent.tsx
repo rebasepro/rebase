@@ -26,7 +26,7 @@ export function SkeletonPropertyComponent({
     let content: React.ReactNode | any;
     if (property.type === "string") {
         const stringProperty = property as StringProperty;
-        if (stringProperty.url) {
+        if (stringProperty.ui?.url) {
             content = renderUrlComponent(stringProperty, size);
         } else if (stringProperty.storage) {
             content = renderSkeletonImageThumbnail(size);
@@ -79,7 +79,7 @@ function renderMap<T extends Record<string, any>>(property: MapProperty, size: P
     if (size === "large") {
         mapPropertyKeys = Object.keys(property.properties);
     } else {
-        mapPropertyKeys = (property.previewProperties || Object.keys(property.properties)) as string[];
+        mapPropertyKeys = ((property.ui as any)?.previewProperties || Object.keys(property.properties)) as string[];
         if (size === "medium")
             mapPropertyKeys = mapPropertyKeys.slice(0, 3);
         else if (size === "small")
@@ -241,7 +241,7 @@ function renderReference() {
 
 function renderUrlComponent(property: StringProperty, size: PreviewSize = "large") {
 
-    if (typeof property.url === "boolean") {
+    if (typeof property.ui?.url === "boolean") {
         return <div style={{
             display: "flex"
         }}>

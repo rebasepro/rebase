@@ -312,7 +312,7 @@ function createFilterField({
             path={baseProperty.path}
             title={resolvedProperty?.name}
             includeId={baseProperty.includeId}
-            previewProperties={baseProperty?.previewProperties}
+            previewProperties={baseProperty?.ui?.previewProperties}
             hidden={hidden}
             setHidden={setHidden}/>;
     } else if (baseProperty.type === "relation" && baseProperty.relation) {

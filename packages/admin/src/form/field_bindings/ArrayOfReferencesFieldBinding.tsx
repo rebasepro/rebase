@@ -39,7 +39,7 @@ export function ArrayOfReferencesFieldBinding({
     setFieldValue
 }: ArrayOfReferencesFieldProps) {
 
-    const minimalistView = minimalistViewProp || property.minimalistView;
+    const minimalistView = minimalistViewProp || property.ui?.minimalistView;
     const { t } = useTranslation();
 
     const ofProperty = property.of as Property;
@@ -47,7 +47,7 @@ export function ArrayOfReferencesFieldBinding({
         throw Error("ArrayOfReferencesField expected a property containing references");
     }
 
-    const expanded = property.expanded === undefined ? true : property.expanded;
+    const expanded = property.ui?.expanded === undefined ? true : property.ui?.expanded;
     const selectedEntityIds = value && Array.isArray(value) ? value.map((ref) => ref.id) : [];
 
     useClearRestoreValue({
@@ -98,7 +98,7 @@ export function ArrayOfReferencesFieldBinding({
             <ReferencePreview
                 key={internalId}
                 disabled={!ofProperty.path}
-                previewProperties={ofProperty.previewProperties}
+                previewProperties={ofProperty.ui?.previewProperties}
                 size={"medium"}
                 onClick={onEntryClick}
                 hover={!disabled}
@@ -107,7 +107,7 @@ export function ArrayOfReferencesFieldBinding({
                 includeEntityLink={ofProperty.includeEntityLink}
             />
         );
-    }, [ofProperty.path, ofProperty.previewProperties, value]);
+    }, [ofProperty.path, ofProperty.ui?.previewProperties, value]);
 
     const title = (<>
         <LabelWithIconAndTooltip

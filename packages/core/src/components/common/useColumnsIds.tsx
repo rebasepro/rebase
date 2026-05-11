@@ -49,7 +49,7 @@ function hideAndExpandKeys<M extends Record<string, any>>(collection: EntityColl
         if (key.includes(".")) {
             const rootKey = key.split(".")[0];
             const rootProperty = collection.properties[rootKey];
-            if (rootProperty && rootProperty.type === "map" && rootProperty.spreadChildren && rootProperty.properties) {
+            if (rootProperty && rootProperty.type === "map" && rootProperty.ui?.spreadChildren && rootProperty.properties) {
                 rootsWithExplicitChildren.add(rootKey);
             }
         }
@@ -66,12 +66,12 @@ function hideAndExpandKeys<M extends Record<string, any>>(collection: EntityColl
         const property = collection.properties[key];
         if (property) {
             processedPropertyKeys.add(key);
-            if (property.hideFromCollection)
+            if (property.ui?.hideFromCollection)
                 return [null];
-            if (property.disabled && typeof property.disabled === "object" && property.disabled.hidden)
+            if (property.ui?.disabled && typeof property.ui?.disabled === "object" && property.ui?.disabled.hidden)
                 return [null];
 
-            if (property.type === "map" && property.spreadChildren && property.properties) {
+            if (property.type === "map" && property.ui?.spreadChildren && property.properties) {
                 // Check if this spread map has explicit child keys in propertiesOrder
                 if (rootsWithExplicitChildren.has(key)) {
                     // DON'T auto-expand - the children are explicitly listed elsewhere
@@ -84,7 +84,7 @@ function hideAndExpandKeys<M extends Record<string, any>>(collection: EntityColl
             }
             return [{
                 key,
-                disabled: Boolean(property.disabled) || Boolean(property.readOnly)
+                disabled: Boolean(property.ui?.disabled) || Boolean(property.ui?.readOnly)
             }];
         }
 
@@ -100,15 +100,15 @@ function hideAndExpandKeys<M extends Record<string, any>>(collection: EntityColl
                     // Mark root as seen
                     processedPropertyKeys.add(rootKey);
 
-                    if (nestedProperty.hideFromCollection)
+                    if (nestedProperty.ui?.hideFromCollection)
                         return [null];
-                    if (nestedProperty.disabled && typeof nestedProperty.disabled === "object" && nestedProperty.disabled.hidden)
+                    if (nestedProperty.ui?.disabled && typeof nestedProperty.ui?.disabled === "object" && nestedProperty.ui?.disabled.hidden)
                         return [null];
 
                     return [{
                         key,
-                        disabled: Boolean(rootProperty.disabled) || Boolean(rootProperty.readOnly) ||
-                            Boolean(nestedProperty.disabled) || Boolean(nestedProperty.readOnly)
+                        disabled: Boolean(rootProperty.ui?.disabled) || Boolean(rootProperty.ui?.readOnly) ||
+                            Boolean(nestedProperty.ui?.disabled) || Boolean(nestedProperty.ui?.readOnly)
                     }];
                 }
             }
@@ -147,10 +147,10 @@ function hideAndExpandKeys<M extends Record<string, any>>(collection: EntityColl
 
         const property = collection.properties[propKey];
         if (!property) continue;
-        if (property.hideFromCollection) continue;
-        if (property.disabled && typeof property.disabled === "object" && property.disabled.hidden) continue;
+        if (property.ui?.hideFromCollection) continue;
+        if (property.ui?.disabled && typeof property.ui?.disabled === "object" && property.ui?.disabled.hidden) continue;
 
-        if (property.type === "map" && property.spreadChildren && property.properties) {
+        if (property.type === "map" && property.ui?.spreadChildren && property.properties) {
             // For spread maps, add all children that weren't already added
             const allChildConfigs = getColumnKeysForProperty(property as MapProperty, propKey);
             for (const childConfig of allChildConfigs) {
@@ -162,7 +162,7 @@ function hideAndExpandKeys<M extends Record<string, any>>(collection: EntityColl
         } else {
             result.push({
                 key: propKey,
-                disabled: Boolean(property.disabled) || Boolean(property.readOnly)
+                disabled: Boolean(property.ui?.disabled) || Boolean(property.ui?.readOnly)
             });
             processedPropertyKeys.add(propKey);
         }
@@ -193,17 +193,17 @@ function getDefaultColumnKeys<M extends Record<string, any> = any>(collection: E
 }
 
 export function getColumnKeysForProperty(property: Property, key: string, disabled?: boolean): PropertyColumnConfig[] {
-    if (property.type === "map" && property.spreadChildren && property.properties) {
+    if (property.type === "map" && property.ui?.spreadChildren && property.properties) {
         return Object.entries(property.properties)
             .flatMap(([childKey, childProperty]) => getColumnKeysForProperty(
                 childProperty as Readonly<Property>,
                 `${key}.${childKey}`,
-                disabled || Boolean(property.disabled) || Boolean(property.readOnly))
+                disabled || Boolean(property.ui?.disabled) || Boolean(property.ui?.readOnly))
             );
     }
     return [{
         key,
-        disabled: disabled || Boolean(property.disabled) || Boolean(property.readOnly)
+        disabled: disabled || Boolean(property.ui?.disabled) || Boolean(property.ui?.readOnly)
     }];
 }
 

@@ -30,7 +30,7 @@ export function ArrayOfReferencesPreview({
                         key={`preview_array_ref_${propertyKey}_${index}`}>
                         <ReferencePreview
                             disabled={!ofProperty.path}
-                            previewProperties={ofProperty.previewProperties}
+                            previewProperties={ofProperty.ui?.previewProperties}
                             size={childSize}
                             reference={reference}
                             includeId={ofProperty.includeId}

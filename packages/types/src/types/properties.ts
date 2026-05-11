@@ -63,6 +63,16 @@ export type Properties = {
     [key: string]: Property;
 };
 
+export type PostgresProperty = Exclude<Property, ReferenceProperty>;
+export type PostgresProperties = {
+    [key: string]: PostgresProperty;
+};
+
+export type FirebaseProperty = Exclude<Property, RelationProperty>;
+export type FirebaseProperties = {
+    [key: string]: FirebaseProperty;
+};
+
 /**
  * A helper type to infer the underlying data type from a Property definition.
  * This is the core of the type inference system.
@@ -127,7 +137,19 @@ export type InferEntityType<P extends Properties> = {
  * Interface including all common properties of a CMS property.
  * @group Entity properties
  */
+export interface BaseUIConfig<CustomProps = unknown> {
+    columnWidth?: number;
+    hideFromCollection?: boolean;
+    readOnly?: boolean;
+    disabled?: boolean | PropertyDisabledConfig;
+    widthPercentage?: number;
+    customProps?: CustomProps;
+    Field?: React.ComponentType<any>;
+    Preview?: React.ComponentType<any>;
+}
+
 export interface BaseProperty<CustomProps = unknown> {
+    ui?: BaseUIConfig<CustomProps>;
     /**
      * Property name (e.g. Product)
      */
@@ -146,31 +168,7 @@ export interface BaseProperty<CustomProps = unknown> {
      */
     propertyConfig?: string;
 
-    /**
-     * Width in pixels of this column in the collection view. If not set
-     * the width is inferred based on the other configurations
-     */
-    columnWidth?: number;
 
-    /**
-     * Do not show this property in the collection view
-     */
-    hideFromCollection?: boolean;
-
-    /**
-     * Is this a read only property. When set to true, it gets rendered as a
-     * preview.
-     */
-    readOnly?: boolean;
-
-    /**
-     * Is this field disabled.
-     * When set to true, it gets rendered as a
-     * disabled field. You can also specify a configuration for defining the
-     * behaviour of disabled properties (including custom messages, clear value on
-     * disabled or hide the field completely)
-     */
-    disabled?: boolean | PropertyDisabledConfig;
 
     /**
      * Rules for validating this property
@@ -182,17 +180,7 @@ export interface BaseProperty<CustomProps = unknown> {
      */
     defaultValue?: unknown;
 
-    /**
-     * A number between 0 and 100 that indicates the width of the field in the form view.
-     * It defaults to 100, but you can set it to 50 to have two fields in the same row.
-     */
-    widthPercentage?: number;
 
-    /**
-     * Additional props that are passed to the components defined in `field`
-     * or in `preview`.
-     */
-    customProps?: CustomProps;
 
 
     /**
@@ -221,23 +209,22 @@ export interface BaseProperty<CustomProps = unknown> {
      */
     callbacks?: PropertyCallbacks;
 
-    /**
-     * Custom field component to render this property in forms.
-     * Used by the CMS layer.
-     */
-    Field?: React.ComponentType<any>;
 
-    /**
-     * Custom preview component to render this property in previews/tables.
-     * Used by the CMS layer.
-     */
-    Preview?: React.ComponentType<any>;
 }
 
 /**
  * @group Entity properties
  */
+export interface StringUIConfig extends BaseUIConfig {
+    multiline?: boolean;
+    markdown?: boolean;
+    previewAsTag?: boolean;
+    clearable?: boolean;
+    url?: boolean | PreviewType;
+}
+
 export interface StringProperty extends BaseProperty {
+    ui?: StringUIConfig;
     type: "string";
     /**
      * Optional database column type. If not set, it defaults to `varchar` or `uuid` depending on `isId` configuration.
@@ -314,10 +301,7 @@ export interface StringProperty extends BaseProperty {
      * Should this string be rendered as a tag instead of just text.
      */
     previewAsTag?: boolean;
-    /**
-     * Add an icon to clear the value and set it to `null`. Defaults to `false`
-     */
-    clearable?: boolean;
+
 
     /**
      * You can use this property (a string) to behave as a reference to another
@@ -331,7 +315,12 @@ export interface StringProperty extends BaseProperty {
 /**
  * @group Entity properties
  */
+export interface NumberUIConfig extends BaseUIConfig {
+    clearable?: boolean;
+}
+
 export interface NumberProperty extends BaseProperty {
+    ui?: NumberUIConfig;
     type: "number";
     /**
      * Optional database column type. Allows specifying exact database numeric types.
@@ -359,16 +348,14 @@ export interface NumberProperty extends BaseProperty {
      * displayed in the dropdown.
      */
     enum?: EnumValues;
-    /**
-     * Add an icon to clear the value and set it to `null`. Defaults to `false`
-     */
-    clearable?: boolean;
+
 }
 
 /**
  * @group Entity properties
  */
 export interface BooleanProperty extends BaseProperty {
+    ui?: BaseUIConfig;
     type: "boolean";
     /**
      * Rules for validating this property
@@ -379,7 +366,12 @@ export interface BooleanProperty extends BaseProperty {
 /**
  * @group Entity properties
  */
+export interface DateUIConfig extends BaseUIConfig {
+    clearable?: boolean;
+}
+
 export interface DateProperty extends BaseProperty {
+    ui?: DateUIConfig;
     type: "date";
     /**
      * Optional database column type. If not set, defaults to `timestamp` with timezone.
@@ -416,6 +408,7 @@ export interface DateProperty extends BaseProperty {
  * @group Entity properties
  */
 export interface GeopointProperty extends BaseProperty {
+    ui?: BaseUIConfig;
     type: "geopoint";
     /**
      * Rules for validating this property
@@ -426,7 +419,12 @@ export interface GeopointProperty extends BaseProperty {
 /**
  * @group Entity properties
  */
+export interface ReferenceUIConfig extends BaseUIConfig {
+    previewProperties?: string[];
+}
+
 export interface ReferenceProperty extends BaseProperty {
+    ui?: ReferenceUIConfig;
     type: "reference";
     /**
      * Marks this field as a Primary Key / Unique Identifier.
@@ -450,12 +448,7 @@ export interface ReferenceProperty extends BaseProperty {
      * e.g. `fixedFilter: { age: [">=", 18] }`
      */
     fixedFilter?: FilterValues<string>;
-    /**
-     * Properties that need to be rendered when displaying a preview of this
-     * reference. If not specified the first 3 are used. Only the first 3
-     * specified values are considered.
-     */
-    previewProperties?: string[];
+
     /**
      * Should the reference include the ID of the entity. Defaults to `true`
      */
@@ -469,7 +462,13 @@ export interface ReferenceProperty extends BaseProperty {
 /**
  * @group Entity properties
  */
+export interface RelationUIConfig extends BaseUIConfig {
+    previewProperties?: string[];
+    widget?: "select" | "dialog";
+}
+
 export interface RelationProperty extends BaseProperty {
+    ui?: RelationUIConfig;
     type: "relation";
     /**
      * Marks this field as a Primary Key / Unique Identifier.
@@ -582,12 +581,7 @@ export interface RelationProperty extends BaseProperty {
      * e.g. `fixedFilter: { age: [">=", 18] }`
      */
     fixedFilter?: FilterValues<string>;
-    /**
-     * Properties that need to be rendered when displaying a preview of this
-     * reference. If not specified the first 3 are used. Only the first 3
-     * specified values are considered.
-     */
-    previewProperties?: string[];
+
     /**
      * Should the reference include the ID of the entity. Defaults to `true`
      */
@@ -607,7 +601,13 @@ export interface RelationProperty extends BaseProperty {
 /**
  * @group Entity properties
  */
+export interface ArrayUIConfig extends BaseUIConfig {
+    expanded?: boolean;
+    minimalistView?: boolean;
+}
+
 export interface ArrayProperty extends BaseProperty {
+    ui?: ArrayUIConfig;
     type: "array";
     /**
      * Optional database column type. Defaults to `jsonb`.
@@ -662,15 +662,7 @@ export interface ArrayProperty extends BaseProperty {
      * Rules for validating this property
      */
     validation?: ArrayPropertyValidationSchema;
-    /**
-     * Should the field be initially expanded. Defaults to `true`
-     */
-    expanded?: boolean;
-    /**
-     * Display the child properties directly, without being wrapped in an
-     * extendable panel.
-     */
-    minimalistView?: boolean;
+
     /**
      * Can the elements in this array be reordered. Defaults to `true`.
      * This prop has no effect if `disabled` is set to true.
@@ -686,7 +678,14 @@ export interface ArrayProperty extends BaseProperty {
 /**
  * @group Entity properties
  */
+export interface MapUIConfig extends BaseUIConfig {
+    expanded?: boolean;
+    minimalistView?: boolean;
+    spreadChildren?: boolean;
+}
+
 export interface MapProperty extends BaseProperty {
+    ui?: MapUIConfig;
     type: "map";
     /**
      * Optional database column type. Defaults to `jsonb`.
@@ -720,20 +719,7 @@ export interface MapProperty extends BaseProperty {
      * needed
      */
     pickOnlySomeKeys?: boolean;
-    /**
-     * Display the child properties as independent columns in the collection
-     * view
-     */
-    spreadChildren?: boolean;
-    /**
-     * Display the child properties directly, without being wrapped in an
-     * extendable panel. Note that this will also hide the title of this property.
-     */
-    minimalistView?: boolean;
-    /**
-     * Should the field be initially expanded. Defaults to `true`
-     */
-    expanded?: boolean;
+
     /**
      * Render this map as a key-value table that allows to use
      * arbitrary keys. You don't need to define the properties in this case.

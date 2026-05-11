@@ -32,7 +32,7 @@ export function buildStringProperty({
             .filter((value) => typeof value === "string" &&
                 value.toString().startsWith("http")).length > totalDocsCount / 3 * 2;
         if (probablyAURL) {
-            config.url = true;
+            config.ui = { url: true };
         }
 
         const probablyAnEmail = valuesResult.values
@@ -46,7 +46,7 @@ export function buildStringProperty({
             .filter((value) => typeof value === "string" && value.length === 28 && !value.includes(" "))
             .length > totalDocsCount / 3 * 2;
         if (probablyUserIds)
-            config.readOnly = true;
+            config.ui = { ...config.ui, readOnly: true };
 
         if (!probablyAnEmail &&
             !probablyAURL &&

@@ -114,7 +114,7 @@ export function FiltersDialog({
                     path={baseProperty.path}
                     title={property.name}
                     includeId={baseProperty.includeId}
-                    previewProperties={baseProperty.previewProperties}
+                    previewProperties={baseProperty.ui?.previewProperties}
                     hidden={hiddenFields[propertyKey] ?? false}
                     setHidden={(hidden) => setHiddenForField(propertyKey, hidden)}
                 />

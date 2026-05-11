@@ -165,7 +165,7 @@ export class CollectionRegistry {
 
         // 2. Merge with manual relations[] (manual entries win on name conflict)
         const relResult = result as CollectionWithRelations;
-        const manualRelations = getDataSourceCapabilities(result.driver).supportsRelations ? (relResult.relations ?? []) : [];
+        const manualRelations = getDataSourceCapabilities(result.driver).supportsRelations ? ((relResult as any).relations ?? []) : [];
         const mergedRelationsRaw = [...extractedRelations];
         for (const manual of manualRelations) {
             const name = manual.relationName;
@@ -192,7 +192,7 @@ export class CollectionRegistry {
             });
 
             // 3. Set the merged relations on the result copy
-            relResult.relations = mergedRelations;
+            (relResult as any).relations = mergedRelations;
         }
 
         // 4. Normalize properties (which stamps relation on each property)
@@ -203,8 +203,8 @@ export class CollectionRegistry {
         if (!result.childCollections) {
             if (getDataSourceCapabilities(result.driver).supportsSubcollections && (result as CollectionWithSubcollections).subcollections) {
                 result.childCollections = (result as CollectionWithSubcollections).subcollections;
-            } else if (getDataSourceCapabilities(result.driver).supportsRelations && relResult.relations) {
-                const manyRelations = relResult.relations.filter((r: Relation) => r.cardinality === "many");
+            } else if (getDataSourceCapabilities(result.driver).supportsRelations && (relResult as any).relations) {
+                const manyRelations = (relResult as any).relations.filter((r: Relation) => r.cardinality === "many");
                 if (manyRelations.length > 0) {
                     result.childCollections = () => manyRelations.map((r: Relation) => {
                         const target = r.target();
@@ -485,8 +485,8 @@ function areCollectionsEqual(a: EntityCollection, b: EntityCollection) {
     // Remove subcollections/relations from comparison objects (already handled above)
     delete restA.subcollections;
     delete restB.subcollections;
-    delete restA.relations;
-    delete restB.relations;
+    delete (restA as any).relations;
+    delete (restB as any).relations;
     if (!areCollectionListsEqual(subcollectionsA, subcollectionsB)) {
         return false;
     }

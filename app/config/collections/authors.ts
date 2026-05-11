@@ -52,7 +52,7 @@ const authorsCollection: EntityCollection = {
         bio: {
             name: "Bio",
             type: "string",
-            markdown: true,
+            ui: { markdown: true },
             description: "Author biography in Markdown format"
         },
         twitter: {

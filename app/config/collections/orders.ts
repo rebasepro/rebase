@@ -176,7 +176,7 @@ const ordersCollection: PostgresCollection = {
         shipping_address: {
             name: "Shipping Address",
             type: "string",
-            multiline: true,
+            ui: { multiline: true },
             description: "Delivery address for this order"
         },
         tracking_number: {
@@ -187,7 +187,7 @@ const ordersCollection: PostgresCollection = {
         notes: {
             name: "Internal Notes",
             type: "string",
-            multiline: true,
+            ui: { multiline: true },
             description: "Internal notes (not visible to customer)"
         },
         order_date: {
@@ -202,27 +202,25 @@ const ordersCollection: PostgresCollection = {
             name: "Shipped Date",
             type: "date",
             mode: "date_time",
-            clearable: true
+            ui: { clearable: true },
         },
         delivered_date: {
             name: "Delivered Date",
             type: "date",
             mode: "date_time",
-            clearable: true
+            ui: { clearable: true },
         },
         created_at: {
             name: "Created at",
             type: "date",
             autoValue: "on_create",
-            readOnly: true,
-            hideFromCollection: true
+            ui: { readOnly: true, hideFromCollection: true },
         },
         updated_at: {
             name: "Updated at",
             type: "date",
             autoValue: "on_update",
-            readOnly: true,
-            hideFromCollection: true
+            ui: { readOnly: true, hideFromCollection: true },
         }
     },
     propertiesOrder: [

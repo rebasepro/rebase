@@ -143,7 +143,7 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
             propertyKey,
             entity
         }) ?? column.custom.resolvedProperty;
-        if (!property?.disabled) {
+        if (!property?.ui?.disabled) {
             disabled = false;
         }
 

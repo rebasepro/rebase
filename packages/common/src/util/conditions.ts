@@ -178,7 +178,8 @@ export function applyPropertyConditions(
     if (conditions.disabled) {
         const isDisabled = evaluateCondition(conditions.disabled, context);
         if (isDisabled) {
-            result.disabled = {
+            result.ui = result.ui || {};
+            result.ui.disabled = {
                 clearOnDisabled: conditions.clearOnDisabled ?? false,
                 disabledMessage: conditions.disabledMessage,
                 hidden: false
@@ -190,8 +191,9 @@ export function applyPropertyConditions(
     if (conditions.hidden) {
         const isHidden = evaluateCondition(conditions.hidden, context);
         if (isHidden) {
-            result.disabled = {
-                ...(typeof result.disabled === "object" ? result.disabled : {}),
+            result.ui = result.ui || {};
+            result.ui.disabled = {
+                ...(typeof result.ui?.disabled === "object" ? result.ui.disabled : {}),
                 hidden: true,
                 clearOnDisabled: conditions.clearOnDisabled ?? false
             };
@@ -202,7 +204,8 @@ export function applyPropertyConditions(
     if (conditions.readOnly) {
         const isReadOnly = evaluateCondition(conditions.readOnly, context);
         if (isReadOnly) {
-            result.readOnly = true;
+            result.ui = result.ui || {};
+            result.ui.readOnly = true;
         }
     }
 

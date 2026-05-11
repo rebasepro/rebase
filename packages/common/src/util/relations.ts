@@ -41,7 +41,7 @@ export function sanitizeRelation(relation: Partial<Relation>, sourceCollection: 
 
                 try {
                     // Look for an owning relation on the target that points back to this collection
-                    const targetRelations = getDataSourceCapabilities(targetCollection.driver).supportsRelations ? ((targetCollection as CollectionWithRelations).relations || []) : [];
+                    const targetRelations = getDataSourceCapabilities(targetCollection.driver).supportsRelations ? (((targetCollection as any).relations) || []) : [];
                     for (const targetRel of targetRelations) {
                         if (targetRel.direction === "owning" &&
                             targetRel.cardinality === "one" &&
@@ -85,7 +85,7 @@ export function sanitizeRelation(relation: Partial<Relation>, sourceCollection: 
                     // Note: we intentionally do NOT require `through` here because the raw (unsanitized)
                     // relations won't have `through` populated yet — sanitizeRelation fills it in later.
                     // `cardinality: "many" + direction: "owning"` is sufficient to identify owning M2M.
-                    const targetRelations = getDataSourceCapabilities(targetCollection.driver).supportsRelations ? ((targetCollection as CollectionWithRelations).relations || []) : [];
+                    const targetRelations = getDataSourceCapabilities(targetCollection.driver).supportsRelations ? (((targetCollection as any).relations) || []) : [];
                     for (const targetRel of targetRelations) {
                         if (targetRel.cardinality === "many" &&
                             (targetRel.direction === "owning" || !targetRel.direction) &&
@@ -152,8 +152,8 @@ export function resolveCollectionRelations(
 
     // 1. Process explicit relations from the `relations` field.
     //    Each relation is stored once under its canonical relationName key.
-    if (relCollection.relations) {
-        relCollection.relations.forEach((relation: Relation) => {
+    if ((relCollection as any).relations) {
+        (relCollection as any).relations.forEach((relation: Relation) => {
             const normalizedRelation = sanitizeRelation(relation, collection);
             const relationKey = normalizedRelation.relationName;
             if (relationKey) {
@@ -232,7 +232,7 @@ export function resolvePropertyRelation({
     }
 
     // 2. Fall back to lookup from collection.relations[] (backward compat)
-    const relation = ((sourceCollection as CollectionWithRelations).relations ?? []).find((rel: Relation) => rel.relationName === relProp.relationName)
+    const relation = (((sourceCollection as any).relations) ?? []).find((rel: Relation) => rel.relationName === relProp.relationName)
     if (!relation) {
         console.warn(`Unrecognized relation format for property '${propertyKey}' in collection '${sourceCollection.slug}'`);
         return undefined;

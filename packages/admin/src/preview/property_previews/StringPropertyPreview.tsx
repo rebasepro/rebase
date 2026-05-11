@@ -24,7 +24,7 @@ export function StringPropertyPreview({
             enumKey={enumKey}
             enumValues={property.enum}
             size={size}/>;
-    } else if (property.previewAsTag) {
+    } else if (property.ui?.previewAsTag) {
         const colorScheme = getColorSchemeForSeed(propertyKey ?? "");
         return (
             <ErrorBoundary>
@@ -34,11 +34,11 @@ export function StringPropertyPreview({
                     {value}
                 </Chip>
             </ErrorBoundary>);
-    } else if (property.url) {
+    } else if (property.ui?.url) {
         return (
             <UrlComponentPreview size={size}
                 url={value}
-                previewType={typeof property.url === "string" ? property.url as PreviewType : undefined}/>
+                previewType={typeof property.ui?.url === "string" ? property.ui?.url as PreviewType : undefined}/>
         );
     } else {
         if (!value) return <></>;

@@ -36,8 +36,8 @@ export function MapFieldBinding({
 }: FieldProps<MapProperty>) {
 
     const pickOnlySomeKeys = property.pickOnlySomeKeys || false;
-    const expanded = property.expanded === undefined ? true : property.expanded;
-    const minimalistView = minimalistViewProp || property.minimalistView;
+    const expanded = property.ui?.expanded === undefined ? true : property.ui?.expanded;
+    const minimalistView = minimalistViewProp || property.ui?.minimalistView;
     const { t } = useTranslation();
 
     if (!property.properties) {
@@ -60,11 +60,11 @@ export function MapFieldBinding({
 
     const mapFormView = <>
         <div
-            className={cls("py-1 flex flex-col space-y-2", minimalistView && property.widthPercentage !== undefined ? "mt-8" : undefined)}>
+            className={cls("py-1 flex flex-col space-y-2", minimalistView && property.ui?.widthPercentage !== undefined ? "mt-8" : undefined)}>
             {Object.entries(mapProperties)
                 .filter(([_, property]) => !isHidden(property))
                 .map(([entryKey, childProperty], index) => {
-                    const thisDisabled = isReadOnly(childProperty) || Boolean(childProperty.disabled);
+                    const thisDisabled = isReadOnly(childProperty) || Boolean(childProperty.ui?.disabled);
                     const fieldBindingProps: PropertyFieldBindingProps<any> = {
                         propertyKey: `${propertyKey}.${entryKey}`,
                         disabled: disabled || thisDisabled,
@@ -105,12 +105,12 @@ export function MapFieldBinding({
         <ErrorBoundary>
 
             {!minimalistView && <ExpandablePanel initiallyExpanded={expanded}
-                onExpandedChange={(expanded) => {
+                onExpandedChange={(expanded: boolean) => {
                     onPropertyChange?.({
-                        expanded
+                        ui: { ...property.ui, expanded }
                     });
                 }}
-                className={property.widthPercentage !== undefined ? "mt-8" : undefined}
+                className={property.ui?.widthPercentage !== undefined ? "mt-8" : undefined}
                 innerClassName={"px-2 md:px-4 pb-2 md:pb-4 pt-1 md:pt-2 bg-white dark:bg-surface-900"}
                 title={<LabelWithIconAndTooltip
                     propertyKey={propertyKey}

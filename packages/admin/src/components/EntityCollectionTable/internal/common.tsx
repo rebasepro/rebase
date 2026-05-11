@@ -17,20 +17,20 @@ export function getTableCellAlignment(property: Property): "right" | "left" | "c
 
 export function getTablePropertyColumnWidth(property: Property): number {
 
-    if (property.columnWidth) {
-        return property.columnWidth;
+    if (property.ui?.columnWidth) {
+        return property.ui?.columnWidth;
     }
 
     if (property.type === "string") {
-        if (property.url) {
+        if (property.ui?.url) {
             return 280;
         } else if (property.storage) {
             return 160;
         } else if (property.enum) {
             return 200;
-        } else if (property.multiline) {
+        } else if (property.ui?.multiline) {
             return 300;
-        } else if (property.markdown) {
+        } else if (property.ui?.markdown) {
             return 300;
         } else if (property.email) {
             return 200;

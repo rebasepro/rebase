@@ -369,6 +369,7 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
  */
 export interface PostgresCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>
     extends BaseEntityCollection<M, USER> {
+    properties: Properties;
 
     /**
      * The driver for this collection. For Postgres collections this
@@ -416,7 +417,6 @@ export interface PostgresCollection<M extends Record<string, unknown> = Record<s
  */
 export interface FirebaseCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>
     extends BaseEntityCollection<M, USER> {
-
     /**
      * The driver for this collection. Must be set to `"firestore"`.
      */

@@ -34,7 +34,7 @@ export function ArrayCustomShapedFieldBinding({
 }: FieldProps<ArrayProperty | ArrayProperty>) {
 
     const authController = useAuthController();
-    const minimalistView = minimalistViewProp || property.minimalistView;
+    const minimalistView = minimalistViewProp || property.ui?.minimalistView;
 
     const resolvedProperties: Property[] | undefined = getArrayResolvedProperties({
         propertyValue: value,
@@ -44,7 +44,7 @@ export function ArrayCustomShapedFieldBinding({
         authController
     })
 
-    const expanded = property.expanded === undefined ? true : property.expanded;
+    const expanded = property.ui?.expanded === undefined ? true : property.ui?.expanded;
 
     useClearRestoreValue({
         property,
@@ -63,7 +63,7 @@ export function ArrayCustomShapedFieldBinding({
     </>);
 
     const body = (resolvedProperties ?? []).map((childProperty, index) => {
-        const thisDisabled = isReadOnly(childProperty) || Boolean(childProperty.disabled);
+        const thisDisabled = isReadOnly(childProperty) || Boolean(childProperty.ui?.disabled);
         const fieldProps = {
             propertyKey: `${propertyKey}[${index}]`,
             disabled: disabled || thisDisabled,

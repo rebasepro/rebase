@@ -72,7 +72,7 @@ export function FieldHelperText<T>({
         </Typography>
     }
 
-    const disabledTooltip: string | undefined = typeof property.disabled === "object" ? property.disabled.disabledMessage : undefined;
+    const disabledTooltip: string | undefined = typeof property.ui?.disabled === "object" ? property.ui?.disabled.disabledMessage : undefined;
 
     return <div className={"flex ml-3.5 mt-1"}>
         <Typography variant={"caption"}

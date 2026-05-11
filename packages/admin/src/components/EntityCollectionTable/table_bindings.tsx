@@ -41,7 +41,7 @@ export interface TableFieldConfig {
 }
 
 export function isStorageProperty(property: Property) {
-    if (property.type === "string" && property.markdown)
+    if (property.type === "string" && property.ui?.markdown)
         return false;
     if (property.type === "string" && (property as StringProperty).storage)
         return true;
@@ -181,8 +181,8 @@ path: referenceProperty.path as string }) : undefined;
                 ),
                 fullHeight: true
             };
-        } else if (stringProperty.markdown || !stringProperty.storage || !stringProperty.reference) {
-            const multiline = Boolean(stringProperty.multiline) || Boolean(stringProperty.markdown);
+        } else if (stringProperty.ui?.markdown || !stringProperty.storage || !stringProperty.reference) {
+            const multiline = Boolean(stringProperty.ui?.multiline) || Boolean(stringProperty.ui?.markdown);
             return {
                 Component: ({ error, validationError, disabled, selected, internalValue, updateValue }: any) => (
                     <VirtualTableInput
@@ -238,7 +238,7 @@ path: referenceProperty.path as string }) : undefined;
                         size={size}
                         path={property.path}
                         multiselect={false}
-                        previewProperties={property.previewProperties}
+                        previewProperties={property.ui?.previewProperties}
                         includeId={property.includeId}
                         includeEntityLink={property.includeEntityLink}
                         title={property.name ?? propertyKey}
@@ -250,7 +250,7 @@ path: referenceProperty.path as string }) : undefined;
         }
     } else if (property.type === "relation") {
         if (property.relation) {
-            if (property.widget === "dialog") {
+            if (property.ui?.widget === "dialog") {
                 return {
                     Component: ({ propertyKey, internalValue, updateValue, disabled, size, property }: any) => (
                         <TableRelationField
@@ -261,7 +261,7 @@ path: referenceProperty.path as string }) : undefined;
                             size={size}
                             multiselect={false}
                             relation={property.relation}
-                            previewProperties={property.previewProperties}
+                            previewProperties={property.ui?.previewProperties}
                             includeId={property.includeId}
                             includeEntityLink={property.includeEntityLink}
                             title={property.name ?? propertyKey}

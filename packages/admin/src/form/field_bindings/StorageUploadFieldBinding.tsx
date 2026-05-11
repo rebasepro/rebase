@@ -63,7 +63,7 @@ export function StorageUploadFieldBinding({
     const authController = useAuthController();
 
     const storageSource = useStorageSource(context.collection);
-    const disabled = isReadOnly(property) || !!property.disabled || isSubmitting || context.disabled;
+    const disabled = isReadOnly(property) || !!property.ui?.disabled || isSubmitting || context.disabled;
 
     const {
         internalValue,

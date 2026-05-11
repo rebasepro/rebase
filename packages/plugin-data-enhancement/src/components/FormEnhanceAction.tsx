@@ -222,7 +222,7 @@ function getPromptsForExistingEntities(properties: Properties): SamplePrompt[] {
         if (isPropertyBuilder(p)) {
             return false;
         }
-        return p.type === "string" && (p.markdown || p.multiline);
+        return p.type === "string" && (p.ui?.markdown || p.ui?.multiline);
     });
 
     const multilinePrompt: Property | undefined = multilineProperties.length > 0

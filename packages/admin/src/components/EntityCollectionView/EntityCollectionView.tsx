@@ -1217,7 +1217,7 @@ function buildPropertyWidthOverwrite(key: string, width: number): PartialEntityC
         const [parentKey, ...childKey] = key.split(".");
         return { properties: { [parentKey]: buildPropertyWidthOverwrite(childKey.join("."), width) } } as PartialEntityCollection;
     }
-    return { properties: { [key]: { columnWidth: width } } } as PartialEntityCollection;
+    return { properties: { [key]: { ui: { columnWidth: width } } } } as PartialEntityCollection;
 }
 
 function EntityIdHeaderWidget({

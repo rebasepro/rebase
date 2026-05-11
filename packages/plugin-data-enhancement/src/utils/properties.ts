@@ -31,7 +31,7 @@ function getSimpleProperty(property: Property): InputProperty {
         enum: "enum" in property && property.enum
             ? getSimpleEnumValues(property.enum)
             : undefined,
-        disabled: Boolean(property.disabled || property.readOnly)
+        disabled: Boolean(property.ui?.disabled || property.ui?.readOnly)
     };
 }
 
@@ -45,7 +45,7 @@ function getSimplifiedProperty(property: Property, path: string, value?: any): R
                 description: property.description,
                 type: property.type,
                 fieldConfigId: "repeat",
-                disabled: Boolean(property.disabled || property.readOnly),
+                disabled: Boolean(property.ui?.disabled || property.ui?.readOnly),
                 of: getSimpleProperty(property.of as Property)
             };
 
@@ -77,7 +77,7 @@ function getSimplifiedProperty(property: Property, path: string, value?: any): R
                 description: property.description,
                 type: property.type,
                 fieldConfigId: "block",
-                disabled: Boolean(property.disabled || property.readOnly),
+                disabled: Boolean(property.ui?.disabled || property.ui?.readOnly),
                 oneOf: {
                     typeField: property.oneOf.typeField,
                     valueField: property.oneOf.valueField,
@@ -128,7 +128,7 @@ function getSimplifiedProperty(property: Property, path: string, value?: any): R
                 description: property.description,
                 type: property.type,
                 fieldConfigId: "group",
-                disabled: Boolean(property.disabled || property.readOnly)
+                disabled: Boolean(property.ui?.disabled || property.ui?.readOnly)
             };
             return {
                 [path]: mapParentProperty,

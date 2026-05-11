@@ -37,7 +37,7 @@ const productsCollection: PostgresCollection = {
         description: {
             name: "Description",
             type: "string",
-            markdown: true,
+            ui: { markdown: true },
             description: "Detailed product description in Markdown"
         },
         images: {
@@ -174,15 +174,13 @@ color: "red" }
             name: "Created at",
             type: "date",
             autoValue: "on_create",
-            readOnly: true,
-            hideFromCollection: true
+            ui: { readOnly: true, hideFromCollection: true }
         },
         updated_at: {
             name: "Updated at",
             type: "date",
             autoValue: "on_update",
-            readOnly: true,
-            hideFromCollection: true
+            ui: { readOnly: true, hideFromCollection: true }
         }
     },
     propertiesOrder: [

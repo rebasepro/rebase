@@ -64,6 +64,7 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
                 id={`add_entity_${path}`}
                 onClick={onNewClick}
                 startIcon={<PlusIcon size={iconSize.small}/>}
+                size="small"
                 variant="filled"
                 color="primary">
                 Add {collection.singularName ?? collection.name}
@@ -71,9 +72,9 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
             : <Button
                 id={`add_entity_${path}`}
                 onClick={onNewClick}
-                variant={compact ? "filled" : "filled"}
+                variant="filled"
                 color={compact ? "neutral" : "primary"}
-                size={compact ? "small" : "medium"}
+                size="small"
             >
                 <PlusIcon size={iconSize.small}/>
             </Button>);

@@ -184,7 +184,7 @@ describe("getEntityTitlePropertyKey", () => {
 name: "Name" } as Property,
                 body: { type: "string",
 name: "Body",
-multiline: true } as Property
+ui: { multiline: true } } as Property
             }
         } as EntityCollection;
 
@@ -203,7 +203,7 @@ name: "Count" } as Property,
 name: "Title" } as Property,
                 body: { type: "string",
 name: "Body",
-multiline: true } as Property
+ui: { multiline: true } } as Property
             }
         } as EntityCollection;
 
@@ -218,7 +218,7 @@ multiline: true } as Property
             properties: {
                 description: { type: "string",
 name: "Description",
-multiline: true } as Property,
+ui: { multiline: true } } as Property,
                 name: { type: "string",
 name: "Name" } as Property
             }
@@ -235,7 +235,7 @@ name: "Name" } as Property
             properties: {
                 content: { type: "string",
 name: "Content",
-markdown: true } as Property,
+ui: { markdown: true } } as Property,
                 slug: { type: "string",
 name: "Slug" } as Property
             }

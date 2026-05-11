@@ -22,7 +22,7 @@ export function useClearRestoreValue<T>({
 
     const clearedValueRef = useRef<T | null>(null);
     useEffect(() => {
-        const shouldClearValueIfDisabled = typeof property.disabled === "object" && Boolean(property.disabled.clearOnDisabled);
+        const shouldClearValueIfDisabled = typeof property.ui?.disabled === "object" && Boolean(property.ui?.disabled.clearOnDisabled);
         if (shouldClearValueIfDisabled) {
             if (value != null) {
                 clearedValueRef.current = value;

@@ -87,7 +87,7 @@ export function MultipleRelationFieldBinding({
         return (
             <RelationPreview
                 key={internalId}
-                previewProperties={property.previewProperties}
+                previewProperties={property.ui?.previewProperties}
                 size={"medium"}
                 onClick={onEntryClick}
                 hover={!disabled}
@@ -96,7 +96,7 @@ export function MultipleRelationFieldBinding({
                 includeEntityLink={property.includeEntityLink}
             />
         );
-    }, [relation, property.previewProperties, value]);
+    }, [relation, property.ui?.previewProperties, value]);
 
     const title = (<>
         <LabelWithIconAndTooltip

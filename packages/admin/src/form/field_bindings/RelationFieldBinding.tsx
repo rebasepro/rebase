@@ -45,7 +45,7 @@ export function RelationFieldBinding({
     const manyRelation = relation?.cardinality === "many";
 
     // Inline selector mode
-    const widget = property.widget ?? "select";
+    const widget = property.ui?.widget ?? "select";
 
     if (widget === "select" && relation) {
         const normalizedSingle = (!manyRelation && value && !Array.isArray(value)) ? normalizeToEntityRelation(value) : null;
@@ -149,7 +149,7 @@ export function RelationFieldBinding({
 
                     {usedRelation && <RelationPreview
                         disabled={!usedRelation}
-                        previewProperties={property.previewProperties}
+                        previewProperties={property.ui?.previewProperties}
                         hover={!disabled}
                         size={size}
                         onClick={disabled || isSubmitting ? undefined : onEntryClick}
