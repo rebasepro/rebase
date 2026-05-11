@@ -10,7 +10,8 @@ export function MissingReferenceWidget({ path: pathProp }: {
 }) {
     const registry = useCollectionRegistryController();
     const path = getLastSegment(pathProp);
-    const parentCollectionIds = registry.getParentCollectionIds(pathProp);
+    const parentCollectionSlugs = registry.getParentCollectionSlugs(pathProp);
+    const parentEntityIds = registry.getParentEntityIds(pathProp);
     const collectionEditor = useCollectionEditorController();
     const { t } = useTranslation();
     return <div className={"p-1 flex flex-col items-center"}>
@@ -21,7 +22,7 @@ export function MissingReferenceWidget({ path: pathProp }: {
                 collectionEditor.createCollection({
                     initialValues: { path,
 name: prettifyIdentifier(path) },
-                    parentCollectionIds,
+                    parentCollectionSlugs, parentEntityIds,
                     redirect: false,
                     sourceClick: "missing_reference"
                 });

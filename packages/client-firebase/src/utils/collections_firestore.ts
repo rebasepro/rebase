@@ -2,10 +2,10 @@ import { deleteField, DocumentSnapshot } from "@firebase/firestore";
 import { EntityCollection, FirebaseCollection, Properties, Property } from "@rebasepro/types";
 import { COLLECTION_PATH_SEPARATOR, sortProperties, stripCollectionPath } from "@rebasepro/common";
 
-export function buildCollectionId(idOrPath: string, parentCollectionIds?: string[]): string {
-    if (!parentCollectionIds)
+export function buildCollectionId(idOrPath: string, parentCollectionSlugs?: string[], parentEntityIds?: string[]): string {
+    if (!parentCollectionSlugs)
         return stripCollectionPath(idOrPath);
-    return [...parentCollectionIds.map(stripCollectionPath), stripCollectionPath(idOrPath)].join(COLLECTION_PATH_SEPARATOR);
+    return [...parentCollectionSlugs.map(stripCollectionPath), stripCollectionPath(idOrPath)].join(COLLECTION_PATH_SEPARATOR);
 }
 
 

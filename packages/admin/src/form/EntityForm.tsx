@@ -510,11 +510,12 @@ export function EntityForm<M extends Record<string, unknown>>({
     }, [formex.version, collection, entityId, path]);
 
     const actionsDisabled = disabled || formex.isSubmitting || (status === "existing" && !formex.dirty) || Boolean(disabledProp);
-    const parentCollectionIds = collectionRegistryController.getParentCollectionIds(path);
+    const parentCollectionSlugs = collectionRegistryController.getParentCollectionSlugs(path);
+    const parentEntityIds = collectionRegistryController.getParentEntityIds(path);
 
     const formActionProps: PluginFormActionProps = {
         entityId,
-        parentCollectionIds,
+        parentCollectionSlugs, parentEntityIds,
         path: path,
         status,
         collection: collection as EntityCollection,

@@ -10,12 +10,12 @@ import { useCollectionEditorController } from "../useCollectionEditorController"
 
 export function PropertyAddColumnComponent({
     path,
-    parentCollectionIds,
+    parentCollectionSlugs, parentEntityIds,
     collection,
     tableController
 }: {
     path: string,
-    parentCollectionIds: string[],
+    parentCollectionSlugs: string[], parentEntityIds: string[],
     collection: EntityCollection;
     tableController: EntityTableController;
 }) {
@@ -40,7 +40,7 @@ export function PropertyAddColumnComponent({
                 onClick={() => {
                     collectionEditorController.editProperty({
                         editedCollectionId: collection.slug,
-                        parentCollectionIds,
+                        parentCollectionSlugs, parentEntityIds,
                         currentPropertiesOrder: getDefaultPropertiesOrder(collection),
                         collection,
                         existingEntities: tableController.data

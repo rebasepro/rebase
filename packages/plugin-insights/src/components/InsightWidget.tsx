@@ -16,19 +16,19 @@ export function InsightWidget({
     definition,
     collectionSlug,
     path,
-    parentCollectionIds,
+    parentCollectionSlugs, parentEntityIds,
     compact = false,
     embedded = false,
 }: {
     definition: InsightDefinition;
     collectionSlug?: string;
     path?: string;
-    parentCollectionIds?: string[];
+    parentCollectionSlugs?: string[], parentEntityIds?: string[];
     compact?: boolean;
     /** When true, inner views skip their own borders since the parent card provides them. */
     embedded?: boolean;
 }) {
-    const { data, loading, error } = useInsightsData(definition, { path, collectionSlug, parentCollectionIds });
+    const { data, loading, error } = useInsightsData(definition, { path, collectionSlug, parentCollectionSlugs });
 
     if (loading) {
         return <InsightWidgetSkeleton config={definition.scorecard} compact={compact} embedded={embedded} />;

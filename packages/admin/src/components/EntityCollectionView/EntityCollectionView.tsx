@@ -90,7 +90,7 @@ export type EntityCollectionViewProps<M extends Record<string, unknown>> = {
     /**
      * If this is a subcollection, specify the parent collection ids.
      */
-    parentCollectionIds?: string[];
+    parentCollectionSlugs?: string[], parentEntityIds?: string[];
     /**
      * Whether this is a subcollection or not.
      */
@@ -145,7 +145,7 @@ export const EntityCollectionView = React.memo(
     function EntityCollectionView<M extends Record<string, unknown>>({
         path: pathProp,
 
-        parentCollectionIds,
+        parentCollectionSlugs, parentEntityIds,
         isSubCollection,
         className,
         updateUrl,
@@ -400,14 +400,14 @@ export const EntityCollectionView = React.memo(
 
         const pluginAddColumnComponents = useSlot("collection.add-column", {
             path,
-            parentCollectionIds: parentCollectionIds ?? EMPTY_ARRAY,
+            parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY, parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             collection,
             tableController
         });
 
         const pluginToolbarWidgets = useSlot("collection.toolbar", {
             path,
-            parentCollectionIds: parentCollectionIds ?? EMPTY_ARRAY,
+            parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY, parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             collection: collection,
             tableController: tableController,
             selectionController: usedSelectionController
@@ -415,7 +415,7 @@ export const EntityCollectionView = React.memo(
 
         const pluginEmptyStates = useSlot("collection.empty-state", {
             path,
-            parentCollectionIds: parentCollectionIds ?? EMPTY_ARRAY,
+            parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY, parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             collection,
             canCreate: canCreateEntities,
             onNewClick
@@ -423,7 +423,7 @@ export const EntityCollectionView = React.memo(
 
         const pluginInsights = useSlot("collection.insights", {
             path,
-            parentCollectionIds: parentCollectionIds ?? EMPTY_ARRAY,
+            parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY, parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             collection
         });
 
@@ -754,14 +754,14 @@ export const EntityCollectionView = React.memo(
                 path,
                 collection: collection as unknown as EntityCollection,
                 tableController: tableController as unknown as EntityTableController,
-                parentCollectionIds: parentCollectionIds ?? EMPTY_ARRAY
+                parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY, parentEntityIds: parentEntityIds ?? EMPTY_ARRAY
             };
             return <>{headerActionContributions.map((s, i) => (
                 <ErrorBoundary key={`header_action_${propertyKey}_${i}`}>
                     <s.Component {...headerSlotProps} {...(s.props ?? {})}/>
                 </ErrorBoundary>
             ))}</>;
-        }, [headerActionContributions, path, parentCollectionIds]);
+        }, [headerActionContributions, path, parentCollectionSlugs]);
 
         const addColumnComponentInternal = pluginAddColumnComponents.length > 0
             ? function () {
@@ -797,13 +797,13 @@ export const EntityCollectionView = React.memo(
                     .forEach(plugin => {
                         plugin.hooks!.onColumnsReorder!({
                             fullPath: path,
-                            parentCollectionIds: parentCollectionIds ?? EMPTY_ARRAY,
+                            parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY, parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
                             collection,
                             newPropertiesOrder
                         });
                     });
             }
-        }, [collection, setLocalPropertiesOrder, customizationController, path, parentCollectionIds]);
+        }, [collection, setLocalPropertiesOrder, customizationController, path, parentCollectionSlugs]);
 
         // Popover open state managed at parent level to prevent closing when view changes
         const [viewModePopoverOpen, setViewModePopoverOpen] = useState(false);
@@ -828,7 +828,7 @@ export const EntityCollectionView = React.memo(
         const pluginErrorViews = useSlot("collection.error", {
             path,
             collection,
-            parentCollectionIds,
+            parentCollectionSlugs, parentEntityIds,
             error: tableController.dataLoadingError as Error
         });
         const pluginErrorView = tableController.dataLoadingError && pluginErrorViews.length > 0
@@ -859,7 +859,7 @@ export const EntityCollectionView = React.memo(
                 onTextSearch={tableController.setSearchString}
                 viewModeToggle={viewModeToggleElement}
                 actionsStart={<EntityCollectionViewStartActions
-                    parentCollectionIds={parentCollectionIds ?? EMPTY_ARRAY}
+                    parentCollectionSlugs={parentCollectionSlugs ?? EMPTY_ARRAY} parentEntityIds={parentEntityIds ?? EMPTY_ARRAY}
                     collection={collection}
                     tableController={tableController}
                     path={path}
@@ -870,7 +870,7 @@ export const EntityCollectionView = React.memo(
                     compact={isCompact}/>}
                 actions={
                     <EntityCollectionViewActions
-                        parentCollectionIds={parentCollectionIds ?? EMPTY_ARRAY}
+                        parentCollectionSlugs={parentCollectionSlugs ?? EMPTY_ARRAY} parentEntityIds={parentEntityIds ?? EMPTY_ARRAY}
                         collection={collection}
                         tableController={tableController}
                         onMultipleDeleteClick={onMultipleDeleteClick}
@@ -892,7 +892,7 @@ export const EntityCollectionView = React.memo(
                 collection={collection}
                 tableController={tableController}
                 fullPath={path}
-                parentCollectionIds={parentCollectionIds}
+                parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
                 columnProperty={selectedKanbanProperty}
                 onEntityClick={onEntityClick}
                 selectionController={usedSelectionController}
@@ -990,7 +990,7 @@ export const EntityCollectionView = React.memo(
                         size={listSize}
                         emptyComponent={emptyComponent}
                         path={path}
-                        parentCollectionIds={parentCollectionIds}
+                        parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
                         selectedEntityId={selectedEntityIdProp}
                         selectedTab={selectedTabProp}
                         toolbar={toolbarNode}
@@ -1003,7 +1003,7 @@ export const EntityCollectionView = React.memo(
                                 className={cls(
                                     "flex flex-col w-full",
                                     selectedEntityIdProp === undefined
-                                        ? "max-w-6xl mx-auto px-3 md:px-4 lg-px-6 py-4"
+                                        ? "max-w-6xl mx-auto px-3 md:px-4 lg:px-6 py-4"
                                         : ""
                                 )}
                             >
@@ -1045,15 +1045,44 @@ export const EntityCollectionView = React.memo(
                         )}
                     </SplitListView>
                 ) : (
-                    <>
+                    <div className="flex flex-col w-full h-full">
                         {toolbarNode}
-                        {pluginInsights.length > 0 && viewMode === "list" && (
-                            <div className="px-3 md:px-4 lg:px-6 max-w-6xl mx-auto w-full flex-shrink-0">
-                                {pluginInsights}
-                            </div>
-                        )}
-                        {innerView}
-                    </>
+                        <div className="flex-1 overflow-auto">
+                            {viewMode === "list" ? (
+                                <div
+                                    className={cls(
+                                        "flex flex-col w-full",
+                                        selectedEntityIdProp === undefined
+                                            ? "max-w-6xl mx-auto px-3 md:px-4 lg:px-6 py-4"
+                                            : ""
+                                    )}
+                                >
+                                    <div
+                                        className={cls(
+                                            "grid transition-[grid-template-rows,transform,margin] duration-150 ease-out",
+                                            selectedEntityIdProp === undefined
+                                                ? "grid-rows-[1fr] translate-y-0 mt-12 mb-6"
+                                                : "grid-rows-[0fr] -translate-y-2 mt-0 mb-0"
+                                        )}
+                                    >
+                                        <div className="overflow-hidden flex items-center gap-4">
+                                            <Typography gutterBottom variant="h4" className="grow mb-0" component="h4">
+                                                {collection.name}
+                                            </Typography>
+                                        </div>
+                                    </div>
+                                    {pluginInsights.length > 0 && (
+                                        <div className="flex-shrink-0">
+                                            {pluginInsights}
+                                        </div>
+                                    )}
+                                    {innerView}
+                                </div>
+                            ) : (
+                                innerView
+                            )}
+                        </div>
+                    </div>
                 )}
 
                 {popupCell && <PopupFormField
@@ -1085,7 +1114,7 @@ export const EntityCollectionView = React.memo(
         );
     }, (a, b) => {
         return equal(a.path, b.path) &&
-            equal(a.parentCollectionIds, b.parentCollectionIds) &&
+            equal(a.parentCollectionSlugs, b.parentCollectionSlugs) && equal(a.parentEntityIds, b.parentEntityIds) &&
             equal(a.isSubCollection, b.isSubCollection) &&
             equal(a.className, b.className) &&
             equal(a.properties, b.properties) &&

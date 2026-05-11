@@ -36,7 +36,8 @@ export function HomePageEditorCollectionAction({
     const onEditCollectionClicked = () => {
         collectionEditorController?.editCollection({
             id: collection.slug,
-            parentCollectionIds: []
+            parentCollectionSlugs: [],
+            parentEntityIds: []
         });
     };
 
@@ -45,7 +46,8 @@ export function HomePageEditorCollectionAction({
         // The editor will handle clearing name, path, and id
         collectionEditorController?.createCollection({
             copyFrom: collection,
-            parentCollectionIds: [],
+            parentCollectionSlugs: [],
+            parentEntityIds: [],
             redirect: true,
             sourceClick: "home_page_duplicate"
         });

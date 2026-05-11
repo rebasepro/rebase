@@ -48,7 +48,7 @@ export interface CollectionEditorDialogProps {
     copyFrom?: EntityCollection;
     editedCollectionId?: string;
     path?: string; // full path of this particular collection, like `products/123/locales`
-    parentCollectionIds?: string[]; // path ids of the parent collection, like [`products`]
+    parentCollectionSlugs?: string[], parentEntityIds?: string[]; // path ids of the parent collection, like [`products`]
     handleClose: (collection?: EntityCollection) => void;
     configController: CollectionsConfigController;
     reservedGroups?: string[];
@@ -172,7 +172,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
     const initialValuesProp = props.initialValues;
     const copyFromProp = props.copyFrom;
     // Skip templates when duplicating (copyFrom is provided)
-    const includeTemplates = !copyFromProp && !initialValuesProp?.slug && (props.parentCollectionIds ?? []).length === 0;
+    const includeTemplates = !copyFromProp && !initialValuesProp?.slug && (props.parentCollectionSlugs ?? []).length === 0;
     const collectionsInThisLevel = (props.parentCollection ? getSubcollections(props.parentCollection) : collections) ?? [];
     const existingPaths = collectionsInThisLevel.map(col => getTableName(col)?.trim().toLowerCase()).filter(Boolean);
     const existingIds = collectionsInThisLevel.map(col => col.slug?.trim().toLowerCase()).filter(Boolean) as string[];
@@ -186,7 +186,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
                     // We must use getRawCollection so the editor schema fields
                     // aren't polluted with dynamically injected runtime `relations`.
                     // The path lookup relies on generating a fake child path to resolve through the registry
-                    const collectionPath = [...(props.parentCollectionIds ?? []), props.editedCollectionId]
+                    const collectionPath = [...(props.parentCollectionSlugs ?? []), props.editedCollectionId]
                         .reduce((acc, segment, i) => i === 0 ? segment : `${acc}/fake_id/${segment}`, "");
 
                     setCollection(collectionRegistry.getRawCollection(collectionPath) as EntityCollection<any>);
@@ -198,7 +198,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
         } catch (e) {
             console.error(e);
         }
-    }, [props.editedCollectionId, props.parentCollectionIds, collectionRegistry.initialised, collectionRegistry.getRawCollection]);
+    }, [props.editedCollectionId, props.parentCollectionSlugs, props.parentEntityIds, collectionRegistry.initialised, collectionRegistry.getRawCollection]);
 
     const groups = topLevelNavigation?.groups ?? [];
 
@@ -258,7 +258,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     isNewCollection,
     configController,
     editedCollectionId,
-    parentCollectionIds,
+    parentCollectionSlugs, parentEntityIds,
     path,
     collectionInference,
     handleClose,
@@ -321,7 +321,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
             id,
             collectionData: updatedCollection,
             previousId: editedCollectionId,
-            parentCollectionIds
+            parentCollectionSlugs
         })
             .then(() => {
                 setError(undefined);
@@ -532,7 +532,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     const usedPath = getTableName(values);
     const pathError = validatePath(usedPath, isNewCollection, existingPaths, values.slug);
 
-    const parentPaths = !pathError && parentCollectionIds ? collectionRegistry.convertIdsToPaths(parentCollectionIds) : undefined;
+    const parentPaths = !pathError && parentCollectionSlugs ? collectionRegistry.convertIdsToPaths(parentCollectionSlugs) : undefined;
 
     const updatedFullPath = parentPaths && parentPaths.length > 0
         ? [...parentPaths, usedPath].join("/fake_id/")

@@ -21,14 +21,14 @@ export function SubcollectionsEditTab({
     configController,
     collectionInference,
     getUser,
-    parentCollectionIds
+    parentCollectionSlugs
 }: {
     collection: EntityCollection,
     parentCollection?: EntityCollection,
     configController: CollectionsConfigController;
     collectionInference?: CollectionInference;
     getUser?: (uid: string) => User | null;
-    parentCollectionIds?: string[];
+    parentCollectionSlugs?: string[], parentEntityIds?: string[];
 }) {
 
     const { entityViews: contextEntityViews } = useCustomizationController();
@@ -187,7 +187,7 @@ export function SubcollectionsEditTab({
                     onAccept={() => {
                         const props = {
                             id: subcollectionToDelete!,
-                            parentCollectionIds: [...(parentCollectionIds ?? []), collection.slug]
+                            parentCollectionSlugs: [...(parentCollectionSlugs ?? []), collection.slug]
                         };
                         console.debug("Deleting subcollection", props)
                         configController.deleteCollection(props).then(() => {
@@ -217,7 +217,7 @@ export function SubcollectionsEditTab({
                 configController={configController}
                 parentCollection={collection}
                 collectionInference={collectionInference}
-                parentCollectionIds={[...parentCollectionIds ?? [], values.slug]}
+                parentCollectionSlugs={[...parentCollectionSlugs ?? [], values.slug]}
                 isNewCollection={false}
                 {...currentDialog}
                 getUser={getUser}

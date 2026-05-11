@@ -129,7 +129,8 @@ export interface NavigationSlotProps {
 export interface CollectionToolbarProps {
     path: string;
     collection: EntityCollection;
-    parentCollectionIds: string[];
+    parentCollectionSlugs: string[];
+    parentEntityIds: string[];
     tableController: EntityTableController;
     selectionController: SelectionController;
 }
@@ -141,7 +142,8 @@ export interface CollectionToolbarProps {
 export interface CollectionEmptyStateProps {
     path: string;
     collection: EntityCollection;
-    parentCollectionIds: string[];
+    parentCollectionSlugs: string[];
+    parentEntityIds: string[];
     canCreate: boolean;
     onNewClick?: () => void;
 }
@@ -154,7 +156,8 @@ export interface CollectionHeaderActionProps {
     property: Property;
     propertyKey: string;
     path: string;
-    parentCollectionIds: string[];
+    parentCollectionSlugs: string[];
+    parentEntityIds: string[];
     onHover: boolean;
     collection: EntityCollection;
     tableController: EntityTableController;
@@ -166,7 +169,8 @@ export interface CollectionHeaderActionProps {
  */
 export interface CollectionAddColumnProps {
     path: string;
-    parentCollectionIds: string[];
+    parentCollectionSlugs: string[];
+    parentEntityIds: string[];
     collection: EntityCollection;
     tableController: EntityTableController;
 }
@@ -178,7 +182,8 @@ export interface CollectionAddColumnProps {
 export interface CollectionErrorProps {
     path: string;
     collection: EntityCollection;
-    parentCollectionIds?: string[];
+    parentCollectionSlugs?: string[];
+    parentEntityIds?: string[];
     error: Error;
 }
 
@@ -189,7 +194,8 @@ export interface CollectionErrorProps {
 export interface KanbanSetupProps {
     collection: EntityCollection;
     fullPath: string;
-    parentCollectionIds: string[];
+    parentCollectionSlugs: string[];
+    parentEntityIds: string[];
 }
 
 /**
@@ -199,7 +205,8 @@ export interface KanbanSetupProps {
 export interface KanbanAddColumnProps {
     collection: EntityCollection;
     fullPath: string;
-    parentCollectionIds: string[];
+    parentCollectionSlugs: string[];
+    parentEntityIds: string[];
     columnProperty: string;
 }
 
@@ -215,7 +222,8 @@ export interface EntityRowActionsProps {
     entityId: string;
     path: string;
     collection: EntityCollection;
-    parentCollectionIds: string[];
+    parentCollectionSlugs: string[];
+    parentEntityIds: string[];
     selectionController: SelectionController;
     context: RebaseContext;
 }
@@ -242,7 +250,8 @@ export interface EntityFieldSlotProps {
 export interface CollectionFilterPanelProps {
     path: string;
     collection: EntityCollection;
-    parentCollectionIds: string[];
+    parentCollectionSlugs: string[];
+    parentEntityIds: string[];
     tableController: EntityTableController;
     context: RebaseContext;
 }
@@ -282,7 +291,8 @@ export interface ShellToolbarProps {
 export interface CollectionInsightsSlotProps {
     path: string;
     collection: EntityCollection;
-    parentCollectionIds: string[];
+    parentCollectionSlugs: string[];
+    parentEntityIds: string[];
 }
 
 /**

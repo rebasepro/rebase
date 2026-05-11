@@ -66,7 +66,7 @@ export interface EntityEditViewProps<M extends Record<string, unknown> = Record<
     databaseId?: string;
     copy?: boolean;
     selectedTab?: string;
-    parentCollectionIds: string[];
+    parentCollectionSlugs: string[], parentEntityIds: string[];
     onValuesModified?: (modified: boolean, values: M) => void;
     onSaved?: (params: OnUpdateParams) => void;
     onTabChange?: (props: OnTabChangeParams<M>) => void;
@@ -143,7 +143,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
     entityId,
     selectedTab: selectedTabProp,
     collection,
-    parentCollectionIds,
+    parentCollectionSlugs, parentEntityIds,
     onValuesModified,
     onSaved,
     onTabChange,
@@ -185,7 +185,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
 
     const formActionTopProps: PluginFormActionProps = {
         entityId,
-        parentCollectionIds,
+        parentCollectionSlugs, parentEntityIds,
         path: path,
         status,
         collection: collection!,
@@ -276,7 +276,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                 <ErrorBoundary>
                     {usedFormContext && <Builder
                         collection={collection}
-                        parentCollectionIds={parentCollectionIds}
+                        parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
                         entity={usedEntity}
                         modifiedValues={usedFormContext?.formex?.values ?? usedEntity?.values}
                         formContext={usedFormContext as unknown as FormContext<Record<string, unknown>>}
@@ -332,7 +332,8 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                     (usedEntity && newFullPath
                         ? <EntityCollectionView
                             path={newFullPath}
-                            parentCollectionIds={[...parentCollectionIds, collection.slug]}
+                            parentCollectionSlugs={[...parentCollectionSlugs, collection.slug]}
+                            parentEntityIds={[...parentEntityIds, String(usedEntity?.id)]}
                             updateUrl={false}
                             {...subcollection}
                             openEntityMode={layout} />

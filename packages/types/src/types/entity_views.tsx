@@ -70,5 +70,6 @@ export interface EntityCustomViewParams<M extends Record<string, unknown> = Reco
     entity?: Entity<M>;
     modifiedValues?: EntityValues<M>;
     formContext: FormContext<M>;
-    parentCollectionIds?: string[];
+    parentCollectionSlugs?: string[];
+    parentEntityIds?: string[];
 }

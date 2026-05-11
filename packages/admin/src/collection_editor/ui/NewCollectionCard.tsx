@@ -30,7 +30,8 @@ export function NewCollectionCard({
             onClick={collectionEditorController && canCreateCollections
                 ? () => collectionEditorController.createCollection({
                     initialValues: group ? { group } : undefined,
-                    parentCollectionIds: [],
+                    parentCollectionSlugs: [],
+                    parentEntityIds: [],
                     redirect: true,
                     sourceClick: "new_collection_card"
                 })

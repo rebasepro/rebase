@@ -354,7 +354,19 @@ entityId };
 
             const driver = c.get("driver") || this.driver;
 
-            if (parsed.entityId) {
+            if (parsed.entityId === "count") {
+                // GET /parent/:parentId/child/count — count child entities
+                const queryDict = c.req.query();
+                const queryOptions = parseQueryOptions(queryDict);
+                
+                const total = driver.countEntities ? await driver.countEntities({
+                    path: parsed.collectionPath,
+                    filter: queryOptions.where as FetchCollectionProps["filter"],
+                    searchString: queryDict.searchString as string | undefined
+                }) : 0;
+                
+                return c.json({ count: total });
+            } else if (parsed.entityId) {
                 // GET /parent/:parentId/child/:id — single entity
                 const entity = await driver.fetchEntity({
                     path: parsed.collectionPath,

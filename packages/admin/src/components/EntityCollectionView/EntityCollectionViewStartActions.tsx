@@ -16,7 +16,7 @@ export type EntityCollectionViewStartActionsProps<M extends Record<string, unkno
     collection: EntityCollection<M>;
     path: string;
     relativePath: string;
-    parentCollectionIds: string[];
+    parentCollectionSlugs: string[], parentEntityIds: string[];
     selectionController: SelectionController<M>;
     tableController: EntityTableController<M>;
     collectionEntitiesCount?: number;
@@ -30,7 +30,7 @@ export type EntityCollectionViewStartActionsProps<M extends Record<string, unkno
 export function EntityCollectionViewStartActions<M extends Record<string, unknown>>({
     collection,
     relativePath,
-    parentCollectionIds,
+    parentCollectionSlugs, parentEntityIds,
     path,
     selectionController,
     tableController,
@@ -59,7 +59,7 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
     const actionProps: CollectionActionsProps<M> = {
         path,
         relativePath,
-        parentCollectionIds,
+        parentCollectionSlugs, parentEntityIds,
         collection,
         selectionController,
         context,

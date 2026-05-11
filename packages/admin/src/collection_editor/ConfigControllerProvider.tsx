@@ -102,7 +102,7 @@ export const ConfigControllerProvider = React.memo(
             parentCollection?: EntityCollection,
             editedCollectionId?: string,
             path?: string,
-            parentCollectionIds: string[],
+            parentCollectionSlugs: string[], parentEntityIds: string[],
             initialValues?: {
                 path?: string,
                 group?: string,
@@ -124,7 +124,7 @@ export const ConfigControllerProvider = React.memo(
             currentPropertiesOrder?: string[],
             editedCollectionId: string,
             path?: string,
-            parentCollectionIds: string[],
+            parentCollectionSlugs: string[], parentEntityIds: string[],
 
             existingEntities?: Entity[];
             collection?: EntityCollection;
@@ -139,7 +139,7 @@ export const ConfigControllerProvider = React.memo(
         const editCollection = useCallback(({
             id,
             path,
-            parentCollectionIds,
+            parentCollectionSlugs, parentEntityIds,
             parentCollection,
             existingEntities,
             initialView,
@@ -147,13 +147,13 @@ export const ConfigControllerProvider = React.memo(
         }: {
             id?: string,
             path?: string,
-            parentCollectionIds: string[],
+            parentCollectionSlugs: string[], parentEntityIds: string[],
             parentCollection?: EntityCollection,
             existingEntities?: Entity[],
             initialView?: "general" | "display" | "properties",
             expandKanban?: boolean
         }) => {
-            console.debug("Edit collection", id, path, parentCollectionIds, parentCollection);
+            console.debug("Edit collection", id, path, parentCollectionSlugs, parentEntityIds, parentCollection);
             onAnalyticsEvent?.("edit_collection", {
                 id,
                 path
@@ -161,7 +161,7 @@ export const ConfigControllerProvider = React.memo(
             setCurrentDialog({
                 editedCollectionId: id,
                 path,
-                parentCollectionIds,
+                parentCollectionSlugs, parentEntityIds,
                 isNewCollection: false,
                 parentCollection,
                 redirect: false,
@@ -177,7 +177,7 @@ export const ConfigControllerProvider = React.memo(
             property,
             editedCollectionId,
             currentPropertiesOrder,
-            parentCollectionIds,
+            parentCollectionSlugs, parentEntityIds,
             collection,
             existingEntities
         }: {
@@ -185,11 +185,11 @@ export const ConfigControllerProvider = React.memo(
             property?: Property,
             currentPropertiesOrder?: string[],
             editedCollectionId: string,
-            parentCollectionIds: string[],
+            parentCollectionSlugs: string[], parentEntityIds: string[],
             collection: EntityCollection,
             existingEntities?: Entity[]
         }) => {
-            console.debug("Edit property", propertyKey, property, editedCollectionId, currentPropertiesOrder, parentCollectionIds, collection);
+            console.debug("Edit property", propertyKey, property, editedCollectionId, currentPropertiesOrder, parentCollectionSlugs, parentEntityIds, collection);
             onAnalyticsEvent?.("edit_property", {
                 propertyKey,
                 editedCollectionId
@@ -207,7 +207,7 @@ export const ConfigControllerProvider = React.memo(
                 namespace,
                 currentPropertiesOrder,
                 editedCollectionId,
-                parentCollectionIds,
+                parentCollectionSlugs, parentEntityIds,
 
                 existingEntities,
                 collection
@@ -215,14 +215,14 @@ export const ConfigControllerProvider = React.memo(
         }, [onAnalyticsEvent]);
 
         const createCollection = useCallback(({
-            parentCollectionIds,
+            parentCollectionSlugs, parentEntityIds,
             parentCollection,
             initialValues,
             copyFrom,
             redirect,
             sourceClick
         }: {
-            parentCollectionIds: string[],
+            parentCollectionSlugs: string[], parentEntityIds: string[],
             parentCollection?: EntityCollection
             initialValues?: {
                 group?: string,
@@ -234,7 +234,7 @@ export const ConfigControllerProvider = React.memo(
             sourceClick?: string
         }) => {
             console.debug("Create collection", {
-                parentCollectionIds,
+                parentCollectionSlugs, parentEntityIds,
                 parentCollection,
                 initialValues,
                 copyFrom,
@@ -242,7 +242,7 @@ export const ConfigControllerProvider = React.memo(
                 sourceClick
             });
             onAnalyticsEvent?.(copyFrom ? "duplicate_collection" : "create_collection", {
-                parentCollectionIds,
+                parentCollectionSlugs, parentEntityIds,
                 parentCollection,
                 initialValues,
                 redirect,
@@ -250,7 +250,7 @@ export const ConfigControllerProvider = React.memo(
             });
             setCurrentDialog({
                 isNewCollection: true,
-                parentCollectionIds,
+                parentCollectionSlugs, parentEntityIds,
                 parentCollection,
                 initialValues,
                 copyFrom,
@@ -279,7 +279,7 @@ export const ConfigControllerProvider = React.memo(
                 onFetchTableMetadata,
                 handleClose: (collection?: EntityCollection) => {
                     if (currentDialog?.redirect) {
-                        if (collection && currentDialog?.isNewCollection && !currentDialog.parentCollectionIds.length) {
+                        if (collection && currentDialog?.isNewCollection && !currentDialog.parentCollectionSlugs.length) {
                             const url = urlController.buildUrlCollectionPath(collection.slug);
                             navigate(url);
                         }
@@ -331,7 +331,7 @@ export const ConfigControllerProvider = React.memo(
                         propertyKey: id,
                         newPropertiesOrder: newProperty && currentPropertyDialog.currentPropertiesOrder ? [...currentPropertyDialog.currentPropertiesOrder, id] : undefined,
                         namespace: currentPropertyDialog.namespace,
-                        parentCollectionIds: currentPropertyDialog.parentCollectionIds
+                        parentCollectionSlugs: currentPropertyDialog.parentCollectionSlugs
                     })
                         .catch((e: any) => {
                             console.error(e);
@@ -351,7 +351,7 @@ export const ConfigControllerProvider = React.memo(
                         propertyKey: currentPropertyDialog.propertyKey,
                         namespace: currentPropertyDialog.namespace,
                         newPropertiesOrder,
-                        parentCollectionIds: currentPropertyDialog.parentCollectionIds
+                        parentCollectionSlugs: currentPropertyDialog.parentCollectionSlugs
                     })
                         .then(() => {
                             setCurrentPropertyDialog(undefined);

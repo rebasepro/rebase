@@ -46,7 +46,8 @@ export type CollectionRegistryController<
      * Retrieve all the related parent collection ids for a given path
      * @param path
      */
-    getParentCollectionIds: (path: string) => string[];
+    getParentCollectionSlugs: (path: string) => string[];
+    getParentEntityIds: (path: string) => string[];
 
     /**
      * Resolve paths from a list of ids

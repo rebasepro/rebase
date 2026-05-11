@@ -30,7 +30,7 @@ export type SplitListViewProps<M extends Record<string, unknown> = Record<string
     initialScroll?: number;
     size?: CollectionSize;
     path: string;
-    parentCollectionIds?: string[];
+    parentCollectionSlugs?: string[], parentEntityIds?: string[];
     /**
      * The entity ID to show in the detail panel.
      * Comes from the URL path (e.g. /c/authors/14 → selectedEntityId = "14").
@@ -99,7 +99,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
     initialScroll,
     size = "m",
     path,
-    parentCollectionIds,
+    parentCollectionSlugs, parentEntityIds,
     selectedEntityId,
     selectedTab,
     toolbar,
@@ -246,7 +246,8 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [selectedEntityId, handleCloseDetail, externalOnEntityClick, externalOnNewClick, entityIds, tableController.data]);
 
-    const usedParentCollectionIds = parentCollectionIds ?? collectionRegistryController.getParentCollectionIds(path);
+    const usedParentCollectionIds = parentCollectionSlugs ?? collectionRegistryController.getParentCollectionSlugs(path);
+    const usedParentEntityIds = parentEntityIds ?? collectionRegistryController.getParentEntityIds(path);
 
     const isDetailVisible = animationPhase !== "idle";
 
@@ -283,7 +284,8 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
                     path={path}
                     collection={collection as EntityCollection<Record<string, unknown>>}
                     entityId={renderedEntityId}
-                    parentCollectionIds={usedParentCollectionIds}
+                    parentCollectionSlugs={usedParentCollectionIds}
+                    parentEntityIds={usedParentEntityIds}
                     selectedTab={selectedTab}
                     layout="split"
                     onTabChange={(params) => {

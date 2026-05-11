@@ -30,7 +30,7 @@ export type EntityCollectionBoardViewProps<M extends Record<string, unknown> = R
     collection: EntityCollection<M>;
     tableController: EntityTableController<M>;
     fullPath: string;
-    parentCollectionIds?: string[];
+    parentCollectionSlugs?: string[], parentEntityIds?: string[];
     columnProperty: string;
     onEntityClick?: (entity: Entity<M>) => void;
     selectionController?: SelectionController<M>;
@@ -48,7 +48,8 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
     collection,
     tableController,
     fullPath,
-    parentCollectionIds = [],
+    parentCollectionSlugs = [],
+    parentEntityIds = [],
     columnProperty,
     onEntityClick,
     selectionController,
@@ -225,13 +226,13 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
             .forEach(plugin => {
                 plugin.hooks!.onKanbanColumnsReorder!({
                     fullPath,
-                    parentCollectionIds,
+                    parentCollectionSlugs, parentEntityIds,
                     collection,
                     kanbanColumnProperty: columnProperty,
                     newColumnsOrder: newColumns
                 });
             });
-    }, [plugins, fullPath, parentCollectionIds, collection, columnProperty, analyticsController]);
+    }, [plugins, fullPath, parentCollectionSlugs, parentEntityIds, collection, columnProperty, analyticsController]);
 
     // Collection-level count queries to detect missing order property
     // Just TWO counts: total and ordered (for the entire collection, not per column)
@@ -475,7 +476,8 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
     const kanbanSetupSlots = useSlot("kanban.setup", {
         collection,
         fullPath,
-        parentCollectionIds
+        parentCollectionSlugs,
+        parentEntityIds
     });
     const KanbanSetupComponent = kanbanSetupSlots.length > 0 ? () => <>{kanbanSetupSlots[0]}</> : null;
 
@@ -483,7 +485,7 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
     const addKanbanColumnSlots = useSlot("kanban.add-column", {
         collection,
         fullPath,
-        parentCollectionIds,
+        parentCollectionSlugs, parentEntityIds,
         columnProperty
     });
     const AddKanbanColumnComponent = addKanbanColumnSlots.length > 0 ? () => <>{addKanbanColumnSlots[0]}</> : null;

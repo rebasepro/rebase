@@ -20,12 +20,12 @@ import { toSnakeCase } from "@rebasepro/utils";
 export function AddKanbanColumnAction({
     collection,
     fullPath,
-    parentCollectionIds,
+    parentCollectionSlugs, parentEntityIds,
     columnProperty
 }: {
     collection: EntityCollection;
     fullPath: string;
-    parentCollectionIds: string[];
+    parentCollectionSlugs: string[], parentEntityIds: string[];
     columnProperty: string;
 }) {
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -111,7 +111,7 @@ export function AddKanbanColumnAction({
                 path: fullPath,
                 propertyKey: columnProperty,
                 property: updatedProperty as StringProperty,
-                parentCollectionIds
+                parentCollectionSlugs
             });
 
             setNewValueLabel("");
@@ -121,7 +121,7 @@ export function AddKanbanColumnAction({
         } finally {
             setSaving(false);
         }
-    }, [newValueLabel, configController, collection, columnProperty, fullPath, parentCollectionIds]);
+    }, [newValueLabel, configController, collection, columnProperty, fullPath, parentCollectionSlugs]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === "Enter" && newValueLabel.trim()) {

@@ -11,7 +11,7 @@ export interface CollectionEditorController {
     editCollection: (props: {
         id?: string,
         path?: string,
-        parentCollectionIds: string[],
+        parentCollectionSlugs: string[], parentEntityIds: string[],
         parentCollection?: EntityCollection,
         existingEntities?: Entity<any>[],
         /**
@@ -36,7 +36,7 @@ export interface CollectionEditorController {
          * pre-populated with the same properties (but with empty name, path, and id).
          */
         copyFrom?: EntityCollection,
-        parentCollectionIds: string[],
+        parentCollectionSlugs: string[], parentEntityIds: string[],
         parentCollection?: EntityCollection,
         redirect: boolean,
         sourceClick?: string
@@ -47,7 +47,7 @@ export interface CollectionEditorController {
         property?: Property,
         currentPropertiesOrder?: string[],
         editedCollectionId: string,
-        parentCollectionIds: string[],
+        parentCollectionSlugs: string[], parentEntityIds: string[],
         collection: EntityCollection,
         existingEntities: Entity<any>[]
     }) => void;

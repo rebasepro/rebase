@@ -104,7 +104,7 @@ export function useNavigationRegistry(userConfigPersistence?: UserConfigurationP
         });
     }, []);
 
-    const getParentCollectionIds = useCallback((path: string): string[] => {
+    const getParentCollectionSlugs = useCallback((path: string): string[] => {
         const strings = path.split("/");
         const oddPathSegments = strings.filter((_, i) => i % 2 === 0);
         oddPathSegments.pop();
@@ -117,6 +117,15 @@ export function useNavigationRegistry(userConfigPersistence?: UserConfigurationP
 
         return result.map(r => getCollectionFromPaths(r)?.slug).filter(Boolean) as string[];
     }, [getAllParentReferencesForPath, getCollectionFromPaths]);
+
+    const getParentEntityIds = useCallback((path: string): string[] => {
+        const strings = path.split("/");
+        const evenPathSegments = strings.filter((_, i) => i % 2 !== 0);
+        if (strings.length % 2 === 0) {
+            evenPathSegments.pop();
+        }
+        return evenPathSegments;
+    }, []);
 
     const convertIdsToPaths = useCallback((ids: string[]): string[] => {
         const registry = collectionRegistryRef.current;
@@ -141,13 +150,15 @@ export function useNavigationRegistry(userConfigPersistence?: UserConfigurationP
         getCollection,
         getRawCollection,
         getParentReferencesFromPath: getAllParentReferencesForPath,
-        getParentCollectionIds,
+        getParentCollectionSlugs,
+        getParentEntityIds,
         convertIdsToPaths
     }), [
         getCollection,
         getRawCollection,
         getAllParentReferencesForPath,
-        getParentCollectionIds,
+        getParentCollectionSlugs,
+        getParentEntityIds,
         convertIdsToPaths
     ]);
 }

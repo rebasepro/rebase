@@ -231,11 +231,14 @@ color: "red" }
             ]
         },
         {
-            relationName: "locales",
+            relationName: "product_locales",
             target: () => productLocalesCollection,
             cardinality: "many",
             direction: "inverse",
-            inverseRelationName: "product"
+            inverseRelationName: "product",
+            overrides: {
+                hideFromNavigation: false
+            }
         }
     ]
 };

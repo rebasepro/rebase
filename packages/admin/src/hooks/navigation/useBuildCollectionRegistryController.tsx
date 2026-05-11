@@ -94,7 +94,7 @@ export function useBuildCollectionRegistryController(props: {
         });
     }, []);
 
-    const getParentCollectionIds = useCallback((path: string): string[] => {
+    const getParentCollectionSlugs = useCallback((path: string): string[] => {
         const registry = collectionRegistryRef.current;
         if (!registry) {
             return [];
@@ -124,6 +124,16 @@ export function useBuildCollectionRegistryController(props: {
         };
 
         return result.map(r => getCollectionFromPaths(r)?.slug).filter(Boolean) as string[];
+    }, []);
+
+    const getParentEntityIds = useCallback((path: string): string[] => {
+        const cleanedPath = removeInitialAndTrailingSlashes(path);
+        const strings = cleanedPath.split("/");
+        const evenPathSegments = strings.filter((_, i) => i % 2 !== 0);
+        if (strings.length % 2 === 0) {
+            evenPathSegments.pop();
+        }
+        return evenPathSegments;
     }, []);
 
     const convertIdsToPaths = useCallback((ids: string[]): string[] => {
@@ -156,7 +166,8 @@ export function useBuildCollectionRegistryController(props: {
         getCollection,
         getRawCollection,
         getParentReferencesFromPath,
-        getParentCollectionIds,
+        getParentCollectionSlugs,
+        getParentEntityIds,
         convertIdsToPaths,
         collectionRegistryRef
     }), [
@@ -165,7 +176,8 @@ export function useBuildCollectionRegistryController(props: {
         getCollection,
         getRawCollection,
         getParentReferencesFromPath,
-        getParentCollectionIds,
+        getParentCollectionSlugs,
+        getParentEntityIds,
         convertIdsToPaths
     ]);
 }

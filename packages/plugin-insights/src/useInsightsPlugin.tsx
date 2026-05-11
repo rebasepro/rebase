@@ -77,7 +77,7 @@ export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
                     if (collectionSlug !== slug) return null;
                     return (
                         <CollectionInsightsInline
-                            {...props as { path: string; collection: unknown; parentCollectionIds: string[] }}
+                            {...props as { path: string; collection: unknown; parentCollectionSlugs: string[], parentEntityIds: string[] }}
                             insights={collectionInsights}
                         />
                     );

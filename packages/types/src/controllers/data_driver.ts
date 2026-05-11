@@ -179,7 +179,8 @@ export interface DataDriver {
         path: string,
         databaseId?: string,
         collection: EntityCollection,
-        parentCollectionIds?: string[]
+        parentCollectionSlugs?: string[];
+        parentEntityIds?: string[];
     }) => Promise<boolean>;
 
     /**

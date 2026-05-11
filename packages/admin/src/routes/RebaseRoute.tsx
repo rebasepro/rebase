@@ -93,7 +93,7 @@ export function RebaseRoute() {
         return <EntityCollectionView
             key={`collection_view_${collection.slug}`}
             {...collection}
-            parentCollectionIds={[]}
+            parentCollectionSlugs={[]} parentEntityIds={[]}
             path={collection.slug}
             updateUrl={true}
             Actions={toArray(collection.Actions)}/>
@@ -116,7 +116,7 @@ export function RebaseRoute() {
             return <EntityCollectionView
                 key={`collection_view_${collection.slug}`}
                 {...collection}
-                parentCollectionIds={[]}
+                parentCollectionSlugs={[]} parentEntityIds={[]}
                 path={collection.slug}
                 updateUrl={true}
                 Actions={toArray(collection.Actions)}/>;
@@ -187,7 +187,7 @@ export function RebaseRoute() {
             return <EntityCollectionView
                 key={`collection_view_${collection.slug}`}
                 {...collection}
-                parentCollectionIds={[]}
+                parentCollectionSlugs={[]} parentEntityIds={[]}
                 path={collection.slug}
                 updateUrl={true}
                 selectedEntityId={lastEntityEntry.entityId}
@@ -272,7 +272,8 @@ function EntityFullScreenRoute({
 
     const [selectedTab, setSelectedTab] = useState<string | undefined>(urlTab);
 
-    const parentCollectionIds = collectionRegistry.getParentCollectionIds(navigationPath);
+    const parentCollectionSlugs = collectionRegistry.getParentCollectionSlugs(navigationPath);
+    const parentEntityIds = collectionRegistry.getParentEntityIds(navigationPath);
     useEffect(() => {
         if (urlTab !== selectedTab) {
             setSelectedTab(urlTab);
@@ -350,7 +351,7 @@ function EntityFullScreenRoute({
                     navigate(`${basePath}/${entityId}${hash}`, { replace: true });
                 }
             }}
-            parentCollectionIds={parentCollectionIds}
+            parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
         />
 
         <UnsavedChangesDialog

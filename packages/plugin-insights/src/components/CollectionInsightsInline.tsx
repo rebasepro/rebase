@@ -10,10 +10,13 @@ import { InsightWidget } from "./InsightWidget";
  */
 export function CollectionInsightsInline({
     insights,
+    path,
+    parentCollectionSlugs,
+    parentEntityIds
 }: {
     path: string;
     collection: unknown;
-    parentCollectionIds: string[];
+    parentCollectionSlugs: string[], parentEntityIds: string[];
     insights: InsightDefinition[];
 }) {
     if (!insights || insights.length === 0) return null;
@@ -25,7 +28,7 @@ export function CollectionInsightsInline({
                     key={def.id} 
                     definition={def} 
                     path={path}
-                    parentCollectionIds={parentCollectionIds}
+                    parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
                 />
             ))}
         </div>

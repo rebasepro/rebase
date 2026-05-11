@@ -16,7 +16,8 @@ export function NewCollectionButton() {
         <Button className={"min-w-fit"}
 
             onClick={() => collectionEditorController.createCollection({
-                parentCollectionIds: [],
+                parentCollectionSlugs: [],
+                parentEntityIds: [],
                 redirect: true,
                 sourceClick: "new_collection_button"
             })}>

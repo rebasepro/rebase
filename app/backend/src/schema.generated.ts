@@ -222,7 +222,7 @@ export const productLocalesRelations = drizzleRelations(productLocales, ({ one, 
 }));
 
 export const productsRelations = drizzleRelations(products, ({ one, many }) => ({
-    "locales": many(productLocales, { relationName: "product_locales_product_id" })
+    "product_locales": many(productLocales, { relationName: "product_locales_product_id" })
 }));
 
 export const tagsRelations = drizzleRelations(tags, ({ one, many }) => ({

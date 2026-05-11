@@ -8,7 +8,7 @@ import { useCollectionEditorController } from "../useCollectionEditorController"
 
 export function EditorEntityAction({
     path,
-    parentCollectionIds,
+    parentCollectionSlugs, parentEntityIds,
     collection,
     formContext
 }: PluginFormActionProps) {
@@ -18,7 +18,7 @@ export function EditorEntityAction({
     const collectionEditorController = useCollectionEditorController();
     const { t } = useTranslation();
 
-    const parentCollection = parentCollectionIds.length > 0 ? collectionRegistry.getCollection(parentCollectionIds[parentCollectionIds.length - 1]) : undefined;
+    const parentCollection = parentCollectionSlugs.length > 0 ? collectionRegistry.getCollection(parentCollectionSlugs[parentCollectionSlugs.length - 1]) : undefined;
 
     const canEditCollection = collectionEditorController.configPermissions
         ? collectionEditorController.configPermissions({
@@ -39,7 +39,7 @@ export function EditorEntityAction({
                 ? () => collectionEditorController?.editCollection({
                     id: collection.slug,
                     path,
-                    parentCollectionIds,
+                    parentCollectionSlugs, parentEntityIds,
                     parentCollection: parentCollection as EntityCollection
                 })
                 : undefined}>

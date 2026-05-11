@@ -531,7 +531,7 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
                         </div>
                     )}
                     {!dataLoading && noMoreToLoad && data.length > 0 && (
-                        <div className="flex items-center justify-center py-2">
+                        <div className="flex items-center justify-center py-2 dark:bg-surface-900">
                             <Typography variant="caption" color="secondary">
                                 All {data.length} entries loaded
                             </Typography>

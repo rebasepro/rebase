@@ -554,7 +554,8 @@ export interface CollectionActionsProps<M extends Record<string, unknown> = Reco
     /**
      * Array of the parent path segments like `['users']`
      */
-    parentCollectionIds: string[];
+    parentCollectionSlugs: string[];
+    parentEntityIds: string[];
 
     /**
      * The collection configuration

@@ -8,7 +8,7 @@ import { useCollectionEditorController } from "../useCollectionEditorController"
 
 export function EditorCollectionAction({
     path,
-    parentCollectionIds,
+    parentCollectionSlugs, parentEntityIds,
     collection,
     tableController
 }: CollectionActionsProps) {
@@ -18,7 +18,7 @@ export function EditorCollectionAction({
     const collectionEditorController = useCollectionEditorController();
     const { t } = useTranslation();
 
-    const parentCollection = parentCollectionIds.length > 0 ? collectionRegistry.getCollection(parentCollectionIds[parentCollectionIds.length - 1]) : undefined;
+    const parentCollection = parentCollectionSlugs.length > 0 ? collectionRegistry.getCollection(parentCollectionSlugs[parentCollectionSlugs.length - 1]) : undefined;
 
     const canEditCollection = !collectionEditorController.configController?.readOnly && (collectionEditorController.configPermissions
         ? collectionEditorController.configPermissions({
@@ -42,7 +42,7 @@ export function EditorCollectionAction({
                 ? () => collectionEditorController?.editCollection({
                     id: collection.slug,
                     path,
-                    parentCollectionIds,
+                    parentCollectionSlugs, parentEntityIds,
                     parentCollection: parentCollection as EntityCollection,
                     existingEntities: tableController?.data ?? []
                 })

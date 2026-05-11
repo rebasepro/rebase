@@ -31,7 +31,7 @@ export function CollectionDetailsForm({
     existingIds?: string[];
     groups: string[] | null;
     parentCollection?: EntityCollection;
-    parentCollectionIds?: string[];
+    parentCollectionSlugs?: string[], parentEntityIds?: string[];
     expandKanban?: boolean;
 }) {
 

@@ -204,7 +204,8 @@ export interface PluginHooks {
      */
     onColumnsReorder?: (props: {
         fullPath: string;
-        parentCollectionIds: string[];
+        parentCollectionSlugs: string[];
+        parentEntityIds: string[];
         collection: EntityCollection;
         newPropertiesOrder: string[];
     }) => void;
@@ -214,7 +215,8 @@ export interface PluginHooks {
      */
     onKanbanColumnsReorder?: (props: {
         fullPath: string;
-        parentCollectionIds: string[];
+        parentCollectionSlugs: string[];
+        parentEntityIds: string[];
         collection: EntityCollection;
         kanbanColumnProperty: string;
         newColumnsOrder: string[];
@@ -306,7 +308,8 @@ export interface PluginHomePageActionsProps<EP extends object = object, M extend
 export interface PluginFormActionProps<USER extends User = User, EC extends EntityCollection = EntityCollection> {
     entityId?: string | number;
     path: string;
-    parentCollectionIds: string[];
+    parentCollectionSlugs: string[];
+    parentEntityIds: string[];
     status: EntityStatus;
     collection: EC;
     disabled: boolean;

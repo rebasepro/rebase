@@ -61,14 +61,14 @@ export type UpdateCollectionParams<M extends Record<string, unknown> = Record<st
     id: string,
     collectionData: Partial<EntityCollection<M>>,
     previousId?: string,
-    parentCollectionIds?: string[]
+    parentCollectionSlugs?: string[], parentEntityIds?: string[]
 }
 
 export type SaveCollectionParams<M extends Record<string, unknown> = Record<string, unknown>> = {
     id: string,
     collectionData: EntityCollection<M>,
     previousId?: string,
-    parentCollectionIds?: string[]
+    parentCollectionSlugs?: string[], parentEntityIds?: string[]
 }
 
 export type SavePropertyParams = {
@@ -77,7 +77,7 @@ export type SavePropertyParams = {
     namespace?: string,
     newPropertiesOrder?: string[],
     property: Property,
-    parentCollectionIds?: string[]
+    parentCollectionSlugs?: string[], parentEntityIds?: string[]
 }
 
 export type DeletePropertyParams = {
@@ -85,24 +85,24 @@ export type DeletePropertyParams = {
     propertyKey: string,
     namespace?: string,
     newPropertiesOrder?: string[],
-    parentCollectionIds?: string[]
+    parentCollectionSlugs?: string[], parentEntityIds?: string[]
 }
 
 export type DeleteCollectionParams = {
     id: string,
-    parentCollectionIds?: string[]
+    parentCollectionSlugs?: string[], parentEntityIds?: string[]
 }
 
 export type UpdatePropertiesOrderParams = {
     fullPath: string;
-    parentCollectionIds: string[];
+    parentCollectionSlugs: string[], parentEntityIds: string[];
     collection: EntityCollection;
     newPropertiesOrder: string[];
 }
 
 export type UpdateKanbanColumnsOrderParams = {
     fullPath: string;
-    parentCollectionIds: string[];
+    parentCollectionSlugs: string[], parentEntityIds: string[];
     collection: EntityCollection;
     kanbanColumnProperty: string;
     newColumnsOrder: string[];

@@ -75,8 +75,12 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
 
     }
 
-    const parentCollectionIds = useMemo(() => {
-        return collectionRegistryController.getParentCollectionIds(path);
+    const parentCollectionSlugs = useMemo(() => {
+        return collectionRegistryController.getParentCollectionSlugs(path);
+    }, [collectionRegistryController, path]);
+
+    const parentEntityIds = useMemo(() => {
+        return collectionRegistryController.getParentEntityIds(path);
     }, [collectionRegistryController, path]);
 
     const collection = collectionRegistryController.getCollection(path) ?? props.collection;
@@ -102,7 +106,7 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
                     {...props}
                     layout={"side_panel"}
                     collection={collection as EntityCollection}
-                    parentCollectionIds={parentCollectionIds}
+                    parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
                     onValuesModified={onValuesModified}
                     onSaved={onUpdate}
                     barActions={({

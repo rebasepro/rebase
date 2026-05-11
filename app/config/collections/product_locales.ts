@@ -1,7 +1,7 @@
-import { EntityCollection } from "@rebasepro/types";
+import { PostgresCollection } from "@rebasepro/types";
 import productsCollection from "./products";
 
-const productLocalesCollection: EntityCollection = {
+const productLocalesCollection: PostgresCollection = {
     name: "Product Locales",
     singularName: "Product Locale",
     slug: "product_locales",

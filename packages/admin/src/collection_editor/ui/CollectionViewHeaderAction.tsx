@@ -10,7 +10,7 @@ export function CollectionViewHeaderAction({
     onHover,
     property,
     path,
-    parentCollectionIds,
+    parentCollectionSlugs, parentEntityIds,
     collection,
     tableController
 }: {
@@ -18,7 +18,7 @@ export function CollectionViewHeaderAction({
     propertyKey: string,
     onHover: boolean,
     path: string,
-    parentCollectionIds: string[],
+    parentCollectionSlugs: string[], parentEntityIds: string[],
     collection: EntityCollection;
     tableController: EntityTableController;
 }) {
@@ -37,7 +37,7 @@ export function CollectionViewHeaderAction({
                         propertyKey,
                         property,
                         editedCollectionId: collection.slug,
-                        parentCollectionIds,
+                        parentCollectionSlugs, parentEntityIds,
                         collection,
                         existingEntities: tableController.data ?? []
                     });
