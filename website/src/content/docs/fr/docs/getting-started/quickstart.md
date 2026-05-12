@@ -8,7 +8,7 @@ description: Créez un nouveau projet Rebase et faites-le fonctionner localement
 ## Créer un nouveau projet
 
 ```bash
-git clone https://github.com/rebasepro/rebase-starter my-app
+pnpm dlx rebase init my-app
 ```
 
 Ceci échafaude un projet avec trois packages :

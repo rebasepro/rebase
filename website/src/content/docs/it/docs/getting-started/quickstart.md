@@ -8,7 +8,7 @@ description: Crea un nuovo progetto Rebase e avvialo localmente in meno di 2 min
 ## Crea un Nuovo Progetto
 
 ```bash
-git clone https://github.com/rebasepro/rebase-starter my-app
+pnpm dlx rebase init my-app
 ```
 
 Questo crea la struttura di un progetto con tre pacchetti:

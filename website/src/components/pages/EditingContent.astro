@@ -10,7 +10,8 @@ import { KanbanDemo } from '../../components/demos/KanbanDemo';
 import { RichTextEditorDemo } from '../../components/demos/RichTextEditorDemo';
 import { SpreadsheetDemo } from '../../components/demos/SpreadsheetDemo';
 import { CustomFieldsDemo } from '../../components/demos/CustomFieldsDemo';
-import { EditorPreviewDemo } from '../../components/demos/EditorPreviewDemo';
+
+import { RebaseEditorDemo } from '../../components/RebaseEditorDemo';
 import "../../styles/editor.css";
 
 
@@ -83,40 +84,31 @@ import "../../styles/editor.css";
     </section>
 
 
-    <!-- Full-width editor video showcase -->
-    <section class="bg-black">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-700 shadow-2xl shadow-primary/5">
-          <video autoplay muted loop playsinline class="w-full h-auto">
-            <source src="/img/editing_demo_dark.mp4" type="video/mp4"/>
-          </video>
-        </div>
-      </div>
-    </section>
-
-
-    <!-- Live Rich Text Editor Demo -->
-    <section class="bg-black py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div>
-            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-violet-500/10 text-violet-400 ring-1 ring-inset ring-violet-500/20">
-              Block Editor
+    <!-- Full-width interactive Notion editor hero -->
+    <section class="bg-black pb-16 sm:pb-24">
+      <div class="mx-auto max-w-6xl px-6 lg:px-8">
+        <div class="rounded-2xl overflow-hidden border border-surface-800/80 bg-surface-950 shadow-[0_0_0_1px_rgba(15,23,42,0.55),0_24px_120px_rgba(0,0,0,0.65)]">
+          <!-- Browser Chrome -->
+          <div class="px-4 py-3 border-b border-surface-800/80 flex items-center gap-2 bg-surface-900/50 backdrop-blur-md">
+            <div class="flex gap-1.5 w-16">
+              <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+              <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
+              <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
             </div>
-            <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Notion-style rich text, built in.</h2>
-            <p class="text-lg text-surface-400 mb-6">Not just a textarea — a full block-based editor powered by TipTap and ProseMirror. Headings, code blocks, tables, task lists, images, and slash commands. All the content blocks your team expects, zero configuration required.</p>
-            <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="text-primary">✓</span> Markdown shortcuts (type <code class="text-xs bg-surface-800/60 px-1.5 py-0.5 rounded text-primary-light"># heading</code> or <code class="text-xs bg-surface-800/60 px-1.5 py-0.5 rounded text-primary-light">**bold**</code>)</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Slash command menu for blocks, images, tables & more</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Drag-and-drop block reordering</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Inline image uploads with storage integration</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Task lists, code fences, blockquotes, horizontal rules</li>
-            </ul>
+            <div class="flex-1 flex justify-center">
+              <div class="bg-surface-950/80 border border-surface-800/80 rounded-md px-3 py-1 text-[11px] font-mono text-surface-500 flex items-center gap-1.5">
+                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                admin.yourdomain.com/posts/new
+              </div>
+            </div>
+            <div class="w-16"></div>
           </div>
-          <div className="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 shadow-2xl shadow-violet-500/5 h-[400px]">
-            <EditorPreviewDemo client:only="react" />
+          <!-- Editor -->
+          <div class="relative w-full" style="min-height: 420px;">
+            <RebaseEditorDemo client:only="react" />
           </div>
         </div>
+        <p class="mt-4 text-center text-xs sm:text-sm text-surface-500">The real Rebase rich text editor — try typing, it's fully interactive.</p>
       </div>
     </section>
 

@@ -285,22 +285,40 @@ describe("generateCollectionFile", () => {
     });
 
     describe("inverse relation (other table -> this table)", () => {
-        it("generates a one-to-many inverse relation", () => {
+        it("generates a one-to-many inverse relation in the relations array", () => {
             const allFks: ForeignKeyRow[] = [mkFk("comments", "post_id", "posts")];
             const meta = makeSimpleTable("posts", [
                 mkCol("posts", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
             ]);
             const result = generateCollectionFile("posts", meta, allFks, new Set(), new Map([["posts", meta]]), new Map());
             expect(result).toContain('import commentsCollection from "./comments"');
+            // Should be in the relations array, not as an inline property
+            expect(result).toContain('relations: [');
+            expect(result).toContain('relationName: "comments"');
             expect(result).toContain('cardinality: "many"');
             expect(result).toContain('direction: "inverse"');
             expect(result).toContain('inverseRelationName: "post"');
             expect(result).toContain('foreignKeyOnTarget: "post_id"');
+            // Should NOT appear as an inline property with type: "relation"
+            const propsSection = result.split('properties:')[1].split('relations:')[0];
+            expect(propsSection).not.toContain('"relation"');
+        });
+
+        it("does NOT include inverse relations in propertiesOrder", () => {
+            const allFks: ForeignKeyRow[] = [mkFk("comments", "post_id", "posts")];
+            const meta = makeSimpleTable("posts", [
+                mkCol("posts", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
+            ]);
+            const result = generateCollectionFile("posts", meta, allFks, new Set(), new Map([["posts", meta]]), new Map());
+            const orderMatch = result.match(/propertiesOrder:\s*(\[[\s\S]*?\])/);
+            expect(orderMatch).toBeTruthy();
+            const orderBlock = orderMatch![1];
+            expect(orderBlock).not.toContain('"comments"');
         });
     });
 
     describe("many-to-many relations", () => {
-        it("generates owning M2M with through config for alphabetically-first table", () => {
+        it("generates owning M2M with through config in relations array", () => {
             const jtFks: ForeignKeyRow[] = [
                 mkFk("articles_tags", "article_id", "articles"),
                 mkFk("articles_tags", "tag_id", "tags"),
@@ -317,13 +335,15 @@ describe("generateCollectionFile", () => {
             const joinTables = new Set(["articles_tags"]);
 
             const result = generateCollectionFile("articles", articlesMeta, [], joinTables, tablesMap, new Map());
+            expect(result).toContain('relations: [');
+            expect(result).toContain('relationName: "tags"');
             expect(result).toContain('direction: "owning"');
             expect(result).toContain('table: "articles_tags"');
             expect(result).toContain('sourceColumn: "article_id"');
             expect(result).toContain('targetColumn: "tag_id"');
         });
 
-        it("generates inverse M2M for alphabetically-second table", () => {
+        it("generates inverse M2M in relations array", () => {
             const jtFks: ForeignKeyRow[] = [
                 mkFk("articles_tags", "article_id", "articles"),
                 mkFk("articles_tags", "tag_id", "tags"),
@@ -340,12 +360,13 @@ describe("generateCollectionFile", () => {
             const joinTables = new Set(["articles_tags"]);
 
             const result = generateCollectionFile("tags", tagsMeta, [], joinTables, tablesMap, new Map());
+            expect(result).toContain('relations: [');
             expect(result).toContain('direction: "inverse"');
         });
     });
 
     describe("self-referencing M2M", () => {
-        it("generates self-ref M2M with _via_ property name", () => {
+        it("generates self-ref M2M with _via_ relation name in relations array", () => {
             const jtFks: ForeignKeyRow[] = [
                 mkFk("user_friends", "user_id", "users"),
                 mkFk("user_friends", "friend_id", "users"),
@@ -362,7 +383,8 @@ describe("generateCollectionFile", () => {
             const joinTables = new Set(["user_friends"]);
 
             const result = generateCollectionFile("users", usersMeta, [], joinTables, tablesMap, new Map());
-            expect(result).toContain("users_via_friend");
+            expect(result).toContain('relations: [');
+            expect(result).toContain('relationName: "users_via_friend"');
             expect(result).toContain('table: "user_friends"');
             expect(result).toContain('sourceColumn: "user_id"');
             expect(result).toContain('targetColumn: "friend_id"');

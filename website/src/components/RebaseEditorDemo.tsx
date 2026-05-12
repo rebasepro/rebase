@@ -41,10 +41,11 @@ export function RebaseEditorDemo() {
                 prose-pre:bg-surface-900 prose-pre:border prose-pre:border-surface-700/50 prose-pre:rounded-lg
                 prose-a:text-primary prose-a:no-underline hover:prose-a:underline
                 prose-th:text-surface-300 prose-td:text-surface-400
+                prose-th:px-3 prose-th:py-2 prose-td:px-3 prose-td:py-2
                 prose-table:border-surface-700
                 prose-hr:border-surface-700
                 prose-li:text-surface-300
-                [&_.ProseMirror]:min-h-[350px] [&_.ProseMirror]:p-6 [&_.ProseMirror]:focus:outline-none
+                [&_.ProseMirror]:min-h-[350px] [&_.ProseMirror]:p-8 [&_.ProseMirror]:focus:outline-none
             ">
                 <RebaseEditor
                     content={sampleContent}

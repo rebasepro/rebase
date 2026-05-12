@@ -43,7 +43,7 @@ export async function runPluginCommand(args: string[]) {
 }
 
 async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
-    const VALID_ACTIONS = ["push", "pull", "generate", "migrate", "studio", "branch"];
+    const VALID_ACTIONS = ["push", "generate", "migrate", "studio", "branch"];
     if (!subcommand || !VALID_ACTIONS.includes(subcommand)) {
         console.error(chalk.red(`Unknown db command. Valid: ${VALID_ACTIONS.join(", ")}`));
         process.exit(1);

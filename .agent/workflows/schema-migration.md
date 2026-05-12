@@ -101,11 +101,11 @@ rebase db migrate
 | Command | Description | When to Use |
 |---------|-------------|-------------|
 | `rebase schema generate` | Collections → Drizzle schema | Always first step |
+| `rebase schema introspect` | DB → Rebase collections | Legacy DB import (Preferred) |
 | `rebase db push` | Apply schema directly to DB | Development |
 | `rebase db generate` | Create SQL migration files | Production prep |
 | `rebase db migrate` | Run pending migrations | Production deploy |
 | `rebase db studio` | Visual database browser | Debugging |
-| `rebase db pull` | DB → Drizzle schema (introspect) | Legacy DB import |
 
 ## Common Scenarios
 
@@ -186,14 +186,12 @@ The `drizzle.config.ts` includes multiple layers of safety to ensure tables/obje
 
 This means you can safely have additional tables in your database (from other applications, legacy systems, manual SQL, etc.) and Rebase will never attempt to modify or drop them.
 
-### Never Use `db pull` Then `db migrate`
+### Introspecting a Database
 
-If you use `rebase db pull` to introspect an existing database, it creates a "baseline" migration file with commented-out SQL. **Do not run `rebase db migrate` after `rebase db pull`** - those tables already exist!
+To introspect an existing database and create Rebase collections, use:
+`rebase schema introspect`
 
-Instead, after `rebase db pull`:
-1. Delete the generated migration file in `./drizzle/`
-2. Clean up the `./drizzle/meta/_journal.json` to remove the entry
-3. Or simply use `rebase db push` for future changes
+This will generate TypeScript collection definitions in your `app/config/collections/` directory based on the tables in the database.
 
 ## Troubleshooting
 

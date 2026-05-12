@@ -281,6 +281,7 @@ export function generateCollectionFile(
     const imports = new Set<string>(['import { PostgresCollection } from "@rebasepro/types";']);
 
     let propsOutput = ``;
+    let relationsOutput = ``;
     const propertiesOrder: string[] = [];
 
     // Detect composite primary keys
@@ -289,7 +290,8 @@ export function generateCollectionFile(
     // Map columns
     for (const col of meta.columns) {
         // Skip foreign keys since we handle them as relations
-        if (meta.fks.some((fk) => fk.column_name === col.column_name)) continue;
+        // Exception: Do not skip if it's part of the primary key!
+        if (meta.fks.some((fk) => fk.column_name === col.column_name) && !meta.pks.includes(col.column_name)) continue;
 
         propertiesOrder.push(col.column_name);
 
@@ -302,22 +304,22 @@ export function generateCollectionFile(
 
         const colNameLower = col.column_name.toLowerCase();
 
-        // Enum values — generate real enumValues from the PG enum
+        // Enum values — generate real enum from the PG enum
         if (isEnumColumn && colEnumValues) {
             const enumEntries = colEnumValues
                 .map((v) => `{ id: "${v}", label: "${humanize(v)}" }`)
                 .join(", ");
-            extra = `\n            enumValues: [${enumEntries}],`;
+            extra = `\n            enum: [${enumEntries}],`;
         }
 
         // Date auto-value heuristics
         if (propType === "date") {
             if (colNameLower === "created_at" || colNameLower === "createdat") {
-                extra = `\n            autoValue: "on_create",\n            readOnly: true,\n            hideFromCollection: true,`;
+                extra = `\n            autoValue: "on_create",\n            ui: {\n                readOnly: true,\n                hideFromCollection: true\n            },`;
             } else if (colNameLower === "updated_at" || colNameLower === "updatedat") {
-                extra = `\n            autoValue: "on_update",\n            readOnly: true,\n            hideFromCollection: true,`;
+                extra = `\n            autoValue: "on_update",\n            ui: {\n                readOnly: true,\n                hideFromCollection: true\n            },`;
             } else if (col.column_default && (col.column_default.includes("now()") || col.column_default.includes("CURRENT_TIMESTAMP"))) {
-                extra = `\n            autoValue: "on_create",\n            readOnly: true,`;
+                extra = `\n            autoValue: "on_create",\n            ui: {\n                readOnly: true\n            },`;
             }
         }
 
@@ -330,7 +332,7 @@ export function generateCollectionFile(
                 // We'll just call mapPgType on the baseType
                 innerType = mapPgType(baseType);
             }
-            extra = `\n            of: { type: "${innerType}" },`;
+            extra = `\n            of: { name: "${humanize(col.column_name)} Item", type: "${innerType}" },`;
         } else if (propType === "map") {
             extra = `\n            keyValue: true,`;
         }
@@ -379,7 +381,12 @@ export function generateCollectionFile(
     for (const fk of meta.fks) {
         const targetTableName = fk.foreign_table_name;
         if (!joinTables.has(targetTableName)) {
-            const relName = fk.column_name.replace(/_id$/, "");
+            let relName = fk.column_name.replace(/_id$/, "");
+            if (meta.pks.includes(fk.column_name) && relName === fk.column_name) {
+                // If the FK is also the PK and its name doesn't imply a relation (like "id"),
+                // use the target table name to avoid conflicting with the PK property.
+                relName = targetTableName;
+            }
             // Push the relation property key, not the FK column name
             propertiesOrder.push(relName);
 
@@ -402,21 +409,19 @@ export function generateCollectionFile(
     }
 
     // Map Inverse Relations (1-to-many where OTHER table points to THIS table)
+    // These go into the `relations` array so they render as subcollection tabs.
     const inverseFks = allFks.filter((fk) => fk.foreign_table_name === tableName && !joinTables.has(fk.table_name));
     for (const fk of inverseFks) {
         const sourceTableName = fk.table_name;
-        propertiesOrder.push(sourceTableName);
 
         const targetCollectionCamel = toCollectionVarName(sourceTableName);
         imports.add(`import ${targetCollectionCamel} from "./${sourceTableName}";`);
 
         const inverseRelName = fk.column_name.replace(/_id$/, "");
-        const relHumanName = humanize(sourceTableName);
 
-        propsOutput += `
-        ${sourceTableName}: {
-            name: "${relHumanName}",
-            type: "relation",
+        relationsOutput += `
+        {
+            relationName: "${sourceTableName}",
             target: () => ${targetCollectionCamel},
             cardinality: "many",
             direction: "inverse",
@@ -426,6 +431,7 @@ export function generateCollectionFile(
     }
 
     // Map Many-to-Many Relations (Join Tables)
+    // These also go into the `relations` array so they render as subcollection tabs.
     const relatedJoinTables = Array.from(joinTables).filter((jt) => {
         const jtMeta = tablesMap.get(jt);
         return jtMeta ? jtMeta.fks.some((fk) => fk.foreign_table_name === tableName) : false;
@@ -445,15 +451,10 @@ export function generateCollectionFile(
             const otherFk = selfRefFks[1];
 
             const relPropName = `${tableName}_via_${otherFk.column_name.replace(/_id$/, "")}`;
-            propertiesOrder.push(relPropName);
 
-            // Self-ref: import is the same collection (use a lazy reference)
-            const relHumanName = humanize(otherFk.column_name.replace(/_id$/, ""));
-
-            propsOutput += `
-        ${relPropName}: {
-            name: "${relHumanName}",
-            type: "relation",
+            relationsOutput += `
+        {
+            relationName: "${relPropName}",
             target: () => ${tableName}Collection,
             cardinality: "many",
             direction: "owning",
@@ -470,7 +471,6 @@ export function generateCollectionFile(
 
         if (otherFk) {
             const targetTableName = otherFk.foreign_table_name;
-            propertiesOrder.push(targetTableName);
 
             const targetCollectionCamel = toCollectionVarName(targetTableName);
             imports.add(`import ${targetCollectionCamel} from "./${targetTableName}";`);
@@ -479,25 +479,27 @@ export function generateCollectionFile(
             const direction = tableName < targetTableName ? "owning" : "inverse";
 
             const thisFk = joinFks.find((fk) => fk.foreign_table_name === tableName);
-            const relHumanName = humanize(targetTableName);
 
             let throughCode = "";
             if (direction === "owning" && thisFk) {
-                throughCode = `\n            through: {\n                table: "${jt}",\n                sourceColumn: "${thisFk.column_name}",\n                targetColumn: "${otherFk.column_name}"\n            }`;
+                throughCode = `\n            through: {\n                table: "${jt}",\n                sourceColumn: "${thisFk.column_name}",\n                targetColumn: "${otherFk.column_name}"\n            },`;
             } else if (direction === "inverse") {
                 throughCode = `\n            // Make sure the target collection configures the 'through' property.`;
             }
 
-            propsOutput += `
-        ${targetTableName}: {
-            name: "${relHumanName}",
-            type: "relation",
+            relationsOutput += `
+        {
+            relationName: "${targetTableName}",
             target: () => ${targetCollectionCamel},
             cardinality: "many",
             direction: "${direction}",${throughCode}
         },`;
         }
     }
+
+    const relationsBlock = relationsOutput
+        ? `\n    relations: [${relationsOutput}\n    ],`
+        : "";
 
     const fileContent = `${Array.from(imports).join("\n")}
 
@@ -509,7 +511,7 @@ const ${tableName}Collection: PostgresCollection = {
     icon: "${icon}",
     group: "App",
     properties: {${propsOutput}
-    },
+    },${relationsBlock}
     propertiesOrder: ${JSON.stringify(propertiesOrder, null, 8).replace(/]$/, "    ]")}
 };
 

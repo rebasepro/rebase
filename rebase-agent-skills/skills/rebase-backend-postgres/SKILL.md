@@ -57,11 +57,11 @@ rebase db migrate
 | Command | Description | When to Use |
 |---------|-------------|-------------|
 | `rebase schema generate` | Collections → Drizzle schema | Always first step |
+| `rebase schema introspect` | DB → Rebase collections | Legacy DB import (Preferred) |
 | `rebase db push` | Apply schema directly to DB | Development |
 | `rebase db generate` | Generate schema + create SQL migration files | Production prep |
 | `rebase db migrate` | Run pending migrations | Production deploy |
 | `rebase db studio` | Visual database browser — Drizzle Studio | Debugging |
-| `rebase db pull` | DB → Drizzle schema — introspect | Legacy DB import |
 
 ## Drizzle Configuration
 
@@ -206,6 +206,7 @@ The backend handles `SIGTERM` and `SIGINT` signals:
 
 ## Important Notes
 
+- **To import a legacy database**, use `rebase schema introspect` to generate Rebase Collections, NOT `rebase db pull`.
 - **Never use `db pull` then `db migrate`** — introspected databases already have the tables
 - **Always backup before production migrations** — `ALTER COLUMN` or `DROP COLUMN` can cause data loss
 - **Tables not in schema are ignored** — custom tables and internal Rebase tables are safe

@@ -78,7 +78,6 @@ ${chalk.green.bold("Usage")}
 ${chalk.green.bold("Commands")}
   ${chalk.gray("(Commands are provided by your active database driver plugin)")}
   ${chalk.blue.bold("push")}       Apply schema directly to database (development)
-  ${chalk.blue.bold("pull")}       Introspect database → Schema
   ${chalk.blue.bold("generate")}   Generate migration files
   ${chalk.blue.bold("migrate")}    Run pending migrations
   ${chalk.blue.bold("studio")}     Open Studio viewer

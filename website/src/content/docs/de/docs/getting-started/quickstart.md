@@ -8,7 +8,7 @@ description: Erstellen Sie ein neues Rebase-Projekt und bringen Sie es in wenige
 ## Erstellen Sie ein neues Projekt
 
 ```bash
-git clone https://github.com/rebasepro/rebase-starter my-app
+pnpm dlx rebase init my-app
 ```
 
 Dies erstellt ein Projekt mit drei Paketen:

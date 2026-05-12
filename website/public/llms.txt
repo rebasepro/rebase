@@ -53,7 +53,7 @@ Rebase is **not** a hosted SaaS. You self-host it, you own your data, and you ow
 ### Quick Start
 
 ```bash
-git clone https://github.com/rebasepro/rebase-starter my-app
+pnpm dlx rebase init my-app
 cd my-app
 ```
 
@@ -108,7 +108,7 @@ That's it. Your admin panel is running at `http://localhost:5173` and the API at
 ### Create a New Project
 
 ```bash
-git clone https://github.com/rebasepro/rebase-starter my-app
+pnpm dlx rebase init my-app
 ```
 
 This scaffolds a project with three packages:
