@@ -25,3 +25,6 @@ drizzle/meta/
 
 # Uploads
 uploads/
+
+# Rebase dev
+.rebase-dev-url

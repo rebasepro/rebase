@@ -5,6 +5,7 @@
 
 .firebaserc
 .firebase
+.rebase-dev-url
 
 # dependencies
 /node_modules

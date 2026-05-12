@@ -1,6 +1,6 @@
 /**
  * Single consolidated seed script for the Rebase demo.
- * Downloads images to local storage and seeds all collections.
+ * Copies static seed images to local storage and seeds all collections.
  * Run with: npx tsx src/seed.ts
  */
 import { createPostgresDatabaseConnection } from "@rebasepro/server-postgresql";
@@ -12,14 +12,13 @@ import {
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import https from "https";
-import http from "http";
 import { createHash } from "crypto";
 import { createRequire } from "module";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const UPLOADS_DIR = path.resolve(__dirname, "../../uploads/default");
+const SEED_ASSETS_DIR = path.resolve(__dirname, "../../seed-assets");
 
 // ── Deterministic RNG & UUIDs ─────────────────────────────────────────
 let _seed = 1337;
@@ -36,56 +35,53 @@ function generateUUID(prefix: string, index: number): string {
     return `${hash.substring(0, 8)}-${hash.substring(8, 12)}-4${hash.substring(13, 16)}-a${hash.substring(17, 20)}-${hash.substring(20, 32)}`;
 }
 
-// ── Image download helpers ────────────────────────────────────────────
-function randomId(len = 5): string {
-    const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-    let result = "";
-    for (let i = 0; i < len; i++) result += chars[Math.floor(Math.random() * chars.length)];
-    return result;
-}
+// ── Static seed-asset helpers ─────────────────────────────────────────
+/**
+ * Copy all files from a seed-assets subdirectory into the uploads directory.
+ * Writes .metadata.json for each file. Skips files already present.
+ * Returns the list of relative storage paths.
+ */
+function copyStaticAssets(assetSubdir: string, uploadsSubdir: string): string[] {
+    const srcDir = path.join(SEED_ASSETS_DIR, assetSubdir);
+    const destDir = path.join(UPLOADS_DIR, uploadsSubdir);
+    fs.mkdirSync(destDir, { recursive: true });
 
-function downloadFile(url: string): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
-        const client = url.startsWith("https") ? https : http;
-        client.get(url, { headers: { "User-Agent": "RebaseSeed/1.0" } }, (res) => {
-            if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-                return downloadFile(res.headers.location).then(resolve).catch(reject);
-            }
-            if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode} for ${url}`));
-            const chunks: Buffer[] = [];
-            res.on("data", (c) => chunks.push(c));
-            res.on("end", () => resolve(Buffer.concat(chunks)));
-            res.on("error", reject);
-        }).on("error", reject);
-    });
-}
-
-async function downloadAndStore(url: string, storagePath: string, filename: string): Promise<string> {
-    const dir = path.join(UPLOADS_DIR, storagePath);
-    fs.mkdirSync(dir, { recursive: true });
-    const id = createHash("md5").update(url).digest("hex").substring(0, 5);
-    const localName = `${id}_${filename}`;
-    const filePath = path.join(dir, localName);
-    const metaPath = filePath + ".metadata.json";
-    const relativePath = `${storagePath}${localName}`;
-
-    if (fs.existsSync(filePath)) return relativePath;
-
-    try {
-        const data = await downloadFile(url);
-        fs.writeFileSync(filePath, data);
-        const ext = filename.split(".").pop()?.toLowerCase() ?? "jpg";
-        const contentType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
-        fs.writeFileSync(metaPath, JSON.stringify({
-            contentType,
-            size: data.length,
-            uploadedAt: new Date().toISOString()
-        }, null, 2));
-        return relativePath;
-    } catch (e) {
-        console.warn(`  ⚠️ Failed to download ${url}: ${(e as Error).message}`);
-        return relativePath;
+    if (!fs.existsSync(srcDir)) {
+        console.warn(`  ⚠️ Seed assets not found: ${srcDir}`);
+        return [];
     }
+
+    const files = fs.readdirSync(srcDir).filter(f => !f.endsWith(".metadata.json"));
+    const paths: string[] = [];
+
+    for (const file of files) {
+        const destPath = path.join(destDir, file);
+        const relativePath = `${uploadsSubdir}${file}`;
+
+        if (!fs.existsSync(destPath)) {
+            fs.copyFileSync(path.join(srcDir, file), destPath);
+        }
+
+        // Write metadata if missing
+        const metaPath = destPath + ".metadata.json";
+        if (!fs.existsSync(metaPath)) {
+            const ext = file.split(".").pop()?.toLowerCase() ?? "jpg";
+            const contentType = ext === "png" ? "image/png"
+                : ext === "webp" ? "image/webp"
+                : ext === "avif" ? "image/avif"
+                : "image/jpeg";
+            const stat = fs.statSync(destPath);
+            fs.writeFileSync(metaPath, JSON.stringify({
+                contentType,
+                size: stat.size,
+                uploadedAt: "2025-01-01T00:00:00.000Z"
+            }, null, 2));
+        }
+
+        paths.push(relativePath);
+    }
+
+    return paths;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────
@@ -103,40 +99,6 @@ function randomDate(startDaysAgo: number, endDaysAgo: number): string {
 }
 function currentYear(): number { return new Date().getFullYear(); }
 
-// ── Unsplash image URLs ───────────────────────────────────────────────
-const heroImageUrls = [
-    "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=1200&q=80",
-    "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=1200&q=80",
-    "https://images.unsplash.com/photo-1504639725590-34d0984388bd?w=1200&q=80",
-    "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=1200&q=80",
-    "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=1200&q=80",
-    "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200&q=80",
-    "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1200&q=80",
-    "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200&q=80",
-    "https://images.unsplash.com/photo-1487058792275-0ad4aaf24ca7?w=1200&q=80",
-    "https://images.unsplash.com/photo-1550439062-609e1531270e?w=1200&q=80",
-    "https://images.unsplash.com/photo-1605379399642-870262d3d051?w=1200&q=80",
-    "https://images.unsplash.com/photo-1531297484001-80022131f5a1?w=1200&q=80",
-    "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1200&q=80",
-    "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=1200&q=80",
-    "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=1200&q=80",
-    "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&q=80",
-    "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=1200&q=80",
-    "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&q=80",
-    "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1200&q=80",
-    "https://images.unsplash.com/photo-1542831371-29b0f74f9713?w=1200&q=80"
-];
-
-const contentImageUrls = [
-    "https://images.unsplash.com/photo-1587620962725-abab7fe55159?w=800&q=80",
-    "https://images.unsplash.com/photo-1536104968055-4d61aa56f46a?w=800&q=80",
-    "https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=800&q=80",
-    "https://images.unsplash.com/photo-1580894894513-541e068a3e2b?w=800&q=80",
-    "https://images.unsplash.com/photo-1484417894907-623942c8ee29?w=800&q=80",
-    "https://images.unsplash.com/photo-1534972195531-d756b9bfa9f2?w=800&q=80",
-    "https://images.unsplash.com/photo-1629654297299-c8506221ca97?w=800&q=80",
-    "https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=800&q=80"
-];
 
 // ── Blog post topics (no PHP, TypeScript-heavy) ───────────────────────
 const topics = [
@@ -268,9 +230,7 @@ function randomName() {
 
 // ── Main ──────────────────────────────────────────────────────────────
 export async function runSeed() {
-    // Reset the deterministic RNG so randomId() produces the same
-    // filenames on every run — this lets downloadAndStore's existsSync
-    // check skip images that are already on disk.
+    // Reset the deterministic RNG for reproducible data on every run.
     _seed = 1337;
 
     console.log("🌱 Connecting to database...");
@@ -278,26 +238,23 @@ export async function runSeed() {
 
     const NUM_AUTHORS = 20;
     const NUM_TAGS = 30;
-    const POST_COUNT = 150;
+    const POST_COUNT = 1500;
 
     try {
-        // ── Download images to local storage ──────────────────────────
-        console.log("📸 Downloading hero images to local storage...");
-        const heroImagePaths: string[] = [];
-        for (let i = 0; i < heroImageUrls.length; i++) {
-            const p = await downloadAndStore(heroImageUrls[i], "posts/hero/", `hero_${i + 1}.jpg`);
-            heroImagePaths.push(p);
-            process.stdout.write(`  ✅ ${i + 1}/${heroImageUrls.length}\r`);
-        }
-        console.log(`  ✅ Downloaded ${heroImagePaths.length} hero images`);
+        // ── Copy static seed images to local storage ─────────────────
+        console.log("📸 Copying seed images to local storage...");
+        const heroImagePaths = copyStaticAssets("hero", "posts/hero/");
+        console.log(`  ✅ ${heroImagePaths.length} hero images`);
 
-        console.log("📸 Downloading content images to local storage...");
-        const contentImagePaths: string[] = [];
-        for (let i = 0; i < contentImageUrls.length; i++) {
-            const p = await downloadAndStore(contentImageUrls[i], "posts/content/", `content_${i + 1}.jpg`);
-            contentImagePaths.push(p);
-        }
-        console.log(`  ✅ Downloaded ${contentImagePaths.length} content images`);
+        const contentImagePaths = copyStaticAssets("content", "posts/content/");
+        console.log(`  ✅ ${contentImagePaths.length} content images`);
+
+        copyStaticAssets("author_pictures", "author_pictures/");
+        console.log(`  ✅ author pictures`);
+
+        const productImagePaths = copyStaticAssets("product_images", "product_images/");
+        console.log(`  ✅ ${productImagePaths.length} product images`);
+
 
         // ── Clear existing data ───────────────────────────────────────
 
@@ -486,16 +443,19 @@ tag_id: tagIds[t - 1] });
 
         // ── Products ──────────────────────────────────────────────────
         console.log("📦 Generating FireCMS Demo products...");
-console.log("📸 Downloading product images...");
+
+        // Map product image URLs to the static seed-asset files (already copied above).
+        // The filenames in seed-assets use the same md5(url)[0:5]_filename pattern.
         const firebaseStorageBase = "https://firebasestorage.googleapis.com/v0/b/firecms-demo-27150.appspot.com/o/";
-        
         for (const p of firecmsDemoProducts) {
             const localPaths: string[] = [];
             for (const imgUrl of p.imageUrls) {
                 const fullUrl = `${firebaseStorageBase}${encodeURIComponent(imgUrl)}?alt=media`;
                 const filename = imgUrl.split("/").pop() || "image.jpg";
-                const downloadedPath = await downloadAndStore(fullUrl, "product_images/", filename);
-                localPaths.push(downloadedPath);
+                const id = createHash("md5").update(fullUrl).digest("hex").substring(0, 5);
+                const localName = `${id}_${filename}`;
+                // Reference the file whether it exists or not — it should be in seed-assets
+                localPaths.push(`product_images/${localName}`);
             }
             (p as any).localImages = localPaths.length > 0 ? localPaths : null;
         }
