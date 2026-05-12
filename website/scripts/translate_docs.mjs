@@ -77,7 +77,33 @@ ${content}
             translatedText = translatedText.replace(/^\`\`\`\n?/, '').replace(/\n?\`\`\`$/, '');
         }
 
-        return translatedText.trim() + '\n';
+        translatedText = translatedText.trim() + '\n';
+
+        // Post-process: fix slug to include locale prefix
+        translatedText = translatedText.replace(
+            /^(slug:\s*)(.+)$/m,
+            (match, prefix, slug) => {
+                const trimmedSlug = slug.trim();
+                if (!trimmedSlug.startsWith(`${targetLang}/`)) {
+                    return `${prefix}${targetLang}/${trimmedSlug}`;
+                }
+                return match;
+            }
+        );
+
+        // Post-process: quote description values containing `: ` to prevent YAML parse errors
+        translatedText = translatedText.replace(
+            /^(description:\s*)([^"'].+)$/m,
+            (match, prefix, value) => {
+                if (value.includes(': ')) {
+                    const escaped = value.trim().replace(/"/g, '\\"');
+                    return `${prefix}"${escaped}"`;
+                }
+                return match;
+            }
+        );
+
+        return translatedText;
     } catch (error) {
         console.error(`Gemini API Error translating to ${targetLang}:`, error.message);
         throw error;

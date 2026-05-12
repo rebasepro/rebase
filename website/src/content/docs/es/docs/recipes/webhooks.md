@@ -1,7 +1,7 @@
 ---
 title: "Receta: Integración de Webhooks"
 sidebar_label: Webhooks
-slug: docs/recipes/webhooks
+slug: es/docs/recipes/webhooks
 description: Utiliza las devoluciones de llamada de la entidad para enviar webhooks a servicios externos cuando los datos cambien.
 ---
 

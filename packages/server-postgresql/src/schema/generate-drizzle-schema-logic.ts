@@ -5,6 +5,18 @@ import { toSnakeCase } from "@rebasepro/utils";
 import { createHash } from "crypto";
 // --- Helper Functions ---
 
+/**
+ * Resolve the SQL column name for a property.
+ * Uses the explicit `columnName` when set (e.g. from introspection),
+ * falling back to `toSnakeCase(propName)` for manually-authored collections.
+ */
+const resolveColumnName = (propName: string, prop?: Property | null): string => {
+    if (prop && "columnName" in prop && typeof prop.columnName === "string") {
+        return prop.columnName;
+    }
+    return toSnakeCase(propName);
+};
+
 const getPrimaryKeyProp = (collection: EntityCollection): { name: string, type: "string" | "number", isUuid: boolean } => {
     if (collection.properties) {
         const idPropEntry = Object.entries(collection.properties).find(([_, prop]) => "isId" in (prop as object) && Boolean((prop as unknown as Record<string, unknown>).isId));
@@ -46,7 +58,7 @@ const isIdProperty = (propName: string, prop: Property, collection: EntityCollec
 };
 
 const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCollection, collections: EntityCollection[]): string | null => {
-    const colName = toSnakeCase(propName);
+    const colName = resolveColumnName(propName, prop);
     let columnDefinition: string;
 
     switch (prop.type) {
@@ -167,7 +179,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
                 return null; // Cannot resolve target
             }
 
-            const fkColumnName = toSnakeCase(relation.localKey);
+            const fkColumnName = relation.localKey;
             const targetTableVar = getTableVarName(getTableName(targetCollection));
             const pkProp = getPrimaryKeyProp(targetCollection);
             const targetIdField = pkProp.name;
@@ -496,7 +508,7 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
         Object.entries(collection.properties ?? {}).forEach(([propName, prop]) => {
             if (("enum" in prop) && (prop.type === "string" || prop.type === "number") && prop.enum) {
                 const enumVarName = getEnumVarName(collectionPath, propName);
-                const enumDbName = `${collectionPath}_${toSnakeCase(propName)}`;
+                const enumDbName = `${collectionPath}_${resolveColumnName(propName, prop)}`;
                 const values = Array.isArray(prop.enum)
                     ? prop.enum.map(v => String(v.id ?? v))
                     : Object.keys(prop.enum);
@@ -560,8 +572,8 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
             const targetId = getPrimaryKeyName(targetCollection);
 
             schemaContent += `export const ${tableVarName} = pgTable(\"${tableName}\", {\n`;
-            schemaContent += `    ${sourceColumn}: ${sourceColType}(\"${toSnakeCase(sourceColumn)}\").notNull().references(() => ${getTableVarName(getTableName(sourceCollection))}.${sourceId}, ${refOptions}),\n`;
-            schemaContent += `    ${targetColumn}: ${targetColType}(\"${toSnakeCase(targetColumn)}\").notNull().references(() => ${getTableVarName(getTableName(targetCollection))}.${targetId}, ${refOptions}),\n`;
+            schemaContent += `    ${sourceColumn}: ${sourceColType}(\"${sourceColumn}\").notNull().references(() => ${getTableVarName(getTableName(sourceCollection))}.${sourceId}, ${refOptions}),\n`;
+            schemaContent += `    ${targetColumn}: ${targetColType}(\"${targetColumn}\").notNull().references(() => ${getTableVarName(getTableName(targetCollection))}.${targetId}, ${refOptions}),\n`;
             schemaContent += "}, (table) => ({\n";
             schemaContent += `    pk: primaryKey({ columns: [table.${sourceColumn}, table.${targetColumn}] })\n`;
             schemaContent += "}));\n\n";

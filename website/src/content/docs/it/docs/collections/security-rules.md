@@ -1,7 +1,7 @@
 ---
 title: Regole di Sicurezza (RLS)
 sidebar_label: Regole di Sicurezza
-slug: docs/collections/security-rules
+slug: it/docs/collections/security-rules
 description: Definisci le politiche di sicurezza a livello di riga (Row Level Security) per le tue collection usando scorciatoie pratiche o espressioni SQL pure.
 ---
 

@@ -1,7 +1,7 @@
 ---
 title: Relações
 sidebar_label: Relações
-slug: docs/collections/relations
+slug: pt/docs/collections/relations
 description: Defina relações SQL um-para-um, um-para-muitos e muitos-para-muitos entre coleções com chaves estrangeiras, tabelas de junção e junções multi-salto.
 ---
 

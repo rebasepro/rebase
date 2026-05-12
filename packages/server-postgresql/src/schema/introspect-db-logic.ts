@@ -370,6 +370,7 @@ export function generateCollectionFile(
         propsOutput += `
         ${col.column_name}: {
             name: "${humanName}",
+            columnName: "${col.column_name}",
             type: "${propType}",${extra}
         },`;
     }

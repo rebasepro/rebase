@@ -1,7 +1,7 @@
 ---
 title: Modalità di Visualizzazione
 sidebar_label: Modalità di Visualizzazione
-slug: docs/frontend/view-modes
+slug: it/docs/frontend/view-modes
 description: Configura le visualizzazioni tabella, schede e bacheca Kanban per le tue collezioni.
 ---
 

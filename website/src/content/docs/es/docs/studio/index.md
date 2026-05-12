@@ -1,7 +1,7 @@
 ---
 title: Herramientas de Studio
 sidebar_label: Studio
-slug: docs/studio
+slug: es/docs/studio
 description: Rebase Studio proporciona herramientas para desarrolladores para la edición visual de esquemas, consultas SQL, scripting de JavaScript, gestión de políticas RLS y navegación de almacenamiento.
 ---
 

@@ -1,7 +1,7 @@
 ---
 title: Panoramica Frontend
 sidebar_label: Frontend
-slug: docs/frontend
+slug: it/docs/frontend
 description: Costruisci e personalizza il pannello di amministrazione Rebase con React — controller, scaffold, routing e viste.
 ---
 

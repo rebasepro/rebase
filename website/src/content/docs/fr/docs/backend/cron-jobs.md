@@ -1,7 +1,7 @@
 ---
 title: Tâches Cron
 sidebar_label: Tâches Cron
-slug: docs/backend/cron-jobs
+slug: fr/docs/backend/cron-jobs
 description: Planifiez des tâches d'arrière-plan récurrentes avec le système de tâches cron intégré de Rebase. Définissez les tâches comme des fichiers TypeScript, surveillez-les dans Studio et gérez-les via l'API REST.
 ---
 

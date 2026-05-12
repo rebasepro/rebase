@@ -126,7 +126,7 @@ context });
                 <div
                     ref={scrollRef}
                     onScroll={handleScroll}
-                    className={"flex-grow min-h-0 overflow-y-auto overflow-x-visible no-scrollbar"}
+                    className={"flex-grow min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar"}
                     style={{
                         maskImage: scrolled
                             ? "linear-gradient(to bottom, transparent 0, black 20px, black calc(100% - 20px), transparent 100%)"

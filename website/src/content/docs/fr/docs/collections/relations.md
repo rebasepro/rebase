@@ -1,7 +1,7 @@
 ---
 title: Relations
 sidebar_label: Relations
-slug: docs/collections/relations
+slug: fr/docs/collections/relations
 description: Définir les relations SQL un-à-un, un-à-plusieurs et plusieurs-à-plusieurs entre les collections avec des clés étrangères, des tables de jonction et des jointures multi-sauts.
 ---
 

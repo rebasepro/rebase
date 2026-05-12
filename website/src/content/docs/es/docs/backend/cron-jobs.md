@@ -1,7 +1,7 @@
 ---
 title: Trabajos Cron
 sidebar_label: Trabajos Cron
-slug: docs/backend/cron-jobs
+slug: es/docs/backend/cron-jobs
 description: Programa tareas en segundo plano recurrentes con el sistema de trabajos cron integrado de Rebase. Define trabajos como archivos TypeScript, monitorízalos en Studio y adminístralos a través de la API REST.
 ---
 

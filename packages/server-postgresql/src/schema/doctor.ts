@@ -17,6 +17,18 @@ import { generateSchema } from "./generate-drizzle-schema-logic";
 import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
 
+/**
+ * Resolve the SQL column name for a property.
+ * Uses the explicit `columnName` when set (e.g. from introspection),
+ * falling back to `toSnakeCase(propName)` for manually-authored collections.
+ */
+const resolveColumnName = (propName: string, prop?: Property | null): string => {
+    if (prop && "columnName" in prop && typeof prop.columnName === "string") {
+        return prop.columnName;
+    }
+    return toSnakeCase(propName);
+};
+
 // ── Types ────────────────────────────────────────────────────────────────
 
 export type IssueSeverity = "error" | "warning" | "info";
@@ -316,7 +328,7 @@ export async function checkCollectionsVsDatabase(
                     const resolvedRelations = resolveCollectionRelations(collection);
                     const relation = findRelation(resolvedRelations, (prop as RelationProperty).relationName ?? propName);
                     if (relation?.direction === "owning" && relation.cardinality === "one" && relation.localKey) {
-                        const fkColName = toSnakeCase(relation.localKey);
+                        const fkColName = relation.localKey;
                         if (!dbColumnMap.has(fkColName)) {
                             issues.push({
                                 severity: "error",
@@ -349,7 +361,7 @@ export async function checkCollectionsVsDatabase(
                     continue;
                 }
 
-                const colName = toSnakeCase(propName);
+                const colName = resolveColumnName(propName, prop);
 
                 // Skip system columns — they're handled automatically
                 if (systemColumns.has(colName)) continue;

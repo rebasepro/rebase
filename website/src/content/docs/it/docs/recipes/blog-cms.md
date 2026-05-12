@@ -1,7 +1,7 @@
 ---
 title: "Ricetta: CMS per Blog"
 sidebar_label: CMS per Blog
-slug: docs/recipes/blog-cms
+slug: it/docs/recipes/blog-cms
 description: Costruisci un CMS per blog completo con articoli, autori, categorie, editing di testo ricco e caricamento di immagini.
 ---
 

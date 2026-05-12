@@ -1,7 +1,7 @@
 ---
 title: "Rezept: Webhook-Integration"
 sidebar_label: Webhooks
-slug: docs/recipes/webhooks
+slug: de/docs/recipes/webhooks
 description: Verwenden Sie Entity-Callbacks, um Webhooks an externe Dienste zu senden, wenn sich Daten ändern.
 ---
 

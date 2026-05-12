@@ -1,7 +1,7 @@
 ---
 title: Avvio Rapido
 sidebar_label: Avvio Rapido
-slug: docs/getting-started/quickstart
+slug: it/docs/getting-started/quickstart
 description: Crea un nuovo progetto Rebase e avvialo localmente in meno di 2 minuti.
 ---
 

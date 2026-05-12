@@ -1,7 +1,7 @@
 ---
 title: Cron-Jobs
 sidebar_label: Cron-Jobs
-slug: docs/backend/cron-jobs
+slug: de/docs/backend/cron-jobs
 description: Planen Sie wiederkehrende Hintergrundaufgaben mit dem integrierten Cron-Job-System von Rebase. Definieren Sie Jobs als TypeScript-Dateien, überwachen Sie sie in Studio und verwalten Sie sie über die REST-API.
 ---
 

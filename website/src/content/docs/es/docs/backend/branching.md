@@ -1,7 +1,7 @@
 ---
 title: Ramificación de Bases de Datos
 sidebar_label: Ramificación
-slug: docs/backend/branching
+slug: es/docs/backend/branching
 description: Cree ramas de bases de datos aisladas para desarrollo, staging y pruebas utilizando CREATE DATABASE ... TEMPLATE de PostgreSQL — copias instantáneas y de alta fidelidad sin tiempo de inactividad.
 ---
 

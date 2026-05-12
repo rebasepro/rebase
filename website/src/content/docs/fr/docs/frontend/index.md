@@ -1,7 +1,7 @@
 ---
 title: Vue d'ensemble du frontend
 sidebar_label: Frontend
-slug: docs/frontend
+slug: fr/docs/frontend
 description: Créez et personnalisez le panneau d'administration Rebase avec React — contrôleurs, échafaudage, routage et vues.
 ---
 

@@ -1,7 +1,7 @@
 ---
 title: Collezioni
 sidebar_label: Collezioni
-slug: docs/collections
+slug: it/docs/collections
 description: Le collezioni sono i blocchi costitutivi fondamentali di Rebase — ogni collezione mappa una tabella di database e ne definisce lo schema, le relazioni, la sicurezza e il comportamento dell'interfaccia utente.
 ---
 

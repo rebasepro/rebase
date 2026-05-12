@@ -1,7 +1,7 @@
 ---
 title: Datenimport
 sidebar_label: Datenimport
-slug: docs/features/data-import
+slug: de/docs/features/data-import
 description: Importieren Sie Daten aus CSV-, JSON- und Excel-Dateien in Ihre Sammlungen mit Feldzuordnung und Validierung.
 ---
 

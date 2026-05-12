@@ -1,7 +1,7 @@
 ---
 title: Lavori Cron
 sidebar_label: Lavori Cron
-slug: docs/backend/cron-jobs
+slug: it/docs/backend/cron-jobs
 description: Pianifica attività in background ricorrenti con il sistema di lavori cron integrato di Rebase. Definisci i lavori come file TypeScript, monitorali in Studio e gestiscili tramite l'API REST.
 ---
 

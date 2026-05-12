@@ -1,7 +1,7 @@
 ---
 title: Sistema de Plugins
 sidebar_label: Plugins
-slug: docs/plugins
+slug: pt/docs/plugins
 description: Estenda o Rebase com plugins — injete componentes de UI, modifique coleções, adicione ações à barra de ferramentas e crie construtores de campos personalizados.
 ---
 

@@ -1,7 +1,7 @@
 ---
 title: Frontend-Übersicht
 sidebar_label: Frontend
-slug: docs/frontend
+slug: de/docs/frontend
 description: Erstellen und anpassen Sie das Rebase-Admin-Panel mit React — Controller, Scaffold, Routing und Ansichten.
 ---
 

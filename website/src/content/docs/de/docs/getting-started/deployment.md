@@ -1,7 +1,7 @@
 ---
 title: Bereitstellung
 sidebar_label: Bereitstellung
-slug: docs/getting-started/deployment
+slug: de/docs/getting-started/deployment
 description: Stellen Sie Ihr Rebase-Projekt mit Docker, Cloud-Plattformen oder manuellen Setups in der Produktion bereit.
 ---
 

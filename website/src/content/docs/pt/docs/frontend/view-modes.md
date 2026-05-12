@@ -1,7 +1,7 @@
 ---
 title: Modos de Visualização
 sidebar_label: Modos de Visualização
-slug: docs/frontend/view-modes
+slug: pt/docs/frontend/view-modes
 description: Configure as visualizações de tabela, cartões e quadro Kanban para suas coleções.
 ---
 

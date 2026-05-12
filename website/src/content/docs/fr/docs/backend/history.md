@@ -1,7 +1,7 @@
 ---
 title: Historique des Entités
 sidebar_label: Historique des Entités
-slug: docs/backend/history
+slug: fr/docs/backend/history
 description: Suivez chaque modification apportée à vos entités grâce à une piste d'audit complète — qui a changé quoi, quand, et l'instantané complet avant/après.
 ---
 

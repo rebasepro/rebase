@@ -1,8 +1,8 @@
 ---
 title: Colecciones
 sidebar_label: Colecciones
-slug: docs/collections
-description: Las colecciones son el componente fundamental de Rebase: cada colección se asigna a una tabla de base de datos y define su esquema, relaciones, seguridad y comportamiento de la interfaz de usuario.
+slug: es/docs/collections
+description: "Las colecciones son el componente fundamental de Rebase: cada colección se asigna a una tabla de base de datos y define su esquema, relaciones, seguridad y comportamiento de la interfaz de usuario."
 ---
 
 ## ¿Qué es una Colección?

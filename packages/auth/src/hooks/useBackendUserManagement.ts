@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Role, User } from "@rebasepro/types";
 
 /**
@@ -135,6 +135,10 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
     const [usersError, setUsersError] = useState<Error | undefined>();
     const [rolesError, setRolesError] = useState<Error | undefined>();
 
+    // Ref to hold the latest apiRequest so the initial-load effect doesn't
+    // re-trigger every time the callback identity changes.
+    const apiRequestRef = useRef<typeof apiRequest | null>(null);
+
     /**
      * Make authenticated API request
      */
@@ -226,6 +230,9 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
         throw lastError;
     }, [apiUrl, getAuthToken]);
 
+    // Keep the ref in sync after every render.
+    apiRequestRef.current = apiRequest;
+
     /**
      * Load roles from API
      */
@@ -260,7 +267,11 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
 
     /**
      * Initial data load - only when user is logged in
-     * Load roles first, then admin users
+     * Load roles first, then admin users.
+     *
+     * Dependencies are intentionally limited to `currentUser?.uid` so the
+     * effect does NOT re-run when callback identities change.  The latest
+     * `apiRequest` is read via `apiRequestRef`.
      */
     useEffect(() => {
         // Don't load if no user is logged in
@@ -273,20 +284,41 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
 
         const load = async () => {
             setLoading(true);
+            const request = apiRequestRef.current!;
+
             // Load roles first
             try {
-                const data = await apiRequest("/roles", "GET", undefined, 6, abortController.signal);
+                const data = await request("/roles", "GET", undefined, 6, abortController.signal);
                 setRoles(data.roles.map(convertRole));
                 setRolesError(undefined);
             } catch (error: unknown) {
-                if (error instanceof Error && error.name !== "AbortError") {
-                    console.error("Failed to load roles:", error);
-                    setRolesError(error);
+                if (error instanceof Error && error.name === "AbortError") return;
+                console.error("Failed to load roles:", error);
+                setRolesError(error instanceof Error ? error : new Error(String(error)));
+
+                // If the error is a permission issue (e.g. 403), skip loading
+                // users — they will fail with the same error and we'd show a
+                // duplicate snackbar / error message.
+                const status = (error as { status?: number }).status;
+                if (status === 403 || status === 401) {
+                    setUsersError(error instanceof Error ? error : new Error(String(error)));
+                    setLoading(false);
+                    return;
                 }
             }
+
             // Then load all users if not aborted
             if (!abortController.signal.aborted) {
-                await loadUsers(abortController.signal);
+                try {
+                    const data = await request("/users", "GET", undefined, 6, abortController.signal);
+                    const allUsers: User[] = data.users.map((u: ApiUser) => convertUser(u));
+                    setUsers(allUsers);
+                    setUsersError(undefined);
+                } catch (error: unknown) {
+                    if (error instanceof Error && error.name === "AbortError") return;
+                    console.error("Failed to load users:", error);
+                    setUsersError(error instanceof Error ? error : new Error(String(error)));
+                }
             }
 
             if (!abortController.signal.aborted) {
@@ -298,7 +330,8 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
         return () => {
             abortController.abort();
         };
-    }, [currentUser, apiRequest, loadUsers]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentUser?.uid]);
 
     /**
      * Search users with server-side pagination.

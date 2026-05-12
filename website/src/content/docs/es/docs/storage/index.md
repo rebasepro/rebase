@@ -1,7 +1,7 @@
 ---
 title: Almacenamiento
 sidebar_label: Almacenamiento
-slug: docs/storage
+slug: es/docs/storage
 description: Configure el almacenamiento de archivos con sistemas de archivos locales o backends compatibles con S3 para cargas de archivos, imágenes y medios.
 ---
 

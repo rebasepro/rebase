@@ -106,7 +106,7 @@ export function DrawerNavigationGroup({
             <div
                 className={cls(
                     "transition-all duration-200 ease-in-out",
-                    (!hideHeader && collapsed) ? "overflow-hidden" : "overflow-visible",
+                    "overflow-hidden",
                     !hideHeader && "dark:bg-transparent",
                     !hideHeader ? (drawerOpen ? "rounded-lg" : "rounded-lg") : "rounded-lg",
                     (!hideHeader && collapsed) ? "max-h-0 opacity-0" : "max-h-[2000px] opacity-100"

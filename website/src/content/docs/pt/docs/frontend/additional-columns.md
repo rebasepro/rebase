@@ -1,7 +1,7 @@
 ---
 title: Colunas Adicionais
 sidebar_label: Colunas Adicionais
-slug: docs/frontend/additional-columns
+slug: pt/docs/frontend/additional-columns
 description: Adicione colunas computadas/virtuais a tabelas de coleção que derivam valores dos dados da entidade.
 ---
 

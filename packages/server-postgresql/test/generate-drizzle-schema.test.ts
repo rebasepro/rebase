@@ -1033,3 +1033,170 @@ isId: true }
         expect(cleanResult).toContain("user_name: varchar(\"user_name\").primaryKey()");
     });
 });
+
+// ── columnName tests ────────────────────────────────────────────────────
+describe("generateDrizzleSchema columnName support", () => {
+    const cleanSchema = (schema: string) => {
+        return schema
+            .replace(/\/\/.*$/gm, "")
+            .replace(/\/\*[\s\S]*?\*\//g, "")
+            .replace(/\n{2,}/g, "\n")
+            .replace(/\s+/g, " ")
+            .trim();
+    };
+
+    it("should use explicit columnName as the SQL column name instead of deriving from the property key", async () => {
+        const collections: EntityCollection[] = [{
+            slug: "billing",
+            table: "company_billing_config",
+            name: "Billing",
+            properties: {
+                employee_number_140a: {
+                    type: "string",
+                    name: "Employee Number 140a",
+                    columnName: "employee_number_140a",
+                },
+                contract_number_140a: {
+                    type: "string",
+                    name: "Contract Number 140a",
+                    columnName: "contract_number_140a",
+                },
+            },
+        }];
+
+        const result = await generateSchema(collections);
+        const cleanResult = cleanSchema(result);
+
+        // Must use the exact columnName, NOT toSnakeCase(propKey) which would produce "employee_number_140_a"
+        expect(cleanResult).toContain('employee_number_140a: varchar("employee_number_140a")');
+        expect(cleanResult).toContain('contract_number_140a: varchar("contract_number_140a")');
+
+        // Must NOT contain the broken snake_case version
+        expect(cleanResult).not.toContain("employee_number_140_a");
+        expect(cleanResult).not.toContain("contract_number_140_a");
+    });
+
+    it("should fall back to toSnakeCase when columnName is not set (manually-authored collections)", async () => {
+        const collections: EntityCollection[] = [{
+            slug: "products",
+            table: "products",
+            name: "Products",
+            properties: {
+                productName: {
+                    type: "string",
+                    name: "Product Name",
+                    // No columnName — should derive from key
+                },
+            },
+        }];
+
+        const result = await generateSchema(collections);
+        const cleanResult = cleanSchema(result);
+
+        // JS key stays camelCase, SQL column name gets snake_cased
+        expect(cleanResult).toContain('productName: varchar("product_name")');
+    });
+
+    it("should handle mixed properties — some with columnName, some without", async () => {
+        const collections: EntityCollection[] = [{
+            slug: "config",
+            table: "app_config",
+            name: "Config",
+            properties: {
+                // Introspected: has explicit columnName
+                fee_number_140a: {
+                    type: "string",
+                    name: "Fee Number",
+                    columnName: "fee_number_140a",
+                },
+                // Manually added: no columnName
+                displayName: {
+                    type: "string",
+                    name: "Display Name",
+                },
+            },
+        }];
+
+        const result = await generateSchema(collections);
+        const cleanResult = cleanSchema(result);
+
+        // Introspected prop uses exact columnName
+        expect(cleanResult).toContain('fee_number_140a: varchar("fee_number_140a")');
+        // Manual prop: JS key stays camelCase, SQL column gets snake_cased
+        expect(cleanResult).toContain('displayName: varchar("display_name")');
+    });
+
+    it("should use columnName for all property types, not just strings", async () => {
+        const collections: EntityCollection[] = [{
+            slug: "metrics",
+            table: "metrics",
+            name: "Metrics",
+            properties: {
+                count_v2: {
+                    type: "number",
+                    name: "Count V2",
+                    columnName: "count_v2",
+                },
+                is_active_v2: {
+                    type: "boolean",
+                    name: "Is Active V2",
+                    columnName: "is_active_v2",
+                },
+                created_at_v2: {
+                    type: "date",
+                    name: "Created At V2",
+                    columnName: "created_at_v2",
+                },
+                metadata_v2: {
+                    type: "map",
+                    name: "Metadata V2",
+                    columnName: "metadata_v2",
+                },
+            },
+        }];
+
+        const result = await generateSchema(collections);
+        const cleanResult = cleanSchema(result);
+
+        expect(cleanResult).toContain('count_v2: numeric("count_v2")');
+        expect(cleanResult).toContain('is_active_v2: boolean("is_active_v2")');
+        expect(cleanResult).toContain('created_at_v2: timestamp("created_at_v2"');
+        expect(cleanResult).toContain('metadata_v2: jsonb("metadata_v2")');
+    });
+
+    it("should reproduce and prevent the medmot bug: digit+letter column names", async () => {
+        // This is the exact scenario from the medmot project that caused the production failure
+        const collections: EntityCollection[] = [{
+            slug: "company_billing_config",
+            table: "company_billing_config",
+            name: "Company Billing Config",
+            properties: {
+                employee_number_140a: { type: "string", name: "Employee Number", columnName: "employee_number_140a" },
+                contract_number_140a: { type: "string", name: "Contract Number", columnName: "contract_number_140a" },
+                amount: { type: "number", name: "Amount" },
+                id: { type: "number", name: "ID", isId: "increment" },
+                service_provider_140a: { type: "string", name: "Service Provider", columnName: "service_provider_140a" },
+                internal_area_code_140a: { type: "string", name: "Internal Area Code", columnName: "internal_area_code_140a" },
+                fee_number_140a: { type: "string", name: "Fee Number", columnName: "fee_number_140a" },
+                receiver_market_participant_140a: { type: "string", name: "Receiver Market Participant", columnName: "receiver_market_participant_140a" },
+                employee_value_number_140a: { type: "string", name: "Employee Value Number", columnName: "employee_value_number_140a" },
+                sender_market_participant_140a: { type: "string", name: "Sender Market Participant", columnName: "sender_market_participant_140a" },
+                processing_indicator_140a: { type: "string", name: "Processing Indicator", columnName: "processing_indicator_140a" },
+                insurance_id_140a: { type: "string", name: "Insurance ID", columnName: "insurance_id_140a" },
+                company_id: { type: "number", name: "Company ID" },
+            },
+        }];
+
+        const result = await generateSchema(collections);
+
+        // Every _140a column must stay _140a, not become _140_a
+        const brokenPattern = /_140_a/;
+        expect(result).not.toMatch(brokenPattern);
+
+        // Spot-check a few exact columns
+        expect(result).toContain('"employee_number_140a"');
+        expect(result).toContain('"contract_number_140a"');
+        expect(result).toContain('"service_provider_140a"');
+        expect(result).toContain('"insurance_id_140a"');
+    });
+});

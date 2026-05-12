@@ -1,5 +1,4 @@
 ---
----
 title: Déploiement de Rebase sur Hetzner Cloud
 description: Découvrez comment déployer Rebase sur Hetzner Cloud en utilisant Docker Compose pour d'excellentes performances basées dans l'UE et une souveraineté des données.
 sidebar_label: Hetzner Cloud

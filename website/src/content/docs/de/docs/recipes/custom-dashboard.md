@@ -1,7 +1,7 @@
 ---
 title: "Rezept: Benutzerdefiniertes Dashboard"
 sidebar_label: Benutzerdefiniertes Dashboard
-slug: docs/recipes/custom-dashboard
+slug: de/docs/recipes/custom-dashboard
 description: Erstellen Sie eine benutzerdefinierte Dashboard-Ansicht mit Diagrammen, Statistiken und Datenvisualisierungen mithilfe von Rebase-Hooks.
 ---
 

@@ -1,7 +1,7 @@
 ---
 title: Schnellstart
 sidebar_label: Schnellstart
-slug: docs/getting-started/quickstart
+slug: de/docs/getting-started/quickstart
 description: Erstellen Sie ein neues Rebase-Projekt und bringen Sie es in weniger als 2 Minuten lokal zum Laufen.
 ---
 

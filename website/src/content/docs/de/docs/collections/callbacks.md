@@ -1,7 +1,7 @@
 ---
 title: Entitäts-Callbacks
 sidebar_label: Callbacks
-slug: docs/collections/callbacks
+slug: de/docs/collections/callbacks
 description: Verwenden Sie Lebenszyklus-Callbacks, um benutzerdefinierte Logik auszuführen, wenn Entitäten erstellt, aktualisiert, gelesen oder gelöscht werden. Beinhaltet die context.data API für sammlungsübergreifende Operationen.
 ---
 

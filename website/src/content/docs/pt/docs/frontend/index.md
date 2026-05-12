@@ -1,7 +1,7 @@
 ---
 title: Visão Geral do Frontend
 sidebar_label: Frontend
-slug: docs/frontend
+slug: pt/docs/frontend
 description: Construa e personalize o painel de administração Rebase com React — controllers, scaffold, roteamento e views.
 ---
 

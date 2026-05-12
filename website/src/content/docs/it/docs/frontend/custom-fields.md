@@ -1,7 +1,7 @@
 ---
 title: Campi Personalizzati
 sidebar_label: Campi Personalizzati
-slug: docs/frontend/custom-fields
+slug: it/docs/frontend/custom-fields
 description: Crea campi modulo personalizzati per la modifica delle entità con pieno accesso al contesto del modulo, ai valori dell'entità e agli hook di Rebase.
 ---
 

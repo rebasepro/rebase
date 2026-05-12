@@ -1,7 +1,7 @@
 ---
 title: Colonnes supplémentaires
 sidebar_label: Colonnes supplémentaires
-slug: docs/frontend/additional-columns
+slug: fr/docs/frontend/additional-columns
 description: Ajoutez des colonnes calculées/virtuelles aux tableaux de collection qui dérivent des valeurs des données d'entité.
 ---
 

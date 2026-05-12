@@ -1,7 +1,7 @@
 ---
 title: Importation de données
 sidebar_label: Importation de données
-slug: docs/features/data-import
+slug: fr/docs/features/data-import
 description: Importez des données depuis des fichiers CSV, JSON et Excel dans vos collections avec mappage des champs et validation.
 ---
 

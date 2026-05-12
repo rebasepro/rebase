@@ -1,7 +1,7 @@
 ---
 title: Visão Geral da Arquitetura
 sidebar_label: Arquitetura
-slug: docs/architecture
+slug: pt/docs/architecture
 description: Entenda como o backend, frontend, SDK do cliente e banco de dados do Rebase se integram para formar um Backend-as-a-Service completo.
 ---
 

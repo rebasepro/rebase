@@ -1,7 +1,7 @@
 ---
 title: Ansichtsmodi
 sidebar_label: Ansichtsmodi
-slug: docs/frontend/view-modes
+slug: de/docs/frontend/view-modes
 description: Konfigurieren Sie Tabellen-, Karten- und Kanban-Board-Ansichten für Ihre Sammlungen.
 ---
 

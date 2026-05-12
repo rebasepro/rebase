@@ -9,6 +9,18 @@ describe("strings utils", () => {
             expect(toKebabCase("XMLParser")).toBe("xml-parser");
             expect(toKebabCase("")).toBe("");
         });
+
+        it("should preserve digit+letter sequences without splitting", () => {
+            expect(toKebabCase("employee_number_140a")).toBe("employee-number-140a");
+            expect(toKebabCase("insurance_id_140a")).toBe("insurance-id-140a");
+            expect(toKebabCase("level2b")).toBe("level-2b");
+            expect(toKebabCase("item3x")).toBe("item-3x");
+        });
+
+        it("should handle version-like strings", () => {
+            expect(toKebabCase("version2")).toBe("version-2");
+            expect(toKebabCase("v2release")).toBe("v-2-release");
+        });
     });
 
     describe("toSnakeCase", () => {
@@ -18,6 +30,58 @@ describe("strings utils", () => {
             expect(toSnakeCase("fooBarBaz")).toBe("foo_bar_baz");
             expect(toSnakeCase("XMLParser")).toBe("xml_parser");
             expect(toSnakeCase("")).toBe("");
+        });
+
+        it("should preserve digit+letter sequences (the medmot bug)", () => {
+            // These are the exact column names that caused the medmot failure.
+            // "140a" must NOT become "140_a".
+            expect(toSnakeCase("employee_number_140a")).toBe("employee_number_140a");
+            expect(toSnakeCase("contract_number_140a")).toBe("contract_number_140a");
+            expect(toSnakeCase("service_provider_140a")).toBe("service_provider_140a");
+            expect(toSnakeCase("internal_area_code_140a")).toBe("internal_area_code_140a");
+            expect(toSnakeCase("fee_number_140a")).toBe("fee_number_140a");
+            expect(toSnakeCase("receiver_market_participant_140a")).toBe("receiver_market_participant_140a");
+            expect(toSnakeCase("employee_value_number_140a")).toBe("employee_value_number_140a");
+            expect(toSnakeCase("sender_market_participant_140a")).toBe("sender_market_participant_140a");
+            expect(toSnakeCase("processing_indicator_140a")).toBe("processing_indicator_140a");
+            expect(toSnakeCase("insurance_id_140a")).toBe("insurance_id_140a");
+        });
+
+        it("should handle camelCase with trailing digit+letter", () => {
+            expect(toSnakeCase("employeeNumber140a")).toBe("employee_number_140a");
+            expect(toSnakeCase("insuranceId140a")).toBe("insurance_id_140a");
+        });
+
+        it("should handle standalone numbers and digit+letter combos", () => {
+            expect(toSnakeCase("level2b")).toBe("level_2b");
+            expect(toSnakeCase("item3x")).toBe("item_3x");
+            expect(toSnakeCase("field99z")).toBe("field_99z");
+        });
+
+        it("should not merge digits into preceding word when no letter follows", () => {
+            expect(toSnakeCase("version2")).toBe("version_2");
+            expect(toSnakeCase("column42")).toBe("column_42");
+            expect(toSnakeCase("test123")).toBe("test_123");
+        });
+
+        it("should preserve already snake_case input", () => {
+            expect(toSnakeCase("already_snake")).toBe("already_snake");
+            expect(toSnakeCase("foo_bar_baz")).toBe("foo_bar_baz");
+            expect(toSnakeCase("a_b_c")).toBe("a_b_c");
+        });
+
+        it("should handle consecutive digit groups", () => {
+            expect(toSnakeCase("abc123def456")).toBe("abc_123_def_456");
+            expect(toSnakeCase("abc123d")).toBe("abc_123d");
+        });
+
+        it("should handle single characters and edge cases", () => {
+            expect(toSnakeCase("a")).toBe("a");
+            expect(toSnakeCase("A")).toBe("a");
+            expect(toSnakeCase("aB")).toBe("a_b");
+            expect(toSnakeCase("AB")).toBe("ab");
+            expect(toSnakeCase("123")).toBe("123");
+            expect(toSnakeCase("123a")).toBe("123a");
         });
     });
 
@@ -36,7 +100,7 @@ describe("strings utils", () => {
     describe("randomColor", () => {
         it("should generate random hex color", () => {
             const tempMathRandom = Math.random;
-            Math.random = jest.fn(() => 0.5);
+            Math.random = () => 0.5;
 
             const color = randomColor();
             expect(color).toBe("7fffff");

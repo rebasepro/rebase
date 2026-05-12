@@ -1,7 +1,7 @@
 ---
 title: Studio-Tools
 sidebar_label: Studio
-slug: docs/studio
+slug: de/docs/studio
 description: Rebase Studio bietet Entwickler-Tools für die visuelle Schema-Bearbeitung, SQL-Abfragen, JavaScript-Skripte, RLS-Richtlinienverwaltung und das Durchsuchen von Speichern.
 ---
 

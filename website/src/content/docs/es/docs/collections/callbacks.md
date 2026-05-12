@@ -1,7 +1,7 @@
 ---
 title: Callbacks de Entidad
 sidebar_label: Callbacks
-slug: docs/collections/callbacks
+slug: es/docs/collections/callbacks
 description: Utilice los callbacks del ciclo de vida para ejecutar lógica personalizada cuando las entidades son creadas, actualizadas, leídas o eliminadas. Incluye la API `context.data` para operaciones entre colecciones.
 ---
 

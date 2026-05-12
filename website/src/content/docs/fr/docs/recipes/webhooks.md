@@ -1,7 +1,7 @@
 ---
 title: "Recette : Intégration de Webhooks"
 sidebar_label: Webhooks
-slug: docs/recipes/webhooks
+slug: fr/docs/recipes/webhooks
 description: Utilisez les callbacks d'entité pour envoyer des webhooks à des services externes lorsque les données changent.
 ---
 

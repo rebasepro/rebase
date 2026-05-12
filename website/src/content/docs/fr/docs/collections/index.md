@@ -1,7 +1,7 @@
 ---
 title: Collections
 sidebar_label: Collections
-slug: docs/collections
+slug: fr/docs/collections
 description: Les collections sont le bloc de construction fondamental de Rebase — chaque collection est mappée à une table de base de données et définit son schéma, ses relations, sa sécurité et son comportement d'interface utilisateur.
 ---
 

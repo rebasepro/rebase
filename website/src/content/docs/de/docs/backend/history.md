@@ -1,7 +1,7 @@
 ---
 title: Entitätshistorie
 sidebar_label: Entitätshistorie
-slug: docs/backend/history
+slug: de/docs/backend/history
 description: Verfolgen Sie jede Änderung an Ihren Entitäten mit einem vollständigen Audit-Trail – wer was wann geändert hat und die vollständige Vorher-/Nachher-Momentaufnahme.
 ---
 

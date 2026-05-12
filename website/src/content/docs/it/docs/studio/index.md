@@ -1,7 +1,7 @@
 ---
 title: Strumenti Studio
 sidebar_label: Studio
-slug: docs/studio
+slug: it/docs/studio
 description: Rebase Studio fornisce strumenti per sviluppatori per la modifica visiva dello schema, query SQL, scripting JavaScript, gestione delle policy RLS e navigazione dello storage.
 ---
 

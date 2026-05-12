@@ -1,7 +1,7 @@
 ---
 title: SDK Client
 sidebar_label: SDK Client
-slug: docs/sdk
+slug: it/docs/sdk
 description: Usa l'SDK Client Rebase per interagire con il tuo backend da qualsiasi applicazione JavaScript — operazioni sui dati, autenticazione, archiviazione e sottoscrizioni in tempo reale.
 ---
 

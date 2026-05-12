@@ -168,6 +168,19 @@ export interface BaseProperty<CustomProps = unknown> {
      */
     propertyConfig?: string;
 
+    /**
+     * Explicit database column name. When set, this value is used as-is
+     * for the SQL column name, bypassing any snake_case conversion of
+     * the property key.
+     *
+     * This is automatically populated by `rebase schema introspect`
+     * to guarantee an exact match with the live database schema.
+     *
+     * For manually-authored collections you can omit this — the framework
+     * will derive the column name from the property key via `toSnakeCase()`.
+     */
+    columnName?: string;
+
 
 
     /**

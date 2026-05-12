@@ -1,7 +1,7 @@
 ---
 title: Eigenschaften
 sidebar_label: Eigenschaften
-slug: docs/collections/properties
+slug: de/docs/collections/properties
 description: Eigenschaftstypen definieren den Datentyp, die Validierung und das UI-Rendering für jedes Feld in einer Sammlung. Rebase unterstützt die Typen string, number, boolean, date, array, map, reference, relation und geopoint.
 ---
 

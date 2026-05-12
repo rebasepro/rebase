@@ -1,7 +1,7 @@
 ---
 title: Schema als Code
 sidebar_label: Schema als Code
-slug: docs/architecture/schema-as-code
+slug: de/docs/architecture/schema-as-code
 description: Wie Rebase TypeScript-Sammlungen als einzige Quelle der Wahrheit für Ihr Datenbankschema, Ihre Benutzeroberfläche und Ihre API verwendet.
 ---
 

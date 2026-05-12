@@ -1,7 +1,7 @@
 ---
 title: CLI-Referenz
 sidebar_label: CLI
-slug: docs/cli
+slug: de/docs/cli
 description: Rebase CLI-Befehle zur Projektinitialisierung, Schema-Generierung, Datenbankmigrationen und SDK-Generierung.
 ---
 

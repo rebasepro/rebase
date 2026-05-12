@@ -1,7 +1,7 @@
 ---
 title: Champs personnalisés
 sidebar_label: Champs personnalisés
-slug: docs/frontend/custom-fields
+slug: fr/docs/frontend/custom-fields
 description: Créez des champs de formulaire personnalisés pour l'édition d'entités avec un accès complet au contexte du formulaire, aux valeurs de l'entité et aux hooks Rebase.
 ---
 

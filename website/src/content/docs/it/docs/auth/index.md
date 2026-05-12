@@ -1,7 +1,7 @@
 ---
 title: Autenticazione
 sidebar_label: Autenticazione
-slug: docs/auth
+slug: it/docs/auth
 description: Configura l'autenticazione JWT, i provider OAuth (Google, LinkedIn), la gestione degli utenti e il controllo degli accessi basato sui ruoli.
 ---
 

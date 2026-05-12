@@ -1,5 +1,6 @@
 ---
 import NavigationDropdown from "./NavigationDropdown.astro";
+import LanguageSelect from "./LanguageSelect.astro";
 import { getLangFromUrl, useTranslations } from "../i18n/ui";
 
 import {
@@ -164,6 +165,7 @@ const navLinks = [
             </div>
         </div>
         <div class="flex flex-1 justify-end items-center gap-4">
+            <LanguageSelect iconOnly={true} />
             <a
                     href="https://demo.rebase.pro"
                     target="_blank" rel="noopener noreferrer"
@@ -289,6 +291,9 @@ const navLinks = [
 </svg>
 
                 </a>
+                <div class="mt-4 w-full flex justify-center">
+                    <LanguageSelect />
+                </div>
             </nav>
         </div>
     </div>

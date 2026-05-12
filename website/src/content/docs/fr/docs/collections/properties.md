@@ -1,7 +1,7 @@
 ---
 title: Propriétés
 sidebar_label: Propriétés
-slug: docs/collections/properties
+slug: fr/docs/collections/properties
 description: Les types de propriétés définissent le type de données, la validation et le rendu de l'interface utilisateur pour chaque champ d'une collection. Rebase prend en charge les types chaîne de caractères, nombre, booléen, date, tableau, carte (map), référence, relation et géopoint.
 ---
 

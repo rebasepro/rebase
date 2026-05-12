@@ -1,14 +1,14 @@
-const kebabCaseRegex = /[A-Z]{2,}(?=[A-Z][a-z]+[0-9]*|\b)|[A-Z]?[a-z]+[0-9]*|[A-Z]|[0-9]+/g;
+const tokenizeRegex = /[A-Z]{2,}(?=[A-Z][a-z]|\b)|[A-Z]?[a-z]+|[0-9]+(?:[a-z](?![a-z]))?|[A-Z]/g;
 
 export const toKebabCase = (str: string) => {
-    const regExpMatchArray = str.match(kebabCaseRegex);
+    const regExpMatchArray = str.match(tokenizeRegex);
     if (!regExpMatchArray) return "";
     return regExpMatchArray
         .map(x => x.toLowerCase())
         .join("-");
 };
 
-const snakeCaseRegex = /[A-Z]{2,}(?=[A-Z][a-z]+[0-9]*|\b)|[A-Z]?[a-z]+[0-9]*|[A-Z]|[0-9]+/g;
+const snakeCaseRegex = tokenizeRegex;
 
 export const toSnakeCase = (str: string) => {
     const regExpMatchArray = str.match(snakeCaseRegex);

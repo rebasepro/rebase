@@ -1,7 +1,7 @@
 ---
 title: Relaciones
 sidebar_label: Relaciones
-slug: docs/collections/relations
+slug: es/docs/collections/relations
 description: Define relaciones SQL uno a uno, uno a muchos y muchos a muchos entre colecciones con claves foráneas, tablas de unión y uniones multi-salto.
 ---
 

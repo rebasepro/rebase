@@ -1,7 +1,7 @@
 ---
 title: Beziehungen
 sidebar_label: Beziehungen
-slug: docs/collections/relations
+slug: de/docs/collections/relations
 description: Definieren Sie Eins-zu-Eins-, Eins-zu-Viele- und Viele-zu-Viele-SQL-Beziehungen zwischen Sammlungen mit Fremdschlüsseln, Verbindungstabellen und Multi-Hop-Joins.
 ---
 

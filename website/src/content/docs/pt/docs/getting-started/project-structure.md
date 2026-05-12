@@ -1,7 +1,7 @@
 ---
 title: Estrutura do Projeto
 sidebar_label: Estrutura do Projeto
-slug: docs/getting-started/project-structure
+slug: pt/docs/getting-started/project-structure
 description: Compreenda a estrutura de um projeto Rebase — frontend, backend e coleções compartilhadas.
 ---
 
