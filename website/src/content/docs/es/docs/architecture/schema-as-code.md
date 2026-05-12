@@ -1,0 +1,109 @@
+---
+title: Esquema como Código
+sidebar_label: Esquema como Código
+slug: docs/architecture/schema-as-code
+description: Cómo Rebase utiliza colecciones de TypeScript como la única fuente de verdad para el esquema de su base de datos, UI y API.
+---
+
+## La Idea Principal
+
+En Rebase, sus **definiciones de colección de TypeScript son la única fuente de verdad**. A partir de un conjunto de objetos TypeScript, Rebase genera:
+
+- **Tablas PostgreSQL** a través de la generación de esquemas Drizzle ORM
+- **UI CRUD** — formularios, tablas, validación, tipos de campo
+- **Endpoints de API REST** con filtrado, ordenación y paginación
+- **SDK de Cliente** — operaciones de datos con seguridad de tipos
+- **Políticas RLS** — Seguridad a Nivel de Fila en Postgres
+
+Esto significa que su esquema es:
+- **Controlado por versiones** — cada cambio es un commit de git
+- **Con seguridad de tipos** — TypeScript detecta errores en tiempo de compilación
+- **Revisable** — los cambios de esquema pasan por pull requests
+- **Portátil** — la misma definición funciona en frontend, backend y CLI
+
+## Edición Visual con Manipulación de AST
+
+Rebase también proporciona un **editor visual de colecciones** en modo Studio. Cuando un no-desarrollador utiliza el editor visual para añadir un campo:
+
+1. El Studio **no** modifica directamente la base de datos
+2. En su lugar, utiliza [ts-morph](https://ts-morph.com/) para analizar su archivo fuente TypeScript como un AST
+3. Inserta la nueva definición de propiedad precisamente en el bloque `properties`
+4. **Todo el código existente, callbacks y lógica personalizada se conservan intactos**
+5. El archivo se guarda, lo que activa la recarga en caliente
+
+Este enfoque de "UI como Generador de Código" significa que las ediciones visuales producen el mismo TypeScript limpio que un desarrollador escribiría a mano.
+
+## Pipeline de Generación de Esquemas
+
+```
+TypeScript Collections
+        │
+        ▼
+  rebase schema generate
+        │
+        ▼
+  Drizzle Schema (schema.generated.ts)
+        │
+        ▼
+  rebase db generate
+        │
+        ▼
+  SQL Migration Files
+        │
+        ▼
+  rebase db migrate
+        │
+        ▼
+  PostgreSQL Tables
+```
+
+### Ejemplo
+
+Dada esta colección:
+
+```typescript
+const productsCollection: EntityCollection = {
+    slug: "products",
+    table: "products",
+    properties: {
+        name: { type: "string", name: "Name", validation: { required: true } },
+        price: { type: "number", name: "Price", columnType: "numeric" },
+        active: { type: "boolean", name: "Active", defaultValue: true },
+        created_at: { type: "date", name: "Created", autoValue: "on_create" }
+    }
+};
+```
+
+Rebase genera este esquema Drizzle:
+
+```typescript
+// schema.generated.ts
+import { pgTable, varchar, numeric, boolean, timestamp } from "drizzle-orm/pg-core";
+
+export const products = pgTable("products", {
+    id: serial("id").primaryKey(),
+    name: varchar("name").notNull(),
+    price: numeric("price"),
+    active: boolean("active").default(true),
+    created_at: timestamp("created_at").defaultNow()
+});
+```
+
+Lo que produce este SQL:
+
+```sql
+CREATE TABLE products (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR NOT NULL,
+    price NUMERIC,
+    active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+## Siguientes Pasos
+
+- **[Colecciones](/docs/collections)** — Referencia completa de la configuración de colecciones
+- **[Propiedades](/docs/collections/properties)** — Mapeos detallados de tipos de columna
+
+---

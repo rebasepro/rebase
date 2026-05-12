@@ -267,5 +267,44 @@ message: "No file to delete" });
         });
     });
 
+    /**
+     * POST /folder - Create a new folder
+     * Body: { path: string, bucket?: string }
+     */
+    router.post("/folder", writeAuthMiddleware, async (c) => {
+        const body = await c.req.json();
+        const folderPath = body.path;
+
+        if (!folderPath || typeof folderPath !== "string") {
+            throw ApiError.badRequest("Folder path is required");
+        }
+
+        const { bucket, resolvedPath } = parseBucketAndPath(folderPath);
+
+        if (!resolvedPath || resolvedPath.trim() === "") {
+            throw ApiError.badRequest("Invalid folder path");
+        }
+
+        if (controller.getType() === "local") {
+            // For local storage, create the directory
+            const localController = controller as LocalStorageController;
+            const absolutePath = localController.getAbsolutePath(resolvedPath, bucket);
+            fs.mkdirSync(absolutePath, { recursive: true });
+        } else {
+            // For S3-compatible storage, create a zero-byte marker object with trailing slash
+            const key = resolvedPath.endsWith("/") ? resolvedPath : resolvedPath + "/";
+            const emptyFile = new File([], key, { type: "application/x-directory" });
+            await controller.putObject({
+                file: emptyFile,
+                key
+            });
+        }
+
+        return c.json({
+            success: true,
+            message: "Folder created"
+        }, 201);
+    });
+
     return router;
 }

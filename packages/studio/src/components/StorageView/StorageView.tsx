@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Typography, cls, defaultBorderMixin, Button, IconButton, Tooltip, CircularProgress, ResizablePanels, Chip, Dialog, DialogTitle, DialogContent, DialogActions, FileUpload, iconSize, Checkbox, LoadingButton } from "@rebasepro/ui";
-import { VideoIcon, Music2Icon, RefreshCwIcon, Trash2Icon, XIcon, PlusIcon, DownloadIcon, UploadCloudIcon, FolderIcon, FileTextIcon, ImageIcon, ArrowLeftIcon, FileIcon, HomeIcon, LayoutGridIcon, ListIcon, CopyIcon, CheckIcon } from "lucide-react";
-import { useStorageSource, useSnackbarController, ErrorView } from "@rebasepro/core";
+import { Typography, cls, defaultBorderMixin, Button, IconButton, Tooltip, CircularProgress, ResizablePanels, Chip, Dialog, DialogTitle, DialogContent, DialogActions, FileUpload, iconSize, Checkbox, LoadingButton, TextField } from "@rebasepro/ui";
+import { VideoIcon, Music2Icon, RefreshCwIcon, Trash2Icon, XIcon, PlusIcon, DownloadIcon, UploadCloudIcon, FolderIcon, FolderPlusIcon, FileTextIcon, ImageIcon, ArrowLeftIcon, FileIcon, HomeIcon, LayoutGridIcon, ListIcon, CopyIcon, CheckIcon } from "lucide-react";
+import { useStorageSource, useSnackbarController, ErrorView, useApiConfig } from "@rebasepro/core";
 import type { StorageListResult } from "@rebasepro/types";
 import { useSearchParams } from "react-router-dom";
 import { useDropzone } from "react-dropzone";
@@ -463,6 +463,12 @@ export const StorageView = () => {
     const [deleteDialogTarget, setDeleteDialogTarget] = useState<"selection" | StorageFile | null>(null);
     const [deleting, setDeleting] = useState(false);
 
+    // New folder
+    const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
+    const [newFolderName, setNewFolderName] = useState("");
+    const [creatingFolder, setCreatingFolder] = useState(false);
+    const apiConfig = useApiConfig();
+
     const storageSourceRef = React.useRef(storageSource);
     useEffect(() => {
         storageSourceRef.current = storageSource;
@@ -619,6 +625,53 @@ export const StorageView = () => {
         await fetchContents(currentPath);
     }, [currentPath, snackbarController, fetchContents]);
 
+    // Create new folder
+    const handleCreateFolder = useCallback(async () => {
+        if (!newFolderName.trim() || !apiConfig?.apiUrl) return;
+
+        // Validate folder name
+        const name = newFolderName.trim();
+        if (name.includes("/") || name.includes("\\")) {
+            snackbarController.open({ type: "error", message: "Folder name cannot contain slashes" });
+            return;
+        }
+
+        // Check if folder already exists
+        const existingFolder = folders.find(f => f.name === name);
+        if (existingFolder) {
+            snackbarController.open({ type: "error", message: `Folder "${name}" already exists` });
+            return;
+        }
+
+        setCreatingFolder(true);
+        try {
+            const folderPath = currentPath ? `default/${currentPath}/${name}` : `default/${name}`;
+            const token = apiConfig.getAuthToken ? await apiConfig.getAuthToken() : null;
+            const response = await fetch(`${apiConfig.apiUrl}/api/storage/folder`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { "Authorization": `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({ path: folderPath })
+            });
+
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({ error: "Failed to create folder" }));
+                throw new Error(err.error || "Failed to create folder");
+            }
+
+            snackbarController.open({ type: "success", message: `Folder "${name}" created` });
+            setNewFolderDialogOpen(false);
+            setNewFolderName("");
+            await fetchContents(currentPath);
+        } catch (e) {
+            snackbarController.open({ type: "error", message: e instanceof Error ? e.message : String(e) });
+        } finally {
+            setCreatingFolder(false);
+        }
+    }, [newFolderName, currentPath, apiConfig, snackbarController, fetchContents, folders]);
+
     // Drag-and-drop on main view
     const handleDropFiles = useCallback(async (droppedFiles: File[]) => {
         if (droppedFiles.length === 0) return;
@@ -661,6 +714,12 @@ export const StorageView = () => {
         // Recurse into sub-folders
         for (const sub of result.prefixes ?? []) {
             await deleteFolderRecursive(sub.fullPath);
+        }
+        // Delete the folder entry itself (needed for local filesystem)
+        try {
+            await storageSourceRef.current.deleteObject(prefix);
+        } catch {
+            // Ignore — S3 folders are virtual and may not exist as objects
         }
     }, []);
 
@@ -746,6 +805,8 @@ export const StorageView = () => {
     // ── Keyboard shortcuts ──
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
+            // Don't handle shortcuts when a dialog is open
+            if (deleteDialogOpen || uploadDialogOpen || newFolderDialogOpen) return;
             // Cmd/Ctrl+A: select all
             if ((e.metaKey || e.ctrlKey) && e.key === "a") {
                 e.preventDefault();
@@ -768,7 +829,7 @@ export const StorageView = () => {
         };
         window.addEventListener("keydown", handler);
         return () => window.removeEventListener("keydown", handler);
-    }, [handleSelectAll, selectedPaths]);
+    }, [handleSelectAll, selectedPaths, deleteDialogOpen, uploadDialogOpen, newFolderDialogOpen]);
 
     // Handle refresh
     const handleRefresh = useCallback(() => {
@@ -812,10 +873,19 @@ export const StorageView = () => {
                         <Typography variant="body2">
                             This folder is empty
                         </Typography>
-                        <Button className="mt-3" onClick={() => setUploadDialogOpen(true)}>
-                            <PlusIcon size={iconSize.smallest}/>
-                            Upload files
-                        </Button>
+                        <div className="flex items-center gap-2 mt-3">
+                            <Button variant="text" onClick={() => {
+                                setNewFolderName("");
+                                setNewFolderDialogOpen(true);
+                            }}>
+                                <FolderPlusIcon size={iconSize.smallest}/>
+                                New folder
+                            </Button>
+                            <Button onClick={() => setUploadDialogOpen(true)}>
+                                <PlusIcon size={iconSize.smallest}/>
+                                Upload files
+                            </Button>
+                        </div>
                     </div>
                 </div>
             );
@@ -1072,7 +1142,7 @@ export const StorageView = () => {
                 {/* Main content */}
                 <div className="flex-grow flex flex-col min-w-0 h-full">
                             {/* Toolbar */}
-                            <div className={cls("flex items-center justify-between pr-2 border-b bg-white dark:bg-surface-800 shrink-0", defaultBorderMixin)}>
+                            <div className={cls("flex items-center justify-between pr-2 border-b bg-white dark:bg-surface-800 shrink-0 h-10", defaultBorderMixin)}>
                                 <div className="flex items-center gap-1.5 flex-grow overflow-hidden px-3 py-2">
                                     {/* Breadcrumbs — always visible */}
                                     {currentPath && (
@@ -1110,12 +1180,6 @@ export const StorageView = () => {
                                     {/* Selection actions or file count */}
                                     {selectedPaths.size > 0 ? (
                                         <div className="flex items-center gap-1.5 shrink-0">
-                                            <Checkbox
-                                                size="small"
-                                                checked={selectedPaths.size === allItems.length}
-                                                indeterminate={selectedPaths.size > 0 && selectedPaths.size < allItems.length}
-                                                onCheckedChange={handleSelectAll}
-                                            />
                                             <Typography variant="body2" className="text-[13px] font-medium whitespace-nowrap">
                                                 {selectedPaths.size} selected
                                             </Typography>
@@ -1180,6 +1244,17 @@ export const StorageView = () => {
                                         </IconButton>
                                     </Tooltip>
 
+                                    <Tooltip title="New folder">
+                                        <IconButton
+                                            size="small"
+                                            onClick={() => {
+                                                setNewFolderName("");
+                                                setNewFolderDialogOpen(true);
+                                            }}
+                                        >
+                                            <FolderPlusIcon size={iconSize.smallest}/>
+                                        </IconButton>
+                                    </Tooltip>
                                     <Button
                                         size="small"
                                         color="primary"
@@ -1309,6 +1384,64 @@ export const StorageView = () => {
                     >
                         <Trash2Icon size={14} className="mr-1"/>
                         Delete
+                    </LoadingButton>
+                </DialogActions>
+            </Dialog>
+
+            {/* New Folder Dialog */}
+            <Dialog
+                open={newFolderDialogOpen}
+                onOpenChange={(open) => {
+                    if (!open && !creatingFolder) {
+                        setNewFolderDialogOpen(false);
+                        setNewFolderName("");
+                    }
+                }}
+            >
+                <DialogContent>
+                    <Typography variant="subtitle1" className="font-semibold mb-4">
+                        New Folder
+                    </Typography>
+                    <TextField
+                        autoFocus
+                        size="small"
+                        label="Folder name"
+                        value={newFolderName}
+                        onChange={(e) => setNewFolderName(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter" && newFolderName.trim()) {
+                                e.preventDefault();
+                                handleCreateFolder();
+                            }
+                        }}
+                        disabled={creatingFolder}
+                        placeholder="Enter folder name"
+                    />
+                    {currentPath && (
+                        <Typography variant="caption" color="secondary" className="mt-2">
+                            Will be created in <span className="font-mono">/{currentPath}/</span>
+                        </Typography>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        variant="text"
+                        onClick={() => {
+                            setNewFolderDialogOpen(false);
+                            setNewFolderName("");
+                        }}
+                        disabled={creatingFolder}
+                    >
+                        Cancel
+                    </Button>
+                    <LoadingButton
+                        color="primary"
+                        loading={creatingFolder}
+                        disabled={!newFolderName.trim()}
+                        onClick={handleCreateFolder}
+                    >
+                        <FolderPlusIcon size={14} className="mr-1"/>
+                        Create
                     </LoadingButton>
                 </DialogActions>
             </Dialog>

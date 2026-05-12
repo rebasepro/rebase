@@ -264,21 +264,37 @@ export class LocalStorageController implements StorageController {
 
         // Normalize path to handle leading/trailing slashes
         resolvedPath = normalizeStoragePath(resolvedPath);
+
+        if (!resolvedPath) {
+            // Safety: never delete the bucket root
+            return;
+        }
+
         const fullPath = this.getFullPath(resolvedPath, resolvedBucket);
 
         try {
-            await unlink(fullPath);
-            // Also delete metadata file if exists
-            try {
-                await unlink(`${fullPath}.metadata.json`);
-            } catch {
-                // Metadata file might not exist
+            const stats = await stat(fullPath);
+            if (stats.isDirectory()) {
+                // Only remove if empty — client must delete contents first
+                await fs.promises.rmdir(fullPath);
+            } else {
+                await unlink(fullPath);
+                // Also delete metadata file if exists
+                try {
+                    await unlink(`${fullPath}.metadata.json`);
+                } catch {
+                    // Metadata file might not exist
+                }
             }
         } catch (error: unknown) {
-            if (error instanceof Error && (error as NodeJS.ErrnoException).code !== "ENOENT") {
-                throw error;
+            if (error instanceof Error) {
+                const code = (error as NodeJS.ErrnoException).code;
+                if (code === "ENOENT" || code === "ENOTEMPTY") {
+                    // File doesn't exist or directory not empty — ignore
+                    return;
+                }
             }
-            // File doesn't exist, nothing to delete
+            throw error;
         }
     }
 

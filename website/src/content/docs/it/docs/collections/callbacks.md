@@ -1,0 +1,398 @@
+---
+title: Callback delle Entità
+sidebar_label: Callback
+slug: docs/collections/callbacks
+description: Utilizza i callback del ciclo di vita per eseguire logica personalizzata quando le entità vengono create, aggiornate, lette o eliminate. Include l'API context.data per operazioni tra collezioni.
+---
+
+## Overview
+
+I callback ti consentono di agganciarti al ciclo di vita dell'entità per:
+
+-   **Sincronizzare i dati tra collezioni** — copiare o spostare entità tra tabelle in base ai cambiamenti di stato
+-   **Trasformare i dati** prima del salvataggio (campi calcolati, slugificazione)
+-   **Validare** le regole di business oltre la validazione dello schema
+-   **Attivare effetti collaterali** dopo le scritture (inviare email, sincronizzare API, aggiornare cache)
+-   **Filtrare/trasformare** i dati dopo la lettura
+-   **Operazioni a cascata** — pulire i record correlati in caso di eliminazione
+
+## Definire i Callback
+
+```typescript
+const articlesCollection: EntityCollection = {
+    slug: "articles",
+    callbacks: {
+        beforeSave: async ({ values, entityId, status }) => {
+            // Auto-generate slug from title
+            if (values.title) {
+                values.slug = values.title
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, "-")
+                    .replace(/(^-|-$)/g, "");
+            }
+
+            // Set timestamps
+            if (status === "new") {
+                values.created_at = new Date();
+            }
+            values.updated_at = new Date();
+
+            return values;
+        },
+
+        afterSave: async ({ values, entityId }) => {
+            // Send notification
+            console.log(`Article ${entityId} saved: ${values.title}`);
+        },
+
+        beforeDelete: async ({ entityId }) => {
+            // Prevent deletion of published articles
+            // Throw to block the deletion
+        },
+
+        afterRead: async ({ entity }) => {
+            // Transform data after loading
+            return entity;
+        }
+    },
+    properties: { /* ... */ }
+};
+```
+
+## Riferimento ai Callback
+
+### `beforeSave`
+
+Chiamato prima che un'entità venga scritta nel database. Restituisce i valori modificati.
+
+```typescript
+beforeSave: async ({
+    values,       // Entity values
+    entityId,     // Entity ID (null for new entities)
+    status,       // "new" | "existing" | "copy"
+    previousValues, // Previous values (for updates)
+    context       // Full Rebase context
+}) => {
+    // Return modified values
+    return { ...values, updated_at: new Date() };
+}
+```
+
+Lancia un errore per **bloccare il salvataggio**:
+
+```typescript
+beforeSave: async ({ values }) => {
+    if (values.price < 0) {
+        throw new Error("Price cannot be negative");
+    }
+    return values;
+}
+```
+
+### `afterSave`
+
+Chiamato dopo un salvataggio riuscito. Utilizzare per effetti collaterali.
+
+```typescript
+afterSave: async ({
+    values,         // Saved values
+    entityId,       // Entity ID
+    previousValues, // Previous values (null for new entities)
+    status,         // "new" | "existing" | "copy"
+    context
+}) => {
+    // Send webhook
+    await fetch("https://api.slack.com/webhook", {
+        method: "POST",
+        body: JSON.stringify({ text: `New article: ${values.title}` })
+    });
+}
+```
+
+### `afterSaveError`
+
+Chiamato quando un'operazione di salvataggio fallisce.
+
+```typescript
+afterSaveError: async ({
+    values,
+    entityId,
+    error,
+    context
+}) => {
+    console.error("Save failed:", error);
+}
+```
+
+### `afterRead`
+
+Chiamato dopo aver letto le entità dal database. Trasforma i dati per la visualizzazione.
+
+```typescript
+afterRead: async ({
+    entity,    // The entity to transform
+    context
+}) => {
+    // Add computed fields
+    return {
+        ...entity,
+        values: {
+            ...entity.values,
+            displayName: `${entity.values.first_name} ${entity.values.last_name}`
+        }
+    };
+}
+```
+
+### `beforeDelete`
+
+Chiamato prima che un'entità venga eliminata. Lancia un errore per bloccare l'eliminazione.
+
+```typescript
+beforeDelete: async ({
+    entityId,
+    entity,
+    context
+}) => {
+    if (entity.values.status === "published") {
+        throw new Error("Cannot delete published articles. Unpublish first.");
+    }
+}
+```
+
+### `afterDelete`
+
+Chiamato dopo un'eliminazione riuscita.
+
+```typescript
+afterDelete: async ({
+    entityId,
+    entity,
+    context
+}) => {
+    // Cleanup related data
+    console.log(`Article ${entityId} deleted`);
+}
+```
+
+## Callback delle Proprietà
+
+Puoi anche definire callback a livello di proprietà per trasformazioni specifiche del campo:
+
+```typescript
+properties: {
+    email: {
+        type: "string",
+        name: "Email",
+        callbacks: {
+            beforeSave: ({ value }) => value?.toLowerCase().trim(),
+            afterRead: ({ value }) => value // Could decrypt, etc.
+        }
+    }
+}
+```
+
+## L'API `context.data`
+
+Ogni callback riceve un oggetto `context` che include `context.data` — un livello di accesso ai dati unificato per eseguire **operazioni tra collezioni** all'interno dei hook del ciclo di vita.
+
+### Accesso alle Collezioni
+
+`context.data` utilizza un Proxy JavaScript, quindi puoi accedere a qualsiasi collezione tramite il suo slug come proprietà:
+
+```typescript
+afterSave: async ({ values, entityId, context }) => {
+    // Dynamic property access — works for any collection slug
+    const jobs = context.data.jobs;
+    const users = context.data.users;
+
+    // Alternatively, use the .collection() method for dynamic slugs
+    const collectionName = "jobs";
+    const accessor = context.data.collection(collectionName);
+}
+```
+
+### Metodi Disponibili
+
+Ogni accessor di collezione (`context.data.<slug>`) fornisce questi metodi:
+
+| Metodo | Firma | Descrizione |
+|--------|-----------|-------------|
+| `.find()` | `find(params?: FindParams) → FindResponse` | Interroga le entità con filtri, ordinamento e paginazione |
+| `.findById()` | `findById(id: string \| number) → Entity \| undefined` | Recupera una singola entità tramite ID |
+| `.create()` | `create(data: Partial<Values>, id?: string) → Entity` | Crea una nuova entità |
+| `.update()` | `update(id: string \| number, data: Partial<Values>) → Entity` | Aggiorna un'entità esistente |
+| `.delete()` | `delete(id: string \| number) → void` | Elimina un'entità |
+| `.count()` | `count(params?: FindParams) → number` | Conta le entità corrispondenti |
+| `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Sottoscrizione in tempo reale (dove supportato) |
+| `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Ascolta una singola entità |
+
+### Interrogare con `.find()`
+
+Il metodo `find()` supporta il filtraggio avanzato:
+
+```typescript
+afterSave: async ({ values, context }) => {
+    // Simple equality
+    const { data: activeJobs } = await context.data.jobs.find({
+        where: { status: "published" },
+        limit: 10,
+        orderBy: "created_at:desc"
+    });
+
+    // PostgREST-style operators
+    const { data: recentJobs } = await context.data.jobs.find({
+        where: {
+            status: "eq.published",
+            salary: "gte.50000"
+        }
+    });
+
+    // Tuple syntax
+    const { data: expensiveJobs } = await context.data.jobs.find({
+        where: {
+            salary: [">=", 100000],
+            role: ["in", ["admin", "manager"]]
+        }
+    });
+}
+```
+
+### Creare Entità
+
+```typescript
+afterSave: async ({ values, entityId, previousValues, context }) => {
+    // Promote an approved submission to a published job
+    if (values.status === "approved" && previousValues?.status !== "approved") {
+        const newJob = await context.data.jobs.create({
+            title: values.title,
+            description: values.description,
+            company_id: values.company_id,
+            status: "published",
+            source_submission_id: entityId,
+        });
+
+        // Link back to the original submission
+        await context.data["job-submissions"].update(entityId, {
+            promoted_job_id: newJob.id,
+        });
+    }
+}
+```
+
+### Sicurezza: Comportamento di Bypass RLS
+
+:::important
+**Le operazioni `context.data` nei callback bypassano la Sicurezza a Livello di Riga (RLS).**
+
+Quando i callback vengono eseguiti nel backend, passano attraverso il `PostgresBackendDriver` di base — non il wrapper autenticato. Ciò significa che `context.data` ha **accesso completo al database** indipendentemente dai permessi dell'utente che ha attivato l'operazione.
+
+Questo è intenzionale: i hook del ciclo di vita lato server sono codice fidato che spesso necessita di scrivere in collezioni a cui l'utente finale non ha accesso diretto (ad esempio, creando una voce di log di audit, aggiornando un contatore su un record padre).
+:::
+
+Se hai bisogno di operazioni con ambito RLS all'interno di un callback, usa direttamente il driver autenticato:
+
+```typescript
+afterSave: async ({ context }) => {
+    // This bypasses RLS (normal for callbacks):
+    await context.data.audit_logs.create({ action: "approved" });
+
+    // To enforce RLS, access the driver and call withAuth():
+    const authDriver = await context.driver.withAuth(context.user);
+    // authDriver.data operations respect RLS
+}
+```
+
+### Semantica delle Transazioni
+
+:::warning
+**Le operazioni `context.data` NON sono automaticamente incluse nella stessa transazione del salvataggio che le attiva.**
+
+Il salvataggio originale dell'entità completa prima la sua transazione di database. Quindi `afterSave` viene eseguito e qualsiasi chiamata `context.data` apre **transazioni separate**. Se un'operazione `context.data` fallisce in `afterSave`, il salvataggio originale **non viene annullato**.
+:::
+
+Questo significa:
+
+-   ✅ Il salvataggio che attiva l'operazione ha sempre successo indipendentemente
+-   ⚠️ Le scritture con effetti collaterali potrebbero fallire senza influenzare l'operazione originale
+-   ⚠️ Non c'è garanzia di atomicità tra il salvataggio originale e le successive chiamate a `context.data`
+
+Per operazioni che devono essere atomiche, avvolgile nella gestione degli errori:
+
+```typescript
+afterSave: async ({ values, entityId, context }) => {
+    try {
+        await context.data.jobs.create({
+            title: values.title,
+            status: "published",
+        });
+    } catch (error) {
+        // Log the failure — the original save already succeeded
+        console.error(`Failed to promote job from submission ${entityId}:`, error);
+        // Optionally: mark the submission as "promotion_failed"
+        await context.data["job-submissions"].update(entityId, {
+            promotion_status: "failed",
+            promotion_error: String(error),
+        });
+    }
+}
+```
+
+## Sincronizzazione dei Dati tra Collezioni
+
+Uno degli usi più potenti dei callback è la **sincronizzazione dei dati tra collezioni** utilizzando `context.data`:
+
+```typescript
+const submissionsCollection: EntityCollection = {
+    slug: "job_submissions",
+    callbacks: {
+        afterSave: async ({ values, entityId, previousValues, context }) => {
+            // When a submission is approved, create a published job
+            if (values.status === "approved" && previousValues?.status !== "approved") {
+                const newJob = await context.data.jobs.create({
+                    title: values.title,
+                    description: values.description,
+                    company_id: values.company_id,
+                    status: "published",
+                    source_submission_id: entityId,
+                });
+
+                // Update the submission with the promoted job reference
+                await context.data["job-submissions"].update(entityId, {
+                    promoted_job_id: newJob.id,
+                });
+            }
+        }
+    },
+    properties: { /* ... */ }
+};
+```
+
+Altri pattern tra collezioni:
+
+-   **Eliminazione a cascata**: Usa `afterDelete` per rimuovere i record correlati nelle collezioni figlie
+-   **Denormalizzazione**: Usa `afterSave` per aggiornare i campi riepilogativi in una collezione padre
+-   **Registrazione audit**: Usa `afterSave` / `afterDelete` per scrivere in una collezione di log di audit
+-   **Contatori**: Usa `afterSave` / `afterDelete` per aggiornare i campi contatore sulle entità correlate
+
+## Riferimento Completo al Contesto
+
+Ogni callback riceve un oggetto `context` di tipo `RebaseCallContext`:
+
+```typescript
+interface RebaseCallContext {
+    /** L'utente autenticato, se presente */
+    user?: User;
+    /** Il driver dati sottostante (PostgresBackendDriver) */
+    driver: DataDriver;
+    /** Accesso dati unificato — context.data.<slug>.create/update/find/delete */
+    data: RebaseData;
+}
+```
+
+## Prossimi Passi
+
+-   **[Regole di Sicurezza](/docs/collections/security-rules)** — Sicurezza a Livello di Riga
+-   **[Cronologia delle Entità](/docs/backend/history)** — Traccia di audit
+-   **[Funzioni Personalizzate](/docs/backend/custom-functions)** — Aggiungere endpoint API personalizzati
+---
