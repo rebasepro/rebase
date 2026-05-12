@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Typography, cls, defaultBorderMixin, Button, IconButton, Tooltip, CircularProgress, ResizablePanels, Chip, Dialog, DialogTitle, DialogContent, DialogActions, FileUpload , iconSize } from "@rebasepro/ui";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Typography, cls, defaultBorderMixin, Button, IconButton, Tooltip, CircularProgress, ResizablePanels, Chip, Dialog, DialogTitle, DialogContent, DialogActions, FileUpload, iconSize, Checkbox, LoadingButton } from "@rebasepro/ui";
 import { VideoIcon, Music2Icon, RefreshCwIcon, Trash2Icon, XIcon, PlusIcon, DownloadIcon, UploadCloudIcon, FolderIcon, FileTextIcon, ImageIcon, ArrowLeftIcon, FileIcon, HomeIcon, LayoutGridIcon, ListIcon, CopyIcon, CheckIcon } from "lucide-react";
 import { useStorageSource, useSnackbarController, ErrorView } from "@rebasepro/core";
 import type { StorageListResult } from "@rebasepro/types";
@@ -454,6 +454,14 @@ export const StorageView = () => {
     // View mode
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
+    // Multi-selection
+    const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
+    const lastClickedRef = useRef<string | null>(null);
+
+    // Bulk / folder delete
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [deleteDialogTarget, setDeleteDialogTarget] = useState<"selection" | StorageFile | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
     const storageSourceRef = React.useRef(storageSource);
     useEffect(() => {
@@ -519,6 +527,8 @@ export const StorageView = () => {
         }
         setSelectedFile(null);
         setSelectedDownloadUrl(null);
+        setSelectedPaths(new Set());
+        lastClickedRef.current = null;
     }, [setSearchParams]);
 
     // Navigate up one level
@@ -528,20 +538,70 @@ export const StorageView = () => {
         handleNavigate(parts.join("/"));
     }, [currentPath, handleNavigate]);
 
-    // Select a file for preview
-    const handleSelectFile = useCallback(async (file: StorageFile) => {
-        setSelectedFile(file);
-        if (file.downloadUrl) {
-            setSelectedDownloadUrl(file.downloadUrl);
+    // All items (folders + files) in display order, for shift-range select
+    const allItems = useMemo(() => [...folders, ...files], [folders, files]);
+
+    // ── Multi-select click handler ──
+    const handleItemClick = useCallback((item: StorageFile, e: React.MouseEvent) => {
+        const path = item.fullPath;
+        if (e.metaKey || e.ctrlKey) {
+            // Toggle individual item
+            setSelectedPaths(prev => {
+                const next = new Set(prev);
+                if (next.has(path)) next.delete(path);
+                else next.add(path);
+                return next;
+            });
+            lastClickedRef.current = path;
+        } else if (e.shiftKey && lastClickedRef.current) {
+            // Range select
+            const allPaths = allItems.map(i => i.fullPath);
+            const anchorIdx = allPaths.indexOf(lastClickedRef.current);
+            const currentIdx = allPaths.indexOf(path);
+            if (anchorIdx >= 0 && currentIdx >= 0) {
+                const [start, end] = anchorIdx < currentIdx ? [anchorIdx, currentIdx] : [currentIdx, anchorIdx];
+                setSelectedPaths(prev => {
+                    const next = new Set(prev);
+                    for (let i = start; i <= end; i++) next.add(allPaths[i]);
+                    return next;
+                });
+            }
         } else {
-            try {
-                const config = await storageSourceRef.current.getSignedUrl(file.fullPath);
-                setSelectedDownloadUrl(config.url);
-            } catch {
+            // Exclusive select
+            setSelectedPaths(new Set([path]));
+            lastClickedRef.current = path;
+            // Also open preview if it's a file
+            if (!item.isFolder) {
+                setSelectedFile(item);
+                if (item.downloadUrl) {
+                    setSelectedDownloadUrl(item.downloadUrl);
+                } else {
+                    storageSourceRef.current.getSignedUrl(item.fullPath)
+                        .then(config => setSelectedDownloadUrl(config.url))
+                        .catch(() => setSelectedDownloadUrl(null));
+                }
+            } else {
+                setSelectedFile(null);
                 setSelectedDownloadUrl(null);
             }
         }
-    }, []);
+    }, [allItems]);
+
+    // Double-click: open folder or preview file
+    const handleItemDoubleClick = useCallback((item: StorageFile) => {
+        if (item.isFolder) {
+            handleNavigate(item.fullPath);
+        } else {
+            setSelectedFile(item);
+            if (item.downloadUrl) {
+                setSelectedDownloadUrl(item.downloadUrl);
+            } else {
+                storageSourceRef.current.getSignedUrl(item.fullPath)
+                    .then(config => setSelectedDownloadUrl(config.url))
+                    .catch(() => setSelectedDownloadUrl(null));
+            }
+        }
+    }, [handleNavigate]);
 
     // Upload files
     const handleUpload = useCallback(async (uploadFiles: File[]) => {
@@ -591,20 +651,124 @@ export const StorageView = () => {
         noDragEventsBubbling: true
     });
 
-    // Delete a file
+    // ── Recursive folder delete helper ──
+    const deleteFolderRecursive = useCallback(async (prefix: string) => {
+        const result = await storageSourceRef.current.listObjects(prefix);
+        // Delete all files in this level
+        for (const item of result.items ?? []) {
+            await storageSourceRef.current.deleteObject(item.fullPath);
+        }
+        // Recurse into sub-folders
+        for (const sub of result.prefixes ?? []) {
+            await deleteFolderRecursive(sub.fullPath);
+        }
+    }, []);
+
+    // Delete a single file
     const handleDeleteFile = useCallback(async (file: StorageFile) => {
         try {
-            await storageSourceRef.current.deleteObject(file.fullPath);
-            snackbarController.open({ type: "success",
-message: `"${file.name}" deleted` });
+            if (file.isFolder) {
+                await deleteFolderRecursive(file.fullPath);
+            } else {
+                await storageSourceRef.current.deleteObject(file.fullPath);
+            }
+            snackbarController.open({ type: "success", message: `"${file.name}" deleted` });
             setSelectedFile(null);
             setSelectedDownloadUrl(null);
+            setSelectedPaths(prev => {
+                const next = new Set(prev);
+                next.delete(file.fullPath);
+                return next;
+            });
             fetchContents(currentPath);
         } catch (e) {
-            snackbarController.open({ type: "error",
-message: e instanceof Error ? e.message : String(e) });
+            snackbarController.open({ type: "error", message: e instanceof Error ? e.message : String(e) });
         }
-    }, [currentPath, snackbarController, fetchContents]);
+    }, [currentPath, snackbarController, fetchContents, deleteFolderRecursive]);
+
+    // Bulk delete (selected items)
+    const handleBulkDelete = useCallback(async () => {
+        setDeleting(true);
+        try {
+            const items = allItems.filter(i => selectedPaths.has(i.fullPath));
+            for (const item of items) {
+                if (item.isFolder) {
+                    await deleteFolderRecursive(item.fullPath);
+                } else {
+                    await storageSourceRef.current.deleteObject(item.fullPath);
+                }
+            }
+            snackbarController.open({ type: "success", message: `${items.length} item${items.length !== 1 ? "s" : ""} deleted` });
+            setSelectedPaths(new Set());
+            setSelectedFile(null);
+            setSelectedDownloadUrl(null);
+            await fetchContents(currentPath);
+        } catch (e) {
+            snackbarController.open({ type: "error", message: e instanceof Error ? e.message : String(e) });
+        } finally {
+            setDeleting(false);
+            setDeleteDialogOpen(false);
+            setDeleteDialogTarget(null);
+        }
+    }, [allItems, selectedPaths, currentPath, snackbarController, fetchContents, deleteFolderRecursive]);
+
+    // Confirm delete for a single folder
+    const handleConfirmDeleteFolder = useCallback(async () => {
+        if (!deleteDialogTarget || deleteDialogTarget === "selection") return;
+        setDeleting(true);
+        try {
+            await deleteFolderRecursive(deleteDialogTarget.fullPath);
+            snackbarController.open({ type: "success", message: `Folder "${deleteDialogTarget.name}" deleted` });
+            setSelectedPaths(prev => {
+                const next = new Set(prev);
+                next.delete(deleteDialogTarget.fullPath);
+                return next;
+            });
+            await fetchContents(currentPath);
+        } catch (e) {
+            snackbarController.open({ type: "error", message: e instanceof Error ? e.message : String(e) });
+        } finally {
+            setDeleting(false);
+            setDeleteDialogOpen(false);
+            setDeleteDialogTarget(null);
+        }
+    }, [deleteDialogTarget, currentPath, snackbarController, fetchContents, deleteFolderRecursive]);
+
+    // Select all / deselect
+    const handleSelectAll = useCallback(() => {
+        if (selectedPaths.size === allItems.length) {
+            setSelectedPaths(new Set());
+        } else {
+            setSelectedPaths(new Set(allItems.map(i => i.fullPath)));
+        }
+    }, [allItems, selectedPaths]);
+
+    // ── Keyboard shortcuts ──
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => {
+            // Cmd/Ctrl+A: select all
+            if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                e.preventDefault();
+                handleSelectAll();
+            }
+            // Escape: deselect
+            if (e.key === "Escape") {
+                setSelectedPaths(new Set());
+                setSelectedFile(null);
+                setSelectedDownloadUrl(null);
+            }
+            // Delete / Backspace: delete selected
+            if ((e.key === "Delete" || e.key === "Backspace") && selectedPaths.size > 0 && !e.metaKey && !e.ctrlKey) {
+                // Don't trigger if user is typing in an input
+                if ((e.target as HTMLElement)?.tagName === "INPUT" || (e.target as HTMLElement)?.tagName === "TEXTAREA") return;
+                e.preventDefault();
+                setDeleteDialogTarget("selection");
+                setDeleteDialogOpen(true);
+            }
+        };
+        window.addEventListener("keydown", handler);
+        return () => window.removeEventListener("keydown", handler);
+    }, [handleSelectAll, selectedPaths]);
 
     // Handle refresh
     const handleRefresh = useCallback(() => {
@@ -612,6 +776,7 @@ message: e instanceof Error ? e.message : String(e) });
     }, [currentPath, fetchContents]);
 
     const segments = breadcrumbSegments(currentPath);
+
 
     // ── Render file grid/list ──
     const renderContents = () => {
@@ -636,7 +801,6 @@ message: e instanceof Error ? e.message : String(e) });
             );
         }
 
-        const allItems = [...folders, ...files];
 
         if (allItems.length === 0) {
             return (
@@ -663,54 +827,105 @@ message: e instanceof Error ? e.message : String(e) });
                     <table className="w-full">
                         <thead>
                             <tr className={cls("border-b text-left text-[10px] uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark", defaultBorderMixin)}>
-                                <th className="px-4 py-2 font-bold">Name</th>
+                                <th className="pl-3 pr-0 py-2 w-8">
+                                    <Checkbox
+                                        size="small"
+                                        checked={allItems.length > 0 && selectedPaths.size === allItems.length}
+                                        indeterminate={selectedPaths.size > 0 && selectedPaths.size < allItems.length}
+                                        onCheckedChange={handleSelectAll}
+                                    />
+                                </th>
+                                <th className="px-2 py-2 font-bold">Name</th>
                                 <th className="px-4 py-2 font-bold w-24">Type</th>
                                 <th className="px-4 py-2 font-bold w-24 text-right">Size</th>
+                                <th className="px-2 py-2 w-10"/>
                             </tr>
                         </thead>
                         <tbody>
-                            {folders.map(folder => (
-                                <tr
-                                    key={folder.fullPath}
-                                    className={cls("hover:bg-surface-100 dark:hover:bg-surface-800 cursor-pointer transition-colors border-b", defaultBorderMixin)}
-                                    onClick={() => handleNavigate(folder.fullPath)}
-                                >
-                                    <td className="px-4 py-2.5">
-                                        <div className="flex items-center gap-2">
-                                            <FolderIcon size={iconSize.smallest} className="text-amber-500 dark:text-amber-400 shrink-0"/>
-                                            <Typography variant="body2" className="text-[13px] font-medium truncate">
-                                                {folder.name}
-                                            </Typography>
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-2.5">
-                                        <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark">
-                                            Folder
-                                        </Typography>
-                                    </td>
-                                    <td className="px-4 py-2.5 text-right">
-                                        <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark">
-                                            —
-                                        </Typography>
-                                    </td>
-                                </tr>
-                            ))}
-                            {files.map(file => {
-                                const FileIconComp = getFileIcon(file.contentType);
-                                const isSelected = selectedFile?.fullPath === file.fullPath;
+                            {folders.map(folder => {
+                                const isChecked = selectedPaths.has(folder.fullPath);
                                 return (
                                     <tr
-                                        key={file.fullPath}
+                                        key={folder.fullPath}
+                                        data-storage-item
                                         className={cls(
-                                            "cursor-pointer transition-colors border-b",
+                                            "cursor-pointer transition-colors border-b group",
                                             defaultBorderMixin,
-                                            isSelected
+                                            isChecked
                                                 ? "bg-primary/5 dark:bg-primary/10"
                                                 : "hover:bg-surface-100 dark:hover:bg-surface-800"
                                         )}
-                                        onClick={() => handleSelectFile(file)}
+                                        onClick={(e) => handleItemClick(folder, e)}
+                                        onDoubleClick={() => handleItemDoubleClick(folder)}
                                     >
+                                        <td className="pl-3 pr-0 py-2.5" onClick={(e) => e.stopPropagation()}>
+                                            <Checkbox
+                                                size="small"
+                                                checked={isChecked}
+                                                onCheckedChange={() => {
+                                                    setSelectedPaths(prev => {
+                                                        const next = new Set(prev);
+                                                        if (next.has(folder.fullPath)) next.delete(folder.fullPath);
+                                                        else next.add(folder.fullPath);
+                                                        return next;
+                                                    });
+                                                }}
+                                            />
+                                        </td>
+                                        <td className="px-2 py-2.5">
+                                            <div className="flex items-center gap-2">
+                                                <FolderIcon size={iconSize.smallest} className="text-amber-500 dark:text-amber-400 shrink-0"/>
+                                                <Typography variant="body2" className="text-[13px] font-medium truncate">
+                                                    {folder.name}
+                                                </Typography>
+                                            </div>
+                                        </td>
                                         <td className="px-4 py-2.5">
+                                            <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark">
+                                                Folder
+                                            </Typography>
+                                        </td>
+                                        <td className="px-4 py-2.5 text-right">
+                                            <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark">
+                                                —
+                                            </Typography>
+                                        </td>
+                                        <td className="px-2 py-2.5"/>
+                                    </tr>
+                                );
+                            })}
+                            {files.map(file => {
+                                const FileIconComp = getFileIcon(file.contentType);
+                                const isChecked = selectedPaths.has(file.fullPath);
+                                return (
+                                    <tr
+                                        key={file.fullPath}
+                                        data-storage-item
+                                        className={cls(
+                                            "cursor-pointer transition-colors border-b group",
+                                            defaultBorderMixin,
+                                            isChecked
+                                                ? "bg-primary/5 dark:bg-primary/10"
+                                                : "hover:bg-surface-100 dark:hover:bg-surface-800"
+                                        )}
+                                        onClick={(e) => handleItemClick(file, e)}
+                                        onDoubleClick={() => handleItemDoubleClick(file)}
+                                    >
+                                        <td className="pl-3 pr-0 py-2.5" onClick={(e) => e.stopPropagation()}>
+                                            <Checkbox
+                                                size="small"
+                                                checked={isChecked}
+                                                onCheckedChange={() => {
+                                                    setSelectedPaths(prev => {
+                                                        const next = new Set(prev);
+                                                        if (next.has(file.fullPath)) next.delete(file.fullPath);
+                                                        else next.add(file.fullPath);
+                                                        return next;
+                                                    });
+                                                }}
+                                            />
+                                        </td>
+                                        <td className="px-2 py-2.5">
                                             <div className="flex items-center gap-2">
                                                 <FileIconComp size={iconSize.smallest} className="text-surface-accent-400 shrink-0"/>
                                                 <Typography variant="body2" className="text-[13px] truncate">
@@ -727,6 +942,15 @@ message: e instanceof Error ? e.message : String(e) });
                                             <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark font-mono text-[11px]">
                                                 {file.size !== undefined ? formatFileSize(file.size) : "—"}
                                             </Typography>
+                                        </td>
+                                        <td className="px-2 py-2.5" onClick={(e) => e.stopPropagation()}>
+                                            <IconButton
+                                                size="smallest"
+                                                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                                onClick={() => handleDeleteFile(file)}
+                                            >
+                                                <Trash2Icon size={14}/>
+                                            </IconButton>
                                         </td>
                                     </tr>
                                 );
@@ -747,24 +971,30 @@ message: e instanceof Error ? e.message : String(e) });
                             Folders
                         </Typography>
                         <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
-                            {folders.map(folder => (
-                                <div
-                                    key={folder.fullPath}
-                                    className={cls(
-                                        "rounded-lg p-3 cursor-pointer border",
-                                        "transition-colors duration-150",
-                                        defaultBorderMixin,
-                                        "hover:bg-surface-100 dark:hover:bg-surface-800 hover:shadow-sm",
-                                        "flex items-center gap-2"
-                                    )}
-                                    onClick={() => handleNavigate(folder.fullPath)}
-                                >
-                                    <FolderIcon size={iconSize.smallest} className="text-amber-500 dark:text-amber-400 shrink-0"/>
-                                    <Typography variant="body2" className="text-[13px] font-medium truncate">
-                                        {folder.name}
-                                    </Typography>
-                                </div>
-                            ))}
+                            {folders.map(folder => {
+                                const isChecked = selectedPaths.has(folder.fullPath);
+                                return (
+                                    <div
+                                        key={folder.fullPath}
+                                        data-storage-item
+                                        className={cls(
+                                            "rounded-lg p-3 cursor-pointer border",
+                                            "transition-colors duration-150",
+                                            defaultBorderMixin,
+                                            "hover:bg-surface-100 dark:hover:bg-surface-800 hover:shadow-sm",
+                                            "flex items-center gap-2",
+                                            isChecked && "ring-2 ring-primary bg-primary/5 dark:bg-primary/10"
+                                        )}
+                                        onClick={(e) => handleItemClick(folder, e)}
+                                        onDoubleClick={() => handleItemDoubleClick(folder)}
+                                    >
+                                        <FolderIcon size={iconSize.smallest} className="text-amber-500 dark:text-amber-400 shrink-0"/>
+                                        <Typography variant="body2" className="text-[13px] font-medium truncate">
+                                            {folder.name}
+                                        </Typography>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 )}
@@ -780,19 +1010,21 @@ message: e instanceof Error ? e.message : String(e) });
                                 const FileIconComp = getFileIcon(file.contentType);
                                 const ext = getExtension(file.name)?.toLowerCase() || "";
                                 const isImage = file.contentType?.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext);
-                                const isSelected = selectedFile?.fullPath === file.fullPath;
+                                const isChecked = selectedPaths.has(file.fullPath);
 
                                 return (
                                     <div
                                         key={file.fullPath}
+                                        data-storage-item
                                         className={cls(
                                             "rounded-lg overflow-hidden cursor-pointer border",
                                             "transition-shadow duration-150",
                                             defaultBorderMixin,
                                             "hover:shadow-md",
-                                            isSelected && "ring-2 ring-primary"
+                                            isChecked && "ring-2 ring-primary"
                                         )}
-                                        onClick={() => handleSelectFile(file)}
+                                        onClick={(e) => handleItemClick(file, e)}
+                                        onDoubleClick={() => handleItemDoubleClick(file)}
                                     >
                                         {/* Thumbnail or icon */}
                                         <div className="aspect-square relative overflow-hidden bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
@@ -842,7 +1074,7 @@ message: e instanceof Error ? e.message : String(e) });
                             {/* Toolbar */}
                             <div className={cls("flex items-center justify-between pr-2 border-b bg-white dark:bg-surface-800 shrink-0", defaultBorderMixin)}>
                                 <div className="flex items-center gap-1.5 flex-grow overflow-hidden px-3 py-2">
-                                    {/* Breadcrumbs */}
+                                    {/* Breadcrumbs — always visible */}
                                     {currentPath && (
                                         <Tooltip title="Go up">
                                             <IconButton size="small" onClick={handleNavigateUp}>
@@ -875,13 +1107,48 @@ message: e instanceof Error ? e.message : String(e) });
 
                                     <div className="flex-1"/>
 
-                                    {/* FileIcon count */}
-                                    {!loading && (
+                                    {/* Selection actions or file count */}
+                                    {selectedPaths.size > 0 ? (
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <Checkbox
+                                                size="small"
+                                                checked={selectedPaths.size === allItems.length}
+                                                indeterminate={selectedPaths.size > 0 && selectedPaths.size < allItems.length}
+                                                onCheckedChange={handleSelectAll}
+                                            />
+                                            <Typography variant="body2" className="text-[13px] font-medium whitespace-nowrap">
+                                                {selectedPaths.size} selected
+                                            </Typography>
+                                            <Button
+                                                size="small"
+                                                variant="text"
+                                                onClick={() => {
+                                                    setDeleteDialogTarget("selection");
+                                                    setDeleteDialogOpen(true);
+                                                }}
+                                            >
+                                                <Trash2Icon size={14} className="mr-1"/>
+                                                Delete
+                                            </Button>
+                                            <Button
+                                                size="small"
+                                                variant="text"
+                                                onClick={() => {
+                                                    setSelectedPaths(new Set());
+                                                    setSelectedFile(null);
+                                                    setSelectedDownloadUrl(null);
+                                                }}
+                                            >
+                                                <XIcon size={14} className="mr-1"/>
+                                                Deselect
+                                            </Button>
+                                        </div>
+                                    ) : !loading ? (
                                         <Chip size="small" className="shrink-0 text-[10px]">
                                             {files.length} file{files.length !== 1 ? "s" : ""}
                                             {folders.length > 0 ? `, ${folders.length} folder${folders.length !== 1 ? "s" : ""}` : ""}
                                         </Chip>
-                                    )}
+                                    ) : null}
                                 </div>
 
                                 <div className="flex shrink-0 items-center justify-end gap-1.5 pr-1">
@@ -925,7 +1192,17 @@ message: e instanceof Error ? e.message : String(e) });
                             </div>
 
                             {/* File grid / list — drop zone */}
-                            <div {...getDropRootProps()} className="flex-grow flex flex-col overflow-hidden min-h-0 relative">
+                            <div {...getDropRootProps()}
+                                 className="flex-grow flex flex-col overflow-hidden min-h-0 relative"
+                                 onClick={(e) => {
+                                     const target = e.target as HTMLElement;
+                                     if (!target.closest("[data-storage-item]") && selectedPaths.size > 0) {
+                                         setSelectedPaths(new Set());
+                                         setSelectedFile(null);
+                                         setSelectedDownloadUrl(null);
+                                     }
+                                 }}
+                            >
                                 <input {...getDropInputProps()} />
                                 {renderContents()}
                                 {/* Drag overlay */}
@@ -954,11 +1231,15 @@ message: e instanceof Error ? e.message : String(e) });
                                         /{currentPath || ""}
                                     </span>
                                 </div>
-                                {selectedFile && (
+                                {selectedPaths.size > 0 ? (
+                                    <div className="text-[11px] text-text-secondary dark:text-text-secondary-dark">
+                                        {selectedPaths.size} item{selectedPaths.size !== 1 ? "s" : ""} selected
+                                    </div>
+                                ) : selectedFile ? (
                                     <div className="text-[11px] text-text-secondary dark:text-text-secondary-dark">
                                         Selected: <span className="font-mono">{selectedFile.name}</span>
                                     </div>
-                                )}
+                                ) : null}
                             </div>
                         </div>
 
@@ -985,6 +1266,52 @@ message: e instanceof Error ? e.message : String(e) });
                 onClose={() => setUploadDialogOpen(false)}
                 onUpload={handleUpload}
             />
+
+            {/* Delete confirmation dialog */}
+            <Dialog
+                open={deleteDialogOpen}
+                onOpenChange={(open) => {
+                    if (!open && !deleting) {
+                        setDeleteDialogOpen(false);
+                        setDeleteDialogTarget(null);
+                    }
+                }}
+            >
+                <DialogContent>
+                    <Typography variant="subtitle1" className="font-semibold mb-2">
+                        {deleteDialogTarget === "selection"
+                            ? `Delete ${selectedPaths.size} item${selectedPaths.size !== 1 ? "s" : ""}?`
+                            : deleteDialogTarget
+                                ? `Delete folder "${deleteDialogTarget.name}"?`
+                                : "Delete?"}
+                    </Typography>
+                    <Typography variant="body2" color="secondary">
+                        {deleteDialogTarget === "selection"
+                            ? "This will permanently delete all selected files and folders, including their contents. This action cannot be undone."
+                            : "This will permanently delete the folder and all of its contents. This action cannot be undone."}
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        variant="text"
+                        onClick={() => {
+                            setDeleteDialogOpen(false);
+                            setDeleteDialogTarget(null);
+                        }}
+                        disabled={deleting}
+                    >
+                        Cancel
+                    </Button>
+                    <LoadingButton
+                        color="error"
+                        loading={deleting}
+                        onClick={deleteDialogTarget === "selection" ? handleBulkDelete : handleConfirmDeleteFolder}
+                    >
+                        <Trash2Icon size={14} className="mr-1"/>
+                        Delete
+                    </LoadingButton>
+                </DialogActions>
+            </Dialog>
         </div>
     );
 };

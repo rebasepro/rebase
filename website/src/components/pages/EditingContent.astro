@@ -7,6 +7,10 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
 import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
 import { KanbanDemo } from '../../components/demos/KanbanDemo';
+import { RichTextEditorDemo } from '../../components/demos/RichTextEditorDemo';
+import { SpreadsheetDemo } from '../../components/demos/SpreadsheetDemo';
+import { CustomFieldsDemo } from '../../components/demos/CustomFieldsDemo';
+import { EditorPreviewDemo } from '../../components/demos/EditorPreviewDemo';
 import "../../styles/editor.css";
 
 
@@ -109,8 +113,8 @@ import "../../styles/editor.css";
               <li class="flex gap-3"><span class="text-primary">✓</span> Task lists, code fences, blockquotes, horizontal rules</li>
             </ul>
           </div>
-          <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 shadow-2xl shadow-violet-500/5">
-            <img src="/img/subcollections.png" alt="Blog entry editor with rich text toolbar, header image upload, and live preview panel — all in dark mode" class="w-full h-auto" loading="lazy"/>
+          <div className="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 shadow-2xl shadow-violet-500/5 h-[400px]">
+            <EditorPreviewDemo client:only="react" />
           </div>
         </div>
       </div>
@@ -300,8 +304,8 @@ import "../../styles/editor.css";
               <li class="flex gap-3"><span class="text-primary">✓</span> Keyboard navigable — never leave your flow</li>
             </ul>
           </div>
-          <div class="rounded-2xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl">
-            <img src="/img/form_editing.webp" alt="CMS entity editor with markdown toolbar, rich text fields, file upload areas, and inline product images — fully dark mode" class="w-full h-auto" loading="lazy"/>
+          <div class="rounded-2xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl h-[400px]">
+            <RichTextEditorDemo client:only="react" />
           </div>
         </div>
       </div>
@@ -350,10 +354,8 @@ import "../../styles/editor.css";
               <li class="flex gap-3"><span class="text-primary">✓</span> CSV / JSON export with one click</li>
             </ul>
           </div>
-          <div class="rounded-2xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl">
-            <video autoplay muted loop playsinline class="w-full h-auto">
-              <source src="/img/full_screen_dark.mp4" type="video/mp4"/>
-            </video>
+          <div className="rounded-2xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl h-[400px]">
+            <SpreadsheetDemo client:only="react" />
           </div>
         </div>
       </div>
@@ -378,15 +380,8 @@ import "../../styles/editor.css";
               <li class="flex gap-3"><span class="text-primary">✓</span> Preview panels for real-time content previews</li>
             </ul>
           </div>
-          <div class="flex flex-col gap-6">
-            <div class="rounded-2xl overflow-hidden ring-1 ring-surface-700 shadow-2xl">
-              <img src="/img/widgets.png" alt="Property widget picker showing Text, Markdown, URL, Email, Switch, Select, and Multi-select field types" class="w-full h-auto" loading="lazy"/>
-            </div>
-            <div class="rounded-2xl overflow-hidden ring-1 ring-surface-700 shadow-2xl">
-              <video autoplay muted loop playsinline class="w-full h-auto">
-                <source src="/img/custom_fields_dark_wide.mp4" type="video/mp4"/>
-              </video>
-            </div>
+          <div className="rounded-2xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl h-[450px]">
+            <CustomFieldsDemo client:only="react" />
           </div>
         </div>
       </div>
