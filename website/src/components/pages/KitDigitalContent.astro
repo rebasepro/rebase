@@ -1,0 +1,375 @@
+---
+const { lang, t } = Astro.props;
+
+import { languages, defaultLang, useTranslations } from '../../i18n/ui';
+
+
+
+import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
+
+
+
+
+const solutions = [
+    {
+        slug: "gestion-de-procesos",
+        category: t('kd.sol1.category'),
+        name: "Rebase Process Manager",
+        sourceUrl: "https://www.acelerapyme.gob.es/kit-digital/gestion-de-procesos",
+        allSectors: true,
+        description: t('kd.sol1.desc'),
+        features: [
+            t('kd.sol1.feat1'),
+            t('kd.sol1.feat2'),
+            t('kd.sol1.feat3'),
+            t('kd.sol1.feat4'),
+            t('kd.sol1.feat5'),
+            t('kd.sol1.feat6'),
+        ],
+        segments: [
+            { name: t('kd.seg.5'), range: t('kd.range.5'), amount: t('kd.amount.18k'), users: t('kd.users.25') },
+            { name: t('kd.seg.4'), range: t('kd.range.4'), amount: t('kd.amount.15k'), users: t('kd.users.20') },
+            { name: t('kd.seg.1'), range: t('kd.range.1'), amount: t('kd.amount.6k'), users: t('kd.users.10') },
+            { name: t('kd.seg.2'), range: t('kd.range.2'), amount: t('kd.amount.3k'), users: t('kd.users.3') },
+            { name: t('kd.seg.3'), range: t('kd.range.3'), amount: t('kd.amount.2k'), users: t('kd.users.1') },
+        ],
+        sectors: t('kd.sol1.sectors'),
+    },
+    {
+        slug: "business-intelligence",
+        category: t('kd.sol2.category'),
+        name: "Rebase Analytics Dashboard",
+        sourceUrl: "https://www.acelerapyme.gob.es/kit-digital/bi-analitica",
+        allSectors: true,
+        description: t('kd.sol2.desc'),
+        features: [
+            t('kd.sol2.feat1'),
+            t('kd.sol2.feat2'),
+            t('kd.sol2.feat3'),
+            t('kd.sol2.feat4'),
+            t('kd.sol2.feat5'),
+            t('kd.sol2.feat6'),
+        ],
+        segments: [
+            { name: t('kd.seg.5'), range: t('kd.range.5'), amount: t('kd.amount.8k'), users: t('kd.users.15') },
+            { name: t('kd.seg.4'), range: t('kd.range.4'), amount: t('kd.amount.7k'), users: t('kd.users.10') },
+            { name: t('kd.seg.1'), range: t('kd.range.1'), amount: t('kd.amount.4k'), users: t('kd.users.3') },
+            { name: t('kd.seg.2'), range: t('kd.range.2'), amount: t('kd.amount.2k'), users: t('kd.users.1') },
+            { name: t('kd.seg.3'), range: t('kd.range.3'), amount: t('kd.amount.1.5k'), users: t('kd.users.1') },
+        ],
+        sectors: t('kd.sol2.sectors'),
+    },
+    {
+        slug: "gestion-de-clientes",
+        category: t('kd.sol3.category'),
+        name: "Rebase CRM",
+        sourceUrl: "https://www.acelerapyme.gob.es/kit-digital/gestion-clientes",
+        allSectors: true,
+        description: t('kd.sol3.desc'),
+        features: [
+            t('kd.sol3.feat1'),
+            t('kd.sol3.feat2'),
+            t('kd.sol3.feat3'),
+            t('kd.sol3.feat4'),
+            t('kd.sol3.feat5'),
+            t('kd.sol3.feat6'),
+        ],
+        segments: [
+            { name: t('kd.seg.5'), range: t('kd.range.5'), amount: t('kd.amount.14k'), users: t('kd.users.15') },
+            { name: t('kd.seg.4'), range: t('kd.range.4'), amount: t('kd.amount.10k'), users: t('kd.users.10') },
+            { name: t('kd.seg.1'), range: t('kd.range.1'), amount: t('kd.amount.4k'), users: t('kd.users.3') },
+            { name: t('kd.seg.2'), range: t('kd.range.2'), amount: t('kd.amount.2k'), users: t('kd.users.1') },
+            { name: t('kd.seg.3'), range: t('kd.range.3'), amount: t('kd.amount.2k'), users: t('kd.users.1') },
+        ],
+        sectors: t('kd.sol3.sectors'),
+    },
+    {
+        slug: "sitio-web",
+        category: t('kd.sol4.category'),
+        name: "Rebase Web Presence",
+        sourceUrl: "https://www.acelerapyme.gob.es/kit-digital/sitio-web",
+        allSectors: true,
+        description: t('kd.sol4.desc'),
+        features: [
+            t('kd.sol4.feat1'),
+            t('kd.sol4.feat2'),
+            t('kd.sol4.feat3'),
+            t('kd.sol4.feat4'),
+            t('kd.sol4.feat5'),
+            t('kd.sol4.feat6'),
+        ],
+        segments: [
+            { name: t('kd.seg.1'), range: t('kd.range.1'), amount: t('kd.amount.2k') },
+            { name: t('kd.seg.2'), range: t('kd.range.2'), amount: t('kd.amount.2k') },
+            { name: t('kd.seg.3'), range: t('kd.range.3'), amount: t('kd.amount.2k') },
+        ],
+        sectors: t('kd.sol4.sectors'),
+    },
+    {
+        slug: "comercio-electronico",
+        category: t('kd.sol5.category'),
+        name: "Rebase E-Commerce",
+        sourceUrl: "https://www.acelerapyme.gob.es/kit-digital/comercio-electronico",
+        allSectors: true,
+        description: t('kd.sol5.desc'),
+        features: [
+            t('kd.sol5.feat1'),
+            t('kd.sol5.feat2'),
+            t('kd.sol5.feat3'),
+            t('kd.sol5.feat4'),
+            t('kd.sol5.feat5'),
+            t('kd.sol5.feat6'),
+        ],
+        segments: [
+            { name: t('kd.seg.5'), range: t('kd.range.5'), amount: t('kd.amount.5k') },
+            { name: t('kd.seg.4'), range: t('kd.range.4'), amount: t('kd.amount.5k') },
+            { name: t('kd.seg.1'), range: t('kd.range.1'), amount: t('kd.amount.2k') },
+            { name: t('kd.seg.2'), range: t('kd.range.2'), amount: t('kd.amount.2k') },
+            { name: t('kd.seg.3'), range: t('kd.range.3'), amount: t('kd.amount.2k') },
+        ],
+        sectors: t('kd.sol5.sectors'),
+    },
+];;
+---
+
+    <Fragment slot="head">
+        <meta name="robots" content="index, follow">
+        <html lang={lang} />
+    </Fragment>
+
+    <main>
+        <!-- Hero Section -->
+        <section class="relative isolate overflow-hidden bg-linear-to-br from-black to-surface-950 pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
+            <SectionBackgroundAccents topLine={true} blob={{ position: "top", size: "lg", opacity: 60 }}>
+                <div class="absolute -bottom-40 right-1/3 w-[700px] h-[700px] rounded-full bg-blue-500/5 blur-3xl opacity-50"></div>
+                <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:40px_40px] opacity-10"></div>
+            </SectionBackgroundAccents>
+
+            <div class="px-4 mx-auto max-w-7xl text-center lg:px-12">
+                <div class="inline-flex items-center gap-2 rounded-full bg-primary/10 border border-primary/20 px-4 py-1.5 text-sm font-medium text-primary-light mb-8">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                    </svg>
+                    {t('kd.hero.badge')}
+                </div>
+                <h1 class="mb-6 text-4xl font-medium tracking-tight md:text-5xl lg:text-6xl text-white font-sans">
+                    {t('kd.hero.title1')} <span class="gradient-text">{t('kd.hero.title2')}</span>
+                </h1>
+                <p class="mb-6 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48" set:html={t('kd.hero.p1')} />
+                <p class="mb-10 text-base leading-7 text-surface-400 sm:px-16 xl:px-48">
+                    {t('kd.hero.p2')}
+                </p>
+                <div class="flex items-center justify-center gap-4 flex-wrap">
+                    <a href="#soluciones"
+                       class="inline-flex items-center gap-x-2 rounded-md bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-dark transition-all duration-200 ease-in-out btn-glow">
+                        {t('kd.hero.btn.solutions')}
+                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </a>
+                    <a href={`/${lang === 'en' ? '' : lang + '/'}contact`}
+                       class="inline-flex items-center gap-x-2 rounded-md border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-surface-700 transition-all duration-200 ease-in-out">
+                        {t('kd.hero.btn.info')}
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Logos institucionales -->
+        <section class="bg-black py-12 border-b border-surface-800">
+            <div class="mx-auto max-w-5xl px-6 lg:px-8">
+                <p class="text-center text-sm text-surface-400 mb-8">{t('kd.logos.funded')}</p>
+                <div class="flex items-center justify-center gap-8 flex-wrap">
+                    <div class="flex flex-col items-center gap-2 px-6 py-4 rounded-xl bg-white/5 ring-1 ring-surface-800">
+                        <span class="text-xs text-surface-400 uppercase tracking-wider">{t('kd.logos.plan')}</span>
+                        <span class="text-sm font-semibold text-white">{t('kd.logos.gov')}</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-2 px-6 py-4 rounded-xl bg-white/5 ring-1 ring-surface-800">
+                        <span class="text-xs text-surface-400 uppercase tracking-wider">{t('kd.logos.fundedBy')}</span>
+                        <span class="text-sm font-semibold text-white">{t('kd.logos.eu')}</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-2 px-6 py-4 rounded-xl bg-white/5 ring-1 ring-surface-800">
+                        <span class="text-xs text-surface-400 uppercase tracking-wider">{t('kd.logos.managed')}</span>
+                        <span class="text-sm font-semibold text-white">Red.es</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ¿Qué es el Kit Digital? -->
+        <section class="bg-black py-16 sm:py-24">
+            <div class="mx-auto max-w-4xl px-6 lg:px-8">
+                <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-8 text-center">{t('kd.whatis.title')}</h2>
+                <div class="prose prose-lg prose-invert max-w-none">
+                    <p class="text-lg text-surface-300 leading-relaxed mb-6" set:html={t('kd.whatis.p1')} />
+                    <p class="text-lg text-surface-300 leading-relaxed mb-6" set:html={t('kd.whatis.p2')} />
+                </div>
+
+                <!-- Segmentos -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mt-12">
+                    {[
+                        { name: t('kd.seg.5'), range: t('kd.range.5'), bono: t('kd.amount.29k') },
+                        { name: t('kd.seg.4'), range: t('kd.range.4'), bono: t('kd.amount.25k') },
+                        { name: t('kd.seg.1'), range: t('kd.range.1'), bono: t('kd.amount.12k') },
+                        { name: t('kd.seg.2'), range: t('kd.range.2'), bono: t('kd.amount.6k') },
+                        { name: t('kd.seg.3'), range: t('kd.range.3'), bono: t('kd.amount.2k') },
+                    ].map((seg) => (
+                        <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-5 ring-1 ring-inset ring-surface-800 text-center">
+                            <h3 class="text-base font-semibold text-white mb-1">{seg.name}</h3>
+                            <p class="text-surface-400 text-xs mb-2">{seg.range}</p>
+                            <p class="text-primary font-semibold text-sm">{seg.bono}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </section>
+
+        <!-- Catálogo de Soluciones -->
+        <section id="soluciones" class="bg-black py-16 sm:py-24 scroll-mt-20">
+            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+                <div class="mx-auto max-w-3xl text-center mb-16">
+                    <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">{t('kd.solutions.title')}</h2>
+                    <p class="mt-6 text-lg leading-8 text-surface-400">{t('kd.solutions.desc')}</p>
+                </div>
+
+                <div class="space-y-12">
+                    {solutions.map((sol, idx) => (
+                        <div class="relative overflow-hidden rounded-2xl bg-surface-900/30 ring-1 ring-inset ring-surface-800 p-8 lg:p-10" id={sol.slug}>
+                            <!-- Category badge -->
+                            <div class="inline-flex items-center gap-2 rounded-full bg-primary/10 border border-primary/20 px-3 py-1 text-xs font-medium text-primary-light mb-4">
+                                {t('kd.solutions.badge')}
+                            </div>
+
+                            <h3 class="text-2xl font-semibold text-white mb-2">{sol.category}</h3>
+                            <p class="text-primary-light font-medium text-lg mb-4">{t('kd.solutions.sol_prefix')} {sol.name}</p>
+                            <p class="text-surface-300 leading-relaxed mb-6 max-w-4xl">{sol.description}</p>
+
+                            <!-- Sector applicability -->
+                            <div class="flex items-center gap-2 mb-4 rounded-lg bg-green-900/20 border border-green-700/30 px-4 py-2.5 w-fit">
+                                <svg class="h-5 w-5 text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span class="text-green-300 text-sm font-medium">{t('kd.solutions.sector_all')}</span>
+                            </div>
+
+                            <!-- Geographic coverage -->
+                            <div class="flex items-center gap-2 mb-8 rounded-lg bg-blue-900/20 border border-blue-700/30 px-4 py-2.5 w-fit">
+                                <svg class="h-5 w-5 text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                                </svg>
+                                <span class="text-blue-300 text-sm font-medium">{t('kd.solutions.geo_all')}</span>
+                            </div>
+
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                <!-- Features -->
+                                <div>
+                                    <h4 class="text-sm font-semibold uppercase tracking-wider text-surface-400 mb-4">{t('kd.solutions.features_title')}</h4>
+                                    <ul class="space-y-3">
+                                        {sol.features.map((f) => (
+                                            <li class="flex items-start gap-3">
+                                                <svg class="h-5 w-5 text-primary flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                                </svg>
+                                                <span class="text-surface-300 text-sm">{f}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+
+                                <!-- Segments & Sectors -->
+                                <div>
+                                    <h4 class="text-sm font-semibold uppercase tracking-wider text-surface-400 mb-4">{t('kd.solutions.segments_title')}</h4>
+                                    <div class="space-y-3 mb-6">
+                                        {sol.segments.map((seg) => (
+                                            <div class="flex items-center justify-between rounded-lg bg-surface-800/50 px-4 py-3 ring-1 ring-surface-700">
+                                                <div>
+                                                    <span class="font-medium text-white text-sm">{seg.name}</span>
+                                                    <span class="text-surface-400 text-xs ml-2">({seg.range})</span>
+                                                    {seg.users && <span class="text-surface-500 text-xs ml-1">· {seg.users}</span>}
+                                                </div>
+                                                <span class="text-primary font-semibold text-sm">{seg.amount}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <h4 class="text-sm font-semibold uppercase tracking-wider text-surface-400 mb-3">{t('kd.solutions.sectors_title')}</h4>
+                                    <p class="text-surface-400 text-sm leading-relaxed mb-4">{sol.sectors}</p>
+
+                                    {sol.sourceUrl && (
+                                        <a href={sol.sourceUrl} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-xs text-surface-500 hover:text-primary-light transition-colors">
+                                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                                            </svg>
+                                            {t('kd.solutions.source')}
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </section>
+
+        <!-- Zona geográfica de actuación -->
+        <section class="bg-black py-16 sm:py-24 border-t border-surface-800">
+            <div class="mx-auto max-w-4xl px-6 lg:px-8">
+                <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-8 text-center">{t('kd.geo.title')}</h2>
+                <p class="text-lg text-surface-300 leading-relaxed mb-8 text-center" set:html={t('kd.geo.desc')} />
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {[
+                        t('kd.geo.andalucia'), t('kd.geo.aragon'), t('kd.geo.asturias'), t('kd.geo.baleares'),
+                        t('kd.geo.canarias'), t('kd.geo.cantabria'), t('kd.geo.castillaleon'), t('kd.geo.castillalamancha'),
+                        t('kd.geo.cataluna'), t('kd.geo.valencia'), t('kd.geo.extremadura'), t('kd.geo.galicia'),
+                        t('kd.geo.madrid'), t('kd.geo.murcia'), t('kd.geo.navarra'),
+                        t('kd.geo.paisvasco'), t('kd.geo.larioja'), t('kd.geo.ceuta'), t('kd.geo.melilla')
+                    ].map((region) => (
+                        <div class="flex items-center gap-2 rounded-lg bg-surface-900/50 px-3 py-2 ring-1 ring-surface-800">
+                            <svg class="h-4 w-4 text-primary flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                            </svg>
+                            <span class="text-surface-300 text-xs">{region}</span>
+                        </div>
+                    ))}
+                </div>
+                <p class="text-sm text-surface-400 mt-6 text-center">
+                    {t('kd.geo.remote')}
+                </p>
+            </div>
+        </section>
+
+        <!-- CTA -->
+        <section class="bg-black py-24 sm:py-32">
+            <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
+                <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">{t('kd.cta.title')}</h2>
+                <p class="text-lg text-surface-400 mb-8 max-w-2xl mx-auto">{t('kd.cta.desc')}</p>
+                <div class="flex items-center justify-center gap-x-6 flex-wrap">
+                    <a href={`/${lang === 'en' ? '' : lang + '/'}contact`}
+                       class="inline-flex items-center gap-x-2 rounded-md bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-dark transition-all duration-200 ease-in-out btn-glow">
+                        {t('kd.cta.contact')}
+                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                        </svg>
+                    </a>
+                    <a href="https://calendar.app.google/UDSmMagx6AEwar8P8"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold">
+                        {t('kd.cta.book')}
+                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14m-7-7l7 7-7 7" />
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Legal disclaimer -->
+        <section class="bg-surface-950 py-8 border-t border-surface-800">
+            <div class="mx-auto max-w-4xl px-6 lg:px-8">
+                <p class="text-xs text-surface-500 text-center leading-relaxed" set:html={t('kd.legal.disclaimer')} />
+            </div>
+        </section>
+    </main>
+

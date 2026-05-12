@@ -1,0 +1,22 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { languages, defaultLang, useTranslations } from '../../i18n/ui';
+
+export function getStaticPaths() {
+  return Object.keys(languages).map((lang) => ({
+    params: { lang: lang === defaultLang ? undefined : lang },
+  }));
+}
+
+const { lang } = Astro.params;
+const currentLang = lang || defaultLang;
+const t = useTranslations(currentLang as keyof typeof languages);
+
+const title = t("index.meta.title");
+const description = t("index.meta.description");
+
+import IndexContent from '../../components/pages/IndexContent.astro';
+---
+<Layout title={title} description={description} lang={currentLang}>
+    <IndexContent lang={currentLang} t={t} />
+</Layout>

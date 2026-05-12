@@ -1,0 +1,501 @@
+---
+const { lang, t } = Astro.props;
+
+import { languages, defaultLang, useTranslations } from '../../i18n/ui';
+
+
+
+import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
+
+
+
+---
+
+  <main>
+    <section class="relative isolate overflow-hidden bg-linear-to-br from-black to-surface-950 pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
+      <SectionBackgroundAccents topLine={true} blob={{ position: "top", size: "lg", opacity: 60 }}/>
+      
+      <div class="px-4 mx-auto max-w-7xl text-center lg:px-12">
+        <h1 class="mb-8 text-5xl font-extrabold tracking-tight leading-none md:text-6xl text-white font-sans">
+          Rebase vs Directus
+        </h1>
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl max-w-3xl mx-auto">
+          Directus is a powerful API engine, but its database-driven architecture makes deployments frustrating and extensibility hard. See why modern engineering teams are choosing Rebase's code-driven, React-native approach.
+        </p>
+      </div>
+    </section>
+
+    <!-- Content Sections -->
+    <section class="bg-black py-16 sm:py-24">
+      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        
+        <div class="space-y-16">
+          
+          <!-- Point 1 -->
+          <div class="py-2">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div>
+                  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-3">
+                    
+<svg
+  class="lucide lucide-file-code"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" />
+  <path d="M14 2v5a1 1 0 0 0 1 1h5" />
+  <path d="M10 12.5 8 15l2 2.5" />
+  <path d="m14 12.5 2 2.5-2 2.5" />
+</svg>
+
+                    Schema Management
+                  </div>
+                  <h3 class="text-2xl font-bold text-white">Code vs Database State</h3>
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+                <!-- VS Badge -->
+                <div class="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-surface-700 bg-surface-900 items-center justify-center text-xs font-bold text-surface-400 z-10 shadow-xl">VS</div>
+                
+                <!-- Competitor Card -->
+                <div class="bg-surface-800/20 rounded-xl p-6 border border-surface-700/50 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-alert"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <circle cx="12" cy="12" r="10" />
+  <line x1="12" x2="12" y1="8" y2="12" />
+  <line x1="12" x2="12.01" y1="16" y2="16" />
+</svg>
+
+                      <h4 class="text-white font-semibold">The Directus Pain</h4>
+                    </div>
+                    <p class="text-surface-400 text-sm leading-relaxed">Directus stores your entire schema and UI configuration in hidden database tables (`directus_collections`, `directus_fields`). Managing environments (Staging to Production) requires clunky schema-sync CLI tools or manual database dumps that frequently break down or overwrite data.</p>
+                  </div>
+                </div>
+
+                <!-- Rebase Card -->
+                <div class="bg-primary/5 rounded-xl p-6 border border-primary/20 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-check-big"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+  <path d="m9 11 3 3L22 4" />
+</svg>
+
+                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                    </div>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
+                      Rebase uses a <strong>Schema-as-Code</strong> approach. Every collection and field is defined in a standard TypeScript file.
+                    </p>
+                    <ul class="text-surface-400 space-y-3 text-sm">
+                      <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Even when you use the visual Rebase Studio to add fields, the engine uses AST-manipulation to write the changes directly to your TypeScript schemas.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Changes are committed to Git.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Deployments are just a `git pull` away, guaranteeing perfectly synchronized environments every single time.</span></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+          </div>
+
+          <!-- Point 2 -->
+          <div class="py-2">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div>
+                  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-3">
+                    
+<svg
+  class="lucide lucide-paintbrush"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="m14.622 17.897-10.68-2.913" />
+  <path d="M18.376 2.622a1 1 0 1 1 3.002 3.002L17.36 9.643a.5.5 0 0 0 0 .707l.944.944a2.41 2.41 0 0 1 0 3.408l-.944.944a.5.5 0 0 1-.707 0L8.354 7.348a.5.5 0 0 1 0-.707l.944-.944a2.41 2.41 0 0 1 3.408 0l.944.944a.5.5 0 0 0 .707 0z" />
+  <path d="M9 8c-1.804 2.71-3.97 3.46-6.583 3.948a.507.507 0 0 0-.302.819l7.32 8.883a1 1 0 0 0 1.185.204C12.735 20.405 16 16.792 16 15" />
+</svg>
+
+                    Extensibility
+                  </div>
+                  <h3 class="text-2xl font-bold text-white">React Framework vs Vue Engine</h3>
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+                <!-- VS Badge -->
+                <div class="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-surface-700 bg-surface-900 items-center justify-center text-xs font-bold text-surface-400 z-10 shadow-xl">VS</div>
+                
+                <!-- Competitor Card -->
+                <div class="bg-surface-800/20 rounded-xl p-6 border border-surface-700/50 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-alert"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <circle cx="12" cy="12" r="10" />
+  <line x1="12" x2="12" y1="8" y2="12" />
+  <line x1="12" x2="12.01" y1="16" y2="16" />
+</svg>
+
+                      <h4 class="text-white font-semibold">The Directus Pain</h4>
+                    </div>
+                    <p class="text-surface-400 text-sm leading-relaxed">Directus is an API engine built heavily on Vue.js. To build custom dashboards, specialized inputs, or unique data views, your team is forced to adopt Vue workflows, and stepping outside Directus's specific extension patterns is notoriously difficult.</p>
+                  </div>
+                </div>
+
+                <!-- Rebase Card -->
+                <div class="bg-primary/5 rounded-xl p-6 border border-primary/20 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-check-big"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+  <path d="m9 11 3 3L22 4" />
+</svg>
+
+                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                    </div>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
+                      Rebase is built natively on React.
+                    </p>
+                    <ul class="text-surface-400 space-y-3 text-sm">
+                      <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Create custom fields, entirely new pages, or bespoke dashboard widgets leveraging the massive React ecosystem.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Use your favorite React components (MUI, Tailwind, Recharts) instantly without friction.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">The backend is a standard Hono app. Want a custom route? Just add `app.get()`.</span></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+          </div>
+
+          <!-- Point 3 -->
+          <div class="py-2">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div>
+                  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-3">
+                    
+<svg
+  class="lucide lucide-shield"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+</svg>
+
+                    Security & Permissions
+                  </div>
+                  <h3 class="text-2xl font-bold text-white">Native RLS vs Application Layer</h3>
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+                <!-- VS Badge -->
+                <div class="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-surface-700 bg-surface-900 items-center justify-center text-xs font-bold text-surface-400 z-10 shadow-xl">VS</div>
+                
+                <!-- Competitor Card -->
+                <div class="bg-surface-800/20 rounded-xl p-6 border border-surface-700/50 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-alert"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <circle cx="12" cy="12" r="10" />
+  <line x1="12" x2="12" y1="8" y2="12" />
+  <line x1="12" x2="12.01" y1="16" y2="16" />
+</svg>
+
+                      <h4 class="text-white font-semibold">The Directus Pain</h4>
+                    </div>
+                    <p class="text-surface-400 text-sm leading-relaxed">Directus enforces permissions exclusively via its own application layer. It does not utilize Postgres Row Level Security (RLS). If an external service queries your DB directly, all those Directus permissions vanish, leaving data exposed.</p>
+                  </div>
+                </div>
+
+                <!-- Rebase Card -->
+                <div class="bg-primary/5 rounded-xl p-6 border border-primary/20 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-check-big"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+  <path d="m9 11 3 3L22 4" />
+</svg>
+
+                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                    </div>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
+                      Rebase marries the power of native Postgres Row-Level Security with a visual management UI.
+                    </p>
+                    <ul class="text-surface-400 space-y-3 text-sm">
+                      <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Rules are pushed to the database via RLS (where possible), so your data stays locked down regardless of where the query originated.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Visual editors make defining RLS policies intuitive and error-free.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">You remain in total control of the security context.</span></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+          </div>
+
+          
+        </div>
+
+      </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="bg-black py-16 sm:py-24 border-t border-surface-800/40">
+      <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
+        <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-6">Own your code, own your data.</h2>
+        <p class="text-lg text-surface-400 mb-8 max-w-2xl mx-auto">Migrate your project to a true TypeScript environment built for developers.</p>
+        <div class="flex items-center justify-center gap-x-6">
+          <a href="/docs" class="inline-flex items-center gap-x-2 rounded-md bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-dark transition-all duration-200 ease-in-out btn-glow">
+            Get Started
+            
+<svg
+  class="lucide lucide-arrow-right"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M5 12h14" />
+  <path d="m12 5 7 7-7 7" />
+</svg>
+
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+

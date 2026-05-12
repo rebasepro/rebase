@@ -1,0 +1,482 @@
+---
+const { lang, t } = Astro.props;
+
+import { languages, defaultLang, useTranslations } from '../../i18n/ui';
+
+
+
+import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
+
+
+
+---
+
+  <main>
+    <section class="relative isolate overflow-hidden bg-linear-to-br from-black to-surface-950 pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
+      <SectionBackgroundAccents topLine={true} blob={{ position: "top", size: "lg", opacity: 60 }}/>
+      
+      <div class="px-4 mx-auto max-w-7xl text-center lg:px-12">
+        <h1 class="mb-8 text-5xl font-extrabold tracking-tight leading-none md:text-6xl text-white font-sans">
+          Rebase vs Payload CMS
+        </h1>
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl max-w-3xl mx-auto">
+          Both Rebase and Payload deliver world-class TypeScript and React developer experiences. But when it comes to supporting existing Postgres databases and enabling non-technical teammates to manage schemas without coding, Rebase shines.
+        </p>
+      </div>
+    </section>
+
+    <!-- Content Sections -->
+    <section class="bg-black py-16 sm:py-24">
+      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        
+        <div class="space-y-16">
+          
+          <!-- Point 1 -->
+          <div class="py-2">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div>
+                  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-3">
+                    
+<svg
+  class="lucide lucide-database"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <ellipse cx="12" cy="5" rx="9" ry="3" />
+  <path d="M3 5V19A9 3 0 0 0 21 19V5" />
+  <path d="M3 12A9 3 0 0 0 21 12" />
+</svg>
+
+                    Existing Databases
+                  </div>
+                  <h3 class="text-2xl font-bold text-white">Database Generation vs Introspection</h3>
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+                <!-- VS Badge -->
+                <div class="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-surface-700 bg-surface-900 items-center justify-center text-xs font-bold text-surface-400 z-10 shadow-xl">VS</div>
+                
+                <!-- Competitor Card -->
+                <div class="bg-surface-800/20 rounded-xl p-6 border border-surface-700/50 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-alert"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <circle cx="12" cy="12" r="10" />
+  <line x1="12" x2="12" y1="8" y2="12" />
+  <line x1="12" x2="12.01" y1="16" y2="16" />
+</svg>
+
+                      <h4 class="text-white font-semibold">The Payload CMS Approach</h4>
+                    </div>
+                    <p class="text-surface-400 text-sm leading-relaxed">Payload CMS is fundamentally a code-first system designed to start with clean slates. Pointing Payload to an extremely large, heavily-populated legacy database requires tedious manual recreation of your structure in its proprietary Config.</p>
+                  </div>
+                </div>
+
+                <!-- Rebase Card -->
+                <div class="bg-primary/5 rounded-xl p-6 border border-primary/20 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-check-big"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+  <path d="m9 11 3 3L22 4" />
+</svg>
+
+                      <h4 class="text-white font-semibold">The Rebase Approach</h4>
+                    </div>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
+                      Rebase thrives on existing data.
+                    </p>
+                    <ul class="text-surface-400 space-y-3 text-sm">
+                      <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Connect Rebase directly to your existing Postgres DB and let built-in introspection tools map it perfectly.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Rebase instantly generates the UI, APIs, and Admin scaffolding for your legacy schema without breaking your existing apps.</span></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+          </div>
+
+          <!-- Point 2 -->
+          <div class="py-2">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div>
+                  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-3">
+                    
+<svg
+  class="lucide lucide-wrench"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" />
+</svg>
+
+                    Non-Technical Collaboration
+                  </div>
+                  <h3 class="text-2xl font-bold text-white">Code-Only vs Visual AST Manipulation</h3>
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+                <!-- VS Badge -->
+                <div class="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-surface-700 bg-surface-900 items-center justify-center text-xs font-bold text-surface-400 z-10 shadow-xl">VS</div>
+                
+                <!-- Competitor Card -->
+                <div class="bg-surface-800/20 rounded-xl p-6 border border-surface-700/50 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-alert"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <circle cx="12" cy="12" r="10" />
+  <line x1="12" x2="12" y1="8" y2="12" />
+  <line x1="12" x2="12.01" y1="16" y2="16" />
+</svg>
+
+                      <h4 class="text-white font-semibold">The Payload CMS Approach</h4>
+                    </div>
+                    <p class="text-surface-400 text-sm leading-relaxed">Because Payload forces a strict code-first setup, making simple schema enhancements (like adding a `published_date` field or swapping an input validation logic) requires a developer to open an IDE, write TypeScript, PR, and redeploy.</p>
+                  </div>
+                </div>
+
+                <!-- Rebase Card -->
+                <div class="bg-primary/5 rounded-xl p-6 border border-primary/20 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-check-big"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+  <path d="m9 11 3 3L22 4" />
+</svg>
+
+                      <h4 class="text-white font-semibold">The Rebase Approach</h4>
+                    </div>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
+                      Rebase empowers PMs, admins, and content managers to move quickly without waiting on engineering.
+                    </p>
+                    <ul class="text-surface-400 space-y-3 text-sm">
+                      <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">The Rebase Studio allows visual drag-and-drop creation for schema edits directly from the UI.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Using intelligent AST manipulation, Rebase safely writes the required TypeScript code changes directly back to your repository—preserving custom developer callbacks identically.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Developers still get `Schema-as-Code`, but the whole team can contribute visually.</span></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+          </div>
+
+          <!-- Point 3 -->
+          <div class="py-2">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div>
+                  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-3">
+                    
+<svg
+  class="lucide lucide-terminal"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M12 19h8" />
+  <path d="m4 17 6-6-6-6" />
+</svg>
+
+                    Raw Tooling
+                  </div>
+                  <h3 class="text-2xl font-bold text-white">Abstracted Layers vs DB Transparency</h3>
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+                <!-- VS Badge -->
+                <div class="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-surface-700 bg-surface-900 items-center justify-center text-xs font-bold text-surface-400 z-10 shadow-xl">VS</div>
+                
+                <!-- Competitor Card -->
+                <div class="bg-surface-800/20 rounded-xl p-6 border border-surface-700/50 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-alert"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <circle cx="12" cy="12" r="10" />
+  <line x1="12" x2="12" y1="8" y2="12" />
+  <line x1="12" x2="12.01" y1="16" y2="16" />
+</svg>
+
+                      <h4 class="text-white font-semibold">The Payload CMS Approach</h4>
+                    </div>
+                    <p class="text-surface-400 text-sm leading-relaxed">Payload entirely abstracts away the database layer (for broader MongoDB / SQL compatibility). If you are building a Postgres-heavy, complex internal tool, you lose out on the Postgres tooling directly inside your admin panel.</p>
+                  </div>
+                </div>
+
+                <!-- Rebase Card -->
+                <div class="bg-primary/5 rounded-xl p-6 border border-primary/20 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-check-big"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+  <path d="m9 11 3 3L22 4" />
+</svg>
+
+                      <h4 class="text-white font-semibold">The Rebase Approach</h4>
+                    </div>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
+                      Rebase builds tools specifically for Postgres admins.
+                    </p>
+                    <ul class="text-surface-400 space-y-3 text-sm">
+                      <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Utilize a fully functional, integrated SQL Console to query raw tables directly.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Execute Postgres EXPLAIN plans instantly to optimize expensive query costs while building internally.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Configure powerful visual RLS rules for airtight security architecture.</span></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+          </div>
+
+          
+        </div>
+
+      </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="bg-black py-16 sm:py-24 border-t border-surface-800/40">
+      <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
+        <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-6">Unleash your Postgres Database.</h2>
+        <div class="flex items-center justify-center gap-x-6">
+          <a href="/docs" class="inline-flex items-center gap-x-2 rounded-md bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-dark transition-all duration-200 ease-in-out btn-glow">
+            Get Started
+            
+<svg
+  class="lucide lucide-arrow-right"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M5 12h14" />
+  <path d="m12 5 7 7-7 7" />
+</svg>
+
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+

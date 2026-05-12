@@ -1,0 +1,688 @@
+---
+const { lang, t } = Astro.props;
+
+import { languages, defaultLang, useTranslations } from '../../i18n/ui';
+
+
+
+import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
+
+
+
+---
+
+
+    <main>
+        <!-- Hero Section -->
+        <section
+            class="relative isolate overflow-hidden bg-linear-to-br from-black to-surface-950 pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
+            <!-- Background accents and subtle grid -->
+            <div class="pointer-events-none absolute inset-0 -z-10">
+                <div class="absolute -bottom-40 right-1/3 w-[700px] h-[700px] rounded-full bg-blue-500/5 blur-3xl opacity-50"></div>
+                <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:40px_40px] opacity-10"></div>
+            </div>
+
+            <div class="px-4 mx-auto max-w-7xl text-center lg:px-12">
+                <h1 class="mb-8 text-5xl font-extrabold tracking-tight leading-none md:text-6xl text-white font-sans">
+                    Trust Through Transparency
+                </h1>
+                <p class="mb-4 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
+                    Your data is <b>yours</b>. Rebase is engineered from the ground up to guarantee
+                    absolute data sovereignty, privacy, and security through transparent architecture.
+                </p>
+            </div>
+            <SectionBackgroundAccents bottomLine={true}/>
+        </section>
+
+        <!-- Core Pillars Section -->
+        <section class="bg-black py-16 sm:py-24">
+            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+                <div class="mx-auto max-w-3xl text-center mb-16">
+                    <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Our Core Security
+                        Principles</h2>
+                    <p class="mt-4 text-lg leading-8 text-surface-400">
+                        Rebase is built on three foundational pillars that ensure your data remains secure
+                        and under your control.
+                    </p>
+                </div>
+                <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
+                    <!-- Pillar 1 -->
+                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
+                        <div class="flex items-center gap-4 mb-6">
+                            <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                                
+<svg
+  class="lucide lucide-database"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <ellipse cx="12" cy="5" rx="9" ry="3" />
+  <path d="M3 5V19A9 3 0 0 0 21 19V5" />
+  <path d="M3 12A9 3 0 0 0 21 12" />
+</svg>
+
+                            </div>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white mb-4">Absolute Data Ownership</h3>
+                        <p class="text-surface-400">Your data lives exclusively in your own PostgreSQL database.
+                            Rebase never stores, accesses, or controls your content. You maintain 100% ownership and
+                            control.</p>
+                    </div>
+                    <!-- Pillar 2 -->
+                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
+                        <div class="flex items-center gap-4 mb-6">
+                            <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                                
+<svg
+  class="lucide lucide-shield"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+</svg>
+
+                            </div>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white mb-4">Multi-Layered Security</h3>
+                        <p class="text-surface-400">Enterprise-grade security through a shared responsibility model: robust
+                            application controls, self-hosted infrastructure under your full control, and your
+                            custom security rules.</p>
+                    </div>
+                    <!-- Pillar 3 -->
+                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
+                        <div class="flex items-center gap-4 mb-6">
+                            <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                                
+<svg
+  class="lucide lucide-eye"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
+  <circle cx="12" cy="12" r="3" />
+</svg>
+
+                            </div>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white mb-4">Transparency by Design</h3>
+                        <p class="text-surface-400">Our open-source core, clear privacy policies, and transparent
+                            architecture mean you can audit every aspect of how Rebase works. No hidden surprises.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Data Sovereignty Section -->
+        <section class="bg-surface-950 py-16 sm:py-24">
+            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+                <div class="grid lg:grid-cols-2 gap-12 items-center">
+                    <div>
+                        <div class="flex items-center mb-4">
+                            
+<svg
+  class="lucide lucide-database"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <ellipse cx="12" cy="5" rx="9" ry="3" />
+  <path d="M3 5V19A9 3 0 0 0 21 19V5" />
+  <path d="M3 12A9 3 0 0 0 21 12" />
+</svg>
+
+                            <h2 class="text-2xl font-medium text-white m-0">Your Data, Your Infrastructure</h2>
+                        </div>
+                        <p class="text-lg text-surface-300 mb-8">
+                            Unlike traditional SaaS CMS platforms that ingest and control your data, Rebase operates as
+                            a sophisticated tool that connects directly to <b>your own</b> database.
+                        </p>
+                        <div class="space-y-6">
+                            <div class="flex items-start gap-3">
+                                
+<svg
+  class="lucide lucide-circle-check-big"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+  <path d="m9 11 3 3L22 4" />
+</svg>
+
+                                <div>
+                                    <h4 class="font-semibold text-white">No Data Migration Required</h4>
+                                    <p class="text-surface-400">Rebase adapts to your existing data structure, not the
+                                        other way around.</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                
+<svg
+  class="lucide lucide-circle-check-big"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+  <path d="m9 11 3 3L22 4" />
+</svg>
+
+                                <div>
+                                    <h4 class="font-semibold text-white">Zero Vendor Lock-in</h4>
+                                    <p class="text-surface-400">Stop using Rebase anytime - your data stays exactly where
+                                        it is.</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                
+<svg
+  class="lucide lucide-circle-check-big"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+  <path d="m9 11 3 3L22 4" />
+</svg>
+
+                                <div>
+                                    <h4 class="font-semibold text-white">Direct Infrastructure Access</h4>
+                                    <p class="text-surface-400">Full control over your PostgreSQL database and
+                                        infrastructure.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="rounded-xl border overflow-hidden border-surface-800">
+                        <img
+                            src="/img/demo-admin-panel.png"
+                            alt="Diagram showing Rebase connecting to customer's own PostgreSQL database"
+                            class="h-full w-full object-cover"
+                        />
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Architecture & Security -->
+        <section class="bg-black py-16 sm:py-24">
+            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Multi-Layered Security
+                        Architecture</h2>
+                    <p class="mt-4 text-lg leading-8 text-surface-400">Security through shared responsibility and defense
+                        in depth.</p>
+                </div>
+                <div class="grid lg:grid-cols-2 gap-12 items-center">
+                    <div class="rounded-xl overflow-hidden">
+                        <img
+                            src="/img/rebase-layers.png"
+                            alt="Security architecture diagram"
+                            class="h-full w-full object-cover"
+                        />
+                    </div>
+                    <div class="space-y-6">
+                        <div class="p-6 rounded-lg border border-surface-800 bg-surface-900/50">
+                            <div class="flex items-center mb-3">
+                                
+<svg
+  class="lucide lucide-shield-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+  <path d="m9 12 2 2 4-4" />
+</svg>
+
+                                <h3 class="text-lg font-semibold text-white m-0">Application Layer</h3>
+                            </div>
+                            <p class="text-surface-400">Granular role-based access control, dynamic permissions, and custom
+                                authentication integrations.</p>
+                        </div>
+                        <div class="p-6 rounded-lg border border-surface-800 bg-surface-900/50">
+                            <div class="flex items-center mb-3">
+                                
+<svg
+  class="lucide lucide-cloud-upload"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M12 13v8" />
+  <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
+  <path d="m8 17 4-4 4 4" />
+</svg>
+
+                                <h3 class="text-lg font-semibold text-white m-0">Infrastructure Layer</h3>
+                            </div>
+                            <p class="text-surface-400">Enterprise-grade security with your own infrastructure:
+                                encryption, network security, and full compliance control.</p>
+                        </div>
+                        <div class="p-6 rounded-lg border border-surface-800 bg-surface-900/50">
+                            <div class="flex items-center mb-3">
+                                
+<svg
+  class="lucide lucide-key"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4" />
+  <path d="m21 2-9.6 9.6" />
+  <circle cx="7.5" cy="15.5" r="5.5" />
+</svg>
+
+                                <h3 class="text-lg font-semibold text-white m-0">Database Security</h3>
+                            </div>
+                            <p class="text-surface-400">Your PostgreSQL row-level security and access policies enforce access at the
+                                data layer. Ultimate control in your hands.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Deployment Models Section -->
+        <section class="bg-surface-950 py-16 sm:py-24">
+            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Your Security
+                        Posture</h2>
+                    <p class="mt-4 text-lg leading-8 text-surface-400">Host it yourself to meet your compliance requirements.</p>
+                </div>
+                <div class="grid gap-8 max-w-3xl mx-auto">
+                    <!-- Self-Hosted -->
+                    <div class="p-8 rounded-xl border bg-surface-900/50 border-surface-800">
+                        <div class="flex items-center mb-4">
+                            
+<svg
+  class="lucide lucide-monitor"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <rect width="20" height="14" x="2" y="3" rx="2" />
+  <line x1="8" x2="16" y1="21" y2="21" />
+  <line x1="12" x2="12" y1="17" y2="21" />
+</svg>
+
+                            <h3 class="text-2xl font-bold m-0 text-white">Self-Hosted</h3>
+                        </div>
+                        <p class="text-surface-400 mb-6">Ultimate control and transparency. Deploy Rebase entirely within
+                            your own infrastructure.</p>
+                        <ul class="space-y-3 text-surface-300">
+                            <li class="flex items-start gap-3">
+                                
+<svg
+  class="lucide lucide-circle-check-big"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+  <path d="m9 11 3 3L22 4" />
+</svg>
+
+                                <span>Open-source MIT license available</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                
+<svg
+  class="lucide lucide-circle-check-big"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+  <path d="m9 11 3 3L22 4" />
+</svg>
+
+                                <span>Deploy on any static hosting provider</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                
+<svg
+  class="lucide lucide-circle-check-big"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+  <path d="m9 11 3 3L22 4" />
+</svg>
+
+                                <span>No external dependencies or proprietary servers</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Privacy & Compliance Section -->
+        <section class="bg-black py-24 sm:py-32">
+            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+                <div class="max-w-4xl mx-auto text-center">
+                    <div class="flex items-center mb-4 justify-center">
+                        <h2 class="text-3xl font-bold text-white m-0">Privacy & Compliance Ready</h2>
+                    </div>
+                    <p class="text-xl text-surface-300 mb-8">
+                        Rebase's architecture is designed to simplify your compliance journey under <b>GDPR</b>,
+                        <b>CCPA</b>, and other global privacy regulations.
+                    </p>
+                </div>
+                <div class="max-w-4xl mx-auto grid md:grid-cols-3 gap-6">
+                    <div class="p-6 rounded-lg border bg-surface-900/50 border-surface-800">
+                        <div class="flex items-center mb-3">
+                            
+<svg
+  class="lucide lucide-user-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="m16 11 2 2 4-4" />
+  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+  <circle cx="9" cy="7" r="4" />
+</svg>
+
+                            <h5 class="font-semibold text-white m-0">You Are the Data Controller</h5>
+                        </div>
+                        <p class="text-surface-400 text-sm">You maintain direct control and legal responsibility for your
+                            end-user data.</p>
+                    </div>
+                    <div class="p-6 rounded-lg border bg-surface-900/50 border-surface-800">
+                        <div class="flex items-center mb-3">
+                            
+<svg
+  class="lucide lucide-file-text"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" />
+  <path d="M14 2v5a1 1 0 0 0 1 1h5" />
+  <path d="M10 9H8" />
+  <path d="M16 13H8" />
+  <path d="M16 17H8" />
+</svg>
+
+                            <h5 class="font-semibold text-white m-0">Simplified Data Subject Requests</h5>
+                        </div>
+                        <p class="text-surface-400 text-sm">Fulfill access and deletion requests directly from your
+                            database.</p>
+                    </div>
+                    <div class="p-6 rounded-lg border bg-surface-900/50 border-surface-800">
+                        <div class="flex items-center mb-3">
+                            
+<svg
+  class="lucide lucide-database"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <ellipse cx="12" cy="5" rx="9" ry="3" />
+  <path d="M3 5V19A9 3 0 0 0 21 19V5" />
+  <path d="M3 12A9 3 0 0 0 21 12" />
+</svg>
+
+                            <h5 class="font-semibold text-white m-0">Data Residency Control</h5>
+                        </div>
+                        <p class="text-surface-400 text-sm">Choose your PostgreSQL deployment region to meet residency
+                            requirements.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Trust Indicators Section -->
+        <section class="bg-surface-950 py-16 sm:py-24">
+            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Trusted by Leading
+                        Organizations</h2>
+                    <p class="mt-4 text-lg leading-8 text-surface-400">Enterprise teams trust Rebase with their most
+                        critical data.</p>
+                </div>
+                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="p-6 rounded-xl border bg-surface-900/50 text-center border-surface-800">
+                        
+<svg
+  class="lucide lucide-users"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+  <path d="M16 3.128a4 4 0 0 1 0 7.744" />
+  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+  <circle cx="9" cy="7" r="4" />
+</svg>
+
+                        <h3 class="text-3xl font-bold text-white mb-2">10000+</h3>
+                        <p class="text-surface-400">Active Projects</p>
+                    </div>
+                    <div class="p-6 rounded-xl border bg-surface-900/50 text-center border-surface-800">
+                        
+<svg
+  class="lucide lucide-shield"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+</svg>
+
+                        <h3 class="text-3xl font-bold text-white mb-2">100%</h3>
+                        <p class="text-surface-400">Data Sovereignty</p>
+                    </div>
+                    <div class="p-6 rounded-xl border bg-surface-900/50 text-center border-surface-800">
+                        
+<svg
+  class="lucide lucide-monitor"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <rect width="20" height="14" x="2" y="3" rx="2" />
+  <line x1="8" x2="16" y1="21" y2="21" />
+  <line x1="12" x2="12" y1="17" y2="21" />
+</svg>
+
+                        <h3 class="text-3xl font-bold text-white mb-2">99.9%</h3>
+                        <p class="text-surface-400">Infrastructure Uptime</p>
+                    </div>
+                    <div class="p-6 rounded-xl border bg-surface-900/50 text-center border-surface-800">
+                        
+<svg
+  class="lucide lucide-user-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="m16 11 2 2 4-4" />
+  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+  <circle cx="9" cy="7" r="4" />
+</svg>
+
+                        <h3 class="text-3xl font-bold text-white mb-2">24/7</h3>
+                        <p class="text-surface-400">Security Monitoring</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Final CTA Section -->
+        <section class="bg-black py-16 sm:py-24">
+
+            <SectionBackgroundAccents topLine={true}/>
+            <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
+
+                <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-8">Ready to Give It a Try?</h2>
+                <p class="text-lg text-surface-300 mb-8 max-w-2xl mx-auto">
+                    Experience unmatched security and control. Join industry leaders who trust Rebase
+                    to keep their data sovereign while delivering powerful content management.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <a href="https://demo.rebase.pro"
+                       class="inline-flex items-center justify-center gap-x-2 rounded-md border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-surface-700 transition-all"
+                       rel="noopener noreferrer"
+                       target="_blank">
+                        Try the Demo
+                    </a>
+                    <a href="/docs"
+                       class="inline-flex items-center justify-center gap-x-2 rounded-md bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-dark transition-all btn-glow">
+                        Get Started
+                        
+<svg
+  class="lucide lucide-arrow-right"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M5 12h14" />
+  <path d="m12 5 7 7-7 7" />
+</svg>
+
+                    </a>
+                </div>
+            </div>
+        </section>
+    </main>
+

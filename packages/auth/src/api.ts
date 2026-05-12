@@ -103,13 +103,13 @@ password })
 }
 
 /**
- * Login with Google ID token
+ * Login with Google token (ID token or access token)
  */
-export async function googleLogin(idToken: string): Promise<AuthResponse> {
+export async function googleLogin(token: string, tokenType: "idToken" | "accessToken" = "idToken"): Promise<AuthResponse> {
     const response = await fetchWithHandling(`${baseApiUrl}/api/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken })
+        body: JSON.stringify({ [tokenType]: token })
     });
 
     return handleResponse<AuthResponse>(response);

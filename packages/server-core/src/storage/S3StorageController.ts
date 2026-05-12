@@ -72,7 +72,10 @@ export class S3StorageController implements StorageController {
      * Get the bucket name - either from parameter or config
      */
     private getBucket(bucket?: string): string {
-        return bucket ?? this.config.bucket;
+        // "default" is a logical bucket name used by local storage;
+        // for S3 it should resolve to the configured bucket.
+        if (!bucket || bucket === "default") return this.config.bucket;
+        return bucket;
     }
 
     async putObject({

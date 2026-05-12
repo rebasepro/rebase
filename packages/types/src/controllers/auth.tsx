@@ -98,8 +98,8 @@ export type AuthController<USER extends User = User, ExtraData = unknown> = {
 export interface AuthControllerExtended<USER extends User = User, ExtraData = unknown> extends AuthController<USER, ExtraData> {
     /** Login with email and password */
     emailPasswordLogin?(email: string, password: string): Promise<void>;
-    /** Login with a Google ID token or trigger Google popup */
-    googleLogin?(idToken: string): Promise<void>;
+    /** Login with a Google token (ID token or access token from popup) */
+    googleLogin?(token: string, tokenType?: "idToken" | "accessToken"): Promise<void>;
     /** Register a new user */
     register?(email: string, password: string, displayName?: string): Promise<void>;
     /** Skip login (for anonymous access if enabled) */

@@ -1,0 +1,499 @@
+---
+const { lang, t } = Astro.props;
+
+import { languages, defaultLang, useTranslations } from '../../i18n/ui';
+
+
+
+import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
+
+
+
+---
+
+  <main>
+    <section class="relative isolate overflow-hidden bg-linear-to-br from-black to-surface-950 pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
+      <SectionBackgroundAccents topLine={true} blob={{ position: "top", size: "lg", opacity: 60 }}/>
+      
+      <div class="px-4 mx-auto max-w-7xl text-center lg:px-12">
+        <h1 class="mb-8 text-5xl font-extrabold tracking-tight leading-none md:text-6xl text-white font-sans">
+          Rebase vs Retool
+        </h1>
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl max-w-3xl mx-auto">
+          Retool is excellent for throwing together quick internal dashboards, but as complexity grows, you slam into the invisible wall of "low-code". Discover why engineering teams migrate to Rebase to retain true code control, native React extensibility, and avoid crippling per-seat pricing.
+        </p>
+      </div>
+    </section>
+
+    <!-- Content Sections -->
+    <section class="bg-black py-16 sm:py-24">
+      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        
+        <div class="space-y-16">
+          
+          <!-- Point 1 -->
+          <div class="py-2">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div>
+                  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-3">
+                    
+<svg
+  class="lucide lucide-credit-card"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <rect width="20" height="14" x="2" y="5" rx="2" />
+  <line x1="2" x2="22" y1="10" y2="10" />
+</svg>
+
+                    Pricing Model
+                  </div>
+                  <h3 class="text-2xl font-bold text-white">Per-Seat Tax vs Open Source</h3>
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+                <!-- VS Badge -->
+                <div class="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-surface-700 bg-surface-900 items-center justify-center text-xs font-bold text-surface-400 z-10 shadow-xl">VS</div>
+                
+                <!-- Competitor Card -->
+                <div class="bg-surface-800/20 rounded-xl p-6 border border-surface-700/50 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-alert"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <circle cx="12" cy="12" r="10" />
+  <line x1="12" x2="12" y1="8" y2="12" />
+  <line x1="12" x2="12.01" y1="16" y2="16" />
+</svg>
+
+                      <h4 class="text-white font-semibold">The Retool Pain</h4>
+                    </div>
+                    <p class="text-surface-400 text-sm leading-relaxed">Retool's pricing model aggressively charges per seat. As your company scales and more non-technical teammates, contractors, or customers need access to internal apps, your SaaS bill balloons out of control, punishing you for growing.</p>
+                  </div>
+                </div>
+
+                <!-- Rebase Card -->
+                <div class="bg-primary/5 rounded-xl p-6 border border-primary/20 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-check-big"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+  <path d="m9 11 3 3L22 4" />
+</svg>
+
+                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                    </div>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
+                      Rebase does not punish you for success.
+                    </p>
+                    <ul class="text-surface-400 space-y-3 text-sm">
+                      <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Rebase is completely open-source (MIT licensed) and free to self-host.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Zero per-seat licensing fees. Add 10 users or 10,000 users.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Stop rationing access to internal tools simply to save on OPEX.</span></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+          </div>
+
+          <!-- Point 2 -->
+          <div class="py-2">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div>
+                  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-3">
+                    
+<svg
+  class="lucide lucide-puzzle"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z" />
+</svg>
+
+                    Extensibility & Logic
+                  </div>
+                  <h3 class="text-2xl font-bold text-white">Low-Code Walls vs Native React</h3>
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+                <!-- VS Badge -->
+                <div class="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-surface-700 bg-surface-900 items-center justify-center text-xs font-bold text-surface-400 z-10 shadow-xl">VS</div>
+                
+                <!-- Competitor Card -->
+                <div class="bg-surface-800/20 rounded-xl p-6 border border-surface-700/50 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-alert"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <circle cx="12" cy="12" r="10" />
+  <line x1="12" x2="12" y1="8" y2="12" />
+  <line x1="12" x2="12.01" y1="16" y2="16" />
+</svg>
+
+                      <h4 class="text-white font-semibold">The Retool Pain</h4>
+                    </div>
+                    <p class="text-surface-400 text-sm leading-relaxed">When your app logic gets complex, Retool forces developers to write hacky, disjointed blocks of JavaScript inside tiny UI text boxes. Debugging is incredibly difficult, and stepping outside their prescribed component library requires building custom iFrames.</p>
+                  </div>
+                </div>
+
+                <!-- Rebase Card -->
+                <div class="bg-primary/5 rounded-xl p-6 border border-primary/20 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-check-big"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+  <path d="m9 11 3 3L22 4" />
+</svg>
+
+                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                    </div>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
+                      Rebase gives you a blazing fast out-of-the-box admin panel, but when you need to extend it, you're just writing React.
+                    </p>
+                    <ul class="text-surface-400 space-y-3 text-sm">
+                      <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Use your favorite React IDE (VSCode, Cursor, WebStorm).</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Import ANY package from NPM (MUI, Tailwind, Recharts, etc) universally natively without iFrame hacks.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Write beautifully clean, linted, and testable TypeScript.</span></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+          </div>
+
+          <!-- Point 3 -->
+          <div class="py-2">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div>
+                  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-3">
+                    
+<svg
+  class="lucide lucide-package"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z" />
+  <path d="M12 22V12" />
+  <polyline points="3.29 7 12 12 20.71 7" />
+  <path d="m7.5 4.27 9 5.15" />
+</svg>
+
+                    Source Control & DevOps
+                  </div>
+                  <h3 class="text-2xl font-bold text-white">Proprietary XML vs True Schema-as-Code</h3>
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+                <!-- VS Badge -->
+                <div class="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-surface-700 bg-surface-900 items-center justify-center text-xs font-bold text-surface-400 z-10 shadow-xl">VS</div>
+                
+                <!-- Competitor Card -->
+                <div class="bg-surface-800/20 rounded-xl p-6 border border-surface-700/50 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-alert"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <circle cx="12" cy="12" r="10" />
+  <line x1="12" x2="12" y1="8" y2="12" />
+  <line x1="12" x2="12.01" y1="16" y2="16" />
+</svg>
+
+                      <h4 class="text-white font-semibold">The Retool Pain</h4>
+                    </div>
+                    <p class="text-surface-400 text-sm leading-relaxed">Retool's "Source Control" is a premium enterprise feature that exports your application state as massive, unreadable JSON or XML blobs. Code reviews (PRs) on these files are virtually impossible for humans to interpret, leading to broken staging environments.</p>
+                  </div>
+                </div>
+
+                <!-- Rebase Card -->
+                <div class="bg-primary/5 rounded-xl p-6 border border-primary/20 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-check-big"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+  <path d="m9 11 3 3L22 4" />
+</svg>
+
+                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                    </div>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
+                      Rebase was built on Git from day one.
+                    </p>
+                    <ul class="text-surface-400 space-y-3 text-sm">
+                      <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Configuration and UI schemas are standard TypeScript files.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">A PR review looks exactly like a standard frontend code review: `+ published: boolean`.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Deploy predictably using standard CI/CD pipelines instead of proprietary deployment tools.</span></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+          </div>
+
+          
+        </div>
+
+      </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="bg-black py-16 sm:py-24 border-t border-surface-800/40">
+      <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
+        <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-6">Escape the Low-Code Trap.</h2>
+        <div class="flex items-center justify-center gap-x-6">
+          <a href="/docs" class="inline-flex items-center gap-x-2 rounded-md bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-dark transition-all duration-200 ease-in-out btn-glow">
+            Get Started
+            
+<svg
+  class="lucide lucide-arrow-right"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M5 12h14" />
+  <path d="m12 5 7 7-7 7" />
+</svg>
+
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+

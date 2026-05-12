@@ -1,0 +1,29 @@
+---
+
+import { languages, defaultLang, useTranslations } from '../../i18n/ui';
+
+export function getStaticPaths() {
+  return Object.keys(languages).map((lang) => ({
+    params: { lang: lang === defaultLang ? undefined : lang },
+  }));
+}
+
+const { lang } = Astro.params;
+const currentLang = lang || defaultLang;
+const t = useTranslations(currentLang as keyof typeof languages);
+
+import Layout from '../../layouts/Layout.astro';
+
+const title = t('kd.title');
+const description = t('kd.desc');
+
+
+import KitDigitalContent from '../../components/pages/KitDigitalContent.astro';
+const breadcrumbs = [
+    { name: t('kd.breadcrumb.home'), url: "https://rebase.pro" },
+    { name: t('kd.breadcrumb.kd'), url: "https://rebase.pro/kit-digital" }
+];
+---
+<Layout title={title} description={description} breadcrumbs={breadcrumbs}>
+    <KitDigitalContent lang={currentLang} t={t} />
+</Layout>

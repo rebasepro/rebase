@@ -1,64 +1,68 @@
 ---
 import SectionBackgroundAccents from "./SectionBackgroundAccents.astro";
+import { getLangFromUrl, useTranslations } from "../i18n/ui";
+
+const lang = getLangFromUrl(Astro.url);
+const t = useTranslations(lang);
 
 const footerNavs = [
     {
-        title: "Product",
+        title: t("footer.product"),
         links: [
-            { label: "Features", url: "/features" },
-            { label: "Rebase Studio", url: "/studio" },
-            { label: "Backend & APIs", url: "/backend" },
-            { label: "AI & Agents", url: "/ai" },
-            { label: "Demo", url: "https://demo.rebase.pro", external: true },
+            { label: t("footer.features"), url: "/features" },
+            { label: t("footer.studio"), url: "/studio" },
+            { label: t("footer.backend"), url: "/backend" },
+            { label: t("footer.ai"), url: "/ai" },
+            { label: t("footer.demo"), url: "https://demo.rebase.pro", external: true },
         ],
     },
     {
-        title: "Developers",
+        title: t("footer.developers"),
         links: [
-            { label: "Overview", url: "/developers" },
-            { label: "Client SDK", url: "/sdk" },
-            { label: "CLI & Tooling", url: "/cli" },
-            { label: "Security & Auth", url: "/security" },
-            { label: "UI Components", url: "/ui" },
+            { label: t("footer.devOverview"), url: "/developers" },
+            { label: t("footer.sdk"), url: "/sdk" },
+            { label: t("footer.cli"), url: "/cli" },
+            { label: t("footer.security"), url: "/security" },
+            { label: t("footer.ui"), url: "/ui" },
             { label: "llms.txt", url: "/llms.txt", external: true },
         ],
     },
     {
-        title: "Solutions",
+        title: t("footer.solutions"),
         links: [
-            { label: "For Startups", url: "/startups" },
-            { label: "For Agencies", url: "/agencies" },
-            { label: "Why Rebase", url: "/why-rebase" },
+            { label: t("footer.startups"), url: "/startups" },
+            { label: t("footer.agencies"), url: "/agencies" },
+            { label: t("footer.whyRebase"), url: "/why-rebase" },
         ],
     },
     {
-        title: "Compare",
+        title: t("footer.compare"),
         links: [
-            { label: "vs Supabase", url: "/rebase-vs-supabase" },
-            { label: "vs Payload", url: "/rebase-vs-payload" },
-            { label: "vs Directus", url: "/rebase-vs-directus" },
-            { label: "vs Strapi", url: "/rebase-vs-strapi" },
-            { label: "vs Retool", url: "/rebase-vs-retool" },
-            { label: "vs Firebase", url: "/rebase-vs-firebase" },
-            { label: "vs Hasura", url: "/rebase-vs-hasura" },
-            { label: "vs Django", url: "/rebase-vs-django" },
+            { label: t("footer.vsSupabase"), url: "/rebase-vs-supabase" },
+            { label: t("footer.vsPayload"), url: "/rebase-vs-payload" },
+            { label: t("footer.vsDirectus"), url: "/rebase-vs-directus" },
+            { label: t("footer.vsStrapi"), url: "/rebase-vs-strapi" },
+            { label: t("footer.vsRetool"), url: "/rebase-vs-retool" },
+            { label: t("footer.vsFirebase"), url: "/rebase-vs-firebase" },
+            { label: t("footer.vsHasura"), url: "/rebase-vs-hasura" },
+            { label: t("footer.vsDjango"), url: "/rebase-vs-django" },
         ],
     },
     {
-        title: "Company",
+        title: t("footer.company"),
         links: [
-            { label: "About", url: "/about" },
-            { label: "Contact", url: "/contact" },
-            { label: "Kit Digital", url: "/kit-digital" },
-            { label: "Book a Call", url: "https://calendar.app.google/UDSmMagx6AEwar8P8", external: true },
+            { label: t("footer.about"), url: "/about" },
+            { label: t("footer.contact"), url: "/contact" },
+            { label: t("footer.kitDigital"), url: "/kit-digital" },
+            { label: t("footer.bookCall"), url: "https://calendar.app.google/UDSmMagx6AEwar8P8", external: true },
         ],
     },
     {
-        title: "Legal",
+        title: t("footer.legal"),
         links: [
-            { label: "Privacy Policy", url: "/policy/privacy_policy" },
-            { label: "Terms of Service", url: "/policy/terms_conditions" },
-            { label: "Cookie Policy", url: "/policy/cookies_policy" },
+            { label: t("footer.privacy"), url: "/policy/privacy_policy" },
+            { label: t("footer.terms"), url: "/policy/terms_conditions" },
+            { label: t("footer.cookies"), url: "/policy/cookies_policy" },
         ],
     },
 ];
@@ -74,7 +78,7 @@ const footerNavs = [
                     </a>
                 </div>
                 <div class="text-surface-400 mt-4 text-sm">
-                    The Open-Source Postgres CMS · Built in Europe
+                    {t("footer.tagline")}
                 </div>
             </div>
             <div class="grid grid-cols-2 gap-8 sm:gap-6 sm:grid-cols-3 lg:grid-cols-6 xl:gap-8">
@@ -102,7 +106,7 @@ const footerNavs = [
         <SectionBackgroundAccents topLine={true} blob={{ position: "top", size: "lg" }}/>
         <div class="mt-8 pt-8 ">
             <div class="sm:flex sm:items-center sm:justify-between">
-                <span class="text-sm sm:text-center text-surface-400">© 2026 Rebase. All Rights Reserved.</span>
+                <span class="text-sm sm:text-center text-surface-400">{t("footer.rights")}</span>
                 <div class="flex gap-6 mt-4 sm:mt-0">
                     <a href="https://github.com/rebaseco" target="_blank" rel="noopener noreferrer"
                        data-track

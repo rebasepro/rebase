@@ -1,0 +1,522 @@
+---
+const { lang, t } = Astro.props;
+
+import { languages, defaultLang, useTranslations } from '../../i18n/ui';
+
+
+
+import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
+
+
+
+---
+
+  <main>
+    <!-- Hero Section -->
+    <section class="relative isolate overflow-hidden bg-linear-to-br from-black to-surface-950 pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
+      <SectionBackgroundAccents topLine={true} blob={{ position: "top", size: "lg", opacity: 60 }}/>
+      
+      <div class="px-4 mx-auto max-w-7xl text-center lg:px-12">
+        <h1 class="mb-8 text-5xl font-extrabold tracking-tight leading-none md:text-6xl text-white font-sans">
+          Rebase vs Supabase
+        </h1>
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl max-w-3xl mx-auto">
+          Supabase is a fantastic platform, but its "Firebase alternative" marketing hides the operational overhead of managing raw PostgreSQL in production. See how Rebase solves the biggest pain points developers face when scaling.
+        </p>
+      </div>
+    </section>
+
+    <!-- Content Sections -->
+    <section class="bg-black py-16 sm:py-24">
+      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        
+        <div class="space-y-16">
+          
+          <!-- Point 1 -->
+          <div class="py-2">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div>
+                  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-3">
+                    
+<svg
+  class="lucide lucide-shield"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+</svg>
+
+                    Security & RBAC
+                  </div>
+                  <h3 class="text-2xl font-bold text-white">RLS without the Footgun</h3>
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+                <!-- VS Badge -->
+                <div class="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-surface-700 bg-surface-900 items-center justify-center text-xs font-bold text-surface-400 z-10 shadow-xl">VS</div>
+                
+                <!-- Competitor Card -->
+                <div class="bg-surface-800/20 rounded-xl p-6 border border-surface-700/50 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-alert"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <circle cx="12" cy="12" r="10" />
+  <line x1="12" x2="12" y1="8" y2="12" />
+  <line x1="12" x2="12.01" y1="16" y2="16" />
+</svg>
+
+                      <h4 class="text-white font-semibold">The Supabase Pain</h4>
+                    </div>
+                    <p class="text-surface-400 text-sm leading-relaxed">PostgreSQL Row Level Security (RLS) policies are notoriously difficult to write, test, and debug. Poorly written policies destroy performance via implicit JOINs, and Supabase lacks a built-in out-of-the-box RBAC UI.</p>
+                  </div>
+                </div>
+
+                <!-- Rebase Card -->
+                <div class="bg-primary/5 rounded-xl p-6 border border-primary/20 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-check-big"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+  <path d="m9 11 3 3L22 4" />
+</svg>
+
+                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                    </div>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
+                      Rebase embraces Native Postgres RLS but surrounds it with powerful tooling. Instead of writing opaque SQL, you define dynamic policies purely in TypeScript. Real-time inference generates user-friendly configuration UI.
+                    </p>
+                    <ul class="text-surface-400 space-y-3 text-sm">
+                      <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Built-in visual RLS policy editor.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Define dynamic context directly in TypeScript instead of complex JOINs.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Granular access control applied logically.</span></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+          </div>
+
+          <!-- Point 2 -->
+          <div class="py-2">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div>
+                  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-3">
+                    
+<svg
+  class="lucide lucide-server"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <rect width="20" height="8" x="2" y="2" rx="2" ry="2" />
+  <rect width="20" height="8" x="2" y="14" rx="2" ry="2" />
+  <line x1="6" x2="6.01" y1="6" y2="6" />
+  <line x1="6" x2="6.01" y1="18" y2="18" />
+</svg>
+
+                    Infrastructure
+                  </div>
+                  <h3 class="text-2xl font-bold text-white">True Self-Hosting Symmetry</h3>
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+                <!-- VS Badge -->
+                <div class="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-surface-700 bg-surface-900 items-center justify-center text-xs font-bold text-surface-400 z-10 shadow-xl">VS</div>
+                
+                <!-- Competitor Card -->
+                <div class="bg-surface-800/20 rounded-xl p-6 border border-surface-700/50 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-alert"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <circle cx="12" cy="12" r="10" />
+  <line x1="12" x2="12" y1="8" y2="12" />
+  <line x1="12" x2="12.01" y1="16" y2="16" />
+</svg>
+
+                      <h4 class="text-white font-semibold">The Supabase Pain</h4>
+                    </div>
+                    <p class="text-surface-400 text-sm leading-relaxed">Self-hosting Supabase is an infrastructure nightmare. It is a massive constellation of microservices: PostgREST (Haskell), GoTrue (Go), Realtime (Elixir), and Edge Functions (Deno). Upgrading these services independently is nearly impossible for small teams.</p>
+                  </div>
+                </div>
+
+                <!-- Rebase Card -->
+                <div class="bg-primary/5 rounded-xl p-6 border border-primary/20 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-check-big"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+  <path d="m9 11 3 3L22 4" />
+</svg>
+
+                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                    </div>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
+                      Rebase is unified. It is a single Node.js backend using standard Hono and Drizzle ORM.
+                    </p>
+                    <ul class="text-surface-400 space-y-3 text-sm">
+                      <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">One service to deploy via Docker, Railway, Fly, or bare metal.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Written completely in TypeScript — the language you already know.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Tightly coupled and fully integrated without black-box binaries.</span></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+          </div>
+
+          <!-- Point 3 -->
+          <div class="py-2">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div>
+                  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-3">
+                    
+<svg
+  class="lucide lucide-code"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="m16 18 6-6-6-6" />
+  <path d="m8 6-6 6 6 6" />
+</svg>
+
+                    Architecture
+                  </div>
+                  <h3 class="text-2xl font-bold text-white">Schema-as-Code Workflow</h3>
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+                <!-- VS Badge -->
+                <div class="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-surface-700 bg-surface-900 items-center justify-center text-xs font-bold text-surface-400 z-10 shadow-xl">VS</div>
+                
+                <!-- Competitor Card -->
+                <div class="bg-surface-800/20 rounded-xl p-6 border border-surface-700/50 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-alert"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <circle cx="12" cy="12" r="10" />
+  <line x1="12" x2="12" y1="8" y2="12" />
+  <line x1="12" x2="12.01" y1="16" y2="16" />
+</svg>
+
+                      <h4 class="text-white font-semibold">The Supabase Pain</h4>
+                    </div>
+                    <p class="text-surface-400 text-sm leading-relaxed">With Supabase, the database *is* the state. Local development, staging, and production environments quickly fall out of sync. Managing version control for RPCs, Triggers, and RLS inside raw SQL files requires extreme discipline.</p>
+                  </div>
+                </div>
+
+                <!-- Rebase Card -->
+                <div class="bg-primary/5 rounded-xl p-6 border border-primary/20 relative overflow-hidden">
+                  <div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] -mr-16 -mt-16"></div>
+                  <div class="relative">
+                    <div class="flex items-center gap-2 mb-3">
+                      
+<svg
+  class="lucide lucide-circle-check-big"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+  <path d="m9 11 3 3L22 4" />
+</svg>
+
+                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                    </div>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
+                      Rebase pioneers a Git-backed hybrid approach. Your schema definitions live purely as standalone TypeScript configuration files (`/collections/products.ts`).
+                    </p>
+                    <ul class="text-surface-400 space-y-3 text-sm">
+                      <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">The Rebase Studio uses AST manipulation to inject fields into your code safely.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Drizzle migrations are automatically synced and deployed.</span></li>
+                  <li class="flex items-start">
+<svg
+  class="lucide lucide-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ <span class="leading-relaxed">Code is the source of truth, guaranteeing environmental parity.</span></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+          </div>
+
+          
+        </div>
+
+      </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="bg-black py-16 sm:py-24 border-t border-surface-800/40">
+      <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
+        <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-6">Ready for a true Open-Source approach?</h2>
+        <p class="text-lg text-surface-400 mb-8 max-w-2xl mx-auto">Rebase generates your admin panel, APIs, and SDK in minutes — right from your existing schema.</p>
+        <div class="flex items-center justify-center gap-x-6">
+          <a href="/docs" class="inline-flex items-center gap-x-2 rounded-md bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-dark transition-all duration-200 ease-in-out btn-glow">
+            Get Started
+            
+<svg
+  class="lucide lucide-arrow-right"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M5 12h14" />
+  <path d="m12 5 7 7-7 7" />
+</svg>
+
+          </a>
+          <a href="https://github.com/rebasepro/rebase" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold">
+            View on GitHub
+            
+<svg
+  class="lucide lucide-arrow-right"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M5 12h14" />
+  <path d="m12 5 7 7-7 7" />
+</svg>
+
+          </a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+

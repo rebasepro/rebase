@@ -1,6 +1,6 @@
 /**
  * Single consolidated seed script for the Rebase demo.
- * Copies static seed images to local storage and seeds all collections.
+ * Uploads static seed images to storage (local or S3/MinIO) and seeds all collections.
  * Run with: npx tsx src/seed.ts
  */
 import { createPostgresDatabaseConnection } from "@rebasepro/server-postgresql";
@@ -20,6 +20,82 @@ const __dirname = path.dirname(__filename);
 const UPLOADS_DIR = path.resolve(__dirname, "../../uploads/default");
 const SEED_ASSETS_DIR = path.resolve(__dirname, "../../seed-assets");
 
+// ── S3 helpers (lazy-loaded only when STORAGE_TYPE=s3) ────────────────
+const isS3 = env.STORAGE_TYPE === "s3";
+let _s3Client: any = null;
+
+async function getS3Client() {
+    if (_s3Client) return _s3Client;
+    const { S3Client } = await import("@aws-sdk/client-s3");
+    _s3Client = new S3Client({
+        endpoint: env.S3_ENDPOINT,
+        region: env.S3_REGION || "us-east-1",
+        forcePathStyle: env.S3_FORCE_PATH_STYLE,
+        credentials: {
+            accessKeyId: env.S3_ACCESS_KEY_ID || "",
+            secretAccessKey: env.S3_SECRET_ACCESS_KEY || "",
+        },
+    });
+    return _s3Client;
+}
+
+function getContentType(file: string): string {
+    const ext = file.split(".").pop()?.toLowerCase() ?? "jpg";
+    const map: Record<string, string> = {
+        jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
+        webp: "image/webp", avif: "image/avif", gif: "image/gif",
+    };
+    return map[ext] || "application/octet-stream";
+}
+
+/**
+ * Upload seed assets from a local directory to S3.
+ * Skips files that already exist in the bucket.
+ * Returns the list of relative storage keys.
+ */
+async function uploadAssetsToS3(assetSubdir: string, storagePrefix: string): Promise<string[]> {
+    const srcDir = path.join(SEED_ASSETS_DIR, assetSubdir);
+    if (!fs.existsSync(srcDir)) {
+        console.warn(`  ⚠️ Seed assets not found: ${srcDir}`);
+        return [];
+    }
+
+    const { PutObjectCommand, HeadObjectCommand } = await import("@aws-sdk/client-s3");
+    const client = await getS3Client();
+    const bucket = env.S3_BUCKET!;
+
+    const files = fs.readdirSync(srcDir).filter(f => !f.endsWith(".metadata.json"));
+    const keys: string[] = [];
+    let uploaded = 0;
+
+    for (const file of files) {
+        const key = `${storagePrefix}${file}`;
+        keys.push(key);
+
+        // Check if already exists
+        try {
+            await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+            continue; // already exists
+        } catch {
+            // doesn't exist, upload it
+        }
+
+        const body = fs.readFileSync(path.join(srcDir, file));
+        await client.send(new PutObjectCommand({
+            Bucket: bucket,
+            Key: key,
+            Body: body,
+            ContentType: getContentType(file),
+        }));
+        uploaded++;
+    }
+
+    if (uploaded > 0) {
+        console.log(`  📤 Uploaded ${uploaded} new files to s3://${bucket}/${storagePrefix}`);
+    }
+    return keys;
+}
+
 // ── Deterministic RNG & UUIDs ─────────────────────────────────────────
 let _seed = 1337;
 function random() {
@@ -37,7 +113,7 @@ function generateUUID(prefix: string, index: number): string {
 
 // ── Static seed-asset helpers ─────────────────────────────────────────
 /**
- * Copy all files from a seed-assets subdirectory into the uploads directory.
+ * Copy all files from a seed-assets subdirectory into the uploads directory (local storage).
  * Writes .metadata.json for each file. Skips files already present.
  * Returns the list of relative storage paths.
  */
@@ -82,6 +158,17 @@ function copyStaticAssets(assetSubdir: string, uploadsSubdir: string): string[] 
     }
 
     return paths;
+}
+
+/**
+ * Unified helper: copies seed assets to local storage or uploads to S3,
+ * depending on the current STORAGE_TYPE configuration.
+ */
+async function seedAssets(assetSubdir: string, storagePrefix: string): Promise<string[]> {
+    if (isS3) {
+        return uploadAssetsToS3(assetSubdir, storagePrefix);
+    }
+    return copyStaticAssets(assetSubdir, storagePrefix);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────
@@ -241,18 +328,18 @@ export async function runSeed() {
     const POST_COUNT = 1500;
 
     try {
-        // ── Copy static seed images to local storage ─────────────────
-        console.log("📸 Copying seed images to local storage...");
-        const heroImagePaths = copyStaticAssets("hero", "posts/hero/");
+        // ── Seed images to storage (local or S3/MinIO) ─────────────────
+        console.log(`📸 Seeding images to ${isS3 ? "S3/MinIO" : "local"} storage...`);
+        const heroImagePaths = await seedAssets("hero", "posts/hero/");
         console.log(`  ✅ ${heroImagePaths.length} hero images`);
 
-        const contentImagePaths = copyStaticAssets("content", "posts/content/");
+        const contentImagePaths = await seedAssets("content", "posts/content/");
         console.log(`  ✅ ${contentImagePaths.length} content images`);
 
-        copyStaticAssets("author_pictures", "author_pictures/");
+        await seedAssets("author_pictures", "author_pictures/");
         console.log(`  ✅ author pictures`);
 
-        const productImagePaths = copyStaticAssets("product_images", "product_images/");
+        const productImagePaths = await seedAssets("product_images", "product_images/");
         console.log(`  ✅ ${productImagePaths.length} product images`);
 
 

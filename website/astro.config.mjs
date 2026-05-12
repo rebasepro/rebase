@@ -17,6 +17,7 @@ export default defineConfig({
         }),
         starlight({
             title: "Rebase Docs",
+            locales: { root: { label: "English", lang: "en" }, es: { label: "Español", lang: "es" }, de: { label: "Deutsch", lang: "de" }, fr: { label: "Français", lang: "fr" }, it: { label: "Italiano", lang: "it" }, pt: { label: "Português", lang: "pt" } },
             customCss: [
                 "./src/styles/global.css",
                 "./src/styles/starlight.css"
@@ -287,7 +288,19 @@ slug: "docs/deployment/flyio" }
             }
         }),
         mdx(),
-        sitemap()
+        sitemap({
+            i18n: {
+                defaultLocale: 'en',
+                locales: {
+                    en: 'en',
+                    es: 'es',
+                    de: 'de',
+                    fr: 'fr',
+                    it: 'it',
+                    pt: 'pt',
+                },
+            },
+        })
     ],
     vite: {
         plugins: [

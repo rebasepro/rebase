@@ -1,0 +1,30 @@
+---
+
+import { languages, defaultLang, useTranslations } from '../../i18n/ui';
+
+export function getStaticPaths() {
+  return Object.keys(languages).map((lang) => ({
+    params: { lang: lang === defaultLang ? undefined : lang },
+  }));
+}
+
+const { lang } = Astro.params;
+const currentLang = lang || defaultLang;
+const t = useTranslations(currentLang as keyof typeof languages);
+
+import Layout from '../../layouts/Layout.astro';
+
+const title = t("studio.meta.title");
+const description = t("studio.meta.description");
+
+
+
+import StudioContent from '../../components/pages/StudioContent.astro';
+const breadcrumbs = [
+    { name: "Home", url: "https://rebase.pro" },
+    { name: "Rebase Studio", url: "https://rebase.pro/studio" }
+];
+---
+<Layout title={title} description={description} breadcrumbs={breadcrumbs}>
+    <StudioContent lang={currentLang} t={t} />
+</Layout>

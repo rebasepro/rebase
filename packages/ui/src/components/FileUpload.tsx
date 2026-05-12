@@ -19,7 +19,7 @@ export type OnFilesUploadAdded = (files: File[]) => void;
 
 export type FileUploadProps = {
     // e.g. accept={{ "*/image": [] }}
-    accept: Record<string, string[]>,
+    accept?: Record<string, string[]>,
     onFilesAdded: OnFilesUploadAdded,
     onFilesRejected?: OnFileUploadRejected,
     maxSize?: number,

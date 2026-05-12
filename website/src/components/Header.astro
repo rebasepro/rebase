@@ -1,48 +1,51 @@
 ---
 import NavigationDropdown from "./NavigationDropdown.astro";
+import { getLangFromUrl, useTranslations } from "../i18n/ui";
 
 import {
     Layers, LayoutDashboard, Server, Bot, Code, Terminal, SquareTerminal, ShieldCheck, Rocket, ArrowRightLeft, Briefcase, FilePenLine
 } from "lucide-react";
 
 const currentPath = Astro.url.pathname.replace(/\/$/, "");
+const lang = getLangFromUrl(Astro.url);
+const t = useTranslations(lang);
 
 const navLinks = [
     {
         href: "/features",
-        label: "Product",
+        label: t("nav.product"),
         dropdown: [
             [
                 {
                     href: "/features",
-                    label: "Features",
-                    description: "Everything Rebase can do, at a glance.",
+                    label: t("nav.features"),
+                    description: t("nav.features.desc"),
                     icon: Layers
                 },
                 {
                     href: "/studio",
-                    label: "Rebase Studio",
-                    description: "Visual schema editor, spreadsheet views, rich text.",
+                    label: t("nav.studio"),
+                    description: t("nav.studio.desc"),
                     icon: LayoutDashboard
                 },
                 {
                     href: "/editing",
-                    label: "Editing Experience",
-                    description: "Notion-style editor, Kanban boards, inline editing.",
+                    label: t("nav.editing"),
+                    description: t("nav.editing.desc"),
                     icon: FilePenLine
                 },
             ],
             [
                 {
                     href: "/backend",
-                    label: "Backend & APIs",
-                    description: "Hono server, REST, GraphQL, WebSockets.",
+                    label: t("nav.backend"),
+                    description: t("nav.backend.desc"),
                     icon: Server
                 },
                 {
                     href: "/ai",
-                    label: "AI & Agents",
-                    description: "MCP server, AI autofill, natural language queries.",
+                    label: t("nav.ai"),
+                    description: t("nav.ai.desc"),
                     icon: Bot
                 },
             ],
@@ -50,33 +53,33 @@ const navLinks = [
     },
     {
         href: "/developers",
-        label: "Developers",
+        label: t("nav.developers"),
         dropdown: [
             [
                 {
                     href: "/developers",
-                    label: "Developer Overview",
-                    description: "Schema-as-code, React extensibility, callbacks.",
+                    label: t("nav.devOverview"),
+                    description: t("nav.devOverview.desc"),
                     icon: Code
                 },
                 {
                     href: "/sdk",
-                    label: "Client SDK",
-                    description: "Typed queries, auth, storage, realtime.",
+                    label: t("nav.sdk"),
+                    description: t("nav.sdk.desc"),
                     icon: Terminal
                 },
             ],
             [
                 {
                     href: "/cli",
-                    label: "CLI & Tooling",
-                    description: "Scaffold, generate, migrate, deploy.",
+                    label: t("nav.cli"),
+                    description: t("nav.cli.desc"),
                     icon: SquareTerminal
                 },
                 {
                     href: "/security",
-                    label: "Security & Auth",
-                    description: "JWT auth, RLS policies, role-based access.",
+                    label: t("nav.security"),
+                    description: t("nav.security.desc"),
                     icon: ShieldCheck
                 },
             ],
@@ -84,27 +87,27 @@ const navLinks = [
     },
     {
         href: "/why-rebase",
-        label: "Solutions",
+        label: t("nav.solutions"),
         dropdown: [
             [
                 {
                     href: "/startups",
-                    label: "For Startups",
-                    description: "Ship your product faster with schema-driven development.",
+                    label: t("nav.startups"),
+                    description: t("nav.startups.desc"),
                     icon: Rocket
                 },
                 {
                     href: "/why-rebase",
-                    label: "Why Rebase",
-                    description: "See how Rebase compares to alternatives.",
+                    label: t("nav.whyRebase"),
+                    description: t("nav.whyRebase.desc"),
                     icon: ArrowRightLeft
                 },
             ],
             [
                 {
                     href: "/agencies",
-                    label: "For Agencies",
-                    description: "Deliver bespoke client projects, faster.",
+                    label: t("nav.agencies"),
+                    description: t("nav.agencies.desc"),
                     icon: Briefcase
                 },
             ],
@@ -112,7 +115,7 @@ const navLinks = [
     },
     {
         href: "/docs",
-        label: "Docs"
+        label: t("nav.docs")
     },
 ];
 ---
@@ -169,8 +172,7 @@ const navLinks = [
                     data-track
                     id="header-start-building-desktop"
             >
-                Try the Demo
-                
+                {t("nav.tryDemo")}
 <svg
   class="lucide lucide-arrow-right"
   xmlns="http://www.w3.org/2000/svg"
@@ -268,7 +270,7 @@ const navLinks = [
                         data-track
                         id="header-start-building-mobile"
                 >
-                    Try the Demo
+                    {t("nav.tryDemo")}
                     
 <svg
   class="lucide lucide-arrow-right"

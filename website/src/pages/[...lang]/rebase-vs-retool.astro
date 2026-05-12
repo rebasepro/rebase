@@ -1,0 +1,28 @@
+---
+
+import { languages, defaultLang, useTranslations } from '../../i18n/ui';
+
+export function getStaticPaths() {
+  return Object.keys(languages).map((lang) => ({
+    params: { lang: lang === defaultLang ? undefined : lang },
+  }));
+}
+
+const { lang } = Astro.params;
+const currentLang = lang || defaultLang;
+const t = useTranslations(currentLang as keyof typeof languages);
+
+import Layout from '../../layouts/Layout.astro';
+
+const title = t("rebase-vs-retool.meta.title");
+const description = t("rebase-vs-retool.meta.description");
+
+import RebaseVsRetoolContent from '../../components/pages/RebaseVsRetoolContent.astro';
+const breadcrumbs = [
+    { name: "Home", url: "https://rebase.pro" },
+    { name: "Rebase vs Retool", url: "https://rebase.pro/rebase-vs-retool" }
+];
+---
+<Layout title={title} description={description} breadcrumbs={breadcrumbs}>
+    <RebaseVsRetoolContent lang={currentLang} t={t} />
+</Layout>

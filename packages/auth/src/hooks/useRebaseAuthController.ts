@@ -360,13 +360,13 @@ roles: customRoles.map(r => r.id) };
         }
     }, [handleAuthSuccess]);
 
-    // Google login with ID token
-    const googleLogin = useCallback(async (idToken: string) => {
+    // Google login with ID token or access token
+    const googleLogin = useCallback(async (token: string, tokenType: "idToken" | "accessToken" = "idToken") => {
         setAuthLoading(true);
         setAuthProviderError(null);
 
         try {
-            const response = await authApi.googleLogin(idToken);
+            const response = await authApi.googleLogin(token, tokenType);
             await handleAuthSuccess(response.user, response.tokens);
         } catch (error: unknown) {
             setAuthProviderError(error as Error);

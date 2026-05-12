@@ -177,13 +177,20 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             return c.body(new Uint8Array(fileContent));
         }
 
-        // For remote storage (S3, GCS, etc.), redirect to a signed URL
-        const downloadConfig = await controller.getSignedUrl(filePath);
-        if (downloadConfig.fileNotFound || !downloadConfig.url) {
+        // For remote storage (S3, GCS, etc.), proxy the file through the backend.
+        // We avoid redirecting to signed URLs because:
+        //  1. Mixed-content (HTTPS page → HTTP MinIO) is blocked by browsers
+        //  2. Internal IPs / VPC endpoints are unreachable from the browser
+        const { bucket: parsedBucket, resolvedPath: parsedPath } = parseBucketAndPath(filePath);
+        const fileObject = await controller.getObject(parsedPath, parsedBucket);
+        if (!fileObject) {
             throw ApiError.notFound("File not found");
         }
 
-        return c.redirect(downloadConfig.url);
+        c.header("Content-Type", fileObject.type || "application/octet-stream");
+        c.header("Cache-Control", "public, max-age=3600, immutable");
+        const buf = await fileObject.arrayBuffer();
+        return c.body(new Uint8Array(buf));
     });
 
     /**
@@ -248,7 +255,7 @@ message: "No file to delete" });
         const result = await controller.listObjects(
             storagePrefix,
             {
-                bucket,
+                bucket: bucket ?? (controller.getType() === "local" ? "default" : undefined),
                 maxResults: maxResults ? parseInt(maxResults, 10) : undefined,
                 pageToken
             }

@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Typography, cls, defaultBorderMixin, Button, IconButton, Tooltip, CircularProgress, ResizablePanels, Chip, Dialog, DialogContent, DialogActions, FileUpload , iconSize } from "@rebasepro/ui";
-import { VideoIcon, Music2Icon, RefreshCwIcon, Trash2Icon, XIcon, PlusIcon, DownloadIcon, UploadCloudIcon, FolderIcon, FileTextIcon, ImageIcon, ArrowLeftIcon, FileIcon, HomeIcon, LayoutGridIcon, ListIcon } from "lucide-react";
+import { Typography, cls, defaultBorderMixin, Button, IconButton, Tooltip, CircularProgress, ResizablePanels, Chip, Dialog, DialogTitle, DialogContent, DialogActions, FileUpload , iconSize } from "@rebasepro/ui";
+import { VideoIcon, Music2Icon, RefreshCwIcon, Trash2Icon, XIcon, PlusIcon, DownloadIcon, UploadCloudIcon, FolderIcon, FileTextIcon, ImageIcon, ArrowLeftIcon, FileIcon, HomeIcon, LayoutGridIcon, ListIcon, CopyIcon, CheckIcon } from "lucide-react";
 import { useStorageSource, useSnackbarController, ErrorView } from "@rebasepro/core";
 import type { StorageListResult } from "@rebasepro/types";
 import { useSearchParams } from "react-router-dom";
+import { useDropzone } from "react-dropzone";
 
 // ──────────────────────────────────────────────
 // Types
@@ -111,78 +112,69 @@ function UploadDialog({
 
     return (
         <Dialog open={open} onOpenChange={(o) => !o && handleClose()} maxWidth="md">
-            <DialogContent className="p-0">
-                <div className="p-4 border-b border-surface-accent-200 dark:border-surface-accent-700">
-                    <Typography variant="h6">Upload Files</Typography>
-                    <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark mt-1 block">
-                        to <span className="font-mono text-primary">/{currentPath || "root"}</span>
-                    </Typography>
-                </div>
-
-                <div className="p-4">
-                    {/* Drop Zone */}
-                    <FileUpload
-                        accept={{} as Record<string, string[]>}
-                        onFilesAdded={handleFilesAdded}
-                        size="large"
-                        uploadDescription={
-                            <div className="flex flex-col items-center justify-center pointer-events-none mt-2">
-                                <UploadCloudIcon className="text-surface-accent-400 mb-2 w-8 h-8"/>
-                                <Typography variant="h6" className="font-bold">
-                                    Drop files here or click to browse
-                                </Typography>
-                                <Typography variant="caption" className="text-surface-accent-500 font-medium">
-                                    Any file type supported
-                                </Typography>
-                            </div>
-                        }
-                    />
-
-                    {error && (
-                        <Typography variant="caption" className="text-red-500 mt-2 block whitespace-pre-line">
-                            {error}
-                        </Typography>
-                    )}
-
-                    {selectedFiles.length > 0 && (
-                        <div className="mt-4 space-y-2">
-                            <Typography variant="caption" className="text-surface-accent-500">
-                                Selected files ({selectedFiles.length})
+            <DialogTitle>
+                Upload Files
+                <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark mt-0.5 block">
+                    to <span className="font-mono text-primary">/{currentPath || "root"}</span>
+                </Typography>
+            </DialogTitle>
+            <DialogContent className="space-y-4">
+                <FileUpload
+                    onFilesAdded={handleFilesAdded}
+                    size="large"
+                    uploadDescription={
+                        <div className="flex flex-col items-center justify-center pointer-events-none">
+                            <UploadCloudIcon className="text-surface-accent-400 mb-2 w-8 h-8"/>
+                            <Typography variant="label">
+                                Drop files here or click to browse
                             </Typography>
-                            <div className="max-h-40 overflow-auto space-y-1">
-                                {selectedFiles.map((file, index) => (
-                                    <div
-                                        key={`${file.name}-${index}`}
-                                        className={cls(
-                                            "flex items-center justify-between p-2 rounded",
-                                            "bg-surface-accent-50 dark:bg-surface-accent-800"
-                                        )}
-                                    >
-                                        <div className="flex-1 min-w-0 mr-2">
-                                            <Typography variant="body2" className="truncate">
-                                                {file.name}
-                                            </Typography>
-                                            <Typography variant="caption" className="text-surface-accent-500">
-                                                {formatFileSize(file.size)}
-                                            </Typography>
-                                        </div>
-                                        <Button
-                                            variant="text"
-                                            size="small"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleRemoveFile(index);
-                                            }}
-                                            disabled={uploading}
-                                        >
-                                            Remove
-                                        </Button>
-                                    </div>
-                                ))}
-                            </div>
+                            <Typography variant="caption" color="secondary">
+                                Any file type supported
+                            </Typography>
                         </div>
-                    )}
-                </div>
+                    }
+                />
+
+                {error && (
+                    <Typography variant="caption" className="text-red-500 block whitespace-pre-line">
+                        {error}
+                    </Typography>
+                )}
+
+                {selectedFiles.length > 0 && (
+                    <div className="space-y-2">
+                        <Typography variant="caption" color="secondary">
+                            Selected files ({selectedFiles.length})
+                        </Typography>
+                        <div className="max-h-40 overflow-auto space-y-1">
+                            {selectedFiles.map((file, index) => (
+                                <div
+                                    key={`${file.name}-${index}`}
+                                    className="flex items-center justify-between p-2 rounded bg-surface-100 dark:bg-surface-800"
+                                >
+                                    <div className="flex-1 min-w-0 mr-2">
+                                        <Typography variant="body2" className="truncate">
+                                            {file.name}
+                                        </Typography>
+                                        <Typography variant="caption" color="secondary">
+                                            {formatFileSize(file.size)}
+                                        </Typography>
+                                    </div>
+                                    <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleRemoveFile(index);
+                                        }}
+                                        disabled={uploading}
+                                    >
+                                        <XIcon size={14}/>
+                                    </IconButton>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </DialogContent>
 
             <DialogActions>
@@ -193,15 +185,9 @@ function UploadDialog({
                     variant="filled"
                     onClick={handleUpload}
                     disabled={selectedFiles.length === 0 || uploading}
+                    startIcon={uploading ? <CircularProgress size="smallest"/> : <UploadCloudIcon size={14}/>}
                 >
-                    {uploading ? (
-                        <>
-                            <CircularProgress size="smallest"/>
-                            Uploading...
-                        </>
-                    ) : (
-                        `Upload ${selectedFiles.length > 0 ? `(${selectedFiles.length})` : ""}`
-                    )}
+                    {uploading ? "Uploading..." : `Upload${selectedFiles.length > 0 ? ` (${selectedFiles.length})` : ""}`}
                 </Button>
             </DialogActions>
         </Dialog>
@@ -228,13 +214,14 @@ function FilePreviewPanel({
     const isAudio = file.contentType?.startsWith("audio/");
     const FileIconComponent = getFileIcon(file.contentType);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [urlCopied, setUrlCopied] = useState(false);
 
     return (
         <>
             <div className={cls(
                 "flex flex-col h-full border-l",
                 defaultBorderMixin,
-                "bg-white dark:bg-surface-950"
+                "bg-white dark:bg-surface-800"
             )}>
                 {/* Header */}
                 <div className={cls("flex items-center justify-between p-3 border-b shrink-0", defaultBorderMixin)}>
@@ -269,7 +256,7 @@ function FilePreviewPanel({
 
                 {/* Preview */}
                 <div className="flex-1 overflow-auto">
-                    <div className="flex flex-col items-center justify-center min-h-[200px] p-4 bg-surface-50 dark:bg-surface-900 border-b border-surface-accent-200 dark:border-surface-accent-700">
+                    <div className={cls("flex flex-col items-center justify-center min-h-[200px] p-4 bg-surface-50 dark:bg-surface-800 border-b", defaultBorderMixin)}>
                         {(() => {
                             const ext = getExtension(file.name)?.toLowerCase() || "";
                             const isImage = file.contentType?.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext);
@@ -372,17 +359,36 @@ function FilePreviewPanel({
                                     URL
                                 </Typography>
                                 <div
-                                    className="p-2 rounded bg-surface-100 dark:bg-surface-950 cursor-pointer hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors"
+                                    className={cls(
+                                        "flex items-center gap-2 p-2 rounded cursor-pointer transition-colors",
+                                        "bg-surface-100 dark:bg-surface-800 hover:bg-surface-200 dark:hover:bg-surface-700"
+                                    )}
                                     onClick={() => {
-                                        navigator.clipboard.writeText(downloadUrl);
+                                        const fullUrl = downloadUrl.startsWith("http")
+                                            ? downloadUrl
+                                            : `${window.location.origin}${downloadUrl.startsWith("/") ? "" : "/"}${downloadUrl}`;
+                                        navigator.clipboard.writeText(fullUrl).then(() => {
+                                            setUrlCopied(true);
+                                            setTimeout(() => setUrlCopied(false), 2000);
+                                        });
                                     }}
                                 >
-                                    <Typography variant="caption" className="font-mono text-[11px] break-all text-primary">
-                                        {downloadUrl}
+                                    <Typography variant="caption" className="font-mono text-[11px] truncate flex-1 min-w-0 text-primary">
+                                        {(() => {
+                                            const fullUrl = downloadUrl.startsWith("http")
+                                                ? downloadUrl
+                                                : `${window.location.origin}${downloadUrl.startsWith("/") ? "" : "/"}${downloadUrl}`;
+                                            return fullUrl;
+                                        })()}
                                     </Typography>
-                                    <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark text-[10px] block mt-1">
-                                        Click to copy
-                                    </Typography>
+                                    <Tooltip title={urlCopied ? "Copied!" : "Copy URL"}>
+                                        <div className="shrink-0">
+                                            {urlCopied
+                                                ? <CheckIcon size={14} className="text-green-500"/>
+                                                : <CopyIcon size={14} className="text-surface-accent-400"/>
+                                            }
+                                        </div>
+                                    </Tooltip>
                                 </div>
                             </div>
                         )}
@@ -447,6 +453,7 @@ export const StorageView = () => {
 
     // View mode
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
 
     const storageSourceRef = React.useRef(storageSource);
     useEffect(() => {
@@ -549,8 +556,40 @@ export const StorageView = () => {
             type: "success",
             message: `${uploadFiles.length} file${uploadFiles.length > 1 ? "s" : ""} uploaded successfully`
         });
-        fetchContents(currentPath);
+        await fetchContents(currentPath);
     }, [currentPath, snackbarController, fetchContents]);
+
+    // Drag-and-drop on main view
+    const handleDropFiles = useCallback(async (droppedFiles: File[]) => {
+        if (droppedFiles.length === 0) return;
+        try {
+            for (const file of droppedFiles) {
+                const key = currentPath ? `${currentPath}/${file.name}` : file.name;
+                await storageSourceRef.current.putObject({ file, key });
+            }
+            snackbarController.open({
+                type: "success",
+                message: `${droppedFiles.length} file${droppedFiles.length > 1 ? "s" : ""} uploaded successfully`
+            });
+            await fetchContents(currentPath);
+        } catch (e) {
+            snackbarController.open({
+                type: "error",
+                message: e instanceof Error ? e.message : String(e)
+            });
+        }
+    }, [currentPath, snackbarController, fetchContents]);
+
+    const {
+        getRootProps: getDropRootProps,
+        getInputProps: getDropInputProps,
+        isDragActive
+    } = useDropzone({
+        onDrop: handleDropFiles,
+        noClick: true,
+        noKeyboard: true,
+        noDragEventsBubbling: true
+    });
 
     // Delete a file
     const handleDeleteFile = useCallback(async (file: StorageFile) => {
@@ -633,7 +672,7 @@ message: e instanceof Error ? e.message : String(e) });
                             {folders.map(folder => (
                                 <tr
                                     key={folder.fullPath}
-                                    className="hover:bg-surface-100 dark:hover:bg-surface-950 cursor-pointer transition-colors border-b border-surface-100 dark:border-surface-950/50"
+                                    className={cls("hover:bg-surface-100 dark:hover:bg-surface-800 cursor-pointer transition-colors border-b", defaultBorderMixin)}
                                     onClick={() => handleNavigate(folder.fullPath)}
                                 >
                                     <td className="px-4 py-2.5">
@@ -663,10 +702,11 @@ message: e instanceof Error ? e.message : String(e) });
                                     <tr
                                         key={file.fullPath}
                                         className={cls(
-                                            "cursor-pointer transition-colors border-b border-surface-100 dark:border-surface-950/50",
+                                            "cursor-pointer transition-colors border-b",
+                                            defaultBorderMixin,
                                             isSelected
                                                 ? "bg-primary/5 dark:bg-primary/10"
-                                                : "hover:bg-surface-100 dark:hover:bg-surface-950"
+                                                : "hover:bg-surface-100 dark:hover:bg-surface-800"
                                         )}
                                         onClick={() => handleSelectFile(file)}
                                     >
@@ -711,9 +751,10 @@ message: e instanceof Error ? e.message : String(e) });
                                 <div
                                     key={folder.fullPath}
                                     className={cls(
-                                        "rounded-lg p-3 cursor-pointer transition-all duration-150 border",
+                                        "rounded-lg p-3 cursor-pointer border",
+                                        "transition-colors duration-150",
                                         defaultBorderMixin,
-                                        "hover:bg-surface-100 dark:hover:bg-surface-950 hover:shadow-sm",
+                                        "hover:bg-surface-100 dark:hover:bg-surface-800 hover:shadow-sm",
                                         "flex items-center gap-2"
                                     )}
                                     onClick={() => handleNavigate(folder.fullPath)}
@@ -745,20 +786,22 @@ message: e instanceof Error ? e.message : String(e) });
                                     <div
                                         key={file.fullPath}
                                         className={cls(
-                                            "rounded-lg overflow-hidden cursor-pointer transition-all duration-150 border group",
+                                            "rounded-lg overflow-hidden cursor-pointer border",
+                                            "transition-shadow duration-150",
                                             defaultBorderMixin,
-                                            "hover:shadow-md hover:-translate-y-0.5",
+                                            "hover:shadow-md",
                                             isSelected && "ring-2 ring-primary"
                                         )}
                                         onClick={() => handleSelectFile(file)}
                                     >
                                         {/* Thumbnail or icon */}
-                                        <div className="aspect-square relative overflow-hidden bg-surface-100 dark:bg-surface-950 flex items-center justify-center">
+                                        <div className="aspect-square relative overflow-hidden bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
                                             {isImage && file.downloadUrl ? (
                                                 <img
                                                     src={file.downloadUrl}
                                                     alt={file.name}
                                                     className="w-full h-full object-cover"
+                                                    loading="lazy"
                                                 />
                                             ) : (
                                                 <FileIconComp className="text-surface-accent-400 dark:text-surface-accent-500 w-8 h-8"/>
@@ -770,12 +813,6 @@ message: e instanceof Error ? e.message : String(e) });
                                                     {getExtension(file.name)}
                                                 </div>
                                             )}
-
-                                            {/* Hover overlay */}
-                                            <div className={cls(
-                                                "absolute inset-0 bg-black/0 group-hover:bg-black/10",
-                                                "transition-colors duration-200 pointer-events-none"
-                                            )}/>
                                         </div>
 
                                         {/* Name & size */}
@@ -798,12 +835,12 @@ message: e instanceof Error ? e.message : String(e) });
     };
 
     return (
-        <div className="flex h-full w-full bg-white dark:bg-surface-950 overflow-hidden text-text-primary dark:text-text-primary-dark">
+        <div className="flex h-full w-full bg-white dark:bg-surface-800 overflow-hidden text-text-primary dark:text-text-primary-dark">
             <div className="flex h-full w-full">
                 {/* Main content */}
                 <div className="flex-grow flex flex-col min-w-0 h-full">
                             {/* Toolbar */}
-                            <div className={cls("flex items-center justify-between pr-2 border-b bg-white dark:bg-surface-950 shrink-0", defaultBorderMixin)}>
+                            <div className={cls("flex items-center justify-between pr-2 border-b bg-white dark:bg-surface-800 shrink-0", defaultBorderMixin)}>
                                 <div className="flex items-center gap-1.5 flex-grow overflow-hidden px-3 py-2">
                                     {/* Breadcrumbs */}
                                     {currentPath && (
@@ -853,7 +890,7 @@ message: e instanceof Error ? e.message : String(e) });
                                         <IconButton
                                             size="small"
                                             onClick={() => setViewMode("grid")}
-                                            className={cls(viewMode === "grid" && "bg-surface-100 dark:bg-surface-950")}
+                                            className={cls(viewMode === "grid" && "bg-surface-100 dark:bg-surface-800")}
                                         >
                                             <LayoutGridIcon size={iconSize.smallest}/>
                                         </IconButton>
@@ -862,13 +899,13 @@ message: e instanceof Error ? e.message : String(e) });
                                         <IconButton
                                             size="small"
                                             onClick={() => setViewMode("list")}
-                                            className={cls(viewMode === "list" && "bg-surface-100 dark:bg-surface-950")}
+                                            className={cls(viewMode === "list" && "bg-surface-100 dark:bg-surface-800")}
                                         >
                                             <ListIcon size={iconSize.smallest}/>
                                         </IconButton>
                                     </Tooltip>
 
-                                    <div className="h-4 w-px bg-surface-200 dark:bg-surface-950 mx-0.5"/>
+                                    <div className={cls("h-4 w-px mx-0.5", defaultBorderMixin, "bg-surface-200 dark:bg-surface-700")}/>
 
                                     <Tooltip title="Refresh">
                                         <IconButton size="small" onClick={handleRefresh} disabled={loading}>
@@ -887,13 +924,28 @@ message: e instanceof Error ? e.message : String(e) });
                                 </div>
                             </div>
 
-                            {/* FileIcon grid / list */}
-                            <div className="flex-grow flex flex-col overflow-hidden min-h-0">
+                            {/* File grid / list — drop zone */}
+                            <div {...getDropRootProps()} className="flex-grow flex flex-col overflow-hidden min-h-0 relative">
+                                <input {...getDropInputProps()} />
                                 {renderContents()}
+                                {/* Drag overlay */}
+                                {isDragActive && (
+                                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-primary/5 dark:bg-primary/10 backdrop-blur-[2px]">
+                                        <div className="flex flex-col items-center gap-2 p-6 rounded-xl border-2 border-dashed border-primary bg-white/80 dark:bg-surface-900/80">
+                                            <UploadCloudIcon className="w-10 h-10 text-primary"/>
+                                            <Typography variant="subtitle2" className="text-primary font-semibold">
+                                                Drop files to upload
+                                            </Typography>
+                                            <Typography variant="caption" color="secondary">
+                                                to /{currentPath || "root"}
+                                            </Typography>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Status bar */}
-                            <div className={cls("px-4 py-1.5 border-t bg-surface-50 dark:bg-surface-900 flex items-center justify-between shrink-0", defaultBorderMixin)}>
+                            <div className={cls("px-4 py-1.5 border-t bg-surface-50 dark:bg-surface-800 flex items-center justify-between shrink-0", defaultBorderMixin)}>
                                 <div className="flex items-center gap-4 text-[11px]">
                                     <span className="text-text-disabled dark:text-text-disabled-dark font-bold uppercase tracking-tighter">
                                         Path
