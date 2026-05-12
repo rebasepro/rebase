@@ -205,7 +205,8 @@ async function createProject(options: InitOptions) {
             console.log(chalk.gray("  Introspecting database and generating collections..."));
             console.log("");
             try {
-                await execa("pnpm", ["exec", "rebase", "schema", "introspect"], {
+                // --force overwrites template example collections with real ones
+                await execa("pnpm", ["exec", "rebase", "schema", "introspect", "--force"], {
                     cwd: options.targetDirectory,
                     stdio: "inherit"
                 });
@@ -274,20 +275,20 @@ async function replacePlaceholders(options: InitOptions) {
         let versionToUse = cliVersion;
         try {
             // First try to check if the specific cliVersion exists for this package
-            const { stdout } = await execa("npm", ["--loglevel", "error", "info", `${pkgName}@${cliVersion}`, "version"]);
+            const { stdout } = await execa("pnpm", ["view", `${pkgName}@${cliVersion}`, "version"]);
             if (!stdout.trim()) throw new Error("Not found");
             versionToUse = stdout.trim();
         } catch {
             try {
                 // If specific version doesn't exist, try the matching tag (canary or latest)
                 const tag = cliVersion.includes("canary") ? "canary" : "latest";
-                const { stdout } = await execa("npm", ["--loglevel", "error", "info", `${pkgName}@${tag}`, "version"]);
+                const { stdout } = await execa("pnpm", ["view", `${pkgName}@${tag}`, "version"]);
                 if (!stdout.trim()) throw new Error("Not found");
                 versionToUse = stdout.trim();
             } catch {
                 try {
                     // Fallback to absolute latest
-                    const { stdout } = await execa("npm", ["--loglevel", "error", "info", pkgName, "version"]);
+                    const { stdout } = await execa("pnpm", ["view", pkgName, "version"]);
                     versionToUse = stdout.trim() || "latest";
                 } catch {
                     versionToUse = "latest";

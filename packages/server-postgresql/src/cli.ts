@@ -561,7 +561,7 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
             process.exit(1);
         }
 
-        const outputPath = argsList["--output"] || path.join("config", "collections");
+        const outputPath = argsList["--output"] || path.join("..", "config", "collections");
 
         console.log("");
         console.log(chalk.bold("  🔍 Rebase Schema Introspector"));
