@@ -1,0 +1,43 @@
+---
+title: Desplegando Rebase en Railway
+description: Despliegue Rebase sin esfuerzo con el análisis de Dockerfile compatible con Railway de forma nativa. Manteniendo el enfoque en la UE.
+sidebar_label: Railway
+---
+
+Railway es un PaaS (Plataforma como Servicio) moderno increíblemente popular que elimina las complejidades de DevOps. Detectará automáticamente el framework Rebase Node y lo construirá sin problemas.
+
+Además, Railway es totalmente compatible con las regiones de despliegue europeas (Ámsterdam), lo que significa que seguirá disfrutando de un estricto cumplimiento del alojamiento regional.
+
+## 1. Crear un Proyecto y Región de la UE
+1. Inicie sesión en su [Cuenta de Railway](https://railway.app/).
+2. Haga clic en **Nuevo Proyecto**.
+3. Vaya a **Configuración -> Región predeterminada**, y configúrela explícitamente en **Europa (Ámsterdam)**. (Si hace esto *después* de crear servicios, es posible que deba migrarlos manualmente).
+
+## 2. Aprovisionar PostgreSQL
+1. Dentro de su proyecto, haga clic en **Nuevo** -> **Base de datos** -> **Añadir PostgreSQL**.
+2. Espere unos segundos a que la base de datos se aprovisione.
+3. Por defecto, Railway proporciona una variable interna `DATABASE_URL`. Haga clic en el widget de Postgres -> **Variables** para localizar esta cadena de conexión.
+
+## 3. Desplegar el Código de Rebase
+1. Haga clic en **Nuevo** -> **Repositorio de GitHub**.
+2. Seleccione su repositorio de Rebase.
+3. Railway detectará inmediatamente el repositorio y buscará un `Dockerfile`. Espere a que comience la construcción inicial.
+
+## 4. Establecer Variables de Entorno
+La construcción inicial podría fallar porque le falta completamente la configuración. Vamos a solucionar eso.
+
+1. Haga clic en la nueva tarjeta de servicio de Rebase GitHub.
+2. Vaya a la pestaña **Variables**.
+3. Haga clic en **Nueva Variable** y añada:
+   - `JWT_SECRET`: Genere una cadena aleatoria segura de 32 o más caracteres.
+   - `NODE_ENV`: Establezca en `production`
+4. Haga clic en **Referenciar Variable** y seleccione `DATABASE_URL` del servicio PostgreSQL que aprovisionó. Railway inyectará de forma segura la URL interna de Postgres en tiempo de ejecución.
+
+## 5. Exponer el Dominio
+1. En la tarjeta de servicio de Rebase, navegue hasta la pestaña **Configuración**.
+2. Desplácese hasta **Redes**.
+3. En **Redes Públicas**, haga clic en **Generar Dominio**. Railway proporcionará una URL de prueba `.up.railway.app`. También puede adjuntar de forma segura un Dominio Personalizado aquí.
+
+Railway se reconstruirá automáticamente de forma segura. ¡Su plataforma alojada en la UE ya está completamente en línea!
+
+---

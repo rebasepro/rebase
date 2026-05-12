@@ -1,0 +1,51 @@
+---
+title: Déployer Rebase sur Google Cloud Platform
+description: Déployez votre instance Rebase en toute sécurité sur GCP en utilisant Cloud SQL et Cloud Run, en vous concentrant sur les régions de centres de données de l'UE.
+sidebar_label: Google Cloud
+---
+
+Google Cloud Platform (GCP) offre une expérience de développement incroyablement fluide pour les applications conteneurisées. Pour une configuration de production robuste, nous tirons parti de **Cloud SQL** pour la base de données et de **Cloud Run** pour l'épine dorsale des conteneurs sans serveur.
+
+Pour maintenir une stricte conformité aux données européennes, assurez-vous d'opérer entièrement au sein d'une région de l'UE, telle que **europe-west3 (Francfort)**, **europe-west9 (Paris)** ou **europe-west1 (Belgique)**.
+
+## 1. Provisionner Cloud SQL (PostgreSQL)
+
+1. Accédez à la console **Cloud SQL** dans votre région de l'UE préférée.
+2. Cliquez sur **Créer une instance** et sélectionnez **PostgreSQL**.
+3. Définissez votre ID d'instance et générez un mot de passe intégré sécurisé pour l'utilisateur `postgres`.
+4. Développez les **Options de configuration** pour allouer le type de machine correct (une machine standard à 2 vCPU est un excellent début).
+5. Assurez-vous que la base de données est configurée pour des réseaux IP privés ou des réseaux IP publics autorisés, en fonction de votre configuration VCP avec Cloud Run.
+6. Assemblez votre URI de connexion :
+   `postgresql://postgres:YOUR_PASSWORD@YOUR_IP:5432/postgres`
+
+## 2. Compiler et déployer sur Cloud Run
+
+Cloud Run met à l'échelle le backend Node.js de Rebase automatiquement jusqu'à zéro (si désiré) et gère le TLS nativement. Vous pouvez compiler et déployer l'application en une seule commande CLI depuis votre espace de travail local en utilisant Google Cloud Build.
+
+Assurez-vous d'avoir l'interface de ligne de commande `gcloud` installée et authentifiée :
+
+```bash
+# Set your active GCP project
+gcloud config set project YOUR_PROJECT_ID
+
+# Submit the build to Cloud Build, which automatically creates the container image and stores it in Google Container Registry (GCR)
+gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/rebase-backend ./backend
+
+# Deploy the newly built image to Cloud Run
+gcloud run deploy rebase-backend \
+  --image gcr.io/YOUR_PROJECT_ID/rebase-backend \
+  --region europe-west3 \
+  --port 3001 \
+  --set-env-vars DATABASE_URL="postgresql://...",JWT_SECRET="YOUR_SECURE_RANDOM_STRING",NODE_ENV="production" \
+  --allow-unauthenticated
+```
+
+## 3. Gérer le stockage de fichiers
+Étant donné que les instances Cloud Run sont strictement sans état et éphémères, vous ne pouvez pas utiliser le stockage sur disque local pour les téléchargements de fichiers Rebase.
+
+1. Accédez à **Google Cloud Storage** et créez un nouveau bucket privé dans la région de l'UE choisie.
+2. Suivez la [Documentation de stockage de Rebase](/docs/storage) pour configurer Rebase afin d'utiliser l'API compatible S3 fournie par Google Cloud Storage au lieu du système de fichiers local.
+
+Votre instance Rebase est maintenant entièrement sans serveur et hautement évolutive nativement au sein de l'UE !
+
+---

@@ -1,0 +1,122 @@
+---
+title: Ansichtsmodi
+sidebar_label: Ansichtsmodi
+slug: docs/frontend/view-modes
+description: Konfigurieren Sie Tabellen-, Karten- und Kanban-Board-Ansichten für Ihre Sammlungen.
+---
+
+## Übersicht
+
+Jede Sammlung kann in vier Ansichtsmodi angezeigt werden:
+
+- **Liste** — Einfache, saubere Listenansicht (die klassische CMS-Standardansicht)
+- **Tabelle** — Tabellenähnliches Raster mit Inline-Bearbeitung, Sortierung, Filterung
+- **Karten** — Kartenraster für visuelle Inhalte (Bilder, Vorschauen)
+- **Kanban** — Drag-and-drop-Board, gruppiert nach einer Enum-Eigenschaft
+
+## Konfiguration
+
+```typescript
+const productsCollection: EntityCollection = {
+    slug: "products",
+    defaultViewMode: "table",            // Default view
+    enabledViews: ["list", "table", "kanban"],    // Available views
+    kanban: {
+        columnProperty: "status",        // Enum property for columns
+        orderProperty: "sort_order"      // Property for drag-and-drop ordering
+    },
+    // ...
+};
+```
+
+## Listenansicht
+
+![List View screenshot placeholder](/img/features/list-view.png)
+
+Die Listenansicht ist der klassische, saubere CMS-Standardansichtsmodus, der Entitäten in einem unkomplizierten Listenformat ohne die Dichte einer Tabelle darstellt.
+
+## Tabellenansicht
+
+![Table View screenshot placeholder](/img/features/table-view.png)
+
+Die Standardansicht ist eine hochleistungsfähige virtualisierte Tabelle mit:
+
+- **Inline-Bearbeitung** — Klicken Sie auf eine beliebige Zelle, um sie direkt zu bearbeiten
+- **Spaltengrößenanpassung** — Spaltenüberschriften ziehen
+- **Spaltenneuanordnung** — Ziehen, um neu anzuordnen
+- **Sortierung** — Klicken Sie auf Spaltenüberschriften
+- **Textsuche** — Volltextsuche über Zeichenfolgenfelder
+- **Filterung** — Spaltenbezogene Filter
+- **Mehrfachauswahl** — Entitäten für Massenaktionen auswählen
+
+### Zeilenhöhe
+
+Steuern Sie die Zeilenhöhe mit `defaultSize`:
+
+| Größe | Pixel | Am besten geeignet für |
+|------|--------|----------|
+| `"xs"` | 40 | Dichte Datentabellen |
+| `"s"` | 54 | Standard |
+| `"m"` | 80 | Mit Bildminiaturen |
+| `"l"` | 120 | Karten mit Vorschauen |
+| `"xl"` | 260 | Vorschauen von Rich Media Inhalten |
+
+## Kanban-Ansicht
+
+![Kanban View screenshot placeholder](/img/features/kanban-view.png)
+
+Konfigurieren Sie ein Kanban-Board, indem Sie festlegen, welche Enum-Eigenschaft als Spalten verwendet werden soll:
+
+```typescript
+const tasksCollection: EntityCollection = {
+    slug: "tasks",
+    defaultViewMode: "kanban",
+    kanban: {
+        columnProperty: "status",
+        orderProperty: "sort_order"
+    },
+    properties: {
+        title: { type: "string", name: "Title" },
+        status: {
+            type: "string",
+            name: "Status",
+            enum: [
+                { id: "backlog", label: "Backlog", color: "grayDark" },
+                { id: "in_progress", label: "In Progress", color: "blueDark" },
+                { id: "review", label: "Review", color: "orangeDark" },
+                { id: "done", label: "Done", color: "greenDark" }
+            ]
+        },
+        sort_order: { type: "number", name: "Sort Order" }
+    }
+};
+```
+
+Drag-and-drop zwischen Spalten aktualisiert automatisch das Enum-Feld und die Sortierreihenfolge.
+
+## Kartenansicht
+
+![Cards View screenshot placeholder](/img/features/cards-view.png)
+
+Karten zeigen Entitäten als visuelle Karten an – nützlich für inhaltsreiche Inhalte mit vielen Bildern:
+
+```typescript
+const articlesCollection: EntityCollection = {
+    slug: "articles",
+    defaultViewMode: "cards",
+    properties: {
+        title: { type: "string", name: "Title" },
+        cover: {
+            type: "string",
+            name: "Cover Image",
+            storage: { storagePath: "covers", acceptedFiles: ["image/*"] }
+        }
+    }
+};
+```
+
+## Nächste Schritte
+
+- **[Entitätsansichten](/docs/frontend/entity-views)** — Benutzerdefinierte Tabs in Entitätsformularen
+- **[Entitätsaktionen](/docs/frontend/entity-actions)** — Benutzerdefinierte Entitätsaktionen
+---

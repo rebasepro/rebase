@@ -97,6 +97,7 @@
 }
 
 .typography-body1 {
+    @apply text-base;
 }
 
 .typography-body2 {

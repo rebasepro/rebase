@@ -89,7 +89,7 @@ export const Checkbox = React.memo(({
                         (indeterminate || isChecked) ? "text-surface-accent-100 dark:text-surface-accent-900" : "",
                         disabled
                             ? "border-transparent"
-                            : (indeterminate || isChecked ? "border-transparent" : "border-surface-accent-800 dark:border-surface-accent-200")
+                            : (indeterminate || isChecked ? "border-transparent" : "border-surface-accent-800 dark:border-surface-accent-500")
                     )}>
                     <CheckboxPrimitive.Indicator asChild>
                         {indeterminate

@@ -40,8 +40,8 @@ export function Skeleton({
             className)
     }>
         <span
-            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 dark:via-white/5 to-transparent"
-            style={{ animation: "shimmer 1s infinite" }}
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 dark:via-white/8 to-transparent"
+            style={{ animation: "shimmer 1.8s ease-in-out infinite" }}
         />
     </span>;
 }

@@ -1,0 +1,182 @@
+---
+title: Referencia de Hooks
+sidebar_label: Hooks
+slug: docs/hooks
+description: Hooks de React proporcionados por Rebase para acceder al estado de autenticación, datos, navegación, paneles laterales, almacenamiento y la interfaz de usuario.
+---
+
+## Visión general
+
+Rebase proporciona hooks de React para acceder a la funcionalidad del framework desde cualquier componente dentro del árbol de proveedores `<Rebase>`.
+
+## `useRebaseContext`
+
+El hook maestro — accede a todo:
+
+```typescript
+import { useRebaseContext } from "@rebasepro/core";
+
+function MyComponent() {
+    const context = useRebaseContext();
+
+    context.dataSource          // Operaciones de datos
+    context.storageSource       // Operaciones de archivo
+    context.authController      // Estado de autenticación
+    context.navigation          // Estado de navegación
+    context.sideEntityController // Control de panel lateral
+    context.snackbarController  // Notificaciones Toast
+}
+```
+
+## `useAuthController`
+
+Acceder al estado de autenticación:
+
+```typescript
+import { useAuthController } from "@rebasepro/core";
+
+function UserMenu() {
+    const auth = useAuthController();
+
+    auth.user            // Usuario actual (o nulo)
+    auth.initialLoading  // Cargando sesión inicial
+    auth.signOut()       // Cerrar sesión
+    auth.getAuthToken()  // Obtener JWT para llamadas a la API
+    auth.extra           // Datos de usuario adicionales (roles, etc.)
+}
+```
+
+## `useSideEntityController`
+
+Abrir entidades programáticamente en un panel lateral:
+
+```typescript
+import { useSideEntityController } from "@rebasepro/core";
+
+function OpenProductButton({ productId }) {
+    const sideEntityController = useSideEntityController();
+
+    return (
+        <button onClick={() => {
+            sideEntityController.open({
+                path: "products",
+                entityId: productId,
+                collection: productsCollection
+            });
+        }}>
+            Abrir Producto
+        </button>
+    );
+}
+```
+
+Métodos:
+
+| Método | Descripción |
+|--------|-------------|
+| `open({ path, entityId, collection })` | Abrir una entidad en un panel lateral |
+| `close()` | Cerrar el panel lateral actual |
+| `replace({ path, entityId, collection })` | Reemplazar el contenido del panel lateral actual |
+
+## `useSnackbarController`
+
+Mostrar notificaciones Toast:
+
+```typescript
+import { useSnackbarController } from "@rebasepro/core";
+
+function SaveButton() {
+    const snackbar = useSnackbarController();
+
+    const handleSave = async () => {
+        try {
+            await saveData();
+            snackbar.open({ type: "success", message: "¡Guardado con éxito!" });
+        } catch (error) {
+            snackbar.open({ type: "error", message: "Error al guardar" });
+        }
+    };
+}
+```
+
+## `useStorageSource`
+
+Acceder a las operaciones de almacenamiento de archivos:
+
+```typescript
+import { useStorageSource } from "@rebasepro/core";
+
+function FileUploader() {
+    const storage = useStorageSource();
+
+    const upload = async (file: File) => {
+        const result = await storage.uploadFile({
+            file,
+            fileName: file.name,
+            path: "documents"
+        });
+        const url = await storage.getDownloadURL(result.path);
+        return url;
+    };
+}
+```
+
+## `useModeController`
+
+Controlar tema claro/oscuro:
+
+```typescript
+import { useModeController } from "@rebasepro/core";
+
+function ThemeToggle() {
+    const mode = useModeController();
+
+    return (
+        <button onClick={mode.toggleMode}>
+            Actual: {mode.mode} {/* "light" | "dark" */}
+        </button>
+    );
+}
+```
+
+## `useEntitySelectionDialog`
+
+Abrir un diálogo lateral para seleccionar entidades de una colección. Este es el mismo hook usado internamente cuando se renderiza una propiedad de relación:
+
+```typescript
+import { useEntitySelectionDialog } from "@rebasepro/core";
+
+function SelectProduct() {
+    const selectionDialog = useEntitySelectionDialog({
+        path: "products",
+        collection: productsCollection,
+        onSingleEntitySelected: (entity) => {
+            console.log("Seleccionado:", entity);
+        }
+    });
+
+    return <button onClick={selectionDialog.open}>Seleccionar Producto</button>;
+}
+```
+
+## `useNavigationController`
+
+Acceder al estado de navegación y colecciones resueltas:
+
+```typescript
+import { useNavigationController } from "@rebasepro/core";
+
+function MyComponent() {
+    const navigation = useNavigationController();
+
+    navigation.collections     // Todas las colecciones registradas
+    navigation.views           // Vistas personalizadas
+    navigation.adminViews      // Vistas en modo administrador
+    navigation.getCollection(path) // Obtener colección para una ruta
+}
+```
+
+## Próximos pasos
+
+- **[Visión general del Frontend](/docs/frontend)** — Referencia del framework de React
+- **[SDK del Cliente](/docs/sdk)** — SDK de operaciones de datos

@@ -55,7 +55,7 @@ export function ToggleButtonGroup<T extends string = string>({
                     className={cls(
                         "flex flex-row items-center justify-center gap-2 py-3 px-4 rounded-md transition-colors",
                         value === option.value
-                            ? "bg-white dark:bg-surface-900 text-primary dark:text-primary-300"
+                            ? "bg-white dark:bg-surface-900 text-primary dark:text-primary-300 shadow-sm"
                             : "text-surface-500 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-700",
                         option.disabled && "opacity-50 cursor-not-allowed"
                     )}

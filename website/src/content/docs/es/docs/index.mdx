@@ -1,0 +1,102 @@
+---
+title: Introducción
+sidebar_label: Introducción
+slug: docs/index
+description: Rebase es un Backend-as-a-Service y panel de administración de código abierto construido con React y TypeScript. Define tu esquema en TypeScript, y Rebase genera una interfaz de usuario CRUD completa, API REST, autenticación, almacenamiento y sincronización en tiempo real, impulsado por PostgreSQL.
+---
+
+<video className="intro_video" loop autoPlay muted>
+    <source src="/img/full_screen_dark.mp4" type="video/mp4"/>
+</video>
+
+## ¿Qué es Rebase?
+
+Rebase es un **Backend-as-a-Service (BaaS) de código abierto** y un **panel de administración** construido con React y TypeScript. Te proporciona todo lo necesario para crear aplicaciones de back-office listas para producción sobre **PostgreSQL**:
+
+- **Esquema como Código** — Define tus modelos de datos como colecciones de TypeScript. Rebase genera tablas de PostgreSQL, una interfaz de usuario CRUD completa, endpoints de API REST y SDKs de cliente con tipos seguros a partir de una única fuente de verdad.
+- **Panel de Administración Instantáneo** — Una interfaz de usuario de administración hermosa y rápida basada en React con tablas de hoja de cálculo, listas, formularios, tableros Kanban, edición en línea y sincronización en tiempo real.
+- **Backend Integrado** — Autenticación (JWT + Google OAuth), almacenamiento de archivos (local o S3), seguridad a nivel de fila (Row Level Security), historial de entidades y WebSocket en tiempo real, todo integrado.
+- **Radicalmente Extensible** — Si puedes construirlo en React, puedes agregarlo a Rebase. Campos personalizados, vistas personalizadas, plugins y acceso total a los hooks internos.
+
+:::tip
+Rebase **no** es un SaaS alojado. Lo auto-alojas, posees tus datos y posees tu código. Piensa en ello como una alternativa de código abierto a Supabase o Retool que controlas de principio a fin.
+:::
+
+## Cómo Funciona
+
+```
+┌──────────────────────────────────────────────────────┐
+│                 Client Applications                  │
+│  ┌──────────────┐  ┌───────────────────────────────┐ │
+│  │   Your App   │  │   Rebase Admin UI             │ │
+│  │  (Any Tech)  │  │   Tables / Lists / Kanban     │ │
+│  └──────┬───────┘  └──────────────┬────────────────┘ │
+└─────────┼──────────────────────────┼─────────────────┘
+          │  HTTP + WebSocket        │
+          ▼                          ▼
+┌──────────────────────────────────────────────────────┐
+│              Rebase Backend (Node.js + Hono)          │
+│  ┌─────────┐ ┌──────┐ ┌─────────┐ ┌───────────────┐ │
+│  │ REST API│ │ Auth │ │ Storage │ │ WebSocket RT  │ │
+│  └────┬────┘ └──┬───┘ └────┬────┘ └──────┬────────┘ │
+└───────┼─────────┼──────────┼─────────────┼───────────┘
+        │         │          │             │
+        ▼         ▼          ▼             ▼
+┌──────────────────────────────────────────────────────┐
+│              PostgreSQL (Drizzle ORM)                 │
+└──────────────────────────────────────────────────────┘
+```
+
+## Inicio Rápido
+
+```bash
+git clone https://github.com/rebasepro/rebase-starter my-app
+cd my-app
+```
+
+Configura tu base de datos en `.env`:
+
+```bash
+DATABASE_URL=postgresql://user:password@localhost:5432/mydb
+JWT_SECRET=your-secret-key
+```
+
+Inicia todo:
+
+```bash
+pnpm dev
+```
+
+Eso es todo. Tu panel de administración se está ejecutando en `http://localhost:5173` y la API en `http://localhost:3001`.
+
+→ Sigue la [guía de Inicio Rápido](/docs/getting-started/quickstart) completa para una explicación detallada.
+
+## Características Principales
+
+| Característica | Descripción |
+|---------|-------------|
+| **Vistas de Hoja de Cálculo** | Tabla rápida y virtualizada con edición en línea, filtrado, clasificación y búsqueda de texto |
+| **Vista de Lista** | Vista de lista vertical limpia y adaptable para colecciones |
+| **Tablero Kanban** | Vista de tablero de arrastrar y soltar agrupada por cualquier propiedad enum |
+| **Relaciones** | Uno a uno, uno a muchos, muchos a muchos con tablas de unión y uniones de múltiples saltos |
+| **Seguridad a Nivel de Fila** | Políticas RLS al estilo Supabase definidas en la configuración de tu colección |
+| **Autenticación** | JWT + tokens de actualización, Google OAuth, control de acceso basado en roles |
+| **Almacenamiento de Archivos** | Sistema de archivos local o compatible con S3 con campos de carga y navegador |
+| **Sincronización en Tiempo Real** | Actualizaciones en vivo basadas en WebSocket para todos los clientes conectados |
+| **Historial de Entidades** | Rastro de auditoría completo para cada creación, actualización y eliminación |
+| **API REST** | Endpoints CRUD autogenerados para cada colección |
+| **Importación/Exportación de Datos** | Importación de CSV, JSON y Excel con mapeo de campos; exportación de CSV/JSON |
+| **Editor de Colecciones** | Editor de esquema visual que genera TypeScript mediante manipulación AST |
+| **SDK de Cliente** | SDK de JavaScript con tipos seguros para tus aplicaciones frontend |
+| **Sistema de Plugins** | Extiende cada parte de la interfaz de usuario — barra de herramientas, formularios, campos, página de inicio |
+| **Mejora de Datos con IA** | Autocompletado impulsado por LLM para campos de texto |
+| **Tareas Programadas (Cron Jobs)** | Tareas en segundo plano programadas con monitoreo, registro y panel de Studio |
+
+## Próximos Pasos
+
+- **[Inicio Rápido](/docs/getting-started/quickstart)** — Ponlo en marcha en 2 minutos
+- **[Estructura del Proyecto](/docs/getting-started/project-structure)** — Comprende el código generado
+- **[Colecciones](/docs/collections)** — Define tu esquema de datos
+- **[Backend](/docs/backend)** — Configura la autenticación, el almacenamiento y la API
+- **[Arquitectura](/docs/architecture)** — Comprende cómo encaja todo
+---

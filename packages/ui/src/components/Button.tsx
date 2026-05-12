@@ -32,18 +32,18 @@ const ButtonInner = React.memo(React.forwardRef<
    }: ButtonProps<any>, ref) => {
 
     const baseClasses =
-        "typography-button h-fit rounded-md whitespace-nowrap inline-flex items-center justify-center p-2 px-4 focus:outline-none transition ease-in-out duration-150 gap-2";
+        "typography-button h-fit rounded-md whitespace-nowrap inline-flex items-center justify-center p-2 px-4 focus:outline-none transition-all ease-in-out duration-150 gap-2 active:scale-[0.98]";
 
     const buttonClasses = cls({
         "w-full": fullWidth,
         "w-fit": !fullWidth,
 
         // Filled Variants
-        "border border-primary bg-primary focus:ring-primary shadow hover:ring-1 hover:ring-primary text-white hover:text-white": variant === "filled" && color === "primary" && !disabled,
-        "border border-secondary bg-secondary focus:ring-secondary shadow hover:ring-1 hover:ring-secondary text-white hover:text-white": variant === "filled" && color === "secondary" && !disabled,
-        "border border-red-500 bg-red-500 hover:bg-red-500 focus:ring-red-500 shadow hover:ring-1 hover:ring-red-600 text-white hover:text-white": variant === "filled" && color === "error" && !disabled,
-        "border border-surface-accent-200 bg-surface-accent-200 hover:bg-surface-accent-300 focus:ring-surface-accent-400 shadow hover:ring-1 hover:ring-surface-accent-400 text-text-primary hover:text-text-primary dark:text-text-primary-dark hover:dark:text-text-primary-dark": variant === "filled" && color === "text" && !disabled,
-        "border border-transparent bg-surface-100 hover:bg-surface-accent-200 text-text-primary dark:bg-surface-900 dark:hover:bg-surface-accent-700 dark:text-text-primary-dark hover:text-text-primary dark:text-text-primary-dark hover:dark:text-text-primary-dark": variant === "filled" && color === "neutral" && !disabled,
+        "border border-primary bg-primary focus:ring-primary shadow-sm hover:shadow-md hover:brightness-110 text-white hover:text-white": variant === "filled" && color === "primary" && !disabled,
+        "border border-secondary bg-secondary focus:ring-secondary shadow-sm hover:shadow-md hover:brightness-110 text-white hover:text-white": variant === "filled" && color === "secondary" && !disabled,
+        "border border-red-500 bg-red-500 hover:bg-red-600 focus:ring-red-500 shadow-sm hover:shadow-md text-white hover:text-white": variant === "filled" && color === "error" && !disabled,
+        "border border-surface-accent-200 bg-surface-accent-200 hover:bg-surface-accent-300 focus:ring-surface-accent-400 shadow-sm hover:shadow-md text-text-primary hover:text-text-primary dark:text-text-primary-dark hover:dark:text-text-primary-dark": variant === "filled" && color === "text" && !disabled,
+        "border border-transparent bg-surface-100 hover:bg-surface-accent-200 text-text-primary dark:bg-surface-700 dark:hover:bg-surface-accent-600 dark:text-text-primary-dark hover:text-text-primary dark:text-text-primary-dark hover:dark:text-text-primary-dark": variant === "filled" && color === "neutral" && !disabled,
 
         // Text Variants
         "border border-transparent text-primary hover:text-primary hover:bg-surface-accent-200 hover:bg-opacity-75 hover:bg-surface-accent-200/75 dark:hover:bg-surface-accent-800": variant === "text" && color === "primary" && !disabled,

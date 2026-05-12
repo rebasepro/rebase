@@ -81,7 +81,7 @@ export function SearchBar({
                 heightClass,
                 "bg-surface-accent-50 dark:bg-surface-900 border",
                 defaultBorderMixin,
-                "focus-within:ring-2 focus-within:ring-primary focus-within:border-primary",
+                "focus-within:ring-1 focus-within:ring-primary/60 focus-within:border-primary focus-within:shadow-[0_0_0_3px_rgba(0,112,244,0.1)]",
                 "rounded-lg overflow-hidden",
                 className)}>
             <div

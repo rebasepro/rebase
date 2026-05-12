@@ -237,7 +237,7 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
             {/* Pass the calculated finalContainer */}
             <SelectPrimitive.Portal container={finalContainer}>
                 <SelectPrimitive.Content position={position}
-                    className={cls(focusedDisabled, "z-50 relative overflow-hidden border bg-white dark:bg-surface-800 p-2 rounded-lg", defaultBorderMixin)}>
+                    className={cls(focusedDisabled, "z-50 relative overflow-hidden border bg-white dark:bg-surface-800 p-2 rounded-lg shadow-lg animate-in fade-in-0 zoom-in-95 duration-150", defaultBorderMixin)}>
                     <SelectPrimitive.Viewport className={cls("p-1", viewportClassName)}
                         style={{ maxHeight: "var(--radix-select-content-available-height)" }}>
                         {children}
