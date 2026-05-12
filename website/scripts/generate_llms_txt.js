@@ -163,31 +163,48 @@ async function extractSidebarIds(configFilePath) {
  * @param {Object} slugMap - The map to populate with slug to file path and title.
  */
 async function buildSlugMap(directoryPath, slugMap) {
-    try {
-        const entries = await fs.promises.readdir(directoryPath, { withFileTypes: true });
+    // The content root from which Starlight derives slugs
+    const contentRoot = path.resolve("./src/content/docs");
 
-        for (const entry of entries) {
-            const fullPath = path.join(directoryPath, entry.name);
-            if (entry.isDirectory()) {
-                await buildSlugMap(fullPath, slugMap);
-            } else {
-                const ext = path.extname(entry.name).toLowerCase();
-                if (ext === ".mdx" || ext === ".md") {
-                    const mdxContent = fs.readFileSync(fullPath, "utf-8");
-                    const parsed = matter(mdxContent);
-                    const frontmatter = parsed.data;
-                    if (frontmatter && frontmatter.slug) {
-                        slugMap[frontmatter.slug] = {
+    async function walk(dir) {
+        try {
+            const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+
+            for (const entry of entries) {
+                const fullPath = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                    await walk(fullPath);
+                } else {
+                    const ext = path.extname(entry.name).toLowerCase();
+                    if (ext === ".mdx" || ext === ".md") {
+                        const mdxContent = fs.readFileSync(fullPath, "utf-8");
+                        const parsed = matter(mdxContent);
+                        const frontmatter = parsed.data;
+
+                        // Derive slug from file path relative to content root
+                        // e.g. src/content/docs/docs/deployment/aws.md → docs/deployment/aws
+                        let slug;
+                        if (frontmatter && frontmatter.slug) {
+                            slug = frontmatter.slug;
+                        } else {
+                            slug = path.relative(contentRoot, fullPath)
+                                .replace(/\.(mdx?|md)$/, "")
+                                .replace(/\/index$/, "");
+                        }
+
+                        slugMap[slug] = {
                             path: fullPath,
-                            title: frontmatter.title || frontmatter.slug
+                            title: frontmatter?.title || slug
                         };
                     }
                 }
             }
+        } catch (error) {
+            console.error(`Error reading directory ${dir}:`, error.message);
         }
-    } catch (error) {
-        console.error(`Error reading directory ${directoryPath}:`, error.message);
     }
+
+    await walk(directoryPath);
 }
 
 // Entry point of the script

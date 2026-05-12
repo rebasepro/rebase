@@ -597,6 +597,402 @@ await initializeRebaseBackend({
 - **[Backend Overview](/docs/backend)** — Full backend configuration
 - **[Storage Configuration](/docs/storage)** — S3 setup for production
 
+## Deploying Rebase on AWS
+
+Amazon Web Services (AWS) provides incredible scale and enterprise-grade security. For a production Rebase deployment, we recommend decoupling the architecture by using **Amazon RDS** for the PostgreSQL database and **AWS App Runner** (or ECS Fargate) to serve the Node.js backend. 
+
+To maintain strict European data compliance, ensure you operate entirely within an EU region, such as **eu-central-1 (Frankfurt)**, **eu-west-1 (Ireland)**, or **eu-west-3 (Paris)**.
+
+### 1. Provision Amazon RDS (PostgreSQL)
+
+1. Navigate to the **RDS** console in your selected EU region.
+2. Click **Create database** and select **Standard create**.
+3. Choose the **PostgreSQL** engine.
+4. Under Templates, choose **Production** or **Free tier/Dev** depending on your load.
+5. Create a Master Username (e.g., `rebase_admin`) and securely generate a Master Password.
+6. Under Connectivity, ensure the database is placed within a **VPC** that your future App Runner instance can securely access (or make it publicly accessible if strictly controlling ingress IP ranges).
+7. Once provisioned, note the **Endpoint endpoint address** and assemble your URI:
+   `postgresql://rebase_admin:YOUR_PASSWORD@YOUR_ENDPOINT:5432/postgres`
+
+### 2. Push Image to ECR (Elastic Container Registry)
+
+AWS App Runner pulls directly from ECR. Build your Docker image locally and push it.
+
+1. Navigate to **Elastic Container Registry** and create a new private repository called `rebase-backend`.
+2. Grab the push commands provided by AWS in the console (which handle Docker authentication).
+3. Build your image locally from the root folder:
+   ```bash
+   docker build -t rebase-backend ./backend
+   ```
+4. Tag and push it to your newly created ECR repository.
+
+### 3. Deploy via AWS App Runner
+
+App Runner is the simplest way to run containers on AWS without managing orchestrators.
+
+1. Navigate to **AWS App Runner** and click **Create service**.
+2. Select **Container registry** and choose **Amazon ECR**.
+3. Browse and select your `rebase-backend` image.
+4. Under **Service settings**, set the Port to **3001**.
+5. Add the necessary Environment Variables under the configuration tab:
+   
+| Key | Value |
+|-----|-------|
+| `DATABASE_URL` | Your RDS Connection String |
+| `JWT_SECRET` | A secure randomly generated hash (32+ chars) |
+| `NODE_ENV` | `production` |
+
+6. (Optional) If your RDS instance is strictly private, configure **Custom VPC** networking in App Runner so the container can securely talk to the database.
+7. Click **Create & deploy**.
+
+AWS will handle TLS termination (providing an `https` URL out of the box) and spin up the Rebase server.
+
+## Deploying Rebase on Google Cloud Platform
+
+Google Cloud Platform (GCP) offers an incredibly seamless developer experience for containerized applications. For a robust production setup, we leverage **Cloud SQL** for the database and **Cloud Run** for the serverless container backbone.
+
+To maintain strict European data compliance, ensure you operate entirely within an EU region, such as **europe-west3 (Frankfurt)**, **europe-west9 (Paris)**, or **europe-west1 (Belgium)**.
+
+### 1. Provision Cloud SQL (PostgreSQL)
+
+1. Navigate to the **Cloud SQL** console in your preferred EU region.
+2. Click **Create Instance** and select **PostgreSQL**.
+3. Set your Instance ID and generate a secure built-in password for the `postgres` user.
+4. Expand the **Configuration Options** to allocate the correct Machine Type (a standard 2 vCPU machine is a great start).
+5. Ensure the database is configured for Private IP or Authorized Public IP networks, depending on your VCP setup with Cloud Run.
+6. Assemble your connection URI:
+   `postgresql://postgres:YOUR_PASSWORD@YOUR_IP:5432/postgres`
+
+### 2. Build and Deploy to Cloud Run
+
+Cloud Run scales the Rebase Node.js backend automatically down to zero (if desired) and handles TLS out of the box. You can build and deploy the application in a single CLI motion from your local workspace using Google Cloud Build.
+
+Ensure you have the `gcloud` CLI installed and authenticated:
+
+```bash
+## Set your active GCP project
+gcloud config set project YOUR_PROJECT_ID
+
+## Submit the build to Cloud Build, which automatically creates the container image and stores it in Google Container Registry (GCR)
+gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/rebase-backend ./backend
+
+## Deploy the newly built image to Cloud Run
+gcloud run deploy rebase-backend \
+  --image gcr.io/YOUR_PROJECT_ID/rebase-backend \
+  --region europe-west3 \
+  --port 3001 \
+  --set-env-vars DATABASE_URL="postgresql://...",JWT_SECRET="YOUR_SECURE_RANDOM_STRING",NODE_ENV="production" \
+  --allow-unauthenticated
+```
+
+### 3. Handle File Storage
+Since Cloud Run instances are strictly stateless and ephemeral, you cannot use local disk storage for Rebase File Uploads.
+
+1. Navigate to **Google Cloud Storage** and create a new private bucket in your chosen EU region.
+2. Follow the [Rebase Storage Documentation](/docs/storage) to configure Rebase to use the S3-compatible API provided by Google Cloud Storage instead of the local filesystem.
+
+Your Rebase instance is now fully serverless and highly scalable natively inside the EU!
+
+## Deploying Rebase on Microsoft Azure
+
+Microsoft Azure offers tight integrations and enterprise compliance. The optimal architecture for running Rebase on Azure involves using **Azure Database for PostgreSQL - Flexible Server** for the data layer and **Azure Container Apps** for hosting the backend container.
+
+To adhere to European data compliance and fast local response times, provision your resources in regions like **West Europe (Amsterdam)**, **North Europe (Ireland)**, or **France Central (Paris)**.
+
+### 1. Provision PostgreSQL Flexible Server
+
+1. From the Azure Portal, search for and select **Azure Database for PostgreSQL servers**.
+2. Click **Create** and select **Flexible Server**.
+3. Choose your Resource Group and set your preferred EU Region.
+4. Select your Compute size (e.g., General Purpose or Burstable `B2s` for smaller deployments).
+5. Setup the **Authentication** tab with an Admin username and a secure password.
+6. Under **Networking**, ensure "Allow public access from any Azure service within Azure to this server" is checked so your Container App can connect, or configure a secure VNet.
+7. Note down your server name and assemble the connection URI:
+   `postgresql://your_admin:YOUR_PASSWORD@your-server-name.postgres.database.azure.com:5432/postgres`
+
+### 2. Build and Push to Azure Container Registry (ACR)
+
+Azure Container Apps will pull your Docker image from ACR.
+1. Create a new **Container Registry** in your chosen EU region.
+2. Login from your CLI:
+   ```bash
+   az acr login --name YourRegistryName
+   ```
+3. Build and push the Rebase image from your local repository:
+   ```bash
+   docker build -t yourregistryname.azurecr.io/rebase-backend:latest ./backend
+   docker push yourregistryname.azurecr.io/rebase-backend:latest
+   ```
+
+### 3. Deploy Azure Container App
+
+Azure Container Apps provides a serverless container environment with built-in HTTPS ingress.
+
+1. Search the portal for **Container Apps** and click **Create**.
+2. Create a new Container Apps Environment in your EU region.
+3. In the **Container** tab, point to your ACR registry and select the `rebase-backend:latest` image.
+4. Set the **Environment variables**:
+
+| Name | Value |
+|------|-------|
+| `DATABASE_URL` | Your Azure Postgres connection string |
+| `JWT_SECRET` | A Secure random 32+ character string |
+| `NODE_ENV` | `production` |
+
+5. Under the **Ingress** tab, explicitly Enable Ingress.
+6. Set the Target Port to **3001**.
+7. Complete the creation. Azure will automatically provision the container and provide you an Application URL secured with TLS!
+
+## Deploying Rebase on Hetzner Cloud
+
+Hetzner Cloud is widely recognized for offering incredible performance-to-price ratios and is a top choice for projects requiring strict European data sovereignty and GDPR compliance (with datacenters in Nuremberg, Falkenstein, and Helsinki).
+
+Deploying Rebase on Hetzner is easiest via Docker Compose on a standard Ubuntu cloud instance.
+
+### 1. Provision a Server
+
+1. Log into your Hetzner Cloud Console.
+2. Click **Add Server**.
+3. Choose your preferred Location (e.g., **Falkenstein** or **Nuremberg**).
+4. Choose an Image: Select **Ubuntu 24.04** or **App -> Docker CE** (this pre-installs Docker for you).
+5. Choose a Type: A `CPX21` (3 cores, 4GB RAM) or `CX32` (4 cores, 8GB RAM) provides excellent baseline compute for running Rebase + Postgres.
+6. Add your SSH key and hit **Create**.
+
+### 2. SSH and Setup
+
+Once your server is provisioned, grab the public IP address.
+
+```bash
+ssh root@<your-server-ip>
+```
+
+If you didn't choose the Docker image, install Docker and Docker Compose explicitly:
+
+```bash
+apt update && apt install docker.io docker-compose-v2 -y
+```
+
+### 3. Clone and Configure Rebase
+
+Clone your Rebase project directly onto the server instance. 
+
+```bash
+git clone https://github.com/your-username/your-rebase-repo.git /opt/rebase
+cd /opt/rebase
+```
+
+Rebase provides a `docker-compose.yml` out of the box. You'll need to define your production environment variables. Create a `.env.production` file:
+
+```bash
+nano .env.production
+```
+
+Add your secrets:
+
+```env
+DATABASE_URL=postgresql://rebase:your_secure_db_password@postgres:5432/rebase
+JWT_SECRET=generate_a_very_long_secure_random_string_here
+NODE_ENV=production
+```
+
+*Be sure to update `docker-compose.yml` if you want to pull the Postgres password from an environment variable.*
+
+### 4. Run the Stack
+
+Bring the stack online using detached mode:
+
+```bash
+docker compose --env-file .env.production up -d --build
+```
+
+Docker will build your Node.js backend from the local `Dockerfile` and spin up the Postgres container. Once completed, your app will be running on `http://localhost:3001` (internal to the server).
+
+### 5. Expose via Caddy or Nginx
+
+You should never expose port 3001 directly to the internet without SSL. We recommend placing **Caddy** in front of your Rebase instance to automatically provision Let's Encrypt certificates.
+
+Install Caddy:
+```bash
+sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt update && sudo apt install caddy
+```
+
+Edit your Caddyfile:
+```bash
+nano /etc/caddy/Caddyfile
+```
+
+Add the following (replace with your domain, which should have its A-Record pointing to this Hetzner IP):
+
+```caddyfile
+admin.yourdomain.com {
+    reverse_proxy localhost:3001
+}
+```
+
+Restart Caddy:
+```bash
+systemctl restart caddy
+```
+
+That's it! Your Rebase platform is securely hosted entirely within the EU.
+
+## Deploying Rebase on Scaleway
+
+Scaleway is a premier European cloud provider based in France with datacenters in Paris, Amsterdam, and Warsaw. It's an excellent choice for organizations prioritizing EU data sovereignty. 
+
+We recommend utilizing Scaleway's **Managed Database** for reliable Postgres backing and **Serverless Containers** to dynamically scale the Rebase Node.js application.
+
+### 1. Create a Managed Postgres Database
+
+Scaleway's Managed Databases offer automatic backups and high availability.
+
+1. In the Scaleway Console, go to **PostgreSQL**.
+2. Click **Create a Database Instance**.
+3. Choose a Region (e.g., Paris - `PAR1`).
+4. Select a Node Type (a standard **Play2-Pico** or **Pro2-XXS** works well).
+5. Add a database name (`rebase_db`) and define an incredibly secure user password.
+6. Once deployed, note down the **Connection string** (URI) from the dashboard. It will look like: 
+   `postgres://user:password@ip:port/rebase_db`
+
+### 2. Build and Push the Container
+
+Scaleway Serverless Containers run standard Docker images. First, build the Rebase backend locally and push it to the Scaleway Container Registry.
+
+1. Go to **Container Registry** in the Scaleway Console and create a Namespace (e.g., `rebase-apps`).
+2. Log in to the registry from your local terminal using the provided instructions.
+3. Build your Rebase app using the generated `Dockerfile`:
+
+```bash
+docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest ./backend
+```
+
+4. Push the image:
+
+```bash
+docker push rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest
+```
+
+### 3. Deploy Serverless Container
+
+Now deploy the image completely serverless without managing infrastructure.
+
+1. Navigate to **Serverless Containers**.
+2. Click **Create a Container**.
+3. Choose the image you just pushed from the Container Registry.
+4. Set the Port to **3001**.
+5. Under Environment Variables, add the following securely:
+
+| Key | Value |
+|-----|-------|
+| `DATABASE_URL` | The URI from your Managed Postgres step |
+| `JWT_SECRET` | A secure 32+ character random string for signing auth tokens |
+| `NODE_ENV` | `production` |
+
+6. Click **Deploy Container**.
+
+Scaleway will immediately provision the container and provide you with a public endpoint URL (e.g., `https://rebase-backend-xxxx.functions.fnc.fr-par.scw.cloud`). 
+
+*Note: For strict data compliance, verify that your Scaleway Organization details reflect your European corporate entity.*
+
+## Deploying Rebase on Railway
+
+Railway is an incredibly popular modern PaaS (Platform as a Service) that takes the pain out of DevOps. It will automatically detect the Rebase Node framework and build it seamlessly. 
+
+Additionally, Railway fully supports European deployment regions (Amsterdam), meaning you still enjoy strict regional hosting compliance.
+
+### 1. Create a Project & EU Region
+1. Login to your [Railway Account](https://railway.app/).
+2. Click **New Project**.
+3. Go to **Settings -> Default Region**, and explicitly set it to **Europe (Amsterdam)**. (If you do this *after* creating services, you may need to manually migrate them).
+
+### 2. Provision PostgreSQL
+1. Inside your project, click **New** -> **Database** -> **Add PostgreSQL**.
+2. Wait a few seconds for the database to provision.
+3. By default, Railway provides an internal `DATABASE_URL` variable. Click on the Postgres widget -> **Variables** to locate this connection string.
+
+### 3. Deploy Rebase Code
+1. Click **New** -> **GitHub Repo**.
+2. Select your Rebase repository.
+3. Railway will immediately detect the repository and look for a `Dockerfile`. Wait for the initial build to begin.
+
+### 4. Set Environment Variables
+The initial build might fail because it is entirely missing configuration. Let's fix that.
+
+1. Click on the new Rebase GitHub service card.
+2. Go to the **Variables** tab. 
+3. Click **New Variable** and add:
+   - `JWT_SECRET`: Generate a secure 32+ character random string.
+   - `NODE_ENV`: Set to `production`
+4. Click **Reference Variable** and select `DATABASE_URL` from the PostgreSQL service you provisioned. Railway will securely inject the internal Postgres URL at runtime.
+
+### 5. Expose the Domain
+1. In the Rebase service card, navigate to the **Settings** tab.
+2. Scroll down to **Networking**.
+3. Under **Public Networking**, click **Generate Domain**. Railway will provide a `.up.railway.app` testing URL. You can also securely attach a Custom Domain here.
+
+Railway will automatically rebuild safely. Your EU-hosted platform is now entirely live!
+
+## Deploying Rebase on Fly.io
+
+Fly.io allows you to host Docker containers close to your users via their global anycast network. Fly is highly configurable regarding data routing, making it an excellent choice for deploying Rebase applications with a strict European data focus.
+
+Fly.io features data centers in **Amsterdam (ams)**, **Frankfurt (fra)**, **Madrid (mad)**, and **Paris (cdg)**. 
+
+### 1. Initialize the Fly App
+From your local Rebase repository, after ensuring the Fly CLI (`flyctl`) is installed, run:
+
+```bash
+fly launch
+```
+
+1. **App Name:** `my-rebase-app`
+2. **Organization:** Personal or your corporate Org.
+3. **Region:** When prompted for a region, explicitly choose a European datacenter such as **Frankfurt (fra)** or **Paris (cdg)**.
+4. **Database:** When prompted to setup a Postgres database, say **Yes**. Fly will automatically create a Postgres cluster in the *same region* and securely inject the `DATABASE_URL` into your app.
+5. **Redis:** Say **No**.
+
+*Do not deploy just yet when prompted.* We need to set a critical environment variable first.
+
+### 2. Setting the JWT Secret
+Before your application spins up in production, you must inject the JWT Secret so Rebase can securely sign authentication tokens operations.
+
+Run the following command locally:
+```bash
+fly secrets set JWT_SECRET=your_super_long_randomly_generated_secure_string -a my-rebase-app
+```
+
+### 3. Validate Internal Configuration
+Fly will have generated a `fly.toml` file at the root of your project. Verify that the internal port explicitly aligns with the Rebase default configuration (`3001`):
+
+```toml
+## fly.toml
+app = "my-rebase-app"
+primary_region = "fra"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 3001 ## Make sure this matches your Hono app port
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 1
+```
+
+### 4. Deploy
+
+Your data is localized, your database is provisioned, and your secrets are injected. Start the deployment:
+
+```bash
+fly deploy
+```
+
+Once parsing and uploading completes, your application will come online automatically. Run `fly open` to view your deployed app in the browser!
+
 ## Architecture Overview
 
 ### System Architecture
