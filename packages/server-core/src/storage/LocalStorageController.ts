@@ -272,6 +272,14 @@ export class LocalStorageController implements StorageController {
 
         const fullPath = this.getFullPath(resolvedPath, resolvedBucket);
 
+        // Check if path exists before attempting to delete
+        try {
+            await access(fullPath, fs.constants.F_OK);
+        } catch {
+            // File doesn't exist — nothing to delete
+            return;
+        }
+
         try {
             const stats = await stat(fullPath);
             if (stats.isDirectory()) {
