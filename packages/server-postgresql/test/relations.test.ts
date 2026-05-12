@@ -382,8 +382,8 @@ relationName: "author" }
             // Should create owning relation on profiles
             expect(cleanResult).toContain("export const profilesRelations = drizzleRelations(profiles, ({ one, many }) => ({ \"author\": one(authors, { fields: [profiles.author_id], references: [authors.id], relationName: \"profiles_author_id\" }) }));");
 
-            // Should create inverse relation on authors (this was previously missing)
-            expect(cleanResult).toContain("export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({ \"profile\": one(profiles, { fields: [authors.id], references: [profiles.author_id], relationName: \"profiles_author_id\" }) }));");
+            // Should create inverse relation on authors — inverse side has NO fields/references
+            expect(cleanResult).toContain("export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({ \"profile\": one(profiles, { relationName: \"profiles_author_id\" }) }));");
         });
 
         it("should generate owning one-to-many relations", async () => {
@@ -818,9 +818,9 @@ relationName: "user" }
             `"user": one(users, { fields: [profiles.user_id], references: [users.id], relationName: \"${expectedSharedName}\" })`
         );
 
-        // Inverse side (users → profiles)
+        // Inverse side (users → profiles) — no fields/references, paired by relationName only
         expect(cleanResult).toContain(
-            `"profile": one(profiles, { fields: [users.id], references: [profiles.user_id], relationName: \"${expectedSharedName}\" })`
+            `"profile": one(profiles, { relationName: \"${expectedSharedName}\" })`
         );
 
         // Both must match

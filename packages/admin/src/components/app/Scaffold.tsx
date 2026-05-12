@@ -184,7 +184,7 @@ function DrawerWrapper(props: {
     const { t } = useTranslation();
 
     const innerDrawer = <div
-        className={cls("h-full no-scrollbar overflow-y-auto overflow-x-clip", defaultBorderMixin,
+        className={cls("h-full overflow-hidden", defaultBorderMixin,
             isFloating ? `absolute top-0 left-0 bottom-0 z-50 bg-surface-50 ${darkBgFloating} shadow-2xl border-r` : `relative bg-surface-50 ${darkBg}`)}
         style={{
             width: visualWidth,

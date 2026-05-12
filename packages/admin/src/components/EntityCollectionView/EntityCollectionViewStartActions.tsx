@@ -68,7 +68,12 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
     };
 
     const handleBackClick = useCallback(() => {
-        const collectionUrl = urlController.buildUrlCollectionPath(path);
+        let collectionUrl = urlController.buildUrlCollectionPath(path);
+        // Preserve the __view query param so the view mode is retained
+        const currentViewParam = new URLSearchParams(window.location.search).get("__view");
+        if (currentViewParam) {
+            collectionUrl += `${collectionUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
+        }
         navigate(collectionUrl);
     }, [navigate, urlController, path]);
 

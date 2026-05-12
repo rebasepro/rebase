@@ -682,31 +682,13 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
                     if (rel.cardinality === "one") {
                         if (rel.direction === "owning" && rel.localKey) {
                             tableRelations.push(`    "${relationKey}": one(${targetTableVar}, {\n        fields: [${tableVarName}.${rel.localKey}],\n        references: [${targetTableVar}.${getPrimaryKeyName(target)}],\n        relationName: \"${drizzleRelationName}\"\n    })`);
-                        } else if (rel.direction === "inverse" && rel.foreignKeyOnTarget) {
-                            const sourceIdField = getPrimaryKeyName(collection);
-                            tableRelations.push(`    "${relationKey}": one(${targetTableVar}, {\n        fields: [${tableVarName}.${sourceIdField}],\n        references: [${targetTableVar}.${rel.foreignKeyOnTarget}],\n        relationName: \"${drizzleRelationName}\"\n    })`);
-                        } else if (rel.direction === "inverse" && !rel.foreignKeyOnTarget) {
-                            // Handle inverse one-to-one relations where the FK is on the target table
-                            // but foreignKeyOnTarget is not explicitly specified
-                            // In this case, we need to find the corresponding owning relation on the target
-                            try {
-                                const targetCollection = rel.target();
-                                const targetResolvedRelations = resolveCollectionRelations(targetCollection);
-
-                                // Find the owning relation on the target that points back to this collection
-                                const correspondingRelation = Object.values(targetResolvedRelations).find(targetRel =>
-                                    targetRel.direction === "owning" &&
-                                    targetRel.cardinality === "one" &&
-                                    targetRel.target().slug === collection.slug
-                                );
-
-                                if (correspondingRelation && correspondingRelation.localKey) {
-                                    const sourceIdField = getPrimaryKeyName(collection);
-                                    tableRelations.push(`    "${relationKey}": one(${targetTableVar}, {\n        fields: [${tableVarName}.${sourceIdField}],\n        references: [${targetTableVar}.${correspondingRelation.localKey}],\n        relationName: \"${drizzleRelationName}\"\n    })`);
-                                }
-                            } catch (e) {
-                                console.warn(`Could not resolve inverse one-to-one relation '${relationKey}':`, e);
-                            }
+                        } else if (rel.direction === "inverse") {
+                            // Inverse one-to-one: the FK lives on the TARGET table, not here.
+                            // Drizzle pairs inverse relations via `relationName` alone — specifying
+                            // `fields`/`references` on the inverse side is invalid and causes
+                            // `normalizeRelation` to crash with "Cannot read properties of
+                            // undefined (reading 'referencedTable')".
+                            tableRelations.push(`    "${relationKey}": one(${targetTableVar}, {\n        relationName: \"${drizzleRelationName}\"\n    })`);
                         }
                     } else if (rel.cardinality === "many") {
                         if (rel.direction === "inverse" && rel.foreignKeyOnTarget) {

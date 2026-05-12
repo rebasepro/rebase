@@ -169,7 +169,12 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
 
     // Close the detail panel: navigate back to the collection path
     const handleCloseDetail = useCallback(() => {
-        const collectionUrl = urlController.buildUrlCollectionPath(path);
+        let collectionUrl = urlController.buildUrlCollectionPath(path);
+        // Preserve the __view query param so the view mode is retained
+        const currentViewParam = new URLSearchParams(window.location.search).get("__view");
+        if (currentViewParam) {
+            collectionUrl += `${collectionUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
+        }
         navigate(collectionUrl);
     }, [navigate, urlController, path]);
 
@@ -256,15 +261,19 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
     const listPanel = (
         <div
             className={cls(
-                "flex flex-col h-full overflow-y-auto overflow-x-hidden min-w-0 transition-all ease-out w-full",
+                "flex flex-col h-full min-w-0 transition-all ease-out w-full",
                 (!largeLayout && isDetailVisible)
                     ? "opacity-0 -translate-x-1/3 pointer-events-none"
                     : "opacity-100 translate-x-0"
             )}
             style={{ transitionDuration: `${TRANSITION_DURATION}ms` }}
         >
+            {/* Toolbar stays fixed above the scrollable area */}
             {toolbar}
-            {children}
+            {/* Scrollable content: title + insights + list rows */}
+            <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
+                {children}
+            </div>
         </div>
     );
 
@@ -290,11 +299,16 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
                     layout="split"
                     onTabChange={(params) => {
                         const newSelectedTab = params.selectedTab;
-                        const entityUrl = urlController.buildUrlCollectionPath(
+                        let entityUrl = urlController.buildUrlCollectionPath(
                             newSelectedTab
                                 ? `${path}/${renderedEntityId}/${newSelectedTab}`
                                 : `${path}/${renderedEntityId}`
                         );
+                        // Preserve the __view query param
+                        const currentViewParam = new URLSearchParams(window.location.search).get("__view");
+                        if (currentViewParam) {
+                            entityUrl += `${entityUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
+                        }
                         navigate(entityUrl);
                     }}
                 />

@@ -57,6 +57,11 @@ export function navigateToEntity({
         if (entityId && selectedTab) {
             to += `/${selectedTab}`;
         }
+        // Preserve the __view query param so the target route knows the current view mode
+        const currentViewParam = new URLSearchParams(window.location.search).get("__view");
+        if (currentViewParam) {
+            to += `${to.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
+        }
         if (!entityId) {
             to += "#new";
         }

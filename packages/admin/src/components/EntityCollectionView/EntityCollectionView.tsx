@@ -1024,8 +1024,17 @@ export const EntityCollectionView = React.memo(
                                     </div>
                                 </div>
                                 {pluginInsights.length > 0 && (
-                                    <div className="flex-shrink-0">
-                                        {pluginInsights}
+                                    <div
+                                        className={cls(
+                                            "grid transition-[grid-template-rows] duration-150 ease-out",
+                                            selectedEntityIdProp === undefined
+                                                ? "grid-rows-[1fr]"
+                                                : "grid-rows-[0fr]"
+                                        )}
+                                    >
+                                        <div className="overflow-hidden flex-shrink-0">
+                                            {pluginInsights}
+                                        </div>
                                     </div>
                                 )}
                                 <EntityCollectionListView
@@ -1048,7 +1057,7 @@ export const EntityCollectionView = React.memo(
                 ) : (
                     <div className="flex flex-col w-full h-full">
                         {toolbarNode}
-                        <div className={cls("flex-1 flex flex-col", viewMode === "list" ? "overflow-auto" : "overflow-hidden")}>
+                        <div className="flex-1 flex flex-col overflow-y-auto">
                             {viewMode === "list" ? (
                                 <div
                                     className={cls(

@@ -89,6 +89,44 @@ function getRowClasses(size: CollectionSize): string {
 }
 
 /**
+ * Estimated row height in pixels for virtualization, based on size.
+ */
+function getEstimatedRowHeight(size: CollectionSize): number {
+    switch (size) {
+        case "xs": return 44;
+        case "s": return 52;
+        case "m": return 64;
+        case "l": return 76;
+        case "xl": return 88;
+        default: return 64;
+    }
+}
+
+/** Number of extra rows rendered above/below the viewport. */
+const OVERSCAN_COUNT = 8;
+
+/** Threshold in pixels from the bottom of the scroll area to trigger loading more. */
+const LOAD_MORE_THRESHOLD = 400;
+
+/**
+ * Walk up the DOM from `element` to find the nearest scrollable ancestor.
+ */
+function getScrollParent(element: HTMLElement | null): HTMLElement | null {
+    let parent = element?.parentElement ?? null;
+    while (parent) {
+        const style = getComputedStyle(parent);
+        if (
+            style.overflowY === "auto" || style.overflowY === "scroll" ||
+            style.overflow === "auto" || style.overflow === "scroll"
+        ) {
+            return parent;
+        }
+        parent = parent.parentElement;
+    }
+    return document.documentElement;
+}
+
+/**
  * Returns true if a property type should NOT be rendered via
  * PropertyPreview in list row columns (because it would blow up height).
  */
@@ -446,22 +484,77 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
     // Empty state
     const isEmpty = !dataLoading && data.length === 0 && !dataLoadingError;
 
+    // ── Virtualization: scroll-parent windowing ──
+    const estimatedRowHeight = getEstimatedRowHeight(size);
+    const [effectiveScrollTop, setEffectiveScrollTop] = useState(0);
+    const [viewportHeight, setViewportHeight] = useState(800);
 
-    // Sentinel ref for IntersectionObserver-based infinite scroll
-    const sentinelRef = useRef<HTMLDivElement | null>(null);
+    // Keep mutable refs for values used in the scroll handler to avoid
+    // re-attaching the listener every time pagination state changes.
+    const paginationStateRef = useRef({ paginationEnabled, noMoreToLoad, itemCount, pageSize });
     useEffect(() => {
-        if (!paginationEnabled || noMoreToLoad || dataLoading) return;
-        const sentinel = sentinelRef.current;
-        if (!sentinel) return;
-        const observer = new IntersectionObserver((entries) => {
-            if (entries[0]?.isIntersecting && !isLoadingMore.current) {
+        paginationStateRef.current = { paginationEnabled, noMoreToLoad, itemCount, pageSize };
+    }, [paginationEnabled, noMoreToLoad, itemCount, pageSize]);
+
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        const scrollEl = getScrollParent(el);
+        if (!scrollEl) return;
+
+        let rafId: number | null = null;
+
+        const update = () => {
+            rafId = null;
+            const scrollRect = scrollEl.getBoundingClientRect();
+            const listRect = el.getBoundingClientRect();
+
+            // How much of the list has scrolled past the viewport top
+            const listTopRelative = listRect.top - scrollRect.top;
+            setEffectiveScrollTop(Math.max(0, -listTopRelative));
+            setViewportHeight(scrollRect.height);
+
+            // Infinite scroll: trigger load-more when near the bottom
+            const { paginationEnabled: pe, noMoreToLoad: nm, itemCount: ic, pageSize: ps } = paginationStateRef.current;
+            if (
+                pe &&
+                !nm &&
+                !isLoadingMore.current &&
+                scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < LOAD_MORE_THRESHOLD
+            ) {
                 isLoadingMore.current = true;
-                setItemCount?.((itemCount ?? pageSize) + pageSize);
+                setItemCount?.((ic ?? ps) + ps);
             }
-        }, { rootMargin: "200px" });
-        observer.observe(sentinel);
-        return () => observer.disconnect();
-    }, [paginationEnabled, noMoreToLoad, dataLoading, data.length, itemCount, pageSize, setItemCount]);
+        };
+
+        const onScroll = () => {
+            if (rafId === null) rafId = requestAnimationFrame(update);
+        };
+
+        scrollEl.addEventListener("scroll", onScroll, { passive: true });
+        const ro = new ResizeObserver(() => update());
+        ro.observe(scrollEl);
+        update(); // initial measurement
+
+        return () => {
+            scrollEl.removeEventListener("scroll", onScroll);
+            ro.disconnect();
+            if (rafId !== null) cancelAnimationFrame(rafId);
+        };
+    }, [setItemCount]); // stable deps only — mutable state via refs
+
+    // Compute the visible window of rows
+    const totalHeight = data.length * estimatedRowHeight;
+    const startIndex = Math.max(0, Math.floor(effectiveScrollTop / estimatedRowHeight) - OVERSCAN_COUNT);
+    const endIndex = Math.min(
+        data.length,
+        Math.ceil((effectiveScrollTop + viewportHeight) / estimatedRowHeight) + OVERSCAN_COUNT
+    );
+    const visibleData = data.slice(startIndex, endIndex);
+    const offsetY = startIndex * estimatedRowHeight;
+
+    // Footer height for loading/end indicators
+    const footerHeight = dataLoading ? 48 : (!dataLoading && noMoreToLoad && data.length > 0) ? 32 : 0;
 
     return (
         <div
@@ -489,55 +582,64 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
                     )}
                 </div>
             ) : (
-                <>
-                    {data.map((entity, index) => {
-                        const isLast = index === data.length - 1;
-                        return (
-                            <div
-                                key={entity.id}
-                                className={cls(
-                                    !isLast && "border-b",
-                                    !isLast && defaultBorderMixin
-                                )}
-                            >
-                                <ListRow
-                                    entity={entity}
-                                    collection={resolvedCollection}
-                                    onClick={handleEntityClick}
-                                    selected={isEntitySelected(entity)}
-                                    highlighted={isEntityHighlighted(entity)}
-                                    onSelectionChange={handleSelectionChange}
-                                    selectionEnabled={selectionEnabled}
-                                    columns={visibleColumns}
-                                    slotKeys={slotKeys}
-                                    rowClasses={rowClasses}
-                                    showImage={showImage}
-                                    size={size}
-                                    isLast={isLast}
-                                    isActive={selectedEntityId !== undefined && entity.id === selectedEntityId}
-                                />
-                            </div>
-                        );
-                    })}
+                /* Spacer with total height — no internal scroll.
+                   The nearest scrollable ancestor provides the scrollbar. */
+                <div style={{ height: totalHeight + footerHeight, position: "relative" }}>
+                    {/* Windowed rows */}
+                    <div style={{ position: "absolute", top: offsetY, left: 0, right: 0 }}>
+                        {visibleData.map((entity, i) => {
+                            const actualIndex = startIndex + i;
+                            const isLast = actualIndex === data.length - 1;
+                            return (
+                                <div
+                                    key={entity.id}
+                                    style={{ height: estimatedRowHeight }}
+                                    className={cls(
+                                        !isLast && "border-b",
+                                        !isLast && defaultBorderMixin
+                                    )}
+                                >
+                                    <ListRow
+                                        entity={entity}
+                                        collection={resolvedCollection}
+                                        onClick={handleEntityClick}
+                                        selected={isEntitySelected(entity)}
+                                        highlighted={isEntityHighlighted(entity)}
+                                        onSelectionChange={handleSelectionChange}
+                                        selectionEnabled={selectionEnabled}
+                                        columns={visibleColumns}
+                                        slotKeys={slotKeys}
+                                        rowClasses={rowClasses}
+                                        showImage={showImage}
+                                        size={size}
+                                        isLast={isLast}
+                                        isActive={selectedEntityId !== undefined && entity.id === selectedEntityId}
+                                    />
+                                </div>
+                            );
+                        })}
+                    </div>
 
-                    {/* Sentinel for infinite scroll pagination */}
-                    {paginationEnabled && !noMoreToLoad && (
-                        <div ref={sentinelRef} className="h-1"/>
-                    )}
-
+                    {/* Loading / end indicators pinned at the bottom */}
                     {dataLoading && (
-                        <div className="flex items-center justify-center py-4">
+                        <div
+                            className="flex items-center justify-center py-3"
+                            style={{ position: "absolute", top: totalHeight, left: 0, right: 0 }}
+                        >
                             <CircularProgress size="small"/>
                         </div>
                     )}
                     {!dataLoading && noMoreToLoad && data.length > 0 && (
-                        <div className="flex items-center justify-center py-2 dark:bg-surface-900">
+                        <div
+                            className="flex items-center justify-center py-2 dark:bg-surface-900"
+                            style={{ position: "absolute", top: totalHeight, left: 0, right: 0 }}
+                        >
                             <Typography variant="caption" color="secondary">
                                 All {data.length} entries loaded
                             </Typography>
                         </div>
                     )}
-                </>
+                </div>
             )}
         </div>
     );
