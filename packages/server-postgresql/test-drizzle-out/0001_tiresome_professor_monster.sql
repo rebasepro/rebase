@@ -1,1 +1,0 @@
-CREATE POLICY "new_policy" ON "jobs" AS PERMISSIVE FOR SELECT TO public;

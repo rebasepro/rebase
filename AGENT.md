@@ -26,3 +26,10 @@ ESLint: Unnecessary escape character: \". (no-useless-escape)
 NEVER convert to any.
 
 Use `pnpm` exclusively, do not use `npm` or `yarn`.
+
+## Scripts & Temporary Files
+- **NEVER** create one-off scripts, codemods, or utility files in the repo root or inside any package directory. This includes files like `fix_*.mjs`, `transform_*.mjs`, `patch_*.js`, `test-*.js`, `scratch.js`, etc.
+- If you need a utility/migration/codemod script, **put it in the `/scripts/` directory** at the repo root.
+- If you need a truly throwaway scratch file, use the agent scratch directory (`<appDataDir>/brain/<conversation-id>/scratch/`), NOT the repo.
+- Log files (`*.log`), diff files (`*.diff`), and temporary text output files should never be committed.
+- The `.gitignore` has aggressive patterns to block these, but don't rely on it — just don't create them in the wrong place.
