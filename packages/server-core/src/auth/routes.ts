@@ -233,8 +233,16 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
             displayName: displayName || undefined
         });
 
-        // Assign configured default role (never auto-assign admin via registration)
-        if (config.defaultRole) {
+        // Auto-bootstrap: if this is the very first user in the system, promote to admin.
+        // This avoids the chicken-and-egg problem where the first user has no permissions
+        // and no way to access the bootstrap endpoint from the UI.
+        const existingUsers = await authRepo.listUsers();
+        const isFirstUser = existingUsers.length === 1 && existingUsers[0].id === user.id;
+
+        if (isFirstUser) {
+            await authRepo.setUserRoles(user.id, ["admin"]);
+        } else if (config.defaultRole) {
+            // Assign configured default role (never auto-assign admin via registration)
             await authRepo.assignDefaultRole(user.id, config.defaultRole);
         }
 
@@ -320,8 +328,14 @@ displayName: user.displayName });
 
                         await authRepo.linkUserIdentity(user.id, provider.id, externalUser.providerId, { email: externalUser.email });
 
-                        // Assign configured default role (never auto-assign admin via registration)
-                        if (config.defaultRole) {
+                        // Auto-bootstrap: first user in the system gets admin
+                        const allUsers = await authRepo.listUsers();
+                        const isFirstUser = allUsers.length === 1 && allUsers[0].id === user.id;
+
+                        if (isFirstUser) {
+                            await authRepo.setUserRoles(user.id, ["admin"]);
+                        } else if (config.defaultRole) {
+                            // Assign configured default role (never auto-assign admin via registration)
                             await authRepo.assignDefaultRole(user.id, config.defaultRole);
                         }
 

@@ -24,15 +24,23 @@ async function main() {
     const args = arg(
         {
             "--output": String,
+            "--collections": String,
             "--force": Boolean,
             "--schema": String,
             "-o": "--output",
+            "-c": "--collections",
             "-f": "--force",
         },
         { permissive: true }
     );
 
-    const outDir = args["--output"] || path.resolve(process.cwd(), "config", "collections");
+    const cwd = process.cwd();
+    const isBackendDir = path.basename(cwd) === "backend";
+    const defaultOutDir = isBackendDir 
+        ? path.resolve(cwd, "..", "config", "collections") 
+        : path.resolve(cwd, "config", "collections");
+
+    const outDir = args["--output"] || args["--collections"] || defaultOutDir;
     const force = args["--force"] || false;
     const pgSchema = args["--schema"] || "public";
 

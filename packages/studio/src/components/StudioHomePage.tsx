@@ -5,7 +5,7 @@ import { ArrowRightIcon } from "lucide-react";
 import { iconSize } from "@rebasepro/ui";
 import { IconForView, useRebaseContext, useRestoreScroll, useSlot } from "@rebasepro/core";
 import { useNavigate } from "react-router-dom";
-import { useStudioBreadcrumbs } from "@rebasepro/core";
+import { useStudioBreadcrumbs, BootstrapAdminBanner } from "@rebasepro/core";
 
 /* ═══════════════════════════════════════════════════════════════
    Static studio tool definitions
@@ -106,6 +106,9 @@ export function StudioHomePage({
     return (
         <div ref={containerRef} className="py-2 overflow-auto h-full w-full">
             <Container maxWidth="6xl">
+                <div className="mb-4">
+                    <BootstrapAdminBanner />
+                </div>
 
                 {(additionalActions || pluginActions) && (
                     <div className="w-full sticky py-4 transition-all duration-400 ease-in-out top-0 z-10 flex flex-row gap-4 justify-end">

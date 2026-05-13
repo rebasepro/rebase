@@ -21,7 +21,7 @@ import { RenameGroupDialog } from "./RenameGroupDialog";
 import { toArray } from "@rebasepro/utils";
 import { useCollapsedGroups, useCustomizationController, useTranslation, useSlot, useAdminModeController } from "@rebasepro/core";
 import { useRestoreScroll } from "@rebasepro/core";
-import { STUDIO_NAVIGATION_GROUPS } from "@rebasepro/core";
+import { STUDIO_NAVIGATION_GROUPS, BootstrapAdminBanner } from "@rebasepro/core";
 import { useBreadcrumbsController, useCMSContext } from "../../index";
 
 export const DEFAULT_GROUP_NAME = "Views";
@@ -314,6 +314,9 @@ export function ContentHomePage({
     return (
         <div ref={containerRef} className="py-2 overflow-auto h-full w-full bg-surface-100 dark:bg-surface-800">
             <Container maxWidth="6xl">
+                <div className="mb-4">
+                    <BootstrapAdminBanner />
+                </div>
                 {/* search & actions */}
                 <div
                     className="w-full sticky py-4 transition-all duration-400 ease-in-out top-0 z-10 flex flex-row gap-4"

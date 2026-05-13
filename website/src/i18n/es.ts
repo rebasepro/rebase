@@ -125,6 +125,9 @@ export const es = {
   "showcase.sync.tab3.title": "Editor visual, TypeScript real",
   "showcase.sync.tab3.desc":
     "Diseña tu modelo de datos visualmente en Rebase Studio. Cada cambio se escribe de vuelta a tus archivos locales TypeScript vía AST — tu código se mantiene limpio, tu equipo se mantiene sincronizado.",
+  "showcase.sync.tab4.title": "Texto enriquecido estilo Notion",
+  "showcase.sync.tab4.desc":
+    "Un editor de bloques completo con comandos slash, atajos de Markdown, reordenación por arrastrar y soltar, imágenes inline, bloques de código y listas de tareas — impulsado por TipTap y ProseMirror.",
   "power.title":
     'Una colección.<br/><span class="text-primary subtle-shimmer">Todo generado.</span>',
   "power.subtitle":

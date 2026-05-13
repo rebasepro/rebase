@@ -125,6 +125,9 @@ export const fr = {
   "showcase.sync.tab3.title": "Éditeur visuel, vrai TypeScript",
   "showcase.sync.tab3.desc":
     "Concevez votre modèle de données visuellement dans Rebase Studio. Chaque changement est réécrit dans vos fichiers locaux TypeScript via AST — votre code reste propre, votre équipe reste synchronisée.",
+  "showcase.sync.tab4.title": "Texte riche style Notion",
+  "showcase.sync.tab4.desc":
+    "Un éditeur de blocs complet avec commandes slash, raccourcis Markdown, réorganisation par glisser-déposer, images en ligne, blocs de code et listes de tâches — propulsé par TipTap et ProseMirror.",
   "power.title":
     'Une collection.<br/><span class="text-primary subtle-shimmer">Tout est généré.</span>',
   "power.subtitle":

@@ -306,7 +306,7 @@ function DrawerModeSwitch({
     return (
         <div
             className={cls(
-                "overflow-hidden transition-all duration-200 ease-in-out px-3",
+                "shrink-0 overflow-hidden transition-all duration-200 ease-in-out px-3",
                 showSwitch ? "opacity-100 h-7 mt-2 mb-0" : "opacity-0 pointer-events-none h-7 mt-2 mb-0"
             )}
         >

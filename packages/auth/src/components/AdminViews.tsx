@@ -153,7 +153,7 @@ message: error instanceof Error ? error.message : "Error deleting user" });
     return (
         <Container className="w-full flex flex-col py-4 gap-4" maxWidth={"6xl"}>
             {/* Bootstrap warning when no admins */}
-            {!hasAdmin && !usersError && loggedInUser && (
+            {!hasAdmin && loggedInUser && (
                 <div className="bg-yellow-100 dark:bg-yellow-900 border border-yellow-400 dark:border-yellow-700 rounded p-4 flex items-center justify-between">
                     <div>
                         <Typography variant="label" className="text-yellow-800 dark:text-yellow-200">

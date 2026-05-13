@@ -7,7 +7,7 @@ import { Button, Container, Dialog, DialogActions, DialogContent, DialogTitle, I
 import { MailIcon, KeyRoundIcon, PlusIcon, Trash2Icon, CopyIcon, CheckCircleIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { RoleChip } from "./RoleChip";
 import { UserManagementDelegate, Role, UserCreationResult } from "@rebasepro/types";
-import { ConfirmationDialog } from "@rebasepro/core";
+import { ConfirmationDialog, BootstrapAdminBanner } from "@rebasepro/core";
 
 const PAGE_SIZE = 25;
 
@@ -249,22 +249,7 @@ message: error instanceof Error ? error.message : t("error_resetting_password") 
 
     return (
         <Container className="w-full flex flex-col py-4 gap-4" maxWidth={"6xl"}>
-            {/* Bootstrap warning when no admins */}
-            {!delegateLoading && !hasAdmin && !usersError && loggedInUser && bootstrapAdmin && (
-                <div className="bg-yellow-100 dark:bg-yellow-900 border border-yellow-400 dark:border-yellow-700 rounded p-4 flex items-center justify-between">
-                    <div>
-                        <Typography variant="label" className="text-yellow-800 dark:text-yellow-200">
-                            {t("no_users_or_roles_defined")}
-                        </Typography>
-                    </div>
-                    <Button
-                        onClick={handleBootstrap}
-                        disabled={bootstrapping}
-                    >
-                        {bootstrapping ? <CircularProgress size="small"/> : t("add_logged_user_as_admin")}
-                    </Button>
-                </div>
-            )}
+            <BootstrapAdminBanner className="mb-4" />
 
             <div className="flex items-center mt-12 mb-4 gap-4">
                 <Typography gutterBottom variant="h4" className="grow mb-0" component="h4">

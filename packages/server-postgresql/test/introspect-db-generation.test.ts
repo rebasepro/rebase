@@ -148,27 +148,27 @@ describe("generateCollectionFile", () => {
     });
 
     describe("enum support", () => {
-        it("generates enumValues for USER-DEFINED columns with matching enum", () => {
+        it("generates enum for USER-DEFINED columns with matching enum", () => {
             const enumMap = new Map([["order_status", ["pending", "shipped", "delivered"]]]);
             const meta = makeSimpleTable("orders", [
                 mkCol("orders", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
                 mkCol("orders", "status", { data_type: "USER-DEFINED", udt_name: "order_status" }),
             ]);
             const result = generateCollectionFile("orders", meta, [], new Set(), new Map([["orders", meta]]), enumMap);
-            expect(result).toContain('enumValues:');
+            expect(result).toContain('enum:');
             expect(result).toContain('{ id: "pending", label: "Pending" }');
             expect(result).toContain('{ id: "shipped", label: "Shipped" }');
             expect(result).toContain('{ id: "delivered", label: "Delivered" }');
             expect(result).toContain('type: "string"');
         });
 
-        it("does NOT add enumValues for USER-DEFINED without matching enum", () => {
+        it("does NOT add enum for USER-DEFINED without matching enum", () => {
             const meta = makeSimpleTable("things", [
                 mkCol("things", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
                 mkCol("things", "geom", { data_type: "USER-DEFINED", udt_name: "geometry" }),
             ]);
             const result = generateCollectionFile("things", meta, [], new Set(), new Map([["things", meta]]), new Map());
-            expect(result).not.toContain("enumValues");
+            expect(result).not.toContain("enum");
         });
 
         it("humanizes enum value labels with underscores", () => {
@@ -264,7 +264,7 @@ describe("generateCollectionFile", () => {
             ]);
             const result = generateCollectionFile("t", meta, [], new Set(), new Map([["t", meta]]), enumMap);
             expect(result).not.toContain("storagePath");
-            expect(result).toContain("enumValues");
+            expect(result).toContain("enum:");
         });
     });
 

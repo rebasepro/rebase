@@ -213,15 +213,21 @@ export function RebaseLoginView({
                                         />
                                     )}
                                     {showRegistration && (
-                                        <Button
-                                            className="w-full"
-                                            variant="filled"
-                                            color="primary"
-                                            size="large"
-                                            onClick={() => switchMode("register")}
-                                        >
-                                            Create an account
-                                        </Button>
+                                        <div className="mt-2 text-center">
+                                            <Typography variant="body2" color="secondary">
+                                                Don&apos;t have an account?{" "}
+                                                <button
+                                                    type="button"
+                                                    className={cls(
+                                                        "font-semibold hover:underline cursor-pointer",
+                                                        "text-primary-600 dark:text-primary-400"
+                                                    )}
+                                                    onClick={() => switchMode("register")}
+                                                >
+                                                    Create one
+                                                </button>
+                                            </Typography>
+                                        </div>
                                     )}
                                 </div>
                             )}
