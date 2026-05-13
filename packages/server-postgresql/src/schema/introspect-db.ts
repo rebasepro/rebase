@@ -188,7 +188,7 @@ async function main() {
                     return;
                 }
 
-                let sampleData: any[] | undefined = undefined;
+                let sampleData: Record<string, unknown>[] | undefined = undefined;
                 if (runDataInference) {
                     try {
                         const { rows } = await client.query(`SELECT * FROM "${pgSchema}"."${tableName}" LIMIT 100`);

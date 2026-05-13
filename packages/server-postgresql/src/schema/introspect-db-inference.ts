@@ -14,7 +14,7 @@ export function inferPropertyFromData(
     columnName: string,
     pgDataType: string,
     currentPropType: string,
-    sampleValues: any[],
+    sampleValues: unknown[],
     isPk: boolean
 ): InferenceResult {
     let result: InferenceResult = {};

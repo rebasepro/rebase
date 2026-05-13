@@ -310,7 +310,8 @@ function EntityFullScreenRoute({
             // Closing a side panel (navigate(-1) back to the form's own path)
             const currentHash = currentLocation.hash;
             if ((currentHash === "#side" || currentHash === "#new_side") &&
-                nextLocation.pathname === basePath)
+                (nextLocation.pathname === basePath ||
+                 nextLocation.pathname.startsWith(entityPath)))
                 return false;
 
             return blocked.current;

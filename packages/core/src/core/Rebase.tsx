@@ -116,20 +116,21 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         }
 
         // 2. Auto-derive from the client's WebSocket connection (Rebase backend)
-        const ws = (client as any)?.ws;
-        if (ws && typeof ws.executeSql === "function") {
+        const ws = client?.ws;
+        if (ws && typeof (ws as Record<string, unknown>).executeSql === "function") {
+            const wsAdmin = ws as import("@rebasepro/types").DatabaseAdmin;
             return {
-                executeSql: ws.executeSql.bind(ws),
-                fetchAvailableDatabases: ws.fetchAvailableDatabases?.bind(ws),
-                fetchAvailableRoles: ws.fetchAvailableRoles?.bind(ws),
-                fetchCurrentDatabase: ws.fetchCurrentDatabase?.bind(ws),
-                fetchUnmappedTables: ws.fetchUnmappedTables?.bind(ws),
-                fetchTableMetadata: ws.fetchTableMetadata?.bind(ws),
+                executeSql: wsAdmin.executeSql!.bind(wsAdmin),
+                fetchAvailableDatabases: wsAdmin.fetchAvailableDatabases?.bind(wsAdmin),
+                fetchAvailableRoles: wsAdmin.fetchAvailableRoles?.bind(wsAdmin),
+                fetchCurrentDatabase: wsAdmin.fetchCurrentDatabase?.bind(wsAdmin),
+                fetchUnmappedTables: wsAdmin.fetchUnmappedTables?.bind(wsAdmin),
+                fetchTableMetadata: wsAdmin.fetchTableMetadata?.bind(wsAdmin),
                 // Branch admin capabilities
-                ...(typeof ws.createBranch === "function" ? {
-                    createBranch: ws.createBranch.bind(ws),
-                    deleteBranch: ws.deleteBranch.bind(ws),
-                    listBranches: ws.listBranches.bind(ws)
+                ...(typeof wsAdmin.createBranch === "function" ? {
+                    createBranch: wsAdmin.createBranch.bind(wsAdmin),
+                    deleteBranch: wsAdmin.deleteBranch!.bind(wsAdmin),
+                    listBranches: wsAdmin.listBranches!.bind(wsAdmin)
                 } : {})
             };
         }
@@ -224,7 +225,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         </RebaseI18nProvider>
     );
 
-    const resolvedApiUrl = apiUrl ?? (client as any)?.baseUrl;
+    const resolvedApiUrl = apiUrl ?? client?.baseUrl;
 
     if (resolvedApiUrl) {
         return (

@@ -12,9 +12,7 @@ import { useEffectiveRoleController } from "./useEffectiveRoleController";
 import React, { useEffect, useContext } from "react";
 import { useInternalUserManagementController } from "./useInternalUserManagementController";
 
-// Temporary context for databaseAdmin - assuming we might add one, or we need to get it from Rebase.tsx.
-// Wait, `databaseAdmin` hasn't been added to a context yet. Let's add it to a context in Rebase.tsx later.
-// Let's create a placeholder for databaseAdmin context access.
+// DatabaseAdmin is provided by <Rebase> via DatabaseAdminContext.
 import { DatabaseAdminContext } from "../contexts/DatabaseAdminContext";
 
 /**
@@ -74,7 +72,9 @@ export const useRebaseContext = <USER extends User = User, AuthControllerType ex
             databaseAdmin,
             client: client!
         };
-    }, [authController, dialogsController, effectiveRoleController, data, databaseAdmin, client]);
+    }, [authController, data, storageSource, snackbarController, userConfigPersistence,
+        dialogsController, customizationController, analyticsController, userManagement,
+        effectiveRoleController, databaseAdmin, client]);
 
     return rebaseContextRef.current;
 }

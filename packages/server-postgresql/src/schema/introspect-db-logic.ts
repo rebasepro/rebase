@@ -520,7 +520,7 @@ export function generateCollectionFile(
     joinTables: Set<string>,
     tablesMap: Map<string, TableMeta>,
     enumMap: Map<string, string[]>,
-    sampleData?: any[],
+    sampleData?: Record<string, unknown>[],
 ): string {
     const collectionName = humanize(tableName);
     const singular = singularize(collectionName);

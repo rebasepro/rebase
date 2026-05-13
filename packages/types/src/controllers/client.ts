@@ -130,4 +130,19 @@ export interface RebaseClient<DB = unknown> {
 
     /** Admin API for user and role management */
     admin?: AdminAPI;
+
+    /**
+     * The base HTTP URL of the backend server.
+     * Exposed by the SDK client (`@rebasepro/client`) and used to auto-derive
+     * the `ApiConfigProvider` URL.
+     */
+    baseUrl?: string;
+
+    /**
+     * WebSocket client for realtime subscriptions and admin capabilities.
+     * Exposed by the SDK client (`@rebasepro/client`). The shape is intentionally
+     * left as `unknown` in the base interface — callers should narrow via feature
+     * detection (e.g. `typeof ws.executeSql === "function"`).
+     */
+    ws?: unknown;
 }

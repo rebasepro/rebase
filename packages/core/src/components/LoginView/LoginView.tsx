@@ -1,5 +1,21 @@
-
 import React, { ReactNode, useEffect, useRef, useState } from "react";
+
+/** Google Identity Services SDK — injected by the GIS <script> tag. */
+declare global {
+    interface Window {
+        google?: {
+            accounts: {
+                oauth2: {
+                    initTokenClient(config: {
+                        client_id: string;
+                        scope: string;
+                        callback: (response: { access_token?: string; error?: string }) => void;
+                    }): { requestAccessToken(): void };
+                };
+            };
+        };
+    }
+}
 
 import { Button, cls, IconButton, LoadingButton, Menu, MenuItem, TextField, Typography, iconSize } from "@rebasepro/ui";
 import { ArrowLeftIcon, MailIcon, MoonIcon, SunIcon, SunMoonIcon } from "lucide-react";
@@ -119,7 +135,9 @@ export function LoginView({
 
     // Resolve capabilities — explicit props override authController.capabilities
     const caps = authController.capabilities ?? {};
-    const isBootstrapMode = needsSetup ?? (authController as any).needsSetup ?? false;
+    const isBootstrapMode = needsSetup
+        ?? ("needsSetup" in authController && !!(authController as { needsSetup?: boolean }).needsSetup)
+        ?? false;
     const canRegister = registrationEnabled ?? caps.registration ?? false;
     const hasGoogleLogin = googleEnabled ?? caps.googleLogin ?? false;
     const hasPasswordReset = caps.passwordReset ?? !!authController.forgotPassword;
@@ -345,12 +363,12 @@ function GoogleLoginButton({
     googleClientId: string,
     authController: AuthControllerExtended
 }) {
-    const tokenClientRef = useRef<any>(null);
+    const tokenClientRef = useRef<{ requestAccessToken(): void } | null>(null);
 
     useEffect(() => {
         if (!authController.googleLogin) return;
 
-        const google = (window as any).google;
+        const google = window.google;
         if (!google || tokenClientRef.current) return;
 
         tokenClientRef.current = google.accounts.oauth2.initTokenClient({
