@@ -62,7 +62,7 @@ For specific topics, see:
 - `rebase-studio` — Visual admin panel, collection editor, custom views
 - `rebase-deployment` — Rebase Cloud, Docker, Firebase Hosting
 - `rebase-storage` — File uploads, S3, local storage
-- `rebase-custom-functions` — Custom Hono API routes
+- `rebase-custom-functions` — Custom Hono API routes + frontend invocation via `client.functions.invoke()`
 - `rebase-cron-jobs` — Scheduled background jobs
 
 ## References

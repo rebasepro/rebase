@@ -6,6 +6,7 @@
  * no process.exit.  It is imported by introspect-db.ts (the CLI entry-point)
  * and consumed directly by tests.
  */
+import { inferPropertyFromData } from "./introspect-db-inference";
 
 // ── Typed interfaces for SQL query results ────────────────────────────
 
@@ -519,6 +520,7 @@ export function generateCollectionFile(
     joinTables: Set<string>,
     tablesMap: Map<string, TableMeta>,
     enumMap: Map<string, string[]>,
+    sampleData?: any[],
 ): string {
     const collectionName = humanize(tableName);
     const singular = singularize(collectionName);
@@ -552,95 +554,112 @@ export function generateCollectionFile(
 
         const colNameLower = col.column_name.toLowerCase();
 
-        // Detect storage field for ordering context
-        const isStorageField = propType === "string" && !isEnumColumn && (
-            colNameLower.includes("image") || colNameLower.includes("avatar") ||
-            colNameLower.includes("photo") || colNameLower.includes("logo") ||
-            colNameLower.includes("cover")
-        );
-
-        orderEntries.push({
-            key: col.column_name,
-            ctx: {
-                propType,
-                isPk: meta.pks.includes(col.column_name),
-                isEnum: isEnumColumn,
-                isStorage: isStorageField,
-                pgDataType: col.data_type,
-                originalIndex: currentIndex,
-            },
-        });
+        // ── Data Inference Engine ────────────────────────────────────────────
+        let finalPropType = propType;
+        let inferenceExtra = "";
+        
+        if (!isEnumColumn && sampleData && sampleData.length > 0) {
+            const values = sampleData.map(r => r[col.column_name]);
+            const inferred = inferPropertyFromData(col.column_name, col.data_type, propType, values, meta.pks.includes(col.column_name));
+            if (inferred.propType) finalPropType = inferred.propType;
+            if (inferred.extra) inferenceExtra = inferred.extra;
+        }
 
         // Enum values — generate real enum from the PG enum
         if (isEnumColumn && colEnumValues) {
             const enumEntries = colEnumValues
                 .map((v) => `{ id: "${v}", label: "${humanize(v)}" }`)
                 .join(", ");
-            extra = `\n            enum: [${enumEntries}],`;
+            extra += `\n            enum: [${enumEntries}],`;
         }
 
         // Date auto-value heuristics
-        if (propType === "date") {
+        if (finalPropType === "date") {
             if (colNameLower === "created_at" || colNameLower === "createdat") {
-                extra = `\n            autoValue: "on_create",\n            ui: {\n                readOnly: true,\n                hideFromCollection: true\n            },`;
+                extra += `\n            autoValue: "on_create",\n            ui: {\n                readOnly: true,\n                hideFromCollection: true\n            },`;
             } else if (colNameLower === "updated_at" || colNameLower === "updatedat") {
-                extra = `\n            autoValue: "on_update",\n            ui: {\n                readOnly: true,\n                hideFromCollection: true\n            },`;
+                extra += `\n            autoValue: "on_update",\n            ui: {\n                readOnly: true,\n                hideFromCollection: true\n            },`;
             } else if (col.column_default && (col.column_default.includes("now()") || col.column_default.includes("CURRENT_TIMESTAMP"))) {
-                extra = `\n            autoValue: "on_create",\n            ui: {\n                readOnly: true\n            },`;
+                extra += `\n            autoValue: "on_create",\n            ui: {\n                readOnly: true\n            },`;
             }
         }
 
-        // Array/Map heuristics
-        if (propType === "array") {
+        // Array/Map heuristics (Fallback if not inferred)
+        if (finalPropType === "array" && !inferenceExtra.includes("of: {")) {
             let innerType = "string";
             if (col.udt_name.startsWith("_")) {
                 const baseType = col.udt_name.substring(1);
-                // Simple recursive check or hardcoded for inner type:
-                // We'll just call mapPgType on the baseType
                 innerType = mapPgType(baseType);
             }
-            extra = `\n            of: { name: "${humanize(col.column_name)} Item", type: "${innerType}" },`;
-        } else if (propType === "map") {
-            extra = `\n            keyValue: true,`;
+            extra += `\n            of: { name: "${humanize(col.column_name)} Item", type: "${innerType}" },`;
+        } else if (finalPropType === "map" && !inferenceExtra.includes("keyValue: true") && !inferenceExtra.includes("properties: {")) {
+            extra += `\n            keyValue: true,`;
         }
 
-        // String sub-type heuristics (skip if already handled as enum)
-        if (propType === "string" && !isEnumColumn) {
-            if (colNameLower.includes("image") || colNameLower.includes("avatar") || colNameLower.includes("photo") || colNameLower.includes("logo") || colNameLower.includes("cover")) {
-                extra = `\n            storage: {\n                storagePath: "${tableName}/${col.column_name}"\n            },`;
+        // String sub-type heuristics (Fallback if not handled by inference or enum)
+        if (finalPropType === "string" && !isEnumColumn && !inferenceExtra) {
+            const isUrl = colNameLower.endsWith("_url") || colNameLower.endsWith("_uri") || colNameLower.endsWith("_link");
+            const isMedia = colNameLower.includes("image") || colNameLower.includes("avatar") || colNameLower.includes("photo") || colNameLower.includes("logo") || colNameLower.includes("cover");
+
+            if (isMedia) {
+                extra += `\n            storage: {\n                storagePath: "${tableName}/${col.column_name}"\n            },`;
+            } else if (isUrl) {
+                extra += `\n            ui: {\n                url: true\n            },`;
             } else if (colNameLower === "description" || colNameLower === "summary" || colNameLower === "excerpt") {
-                extra = `\n            multiline: true,`;
+                extra += `\n            multiline: true,`;
             } else if (colNameLower === "content" || colNameLower === "body") {
-                extra = `\n            multiline: true,\n            markdown: true,`;
+                extra += `\n            multiline: true,\n            markdown: true,`;
             } else if (col.data_type === "text") {
-                extra = `\n            multiline: true,`;
+                extra += `\n            multiline: true,`;
             }
         }
+        
+        // Append inference results
+        if (inferenceExtra) {
+            extra += inferenceExtra;
+            if (!extra.endsWith(",")) extra += ",";
+        }
 
-        // Identify IDs
+        // Identify IDs (unless already inferred as UUID/CUID by inferenceEngine)
         if (meta.pks.includes(col.column_name)) {
             if (isCompositePk) {
                 extra += `\n            // Part of composite primary key (${meta.pks.join(", ")})`;
-            } else if (propType === "number") {
+            } else if (finalPropType === "number" && !inferenceExtra.includes("isId:")) {
                 extra += `\n            isId: "increment",`;
-            } else if (col.data_type.toLowerCase() === "uuid") {
+            } else if (col.data_type.toLowerCase() === "uuid" && !inferenceExtra.includes("isId:")) {
                 extra += `\n            isId: "uuid",`;
-            } else {
+            } else if (!inferenceExtra.includes("isId:")) {
                 extra += `\n            isId: "uuid", // Verify if this is a UUID or CUID`;
             }
         }
 
         if (col.is_nullable === "NO" && !meta.pks.includes(col.column_name) && !col.column_default) {
-            extra += `\n            validation: {\n                required: true\n            },`;
+            if (extra.includes("validation: {")) {
+                extra = extra.replace("validation: {", "validation: {\n                required: true,");
+            } else {
+                extra += `\n            validation: {\n                required: true\n            },`;
+            }
         }
 
         const humanName = humanize(col.column_name);
+
+        orderEntries.push({
+            key: col.column_name,
+            ctx: {
+                propType: finalPropType,
+                isPk: meta.pks.includes(col.column_name),
+                isEnum: isEnumColumn,
+                isStorage: extra.includes("storage: {") || inferenceExtra.includes("storage: {"),
+                pgDataType: col.data_type,
+                originalIndex: currentIndex,
+            },
+        });
 
         propertyBlocks.set(col.column_name, `
         ${col.column_name}: {
             name: "${humanName}",
             columnName: "${col.column_name}",
-            type: "${propType}",${extra}
+            type: "${finalPropType}",${extra}
         },`);
     }
 
@@ -783,9 +802,10 @@ export function generateCollectionFile(
         propsOutput += propertyBlocks.get(key) || "";
     }
 
+    const collectionVarName = toCollectionVarName(tableName);
     const fileContent = `${Array.from(imports).join("\n")}
 
-const ${tableName}Collection: PostgresCollection = {
+const ${collectionVarName}: PostgresCollection = {
     name: "${collectionName}",
     singularName: "${singular}",
     slug: "${tableName}",
@@ -796,7 +816,7 @@ const ${tableName}Collection: PostgresCollection = {
     propertiesOrder: ${JSON.stringify(sortedPropertiesOrder, null, 8).replace(/]$/, "    ]")}
 };
 
-export default ${tableName}Collection;
+export default ${collectionVarName};
 `;
 
     return fileContent;

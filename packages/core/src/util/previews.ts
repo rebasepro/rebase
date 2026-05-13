@@ -54,17 +54,25 @@ export function getEntityTitlePropertyKey<M extends Record<string, any>>(collect
     if (collection.titleProperty) {
         return collection.titleProperty as string;
     }
-    // find first text field property according to defined order
+    
     const orderToSearch = (collection.propertiesOrder as string[]) || Object.keys(collection.properties);
+    let firstStringCandidate: string | undefined;
+
     for (const key of orderToSearch) {
         const property = collection.properties[key];
         if (property && !isPropertyBuilder(property)) {
             const prop = property as Property;
             if (prop.type === "string" && !prop.ui?.multiline && !prop.ui?.markdown && !prop.storage && !prop.isId) {
-                return key;
+                if (!firstStringCandidate) {
+                    firstStringCandidate = key;
+                }
+                const lowerKey = key.toLowerCase();
+                if (["name", "title", "label", "displayname", "username"].includes(lowerKey)) {
+                    return key; // Immediate return if it's a strong title candidate
+                }
             }
         }
     }
-    return undefined;
+    return firstStringCandidate;
 }
 

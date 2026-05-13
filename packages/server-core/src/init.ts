@@ -582,6 +582,18 @@ collectionRegistry });
     _initRebase(serverClient);
     logger.info("Rebase singleton initialized");
 
+    // Retroactively inject the server client into the driver so that
+    // entity callbacks receive `context.client` at runtime.
+    // The driver is created before the client (which depends on the mounted
+    // Hono app), so we set it here, mirroring the historyService injection above.
+    if (defaultDriverResult.internals) {
+        const internals = defaultDriverResult.internals as Record<string, unknown>;
+        const driver = internals.driver as Record<string, unknown> | undefined;
+        if (driver && "client" in driver) {
+            driver.client = serverClient;
+        }
+    }
+
     // 5. Mount Custom Functions
     if (config.functionsDir) {
         const { loadFunctionsFromDirectory } = await import("./functions/function-loader");

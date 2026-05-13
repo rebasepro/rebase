@@ -68,10 +68,10 @@ export function DefaultDrawer({
     const allNavigationEntries = navigationState.topLevelNavigation?.navigationEntries ?? [];
 
     // Studio mode shows only view-type entries (devViews like schema editor).
-    // Content mode shows collections and views (everything except admin entries).
+    // Content mode shows collections and custom entries (everything except admin and studio views).
     const filteredEntries = adminModeController.mode === "studio"
         ? allNavigationEntries.filter(e => e.type === "view")
-        : allNavigationEntries.filter(e => e.type !== "admin");
+        : allNavigationEntries.filter(e => e.type !== "admin" && e.type !== "view");
 
     // Derive groups from the filtered entries
     const groupsToRender = [...new Set(filteredEntries.map(e => e.group).filter(Boolean))] as string[];
@@ -154,7 +154,6 @@ context });
                                 tooltipsOpen={tooltipsOpen}
                                 adminMenuOpen={adminMenuOpen}
                                 onItemClick={onItemClick}
-                                hideHeader={adminModeController.mode === "studio"}
                             />
                         );
                     })}

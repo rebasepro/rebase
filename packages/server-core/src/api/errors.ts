@@ -120,10 +120,11 @@ export const errorHandler: ErrorHandler = (err, c) => {
         `❌ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}`
     );
 
-    // Suppress the huge stack trace for known missing schema errors (it's noisy and not a code bug)
+    // Suppress the huge stack trace for known DB errors (it's noisy and leaks SQL)
     const causePg = (error.cause && typeof error.cause === "object") ? (error.cause as PgLikeError) : undefined;
     const pgErrorCode = causePg?.code || error.code;
-    if (pgErrorCode !== "42703" && pgErrorCode !== "42P01") {
+    const suppressStack = pgErrorCode === "42703" || pgErrorCode === "42P01" || (statusCode < 500 && code === "BAD_REQUEST");
+    if (!suppressStack) {
         console.error(error.stack || error);
     }
 

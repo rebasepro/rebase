@@ -617,6 +617,10 @@ export class EntityFetchService {
 
                 return entity;
             } catch (e) {
+                if (e instanceof Error && e.message.includes("not enough information to infer relation")) {
+                    console.error(`[EntityFetchService] Relation inference error for collection '${collectionPath}': ${e.message}`);
+                    console.error(`Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.`);
+                }
                 console.warn(`[EntityFetchService] db.query.findFirst failed for ${collectionPath}, falling back to db.select:`, e);
             }
         }
@@ -733,6 +737,10 @@ export class EntityFetchService {
 
                 return entities;
             } catch (e) {
+                if (e instanceof Error && e.message.includes("not enough information to infer relation")) {
+                    console.error(`[EntityFetchService] Relation inference error for collection '${collectionPath}': ${e.message}`);
+                    console.error(`Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.`);
+                }
                 console.warn(`[EntityFetchService] db.query.findMany failed for ${collectionPath}, falling back to db.select:`, e);
             }
         }
@@ -1195,6 +1203,10 @@ export class EntityFetchService {
 
                 return restRows;
             } catch (e) {
+                if (e instanceof Error && e.message.includes("not enough information to infer relation")) {
+                    console.error(`[EntityFetchService] Relation inference error for collection '${collectionPath}': ${e.message}`);
+                    console.error(`Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.`);
+                }
                 console.warn(`[fetchCollectionForRest] db.query.findMany failed for ${collectionPath}, falling back:`, e);
             }
         }
@@ -1305,6 +1317,10 @@ export class EntityFetchService {
 
                 return restRow;
             } catch (e) {
+                if (e instanceof Error && e.message.includes("not enough information to infer relation")) {
+                    console.error(`[EntityFetchService] Relation inference error for collection '${collectionPath}': ${e.message}`);
+                    console.error(`Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.`);
+                }
                 console.warn(`[fetchEntityForRest] db.query.findFirst failed for ${collectionPath}, falling back:`, e);
             }
         }

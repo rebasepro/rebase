@@ -5,7 +5,7 @@ description: Guide for working with Rebase auto-generated REST and GraphQL APIs.
 
 # Rebase Auto-Generated APIs
 
-> **WARNING FOR AGENTS**: If you are writing a script or data task, **default to using the Rebase SDK** (`@rebasepro/client` or `@rebasepro/server-core`) instead of making raw REST or GraphQL API calls (`fetch` / `curl`). Only use raw API calls if specifically instructed to do so or if you are demonstrating HTTP usage to the user.
+> **WARNING FOR AGENTS**: If you are writing a script or data task, **default to using the Rebase SDK** (`@rebasepro/client` or `@rebasepro/server-core`) instead of making raw REST or GraphQL API calls (`fetch` / `curl`). For custom backend functions, use `client.functions.invoke('function-name', payload)` — **NEVER** manually construct `/api/functions/` URLs or extract tokens from localStorage. Only use raw API calls if specifically instructed to do so or if you are demonstrating HTTP usage to the user.
 
 Every collection defined in Rebase automatically gets full REST CRUD and GraphQL endpoints. No manual route creation needed.
 
@@ -29,6 +29,7 @@ Other API categories use their own base paths:
 | `/api/auth/*` | Authentication (login, register, refresh) |
 | `/api/admin/*` | User & role management |
 | `/api/storage/*` | File uploads and downloads |
+| `/api/functions/{name}` | Custom backend functions (auto-mounted from `functions/` dir) |
 | `/api/schema-editor/*` | Visual schema editor (dev only) |
 
 ### CRUD Operations

@@ -23,6 +23,7 @@ export function navigateToEntity({
     copy,
     path,
     selectedTab,
+    defaultValues,
     sideEntityController,
     onClose,
     navigation
@@ -34,6 +35,15 @@ export function navigateToEntity({
         entityId?: string | number;
         selectedTab?: string;
         copy?: boolean;
+        /**
+         * Pre-populate the new entity form with these values.
+         * Only applied when entityId is not set (i.e. "new" mode).
+         *
+         * Side panel: passed through EntitySidePanelProps → EntityEditView.
+         * Full screen: carried via React Router location.state so the route
+         * component can read it on mount without polluting the URL.
+         */
+        defaultValues?: Record<string, unknown>;
         path: string;
         sideEntityController: SideEntityController;
         onClose?: () => void;
@@ -49,7 +59,8 @@ export function navigateToEntity({
             selectedTab,
             collection,
             updateUrl: true,
-            onClose
+            onClose,
+            defaultValues
         });
 
     } else {
@@ -68,7 +79,10 @@ export function navigateToEntity({
         if (copy) {
             to += "#copy";
         }
-        navigation.navigate(to);
+        // Use React Router location.state to carry defaultValues — the correct SPA
+        // approach. No URL size limits, no encoding, nothing in the address bar.
+        // EntityFullScreenRoute reads location.state.defaultValues on mount.
+        navigation.navigate(to, defaultValues ? { state: { defaultValues } } : undefined);
     }
 
 }

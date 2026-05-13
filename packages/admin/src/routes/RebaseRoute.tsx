@@ -235,6 +235,10 @@ function EntityFullScreenRoute({
     const navigate = useNavigate();
     const location = useLocation();
 
+    // defaultValues may be carried via location.state when openNewDocument() is called
+    // for full-screen mode. We read it once on mount — after that, the form owns its state.
+    const defaultValues = (location.state as { defaultValues?: Record<string, unknown> } | null)?.defaultValues;
+
     // Preserve the current hash (e.g. #full) across tab/save navigations
     const hash = location.hash;
 
@@ -330,14 +334,18 @@ function EntityFullScreenRoute({
             path={collectionPath}
             copy={isCopy}
             selectedTab={selectedTab ?? undefined}
+            defaultValues={isNew ? defaultValues : undefined}
             onValuesModified={(modified) => blocked.current = modified}
             onSaved={(params) => {
                 const newSelectedTab = params.selectedTab;
                 const newEntityId = params.entityId;
+                // Clear the hash after saving a new entity — preserving #new
+                // would cause the route to re-parse as "new" and show "not found".
+                const savedHash = isNew ? "" : hash;
                 if (newSelectedTab) {
-                    navigate(`${basePath}/${newEntityId}/${newSelectedTab}${hash}`, { replace: true });
+                    navigate(`${basePath}/${newEntityId}/${newSelectedTab}${savedHash}`, { replace: true });
                 } else {
-                    navigate(`${basePath}/${newEntityId}${hash}`, { replace: true });
+                    navigate(`${basePath}/${newEntityId}${savedHash}`, { replace: true });
                 }
             }}
             onTabChange={(params) => {

@@ -374,6 +374,23 @@ export const EntityCollectionView = React.memo(
             })
         }, [path, sideEntityController]);
 
+        const openNewDocument = useCallback((defaultValues?: Record<string, unknown>) => {
+            const collection = collectionRef.current;
+            analyticsController.onAnalyticsEvent?.("new_entity_click", {
+                path: path
+            });
+            navigateToEntity({
+                openEntityMode,
+                collection,
+                entityId: undefined,
+                defaultValues,
+                path: path,
+                sideEntityController,
+                navigation: urlController,
+                onClose: unselectNavigatedEntity
+            });
+        }, [path, sideEntityController, openEntityMode, urlController, unselectNavigatedEntity]);
+
         const onMultipleDeleteClick = () => {
             analyticsController.onAnalyticsEvent?.("multiple_delete_dialog_open", {
                 path: path
@@ -869,6 +886,7 @@ export const EntityCollectionView = React.memo(
                     selectionController={usedSelectionController}
                     collectionEntitiesCount={docsCount ?? undefined}
                     resolvedProperties={resolvedCollection.properties}
+                    openNewDocument={openNewDocument}
                     compact={isCompact}/>}
                 actions={
                     <EntityCollectionViewActions
@@ -877,6 +895,7 @@ export const EntityCollectionView = React.memo(
                         tableController={tableController}
                         onMultipleDeleteClick={onMultipleDeleteClick}
                         onNewClick={onNewClick}
+                        openNewDocument={openNewDocument}
                         path={path}
                         relativePath={collection.slug}
                         selectionController={usedSelectionController}

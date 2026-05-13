@@ -3,6 +3,7 @@ import type { AuthController } from "./controllers/auth";
 import type { StorageSource } from "./controllers/storage";
 import type { UserConfigurationPersistence } from "./controllers/local_config_persistence";
 import type { DatabaseAdmin } from "./types/backend";
+import type { RebaseClient } from "./controllers/client";
 
 import type { RebaseData } from "./controllers/data";
 import type { User } from "./users";
@@ -15,6 +16,23 @@ import type { UserManagementDelegate } from "./types/user_management_delegate";
  * @group Hooks and utilities
  */
 export type RebaseCallContext<USER extends User = User> = {
+
+    /**
+     * The Rebase client instance.
+     * Available in all entity callbacks (beforeSave, afterSave, afterRead,
+     * beforeDelete, afterDelete) and in CollectionActionsProps via context.
+     * Use it to call backend functions, access data, storage, etc.
+     *
+     * @example
+     * // In a beforeSave callback:
+     * const result = await context.client.functions.invoke('my-function', { ... });
+     *
+     * @example
+     * // In a CollectionAction component:
+     * const { client } = props.context;
+     * const result = await client.functions.invoke('extract-job', { url });
+     */
+    client: RebaseClient<any>;
 
     /**
      * Unified data access — `context.data.products.create(...)`.

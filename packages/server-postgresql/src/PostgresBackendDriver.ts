@@ -4,7 +4,7 @@ import { BranchService } from "./services/BranchService";
 import { RealtimeService } from "./services/realtimeService";
 import { DatabasePoolManager } from "./databasePoolManager";
 import { DrizzleClient } from "./interfaces";
-import { User } from "@rebasepro/types";
+import { User, RebaseClient } from "@rebasepro/types";
 import { sql as drizzleSql } from "drizzle-orm";
 import { buildPropertyCallbacks } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
@@ -44,6 +44,7 @@ export class PostgresBackendDriver implements DataDriver {
     public branchService?: BranchService;
     public user?: User;
     public data: RebaseData;
+    public client?: RebaseClient;
 
     /**
      * When true, realtime notifications are deferred until after the
@@ -163,7 +164,8 @@ propertyCallbacks: undefined };
             const contextForCallback = {
                 user: this.user,
                 driver: this,
-                data: this.data
+                data: this.data,
+                client: this.client
             } as unknown as RebaseCallContext; // Backend context
             return Promise.all(entities.map(async (entity) => {
                 let fetched = entity;
@@ -272,7 +274,8 @@ propertyCallbacks: undefined };
             const contextForCallback = {
                 user: this.user,
                 driver: this,
-                data: this.data
+                data: this.data,
+                client: this.client
             } as unknown as RebaseCallContext; // Backend context
             if (callbacks?.afterRead) {
                 entity = await callbacks.afterRead({
@@ -354,7 +357,8 @@ propertyCallbacks: undefined };
         const contextForCallback = {
             user: this.user,
             driver: this,
-            data: this.data
+            data: this.data,
+            client: this.client
         } as unknown as RebaseCallContext;
 
         // Fetch previous values for callbacks AND history recording
@@ -517,7 +521,8 @@ propertyCallbacks: undefined };
         const contextForCallback = {
             user: this.user,
             driver: this,
-            data: this.data
+            data: this.data,
+            client: this.client
         } as unknown as RebaseCallContext;
 
         if (callbacks?.beforeDelete || propertyCallbacks?.beforeDelete) {
@@ -940,6 +945,7 @@ roles: userRoles })}, true)
             txDelegate.entityService = txEntityService;
             txDelegate._deferNotifications = true;
             txDelegate._pendingNotifications = pendingNotifications;
+            txDelegate.client = this.delegate.client;
 
             return await operation(txDelegate);
         });

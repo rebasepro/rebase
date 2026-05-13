@@ -72,6 +72,12 @@ export interface EntityEditViewProps<M extends Record<string, unknown> = Record<
     layout?: "side_panel" | "full_screen" | "split";
     barActions?: (params: BarActionsParams) => any;
     formProps?: Partial<EntityFormProps<M>>,
+    /**
+     * Pre-populate the form with these values when creating a new entity.
+     * Only applied when the form is in "new" mode (no entityId).
+     * Sourced from EntitySidePanelProps (side panel) or location.state (full screen).
+     */
+    defaultValues?: Partial<M>;
 }
 
 /**
@@ -98,7 +104,7 @@ export function EntityEditView<M extends Record<string, unknown>>({
 
     const initialDirtyValues = entityId
         ? getEntityFromMemoryCache(props.path + "/" + entityId)
-        : getEntityFromMemoryCache(props.path + "#new");
+        : (props.defaultValues ?? getEntityFromMemoryCache(props.path + "#new"));
 
     const { canEdit: canEditHook } = usePermissions();
 

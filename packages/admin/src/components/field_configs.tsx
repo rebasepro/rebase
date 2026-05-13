@@ -344,10 +344,10 @@ export function getFieldConfig(property: Property, propertyConfigs: Record<strin
 
 export function getDefaultFieldId(property: Property) {
     if (property.type === "string") {
-        if (property.ui?.multiline) {
-            return "multiline";
-        } else if (property.ui?.markdown) {
+        if (property.ui?.markdown) {
             return "markdown";
+        } else if (property.ui?.multiline) {
+            return "multiline";
         } else if (property.storage) {
             return "file_upload";
         } else if (property.ui?.url) {

@@ -298,51 +298,127 @@ export class EntityPersistService {
 
         if (pgError) {
             const detail = pgError.detail as string | undefined;
+            const hint = pgError.hint as string | undefined;
             const constraint = pgError.constraint as string | undefined;
             const column = pgError.column as string | undefined;
             const table = pgError.table as string | undefined;
+            const dataType = pgError.dataType as string | undefined;
+            const pgMessage = pgError.message || "Unknown database error";
+
+            const suffix = hint ? ` Hint: ${hint}` : "";
+            const tableRef = table ?? collectionSlug;
 
             switch (pgError.code) {
                 case "23503": // foreign_key_violation
                     return new Error(
                         detail
-                            ? `Foreign key constraint violated: ${detail}`
-                            : `Cannot save: a foreign key constraint${constraint ? ` (${constraint})` : ""} was violated in "${collectionSlug}".`
+                            ? `Foreign key constraint violated: ${detail}${suffix}`
+                            : `Cannot save: a foreign key constraint${constraint ? ` (${constraint})` : ""} was violated in "${collectionSlug}".${suffix}`
                     );
                 case "23505": // unique_violation
                     return new Error(
                         detail
-                            ? `Duplicate value: ${detail}`
-                            : `Cannot save: a unique constraint${constraint ? ` (${constraint})` : ""} was violated in "${collectionSlug}".`
+                            ? `Duplicate value: ${detail}${suffix}`
+                            : `Cannot save: a unique constraint${constraint ? ` (${constraint})` : ""} was violated in "${collectionSlug}".${suffix}`
                     );
                 case "23502": // not_null_violation
                     return new Error(
-                        `Missing required field: "${column ?? "unknown"}" in "${table ?? collectionSlug}" cannot be empty.`
+                        `Missing required field: "${column ?? "unknown"}" in "${tableRef}" cannot be empty.${suffix}`
                     );
                 case "23514": // check_violation
                     return new Error(
-                        `Validation failed: a check constraint${constraint ? ` (${constraint})` : ""} was violated in "${collectionSlug}".`
+                        `Validation failed: a check constraint${constraint ? ` (${constraint})` : ""} was violated in "${collectionSlug}".${suffix}`
                     );
+                case "22P02": // invalid_text_representation (e.g. invalid UUID, wrong enum value)
+                    return new Error(
+                        `Invalid data format in "${collectionSlug}": ${pgMessage}${suffix}`
+                    );
+                case "22001": // string_data_right_truncation (value too long)
+                    return new Error(
+                        `Value too long for column "${column ?? "unknown"}" in "${tableRef}": ${pgMessage}${suffix}`
+                    );
+                case "22003": // numeric_value_out_of_range
+                    return new Error(
+                        `Numeric value out of range for column "${column ?? "unknown"}" in "${tableRef}": ${pgMessage}${suffix}`
+                    );
+                case "42703": // undefined_column
+                    return new Error(
+                        `Unknown column in "${tableRef}": ${pgMessage}. Check if your schema is up to date (run migrations).${suffix}`
+                    );
+                case "42P01": // undefined_table
+                    return new Error(
+                        `Table not found for "${collectionSlug}": ${pgMessage}. Check if your schema is up to date (run migrations).${suffix}`
+                    );
+                default: {
+                    // Unhandled PG code — still surface the actual database message
+                    const parts = [`Database error in "${collectionSlug}" [${pgError.code}]: ${pgMessage}`];
+                    if (detail) parts.push(`Detail: ${detail}`);
+                    if (column) parts.push(`Column: ${column}`);
+                    if (dataType) parts.push(`Data type: ${dataType}`);
+                    if (constraint) parts.push(`Constraint: ${constraint}`);
+                    if (hint) parts.push(`Hint: ${hint}`);
+                    return new Error(parts.join(". "));
+                }
             }
         }
 
-        // Fall through: re-throw original
-        if (error instanceof Error) return error;
-        return new Error(String(error));
+        // No PG error found — try to extract a useful message from the
+        // Drizzle wrapper instead of leaking the raw SQL query + params.
+        const causeMessage = this.extractCauseMessage(error);
+        if (causeMessage) {
+            return new Error(`Database error in "${collectionSlug}": ${causeMessage}`);
+        }
+
+        // Last resort: use the original error message but strip the SQL query
+        if (error instanceof Error) {
+            const cleaned = this.stripSqlFromMessage(error.message, collectionSlug);
+            return new Error(cleaned);
+        }
+        return new Error(`Database error in "${collectionSlug}": ${String(error)}`);
+    }
+
+    /**
+     * Walk the error cause chain and return the deepest meaningful message.
+     */
+    private extractCauseMessage(error: unknown): string | null {
+        if (!error || typeof error !== "object") return null;
+        const err = error as Error & { cause?: unknown };
+
+        if (err.cause && typeof err.cause === "object") {
+            const deeper = this.extractCauseMessage(err.cause);
+            if (deeper) return deeper;
+            // The cause itself has a message
+            if (err.cause instanceof Error && err.cause.message) {
+                return err.cause.message;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Strip the raw SQL query from a Drizzle "Failed query: ..." message,
+     * keeping only the error description.
+     */
+    private stripSqlFromMessage(message: string, collectionSlug: string): string {
+        // Drizzle format: "Failed query: <SQL>\nparams: <params>"
+        if (message.startsWith("Failed query:")) {
+            return `Failed to save entity in "${collectionSlug}". Check server logs for details.`;
+        }
+        return message;
     }
 
     /**
      * Extract the underlying PostgreSQL error from a Drizzle wrapper.
      * Drizzle wraps PG errors in a `cause` property.
      */
-    private extractPgError(error: unknown): (Error & { code?: string; detail?: unknown; constraint?: unknown; column?: unknown; table?: unknown }) | null {
+    private extractPgError(error: unknown): (Error & { code?: string; detail?: unknown; hint?: unknown; constraint?: unknown; column?: unknown; table?: unknown; dataType?: unknown }) | null {
         if (!error || typeof error !== "object") return null;
 
         const err = error as Error & { code?: string; cause?: unknown; detail?: unknown };
 
         // Check if the error itself has a PG error code
-        if (err.code && /^[0-9]{5}$/.test(err.code)) {
-            return err as Error & { code: string; detail?: unknown; constraint?: unknown; column?: unknown; table?: unknown };
+        if (err.code && /^[0-9A-Z]{5}$/.test(err.code)) {
+            return err as Error & { code: string; detail?: unknown; hint?: unknown; constraint?: unknown; column?: unknown; table?: unknown; dataType?: unknown };
         }
 
         // Check the cause chain (Drizzle wraps PG errors)

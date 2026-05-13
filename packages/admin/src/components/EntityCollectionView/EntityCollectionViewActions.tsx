@@ -29,6 +29,7 @@ export type EntityCollectionViewActionsProps<M extends Record<string, unknown>> 
     collectionEntitiesCount?: number;
     compact?: boolean;
     children?: React.ReactNode;
+    openNewDocument: (defaultValues?: Record<string, unknown>) => void;
 }
 
 export function EntityCollectionViewActions<M extends Record<string, unknown>>({
@@ -43,7 +44,8 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
     tableController,
     collectionEntitiesCount,
     compact,
-    children
+    children,
+    openNewDocument
 }: EntityCollectionViewActionsProps<M>) {
     const context = useCMSContext();
 
@@ -116,7 +118,8 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
         selectionController,
         context,
         tableController,
-        collectionEntitiesCount
+        collectionEntitiesCount,
+        openNewDocument
     };
 
     const actions = toArray(collection.Actions)

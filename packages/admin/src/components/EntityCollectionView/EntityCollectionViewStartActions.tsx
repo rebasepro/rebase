@@ -25,6 +25,7 @@ export type EntityCollectionViewStartActionsProps<M extends Record<string, unkno
      */
     resolvedProperties?: Properties;
     compact?: boolean;
+    openNewDocument: (defaultValues?: Record<string, unknown>) => void;
 }
 
 export function EntityCollectionViewStartActions<M extends Record<string, unknown>>({
@@ -36,7 +37,8 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
     tableController,
     collectionEntitiesCount,
     resolvedProperties,
-    compact
+    compact,
+    openNewDocument
 }: EntityCollectionViewStartActionsProps<M>) {
 
     const context = useCMSContext();
@@ -64,7 +66,8 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
         selectionController,
         context,
         tableController,
-        collectionEntitiesCount
+        collectionEntitiesCount,
+        openNewDocument
     };
 
     const handleBackClick = useCallback(() => {

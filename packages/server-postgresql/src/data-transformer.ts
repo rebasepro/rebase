@@ -258,7 +258,26 @@ export function serializePropertyToServer(value: unknown, property: Property): u
             }
             return value;
 
+        case "string":
+            if (typeof value === "string") {
+                if (value.startsWith("data:application/octet-stream;base64,")) {
+                    const base64Data = value.split(",")[1];
+                    if (base64Data) {
+                        return Buffer.from(base64Data, "base64");
+                    }
+                }
+            }
+            return value;
+
         default:
+            if (typeof value === "string") {
+                if (value.startsWith("data:application/octet-stream;base64,")) {
+                    const base64Data = value.split(",")[1];
+                    if (base64Data) {
+                        return Buffer.from(base64Data, "base64");
+                    }
+                }
+            }
             return value;
     }
 }
@@ -447,6 +466,45 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
     }
 
     switch (property.type) {
+        case "string": {
+            if (typeof value === "string") return value;
+            
+            // Handle Buffer objects (e.g. from PostgreSQL bytea columns)
+            let isBuffer = false;
+            let buf: Buffer | null = null;
+            
+            if (Buffer.isBuffer(value)) {
+                isBuffer = true;
+                buf = value;
+            } else if (typeof value === "object" && value !== null && (value as any).type === "Buffer" && Array.isArray((value as any).data)) {
+                isBuffer = true;
+                buf = Buffer.from((value as any).data);
+            }
+            
+            if (isBuffer && buf) {
+                // Heuristic: if all bytes are printable ASCII, return utf8, else base64
+                let isPrintable = true;
+                for (let i = 0; i < buf.length; i++) {
+                    const b = buf[i];
+                    // Allow standard printable ASCII + common whitespace (\r, \n, \t)
+                    if ((b < 32 || b > 126) && b !== 9 && b !== 10 && b !== 13) {
+                        isPrintable = false;
+                        break;
+                    }
+                }
+                return isPrintable ? buf.toString("utf8") : `data:application/octet-stream;base64,${buf.toString("base64")}`;
+            }
+            
+            if (typeof value === "object" && value !== null) {
+                try {
+                    return JSON.stringify(value);
+                } catch {
+                    return String(value);
+                }
+            }
+            return String(value);
+        }
+
         case "relation":
             // Transform ID back to relation object with type information
             if (typeof value === "string" || typeof value === "number") {
@@ -538,8 +596,33 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
             return null;
         }
 
-        default:
+        default: {
+            // Fallback for buffers in case they are mapped to something other than string
+            let isBuffer = false;
+            let buf: Buffer | null = null;
+            
+            if (Buffer.isBuffer(value)) {
+                isBuffer = true;
+                buf = value;
+            } else if (typeof value === "object" && value !== null && (value as any).type === "Buffer" && Array.isArray((value as any).data)) {
+                isBuffer = true;
+                buf = Buffer.from((value as any).data);
+            }
+            
+            if (isBuffer && buf) {
+                let isPrintable = true;
+                for (let i = 0; i < buf.length; i++) {
+                    const b = buf[i];
+                    if ((b < 32 || b > 126) && b !== 9 && b !== 10 && b !== 13) {
+                        isPrintable = false;
+                        break;
+                    }
+                }
+                return isPrintable ? buf.toString("utf8") : `data:application/octet-stream;base64,${buf.toString("base64")}`;
+            }
+            
             return value;
+        }
     }
 }
 

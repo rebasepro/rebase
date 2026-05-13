@@ -740,6 +740,33 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
                     console.warn(`Could not generate relation ${relationKey} for ${collection.name}:`, e);
                 }
             }
+
+            // Synthesize missing reciprocal relations
+            for (const otherCollection of collections) {
+                if (otherCollection.slug === collection.slug) continue;
+                
+                const otherRelations = resolveCollectionRelations(otherCollection);
+                for (const [otherKey, otherRel] of Object.entries(otherRelations)) {
+                    if (otherRel.direction === "inverse" && otherRel.foreignKeyOnTarget) {
+                        try {
+                            const otherTarget = otherRel.target();
+                            if (otherTarget.slug === collection.slug) {
+                                const drizzleRelationName = computeSharedRelationName(otherRel, otherCollection, collections);
+                                const deduplicationKey = `${drizzleRelationName}::owning`;
+                                
+                                if (!emittedRelationNames.has(deduplicationKey)) {
+                                    const otherTableVar = getTableVarName(getTableName(otherCollection));
+                                    const synthKey = `_synth_${otherTableVar}_${otherRel.foreignKeyOnTarget}`;
+                                    tableRelations.push(`    "${synthKey}": one(${otherTableVar}, {\n        fields: [${tableVarName}.${otherRel.foreignKeyOnTarget}],\n        references: [${otherTableVar}.${getPrimaryKeyName(otherCollection)}],\n        relationName: \"${drizzleRelationName}\"\n    })`);
+                                    emittedRelationNames.add(deduplicationKey);
+                                }
+                            }
+                        } catch (e) {
+                            // ignore
+                        }
+                    }
+                }
+            }
         }
 
         if (tableRelations.length > 0) {

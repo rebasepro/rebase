@@ -73,6 +73,14 @@ export interface EntitySidePanelProps<M extends Record<string, unknown> = Record
      * Allow the user to open the entity fullscreen
      */
     allowFullScreen?: boolean;
+
+    /**
+     * Pre-populate the form with these values when creating a new entity.
+     * Only applied when `entityId` is not set (i.e. the form is in "new" mode).
+     * Useful for actions that fetch data from an external source (e.g. a URL)
+     * and want to pre-fill the document before the user saves.
+     */
+    defaultValues?: Partial<M>;
 }
 
 /**

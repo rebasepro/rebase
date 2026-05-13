@@ -31,13 +31,11 @@ export function FormEnhanceAction({
     const [samplePrompts, setSamplePrompts] = React.useState<SamplePrompt[] | undefined>(undefined);
     const [instructions, setInstructions] = React.useState<string>("");
 
-    const {
-        suggestions,
-        getSamplePrompts
-    } = dataEnhancementController;
+    const getSamplePrompts = dataEnhancementController?.getSamplePrompts;
 
     const loadingPrompts = useRef(false);
     const updateSuggestedPrompts = useCallback(async function updateSuggestedPrompts(instructions?: string) {
+        if (!getSamplePrompts) return;
         if (loadingPrompts.current) return;
         loadingPrompts.current = true;
         const prompts = status === "new"
@@ -55,18 +53,20 @@ export function FormEnhanceAction({
     // const enoughData = countStringCharacters(deferredValues, collection.properties) > 20;
 
     useEffect(() => {
+        if (!dataEnhancementController) return;
         if (!samplePrompts) {
             setSamplePrompts(getRecentPromptsFromStorage(storageKey));
             updateSuggestedPrompts().then();
         }
-    }, [samplePrompts, storageKey, updateSuggestedPrompts, instructions, status]);
+    }, [dataEnhancementController, samplePrompts, storageKey, updateSuggestedPrompts, instructions, status]);
 
     useEffect(() => {
+        if (!dataEnhancementController) return;
         updateSuggestedPrompts().then();
-    }, [status]);
+    }, [dataEnhancementController, status]);
 
     const enhance = (prompt?: string) => {
-        if (!formContext?.values) return;
+        if (!dataEnhancementController || !formContext?.values) return;
         setLoading(true);
         if (prompt) {
             addRecentPrompt(storageKey, prompt);
@@ -88,6 +88,7 @@ export function FormEnhanceAction({
     if (!dataEnhancementController?.enabled)
         return null;
 
+    const suggestions = dataEnhancementController.suggestions;
     const hasSuggestions = Object.values(suggestions).filter(Boolean).length > 0;
 
     const disabledSuggestionActions = !hasSuggestions;

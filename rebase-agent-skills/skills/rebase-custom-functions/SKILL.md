@@ -118,6 +118,98 @@ app.get("/", async (c) => {
 export default app;
 ```
 
+## Invoking Functions from the Frontend
+
+> **CRITICAL FOR AGENTS**: When calling custom backend functions from the frontend, **ALWAYS** use `client.functions.invoke()`. **NEVER** use raw `fetch()`, manually construct URLs, or manually extract auth tokens from `localStorage`. The SDK handles all of this automatically.
+
+The `@rebasepro/client` SDK provides a `functions` namespace that handles:
+- **Automatic routing** — appends `/api/functions/{name}` to the client's configured `baseUrl`
+- **Automatic authentication** — injects the current session's JWT into the `Authorization: Bearer` header
+- **Standardized errors** — throws `RebaseApiError` on non-2xx responses, matching the behavior of collection methods
+- **401 retry** — automatically attempts token refresh on unauthorized responses
+
+### Basic Usage
+
+```typescript
+// Invoke a function by name — auth token is injected automatically
+const result = await client.functions.invoke<{ job: JobData }>('extract-job', {
+    url: 'https://example.com/job-posting',
+    html: htmlContent,
+});
+console.log(result.job.title);
+```
+
+### With Options
+
+```typescript
+// Custom HTTP method
+const status = await client.functions.invoke<{ status: string }>('send-invoice', undefined, {
+    method: 'GET',
+    path: `status/${invoiceId}`,
+});
+
+// DELETE request
+await client.functions.invoke('cleanup', { olderThan: '30d' }, {
+    method: 'DELETE',
+});
+```
+
+### TypeScript Generics
+
+Use the generic type parameter to get full type safety on the response:
+
+```typescript
+interface ExtractResult {
+    job: {
+        title: string;
+        company_name: string;
+        description_md: string;
+    };
+}
+
+const result = await client.functions.invoke<ExtractResult>('extract-job', { url });
+// result.job.title is typed as string
+```
+
+### Error Handling
+
+Errors follow the same pattern as collection methods:
+
+```typescript
+import { RebaseApiError } from '@rebasepro/client';
+
+try {
+    const result = await client.functions.invoke('process-payment', { orderId });
+} catch (err) {
+    if (err instanceof RebaseApiError) {
+        console.error(`Status ${err.status}: ${err.message}`);
+        // err.code and err.details are also available
+    }
+}
+```
+
+### ❌ Anti-Pattern — Do NOT Do This
+
+```typescript
+// WRONG: Manual fetch with manual URL and manual token extraction
+const token = JSON.parse(localStorage.getItem('rebase_auth') || '{}').accessToken;
+const res = await fetch(`${apiUrl}/api/functions/extract-job`, {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ url }),
+});
+```
+
+### ✅ Correct Pattern
+
+```typescript
+// RIGHT: SDK handles URL, auth, Content-Type, and error handling
+const result = await client.functions.invoke('extract-job', { url });
+```
+
 ## Common Use Cases
 
 - **Webhook handlers** — Stripe, GitHub, Slack, Twilio incoming webhooks

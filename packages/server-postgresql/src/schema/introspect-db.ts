@@ -4,6 +4,7 @@ import path from "path";
 import pg from "pg";
 import arg from "arg";
 import * as dotenv from "dotenv";
+import readline from "readline";
 
 import {
     TableRow,
@@ -27,6 +28,7 @@ async function main() {
             "--collections": String,
             "--force": Boolean,
             "--schema": String,
+            "--data-inference": Boolean,
             "-o": "--output",
             "-c": "--collections",
             "-f": "--force",
@@ -151,32 +153,65 @@ async function main() {
 
         console.log(chalk.blue(`Found ${tablesMap.size} tables (including ${joinTables.size} detected join tables).`));
 
+        let runDataInference = false;
+        if (args["--data-inference"] !== undefined) {
+            runDataInference = args["--data-inference"];
+        } else {
+            const rl = readline.createInterface({
+                input: process.stdin,
+                output: process.stdout
+            });
+            const answer = await new Promise<string>((resolve) => rl.question(chalk.yellow("? Do you want to run comprehensive data inference on sampled rows to auto-detect types, formats, constraints, and UI configurations? (y/N) "), resolve));
+            runDataInference = answer.trim().toLowerCase() === 'y';
+            rl.close();
+        }
+
+        if (runDataInference) {
+            console.log(chalk.gray(`Sampling database rows for data inference...`));
+        }
+
         // Generate Collections
         const generatedFiles: string[] = [];
         const skippedFiles: string[] = [];
 
-        for (const [tableName, meta] of tablesMap.entries()) {
-            if (joinTables.has(tableName)) continue; // We don't generate base collections for pure join tables
+        const tablesToProcess = Array.from(tablesMap.entries()).filter(([tableName]) => !joinTables.has(tableName));
+        
+        const BATCH_SIZE = 10;
+        for (let i = 0; i < tablesToProcess.length; i += BATCH_SIZE) {
+            const batch = tablesToProcess.slice(i, i + BATCH_SIZE);
+            
+            await Promise.all(batch.map(async ([tableName, meta]) => {
+                // ── File overwrite protection ──────────────────────────────
+                const filePath = path.join(outDir, `${tableName}.ts`);
+                if (fs.existsSync(filePath) && !force) {
+                    skippedFiles.push(tableName);
+                    return;
+                }
 
-            // ── File overwrite protection ──────────────────────────────
-            const filePath = path.join(outDir, `${tableName}.ts`);
-            if (fs.existsSync(filePath) && !force) {
-                skippedFiles.push(tableName);
-                continue;
-            }
+                let sampleData: any[] | undefined = undefined;
+                if (runDataInference) {
+                    try {
+                        const { rows } = await client.query(`SELECT * FROM "${pgSchema}"."${tableName}" LIMIT 100`);
+                        sampleData = rows;
+                    } catch (err) {
+                        console.error(chalk.yellow(`⚠ Failed to sample data for table ${tableName}: ${err instanceof Error ? err.message : String(err)}`));
+                    }
+                }
 
-            const fileContent = generateCollectionFile(
-                tableName,
-                meta,
-                fks,
-                joinTables,
-                tablesMap,
-                enumMap,
-            );
+                const fileContent = generateCollectionFile(
+                    tableName,
+                    meta,
+                    fks,
+                    joinTables,
+                    tablesMap,
+                    enumMap,
+                    sampleData,
+                );
 
-            fs.writeFileSync(filePath, fileContent, "utf-8");
-            generatedFiles.push(tableName);
-            console.log(chalk.green(`  ✓ ${filePath}`));
+                fs.writeFileSync(filePath, fileContent, "utf-8");
+                generatedFiles.push(tableName);
+                console.log(chalk.green(`  ✓ ${filePath}`));
+            }));
         }
 
         // Generate index.ts (sorted alphabetically for deterministic output)

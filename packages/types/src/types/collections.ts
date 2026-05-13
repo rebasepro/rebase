@@ -579,6 +579,22 @@ export interface CollectionActionsProps<M extends Record<string, unknown> = Reco
      */
     collectionEntitiesCount?: number;
 
+    /**
+     * Programmatically open the new-document form for this collection,
+     * optionally pre-populating it with initial field values.
+     * The form opens in the same mode configured for the collection
+     * (side panel, full screen, or split).
+     *
+     * This is the primary hook for workflows that need to create a document
+     * from external data — e.g. fetching content from a URL, importing from
+     * a third-party API, or duplicating from another system.
+     *
+     * @example
+     * // Inside a custom CollectionAction component:
+     * openNewDocument({ title: "Fetched title", body: "..." });
+     */
+    openNewDocument: (defaultValues?: Record<string, unknown>) => void;
+
 }
 
 /**
