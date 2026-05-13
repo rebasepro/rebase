@@ -293,15 +293,26 @@ function EntityFullScreenRoute({
     let blocker: Blocker | undefined = undefined;
     try {
         blocker = useBlocker(({
+            currentLocation,
             nextLocation
         }) => {
             if (nextLocation.pathname.startsWith(entityPath))
                 return false;
-            // Allow navigation to side panel overlays — the underlying form is
-            // preserved via base_location in router state, so no data is lost.
+
+            // Side panel overlay navigations preserve the underlying form via
+            // base_location in router state — no data is lost in either direction.
+
+            // Opening a side panel (e.g. clicking a relation arrow)
             const nextHash = nextLocation.hash;
             if (nextHash === "#side" || nextHash === "#new_side")
                 return false;
+
+            // Closing a side panel (navigate(-1) back to the form's own path)
+            const currentHash = currentLocation.hash;
+            if ((currentHash === "#side" || currentHash === "#new_side") &&
+                nextLocation.pathname === basePath)
+                return false;
+
             return blocked.current;
         });
     } catch (e) {
