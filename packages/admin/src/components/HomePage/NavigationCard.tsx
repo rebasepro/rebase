@@ -26,10 +26,10 @@ export const NavigationCard = React.memo(function NavigationCard({
     return (
         <Card
             className={cls(
-                "group h-full p-5 cursor-pointer transition-all duration-200 ease-in-out",
-                "border-surface-200/40 dark:border-surface-700/40",
-                "hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/5",
-                "hover:border-primary/30 dark:hover:border-primary/20",
+                "group h-full p-4 cursor-pointer transition-all duration-150 ease-in-out",
+                "border-surface-200 dark:border-surface-700/40",
+                "hover:shadow-md hover:shadow-black/[0.04]",
+                "hover:border-surface-300 dark:hover:border-primary/20",
                 shrink && "w-full max-w-full min-h-0 scale-75"
             )}
             onClick={() => {

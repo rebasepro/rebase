@@ -123,7 +123,6 @@ function collectionToCode(collection: EntityCollection): object {
         description: collection.description,
 
         icon: collection.icon,
-        group: collection.group,
         defaultFilter: collection.defaultFilter,
         sort: collection.sort,
         properties: Object.entries({

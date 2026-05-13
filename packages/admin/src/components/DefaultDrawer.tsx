@@ -1,8 +1,9 @@
 import type { NavigationEntry, NavigationResult } from "@rebasepro/types";
-import React from "react";
+import React, { useMemo } from "react";
 
-import { useCollapsedGroups, useLargeLayout, useAdminModeController, useEffectiveRoleController, useTranslation, useSlot, useRebaseContext, useAnalyticsController, useRebaseRegistry, STUDIO_NAVIGATION_GROUPS } from "@rebasepro/core";
+import { useCollapsedGroups, buildCollapsedDefaults, useLargeLayout, useAdminModeController, useEffectiveRoleController, useTranslation, useSlot, useRebaseContext, useAnalyticsController, useRebaseRegistry } from "@rebasepro/core";
 import { useNavigationStateController, useUrlController } from "../hooks";
+
 
 import { Link, useNavigate } from "react-router-dom";
 import { AnalyticsEvent } from "@rebasepro/types";
@@ -64,15 +65,23 @@ export function DefaultDrawer({
 
     const adminViews = navigationState.topLevelNavigation?.navigationEntries.filter(e => e.type === "admin") ?? [];
 
-    let groupsToRender = navigationState.topLevelNavigation?.groups ?? [];
-    if (adminModeController.mode === "studio") {
-        groupsToRender = groupsToRender.filter(g => STUDIO_NAVIGATION_GROUPS.includes(g));
-    } else {
-        groupsToRender = groupsToRender.filter(g => !STUDIO_NAVIGATION_GROUPS.includes(g));
-    }
+    const allNavigationEntries = navigationState.topLevelNavigation?.navigationEntries ?? [];
+
+    // Studio mode shows only view-type entries (devViews like schema editor).
+    // Content mode shows collections and views (everything except admin entries).
+    const filteredEntries = adminModeController.mode === "studio"
+        ? allNavigationEntries.filter(e => e.type === "view")
+        : allNavigationEntries.filter(e => e.type !== "admin");
+
+    // Derive groups from the filtered entries
+    const groupsToRender = [...new Set(filteredEntries.map(e => e.group).filter(Boolean))] as string[];
 
     // Collapsible groups state - using "drawer" namespace for independent state from home page
-    const { isGroupCollapsed, toggleGroupCollapsed } = useCollapsedGroups(groupsToRender, "drawer");
+    const collapsedDefaults = useMemo(
+        () => buildCollapsedDefaults(registry.cmsConfig?.navigationGroupMappings, "drawer"),
+        [registry.cmsConfig?.navigationGroupMappings]
+    );
+    const { isGroupCollapsed, toggleGroupCollapsed } = useCollapsedGroups(groupsToRender, "drawer", collapsedDefaults);
 
     const headerSlot = useSlot("navigation.header", { drawerOpen,
 drawerHovered,
@@ -84,7 +93,6 @@ context });
     if (!navigationState.topLevelNavigation)
         return null;
 
-    const navigationEntries = navigationState.topLevelNavigation.navigationEntries;
     const groups = navigationState.topLevelNavigation.groups;
 
     const onItemClick = (view: NavigationEntry) => {
@@ -134,7 +142,7 @@ context });
                     }}>
 
                     {groupsToRender.map((group) => {
-                        const entriesInGroup = Object.values(navigationEntries).filter(e => e.group === group);
+                        const entriesInGroup = filteredEntries.filter(e => e.group === group);
                         return (
                             <DrawerNavigationGroup
                                 key={`drawer_group_${group}`}

@@ -126,11 +126,11 @@ ${chalk.green.bold("Commands")}
 
 ${chalk.green.bold("Schema")}
   ${chalk.blue.bold("schema generate")}         Generate Drizzle schema from collections
+  ${chalk.blue.bold("schema introspect")}       Introspect database → Rebase collections
   ${chalk.blue.bold("schema")} ${chalk.gray("--help")}           Show schema command help
 
 ${chalk.green.bold("Database")}
   ${chalk.blue.bold("db push")}                 Apply schema directly to database ${chalk.gray("(dev)")}
-  ${chalk.blue.bold("db pull")}                 Introspect database → Drizzle schema
   ${chalk.blue.bold("db generate")}             Generate SQL migration files
   ${chalk.blue.bold("db migrate")}              Run pending migrations
   ${chalk.blue.bold("db studio")}               Open Drizzle Studio

@@ -254,6 +254,252 @@ export function identifyJoinTables(tablesMap: Map<string, TableMeta>): Set<strin
     return joinTables;
 }
 
+// ── Property ordering heuristics ──────────────────────────────────────
+
+/**
+ * Property metadata used to compute display priority.
+ * Keeps computePropertyPriority free of any TableMeta coupling.
+ */
+export interface PropertyOrderingContext {
+    /** The resolved Rebase property type (e.g. "string", "number", "date", "relation"). */
+    propType: string;
+    /** Whether this column is a primary key. */
+    isPk: boolean;
+    /** Whether this column is an enum (USER-DEFINED with matching values). */
+    isEnum: boolean;
+    /** Whether this is a storage/file-upload field (detected from column name). */
+    isStorage: boolean;
+    /** The PostgreSQL data_type (e.g. "text", "character varying", "jsonb"). */
+    pgDataType: string;
+    /** The original column index in PostgreSQL (for stable tiebreaking). */
+    originalIndex: number;
+}
+
+// — Tier 0: Identity (0–9) ————————————————————————————————————————————
+const IDENTITY_EXACT: Record<string, number> = {
+    id: 0,
+    uuid: 1,
+    _id: 2,
+};
+
+// — Tier 1: Title / Name — the "display column" (10–19) ———————————————
+const TITLE_EXACT: Record<string, number> = {
+    name: 10,
+    title: 11,
+    label: 12,
+    display_name: 13,
+    displayname: 13,
+    headline: 14,
+    subject: 15,
+    heading: 16,
+};
+
+// — Tier 2: Human identity fields (20–29) —————————————————————————————
+const HUMAN_IDENTITY_EXACT: Record<string, number> = {
+    first_name: 20,
+    firstname: 20,
+    last_name: 21,
+    lastname: 21,
+    full_name: 22,
+    fullname: 22,
+    given_name: 22,
+    family_name: 23,
+    middle_name: 24,
+    username: 25,
+    user_name: 25,
+    email: 26,
+    email_address: 26,
+    phone: 27,
+    phone_number: 27,
+    mobile: 27,
+};
+
+// — Tier 3: Core descriptors (30–39) ——————————————————————————————————
+const DESCRIPTOR_EXACT: Record<string, number> = {
+    slug: 30,
+    code: 31,
+    sku: 32,
+    reference: 33,
+    ref: 33,
+    type: 34,
+    kind: 34,
+    status: 35,
+    state: 35,
+    role: 36,
+    category: 37,
+    group: 38,
+    priority: 39,
+    order: 39,
+    sort_order: 39,
+    position: 39,
+};
+
+// — Tier 12: System timestamps (120–129) ——————————————————————————————
+const SYSTEM_TIMESTAMP_EXACT: Record<string, number> = {
+    created_at: 120,
+    createdat: 120,
+    creation_date: 120,
+    inserted_at: 121,
+    updated_at: 122,
+    updatedat: 122,
+    modified_at: 122,
+    last_modified: 122,
+    deleted_at: 123,
+    deletedat: 123,
+    archived_at: 124,
+};
+
+// — Pattern-based rules for partial matches ———————————————————————————
+const TITLE_PATTERNS = ["name", "title", "label"];
+const LONG_TEXT_NAMES = new Set(["description", "summary", "excerpt", "abstract", "overview", "bio", "biography", "about"]);
+const RICH_CONTENT_NAMES = new Set(["content", "body", "html", "markup", "text", "article_body", "post_body"]);
+const MEDIA_PATTERNS = ["image", "avatar", "photo", "logo", "cover", "thumbnail", "banner", "icon", "picture", "poster"];
+const JSON_MAP_NAMES = new Set(["metadata", "meta", "config", "configuration", "settings", "options", "preferences", "data", "payload", "attributes", "extra", "additional_info"]);
+
+/**
+ * Compute a numeric priority score for a property.
+ * Lower scores appear first in the generated `propertiesOrder` array.
+ *
+ * The system uses 14 tiers (0–139), with the original column index
+ * added as a fractional tiebreaker (originalIndex / 10000) to
+ * guarantee stable ordering within the same tier.
+ *
+ * Pure function — no side effects.
+ */
+export function computePropertyPriority(
+    columnName: string,
+    ctx: PropertyOrderingContext,
+): number {
+    // Normalize camelCase/PascalCase to snake_case, then lowercase
+    const col = columnName.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+    const tiebreaker = ctx.originalIndex / 10000;
+
+    // ── Tier 0: Primary key identity fields
+    if (ctx.isPk) {
+        const exactScore = IDENTITY_EXACT[col];
+        return (exactScore ?? 5) + tiebreaker;
+    }
+
+    // ── Tier 12: System timestamps (check early to prevent false matches)
+    const systemTs = SYSTEM_TIMESTAMP_EXACT[col];
+    if (systemTs !== undefined) {
+        return systemTs + tiebreaker;
+    }
+
+    // ── Tier 1: Title / Name exact matches
+    const titleExact = TITLE_EXACT[col];
+    if (titleExact !== undefined) {
+        return titleExact + tiebreaker;
+    }
+
+    // ── Tier 2: Human identity exact matches
+    const humanExact = HUMAN_IDENTITY_EXACT[col];
+    if (humanExact !== undefined) {
+        return humanExact + tiebreaker;
+    }
+
+    // ── Tier 3: Core descriptor exact matches
+    const descriptorExact = DESCRIPTOR_EXACT[col];
+    if (descriptorExact !== undefined) {
+        return descriptorExact + tiebreaker;
+    }
+
+    // ── Tier 1b: Title-like partial matches (e.g. "product_name", "page_title")
+    // Score 17–19 so they rank after exact matches but still in tier 1.
+    for (const pattern of TITLE_PATTERNS) {
+        if (col.includes(pattern) && col !== pattern) {
+            return 17 + tiebreaker;
+        }
+    }
+
+    // ── Tier 9: Media / file upload fields (check before general strings)
+    if (ctx.isStorage) {
+        return 90 + tiebreaker;
+    }
+    for (const pattern of MEDIA_PATTERNS) {
+        if (col.includes(pattern)) {
+            return 91 + tiebreaker;
+        }
+    }
+    if (col.endsWith("_url") || col.endsWith("_uri") || col.endsWith("_link")) {
+        return 92 + tiebreaker;
+    }
+
+    // ── Tier 7: Long text fields
+    if (LONG_TEXT_NAMES.has(col)) {
+        return 70 + tiebreaker;
+    }
+
+    // ── Tier 8: Rich content fields
+    if (RICH_CONTENT_NAMES.has(col)) {
+        return 80 + tiebreaker;
+    }
+
+    // ── Tier 10: JSON / Map types
+    if (ctx.propType === "map") {
+        return JSON_MAP_NAMES.has(col) ? 100 + tiebreaker : 105 + tiebreaker;
+    }
+
+    // ── Tier 11: Array types
+    if (ctx.propType === "array") {
+        return 110 + tiebreaker;
+    }
+
+    // ── Tier 6: Owning relations
+    if (ctx.propType === "relation") {
+        return 60 + tiebreaker;
+    }
+
+    // ── Tier 4: Short text, enums, booleans — "quick glance" fields
+    if (ctx.isEnum) {
+        return 40 + tiebreaker;
+    }
+    if (ctx.propType === "boolean") {
+        return 45 + tiebreaker;
+    }
+    if (ctx.propType === "string" && ctx.pgDataType !== "text") {
+        // Short string (varchar, char, uuid that's not a PK)
+        return 42 + tiebreaker;
+    }
+
+    // ── Tier 5: Numbers & user-facing dates
+    if (ctx.propType === "number") {
+        return 50 + tiebreaker;
+    }
+    if (ctx.propType === "date") {
+        // A date that isn't a system timestamp (already handled above)
+        return 55 + tiebreaker;
+    }
+
+    // ── Tier 7b: text data_type that didn't match long-text names
+    if (ctx.propType === "string" && ctx.pgDataType === "text") {
+        return 75 + tiebreaker;
+    }
+
+    // ── Tier 13: Fallback / unknown
+    return 130 + tiebreaker;
+}
+
+/**
+ * Sort a `propertiesOrder` array using the priority heuristic.
+ * Returns a new sorted array; does not mutate the input.
+ *
+ * @param entries - Array of { key, columnName, propType, ... } objects
+ *                  carrying the information needed to compute priority.
+ */
+export interface PropertyOrderEntry {
+    /** The property key in the generated collection (may differ from columnName for relations). */
+    key: string;
+    /** The ordering context for this property. */
+    ctx: PropertyOrderingContext;
+}
+
+export function sortPropertiesOrder(entries: PropertyOrderEntry[]): string[] {
+    return [...entries]
+        .sort((a, b) => computePropertyPriority(a.key, a.ctx) - computePropertyPriority(b.key, b.ctx))
+        .map((e) => e.key);
+}
+
 // ── Generate collection file content ──────────────────────────────────
 
 export interface GeneratedFile {
@@ -282,7 +528,9 @@ export function generateCollectionFile(
 
     let propsOutput = ``;
     let relationsOutput = ``;
-    const propertiesOrder: string[] = [];
+    const orderEntries: PropertyOrderEntry[] = [];
+    const propertyBlocks = new Map<string, string>();
+    let columnIndex = 0;
 
     // Detect composite primary keys
     const isCompositePk = meta.pks.length > 1;
@@ -293,7 +541,7 @@ export function generateCollectionFile(
         // Exception: Do not skip if it's part of the primary key!
         if (meta.fks.some((fk) => fk.column_name === col.column_name) && !meta.pks.includes(col.column_name)) continue;
 
-        propertiesOrder.push(col.column_name);
+        const currentIndex = columnIndex++;
 
         // Check if this column uses a PostgreSQL enum type
         const colEnumValues = enumMap.get(col.udt_name);
@@ -303,6 +551,25 @@ export function generateCollectionFile(
         let extra = "";
 
         const colNameLower = col.column_name.toLowerCase();
+
+        // Detect storage field for ordering context
+        const isStorageField = propType === "string" && !isEnumColumn && (
+            colNameLower.includes("image") || colNameLower.includes("avatar") ||
+            colNameLower.includes("photo") || colNameLower.includes("logo") ||
+            colNameLower.includes("cover")
+        );
+
+        orderEntries.push({
+            key: col.column_name,
+            ctx: {
+                propType,
+                isPk: meta.pks.includes(col.column_name),
+                isEnum: isEnumColumn,
+                isStorage: isStorageField,
+                pgDataType: col.data_type,
+                originalIndex: currentIndex,
+            },
+        });
 
         // Enum values — generate real enum from the PG enum
         if (isEnumColumn && colEnumValues) {
@@ -369,12 +636,12 @@ export function generateCollectionFile(
 
         const humanName = humanize(col.column_name);
 
-        propsOutput += `
+        propertyBlocks.set(col.column_name, `
         ${col.column_name}: {
             name: "${humanName}",
             columnName: "${col.column_name}",
             type: "${propType}",${extra}
-        },`;
+        },`);
     }
 
     // Map Owning Relations (from this table's FKs to other tables)
@@ -388,14 +655,24 @@ export function generateCollectionFile(
                 relName = targetTableName;
             }
             // Push the relation property key, not the FK column name
-            propertiesOrder.push(relName);
+            orderEntries.push({
+                key: relName,
+                ctx: {
+                    propType: "relation",
+                    isPk: false,
+                    isEnum: false,
+                    isStorage: false,
+                    pgDataType: "",
+                    originalIndex: columnIndex++,
+                },
+            });
 
             const targetCollectionCamel = toCollectionVarName(targetTableName);
             imports.add(`import ${targetCollectionCamel} from "./${targetTableName}";`);
 
             const relHumanName = humanize(relName);
 
-            propsOutput += `
+            propertyBlocks.set(relName, `
         ${relName}: {
             name: "${relHumanName}",
             type: "relation",
@@ -404,7 +681,7 @@ export function generateCollectionFile(
             direction: "owning",
             localKey: "${fk.column_name}",
             // mapped from foreign key: ${fk.column_name} -> ${targetTableName}(${fk.foreign_column_name})
-        },`;
+        },`);
         }
     }
 
@@ -501,6 +778,11 @@ export function generateCollectionFile(
         ? `\n    relations: [${relationsOutput}\n    ],`
         : "";
 
+    const sortedPropertiesOrder = sortPropertiesOrder(orderEntries);
+    for (const key of sortedPropertiesOrder) {
+        propsOutput += propertyBlocks.get(key) || "";
+    }
+
     const fileContent = `${Array.from(imports).join("\n")}
 
 const ${tableName}Collection: PostgresCollection = {
@@ -509,10 +791,9 @@ const ${tableName}Collection: PostgresCollection = {
     slug: "${tableName}",
     table: "${tableName}",
     icon: "${icon}",
-    group: "App",
     properties: {${propsOutput}
     },${relationsBlock}
-    propertiesOrder: ${JSON.stringify(propertiesOrder, null, 8).replace(/]$/, "    ]")}
+    propertiesOrder: ${JSON.stringify(sortedPropertiesOrder, null, 8).replace(/]$/, "    ]")}
 };
 
 export default ${tableName}Collection;

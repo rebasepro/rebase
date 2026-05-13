@@ -137,7 +137,7 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
                         {hasAppBar && <DrawerHeader/>}
 
                         <div
-                            className={cls(defaultBorderMixin, "bg-white dark:bg-surface-800", "grow overflow-auto m-0", {
+                            className={cls(defaultBorderMixin, "bg-surface-50 dark:bg-surface-800", "grow overflow-auto m-0", {
                                 "lg:mt-4": !hasAppBar,
                                 "mt-1 lg:m-0 lg:mx-2 lg:mb-2 lg:rounded-lg lg:border-t lg:border-x lg:border-solid": padding,
                                 "border-t": hasAppBar && !padding
@@ -158,7 +158,7 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
 
 const DrawerHeader = () => {
     return (
-        <div className="flex flex-col min-h-16"></div>
+        <div className="flex flex-col min-h-14"></div>
     );
 };
 
@@ -185,7 +185,7 @@ function DrawerWrapper(props: {
 
     const innerDrawer = <div
         className={cls("h-full overflow-hidden", defaultBorderMixin,
-            isFloating ? `absolute top-0 left-0 bottom-0 z-50 bg-surface-50 ${darkBgFloating} shadow-2xl border-r` : `relative bg-surface-50 ${darkBg}`)}
+            isFloating ? `absolute top-0 left-0 bottom-0 z-50 bg-surface-50 ${darkBgFloating} shadow-lg border-r` : `relative bg-surface-50 ${darkBg}`)}
         style={{
             width: visualWidth,
             transition: "left 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms, opacity 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms, width 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms"

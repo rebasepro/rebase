@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import { Button, IconButton, Typography, Table, TableHeader, TableCell, TableBody, TableRow, TextField, Select, SelectItem, Container, Dialog, DialogTitle, DialogContent, DialogActions } from "@rebasepro/ui";
+import { Button, IconButton, Typography, Table, TableHeader, TableCell, TableBody, TableRow, TextField, Select, SelectItem, Container, Dialog, DialogTitle, DialogContent, DialogActions, cls, defaultBorderMixin } from "@rebasepro/ui";
 import { Trash2Icon } from "lucide-react";
 import { useFormex } from "@rebasepro/formex";
 import { PostgresCollection, Relation } from "@rebasepro/types";
@@ -128,7 +128,7 @@ direction: "owning" });
                             <DialogTitle className="flex justify-between items-center w-full" variant="h6">
                                 {editingRelationIndex === -1 ? "New Relation" : "Edit Relation"}
                             </DialogTitle>
-                            <DialogContent includeMargin={false} className="p-4 md:p-6 border-t dark:border-surface-700 bg-surface-50 dark:bg-surface-800">
+                            <DialogContent includeMargin={false} className={cls("p-4 md:p-6 border-t bg-white dark:bg-surface-900", defaultBorderMixin)}>
                                 <div className="flex flex-col gap-4 max-w-2xl mx-auto">
                                     <TextField
                                         label="Relation Name"
@@ -178,7 +178,7 @@ direction: val as Relation["direction"] } : null)}
                                     </Select>
 
                                     {editingRelationState.cardinality === "many" && editingRelationState.direction === "owning" && (
-                                        <div className="flex flex-col gap-4 mt-4 pt-4 border-t dark:border-surface-800">
+                                        <div className={cls("flex flex-col gap-4 mt-4 pt-4 border-t", defaultBorderMixin)}>
                                             <Typography variant="subtitle2" className="text-text-primary">Intermediate Table</Typography>
                                             <Typography variant="body2" className="text-text-secondary -mt-3">
                                                 Required for many-to-many relationships. This defines the junction table linking both collections.

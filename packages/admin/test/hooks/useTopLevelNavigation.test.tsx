@@ -28,8 +28,7 @@ describe("useTopLevelNavigation", () => {
         { id: "test",
 name: "Test Collection",
 path: "test",
-slug: "test",
-group: "My Group" }
+slug: "test" }
     ];
 
     it("should return undefined if collections and views are not resolved", () => {
@@ -58,7 +57,7 @@ group: "My Group" }
         expect(nav.navigationEntries).toHaveLength(1);
         expect(nav.navigationEntries[0].id).toBe("collection:test");
         expect(nav.navigationEntries[0].url).toBe("/c/test");
-        expect(nav.groups).toContain("My Group");
+        expect(nav.groups).toContain("Views");
     });
 
     it("should hide navigation entries with hideFromNavigation = true", () => {

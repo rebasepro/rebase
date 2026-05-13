@@ -110,9 +110,9 @@ export const DefaultAppBar = function DefaultAppBar({
         <div
             style={style}
             role="banner"
-            className={cls("w-full h-16 transition-all ease-in duration-75 absolute top-0 max-w-full overflow-x-auto no-scrollbar",
+            className={cls("w-full h-14 transition-all ease-in duration-75 absolute top-0 max-w-full overflow-x-auto no-scrollbar",
                 "flex flex-row gap-2 px-4 items-center",
-                "backdrop-blur-md bg-surface-50/80 dark:bg-surface-900/80",
+                "backdrop-blur-sm bg-surface-50/95 dark:bg-surface-900/80",
                 {
                     "pl-[19rem]": drawerOpen && largeLayout,
                     "pl-24": hasDrawer && !(drawerOpen && largeLayout),

@@ -40,8 +40,8 @@ export function NavigationGroup({
                 component={"h2"}
                 color="secondary"
                 className={cls(
-                    "p-4 py-2 rounded",
-                    "font-medium text-sm text-surface-600 dark:text-surface-400"
+                    "px-4 py-1 rounded",
+                    "font-semibold text-[11px] uppercase tracking-wider text-surface-400 dark:text-surface-400"
                 )}
             >
                 {currentGroupName}

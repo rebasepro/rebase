@@ -36,7 +36,7 @@ export function getEntityPreviewKeys(
     if (listProperties && listProperties.length > 0) {
         return listProperties;
     } else {
-        listProperties = allProperties;
+        listProperties = (targetCollection.propertiesOrder as string[]) || allProperties;
         return listProperties
             .filter(key => {
                 const prop = targetCollection.properties[key];
@@ -54,10 +54,11 @@ export function getEntityTitlePropertyKey<M extends Record<string, any>>(collect
     if (collection.titleProperty) {
         return collection.titleProperty as string;
     }
-    // find first text field property
-    for (const key in collection.properties) {
+    // find first text field property according to defined order
+    const orderToSearch = (collection.propertiesOrder as string[]) || Object.keys(collection.properties);
+    for (const key of orderToSearch) {
         const property = collection.properties[key];
-        if (!isPropertyBuilder(property)) {
+        if (property && !isPropertyBuilder(property)) {
             const prop = property as Property;
             if (prop.type === "string" && !prop.ui?.multiline && !prop.ui?.markdown && !prop.storage && !prop.isId) {
                 return key;

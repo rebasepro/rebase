@@ -15,34 +15,14 @@ import type { EntityCollection, AppView, RebasePlugin, NavigationGroupMapping } 
 // getGroup
 // ---------------------------------------------------------------------------
 describe("getGroup", () => {
-    it("returns the group name when set", () => {
-        const collection = { group: "Products" } as EntityCollection;
-        expect(getGroup(collection)).toBe("Products");
-    });
-
-    it("returns default group name for undefined group", () => {
+    it("always returns the default group name", () => {
         const collection = {} as EntityCollection;
         expect(getGroup(collection)).toBe(NAVIGATION_DEFAULT_GROUP_NAME);
     });
 
-    it("returns default group name for empty string group", () => {
-        const collection = { group: "" } as EntityCollection;
-        expect(getGroup(collection)).toBe(NAVIGATION_DEFAULT_GROUP_NAME);
-    });
-
-    it("returns default group name for whitespace-only group", () => {
-        const collection = { group: "   " } as EntityCollection;
-        expect(getGroup(collection)).toBe(NAVIGATION_DEFAULT_GROUP_NAME);
-    });
-
-    it("trims whitespace from group name", () => {
-        const collection = { group: " Content " } as EntityCollection;
-        expect(getGroup(collection)).toBe("Content");
-    });
-
-    it("works with AppView", () => {
-        const view = { group: "Settings" } as AppView;
-        expect(getGroup(view)).toBe("Settings");
+    it("returns default group name for AppView", () => {
+        const view = {} as AppView;
+        expect(getGroup(view)).toBe(NAVIGATION_DEFAULT_GROUP_NAME);
     });
 });
 
@@ -53,42 +33,36 @@ describe("computeNavigationGroups", () => {
     const collection1: EntityCollection = {
         id: "products",
         slug: "products",
-        group: "Content",
         properties: {}
     } as unknown as EntityCollection;
 
     const collection2: EntityCollection = {
         id: "orders",
         slug: "orders",
-        group: "Content",
         properties: {}
     } as unknown as EntityCollection;
 
     const collection3: EntityCollection = {
         id: "settings",
         slug: "settings",
-        group: "Admin",
         properties: {}
     } as unknown as EntityCollection;
 
-    it("creates groups from scratch when no existing mappings", () => {
+    it("puts all collections in default group when no mappings", () => {
         const result = computeNavigationGroups({
             collections: [collection1, collection2, collection3]
         });
 
-        expect(result).toHaveLength(2);
-        const contentGroup = result.find(g => g.name === "Content");
-        expect(contentGroup?.entries).toContain("products");
-        expect(contentGroup?.entries).toContain("orders");
-
-        const adminGroup = result.find(g => g.name === "Admin");
-        expect(adminGroup?.entries).toContain("settings");
+        expect(result).toHaveLength(1);
+        const defaultGroup = result.find(g => g.name === NAVIGATION_DEFAULT_GROUP_NAME);
+        expect(defaultGroup?.entries).toContain("products");
+        expect(defaultGroup?.entries).toContain("orders");
+        expect(defaultGroup?.entries).toContain("settings");
     });
 
-    it("preserves existing group mappings and adds unassigned entries", () => {
+    it("preserves existing group mappings and adds unassigned to default", () => {
         const existingMappings: NavigationGroupMapping[] = [
-            { name: "Content",
-entries: ["products"] }
+            { name: "Content", entries: ["products", "orders"] }
         ];
 
         const result = computeNavigationGroups({
@@ -96,25 +70,30 @@ entries: ["products"] }
             collections: [collection1, collection2, collection3]
         });
 
-        // products already in Content, orders should be added to Content too
+        // products & orders should stay in Content
         const contentGroup = result.find(g => g.name === "Content");
         expect(contentGroup?.entries).toContain("products");
         expect(contentGroup?.entries).toContain("orders");
 
-        // settings should go to Admin group
-        const adminGroup = result.find(g => g.name === "Admin");
-        expect(adminGroup?.entries).toContain("settings");
+        // settings is unassigned, should go to default group
+        const defaultGroup = result.find(g => g.name === NAVIGATION_DEFAULT_GROUP_NAME);
+        expect(defaultGroup?.entries).toContain("settings");
     });
 
     it("handles views alongside collections", () => {
         const view: AppView = {
             name: "Dashboard",
             slug: "dashboard",
-            group: "Main",
             view: null!
         } as unknown as AppView;
 
+        const existingMappings: NavigationGroupMapping[] = [
+            { name: "Content", entries: ["products"] },
+            { name: "Main", entries: ["dashboard"] }
+        ];
+
         const result = computeNavigationGroups({
+            navigationGroupMappings: existingMappings,
             collections: [collection1],
             views: [view]
         });
@@ -130,8 +109,7 @@ entries: ["products"] }
 
     it("deduplicates entries within groups", () => {
         const existingMappings: NavigationGroupMapping[] = [
-            { name: "Content",
-entries: ["products", "products"] }
+            { name: "Content", entries: ["products", "products"] }
         ];
 
         const result = computeNavigationGroups({
@@ -168,8 +146,7 @@ entries: ["products", "products"] }
 
     it("does not mutate the original input mappings", () => {
         const existingMappings: NavigationGroupMapping[] = [
-            { name: "Content",
-entries: ["products"] }
+            { name: "Content", entries: ["products"] }
         ];
         const originalEntries = [...existingMappings[0].entries];
 
@@ -181,7 +158,10 @@ entries: ["products"] }
         // The result should contain both entries
         const contentGroup = result.find(g => g.name === "Content");
         expect(contentGroup?.entries).toContain("products");
-        expect(contentGroup?.entries).toContain("orders");
+
+        // orders is unassigned, so it goes to default
+        const defaultGroup = result.find(g => g.name === NAVIGATION_DEFAULT_GROUP_NAME);
+        expect(defaultGroup?.entries).toContain("orders");
 
         // But the original input must not have been mutated
         expect(existingMappings[0].entries).toEqual(originalEntries);
@@ -197,8 +177,7 @@ describe("areCollectionsEqual", () => {
         name: "Products",
         path: "products",
         slug: "products",
-        properties: { title: { type: "string",
-name: "Title" } }
+        properties: { title: { type: "string", name: "Title" } }
     } as unknown as EntityCollection;
 
     const collB: EntityCollection = {
@@ -206,8 +185,7 @@ name: "Title" } }
         name: "Products",
         path: "products",
         slug: "products",
-        properties: { title: { type: "string",
-name: "Title" } }
+        properties: { title: { type: "string", name: "Title" } }
     } as unknown as EntityCollection;
 
     it("considers identical collections equal", () => {
@@ -215,16 +193,14 @@ name: "Title" } }
     });
 
     it("considers collections with different slugs unequal", () => {
-        const different = { ...collA,
-slug: "different" } as unknown as EntityCollection;
+        const different = { ...collA, slug: "different" } as unknown as EntityCollection;
         expect(areCollectionsEqual(collA, different)).toBe(false);
     });
 
     it("considers collections with different properties unequal", () => {
         const different = {
             ...collA,
-            properties: { body: { type: "string",
-name: "Body" } }
+            properties: { body: { type: "string", name: "Body" } }
         } as unknown as EntityCollection;
         expect(areCollectionsEqual(collA, different)).toBe(false);
     });
@@ -288,8 +264,7 @@ describe("areCollectionListsEqual", () => {
     });
 
     it("returns false for different collections", () => {
-        const col3 = { ...col1,
-slug: "c" } as unknown as EntityCollection;
+        const col3 = { ...col1, slug: "c" } as unknown as EntityCollection;
         expect(areCollectionListsEqual([col1], [col3])).toBe(false);
     });
 

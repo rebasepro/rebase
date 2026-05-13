@@ -75,7 +75,7 @@ export function DrawerNavigationGroup({
             {/* Group Header */}
             {!hideHeader && (
                 <div
-                    className={cls("pl-4 pr-2 py-0.5 flex flex-row items-center transition-colors",
+                    className={cls("pl-3 pr-2 py-0.5 flex flex-row items-center transition-colors",
                         drawerOpen ? "cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-800/40 rounded-lg" : "opacity-0 invisible pointer-events-none"
                     )}
                     onClick={drawerOpen ? onToggleCollapsed : undefined}
@@ -83,14 +83,14 @@ export function DrawerNavigationGroup({
                     <ChevronDownIcon
                         size={iconSize.small}
                         className={cls(
-                            "text-surface-500 dark:text-surface-400 transition-transform duration-200 mr-1",
+                            "text-surface-400 dark:text-surface-400 transition-transform duration-200 mr-1",
                             collapsed ? "-rotate-90" : "rotate-0"
                         )}
                     />
                     <Typography
                         variant={"caption"}
                         color={"secondary"}
-                        className="font-medium flex-grow line-clamp-1"
+                        className="font-semibold text-[11px] uppercase tracking-wider flex-grow line-clamp-1 text-surface-400 dark:text-surface-400"
                     >
                         {(group || t("views_group"))}
                     </Typography>

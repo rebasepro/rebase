@@ -8,7 +8,6 @@ const postsCollection: PostgresCollection = {
     slug: "posts",
     table: "posts",
     icon: "FileText",
-    group: "Content",
     history: true,
     defaultViewMode: "cards",
     enabledViews: ["table", "cards", "kanban"],

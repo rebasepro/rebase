@@ -7,7 +7,6 @@ const productLocalesCollection: PostgresCollection = {
     slug: "product_locales",
     table: "product_locales",
     icon: "Translate",
-    group: "eCommerce",
     history: true,
     hideFromNavigation: true,
     properties: {

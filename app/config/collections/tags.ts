@@ -7,7 +7,6 @@ const tagsCollection: EntityCollection = {
     slug: "tags",
     table: "tags",
     icon: "Tag",
-    group: "Content",
     history: true,
     hideFromNavigation: true,
     properties: {

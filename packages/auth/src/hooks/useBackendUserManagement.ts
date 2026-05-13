@@ -135,6 +135,10 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
     const [usersError, setUsersError] = useState<Error | undefined>();
     const [rolesError, setRolesError] = useState<Error | undefined>();
 
+    // Tracks the UID for which roles+users were last successfully loaded.
+    // Prevents redundant refetches on React StrictMode double-mounts.
+    const lastLoadedUidRef = useRef<string | null>(null);
+
     // Ref to hold the latest apiRequest so the initial-load effect doesn't
     // re-trigger every time the callback identity changes.
     const apiRequestRef = useRef<typeof apiRequest | null>(null);
@@ -280,6 +284,13 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
             return;
         }
 
+        // Skip refetch if we already loaded data for this same UID
+        // (e.g. React StrictMode unmounts and re-mounts with the same user).
+        if (lastLoadedUidRef.current === currentUser.uid) {
+            setLoading(false);
+            return;
+        }
+
         const abortController = new AbortController();
 
         const load = async () => {
@@ -322,6 +333,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
             }
 
             if (!abortController.signal.aborted) {
+                lastLoadedUidRef.current = currentUser.uid;
                 setLoading(false);
             }
         };

@@ -69,11 +69,14 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     const userConfigPersistence = useBuildLocalConfigurationPersistence();
 
     // ── Collection Editor resolution ──────────────────────────────────
+    // The collection editor is ALWAYS enabled when Studio is registered.
+    // The `collectionEditor` CMS config is for fine-tuning (readOnly, auth, etc.),
+    // not for opting-in. When omitted, the editor defaults to enabled
+    // (read-only in production).
     const collectionEditorConfig = registry.cmsConfig?.collectionEditor;
-    const collectionEditorEnabled = Boolean(collectionEditorConfig);
+    const collectionEditorEnabled = Boolean(collectionEditorConfig) || Boolean(registry.studioConfig);
     const collectionEditorOptions: CollectionEditorOptions | undefined = useMemo(() => {
-        if (!collectionEditorConfig) return undefined;
-        if (collectionEditorConfig === true) return {};
+        if (collectionEditorConfig === true || !collectionEditorConfig) return {};
         return collectionEditorConfig;
     }, [collectionEditorConfig]);
 
@@ -117,7 +120,6 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         return {
             slug: "schema",
             name: "Edit collections",
-            group: "Database",
             icon: "LayoutList",
             nestedRoutes: true,
             view: (
@@ -138,6 +140,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         plugins: registry.cmsConfig?.plugins ?? EMPTY_PLUGINS,
         collections: collectionsBuilder,
         views: devViews,
+        navigationGroupMappings: registry.cmsConfig?.navigationGroupMappings,
         authController: context.authController!,
         data: context.data,
         collectionRegistryController,

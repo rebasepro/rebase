@@ -30,7 +30,8 @@ import {
     useLargeLayout,
     usePermissions,
     useTranslation,
-    useSlot
+    useSlot,
+    IconForView
 } from "@rebasepro/core";
 import { useUserConfigurationPersistence } from "@rebasepro/core";
 import { EntityCollectionViewActions } from "./EntityCollectionViewActions";
@@ -1146,6 +1147,13 @@ export const EntityCollectionView = React.memo(
             equal(a.selectedTab, b.selectedTab);
     }) as React.FunctionComponent<EntityCollectionViewProps<any>>
 
+/**
+ * Inflight count request deduplication map.
+ * Keyed by `path|filterKey|sortByProperty|sortDir` so that concurrent
+ * callers (e.g. React StrictMode double-mount) share the same promise.
+ */
+const inflightCountRequests = new Map<string, Promise<number>>();
+
 function EntitiesCount({
     path,
     collection,
@@ -1204,10 +1212,20 @@ function EntitiesCount({
         const whereParams = Object.keys(whereMap).length > 0 ? whereMap : undefined;
         const orderByParams = sortByProperty ? `${String(sortByProperty)}:${currentSort}` : undefined;
 
-        accessor.count({
-            where: whereParams,
-            orderBy: orderByParams
-        }).then((c) => {
+        // Deduplicate inflight count requests (e.g. React StrictMode double-mount)
+        const cacheKey = `${path}|${filterKey}|${sortByProperty ?? ""}|${currentSort ?? ""}`;
+        let countPromise = inflightCountRequests.get(cacheKey);
+        if (!countPromise) {
+            countPromise = accessor.count({
+                where: whereParams,
+                orderBy: orderByParams
+            });
+            inflightCountRequests.set(cacheKey, countPromise);
+            // Clean up the inflight entry once resolved/rejected
+            countPromise.finally(() => inflightCountRequests.delete(cacheKey));
+        }
+
+        countPromise.then((c) => {
             if (!cancelled) onCountChangeRef.current?.(c);
         }).catch((e) => {
             console.warn("Error fetching count", e);

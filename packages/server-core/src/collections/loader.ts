@@ -26,9 +26,9 @@ export async function loadCollectionsFromDirectory(directory: string): Promise<E
                 try {
                     const fileUrl = pathToFileURL(filePath).href;
 
-                    // Use new Function to compile dynamic import natively and bypass tsc converting import() to require()
-                    const dynamicImport = new Function("url", "return import(url)");
-                    const module = await dynamicImport(fileUrl);
+                    // Use standard import() so that tsx/loader hooks can
+                    // resolve .ts files and workspace bare-specifiers.
+                    const module = await import(fileUrl);
 
                     // Expect the collection to be the default export
                     if (module && module.default) {

@@ -26,14 +26,12 @@ export function createUserManagementAdminViews({ userManagement, apiUrl, getAuth
         {
             slug: "dev/users",
             name: "CMS Users",
-            group: "Admin",
             icon: "face",
             view: <UsersView userManagement={userManagement} apiUrl={apiUrl} getAuthToken={getAuthToken}/>
         },
         {
             slug: "dev/roles",
             name: "Roles",
-            group: "Admin",
             icon: "gpp_good",
             view: <RolesView userManagement={userManagement} collections={collections}/>
         }

@@ -43,7 +43,7 @@ export async function runPluginCommand(args: string[]) {
 }
 
 async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
-    const VALID_ACTIONS = ["push", "pull", "generate", "migrate", "studio", "branch"];
+    const VALID_ACTIONS = ["push", "generate", "migrate", "studio", "branch"];
     if (!subcommand || !VALID_ACTIONS.includes(subcommand)) {
         console.error(chalk.red(`Unknown db command. Valid: ${VALID_ACTIONS.join(", ")}`));
         process.exit(1);
@@ -70,10 +70,10 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         console.log("");
     } else if (subcommand === "pull") {
         console.log("");
-        console.log(chalk.bold("  📥 Rebase DB Pull"));
-        console.log(chalk.gray("  Introspecting database and generating collections..."));
+        console.log(chalk.yellow("  ⚠ \"rebase db pull\" has been removed."));
+        console.log(chalk.gray("  Use \"rebase schema introspect\" instead."));
         console.log("");
-        await schemaCommand("introspect", rawArgs);
+        process.exit(1);
     } else {
         console.log("");
         console.log(chalk.bold(`  🗄️  Rebase DB ${subcommand.charAt(0).toUpperCase() + subcommand.slice(1)}`));

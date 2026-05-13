@@ -32,11 +32,6 @@ export interface ConfigControllerProviderProps {
      */
     configPermissions?: CollectionEditorPermissionsBuilder;
 
-    /**
-     * Groups that cannot be used to create new collections.
-     */
-    reservedGroups?: string[];
-
     extraView?: {
         View: React.ComponentType<{
             path: string
@@ -65,7 +60,6 @@ export const ConfigControllerProvider = React.memo(
         children,
         collectionConfigController,
         configPermissions,
-        reservedGroups,
         collectionInference,
         extraView,
         getUser,
@@ -105,7 +99,6 @@ export const ConfigControllerProvider = React.memo(
             parentCollectionSlugs: string[], parentEntityIds: string[],
             initialValues?: {
                 path?: string,
-                group?: string,
                 name?: string
             },
             copyFrom?: EntityCollection,
@@ -225,7 +218,6 @@ export const ConfigControllerProvider = React.memo(
             parentCollectionSlugs: string[], parentEntityIds: string[],
             parentCollection?: EntityCollection
             initialValues?: {
-                group?: string,
                 path?: string,
                 name?: string
             },
@@ -270,7 +262,6 @@ export const ConfigControllerProvider = React.memo(
                 collectionInference,
                 ...currentDialog,
                 getData,
-                reservedGroups,
                 extraView,
                 getUser,
                 generateCollection,
@@ -289,7 +280,7 @@ export const ConfigControllerProvider = React.memo(
             };
         }, [
             currentDialog, collectionConfigController, collectionInference,
-            getData, reservedGroups, extraView, getUser, generateCollection,
+            getData, extraView, getUser, generateCollection,
             onAnalyticsEvent, unmappedTables, onFetchTableMetadata,
             urlController, navigate
         ]);

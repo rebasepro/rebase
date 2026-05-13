@@ -7,7 +7,6 @@ const customersCollection: PostgresCollection = {
     slug: "customers",
     table: "customers",
     icon: "Users",
-    group: "E-Commerce",
     history: true,
     properties: {
         id: {

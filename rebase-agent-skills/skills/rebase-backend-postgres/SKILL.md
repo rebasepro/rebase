@@ -206,8 +206,8 @@ The backend handles `SIGTERM` and `SIGINT` signals:
 
 ## Important Notes
 
-- **To import a legacy database**, use `rebase schema introspect` to generate Rebase Collections, NOT `rebase db pull`.
-- **Never use `db pull` then `db migrate`** — introspected databases already have the tables
+- **To import a legacy database**, use `rebase schema introspect` to generate Rebase Collections.
+- **Never use `schema introspect` then `db migrate`** — introspected databases already have the tables
 - **Always backup before production migrations** — `ALTER COLUMN` or `DROP COLUMN` can cause data loss
 - **Tables not in schema are ignored** — custom tables and internal Rebase tables are safe
 - **Review generated SQL** — always inspect the `.sql` files in `./drizzle/` before applying

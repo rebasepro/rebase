@@ -350,16 +350,36 @@ export interface AuthConfigResponse {
 }
 
 /**
+ * Inflight promise for `fetchAuthConfig` — ensures concurrent callers
+ * (e.g. React StrictMode double-mount) reuse the same network request.
+ */
+let authConfigInflight: Promise<AuthConfigResponse> | null = null;
+
+/**
  * Fetch auth configuration / status from the backend
- * This is an unauthenticated endpoint used to detect bootstrap mode
+ * This is an unauthenticated endpoint used to detect bootstrap mode.
+ *
+ * Concurrent calls are deduplicated: only one network request is made
+ * and all callers share the same promise.
  */
 export async function fetchAuthConfig(): Promise<AuthConfigResponse> {
-    const response = await fetchWithHandling(`${baseApiUrl}/api/auth/config`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" }
-    });
+    if (authConfigInflight) {
+        return authConfigInflight;
+    }
 
-    return handleResponse<AuthConfigResponse>(response);
+    authConfigInflight = (async () => {
+        const response = await fetchWithHandling(`${baseApiUrl}/api/auth/config`, {
+            method: "GET",
+            headers: { "Content-Type": "application/json" }
+        });
+        return handleResponse<AuthConfigResponse>(response);
+    })();
+
+    try {
+        return await authConfigInflight;
+    } finally {
+        authConfigInflight = null;
+    }
 }
 
 export { AuthApiError };

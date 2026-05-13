@@ -178,13 +178,6 @@ export interface AppView {
     view: React.ReactNode;
 
     /**
-     * Optional field used to group top level navigation entries under a
-     * navigation view.
-     * This prop is ignored for admin views.
-     */
-    group?: string;
-
-    /**
      * If true, a wildcard route (slug/*) is automatically registered
      * alongside the base route, enabling nested navigation within this view.
      */
@@ -227,6 +220,17 @@ export interface NavigationGroupMapping {
      * List of collection ids or view paths that belong to this group.
      */
     entries: string[];
+    /**
+     * Configure which groups start collapsed.
+     * Set to `true` to collapse in both drawer and home page,
+     * or use an object to control each independently.
+     *
+     * @defaultValue false (expanded)
+     */
+    collapsedByDefault?: boolean | {
+        drawer?: boolean;
+        home?: boolean;
+    };
 }
 
 export interface NavigationEntry {

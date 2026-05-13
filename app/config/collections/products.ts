@@ -8,7 +8,6 @@ const productsCollection: PostgresCollection = {
     slug: "products",
     table: "products",
     icon: "Package",
-    group: "E-Commerce",
     history: true,
     defaultViewMode: "cards",
     enabledViews: ["table", "cards"],

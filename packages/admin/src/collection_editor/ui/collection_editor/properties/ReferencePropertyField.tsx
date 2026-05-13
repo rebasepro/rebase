@@ -4,7 +4,7 @@ import React from "react";
 import { Field, getIn, useFormex } from "@rebasepro/formex";
 ;
 import { NumberProperty, StringProperty } from "@rebasepro/types";
-import { CircularProgress, Select, SelectGroup, SelectItem, Typography } from "@rebasepro/ui";
+import { CircularProgress, Select, SelectItem, Typography } from "@rebasepro/ui";
 
 export function ReferencePropertyField({
     existing,
@@ -81,12 +81,6 @@ export function CollectionsSelect({
 
     const collections = collectionRegistry.collections ?? [];
 
-    const groups: string[] = Array.from(new Set(
-        Object.values(collections).map(e => e.group).filter(Boolean) as string[]
-    ).values());
-
-    const ungroupedCollections = collections.filter((col) => !col.group);
-
     return (
         <>
             <Select
@@ -113,48 +107,20 @@ export function CollectionsSelect({
                 }}
                 {...props}>
 
-                {groups.flatMap((group) => (
-                    <SelectGroup label={group || "Views"}
-                        key={`group_${group}`}>
-                        {
-                            collections.filter(collection => collection.group === group)
-                                .map((collection) => {
-                                    return <SelectItem
-                                        key={`${collection.slug}-${group}`}
-                                        value={collection.slug}>
-                                        <div className="flex flex-row">
-                                            <IconForView collectionOrView={collection}/>
-                                            <Typography
-                                                variant={"subtitle2"}
-                                                className="ml-4">
-                                                {collection?.name.toUpperCase()}
-                                            </Typography>
-                                        </div>
-                                    </SelectItem>;
-                                })
-
-                        }
-                    </SelectGroup>
-                ))}
-
-                {ungroupedCollections && <SelectGroup label={"Views"}>
-                    {ungroupedCollections
-                        .map((collection) => {
-                            return <SelectItem key={collection.slug}
-                                value={collection.slug}>
-                                <div className="flex flex-row">
-                                    <IconForView collectionOrView={collection}/>
-                                    <Typography
-                                        variant={"subtitle2"}
-                                        className="ml-4">
-                                        {collection?.name.toUpperCase()}
-                                    </Typography>
-                                </div>
-                            </SelectItem>;
-                        })
-
-                    }
-                </SelectGroup>}
+                {collections.map((collection) => {
+                    return <SelectItem
+                        key={collection.slug}
+                        value={collection.slug}>
+                        <div className="flex flex-row">
+                            <IconForView collectionOrView={collection}/>
+                            <Typography
+                                variant={"subtitle2"}
+                                className="ml-4">
+                                {collection?.name.toUpperCase()}
+                            </Typography>
+                        </div>
+                    </SelectItem>;
+                })}
 
             </Select>
 

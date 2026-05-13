@@ -19,9 +19,10 @@ import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { restrictToVerticalAxis, restrictToWindowEdges } from "@dnd-kit/modifiers";
 import { RenameGroupDialog } from "./RenameGroupDialog";
 import { toArray } from "@rebasepro/utils";
-import { useCollapsedGroups, useCustomizationController, useTranslation, useSlot, useAdminModeController } from "@rebasepro/core";
+import { useCollapsedGroups, buildCollapsedDefaults, useCustomizationController, useTranslation, useSlot, useAdminModeController, useRebaseRegistry } from "@rebasepro/core";
 import { useRestoreScroll } from "@rebasepro/core";
-import { STUDIO_NAVIGATION_GROUPS, BootstrapAdminBanner } from "@rebasepro/core";
+
+import { BootstrapAdminBanner } from "@rebasepro/core";
 import { useBreadcrumbsController, useCMSContext } from "../../index";
 
 export const DEFAULT_GROUP_NAME = "Views";
@@ -45,7 +46,8 @@ export function ContentHomePage({
     const { navigationStateController } = context;
     const customizationController = useCustomizationController();
     const adminModeController = useAdminModeController();
-    const isStudioMode = adminModeController.mode === "studio";
+    const registry = useRebaseRegistry();
+
     const { resolvedSlots } = customizationController;
     const breadcrumbs = useBreadcrumbsController();
     const { t } = useTranslation();
@@ -61,19 +63,19 @@ export function ContentHomePage({
         onNavigationEntriesUpdate = () => {}
     } = navigationStateController.topLevelNavigation || {};
 
+    // Studio mode shows only view-type entries (devViews).
+    // Content mode shows collections and views (everything except admin entries).
     const rawNavigationEntries = useMemo(() => {
-        return unFilteredNavigationEntries.filter(e => {
-            const isStudioGroup = e.group ? STUDIO_NAVIGATION_GROUPS.includes(e.group) : false;
-            return isStudioMode ? isStudioGroup : !isStudioGroup;
-        });
-    }, [unFilteredNavigationEntries, isStudioMode]);
+        if (adminModeController.mode === "studio") {
+            return unFilteredNavigationEntries.filter(e => e.type === "view");
+        }
+        return unFilteredNavigationEntries.filter(e => e.type !== "admin");
+    }, [unFilteredNavigationEntries, adminModeController.mode]);
 
     const groupOrderFromNavController = useMemo(() => {
-        return unFilteredGroupOrder.filter(g => {
-            const isStudioGroup = STUDIO_NAVIGATION_GROUPS.includes(g);
-            return isStudioMode ? isStudioGroup : !isStudioGroup;
-        });
-    }, [unFilteredGroupOrder, isStudioMode]);
+        const entryGroups = new Set(rawNavigationEntries.map(e => e.group).filter(Boolean));
+        return unFilteredGroupOrder.filter(g => entryGroups.has(g));
+    }, [unFilteredGroupOrder, rawNavigationEntries]);
 
     const fuse = useRef<Fuse<NavigationEntry> | null>(null);
     const [filteredUrls, setFilteredUrls] = useState<string[] | null>(null);
@@ -244,7 +246,11 @@ export function ContentHomePage({
         ...(adminGroupData ? [adminGroupData.name] : [])
     ], [items, adminGroupData]);
 
-    const { isGroupCollapsed, toggleGroupCollapsed } = useCollapsedGroups(groupNames, "home");
+    const collapsedDefaults = useMemo(
+        () => buildCollapsedDefaults(registry.cmsConfig?.navigationGroupMappings, "home"),
+        [registry.cmsConfig?.navigationGroupMappings]
+    );
+    const { isGroupCollapsed, toggleGroupCollapsed } = useCollapsedGroups(groupNames, "home", collapsedDefaults);
 
     const {
         sensors,
@@ -312,7 +318,7 @@ export function ContentHomePage({
        Render
        ─────────────────────────────────────────────────────────────── */
     return (
-        <div ref={containerRef} className="py-2 overflow-auto h-full w-full bg-surface-100 dark:bg-surface-800">
+        <div ref={containerRef} className="py-2 overflow-auto h-full w-full bg-surface-50 dark:bg-surface-800">
             <Container maxWidth="6xl">
                 <div className="mb-4">
                     <BootstrapAdminBanner />

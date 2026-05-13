@@ -37,7 +37,6 @@ export interface CollectionEditorDialogProps {
     open: boolean;
     isNewCollection: boolean;
     initialValues?: {
-        group?: string,
         slug?: string,
         name?: string,
     }
@@ -51,7 +50,6 @@ export interface CollectionEditorDialogProps {
     parentCollectionSlugs?: string[], parentEntityIds?: string[]; // path ids of the parent collection, like [`products`]
     handleClose: (collection?: EntityCollection) => void;
     configController: CollectionsConfigController;
-    reservedGroups?: string[];
     collectionInference?: CollectionInference;
     extraView?: {
         View: React.ComponentType<{
@@ -200,7 +198,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
         }
     }, [props.editedCollectionId, props.parentCollectionSlugs, props.parentEntityIds, collectionRegistry.initialised, collectionRegistry.getRawCollection]);
 
-    const groups = topLevelNavigation?.groups ?? [];
+
 
     const initialCollection = collection
         ? {
@@ -226,7 +224,6 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
                 slug: initialValuesProp?.slug ?? randomString(16),
                 table: initialValuesProp?.slug ?? "",
                 name: initialValuesProp?.name ?? "",
-                group: initialValuesProp?.group ?? "",
                 properties: {} as Properties,
                 propertiesOrder: [],
                 icon: coolIconKeys[Math.floor(Math.random() * coolIconKeys.length)],
@@ -249,7 +246,6 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
         includeTemplates={includeTemplates}
         collection={collection}
         setCollection={setCollection}
-        groups={groups}
         propertyConfigs={propertyConfigs}/>
 
 }
@@ -262,7 +258,6 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     path,
     collectionInference,
     handleClose,
-    reservedGroups,
     extraView,
     handleCancel,
     setFormDirty,
@@ -276,7 +271,6 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     setCollection,
     initialValues,
     propertyConfigs,
-    groups,
     existingEntities,
     initialView: initialViewProp,
     expandKanban,
@@ -295,7 +289,6 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     collection: EntityCollection<M> | undefined,
     setCollection: (collection: EntityCollection<M>) => void,
     propertyConfigs: Record<string, PropertyConfig>,
-    groups: string[],
 }
 ) {
 
@@ -619,7 +612,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
         <Formex value={formController}>
 
             <>
-                {!isNewCollection && <div className={cls("px-4 py-2 w-full flex shrink-0 items-center justify-between gap-4 bg-white dark:bg-surface-950 border-b", defaultBorderMixin)}>
+                {!isNewCollection && <div className={cls("px-4 py-2 w-full flex shrink-0 items-center justify-between gap-4 bg-surface-50 dark:bg-surface-950 border-b", defaultBorderMixin)}>
                     <div className="flex flex-1 items-center justify-end gap-4 min-w-0">
                         <Tabs value={currentView}
                             className="bg-transparent !w-fit max-w-full"
@@ -756,7 +749,6 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                             <CollectionPropertiesEditorForm
                                 showErrors={submitCount > 0}
                                 isNewCollection={isNewCollection}
-                                reservedGroups={reservedGroups}
                                 onPropertyError={(propertyKey, namespace, error) => {
                                     const current = removeUndefined({
                                         ...propertyErrorsRef.current,

@@ -7,7 +7,6 @@ const ticketsCollection: PostgresCollection = {
     slug: "tickets",
     table: "tickets",
     icon: "Ticket",
-    group: "Support",
     history: true,
     defaultViewMode: "kanban",
     enabledViews: ["table", "kanban"],

@@ -3,7 +3,7 @@ import type { EntityCollection } from "../types/collections";
 import type { EntityCollectionsBuilder } from "../types/builders";
 import type { EntityCustomView } from "../types/entity_views";
 import type { EntityAction } from "../types/entity_actions";
-import type { AppView } from "./navigation";
+import type { AppView, NavigationGroupMapping } from "./navigation";
 
 /**
  * Options to enable the built-in collection editor.
@@ -27,6 +27,15 @@ export interface RebaseCMSConfig<EC extends EntityCollection = any> {
     entityViews?: EntityCustomView<any>[];
     entityActions?: EntityAction[];
     plugins?: any[];
+
+    /**
+     * Centralized configuration for how collections and views are grouped
+     * in the navigation sidebar and home page.
+     * Each mapping defines a named group and the collection/view slugs
+     * that belong to it. The array order determines group display order.
+     * Entry order within each group determines card order.
+     */
+    navigationGroupMappings?: NavigationGroupMapping[];
 
     /**
      * Enable the built-in visual collection/schema editor.

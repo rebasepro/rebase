@@ -10,7 +10,7 @@
         "start": "pnpm --filter \"*-backend\" start",
         "db:generate": "rebase db generate --collections ../config/collections",
         "db:migrate": "rebase db migrate",
-        "db:pull": "rebase db pull",
+        "schema:introspect": "rebase schema introspect",
         "db:push": "rebase db push --collections ../config/collections",
         "db:studio": "rebase db studio",
         "schema:generate": "rebase schema generate --collections ../config/collections",

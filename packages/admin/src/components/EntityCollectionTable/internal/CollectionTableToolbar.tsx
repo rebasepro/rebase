@@ -54,7 +54,7 @@ export function CollectionTableToolbar({
                     {viewModeToggle}
                 </div>
 
-                {title && <div className={"hidden lg:block"}>
+                {title && <div className={"flex items-center"}>
                     {title}
                 </div>}
 

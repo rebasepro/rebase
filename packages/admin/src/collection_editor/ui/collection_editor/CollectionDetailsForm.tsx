@@ -5,7 +5,7 @@ import React, { useMemo, useState } from "react";
 import { useAuthController, useCustomizationController } from "@rebasepro/core";
 import { getFieldConfig, PropertyConfigBadge, SearchIconsView } from "../../_cms_internals";
 import { EntityCollection, Property } from "@rebasepro/types";
-import { BooleanSwitchWithLabel, Chip, cls, Container, DebouncedTextField, Dialog, IconButton, Select, SelectItem, TextField, Tooltip, Typography, useAutoComplete, Button , iconSize } from "@rebasepro/ui";
+import { BooleanSwitchWithLabel, Chip, cls, Container, DebouncedTextField, Dialog, IconButton, Select, SelectItem, TextField, Tooltip, Typography, Button, iconSize } from "@rebasepro/ui";
 import { XIcon, HistoryIcon } from "lucide-react";
 
 import { Field, getIn, useFormex } from "@rebasepro/formex";
@@ -18,24 +18,20 @@ import { singular, toSnakeCase, unslugify } from "@rebasepro/utils";
 
 export function CollectionDetailsForm({
     isNewCollection,
-    reservedGroups,
     existingPaths,
     existingIds,
-    groups,
     parentCollection,
     expandKanban
 }: {
     isNewCollection: boolean,
-    reservedGroups?: string[];
     existingPaths?: string[];
     existingIds?: string[];
-    groups: string[] | null;
     parentCollection?: EntityCollection;
     parentCollectionSlugs?: string[], parentEntityIds?: string[];
     expandKanban?: boolean;
 }) {
 
-    const groupRef = React.useRef<HTMLInputElement>(null);
+
     const {
         values,
         setFieldValue,
@@ -98,15 +94,7 @@ export function CollectionDetailsForm({
 
     const collectionIcon = <IconForView collectionOrView={values}/>;
 
-    const groupOptions = groups?.filter((group) => !reservedGroups?.includes(group));
 
-    const {
-        inputFocused,
-        autoCompleteOpen,
-        setAutoCompleteOpen
-    } = useAutoComplete({
-        ref: groupRef
-    });
 
     const isSubcollection = !!parentCollection;
 
@@ -172,39 +160,7 @@ export function CollectionDetailsForm({
 
                     </div>
 
-                    {/*{!isSubcollection && <div className={"col-span-12 sm:col-span-4 relative"}>*/}
 
-                    {/*    <TextField error={showErrors && Boolean(errors.group)}*/}
-                    {/*               disabled={isSubmitting}*/}
-                    {/*               value={values.group ?? ""}*/}
-                    {/*               autoComplete="off"*/}
-                    {/*               onChange={(event) => setFieldValue("group", event.target.value)}*/}
-                    {/*               name={"group"}*/}
-                    {/*               inputRef={groupRef}*/}
-                    {/*               label="Group"/>*/}
-                    {/*    <Autocomplete*/}
-                    {/*        open={autoCompleteOpen && (groupOptions ?? []).length > 0}*/}
-                    {/*        setOpen={setAutoCompleteOpen}>*/}
-                    {/*        {groupOptions?.map((group, index) => {*/}
-                    {/*            return <AutocompleteItem*/}
-                    {/*                key={index + "_" + group}*/}
-                    {/*                className={"pr-6 pl-14"}*/}
-                    {/*                onClick={() => {*/}
-                    {/*                    setAutoCompleteOpen(false);*/}
-                    {/*                    setFieldValue("group", group ?? null);*/}
-                    {/*                }}*/}
-                    {/*            >*/}
-                    {/*                <div className={"flex-grow"}>*/}
-                    {/*                    {group}*/}
-                    {/*                </div>*/}
-                    {/*            </AutocompleteItem>;*/}
-                    {/*        })}*/}
-                    {/*    </Autocomplete>*/}
-                    {/*    <FieldCaption>*/}
-                    {/*        {showErrors && Boolean(errors.group) ? errors.group : "Group in the home page"}*/}
-                    {/*    </FieldCaption>*/}
-
-                    {/*</div>}*/}
 
                     <LayoutModeSwitch
                         className={"col-span-12"}

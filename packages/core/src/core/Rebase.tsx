@@ -255,7 +255,12 @@ function RebaseInternal({
     }) : children;
 
     const plugins = customizationController.plugins;
-    if (!loading && plugins && plugins.length > 0) {
+    const authController = context.authController;
+    const authReady = !loading
+        && !authController.authLoading
+        && (Boolean(authController.user) || authController.loginSkipped);
+
+    if (authReady && plugins && plugins.length > 0) {
         return (
             <PluginProviderStack
                 plugins={plugins}

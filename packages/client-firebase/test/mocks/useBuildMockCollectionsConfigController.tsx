@@ -38,7 +38,6 @@ export const productsCollection: EntityCollection = {
     slug: "products",
     name: "Products",
     singularName: "Product",
-    group: "Main",
     icon: "shopping_cart",
     description: "List of the products currently sold in our shop",
     properties: {

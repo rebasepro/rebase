@@ -16,7 +16,6 @@ import {
     resolveDefaultSelectedView
 } from "@rebasepro/common";
 import { resolvedSelectedEntityView } from "../util/resolutions";
-import { getEntityTitlePropertyKey } from "../util/previews";
 import { CenteredView, CircularProgress, cls, defaultBorderMixin, IconButton, Tab, Tabs, Tooltip, Typography, Skeleton } from "@rebasepro/ui";
 import {
     useCustomizationController,
@@ -458,33 +457,6 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
         </Tooltip>
     ) : null;
 
-    // Compute contextual title for subcollection tabs, e.g. "Orders of James"
-    const subcollectionContextTitle = useMemo(() => {
-        if (selectedTab === MAIN_TAB_VALUE || selectedTab === JSON_TAB_VALUE || selectedTab === HISTORY_TAB_VALUE) {
-            return null;
-        }
-        // Check if the selected tab is a subcollection
-        const matchedSubcollection = subcollections.find(sc => sc.slug === selectedTab);
-        if (!matchedSubcollection) {
-            return null;
-        }
-        // Check if the selected tab is a custom view (not a subcollection)
-        const isCustomView = resolvedEntityViews.some(v => v.key === selectedTab);
-        if (isCustomView) {
-            return null;
-        }
-        // Resolve the parent entity's title
-        const titleKey = getEntityTitlePropertyKey(collection, customizationController.propertyConfigs);
-        const entityValues = usedEntity?.values;
-        if (!titleKey || !entityValues) {
-            return matchedSubcollection.name;
-        }
-        const titleValue = entityValues[titleKey as keyof M];
-        if (!titleValue || typeof titleValue !== "string") {
-            return matchedSubcollection.name;
-        }
-        return `${matchedSubcollection.name} of ${titleValue}`;
-    }, [selectedTab, subcollections, resolvedEntityViews, collection, customizationController.propertyConfigs, usedEntity?.values]);
 
     let result = <div className="relative flex flex-col h-full w-full bg-white dark:bg-surface-800">
 
@@ -500,14 +472,6 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                 status
             })}
 
-            {subcollectionContextTitle && (
-                <Typography
-                    variant="label"
-                    className="truncate min-w-0 shrink ml-2 text-surface-600 dark:text-surface-400"
-                >
-                    {subcollectionContextTitle}
-                </Typography>
-            )}
 
             {pluginActionsTop}
 

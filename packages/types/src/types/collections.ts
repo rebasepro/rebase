@@ -98,11 +98,6 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
     icon?: string | React.ReactNode;
 
     /**
-     * Navigation group for this collection.
-     */
-    group?: string;
-
-    /**
      * Array of entity views that this collection has.
      * Can be an array of `EntityCustomView` or a string representing the key of a global `EntityCustomView`.
      */

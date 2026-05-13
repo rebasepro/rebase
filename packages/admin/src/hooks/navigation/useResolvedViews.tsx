@@ -21,7 +21,7 @@ import { AuthController, RebaseData, User } from "@rebasepro/types";
 import { UserManagementDelegate } from "@rebasepro/types";
 
 import { resolveAppViews } from "./useNavigationResolution";
-import { NAVIGATION_ADMIN_GROUP_NAME } from "./utils";
+
 
 // Lazy-load admin views — only rendered when navigation reaches /users or /roles
 const UsersView = lazy(() => import("../../components/admin/UsersView").then(m => ({ default: m.UsersView })));
@@ -128,7 +128,6 @@ export function useResolvedViews<USER extends User>(
             views.push({
                 slug: "users",
                 name: "Users",
-                group: NAVIGATION_ADMIN_GROUP_NAME,
                 icon: "Headset",
                 view: usersViewElement
             });
@@ -136,7 +135,6 @@ export function useResolvedViews<USER extends User>(
                 views.push({
                     slug: "roles",
                     name: "Roles",
-                    group: NAVIGATION_ADMIN_GROUP_NAME,
                     icon: "Shield",
                     view: rolesViewElement
                 });

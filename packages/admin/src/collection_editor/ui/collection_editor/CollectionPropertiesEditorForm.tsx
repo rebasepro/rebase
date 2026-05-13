@@ -27,7 +27,6 @@ type CollectionEditorFormProps = {
     propertyErrorsRef?: React.MutableRefObject<any>;
     onPropertyError: (propertyKey: string, namespace: string | undefined, error?: Record<string, any>) => void;
     setDirty?: (dirty: boolean) => void;
-    reservedGroups?: string[];
     extraIcon: React.ReactNode | any;
     getUser?: (uid: string) => User | null;
     getData?: () => Promise<object[]>;
@@ -42,7 +41,6 @@ export function CollectionPropertiesEditorForm({
     propertyErrorsRef,
     onPropertyError,
     setDirty,
-    reservedGroups,
     extraIcon,
     getUser,
     getData,
@@ -391,7 +389,7 @@ export function CollectionPropertiesEditorForm({
     };
 
     const body = (
-        <div className={"grid grid-cols-12 gap-2 h-full bg-surface dark:bg-surface-dark"}>
+        <div className={"grid grid-cols-12 gap-2 h-full bg-white dark:bg-surface-950"}>
             <div className={cls(
                 "bg-surface-50 dark:bg-surface-900",
                 "p-4 md:p-8",

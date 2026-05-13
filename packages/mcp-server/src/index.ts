@@ -110,11 +110,11 @@ properties: {} },
         cmd: ["db", "push"]
     },
     {
-        name: "rebase_db_pull",
-        description: "Introspect the live database and write back a Drizzle schema (reverse-engineer existing tables).",
+        name: "rebase_schema_introspect",
+        description: "Introspect the live database and generate Rebase collection definitions from existing tables.",
         inputSchema: { type: "object",
 properties: {} },
-        cmd: ["db", "pull"]
+        cmd: ["schema", "introspect"]
     },
     {
         name: "rebase_db_generate",
