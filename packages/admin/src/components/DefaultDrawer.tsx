@@ -1,7 +1,7 @@
 import type { NavigationEntry, NavigationResult } from "@rebasepro/types";
 import React, { useMemo } from "react";
 
-import { useCollapsedGroups, buildCollapsedDefaults, useLargeLayout, useAdminModeController, useEffectiveRoleController, useTranslation, useSlot, useRebaseContext, useAnalyticsController, useRebaseRegistry } from "@rebasepro/core";
+import { useCollapsedGroups, buildCollapsedDefaults, useLargeLayout, useAdminModeController, useTranslation, useSlot, useRebaseContext, useAnalyticsController, useRebaseRegistry } from "@rebasepro/core";
 import { useNavigationStateController, useUrlController } from "../hooks";
 
 
@@ -58,20 +58,16 @@ export function DefaultDrawer({
 
     const tooltipsOpen = drawerHovered && !drawerOpen && !adminMenuOpen;
     const largeLayout = useLargeLayout();
-    const navigate = useNavigate();
     const adminModeController = useAdminModeController();
-    const effectiveRoleController = useEffectiveRoleController();
     const registry = useRebaseRegistry();
-
-    const adminViews = navigationState.topLevelNavigation?.navigationEntries.filter(e => e.type === "admin") ?? [];
 
     const allNavigationEntries = navigationState.topLevelNavigation?.navigationEntries ?? [];
 
-    // Studio mode shows only view-type entries (devViews like schema editor).
-    // Content mode shows collections and custom entries (everything except admin and studio views).
+    // Studio mode shows view-type entries (devViews) + admin entries (Users/Roles).
+    // Content mode shows collections and custom entries + admin entries (Users/Roles), but not studio views.
     const filteredEntries = adminModeController.mode === "studio"
-        ? allNavigationEntries.filter(e => e.type === "view")
-        : allNavigationEntries.filter(e => e.type !== "admin" && e.type !== "view");
+        ? allNavigationEntries.filter(e => e.type === "view" || e.type === "admin")
+        : allNavigationEntries.filter(e => e.type !== "view");
 
     // Derive groups from the filtered entries
     const groupsToRender = [...new Set(filteredEntries.map(e => e.group).filter(Boolean))] as string[];

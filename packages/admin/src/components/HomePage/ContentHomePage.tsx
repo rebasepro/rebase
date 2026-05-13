@@ -63,13 +63,13 @@ export function ContentHomePage({
         onNavigationEntriesUpdate = () => {}
     } = navigationStateController.topLevelNavigation || {};
 
-    // Studio mode shows only view-type entries (devViews).
-    // Content mode shows collections and custom entries (everything except admin and studio views).
+    // Studio mode shows view-type entries (devViews) + admin entries (Users/Roles).
+    // Content mode shows collections, admin entries (Users/Roles), and custom entries — but not studio views.
     const rawNavigationEntries = useMemo(() => {
         if (adminModeController.mode === "studio") {
-            return unFilteredNavigationEntries.filter(e => e.type === "view");
+            return unFilteredNavigationEntries.filter(e => e.type === "view" || e.type === "admin");
         }
-        return unFilteredNavigationEntries.filter(e => e.type !== "admin" && e.type !== "view");
+        return unFilteredNavigationEntries.filter(e => e.type !== "view");
     }, [unFilteredNavigationEntries, adminModeController.mode]);
 
     const groupOrderFromNavController = useMemo(() => {
