@@ -7,9 +7,8 @@ export function AdvancedPropertyValidation({ disabled }: {
     disabled: boolean
 }) {
 
-    const columnWidth = "columnWidth";
-    const hideFromCollection = "hideFromCollection";
-    const readOnly = "readOnly";
+    const hideFromCollection = "ui.hideFromCollection";
+    const readOnly = "ui.readOnly";
 
     return (
 

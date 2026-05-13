@@ -111,7 +111,7 @@ export function MapPropertyField({ disabled, getData, allowDataInference, proper
                     position={"start"}
                     size={"medium"}
                     label={t("spread_children_as_columns")}
-                    onValueChange={(v) => setFieldValue("spreadChildren", v)}
+                    onValueChange={(v) => setFieldValue("ui.spreadChildren", v)}
                     value={values.ui?.spreadChildren ?? false}
                 />
                 <FieldCaption>

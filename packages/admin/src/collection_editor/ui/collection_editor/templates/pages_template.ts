@@ -176,7 +176,7 @@ export const pagesCollectionTemplate = {
         is_published: {
             type: "boolean",
             name: "Is Published",
-            columnWidth: 100,
+            ui: { columnWidth: 100 },
             description: "Should this page be live on the site?"
         }
     }
