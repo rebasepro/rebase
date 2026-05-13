@@ -297,6 +297,11 @@ function EntityFullScreenRoute({
         }) => {
             if (nextLocation.pathname.startsWith(entityPath))
                 return false;
+            // Allow navigation to side panel overlays — the underlying form is
+            // preserved via base_location in router state, so no data is lost.
+            const nextHash = nextLocation.hash;
+            if (nextHash === "#side" || nextHash === "#new_side")
+                return false;
             return blocked.current;
         });
     } catch (e) {

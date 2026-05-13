@@ -110,11 +110,39 @@ export function resolveCollectionSlotKeys(
 
     // Status: first string-enum that isn't the title
     let statusKey: string | undefined;
-    for (const [key, prop] of Object.entries(collection.properties)) {
-        const p = prop as Property;
-        if (p.type === "string" && "enum" in p && p.enum && key !== titleKey) {
-            statusKey = key;
-            break;
+
+    // 1. Explicitly defined in previewProperties
+    if (!statusKey && collection.previewProperties) {
+        for (const key of collection.previewProperties) {
+            const p = collection.properties[key] as Property | undefined;
+            if (p?.type === "string" && "enum" in p && p.enum && key !== titleKey) {
+                statusKey = key;
+                break;
+            }
+        }
+    }
+
+    // 2. Explicitly defined in propertiesOrder
+    if (!statusKey && collection.propertiesOrder) {
+        for (const key of collection.propertiesOrder) {
+            if (typeof key === "string" && !key.startsWith("subcollection:")) {
+                const p = collection.properties[key] as Property | undefined;
+                if (p?.type === "string" && "enum" in p && p.enum && key !== titleKey) {
+                    statusKey = key;
+                    break;
+                }
+            }
+        }
+    }
+
+    // 3. Default automatic inference
+    if (!statusKey) {
+        for (const [key, prop] of Object.entries(collection.properties)) {
+            const p = prop as Property;
+            if (p.type === "string" && "enum" in p && p.enum && key !== titleKey) {
+                statusKey = key;
+                break;
+            }
         }
     }
 

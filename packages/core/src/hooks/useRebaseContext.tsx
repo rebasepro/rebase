@@ -1,5 +1,6 @@
 import { AuthController, RebaseContext, User } from "@rebasepro/types";
 import { useAuthController } from "./useAuthController";
+import { useRebaseClient } from "./useRebaseClient";
 import { useData } from "./data/useData";
 import { useStorageSource } from "./useStorageSource";
 import { useSnackbarController } from "./useSnackbarController";
@@ -27,6 +28,8 @@ import { DatabaseAdminContext } from "../contexts/DatabaseAdminContext";
  */
 export const useRebaseContext = <USER extends User = User, AuthControllerType extends AuthController<USER> = AuthController<USER>>(): RebaseContext<USER, AuthControllerType> => {
 
+    const client = useRebaseClient<any>();
+
     const authController = useAuthController<USER, AuthControllerType>();
     const data = useData();
     const storageSource = useStorageSource();
@@ -52,7 +55,8 @@ export const useRebaseContext = <USER extends User = User, AuthControllerType ex
         analyticsController,
         userManagement,
         effectiveRoleController,
-        databaseAdmin
+        databaseAdmin,
+        client: client! // Client should be provided
     });
 
     React.useEffect(() => {
@@ -67,9 +71,10 @@ export const useRebaseContext = <USER extends User = User, AuthControllerType ex
             analyticsController,
             userManagement,
             effectiveRoleController,
-            databaseAdmin
+            databaseAdmin,
+            client: client!
         };
-    }, [authController, dialogsController, effectiveRoleController, data, databaseAdmin]);
+    }, [authController, dialogsController, effectiveRoleController, data, databaseAdmin, client]);
 
     return rebaseContextRef.current;
 }
