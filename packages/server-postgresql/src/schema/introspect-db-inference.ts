@@ -200,7 +200,7 @@ export function inferPropertyFromData(
             const paddedMax = Math.ceil((maxLength * 1.5) / 10) * 10;
             // Only add length constraint if it seems like a bounded string, not a long text
             if (paddedMax < 255) {
-                extraLines.push(`            validation: {\n                maxLength: ${paddedMax}\n            }`);
+                extraLines.push(`            validation: {\n                max: ${paddedMax}\n            }`);
             }
         }
 

@@ -18,7 +18,7 @@ O pacote `@rebasepro/client` oferece um SDK JavaScript com segurança de tipo pa
 ## Instalação
 
 ```bash
-npm install @rebasepro/client
+pnpm add @rebasepro/client
 ```
 
 ## Configuração

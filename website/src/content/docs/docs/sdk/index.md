@@ -18,7 +18,7 @@ The `@rebasepro/client` package provides a type-safe JavaScript SDK for interact
 ## Installation
 
 ```bash
-npm install @rebasepro/client
+pnpm add @rebasepro/client
 ```
 
 ## Setup

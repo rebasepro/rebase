@@ -93,7 +93,10 @@ async function startServer() {
             accessExpiresIn: env.JWT_ACCESS_EXPIRES_IN,
             refreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN,
             google: env.GOOGLE_CLIENT_ID
-                ? { clientId: env.GOOGLE_CLIENT_ID }
+                ? {
+                    clientId: env.GOOGLE_CLIENT_ID,
+                    clientSecret: env.GOOGLE_CLIENT_SECRET
+                }
                 : undefined,
             defaultRole: undefined,
             seedDefaultRoles: true,

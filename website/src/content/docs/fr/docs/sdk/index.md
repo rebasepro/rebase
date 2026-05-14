@@ -18,7 +18,7 @@ Le package `@rebasepro/client` fournit un SDK JavaScript typé pour interagir av
 ## Installation
 
 ```bash
-npm install @rebasepro/client
+pnpm add @rebasepro/client
 ```
 
 ## Configuration

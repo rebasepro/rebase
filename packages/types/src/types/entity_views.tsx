@@ -2,6 +2,7 @@ import React from "react";
 import type { Entity, EntityValues } from "./entities";
 import type { EntityCollection } from "./collections";
 import type { FormexController } from "./formex";
+import type { ComponentRef } from "./component_ref";
 
 /**
  * Context passed to custom fields and entity views.
@@ -61,7 +62,7 @@ export type EntityCustomView<M extends Record<string, unknown> = Record<string, 
     name: string;
     tabComponent?: React.ReactNode;
     includeActions?: boolean | "bottom";
-    Builder?: React.ComponentType<EntityCustomViewParams<M>>;
+    Builder?: ComponentRef<EntityCustomViewParams<M>>;
     position?: "start" | "end";
 };
 

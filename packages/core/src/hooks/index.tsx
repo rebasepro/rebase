@@ -45,3 +45,4 @@ export * from "./useRebaseClient";
 
 export * from "./useAnalyticsController";
 export * from "./useUserConfigurationPersistence";
+export * from "./useResolvedComponent";

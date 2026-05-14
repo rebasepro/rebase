@@ -1,11 +1,11 @@
 import type { ArrayProperty, MapProperty, NumberProperty, Property, StringProperty } from "@rebasepro/types";
-import React, { createElement } from "react";
+import React, { createElement, Suspense } from "react";
 import { deepEqual as equal } from "fast-equals"
 
 import { EntityReference, EntityRelation } from "@rebasepro/types";
 import type { PropertyPreviewProps } from "../types/components/PropertyPreviewProps";
 import { resolveProperty, normalizeToEntityRelation } from "@rebasepro/common";
-import { useAuthController, useCustomizationController } from "@rebasepro/core";
+import { useAuthController, useCustomizationController, resolveComponentRef } from "@rebasepro/core";
 import { EmptyValue } from "./components/EmptyValue";
 import { UrlComponentPreview } from "./components/UrlComponentPreview";
 import { StorageThumbnail } from "./components/StorageThumbnail";
@@ -57,17 +57,21 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
     if (property === null) {
         content = <EmptyValue/>;
     } else if (property.ui?.Preview) {
-        content = createElement(property.ui?.Preview,
-            {
-                propertyKey,
-                value,
-                property,
-                size,
-                height,
-                width,
-                // entity,
-                customProps: property.ui?.customProps
-            });
+        const ResolvedPreview = resolveComponentRef(property.ui.Preview);
+        if (ResolvedPreview) {
+            content = <Suspense fallback={null}>
+                {createElement(ResolvedPreview,
+                    {
+                        propertyKey,
+                        value,
+                        property,
+                        size,
+                        height,
+                        width,
+                        customProps: property.ui?.customProps
+                    })}
+            </Suspense>;
+        }
     } else if (value === undefined || value === null) {
         content = <EmptyValue/>;
     } else if (property.type === "string") {

@@ -1,5 +1,7 @@
 import React from "react";
 
+import type { ComponentRef } from "./component_ref";
+
 import type { EntityReference, EntityRelation, EntityValues, GeoPoint, Entity } from "./entities";
 import type { Relation, JoinStep, OnAction } from "./relations";
 import type { EntityCollection, FilterValues } from "./collections";
@@ -144,8 +146,8 @@ export interface BaseUIConfig<CustomProps = unknown> {
     disabled?: boolean | PropertyDisabledConfig;
     widthPercentage?: number;
     customProps?: CustomProps;
-    Field?: React.ComponentType<any>;
-    Preview?: React.ComponentType<any>;
+    Field?: ComponentRef<any>;
+    Preview?: ComponentRef<any>;
 }
 
 export interface BaseProperty<CustomProps = unknown> {

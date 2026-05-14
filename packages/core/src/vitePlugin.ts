@@ -1,4 +1,5 @@
 
+import path from "path";
 
 export interface RebaseCollectionsPluginOptions {
     /**
@@ -9,21 +10,69 @@ export interface RebaseCollectionsPluginOptions {
 }
 
 /**
+ * Properties on collection objects that accept `ComponentRef` values.
+ * When a string literal is found for any of these keys in a collection file,
+ * the transform plugin replaces it with a `LazyComponentRef` object so the
+ * component is loaded lazily and never evaluated by the backend.
+ */
+const LAZY_COMPONENT_KEYS = ["Field", "Preview", "Builder"];
+
+/**
+ * Regex that matches `Key: "relative/path"` or `Key: 'relative/path'`
+ * for each key listed in LAZY_COMPONENT_KEYS.
+ *
+ * It captures:
+ *   $1 — everything before the quote (e.g. `Field: `)
+ *   $2 — the quote character (' or ")
+ *   $3 — the path (must start with ./ or ../)
+ *
+ * The lookbehind-free pattern avoids issues with older runtimes.
+ */
+function buildTransformRegex(): RegExp {
+    const keys = LAZY_COMPONENT_KEYS.join("|");
+    // Match property key, colon, optional whitespace, then a string starting with a dot-path
+    return new RegExp(
+        `((?:${keys})\\s*:\\s*)(['"])(\\.\\.?\\/[^'"]+)\\2`,
+        "g"
+    );
+}
+
+/**
  * A Vite plugin that dynamically loads and automatically wires Rebase collections.
- * It provides a virtual module "virtual:rebase-collections" that statically exports the resolved collections array.
+ *
+ * It provides two capabilities:
+ * 1. A **virtual module** `"virtual:rebase-collections"` that statically exports
+ *    the resolved collections array.
+ * 2. A **transform hook** that converts string-based component references
+ *    (e.g. `Field: "../../components/MyField"`) into `LazyComponentRef` objects
+ *    (`{ __rebaseLazy: true, load: () => import(...) }`), enabling code-splitting
+ *    and preventing the backend from loading React-dependent modules.
  */
 export function rebaseCollectionsPlugin(options: RebaseCollectionsPluginOptions) {
     const virtualModuleId = "virtual:rebase-collections";
     const resolvedVirtualModuleId = "\0" + virtualModuleId;
 
+    let resolvedCollectionsDir: string;
+    const transformRegex = buildTransformRegex();
+
     return {
         name: "rebase-collections-plugin",
+
+        configResolved(config: { root: string }) {
+            // Resolve the collections directory to an absolute path
+            // so the `transform` hook can match files reliably.
+            resolvedCollectionsDir = path.isAbsolute(options.collectionsDir)
+                ? options.collectionsDir
+                : path.resolve(config.root, options.collectionsDir);
+        },
+
         resolveId(id: string) {
             if (id === virtualModuleId) {
                 return resolvedVirtualModuleId;
             }
             return null;
         },
+
         load(id: string) {
             if (id === resolvedVirtualModuleId) {
                 // Vite evaluates `import.meta.glob` relative to the project root.
@@ -41,6 +90,43 @@ export function rebaseCollectionsPlugin(options: RebaseCollectionsPluginOptions)
                 `;
             }
             return null;
+        },
+
+        /**
+         * Transform collection files to convert string component references
+         * into lazy-loading `LazyComponentRef` objects.
+         *
+         * Example transform:
+         * ```
+         * // Input
+         * Field: "../../frontend/src/components/MyField"
+         *
+         * // Output
+         * Field: { __rebaseLazy: true, load: () => import("../../frontend/src/components/MyField") }
+         * ```
+         */
+        transform(code: string, id: string) {
+            // Only process .ts/.tsx files inside the collections directory
+            if (!resolvedCollectionsDir) return null;
+            if (!id.startsWith(resolvedCollectionsDir)) return null;
+            if (!/\.tsx?$/.test(id)) return null;
+
+            // Reset the regex state (global flag means lastIndex persists)
+            transformRegex.lastIndex = 0;
+
+            if (!transformRegex.test(code)) return null;
+
+            // Reset again after the test consumed the regex
+            transformRegex.lastIndex = 0;
+
+            const transformed = code.replace(
+                transformRegex,
+                (_match, prefix: string, quote: string, importPath: string) => {
+                    return `${prefix}{ __rebaseLazy: true, load: () => import(${quote}${importPath}${quote}) }`;
+                }
+            );
+
+            return { code: transformed, map: null };
         }
     };
 }

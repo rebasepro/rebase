@@ -110,7 +110,7 @@ Das Dashboard erscheint nun in der Seitenleiste unter „Analytics“ und ist un
 Installieren Sie eine Diagrammbibliothek:
 
 ```bash
-npm install recharts
+pnpm add recharts
 ```
 
 Verwenden Sie es dann in Ihrem Dashboard:

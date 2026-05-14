@@ -81,7 +81,7 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
 
                     const content = ticket.getPayload();
                     if (!content) {
-                        return null;
+                        throw new Error("Google ID token payload was empty");
                     }
 
                     return {
@@ -99,8 +99,7 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
                         { headers: { Authorization: `Bearer ${payload.accessToken}` } }
                     );
                     if (!res.ok) {
-                        console.error("Google userinfo request failed:", res.status);
-                        return null;
+                        throw new Error(`Google userinfo request failed with status ${res.status}`);
                     }
                     const info = await res.json() as {
                         sub: string;
@@ -109,7 +108,7 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
                         picture?: string;
                     };
                     if (!info.sub || !info.email) {
-                        return null;
+                        throw new Error("Google userinfo response missing sub or email");
                     }
                     return {
                         providerId: info.sub,
@@ -125,11 +124,10 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
                 // tokens, so the access/id tokens never touch the browser.
                 if (payload.code && payload.redirectUri) {
                     if (!clientSecret) {
-                        console.error(
+                        throw new Error(
                             "Google authorization code flow requires clientSecret. " +
-                            "Configure google.clientSecret in your auth config."
+                            "Configure GOOGLE_CLIENT_SECRET in your environment."
                         );
-                        return null;
                     }
 
                     // Exchange the authorization code for tokens
@@ -147,8 +145,7 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
 
                     if (!tokenResponse.ok) {
                         const errorBody = await tokenResponse.text();
-                        console.error("Google token exchange failed:", tokenResponse.status, errorBody);
-                        return null;
+                        throw new Error(`Google token exchange failed (${tokenResponse.status}): ${errorBody}`);
                     }
 
                     const tokenData = await tokenResponse.json() as {
@@ -159,8 +156,7 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
                     };
 
                     if (tokenData.error) {
-                        console.error("Google token exchange error:", tokenData.error, tokenData.error_description);
-                        return null;
+                        throw new Error(`Google token exchange error: ${tokenData.error} – ${tokenData.error_description || "no details"}`);
                     }
 
                     // Prefer verifying the ID token (cryptographic verification)
@@ -172,7 +168,7 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
 
                         const content = ticket.getPayload();
                         if (!content) {
-                            return null;
+                            throw new Error("Google ID token payload was empty after code exchange");
                         }
 
                         return {
@@ -190,8 +186,7 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
                             { headers: { Authorization: `Bearer ${tokenData.access_token}` } }
                         );
                         if (!userInfoRes.ok) {
-                            console.error("Google userinfo request failed after code exchange:", userInfoRes.status);
-                            return null;
+                            throw new Error(`Google userinfo request failed after code exchange (${userInfoRes.status})`);
                         }
                         const info = await userInfoRes.json() as {
                             sub: string;
@@ -210,14 +205,13 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
                         };
                     }
 
-                    console.error("Google token exchange returned neither id_token nor access_token");
-                    return null;
+                    throw new Error("Google token exchange returned neither id_token nor access_token");
                 }
 
-                return null;
+                throw new Error("No valid Google credential provided (expected idToken, accessToken, or code+redirectUri)");
             } catch (error) {
-                console.error("Failed to verify Google token:", error);
-                return null;
+                console.error("Google OAuth verification failed:", error);
+                throw error;
             }
         }
     };

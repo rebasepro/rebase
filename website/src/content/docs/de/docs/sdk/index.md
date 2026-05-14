@@ -18,7 +18,7 @@ Das Paket `@rebasepro/client` bietet ein typsicheres JavaScript SDK für die Int
 ## Installation
 
 ```bash
-npm install @rebasepro/client
+pnpm add @rebasepro/client
 ```
 
 ## Einrichtung

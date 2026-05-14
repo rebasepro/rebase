@@ -17,9 +17,8 @@ WORKDIR /app
 # Copy workspace root
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# Copy source packages, patches, and app
+# Copy source packages and app
 COPY packages ./packages
-COPY patches ./patches
 COPY app ./app
 
 # Install all dependencies with flat node_modules for Docker compatibility

@@ -297,7 +297,13 @@ displayName: user.displayName });
             router.post(`/${provider.id}`, defaultAuthLimiter, async (c) => {
                 const payload = parseBody(provider.schema, await c.req.json());
 
-                const externalUser = await provider.verify(payload);
+                let externalUser;
+                try {
+                    externalUser = await provider.verify(payload);
+                } catch (err: unknown) {
+                    const msg = err instanceof Error ? err.message : String(err);
+                    throw ApiError.unauthorized(`${provider.id} login failed: ${msg}`, "OAUTH_ERROR");
+                }
                 if (!externalUser) {
                     throw ApiError.unauthorized(`Invalid ${provider.id} credentials`, "INVALID_TOKEN");
                 }

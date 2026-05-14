@@ -2,7 +2,7 @@
 import type { EntityCollection } from "@rebasepro/types";
 import React, { lazy, Suspense } from "react";
 
-import { useLargeLayout, useTranslation, useSlot } from "@rebasepro/core";
+import { useLargeLayout, useTranslation, useSlot, resolveComponentRef } from "@rebasepro/core";
 import { CollectionActionsProps, EntityTableController, SelectionController } from "@rebasepro/types";
 import { Button, IconButton, Tooltip, Popover, iconSize } from "@rebasepro/ui";
 import { PlusIcon, Trash2Icon, MoreVerticalIcon } from "lucide-react";
@@ -123,11 +123,17 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
     };
 
     const actions = toArray(collection.Actions)
-        .map((Action, i) => (
-            <ErrorBoundary key={`actions_${i}`}>
-                <Action {...actionProps}/>
-            </ErrorBoundary>
-        ));
+        .map((actionRef, i) => {
+            const Action = resolveComponentRef(actionRef);
+            if (!Action) return null;
+            return (
+                <ErrorBoundary key={`actions_${i}`}>
+                    <Suspense fallback={null}>
+                        <Action {...actionProps}/>
+                    </Suspense>
+                </ErrorBoundary>
+            );
+        });
 
     const pluginActions = useSlot("collection.actions", actionProps as any);
 

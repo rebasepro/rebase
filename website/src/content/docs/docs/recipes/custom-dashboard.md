@@ -110,7 +110,7 @@ The dashboard now appears in the sidebar under "Analytics" and is accessible at 
 Install a charting library:
 
 ```bash
-npm install recharts
+pnpm add recharts
 ```
 
 Then use it in your dashboard:

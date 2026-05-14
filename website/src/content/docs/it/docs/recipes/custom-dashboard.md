@@ -110,7 +110,7 @@ La dashboard appare ora nella barra laterale sotto "Analisi" ed è accessibile a
 Installa una libreria di grafici:
 
 ```bash
-npm install recharts
+pnpm add recharts
 ```
 
 Poi usala nella tua dashboard:

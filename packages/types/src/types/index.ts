@@ -25,3 +25,4 @@ export * from "./entity_views";
 export * from "./data_source";
 export * from "./cron";
 export * from "./backend_hooks";
+export * from "./component_ref";

@@ -1,8 +1,10 @@
 import type { EntityCollection } from "@rebasepro/types";
 import type { FieldProps, PropertyFieldBindingProps } from "../types/fields";
 import type { RebasePlugin, PluginFieldBuilderParams, Property } from "@rebasepro/types";
-import React, { ComponentType, ReactElement, useCallback, useRef } from "react";
+import React, { ComponentType, ReactElement, Suspense, useCallback, useRef } from "react";
 import { deepEqual as equal } from "fast-equals"
+
+import { resolveComponentRef } from "@rebasepro/core";
 
 import { Field, FieldProps as FormexFieldProps, getIn } from "@rebasepro/formex";
 
@@ -114,8 +116,9 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
                 } else if (readOnly) {
                     Component = ReadOnlyFieldBinding;
                 } else if (resolvedProperty.ui?.Field) {
-                    if (typeof resolvedProperty.ui?.Field === "function") {
-                        Component = resolvedProperty.ui?.Field as ComponentType<FieldProps<any>>;
+                    const resolved = resolveComponentRef(resolvedProperty.ui.Field);
+                    if (resolved) {
+                        Component = resolved as ComponentType<FieldProps<any>>;
                     }
                 } else {
                     const propertyConfig = getFieldConfig(resolvedProperty, customizationController.propertyConfigs);
@@ -139,7 +142,7 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
                         index,
                         authController
                     }) as Property | null;
-                    Component = configProperty?.ui?.Field as ComponentType<FieldProps> | undefined;
+                    Component = resolveComponentRef(configProperty?.ui?.Field) as ComponentType<FieldProps> | undefined;
                 }
                 if (!Component) {
                     console.warn(`No field component found for property ${propertyKey}`);
@@ -265,8 +268,9 @@ function FieldInternal<CustomProps, M extends Record<string, any>>
 
     return (
         <ErrorBoundary>
-
-            <UsedComponent {...cmsFieldProps}/>
+            <Suspense fallback={null}>
+                <UsedComponent {...cmsFieldProps}/>
+            </Suspense>
 
             {underlyingValueHasChanged && !isSubmitting &&
                 <Typography variant={"caption"} className={"ml-3.5"}>

@@ -12,13 +12,13 @@ Die Rebase CLI (`rebase`) verwaltet Ihr Projekt vom Scaffolding bis zur Bereitst
 ## Installation
 
 ```bash
-npm install -g @rebasepro/cli
+pnpm add -g @rebasepro/cli
 ```
 
-Oder über `npx` verwenden:
+Oder über `pnpm dlx` verwenden:
 
 ```bash
-npx @rebasepro/cli <command>
+pnpm dlx @rebasepro/cli <command>
 ```
 
 ## Befehle

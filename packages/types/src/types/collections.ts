@@ -10,6 +10,7 @@ import type { RebaseContext } from "../rebase_context";
 import type { Relation } from "./relations";
 import type { EntityCustomView } from "./entity_views";
 import type { EntityAction } from "./entity_actions";
+import type { ComponentRef } from "./component_ref";
 
 /**
  * Base interface containing all driver-agnostic collection properties.
@@ -346,7 +347,7 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
     /**
      * Builder for the collection actions rendered in the toolbar
      */
-    Actions?: React.ComponentType<any>[];
+    Actions?: ComponentRef<CollectionActionsProps>[];
 
 
 }

@@ -110,7 +110,7 @@ Le tableau de bord apparaît maintenant dans la barre latérale sous "Analytics"
 Installez une bibliothèque de graphiques :
 
 ```bash
-npm install recharts
+pnpm add recharts
 ```
 
 Utilisez-le ensuite dans votre tableau de bord :

@@ -1,9 +1,9 @@
-import type { EntityCollection, EntityCustomViewParams } from "@rebasepro/types";
+import type { ComponentRef, EntityCollection, EntityCustomViewParams } from "@rebasepro/types";
 import type { FormContext } from "../types/fields";
 import type { PluginFormActionProps } from "@rebasepro/types";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity, EntityStatus } from "@rebasepro/types";
-import { PluginProviderStack } from "@rebasepro/core";
+import { PluginProviderStack, resolveComponentRef } from "@rebasepro/core";
 
 import { EntityCollectionView, EntityView } from "../components";
 import { CircularProgressCenter, iconSize } from "@rebasepro/ui";
@@ -277,9 +277,9 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
 
             if (!customView)
                 return null;
-            const Builder = customView.Builder;
+            const Builder = resolveComponentRef<EntityCustomViewParams>(customView.Builder);
             if (!Builder) {
-                console.error("INTERNAL: customView.Builder is not defined");
+                console.error("INTERNAL: customView.Builder is not defined or could not be resolved");
                 return null;
             }
 
@@ -304,13 +304,15 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                 key={`custom_view_${customView.key}`}
                 role="tabpanel">
                 <ErrorBoundary>
-                    {usedFormContext && <Builder
-                        collection={collection}
-                        parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
-                        entity={usedEntity}
-                        modifiedValues={usedFormContext?.formex?.values ?? usedEntity?.values}
-                        formContext={usedFormContext as unknown as FormContext<Record<string, unknown>>}
-                    />}
+                    <Suspense fallback={<CircularProgressCenter />}>
+                        {usedFormContext && <Builder
+                            collection={collection}
+                            parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
+                            entity={usedEntity}
+                            modifiedValues={usedFormContext?.formex?.values ?? usedEntity?.values}
+                            formContext={usedFormContext as unknown as FormContext<Record<string, unknown>>}
+                        />}
+                    </Suspense>
                 </ErrorBoundary>
             </div>;
         }).filter(Boolean);
@@ -443,7 +445,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
             onSaved?.(res);
             formProps?.onSaved?.(res);
         }}
-        Builder={selectedSecondaryForm?.Builder as React.ComponentType<EntityCustomViewParams<M>> | undefined}
+        Builder={resolveComponentRef(selectedSecondaryForm?.Builder as ComponentRef<EntityCustomViewParams<M>> | undefined) as React.ComponentType<EntityCustomViewParams<M>> | undefined}
     />;
 
     const subcollectionTabs = subcollections && subcollections.map((subcollection) =>

@@ -110,7 +110,7 @@ El panel de control ahora aparece en la barra lateral bajo "Análisis" y es acce
 Instale una librería de gráficos:
 
 ```bash
-npm install recharts
+pnpm add recharts
 ```
 
 Luego úsela en su panel de control:

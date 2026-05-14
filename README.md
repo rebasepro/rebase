@@ -54,19 +54,17 @@ It's designed exclusively for developers who demand complete control and unlimit
 
 Scaffold a complete, self-hosted Rebase application connected to your database instantly.
 
-Our powerful CLI relies on Docker Compose to seamlessly orchestrate both your Rebase instance and a PostgreSQL database across any environment. No config nightmares—just pure developer bliss.
-
 ```bash
-npx @rebasepro/create my-rebase-app
+pnpm dlx rebase init my-rebase-app
 ```
 
-Then, start the entire backend and frontend environment locally:
+Configure your database in `.env`, then start everything:
 ```bash
 cd my-rebase-app
-docker compose up
+pnpm dev
 ```
 
-You're done! Your extremely scalable CMS is now alive. 
+You're done! Your admin panel is running at `http://localhost:5173` and the API at `http://localhost:3001`. 
 
 ---
 
@@ -127,7 +125,7 @@ We don't reinvent the wheel. Rebase is built entirely upon the most modern, batt
 Rebase exposes its premium design engine as a completely independent library. Fully typed, highly accessible, and gorgeously customized via Tailwind CSS v4. Drop it into **any** of your React projects instantly:
 
 ```bash
-npm install @rebasepro/ui
+pnpm add @rebasepro/ui
 ```
 
 ---

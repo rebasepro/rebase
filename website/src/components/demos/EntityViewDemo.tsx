@@ -15,7 +15,7 @@ const MOCK_ENTITIES: Entity[] = [
   {
     "id": "PROD-1",
     "title": "Baseball Cap",
-    "image": "https://storage.googleapis.com/firecms-demo-27150.appspot.com/dadaki/B000P0MDMS-576916726.jpg",
+    "image": "https://picsum.photos/seed/baseball-cap/400/400",
     "status": "Available",
     "brand": "Authentic Pigment",
     "category": "clothing_man"
@@ -23,7 +23,7 @@ const MOCK_ENTITIES: Entity[] = [
   {
     "id": "PROD-2",
     "title": "Conceal invisible shelf",
-    "image": "https://storage.googleapis.com/firecms-demo-27150.appspot.com/dadaki/B000UO4KXY-825906283.jpg",
+    "image": "https://picsum.photos/seed/shelf-wood/400/400",
     "status": "Available",
     "brand": "Umbra",
     "category": "home_storage"
@@ -31,7 +31,7 @@ const MOCK_ENTITIES: Entity[] = [
   {
     "id": "PROD-3",
     "title": "Aviator RB 3025",
-    "image": "https://storage.googleapis.com/firecms-demo-27150.appspot.com/dadaki/B000ZHY0JK-2047853797.jpg",
+    "image": "https://picsum.photos/seed/aviator-sun/400/400",
     "status": "Available",
     "brand": "Ray-Ban",
     "category": "sunglasses"
@@ -39,7 +39,7 @@ const MOCK_ENTITIES: Entity[] = [
   {
     "id": "PROD-4",
     "title": "Wine decanter",
-    "image": "https://storage.googleapis.com/firecms-demo-27150.appspot.com/dadaki/B0017TNJWY-528977189.jpg",
+    "image": "https://picsum.photos/seed/wine-decant/400/400",
     "status": "Out of Stock",
     "brand": "Sagaform",
     "category": "serveware"
@@ -47,7 +47,7 @@ const MOCK_ENTITIES: Entity[] = [
   {
     "id": "PROD-5",
     "title": "Wobble Chess Set Walnut",
-    "image": "https://storage.googleapis.com/firecms-demo-27150.appspot.com/dadaki/B001A793IW-400375460.jpg",
+    "image": "https://picsum.photos/seed/chess-walnut/400/400",
     "status": "Available",
     "brand": "Umbra",
     "category": "toys_and_games"
@@ -55,7 +55,7 @@ const MOCK_ENTITIES: Entity[] = [
   {
     "id": "PROD-6",
     "title": "Pimentero",
-    "image": "https://storage.googleapis.com/firecms-demo-27150.appspot.com/dadaki/B001DE7P7S-994938178.jpg",
+    "image": "https://picsum.photos/seed/pepper-mill/400/400",
     "status": "Available",
     "brand": "Seletti",
     "category": "serveware"
@@ -63,7 +63,7 @@ const MOCK_ENTITIES: Entity[] = [
   {
     "id": "PROD-7",
     "title": "AAM32 1 Corkscrew",
-    "image": "https://storage.googleapis.com/firecms-demo-27150.appspot.com/dadaki/B001M8APXG-1784151073.jpg",
+    "image": "https://picsum.photos/seed/corkscrew-a/400/400",
     "status": "Available",
     "brand": "Alessi",
     "category": "kitchen"
@@ -71,7 +71,7 @@ const MOCK_ENTITIES: Entity[] = [
   {
     "id": "PROD-8",
     "title": " PREDATOR 2 ",
-    "image": "https://storage.googleapis.com/firecms-demo-27150.appspot.com/dadaki/B001UQ71F0-122304841.jpg",
+    "image": "https://picsum.photos/seed/predator-2/400/400",
     "status": "Available",
     "brand": "Ray-Ban",
     "category": "sunglasses"
@@ -79,7 +79,7 @@ const MOCK_ENTITIES: Entity[] = [
   {
     "id": "PROD-9",
     "title": "Casio Collection",
-    "image": "https://storage.googleapis.com/firecms-demo-27150.appspot.com/images/6vhbn_61gb0NS5lIL._AC_SY879_.JPEG",
+    "image": "https://picsum.photos/seed/casio-watch/400/400",
     "status": "Available",
     "brand": "Casio",
     "category": "watches"
@@ -115,13 +115,13 @@ const KANBAN_COLUMNS: KanbanColumn[] = [
     cards: [
       { id: "871492",
 title: "Dark mode",
-image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=80&h=80&fit=crop" },
+image: "https://picsum.photos/seed/dark-mode/80/80" },
       { id: "871388",
 title: "Search indexing",
-image: "https://images.unsplash.com/photo-1504639725590-34d0984388bd?w=80&h=80&fit=crop" },
+image: "https://picsum.photos/seed/search-idx/80/80" },
       { id: "871204",
 title: "API documentation",
-image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=80&h=80&fit=crop" }
+image: "https://picsum.photos/seed/api-docs/80/80" }
     ]
   },
   {
@@ -131,10 +131,10 @@ image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=80&h=80&f
     cards: [
       { id: "871090",
 title: "Auth middleware refactor",
-image: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=80&h=80&fit=crop" },
+image: "https://picsum.photos/seed/auth-mid/80/80" },
       { id: "870984",
 title: "Onboarding flow",
-image: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=80&h=80&fit=crop" }
+image: "https://picsum.photos/seed/onboard-f/80/80" }
     ]
   },
   {
@@ -144,7 +144,7 @@ image: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=80&h=80&fit=
     cards: [
       { id: "870812",
 title: "RLS policies",
-image: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=80&h=80&fit=crop" }
+image: "https://picsum.photos/seed/rls-policy/80/80" }
     ]
   },
   {
@@ -154,10 +154,10 @@ image: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=80&h=80&f
     cards: [
       { id: "870650",
 title: "CI/CD pipeline",
-image: "https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=80&h=80&fit=crop" },
+image: "https://picsum.photos/seed/cicd-pipe/80/80" },
       { id: "870511",
 title: "Export to CSV",
-image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=80&h=80&fit=crop" }
+image: "https://picsum.photos/seed/export-csv/80/80" }
     ]
   }
 ];

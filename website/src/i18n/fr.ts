@@ -188,7 +188,7 @@ export const fr = {
   "roadmap.now.item3": "APIs REST & GraphQL instantanées",
   "roadmap.now.item4": "Sécurité au niveau des lignes (RLS)",
   "roadmap.now.item5": "Abonnements WebSocket en temps réel",
-  "roadmap.now.item6": "Vues liées au Studio",
+  "roadmap.now.item6": "Vues Tableau, Liste, Kanban et Galerie",
   "roadmap.now.item7": "Système d'authentification et de rôles",
   "roadmap.now.item8": "Crons et fonctions backend",
   "roadmap.now.item9": "Stockage natif compatible S3",

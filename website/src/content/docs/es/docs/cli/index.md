@@ -12,13 +12,13 @@ La CLI de Rebase (`rebase`) gestiona tu proyecto desde el andamiaje hasta el des
 ## Instalación
 
 ```bash
-npm install -g @rebasepro/cli
+pnpm add -g @rebasepro/cli
 ```
 
-O úsalo a través de `npx`:
+O úsalo a través de `pnpm dlx`:
 
 ```bash
-npx @rebasepro/cli <command>
+pnpm dlx @rebasepro/cli <command>
 ```
 
 ## Comandos

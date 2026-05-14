@@ -3579,7 +3579,7 @@ The `@rebasepro/client` package provides a type-safe JavaScript SDK for interact
 ### Installation
 
 ```bash
-npm install @rebasepro/client
+pnpm add @rebasepro/client
 ```
 
 ### Setup
@@ -4994,13 +4994,13 @@ The Rebase CLI (`rebase`) manages your project from scaffolding to deployment.
 ### Installation
 
 ```bash
-npm install -g @rebasepro/cli
+pnpm add -g @rebasepro/cli
 ```
 
-Or use via `npx`:
+Or use via `pnpm dlx`:
 
 ```bash
-npx @rebasepro/cli <command>
+pnpm dlx @rebasepro/cli <command>
 ```
 
 ### Commands
@@ -5534,7 +5534,7 @@ The dashboard now appears in the sidebar under "Analytics" and is accessible at 
 Install a charting library:
 
 ```bash
-npm install recharts
+pnpm add recharts
 ```
 
 Then use it in your dashboard:
