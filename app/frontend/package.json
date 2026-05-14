@@ -1,6 +1,6 @@
 {
     "name": "rebase-app-frontend",
-    "version": "0.0.1-canary.4d4fb3e",
+    "version": "0.1.0",
     "private": true,
     "type": "module",
     "dependencies": {

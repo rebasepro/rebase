@@ -239,7 +239,7 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
     return (
         <SelectableTableContext.Provider
             value={contextValue}>
-            <div className="h-full w-full flex flex-col bg-white dark:bg-surface-800"
+            <div className="h-full w-full flex flex-col bg-white dark:bg-surface-900"
                 ref={ref}>
 
                 <VirtualTable
@@ -264,7 +264,7 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
                     checkFilterCombination={checkFilterCombination}
                     createFilterField={filterable ? createFilterField : undefined}
                     rowClassName={useCallback((entity: Entity<M>) => {
-                        return highlightedRow?.(entity) ? "bg-surface-50/75 bg-surface-100/75 dark:!bg-surface-800/60" : "";
+                        return highlightedRow?.(entity) ? "bg-surface-accent-50 dark:!bg-surface-accent-900" : "";
                     }, [highlightedRow])}
                     className="grow"
                     emptyComponent={emptyComponent}

@@ -204,7 +204,7 @@ export const EntityTableCell = React.memo<EntityTableCellProps>(
                     `flex relative h-full rounded-md p-${p} border-4`,
                     showSaved ? "bg-primary/20 dark:bg-primary/20" : (onHover && !disabled ? "bg-surface-50 dark:bg-surface-900" : ""),
                     hideOverflow ? "overflow-hidden" : "",
-                    isSelected && !showSaved ? "bg-surface-50 dark:bg-surface-900" : "",
+                    isSelected && !showSaved ? "bg-surface-accent-50 dark:bg-surface-accent-900" : "",
                     borderClass
                 )}
                 ref={ref}
@@ -265,7 +265,7 @@ export const EntityTableCell = React.memo<EntityTableCellProps>(
                 style={sortableStyle}
                 className={cls(
                     "flex-shrink-0",
-                    frozen && "sticky left-0 z-10 bg-white dark:bg-surface-800"
+                    frozen && "sticky left-0 z-10 bg-white dark:bg-surface-900"
                 )}
                 {...sortableAttrsWithoutTabIndex}
             >

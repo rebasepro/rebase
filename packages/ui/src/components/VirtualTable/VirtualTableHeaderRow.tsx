@@ -209,7 +209,7 @@ export const VirtualTableHeaderRow = ({
     return (
         <>
             <div
-                className={cls(defaultBorderMixin, "z-20 sticky min-w-full flex w-fit flex-row top-0 left-0 border-b bg-surface-50 dark:bg-surface-800")}
+                className={cls(defaultBorderMixin, "z-20 sticky min-w-full flex w-fit flex-row top-0 left-0 border-b bg-surface-50 dark:bg-surface-900")}
                 style={{ height: headerHeight }}>
                 {columns.map((column, columnIndex) => {
                     const filterForThisProperty: [VirtualTableWhereFilterOp, any] | undefined =

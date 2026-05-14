@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/schema-inference",
-  "version": "0.0.1-canary.09e5ec54d",
+  "version": "0.1.0",
   "type": "module",
   "publishConfig": {
     "access": "public"

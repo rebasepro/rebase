@@ -91,8 +91,10 @@ export const EntityCollectionRowActions = function EntityCollectionRowActions({
     const content = (
         <div
             className={cls(
-                "h-full flex items-center justify-center flex-col bg-surface-50 dark:bg-surface-800 bg-opacity-90 bg-surface-50/90 dark:bg-opacity-90 dark:bg-surface-800/90 z-10",
-                "h-full flex items-center justify-center flex-col bg-surface-50/90 dark:bg-surface-800/90 z-10",
+                "h-full flex items-center justify-center flex-col z-10",
+                isSelected
+                    ? "bg-surface-accent-50 dark:bg-surface-accent-900"
+                    : "bg-surface-50/90 dark:bg-surface-900/90",
                 frozen ? "sticky left-0" : ""
             )}
             onClick={useCallback((event: React.MouseEvent) => {
@@ -219,7 +221,7 @@ export const EntityCollectionRowActions = function EntityCollectionRowActions({
                 style={sortableStyle}
                 className={cls(
                     "flex-shrink-0",
-                    frozen && "sticky left-0 z-10 bg-white dark:bg-surface-800"
+                    frozen && "sticky left-0 z-10 bg-white dark:bg-surface-900"
                 )}
                 {...sortableAttrsWithoutTabIndex}
             >

@@ -94,8 +94,8 @@ export function EntityCard<M extends Record<string, unknown> = Record<string, un
                 "cursor-pointer overflow-hidden group relative",
                 "transition-all duration-200",
                 "hover:shadow-lg hover:-translate-y-0.5",
-                selected && "ring-2 ring-primary",
-                highlighted && !selected && "ring-2 ring-primary ring-opacity-50"
+                selected && "ring-2 ring-primary bg-surface-accent-50 dark:bg-surface-accent-900",
+                highlighted && !selected && "ring-2 ring-primary ring-opacity-50 bg-surface-accent-50/50 dark:bg-surface-accent-900"
             )}
             onClick={handleClick}
         >
