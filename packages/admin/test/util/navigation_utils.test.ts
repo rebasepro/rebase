@@ -306,7 +306,7 @@ describe("navigateToEntity", () => {
             navigation: mockNavigation
         });
 
-        expect(mockNavigate).toHaveBeenCalledWith("/c/products/abc");
+        expect(mockNavigate).toHaveBeenCalledWith("/c/products/abc", undefined);
         expect(mockSideEntityController.open).not.toHaveBeenCalled();
     });
 
@@ -320,7 +320,7 @@ describe("navigateToEntity", () => {
             navigation: mockNavigation
         });
 
-        expect(mockNavigate).toHaveBeenCalledWith("/c/products/abc/details");
+        expect(mockNavigate).toHaveBeenCalledWith("/c/products/abc/details", undefined);
     });
 
     it("adds #new when no entityId in full_screen mode", () => {
@@ -332,7 +332,7 @@ describe("navigateToEntity", () => {
             navigation: mockNavigation
         });
 
-        expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining("#new"));
+        expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining("#new"), undefined);
     });
 
     it("adds #copy when copy flag is set in full_screen mode", () => {
@@ -345,6 +345,6 @@ describe("navigateToEntity", () => {
             navigation: mockNavigation
         });
 
-        expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining("#copy"));
+        expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining("#copy"), undefined);
     });
 });
