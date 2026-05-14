@@ -81,7 +81,16 @@ export function useDataTableController<M extends Record<string, any> = any, USER
     const paginationEnabled = collection.pagination === undefined || Boolean(collection.pagination);
     const pageSize = typeof collection.pagination === "number" ? collection.pagination : DEFAULT_PAGE_SIZE;
 
-    const [searchString, setSearchString] = React.useState<string | undefined>();
+    const location = useLocation();
+
+    const [searchString, setSearchString] = React.useState<string | undefined>(() => {
+        if (updateUrl) {
+            const params = new URLSearchParams(location.search);
+            const urlSearch = params.get("search");
+            return urlSearch ? decodeURIComponent(urlSearch) : undefined;
+        }
+        return undefined;
+    });
 
     const checkFilterCombination = useCallback((filterValues: FilterValues<any>,
         sortBy?: [string, "asc" | "desc"]) => {
@@ -96,8 +105,6 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         }
         return sort;
     }, [sort, fixedFilter]);
-
-    const location = useLocation();
 
     const {
         filterValues: filterUrl,
@@ -128,6 +135,11 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         } else {
             setSortBy(urlSortBy as [Extract<keyof M, string> | (string & {}), "asc" | "desc"] | undefined);
         }
+
+        // Sync search string from URL
+        const urlParams = new URLSearchParams(location.search);
+        const urlSearch = urlParams.get("search");
+        setSearchString(urlSearch ? decodeURIComponent(urlSearch) : undefined);
     }, [location.search, updateUrl, fixedFilter, checkFilterCombination]);
 
     useUpdateUrl(filterValues, sortBy, searchString, updateUrl);

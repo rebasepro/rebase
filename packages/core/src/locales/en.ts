@@ -52,6 +52,7 @@ export const en: RebaseTranslations = {
     all_entries_loaded: "All {{count}} entries loaded",
     create_your_first_entry: "Create your first entry",
     no_results_filter_sort: "No results with the applied filter/sort",
+    no_results_search: "No results found for \"{{search}}\"",
     add: "Add",
     remove: "Remove",
     multiple_entities: "Multiple entities",

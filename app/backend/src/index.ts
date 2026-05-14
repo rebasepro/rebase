@@ -39,7 +39,8 @@ app.use("/*", cors({
 }));
 
 app.use("/*", secureHeaders({
-    crossOriginResourcePolicy: "cross-origin"
+    crossOriginResourcePolicy: "cross-origin",
+    crossOriginOpenerPolicy: "same-origin-allow-popups"
 }));
 
 // ─── Database ────────────────────────────────────────────────────────

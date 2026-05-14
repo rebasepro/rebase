@@ -172,6 +172,14 @@ export interface AppView {
     hideFromNavigation?: boolean;
 
     /**
+     * Navigation group for this view.
+     * Views sharing the same group name will be visually grouped
+     * together in the drawer and home page. If not set, the view
+     * falls into the default "Views" group.
+     */
+    group?: string;
+
+    /**
      * Component to be rendered. This can be any React component, and can use
      * any of the provided hooks
      */

@@ -338,44 +338,71 @@ function GoogleLoginButton({
     googleClientId: string,
     authController: RebaseAuthController
 }) {
-    const tokenClientRef = useRef<any>(null);
+    const codeClientRef = useRef<{ requestCode(): void } | null>(null);
+    const [loginError, setLoginError] = useState<string | null>(null);
+
+    // Use a ref for googleLogin to avoid stale closure inside initCodeClient callback
+    const googleLoginRef = useRef(authController.googleLogin);
+    googleLoginRef.current = authController.googleLogin;
 
     useEffect(() => {
         const google = (window as any).google;
-        if (!google || tokenClientRef.current) return;
+        if (!google || codeClientRef.current) return;
 
-        tokenClientRef.current = google.accounts.oauth2.initTokenClient({
+        codeClientRef.current = google.accounts.oauth2.initCodeClient({
             client_id: googleClientId,
             scope: "openid email profile",
-            callback: async (response: { access_token?: string; error?: string }) => {
-                if (response.error || !response.access_token) {
-                    console.error("Google login error:", response.error);
+            ux_mode: "popup",
+            callback: async (response: { code?: string; error?: string }) => {
+                console.log("[GoogleLogin] Callback fired, has code:", !!response.code, "error:", response.error);
+                if (response.error || !response.code) {
+                    const msg = response.error || "No authorization code received";
+                    console.error("[GoogleLogin] Error:", msg);
+                    setLoginError(`Google Sign-In failed: ${msg}`);
                     return;
                 }
+                setLoginError(null);
                 try {
-                    await authController.googleLogin(response.access_token, "accessToken");
+                    console.log("[GoogleLogin] Sending auth code to backend...");
+                    // Send the authorization code to the backend.
+                    // redirectUri "postmessage" is required when using popup ux_mode.
+                    await googleLoginRef.current({
+                        code: response.code,
+                        redirectUri: "postmessage"
+                    });
+                    console.log("[GoogleLogin] Backend auth succeeded, user should be set now");
                 } catch (err: unknown) {
-                    console.error("Google login error:", err);
+                    const msg = err instanceof Error ? err.message : String(err);
+                    console.error("[GoogleLogin] Backend auth failed:", msg);
+                    setLoginError(msg);
                 }
             }
         });
-    }, [googleClientId, authController]);
+    }, [googleClientId]);
 
     const handleClick = () => {
-        if (!tokenClientRef.current) {
-            console.error("Google Sign-In not loaded");
+        setLoginError(null);
+        if (!codeClientRef.current) {
+            setLoginError("Google Sign-In SDK not loaded. Please refresh the page.");
             return;
         }
-        tokenClientRef.current.requestAccessToken();
+        codeClientRef.current.requestCode();
     };
 
     return (
-        <LoginButton
-            disabled={disabled}
-            text="Sign in with Google"
-            icon={<GoogleIcon/>}
-            onClick={handleClick}
-        />
+        <>
+            <LoginButton
+                disabled={disabled}
+                text="Sign in with Google"
+                icon={<GoogleIcon/>}
+                onClick={handleClick}
+            />
+            {loginError && (
+                <div className="w-full mt-2">
+                    <ErrorView error={loginError}/>
+                </div>
+            )}
+        </>
     );
 }
 

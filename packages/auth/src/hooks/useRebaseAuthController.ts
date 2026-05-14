@@ -306,6 +306,7 @@ export function useRebaseAuthController(
 
     // Handle successful authentication
     const handleAuthSuccess = useCallback(async (userInfo: UserInfo, tokens: AuthTokens) => {
+        console.log("[Auth] handleAuthSuccess called, user:", userInfo.email, "uid:", userInfo.uid);
         tokensRef.current = tokens;
         let convertedUser = convertToUser(userInfo);
 
@@ -321,11 +322,13 @@ roles: customRoles.map(r => r.id) };
         // Save to localStorage for persistence
         saveAuthToStorage(tokens, userInfo);
 
+        console.log("[Auth] Calling setUser, roles:", convertedUser.roles);
         setUser(convertedUser);
         setAuthError(null);
         setAuthProviderError(null);
         setLoginSkipped(false);
         scheduleTokenRefresh(tokens);
+        console.log("[Auth] handleAuthSuccess completed");
     }, [scheduleTokenRefresh, defineRolesFor]);
 
     // Email/password login

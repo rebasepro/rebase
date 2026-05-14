@@ -8,6 +8,8 @@ import execa from "execa";
 import ncp from "ncp";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
+import { detectPackageManager, getPMCommands } from "../utils/package-manager";
+import type { PackageManager, PMCommands } from "../utils/package-manager";
 
 const access = promisify(fs.access);
 const copy = promisify(ncp);
@@ -37,6 +39,10 @@ export interface InitOptions {
     templateDirectory: string;
     databaseUrl?: string;
     introspect?: boolean;
+    /** Detected package manager (pnpm or npm). */
+    pm: PackageManager;
+    /** Command helpers for the detected PM. */
+    pmCommands: PMCommands;
 }
 
 export async function createRebaseApp(rawArgs: string[]) {
@@ -44,11 +50,12 @@ export async function createRebaseApp(rawArgs: string[]) {
 ${chalk.bold("Rebase")} — Create a new project 🚀
 `);
 
-    const options = await promptForOptions(rawArgs);
+    const pm = detectPackageManager();
+    const options = await promptForOptions(rawArgs, pm);
     await createProject(options);
 }
 
-async function promptForOptions(rawArgs: string[]): Promise<InitOptions> {
+async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<InitOptions> {
     const args = arg(
         {
             "--git": Boolean,
@@ -96,7 +103,7 @@ async function promptForOptions(rawArgs: string[]): Promise<InitOptions> {
         questions.push({
             type: "confirm",
             name: "installDeps",
-            message: "Install dependencies with pnpm?",
+            message: `Install dependencies with ${pm}?`,
             default: true
         });
     }
@@ -121,6 +128,7 @@ async function promptForOptions(rawArgs: string[]): Promise<InitOptions> {
     const targetDirectory = path.resolve(process.cwd(), nameArg || answers.projectName);
     const projectName = path.basename(targetDirectory);
     const templateDirectory = path.resolve(cliRoot!, "templates", "template");
+    const pmCommands = getPMCommands(pm);
 
     return {
         projectName,
@@ -129,7 +137,9 @@ async function promptForOptions(rawArgs: string[]): Promise<InitOptions> {
         targetDirectory,
         templateDirectory,
         databaseUrl: (answers.databaseUrl as string)?.trim() || undefined,
-        introspect: answers.introspect || false
+        introspect: answers.introspect || false,
+        pm,
+        pmCommands
     };
 }
 
@@ -185,17 +195,21 @@ async function createProject(options: InitOptions) {
         }
     }
 
+    const { pm, pmCommands } = options;
+    const installCmd = pmCommands.install;
+    const execCmd = pmCommands.exec("rebase", ["schema", "introspect", "--force"]);
+
     if (options.installDeps) {
         console.log("");
-        console.log(chalk.gray("  Installing dependencies with pnpm..."));
+        console.log(chalk.gray(`  Installing dependencies with ${pm}...`));
         console.log("");
         try {
-            await execa("pnpm", ["install"], {
+            await execa(installCmd[0], installCmd.slice(1), {
                 cwd: options.targetDirectory,
                 stdio: "inherit"
             });
         } catch {
-            console.warn(chalk.yellow("  Warning: Failed to install dependencies. You may need to run `pnpm install` manually."));
+            console.warn(chalk.yellow(`  Warning: Failed to install dependencies. You may need to run \`${installCmd.join(" ")}\` manually.`));
         }
     }
 
@@ -206,18 +220,18 @@ async function createProject(options: InitOptions) {
             console.log("");
             try {
                 // --force overwrites template example collections with real ones
-                await execa("pnpm", ["exec", "rebase", "schema", "introspect", "--force"], {
+                await execa(execCmd[0], execCmd.slice(1), {
                     cwd: options.targetDirectory,
                     stdio: "inherit"
                 });
                 console.log(chalk.green("  Database successfully introspected!"));
             } catch {
                 console.warn(chalk.yellow("  Warning: Failed to introspect database automatically."));
-                console.warn(chalk.yellow("  You can run `pnpm exec rebase schema introspect` manually after setup."));
+                console.warn(chalk.yellow(`  You can run \`${execCmd.join(" ")}\` manually after setup.`));
             }
         } else {
             console.warn(chalk.yellow("  Skipping introspection because dependencies were not installed."));
-            console.warn(chalk.yellow("  Run `pnpm install` then `pnpm exec rebase schema introspect` manually."));
+            console.warn(chalk.yellow(`  Run \`${installCmd.join(" ")}\` then \`${execCmd.join(" ")}\` manually.`));
         }
     }
 
@@ -227,9 +241,10 @@ async function createProject(options: InitOptions) {
     console.log("");
     console.log(chalk.bold("Next steps:"));
     console.log("");
+    const runDev = pmCommands.run("dev");
     console.log(`  ${chalk.cyan("cd")} ${options.projectName}`);
     if (!options.installDeps) {
-        console.log(`  ${chalk.cyan("pnpm install")}`);
+        console.log(`  ${chalk.cyan(installCmd.join(" "))}`);
     }
     console.log("");
     if (options.databaseUrl) {
@@ -242,7 +257,7 @@ async function createProject(options: InitOptions) {
         console.log(chalk.gray("  # Then start the dev server:"));
     }
     console.log("");
-    console.log(`  ${chalk.cyan("pnpm dev")}`);
+    console.log(`  ${chalk.cyan(runDev.join(" "))}`);
     console.log("");
     console.log(chalk.gray("This starts both the backend (Hono + PostgreSQL)")
         + chalk.gray(" and the frontend (Vite + React) concurrently."));
@@ -258,7 +273,8 @@ async function replacePlaceholders(options: InitOptions) {
         "frontend/package.json",
         "backend/package.json",
         "config/package.json",
-        "frontend/index.html"
+        "frontend/index.html",
+        "README.md"
     ];
 
     const packageJsonPath = path.resolve(cliRoot!, "package.json");
@@ -270,25 +286,28 @@ async function replacePlaceholders(options: InitOptions) {
 
     const versionCache = new Map<string, string>();
 
+    // Use npm view for registry queries — it's universal and works regardless of PM
+    const viewBin = "npm";
+
     const getPackageVersion = async (pkgName: string) => {
         if (versionCache.has(pkgName)) return versionCache.get(pkgName)!;
         let versionToUse = cliVersion;
         try {
             // First try to check if the specific cliVersion exists for this package
-            const { stdout } = await execa("pnpm", ["view", `${pkgName}@${cliVersion}`, "version"]);
+            const { stdout } = await execa(viewBin, ["view", `${pkgName}@${cliVersion}`, "version"]);
             if (!stdout.trim()) throw new Error("Not found");
             versionToUse = stdout.trim();
         } catch {
             try {
                 // If specific version doesn't exist, try the matching tag (canary or latest)
                 const tag = cliVersion.includes("canary") ? "canary" : "latest";
-                const { stdout } = await execa("pnpm", ["view", `${pkgName}@${tag}`, "version"]);
+                const { stdout } = await execa(viewBin, ["view", `${pkgName}@${tag}`, "version"]);
                 if (!stdout.trim()) throw new Error("Not found");
                 versionToUse = stdout.trim();
             } catch {
                 try {
                     // Fallback to absolute latest
-                    const { stdout } = await execa("pnpm", ["view", pkgName, "version"]);
+                    const { stdout } = await execa(viewBin, ["view", pkgName, "version"]);
                     versionToUse = stdout.trim() || "latest";
                 } catch {
                     versionToUse = "latest";
@@ -323,7 +342,7 @@ async function replacePlaceholders(options: InitOptions) {
     // Perform replacements
     for (const [fullPath, originalContent] of fileContents.entries()) {
         let content = originalContent.replace(/\{\{PROJECT_NAME\}\}/g, options.projectName);
-        
+
         // Replace workspace:* with the dynamically resolved version
         const matches = [...content.matchAll(/"(@rebasepro\/[^"]+)":\s*"workspace:\*"/g)];
         for (const match of matches) {
@@ -335,6 +354,7 @@ async function replacePlaceholders(options: InitOptions) {
         fs.writeFileSync(fullPath, content, "utf-8");
     }
 }
+
 
 export function configureEnvFile(targetDirectory: string, databaseUrl?: string) {
     const envExamplePath = path.join(targetDirectory, ".env.example");

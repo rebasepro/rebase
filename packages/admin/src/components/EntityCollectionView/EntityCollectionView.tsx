@@ -855,7 +855,8 @@ export const EntityCollectionView = React.memo(
             : null;
 
         // Shared empty state — plugin slot takes priority, then default
-        const isFilteredOrSorted = tableController.filterValues !== undefined || tableController.sortBy !== undefined;
+        const isSearching = !!tableController.searchString;
+        const isFilteredOrSorted = tableController.filterValues !== undefined || tableController.sortBy !== undefined || isSearching;
         const emptyComponent = pluginEmptyStates.length > 0
             ? <>{pluginEmptyStates}</>
             : canCreateEntities && !isFilteredOrSorted
@@ -869,13 +870,18 @@ export const EntityCollectionView = React.memo(
                         {t("create_your_first_entry")}
                     </Button>
                 </div>
-                : <Typography variant={"label"}>{t("no_results_filter_sort")}</Typography>;
+                : <Typography variant={"label"}>
+                    {isSearching
+                        ? t("no_results_search", { search: tableController.searchString ?? "" })
+                        : t("no_results_filter_sort")}
+                </Typography>;
 
         const toolbarNode = (
             <CollectionTableToolbar
                 compact={isCompact}
                 loading={tableController.dataLoading}
                 onTextSearch={tableController.setSearchString}
+                initialSearchText={tableController.searchString}
                 viewModeToggle={viewModeToggleElement}
                 actionsStart={<EntityCollectionViewStartActions
                     parentCollectionSlugs={parentCollectionSlugs ?? EMPTY_ARRAY} parentEntityIds={parentEntityIds ?? EMPTY_ARRAY}

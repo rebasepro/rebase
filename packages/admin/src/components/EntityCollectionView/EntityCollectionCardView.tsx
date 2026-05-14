@@ -5,7 +5,6 @@ import { EntityCard } from "./EntityCard";
 import {
     cls,
     CircularProgress,
-    CircularProgressCenter,
     Typography
 } from "@rebasepro/ui";
 import { useAuthController, useCustomizationController } from "@rebasepro/core";
@@ -213,9 +212,11 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
                     </Typography>
                 </div>
             ) : isInitialLoading ? (
-                <CircularProgressCenter/>
+                <div className="flex items-center justify-center py-12 px-8">
+                    <CircularProgress size="small"/>
+                </div>
             ) : isEmpty ? (
-                <div className="h-full flex items-center justify-center p-8">
+                <div className="flex items-center justify-center py-12 px-8">
                     {emptyComponent ?? (
                         <Typography variant="label" color="secondary">
                             No entries found

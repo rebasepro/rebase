@@ -44,6 +44,7 @@ export const de: RebaseTranslations = {
     all_entries_loaded: "Alle {{count}} Einträge geladen",
     create_your_first_entry: "Erstellen Sie Ihren ersten Eintrag",
     no_results_filter_sort: "Keine Ergebnisse mit angewendetem Filter/Sortierung",
+    no_results_search: "Keine Ergebnisse gefunden für \"{{search}}\"",
     add: "Hinzufügen",
     remove: "Entfernen",
     multiple_entities: "Mehrere Entitäten",

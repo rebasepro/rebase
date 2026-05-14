@@ -61,6 +61,8 @@ export interface RebaseTranslations {
     all_entries_loaded: string;
     create_your_first_entry: string;
     no_results_filter_sort: string;
+    /** Shown when a text search yields no results. Supports `{{search}}` interpolation. */
+    no_results_search?: string;
     add: string;
     remove: string;
     copy_id: string;

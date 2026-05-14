@@ -25,8 +25,17 @@ vi.mock("./db", () => ({
 vi.mock("./dev", () => ({
     devCommand: vi.fn()
 }));
+vi.mock("./build", () => ({
+    buildCommand: vi.fn()
+}));
+vi.mock("./start", () => ({
+    startCommand: vi.fn()
+}));
 vi.mock("./auth", () => ({
     authCommand: vi.fn()
+}));
+vi.mock("./doctor", () => ({
+    doctorCommand: vi.fn()
 }));
 
 import { entry } from "../cli";
@@ -34,6 +43,8 @@ import { createRebaseApp } from "./init";
 import { schemaCommand } from "./schema";
 import { dbCommand } from "./db";
 import { devCommand } from "./dev";
+import { buildCommand } from "./build";
+import { startCommand } from "./start";
 import { authCommand } from "./auth";
 
 let consoleLogSpy: ReturnType<typeof vi.spyOn>;
@@ -89,6 +100,16 @@ describe("CLI routing", () => {
         const args = ["node", "rebase", "auth", "reset-password"];
         await entry(args);
         expect(authCommand).toHaveBeenCalledWith("reset-password", args);
+    });
+
+    it("routes 'build' to buildCommand", async () => {
+        await entry(["node", "rebase", "build"]);
+        expect(buildCommand).toHaveBeenCalled();
+    });
+
+    it("routes 'start' to startCommand", async () => {
+        await entry(["node", "rebase", "start"]);
+        expect(startCommand).toHaveBeenCalled();
     });
 
     it("passes --help through to namespaced commands", async () => {

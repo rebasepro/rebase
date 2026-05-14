@@ -290,6 +290,126 @@ describe("template package.json contracts", () => {
 });
 
 // =============================================================================
+// Dual package manager compatibility
+// =============================================================================
+
+describe("dual PM compatibility", () => {
+    describe("workspace configuration", () => {
+        it("ships both pnpm-workspace.yaml AND workspaces in package.json", () => {
+            // Both must coexist for the project to work with either PM
+            expect(fs.existsSync(path.join(TEMPLATE_DIR, "pnpm-workspace.yaml"))).toBe(true);
+            const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "package.json"), "utf-8"));
+            expect(pkg.workspaces).toEqual(["frontend", "backend", "config"]);
+        });
+
+        it("pnpm-workspace.yaml and package.json workspaces define the same packages", () => {
+            const workspace = fs.readFileSync(path.join(TEMPLATE_DIR, "pnpm-workspace.yaml"), "utf-8");
+            const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "package.json"), "utf-8"));
+            for (const ws of pkg.workspaces) {
+                expect(workspace).toContain(ws);
+            }
+        });
+    });
+
+    describe("scripts are PM-agnostic", () => {
+        it("root scripts use rebase CLI commands, not pnpm/npm directly", () => {
+            const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "package.json"), "utf-8"));
+            const pmSpecificPatterns = [
+                /^pnpm\s/,
+                /^npm\s/,
+                /^npx\s/
+            ];
+
+            for (const [scriptName, scriptCmd] of Object.entries(pkg.scripts)) {
+                const cmd = scriptCmd as string;
+                for (const pattern of pmSpecificPatterns) {
+                    expect(
+                        pattern.test(cmd),
+                        `Script "${scriptName}" (${cmd}) should not start with a PM-specific command`
+                    ).toBe(false);
+                }
+            }
+        });
+
+        it("dev script uses 'rebase dev'", () => {
+            const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "package.json"), "utf-8"));
+            expect(pkg.scripts.dev).toBe("rebase dev");
+        });
+
+        it("build script uses 'rebase build'", () => {
+            const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "package.json"), "utf-8"));
+            expect(pkg.scripts.build).toBe("rebase build");
+        });
+
+        it("start script uses 'rebase start'", () => {
+            const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "package.json"), "utf-8"));
+            expect(pkg.scripts.start).toBe("rebase start");
+        });
+
+        it("deploy script uses rebase commands", () => {
+            const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "package.json"), "utf-8"));
+            expect(pkg.scripts.deploy).toBe("rebase build && rebase start");
+        });
+    });
+
+    describe("internal dependencies use '*' (not workspace:*)", () => {
+        it("backend config dependency uses '*'", () => {
+            const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "backend", "package.json"), "utf-8"));
+            const configDep = Object.entries(pkg.dependencies).find(
+                ([name]) => name.includes("-config")
+            );
+            expect(configDep).toBeTruthy();
+            expect(configDep![1]).toBe("*");
+        });
+
+        it("frontend config dependency uses '*'", () => {
+            const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "frontend", "package.json"), "utf-8"));
+            const configDep = Object.entries(pkg.dependencies).find(
+                ([name]) => name.includes("-config")
+            );
+            expect(configDep).toBeTruthy();
+            expect(configDep![1]).toBe("*");
+        });
+    });
+
+    describe(".npmrc configuration", () => {
+        it("ships a .npmrc file", () => {
+            expect(fs.existsSync(path.join(TEMPLATE_DIR, ".npmrc"))).toBe(true);
+        });
+
+        it(".npmrc enables link-workspace-packages for pnpm", () => {
+            const npmrc = fs.readFileSync(path.join(TEMPLATE_DIR, ".npmrc"), "utf-8");
+            expect(npmrc).toContain("link-workspace-packages=true");
+        });
+    });
+
+    describe("README documents both package managers", () => {
+        it("mentions both pnpm and npm", () => {
+            const readme = fs.readFileSync(path.join(TEMPLATE_DIR, "README.md"), "utf-8");
+            expect(readme).toContain("pnpm");
+            expect(readme).toContain("npm");
+        });
+
+        it("does not contain any unreplaced PM placeholders", () => {
+            const readme = fs.readFileSync(path.join(TEMPLATE_DIR, "README.md"), "utf-8");
+            expect(readme).not.toContain("{{PACKAGE_MANAGER}}");
+            expect(readme).not.toContain("{{INSTALL_CMD}}");
+            expect(readme).not.toContain("{{RUN_DEV_CMD}}");
+            expect(readme).not.toContain("{{PACKAGE_MANAGER_URL}}");
+        });
+    });
+
+    describe("docker-compose is PM-agnostic", () => {
+        it("does not reference pnpm or npm directly", () => {
+            const compose = fs.readFileSync(path.join(TEMPLATE_DIR, "docker-compose.yml"), "utf-8");
+            // Should use "rebase dev" not "pnpm dev" or "npm run dev"
+            expect(compose).not.toMatch(/\bpnpm\b/);
+            expect(compose).not.toMatch(/\bnpm\b/);
+        });
+    });
+});
+
+// =============================================================================
 // .env.example
 // =============================================================================
 

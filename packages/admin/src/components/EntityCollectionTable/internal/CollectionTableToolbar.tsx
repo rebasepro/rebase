@@ -14,6 +14,10 @@ interface CollectionTableToolbarProps {
     title?: React.ReactNode,
     onTextSearch?: (searchString?: string) => void;
     /**
+     * Initial search string to pre-populate the search bar (e.g. from URL params).
+     */
+    initialSearchText?: string;
+    /**
      * When true the toolbar is in "compact" mode for the split-view left panel.
      * - Search bar, loading spinner, and view-mode toggle are hidden.
      * - Secondary actions remain inline (displayed horizontally).
@@ -29,6 +33,7 @@ export function CollectionTableToolbar({
     onTextSearch,
     title,
     viewModeToggle,
+    initialSearchText,
     compact = false
 }: CollectionTableToolbarProps) {
 
@@ -84,7 +89,8 @@ export function CollectionTableToolbar({
                             size={"small"}
                             placeholder={t("search")}
                             onTextSearch={onTextSearch}
-                            expandable={true}/>}
+                            expandable={true}
+                            initialValue={initialSearchText}/>}
                 </div>
 
                 {/* Secondary actions — always inline */}

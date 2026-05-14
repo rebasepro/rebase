@@ -69,8 +69,13 @@ export function DefaultDrawer({
         ? allNavigationEntries.filter(e => e.type === "view" || e.type === "admin")
         : allNavigationEntries.filter(e => e.type !== "view");
 
-    // Derive groups from the filtered entries
-    const groupsToRender = [...new Set(filteredEntries.map(e => e.group).filter(Boolean))] as string[];
+    // Derive groups from the filtered entries, preserving the order from topLevelNavigation.groups
+    const entryGroups = new Set(filteredEntries.map(e => e.group).filter(Boolean));
+    const orderedGroups = navigationState.topLevelNavigation?.groups ?? [];
+    const groupsToRender = [
+        ...orderedGroups.filter(g => entryGroups.has(g)),
+        ...[...entryGroups].filter(g => !orderedGroups.includes(g))
+    ];
 
     // Collapsible groups state - using "drawer" namespace for independent state from home page
     const collapsedDefaults = useMemo(

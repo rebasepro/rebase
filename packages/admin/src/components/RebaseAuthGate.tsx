@@ -27,6 +27,8 @@ export function RebaseAuthGate({ children }: { children: React.ReactNode }) {
     const registry = useRebaseRegistry();
     const authController = useAuthController();
 
+    console.log("[AuthGate] initialLoading:", authController?.initialLoading, "user:", authController?.user?.email ?? null);
+
     if (authController?.initialLoading) {
         return <CircularProgressCenter size={"large"}/>;
     }

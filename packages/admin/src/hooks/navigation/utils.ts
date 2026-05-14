@@ -6,8 +6,12 @@ import { deepEqual as equal } from "fast-equals";
 export const NAVIGATION_DEFAULT_GROUP_NAME = "Views";
 export const NAVIGATION_ADMIN_GROUP_NAME = "Admin";
 
-export function getGroup(_collectionOrView: EntityCollection<any, any> | AppView) {
-    return NAVIGATION_DEFAULT_GROUP_NAME;
+export function getGroup(collectionOrView: EntityCollection<any, any> | AppView) {
+    const trimmed = collectionOrView.group?.trim();
+    if (!trimmed || trimmed === "") {
+        return NAVIGATION_DEFAULT_GROUP_NAME;
+    }
+    return trimmed;
 }
 
 export function computeNavigationGroups({

@@ -42,7 +42,7 @@ export const UserSelector = React.forwardRef<
             clearable = true,
             className,
             pageSize,
-            searchPlaceholder = "SearchIcon users...",
+            searchPlaceholder = "Search users...",
             noResultsText = "No users found.",
             loadingText = "Loading..."
         },

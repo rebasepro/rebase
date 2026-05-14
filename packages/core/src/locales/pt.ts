@@ -49,6 +49,7 @@ export const pt: RebaseTranslations = {
     all_entries_loaded: "Todos os {{count}} registos carregados",
     create_your_first_entry: "Crie o seu primeiro registo",
     no_results_filter_sort: "Sem resultados com o filtro/ordenação aplicado",
+    no_results_search: "Nenhum resultado encontrado para \"{{search}}\"",
     add: "Adicionar",
     remove: "Remover",
     multiple_entities: "Múltiplas entidades",

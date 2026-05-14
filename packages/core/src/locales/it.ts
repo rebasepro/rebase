@@ -44,6 +44,7 @@ export const it: RebaseTranslations = {
     all_entries_loaded: "Tutte le {{count}} voci caricate",
     create_your_first_entry: "Crea la tua prima voce",
     no_results_filter_sort: "Nessun risultato con il filtro/ordinamento applicato",
+    no_results_search: "Nessun risultato trovato per \"{{search}}\"",
     add: "Aggiungi",
     remove: "Rimuovi",
     multiple_entities: "Entità multiple",

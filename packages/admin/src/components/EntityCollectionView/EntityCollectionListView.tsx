@@ -7,7 +7,6 @@ import {
     Checkbox,
     Chip,
     CircularProgress,
-    CircularProgressCenter,
     cls,
     defaultBorderMixin,
     Typography
@@ -572,9 +571,11 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
                     </Typography>
                 </div>
             ) : isInitialLoading ? (
-                <CircularProgressCenter/>
+                <div className="flex items-center justify-center py-12 px-8">
+                    <CircularProgress size="small"/>
+                </div>
             ) : isEmpty ? (
-                <div className="flex items-center justify-center p-8">
+                <div className="flex items-center justify-center py-12 px-8">
                     {emptyComponent ?? (
                         <Typography variant="label" color="secondary">
                             No entries found

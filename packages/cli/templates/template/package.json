@@ -4,10 +4,15 @@
     "description": "Rebase application with PostgreSQL backend",
     "private": true,
     "type": "module",
+    "workspaces": [
+        "frontend",
+        "backend",
+        "config"
+    ],
     "scripts": {
         "dev": "rebase dev",
-        "build": "pnpm -r run build",
-        "start": "pnpm --filter \"*-backend\" start",
+        "build": "rebase build",
+        "start": "rebase start",
         "db:generate": "rebase db generate --collections ../config/collections",
         "db:migrate": "rebase db migrate",
         "schema:introspect": "rebase schema introspect",
@@ -15,7 +20,7 @@
         "db:studio": "rebase db studio",
         "schema:generate": "rebase schema generate --collections ../config/collections",
         "generate:sdk": "rebase generate-sdk",
-        "deploy": "pnpm run build && pnpm run start"
+        "deploy": "rebase build && rebase start"
     },
     "devDependencies": {
         "@rebasepro/cli": "workspace:*",

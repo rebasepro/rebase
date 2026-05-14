@@ -292,7 +292,7 @@ hour12: false,
                     }}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-surface-accent-500!"
                 >
-                    <CalendarIcon color={"disabled"}/>
+                    <CalendarIcon/>
                 </IconButton>
                 {clearable && value && (
                     <IconButton

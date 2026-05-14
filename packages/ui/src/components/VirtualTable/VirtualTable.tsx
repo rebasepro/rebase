@@ -8,7 +8,7 @@ import { deepEqual as equal } from "fast-equals"
 import { FixedSizeList as List } from "react-window";
 import useMeasure from "react-use-measure";
 
-import { CircularProgressCenter } from "../CircularProgressCenter";
+import { CircularProgress } from "../CircularProgress";
 import {
     OnVirtualTableColumnResizeParams,
     VirtualTableColumn,
@@ -74,7 +74,7 @@ const innerElementType = forwardRef<HTMLDivElement, InnerElementProps>(({
                                 }}>
                                 <div style={{ position: "sticky",
 top: 0,
-zIndex: 10 }}>
+zIndex: 20 }}>
                                     <VirtualTableHeaderRow {...virtualTableProps}/>
                                 </div>
                                 {!customView && children}
@@ -333,9 +333,11 @@ export const VirtualTable = React.memo<VirtualTableProps<any>>(
             </CenteredView>
             : (empty
                 ? (loading
-                    ? <CircularProgressCenter/>
+                    ? <div className="flex items-center justify-center py-12 px-8">
+                        <CircularProgress size="small"/>
+                    </div>
                     : <div
-                        className="flex flex-col overflow-auto items-center justify-center p-8 h-full">
+                        className="flex flex-col overflow-auto items-center justify-center py-12 px-8">
                         {emptyComponent}
                     </div>)
                 : undefined);

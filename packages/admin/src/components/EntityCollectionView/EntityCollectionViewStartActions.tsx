@@ -111,13 +111,14 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
                         {t("filters")}{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
                     </Button>
                 ) : (
-                    <IconButton
+                    <Button
+                        variant="text"
                         size="small"
                         onClick={() => setFiltersDialogOpen(true)}
                         className={cls(activeFilterCount > 0 && "text-primary")}
                     >
                         <FilterIcon size={iconSize.small}/>
-                    </IconButton>
+                    </Button>
                 )}
             </Badge>
         </Tooltip>

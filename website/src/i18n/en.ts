@@ -12,20 +12,20 @@ export const en = {
   "demo.pull": "✔ Introspected PostgreSQL schema. Generated types.",
   "demo.dev": "✔ Admin panel, API, and WebSocket server running.",
   "social.title": "Trusted by developers and startups building on Postgres",
-  "howitworks.badge": "Zero to production",
+  "howitworks.badge": "Time reclaimed",
   "howitworks.title":
-    'One schema. <span class="text-primary">Full stack.</span>',
+    'What you\'ll <span class="text-primary">never build again.</span>',
   "howitworks.subtitle":
-    "Define it once in TypeScript — Rebase generates the rest.",
-  "howitworks.step1.title": "Define your schema",
+    "Every hour you used to spend on plumbing is now spent on your product.",
+  "howitworks.step1.title": "Boilerplate admin UIs",
   "howitworks.step1.desc":
-    "Point Rebase at any existing Postgres database, or define your schema in TypeScript. Tables, types, relations — understood instantly.",
-  "howitworks.step2.title": "Generate everything, instantly",
+    "No more hand-wiring table views, form layouts, or filter logic. Connect your Postgres and get a complete, editable admin panel — instantly.",
+  "howitworks.step2.title": "Hand-rolled API layers",
   "howitworks.step2.desc":
-    "Admin panel, entity forms, REST & GraphQL APIs, typed SDK, and real-time subscriptions — all generated from a single source of truth.",
-  "howitworks.step3.title": "Extend with real code",
+    "Stop writing CRUD endpoints, serializers, and validation middleware. Rebase exposes type-safe REST, GraphQL, and WebSocket APIs from your schema — zero glue code.",
+  "howitworks.step3.title": "Brittle auth & permissions",
   "howitworks.step3.desc":
-    "Add callbacks, custom views, business logic, and granular permissions in TypeScript — all version-controlled, no platform lock-in.",
+    "Forget custom JWT plumbing and scattered access checks. Define row-level security and role-based permissions right in your TypeScript schema — auditable, version-controlled, bulletproof.",
   "showcase.badge": "Built for Real Products",
   "showcase.title.part1": "Teams Ship Faster with",
   "showcase.title.part2": "REBASE",

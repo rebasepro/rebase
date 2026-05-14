@@ -9,7 +9,7 @@
 #   2. Backend (Node.js / Hono) with health checks
 #   3. Frontend (nginx) serving the Vite build
 #
-# For development, use `pnpm dev` instead.
+# For development, use `rebase dev` instead.
 # ─────────────────────────────────────────────────────────────────────
 
 services:

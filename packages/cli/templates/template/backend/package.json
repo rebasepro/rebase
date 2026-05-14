@@ -10,7 +10,7 @@
         "start": "tsx src/index.ts"
     },
     "dependencies": {
-        "{{PROJECT_NAME}}-config": "workspace:*",
+        "{{PROJECT_NAME}}-config": "*",
         "@rebasepro/server-core": "workspace:*",
         "@rebasepro/server-postgresql": "workspace:*",
         "drizzle-orm": "^0.44.4",

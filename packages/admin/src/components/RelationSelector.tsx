@@ -83,6 +83,10 @@ export const RelationSelector = React.forwardRef<
         // Track IDs that were set via local user interaction (onItemClick / handleClear / handleRemoveItem).
         // When an incoming value change matches these IDs exactly, we skip async re-resolution.
         const localSelectionIdsRef = useRef<string | null>(null);
+        // Snapshot of selected IDs captured when the popover opens.
+        // Used to sort the dropdown list so selected items appear at the top.
+        // Stays stable for the entire popover session so items don't jump around.
+        const pinnedIdsRef = useRef<Set<string> | null>(null);
 
         const {
             items: availableItems,
@@ -323,6 +327,7 @@ relation } as RelationItem;
                 newSelected = [item];
                 setIsPopoverOpen(false);
                 isPopoverOpenRef.current = false;
+                pinnedIdsRef.current = null;
             }
             setSelectedItems(newSelected);
             // Mark this fingerprint so the resolution effect skips async work
@@ -348,11 +353,13 @@ relation } as RelationItem;
             if (disabled) return;
             // We control open manually; only allow opening attempts from Radix (e.g. trigger press)
             if (next) {
+                // Capture current selection so we can pin those items to the top of the list
+                pinnedIdsRef.current = new Set(selectedItems.map(i => String(i.id)));
                 setIsPopoverOpen(true);
                 isPopoverOpenRef.current = true;
             }
             // Ignore close attempts here; outside click/Escape handled manually; single select closes explicitly on selection.
-        }, [disabled]);
+        }, [disabled, selectedItems]);
 
         // Outside click + Escape handling (simple and reliable)
         useEffect(() => {
@@ -367,12 +374,14 @@ relation } as RelationItem;
                 // Outside
                 setIsPopoverOpen(false);
                 isPopoverOpenRef.current = false;
+                pinnedIdsRef.current = null;
             }
 
             function handleKey(ev: KeyboardEvent) {
                 if (ev.key === "Escape") {
                     setIsPopoverOpen(false);
                     isPopoverOpenRef.current = false;
+                    pinnedIdsRef.current = null;
                 }
             }
 
@@ -389,6 +398,7 @@ relation } as RelationItem;
         const closePopover = useCallback(() => {
             setIsPopoverOpen(false);
             isPopoverOpenRef.current = false;
+            pinnedIdsRef.current = null;
         }, []);
 
         const resolvedPlaceholder = placeholder || emptyPlaceholder || <EmptyValue className={"ml-2"}/>;
@@ -412,6 +422,11 @@ relation } as RelationItem;
                                 setIsPopoverOpen(o => {
                                     const next = !o;
                                     isPopoverOpenRef.current = next;
+                                    if (next) {
+                                        pinnedIdsRef.current = new Set(selectedItems.map(i => String(i.id)));
+                                    } else {
+                                        pinnedIdsRef.current = null;
+                                    }
                                     return next;
                                 });
                             }}
@@ -589,7 +604,20 @@ relation } as RelationItem;
                                         </CommandPrimitive.Empty>
                                     )}
                                     <CommandPrimitive.Group>
-                                        {availableItems.map((item) => {
+                                        {(() => {
+                                            // Sort items so that initially-selected (pinned) items appear first.
+                                            // We use the snapshot taken when the popover opened so items don't
+                                            // jump around as the user checks/unchecks.
+                                            const pinned = pinnedIdsRef.current;
+                                            const sortedItems = pinned && pinned.size > 0
+                                                ? [...availableItems].sort((a, b) => {
+                                                    const aP = pinned.has(String(a.id)) ? 0 : 1;
+                                                    const bP = pinned.has(String(b.id)) ? 0 : 1;
+                                                    return aP - bP;
+                                                })
+                                                : availableItems;
+                                            return sortedItems;
+                                        })().map((item) => {
                                             const isSelected = selectedItems.some(v => String(v.id) === String(item.id));
                                             return (
                                                 <CommandPrimitive.Item

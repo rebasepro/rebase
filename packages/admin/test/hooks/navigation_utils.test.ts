@@ -15,14 +15,39 @@ import type { EntityCollection, AppView, RebasePlugin, NavigationGroupMapping } 
 // getGroup
 // ---------------------------------------------------------------------------
 describe("getGroup", () => {
-    it("always returns the default group name", () => {
+    it("returns the default group name when no group is set", () => {
         const collection = {} as EntityCollection;
         expect(getGroup(collection)).toBe(NAVIGATION_DEFAULT_GROUP_NAME);
     });
 
-    it("returns default group name for AppView", () => {
+    it("returns default group name for AppView without group", () => {
         const view = {} as AppView;
         expect(getGroup(view)).toBe(NAVIGATION_DEFAULT_GROUP_NAME);
+    });
+
+    it("returns the custom group name from a collection", () => {
+        const collection = { group: "E-Commerce" } as unknown as EntityCollection;
+        expect(getGroup(collection)).toBe("E-Commerce");
+    });
+
+    it("returns the custom group name from a view", () => {
+        const view = { group: "Dashboard" } as unknown as AppView;
+        expect(getGroup(view)).toBe("Dashboard");
+    });
+
+    it("trims whitespace from group names", () => {
+        const collection = { group: "  Content  " } as unknown as EntityCollection;
+        expect(getGroup(collection)).toBe("Content");
+    });
+
+    it("returns default group for empty string group", () => {
+        const collection = { group: "" } as unknown as EntityCollection;
+        expect(getGroup(collection)).toBe(NAVIGATION_DEFAULT_GROUP_NAME);
+    });
+
+    it("returns default group for whitespace-only group", () => {
+        const collection = { group: "   " } as unknown as EntityCollection;
+        expect(getGroup(collection)).toBe(NAVIGATION_DEFAULT_GROUP_NAME);
     });
 });
 

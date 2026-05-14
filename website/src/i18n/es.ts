@@ -14,20 +14,20 @@ export const es = {
     "✔ Panel de administración, API y servidor WebSocket en ejecución.",
   "social.title":
     "Utilizado por desarrolladores y startups construyendo sobre Postgres",
-  "howitworks.badge": "De cero a producción",
+  "howitworks.badge": "Tiempo recuperado",
   "howitworks.title":
-    'Un esquema. <span class="text-primary">Full stack.</span>',
+    'Lo que <span class="text-primary">nunca volverás a construir.</span>',
   "howitworks.subtitle":
-    "Defínelo una vez en TypeScript — Rebase genera el resto.",
-  "howitworks.step1.title": "Define tu esquema",
+    "Cada hora que gastabas en fontanería ahora la dedicas a tu producto.",
+  "howitworks.step1.title": "Interfaces admin repetitivas",
   "howitworks.step1.desc":
-    "Apunta Rebase a cualquier base de datos Postgres existente, o define tu esquema en TypeScript. Tablas, tipos, relaciones — entendidos al instante.",
-  "howitworks.step2.title": "Genera todo, al instante",
+    "Deja de cablear vistas de tablas, formularios y lógica de filtrado. Conecta tu Postgres y obtén un panel de administración completo y editable — al instante.",
+  "howitworks.step2.title": "Capas de API hechas a mano",
   "howitworks.step2.desc":
-    "Panel de administración, formularios de entidades, APIs REST & GraphQL, SDK tipado y suscripciones en tiempo real — todo generado desde una única fuente de verdad.",
-  "howitworks.step3.title": "Extiende con código real",
+    "Deja de escribir endpoints CRUD, serializadores y middleware de validación. Rebase expone APIs REST, GraphQL y WebSocket tipadas desde tu esquema — cero código de conexión.",
+  "howitworks.step3.title": "Auth y permisos frágiles",
   "howitworks.step3.desc":
-    "Añade callbacks, vistas personalizadas, lógica de negocio y permisos granulares en TypeScript — todo bajo control de versiones, sin ataduras a la plataforma.",
+    "Olvídate del cableado JWT y de los controles de acceso dispersos. Define seguridad a nivel de fila y permisos basados en roles directamente en tu esquema TypeScript — auditable, versionado, a prueba de balas.",
   "showcase.badge": "Construido para Productos Reales",
   "showcase.title.part1": "Los equipos lanzan más rápido con",
   "showcase.title.part2": "REBASE",

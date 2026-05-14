@@ -14,20 +14,20 @@ export const fr = {
     "✔ Panneau d'administration, API et serveur WebSocket en cours d'exécution.",
   "social.title":
     "Fait confiance par les développeurs et les startups construisant sur Postgres",
-  "howitworks.badge": "De zéro à la production",
+  "howitworks.badge": "Temps récupéré",
   "howitworks.title":
-    'Un schéma. <span class="text-primary">Full stack.</span>',
+    'Ce que vous ne <span class="text-primary">construirez plus jamais.</span>',
   "howitworks.subtitle":
-    "Définissez-le une fois en TypeScript — Rebase génère le reste.",
-  "howitworks.step1.title": "Définissez votre schéma",
+    "Chaque heure que vous passiez sur la plomberie est désormais consacrée à votre produit.",
+  "howitworks.step1.title": "Interfaces admin répétitives",
   "howitworks.step1.desc":
-    "Pointez Rebase vers n'importe quelle base de données Postgres existante, ou définissez votre schéma en TypeScript. Tables, types, relations — compris instantanément.",
-  "howitworks.step2.title": "Générez tout, instantanément",
+    "Plus besoin de câbler des vues de tableaux, des formulaires ou la logique de filtrage. Connectez votre Postgres et obtenez un panneau d'administration complet et éditable — instantanément.",
+  "howitworks.step2.title": "Couches d'API faites à la main",
   "howitworks.step2.desc":
-    "Panneau d'administration, formulaires d'entités, APIs REST & GraphQL, SDK typé et abonnements en temps réel — tout généré à partir d'une seule source de vérité.",
-  "howitworks.step3.title": "Étendez avec du vrai code",
+    "Arrêtez d'écrire des endpoints CRUD, des sérialiseurs et des middlewares de validation. Rebase expose des APIs REST, GraphQL et WebSocket typées à partir de votre schéma — zéro code de liaison.",
+  "howitworks.step3.title": "Auth et permissions fragiles",
   "howitworks.step3.desc":
-    "Ajoutez des callbacks, des vues personnalisées, de la logique métier et des permissions granulaires en TypeScript — tout est versionné, sans enfermement propriétaire.",
+    "Oubliez la plomberie JWT et les contrôles d'accès éparpillés. Définissez la sécurité au niveau des lignes et les permissions par rôle directement dans votre schéma TypeScript — auditable, versionné, infaillible.",
   "showcase.badge": "Construit pour des Produits Réels",
   "showcase.title.part1": "Les équipes livrent plus vite avec",
   "showcase.title.part2": "REBASE",

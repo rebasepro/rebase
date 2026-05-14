@@ -44,6 +44,7 @@ export const hi: RebaseTranslations = {
     all_entries_loaded: "सभी {{count}} प्रविष्टियाँ लोड हो गईं",
     create_your_first_entry: "अपनी पहली प्रविष्टि बनाएं",
     no_results_filter_sort: "लागू किए गए फ़िल्टर/सॉर्ट के साथ कोई परिणाम नहीं",
+    no_results_search: "\"{{search}}\" के लिए कोई परिणाम नहीं मिला",
     add: "जोड़ें",
     remove: "हटाएं",
     multiple_entities: "एकाधिक इकाइयां",

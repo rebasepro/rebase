@@ -26,6 +26,7 @@ import {
     findEnvFile,
     resolveTsx
 } from "../utils/project";
+import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 
 /** Well-known filename the backend writes its actual port to. */
 const DEV_PORT_FILENAME = ".rebase-dev-port";
@@ -189,9 +190,13 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             console.log(`  ${chalk.gray("↳ VITE_API_URL")} = ${chalk.white(`http://localhost:${backendPort}`)}`);
         }
 
+        const pm = detectPackageManager(projectRoot);
+        const pmCmds = getPMCommands(pm);
+        const runDevCmd = pmCmds.run("dev");
+
         const frontendChild = execa(
-            "pnpm",
-            ["run", "dev"],
+            runDevCmd[0],
+            runDevCmd.slice(1),
             {
                 cwd: frontendDir,
                 stdio: ["inherit", "pipe", "pipe"],
@@ -229,8 +234,10 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     if (!frontendOnly && backendDir) {
         const tsxBin = resolveTsx(projectRoot);
         if (!tsxBin) {
+            const pmName = detectPackageManager(projectRoot);
+            const addCmd = pmName === "npm" ? "npm install -D tsx" : "pnpm add -D tsx";
             console.error(chalk.red("  ✗ Could not find tsx binary for backend."));
-            console.error(chalk.gray("    Install it with: pnpm add -D tsx"));
+            console.error(chalk.gray(`    Install it with: ${addCmd}`));
             process.exit(1);
         }
 

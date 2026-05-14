@@ -252,37 +252,12 @@ path: referenceProperty.path as string }) : undefined;
         if (property.relation) {
             if (property.ui?.widget === "dialog") {
                 return {
-                    Component: ({ propertyKey, internalValue, updateValue, disabled, size, property }: any) => (
-                        <TableRelationField
-                            name={propertyKey}
-                            internalValue={internalValue as EntityRelation}
-                            updateValue={updateValue}
-                            disabled={disabled}
-                            size={size}
-                            multiselect={false}
-                            relation={property.relation}
-                            previewProperties={property.ui?.previewProperties}
-                            includeId={property.includeId}
-                            includeEntityLink={property.includeEntityLink}
-                            title={property.name ?? propertyKey}
-                            fixedFilter={property.fixedFilter}
-                        />
-                    ),
+                    Component: RelationDialogBindingComponent,
                     allowScroll: false
                 };
             } else {
                 return {
-                    Component: ({ propertyKey, internalValue, updateValue, disabled, property }: any) => (
-                        <TableRelationSelectorField
-                            name={propertyKey}
-                            internalValue={internalValue as EntityRelation}
-                            updateValue={updateValue}
-                            disabled={disabled}
-                            size={"small"}
-                            relation={property.relation!}
-                            fixedFilter={property.fixedFilter}
-                        />
-                    ),
+                    Component: RelationSelectorBindingComponent,
                     allowScroll: false
                 };
             }
@@ -343,4 +318,39 @@ path: referenceProperty.path as string }) : undefined;
     }
 
     return undefined;
+}
+
+/** Stable component for relation fields rendered with the dialog widget */
+function RelationDialogBindingComponent({ propertyKey, internalValue, updateValue, disabled, size, property }: any) {
+    return (
+        <TableRelationField
+            name={propertyKey}
+            internalValue={internalValue as EntityRelation}
+            updateValue={updateValue}
+            disabled={disabled}
+            size={size}
+            multiselect={false}
+            relation={property.relation}
+            previewProperties={property.ui?.previewProperties}
+            includeId={property.includeId}
+            includeEntityLink={property.includeEntityLink}
+            title={property.name ?? propertyKey}
+            fixedFilter={property.fixedFilter}
+        />
+    );
+}
+
+/** Stable component for relation fields rendered with the inline selector */
+function RelationSelectorBindingComponent({ propertyKey, internalValue, updateValue, disabled, property }: any) {
+    return (
+        <TableRelationSelectorField
+            name={propertyKey}
+            internalValue={internalValue as EntityRelation}
+            updateValue={updateValue}
+            disabled={disabled}
+            size={"small"}
+            relation={property.relation!}
+            fixedFilter={property.fixedFilter}
+        />
+    );
 }

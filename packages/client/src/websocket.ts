@@ -195,11 +195,13 @@ export class RebaseWebSocketClient {
                 if (!this.ws) return; // Prevent memory leaks / actions after disconnect
                 if (token) {
                     this.authenticate(token).catch(e => {
-                        if (this.ws) console.warn("WebSocket auto-auth failed:", e);
+                        if (this.ws) console.debug("WebSocket auto-auth skipped:", e?.message || e);
                     });
                 }
             }).catch(e => {
-                if (this.ws) console.warn("WebSocket auto-auth failed:", e);
+                // User not logged in or auth still loading — this is expected,
+                // the WebSocket will authenticate on-demand when a request is made.
+                if (this.ws) console.debug("WebSocket auto-auth skipped:", e?.message || e);
             });
         }
     }
@@ -244,7 +246,9 @@ export class RebaseWebSocketClient {
                             console.debug("WebSocket auto-authenticated");
                         }
                     } catch (error) {
-                        console.warn("WebSocket auto-auth failed, requests may fail:", error);
+                        // User not logged in or auth still loading — this is expected.
+                        // Authentication will happen on-demand when the user logs in.
+                        console.debug("WebSocket connected without auth:", (error as Error)?.message || error);
                     }
                 }
 

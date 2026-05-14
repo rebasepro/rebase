@@ -69,8 +69,11 @@ export class RebaseApiServer {
      * Setup Hono middleware
      */
     private setupMiddleware(): void {
-        // Security headers
-        this.router.use("/*", secureHeaders());
+        // Security headers — use same-origin-allow-popups for COOP so that
+        // OAuth popup flows (Google, etc.) can postMessage back to the opener.
+        this.router.use("/*", secureHeaders({
+            crossOriginOpenerPolicy: "same-origin-allow-popups"
+        }));
 
         // CORS — only applied if explicitly configured via `cors` option.
         // If omitted, the user is expected to configure CORS on their own

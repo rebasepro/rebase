@@ -28,6 +28,10 @@ interface SearchBarProps {
     disabled?: boolean;
     loading?: boolean;
     inputRef?: React.Ref<HTMLInputElement>;
+    /**
+     * Optional initial value for the search input, e.g. from URL params.
+     */
+    initialValue?: string;
 }
 
 export function SearchBar({
@@ -41,10 +45,11 @@ export function SearchBar({
     autoFocus,
     disabled,
     loading,
-    inputRef
+    inputRef,
+    initialValue
 }: SearchBarProps) {
 
-    const [searchText, setSearchText] = useState<string>("");
+    const [searchText, setSearchText] = useState<string>(initialValue ?? "");
     const [active, setActive] = useState<boolean>(false);
 
     const deferredValues = useDebounceValue(searchText, 200);

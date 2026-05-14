@@ -23,7 +23,7 @@ That's it. Your app is running:
 #### Prerequisites
 
 - [Node.js](https://nodejs.org) >= 18
-- [pnpm](https://pnpm.io)
+- [pnpm](https://pnpm.io) or [npm](https://www.npmjs.com) (v7+)
 - A PostgreSQL database
 
 #### Setup
@@ -31,7 +31,7 @@ That's it. Your app is running:
 1. Install dependencies:
 
 ```bash
-pnpm install
+pnpm install   # or: npm install
 ```
 
 2. Configure environment:
@@ -51,7 +51,7 @@ rebase db push
 4. Start the dev server:
 
 ```bash
-pnpm dev
+pnpm dev   # or: npm run dev
 ```
 
 Backend (Hono + PostgreSQL) on port 3001, frontend (Vite + React) on port 5173.
