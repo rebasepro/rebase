@@ -1,7 +1,19 @@
 import React, { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { CodeBlock } from "./CodeBlock";
-import { Icon } from "@rebasepro/ui";
+import {
+    User,
+    Sparkles,
+    Copy,
+    ThumbsUp,
+    ThumbsDown,
+    Search,
+    Download,
+    Mail,
+    Calendar,
+    ToggleRight,
+    Plus
+} from "lucide-react";
 
 export interface Exchange {
     query: string;
@@ -88,7 +100,7 @@ export function DataTalkDemo({
                     <div className="flex items-center gap-6">
                         <div
                             className="rounded-full flex items-center justify-center flex-shrink-0 w-10 h-10 bg-surface-700">
-                            <Icon iconKey="User" className="text-surface-200" size={20} />
+                            <User className="text-surface-200" size={20} />
                         </div>
                         <div className="flex-1 text-surface-200">
                             <p className="min-h-[1.5em] font-semibold leading-relaxed">
@@ -115,7 +127,7 @@ export function DataTalkDemo({
                             {/* AI avatar */}
                             <div
                                 className="rounded-full flex items-center justify-center flex-shrink-0 w-10 h-10 bg-blue-600">
-                                <Icon iconKey="Sparkles" className="text-white" size={20} />
+                                <Sparkles className="text-white" size={20} />
                             </div>
 
                             <div className="flex-1 text-surface-200">
@@ -166,21 +178,21 @@ export function DataTalkDemo({
                                         title="Copy code"
                                         className="cursor-pointer text-surface-300 bg-transparent hover:bg-surface-700/30 inline-flex items-center justify-center text-sm font-medium rounded-full w-8 h-8"
                                     >
-                                        <Icon iconKey="Copy" size={18} />
+                                        <Copy size={18} />
                                     </button>
                                     <button
                                         type="button"
                                         title="Good response"
                                         className="cursor-pointer text-surface-300 bg-transparent hover:bg-surface-700/30 inline-flex items-center justify-center text-sm font-medium rounded-full w-8 h-8"
                                     >
-                                        <Icon iconKey="ThumbsUp" size={18} />
+                                        <ThumbsUp size={18} />
                                     </button>
                                     <button
                                         type="button"
                                         title="Bad response"
                                         className="cursor-pointer text-surface-300 bg-transparent hover:bg-surface-700/30 inline-flex items-center justify-center text-sm font-medium rounded-full w-8 h-8"
                                     >
-                                        <Icon iconKey="ThumbsDown" size={18} />
+                                        <ThumbsDown size={18} />
                                     </button>
                                 </div>
                             </div>
@@ -323,7 +335,7 @@ export function UsersDemoTable() {
                         className="relative h-[32px] bg-surface-900/70 border border-surface-800 rounded-md flex items-center">
                         <div
                             className="absolute p-0 px-3 h-full pointer-events-none flex items-center justify-center top-0 left-0">
-                            <Icon iconKey="Search" className="text-surface-500 text-xl" />
+                            <Search className="text-surface-500" size={20} />
                         </div>
                         <input placeholder="Search" readOnly
                                className="pointer-events-none placeholder-surface-500 bg-transparent outline-none border-none pl-10 h-full text-surface-200 w-[150px]"
@@ -331,7 +343,7 @@ export function UsersDemoTable() {
                     </div>
                     <button type="button" title="Download"
                             className="cursor-pointer text-surface-300 inline-flex items-center justify-center p-2 text-sm hover:bg-surface-900 rounded-full w-9 h-9">
-                        <Icon iconKey="Download" className="text-xl" />
+                        <Download size={20} />
                     </button>
                 </div>
             </div>
@@ -362,7 +374,7 @@ export function UsersDemoTable() {
                             maxWidth: "200px"
                         }}>
                         <div className="overflow-hidden flex-grow flex items-center justify-start">
-                            <Icon iconKey="User" className="mr-2 text-xl" size={20} />
+                            <User className="mr-2" size={20} />
                             <div className="truncate mx-1">Name</div>
                         </div>
                         <div
@@ -376,7 +388,7 @@ export function UsersDemoTable() {
                             maxWidth: "240px"
                         }}>
                         <div className="overflow-hidden flex-grow flex items-center justify-start">
-                            <Icon iconKey="Mail" className="mr-2 text-xl" size={20} />
+                            <Mail className="mr-2" size={20} />
                             <div className="truncate mx-1">Email</div>
                         </div>
                         <div
@@ -390,7 +402,7 @@ export function UsersDemoTable() {
                             maxWidth: "180px"
                         }}>
                         <div className="overflow-hidden flex-grow flex items-center justify-start">
-                            <Icon iconKey="Calendar" className="mr-2 text-xl" />
+                            <Calendar className="mr-2" size={20} />
                             <div className="truncate mx-1">Created At</div>
                         </div>
                         <div
@@ -404,7 +416,7 @@ export function UsersDemoTable() {
                             maxWidth: "140px"
                         }}>
                         <div className="overflow-hidden flex-grow flex items-center justify-start">
-                            <Icon iconKey="ToggleRight" className="mr-2 text-xl" size={20} />
+                            <ToggleRight className="mr-2" size={20} />
                             <div className="truncate mx-1">Status</div>
                         </div>
                         <div
@@ -413,7 +425,7 @@ export function UsersDemoTable() {
                     {/* Add Column Button Placeholder */}
                     <div
                         className="p-0.5 w-20 h-full flex items-center justify-center cursor-pointer bg-surface-950 hover:bg-surface-900/60 flex-shrink-0">
-                        <Icon iconKey="Plus" className="text-xl text-surface-400" size={20} />
+                        <Plus className="text-surface-400" size={20} />
                     </div>
                 </div>
 

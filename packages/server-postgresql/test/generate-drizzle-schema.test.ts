@@ -1199,4 +1199,132 @@ describe("generateDrizzleSchema columnName support", () => {
         expect(result).toContain('"service_provider_140a"');
         expect(result).toContain('"insurance_id_140a"');
     });
+
+    describe("generateDrizzleSchema autoValue date properties", () => {
+
+        it("should add .default(sql`now()`) for on_create autoValue", async () => {
+            const collections: EntityCollection[] = [
+                {
+                    slug: "articles",
+                    table: "articles",
+                    name: "Articles",
+                    properties: {
+                        title: { type: "string" },
+                        created_at: {
+                            type: "date",
+                            autoValue: "on_create"
+                        }
+                    }
+                }
+            ];
+
+            const result = await generateSchema(collections, true);
+
+            // on_create should produce .default(sql`now()`)
+            expect(result).toContain(".default(sql`now()`)");
+            // No $onUpdate or triggers — on_update logic lives in the backend driver
+            expect(result).not.toContain(".$onUpdate");
+            expect(result).not.toContain("CREATE OR REPLACE TRIGGER");
+            expect(result).not.toContain("CREATE OR REPLACE FUNCTION");
+        });
+
+        it("should add .default(sql`now()`) for on_update autoValue (INSERT default only)", async () => {
+            const collections: EntityCollection[] = [
+                {
+                    slug: "articles",
+                    table: "articles",
+                    name: "Articles",
+                    properties: {
+                        title: { type: "string" },
+                        updated_at: {
+                            type: "date",
+                            autoValue: "on_update"
+                        }
+                    }
+                }
+            ];
+
+            const result = await generateSchema(collections, true);
+
+            // on_update should produce .default(sql`now()`) for initial INSERT value
+            expect(result).toContain(".default(sql`now()`)");
+            // No $onUpdate or triggers — update logic is handled by the backend driver
+            expect(result).not.toContain(".$onUpdate");
+            expect(result).not.toContain("CREATE OR REPLACE TRIGGER");
+        });
+
+        it("should not modify date columns without autoValue", async () => {
+            const collections: EntityCollection[] = [
+                {
+                    slug: "events",
+                    table: "events",
+                    name: "Events",
+                    properties: {
+                        name: { type: "string" },
+                        event_date: { type: "date" }
+                    }
+                }
+            ];
+
+            const result = await generateSchema(collections, true);
+
+            // A plain date should NOT have any autoValue-related modifiers
+            expect(result).not.toContain(".default(sql`now()`)");
+            expect(result).not.toContain(".$onUpdate");
+        });
+
+        it("should handle both on_create and on_update in the same collection", async () => {
+            const collections: EntityCollection[] = [
+                {
+                    slug: "posts",
+                    table: "posts",
+                    name: "Posts",
+                    properties: {
+                        title: { type: "string" },
+                        created_at: {
+                            type: "date",
+                            autoValue: "on_create"
+                        },
+                        updated_at: {
+                            type: "date",
+                            autoValue: "on_update"
+                        }
+                    }
+                }
+            ];
+
+            const result = await generateSchema(collections, true);
+
+            // Both should get .default(sql`now()`) for INSERT defaults
+            expect(result).toMatch(/created_at:.*\.default\(sql`now\(\)`\)/);
+            expect(result).toMatch(/updated_at:.*\.default\(sql`now\(\)`\)/);
+            // No $onUpdate or triggers
+            expect(result).not.toContain(".$onUpdate");
+            expect(result).not.toContain("CREATE OR REPLACE TRIGGER");
+        });
+
+        it("should handle on_create with date columnType", async () => {
+            const collections: EntityCollection[] = [
+                {
+                    slug: "logs",
+                    table: "logs",
+                    name: "Logs",
+                    properties: {
+                        message: { type: "string" },
+                        log_date: {
+                            type: "date",
+                            columnType: "date",
+                            autoValue: "on_create"
+                        }
+                    }
+                }
+            ];
+
+            const result = await generateSchema(collections, true);
+
+            // Should use date() column with the default
+            expect(result).toContain("date(\"log_date\"");
+            expect(result).toContain(".default(sql`now()`)");
+        });
+    });
 });

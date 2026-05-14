@@ -193,19 +193,31 @@ accessToken: session.accessToken,
 refreshToken: session.refreshToken };
     }
 
-    async function signInWithGoogle(idToken: string) {
+    /**
+     * Sign in with Google.
+     *
+     * Supports two invocation styles:
+     * - `signInWithGoogle({ idToken })` — ID-token flow (One Tap / Sign In button)
+     * - `signInWithGoogle({ accessToken })` — Access-token flow (popup)
+     * - `signInWithGoogle({ code, redirectUri })` — Authorization code flow (most secure)
+     * - `signInWithGoogle(idToken)` — Legacy shorthand for ID-token flow
+     */
+    async function signInWithGoogle(
+        tokenOrPayload: string | { idToken?: string; accessToken?: string; code?: string; redirectUri?: string }
+    ) {
         const fetchFn = getFetch();
+        const body = typeof tokenOrPayload === "string"
+            ? { idToken: tokenOrPayload }
+            : tokenOrPayload;
         const res = await fetchFn(authUrl("/google"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ idToken })
+            body: JSON.stringify(body)
         });
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) throwApiError(res.status, body, res.statusText);
-        const session = handleAuthResponse(body, "SIGNED_IN");
-        return { user: session.user,
-accessToken: session.accessToken,
-refreshToken: session.refreshToken };
+        const responseBody = await res.json().catch(() => ({}));
+        if (!res.ok) throwApiError(res.status, responseBody, res.statusText);
+        const session = handleAuthResponse(responseBody, "SIGNED_IN");
+        return { user: session.user, accessToken: session.accessToken, refreshToken: session.refreshToken };
     }
 
     async function signInWithLinkedin(code: string, redirectUri: string) {

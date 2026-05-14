@@ -2,108 +2,94 @@ import React, { useState, useCallback, useEffect } from "react";
 
 // ─── Types ───────────────────────────────────────────────
 interface Entity {
-  id: number;
+  id: string;
   title: string;
   image: string | null;
-  status: "Published" | "In Review" | "Draft" | "Archived";
-  author: { name: string; email: string } | null;
-  tags: string[];
+  status: "Available" | "Out of Stock" | "Discontinued";
+  brand: string | null;
+  category: string;
 }
 
 // ─── Mock Data ───────────────────────────────────────────
 const MOCK_ENTITIES: Entity[] = [
   {
-    id: 43,
-    title: "Captivating Caption for Your Latest Post",
-    image: "https://images.unsplash.com/photo-1504805572947-34fad45aed93?w=240&h=160&fit=crop",
-    status: "Published",
-    author: { name: "Emily Watson",
-email: "emily.w@example.com" },
-    tags: ["Travel", "Music", "Business", "Sports", "Gaming"]
+    "id": "PROD-1",
+    "title": "Baseball Cap",
+    "image": "https://storage.googleapis.com/firecms-demo-27150.appspot.com/dadaki/B000P0MDMS-576916726.jpg",
+    "status": "Available",
+    "brand": "Authentic Pigment",
+    "category": "clothing_man"
   },
   {
-    id: 42,
-    title: "Visually Appealing Image Design!",
-    image: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=240&h=160&fit=crop",
-    status: "Published",
-    author: { name: "Steve Rogers",
-email: "steve.r@example.com" },
-    tags: ["DIY", "Fashion"]
+    "id": "PROD-2",
+    "title": "Conceal invisible shelf",
+    "image": "https://storage.googleapis.com/firecms-demo-27150.appspot.com/dadaki/B000UO4KXY-825906283.jpg",
+    "status": "Available",
+    "brand": "Umbra",
+    "category": "home_storage"
   },
   {
-    id: 41,
-    title: "The Importance of Mental Health",
-    image: null,
-    status: "In Review",
-    author: { name: "Alice Johnson",
-email: "alice.j@example.com" },
-    tags: ["Movies", "Books"]
+    "id": "PROD-3",
+    "title": "Aviator RB 3025",
+    "image": "https://storage.googleapis.com/firecms-demo-27150.appspot.com/dadaki/B000ZHY0JK-2047853797.jpg",
+    "status": "Available",
+    "brand": "Ray-Ban",
+    "category": "sunglasses"
   },
   {
-    id: 40,
-    title: "A Look at Sustainable Farming Practices",
-    image: "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=240&h=160&fit=crop",
-    status: "Draft",
-    author: { name: "George Costanza",
-email: "george.c@example.com" },
-    tags: []
+    "id": "PROD-4",
+    "title": "Wine decanter",
+    "image": "https://storage.googleapis.com/firecms-demo-27150.appspot.com/dadaki/B0017TNJWY-528977189.jpg",
+    "status": "Out of Stock",
+    "brand": "Sagaform",
+    "category": "serveware"
   },
   {
-    id: 39,
-    title: "The Psychology of Color in Marketing",
-    image: "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=240&h=160&fit=crop",
-    status: "Published",
-    author: { name: "Rachel Green",
-email: "rachel.g@example.com" },
-    tags: ["Music", "Movies", "Art"]
+    "id": "PROD-5",
+    "title": "Wobble Chess Set Walnut",
+    "image": "https://storage.googleapis.com/firecms-demo-27150.appspot.com/dadaki/B001A793IW-400375460.jpg",
+    "status": "Available",
+    "brand": "Umbra",
+    "category": "toys_and_games"
   },
   {
-    id: 38,
-    title: "DIY Home Renovation Tips",
-    image: null,
-    status: "Draft",
-    author: { name: "Pam Beesly",
-email: "pam.b@example.com" },
-    tags: ["Lifestyle", "DIY"]
+    "id": "PROD-6",
+    "title": "Pimentero",
+    "image": "https://storage.googleapis.com/firecms-demo-27150.appspot.com/dadaki/B001DE7P7S-994938178.jpg",
+    "status": "Available",
+    "brand": "Seletti",
+    "category": "serveware"
   },
   {
-    id: 37,
-    title: "Mastering the Art of Negotiation",
-    image: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=240&h=160&fit=crop",
-    status: "Published",
-    author: { name: "Laura Palmer",
-email: "laura.p@example.com" },
-    tags: []
+    "id": "PROD-7",
+    "title": "AAM32 1 Corkscrew",
+    "image": "https://storage.googleapis.com/firecms-demo-27150.appspot.com/dadaki/B001M8APXG-1784151073.jpg",
+    "status": "Available",
+    "brand": "Alessi",
+    "category": "kitchen"
   },
   {
-    id: 36,
-    title: "Modern Architectural Marvels",
-    image: "https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=240&h=160&fit=crop",
-    status: "Draft",
-    author: { name: "George Costanza",
-email: "george.c@example.com" },
-    tags: []
+    "id": "PROD-8",
+    "title": " PREDATOR 2 ",
+    "image": "https://storage.googleapis.com/firecms-demo-27150.appspot.com/dadaki/B001UQ71F0-122304841.jpg",
+    "status": "Available",
+    "brand": "Ray-Ban",
+    "category": "sunglasses"
   },
   {
-    id: 35,
-    title: "Exploring the Deep Sea",
-    image: "https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?w=240&h=160&fit=crop",
-    status: "Archived",
-    author: { name: "Hannah Abbott",
-email: "hannah.a@example.com" },
-    tags: ["Science"]
+    "id": "PROD-9",
+    "title": "Casio Collection",
+    "image": "https://storage.googleapis.com/firecms-demo-27150.appspot.com/images/6vhbn_61gb0NS5lIL._AC_SY879_.JPEG",
+    "status": "Available",
+    "brand": "Casio",
+    "category": "watches"
   }
 ];
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  Published: { bg: "rgb(147, 224, 136)",
-text: "rgb(11, 29, 5)" },
-  "In Review": { bg: "rgb(255, 169, 129)",
-text: "rgb(107, 38, 19)" },
-  Draft: { bg: "rgb(204, 204, 204)",
-text: "rgb(4, 4, 4)" },
-  Archived: { bg: "rgb(255, 158, 183)",
-text: "rgb(76, 12, 28)" }
+  Available: { bg: "rgb(147, 224, 136)", text: "rgb(11, 29, 5)" },
+  "Out of Stock": { bg: "rgb(255, 169, 129)", text: "rgb(107, 38, 19)" },
+  Discontinued: { bg: "rgb(204, 204, 204)", text: "rgb(4, 4, 4)" },
 };
 
 // ─── Kanban Data (for TAGS collection) ───────────────────
@@ -391,25 +377,22 @@ width: 140 }}
         </span>
       </div>
 
-      {/* Author (relation cell) */}
+      {/* Brand */}
       <div
         className="flex-shrink-0 flex items-center px-2"
         style={{ minWidth: 200,
 maxWidth: 200,
 width: 200 }}
       >
-        {entity.author ? (
+        {entity.brand ? (
           <div className="min-h-[38px] py-1 px-2 w-full rounded-md text-sm flex items-center bg-surface-200/20 dark:bg-surface-800/30">
             <div className="flex items-center gap-1 flex-1 min-w-0">
               <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-primary">
-                <MI size={20}>person</MI>
+                <MI size={20}>sell</MI>
               </div>
               <div className="flex flex-col min-w-0 flex-1">
                 <div className="truncate text-sm font-medium text-surface-900 dark:text-white">
-                  {entity.author.name}
-                </div>
-                <div className="truncate text-xs text-surface-500">
-                  {entity.author.email}
+                  {entity.brand}
                 </div>
               </div>
             </div>
@@ -427,45 +410,28 @@ width: 200 }}
         )}
       </div>
 
-      {/* Tags (relation chips) */}
+      {/* Category */}
       <div
         className="flex-shrink-0 flex items-center px-2 overflow-hidden"
         style={{ minWidth: 240,
 maxWidth: 240,
 width: 240 }}
       >
-        {entity.tags.length > 0 ? (
-          <div className="min-h-[38px] py-1 px-2 w-full rounded-md text-sm flex items-center bg-surface-200/20 dark:bg-surface-800/30">
-            <div className="flex flex-wrap items-center gap-1 flex-1 min-w-0 overflow-hidden max-h-[38px]">
-              {entity.tags.slice(0, 3).map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-lg inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs bg-surface-200 dark:bg-surface-700 text-surface-700 dark:text-surface-200 whitespace-nowrap"
-                >
-                  <MI size={12} className="text-primary opacity-70">
-                    tag
-                  </MI>
-                  {tag}
-                </span>
-              ))}
-              {entity.tags.length > 3 && (
-                <span className="text-xs text-surface-400">
-                  +{entity.tags.length - 3}
-                </span>
-              )}
-            </div>
-            <MI size={16} className="text-surface-400 flex-shrink-0">
-              keyboard_arrow_down
-            </MI>
+        <div className="min-h-[38px] py-1 px-2 w-full rounded-md text-sm flex items-center bg-surface-200/20 dark:bg-surface-800/30">
+          <div className="flex flex-wrap items-center gap-1 flex-1 min-w-0 overflow-hidden max-h-[38px]">
+            <span
+              className="rounded-lg inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs bg-surface-200 dark:bg-surface-700 text-surface-700 dark:text-surface-200 whitespace-nowrap"
+            >
+              <MI size={12} className="text-primary opacity-70">
+                folder
+              </MI>
+              {entity.category}
+            </span>
           </div>
-        ) : (
-          <div className="min-h-[38px] py-1 px-2 w-full rounded-md text-sm flex items-center bg-surface-200/20 dark:bg-surface-800/30 justify-between">
-            <span className="text-surface-400">—</span>
-            <MI size={16} className="text-surface-400">
-              keyboard_arrow_down
-            </MI>
-          </div>
-        )}
+          <MI size={16} className="text-surface-400 flex-shrink-0">
+            keyboard_arrow_down
+          </MI>
+        </div>
       </div>
     </div>
   );
@@ -477,15 +443,15 @@ width: 240 }}
    layout from production
    ═══════════════════════════════════════════════════════════ */
 export function EntityViewDemo() {
-  const [selectedEntityId, setSelectedEntityId] = useState<number | null>(null);
-  const [hoveredRow, setHoveredRow] = useState<number | null>(null);
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+  const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [formDirty, setFormDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [formValues, setFormValues] = useState<Record<string, any>>({});
   // Inline table cell overrides (spreadsheet-style editing)
-  const [tableOverrides, setTableOverrides] = useState<Record<number, Partial<Entity>>>({});
+  const [tableOverrides, setTableOverrides] = useState<Record<string, Partial<Entity>>>({});
   // Green border highlight: { entityId, field }
-  const [highlightedCell, setHighlightedCell] = useState<{ entityId: number; field: string } | null>(null);
+  const [highlightedCell, setHighlightedCell] = useState<{ entityId: string; field: string } | null>(null);
   // Also highlight form fields
   const [highlightedFormField, setHighlightedFormField] = useState<string | null>(null);
   // Active collection (for switching between list/kanban)
@@ -503,7 +469,7 @@ y: 0 });
   // Source column of the dragged card (to compute overlay position)
   const [dragSourceColumn, setDragSourceColumn] = useState<string | null>(null);
 
-  const flashCell = useCallback((entityId: number, field: string, durationMs = 1000) => {
+  const flashCell = useCallback((entityId: string, field: string, durationMs = 1000) => {
     setHighlightedCell({ entityId,
 field });
     setTimeout(() => setHighlightedCell(null), durationMs);
@@ -517,7 +483,7 @@ field });
   const panelOpen = selectedEntityId !== null;
   const selectedEntity = MOCK_ENTITIES.find((e) => e.id === selectedEntityId);
 
-  const openEntity = useCallback((id: number) => {
+  const openEntity = useCallback((id: string) => {
     const entity = MOCK_ENTITIES.find((e) => e.id === id);
     if (entity) {
       setSelectedEntityId(id);
@@ -525,8 +491,8 @@ field });
         title: entity.title,
         image: entity.image,
         status: entity.status,
-        author: entity.author,
-        tags: entity.tags
+        brand: entity.brand,
+        category: entity.category
       });
       setFormDirty(false);
     }
@@ -566,32 +532,32 @@ y });
         // ── Phase 1: TABLE view — Browse rows, inline-edit ──
         setActiveCollection("posts");
         setViewMode("table");
-        setHoveredRow(43);
+        setHoveredRow("PROD-1");
         await wait(350); if (!guard()) return;
-        setHoveredRow(42);
+        setHoveredRow("PROD-2");
         await wait(300); if (!guard()) return;
-        setHoveredRow(40);
+        setHoveredRow("PROD-4");
         await wait(300); if (!guard()) return;
 
-        // Inline edit: change entity 40 status from Draft → In Review
+        // Inline edit: change entity PROD-4 status from Out of Stock → Available
         setTableOverrides((prev) => ({ ...prev,
-40: { status: "In Review" } }));
-        flashCell(40, "status");
+"PROD-4": { status: "Available" } }));
+        flashCell("PROD-4", "status");
         await wait(700); if (!guard()) return;
 
-        setHoveredRow(39);
+        setHoveredRow("PROD-5");
         await wait(300); if (!guard()) return;
-        setHoveredRow(42);
+        setHoveredRow("PROD-2");
         await wait(300); if (!guard()) return;
 
-        // Open entity 42
-        openEntity(42);
+        // Open entity PROD-2
+        openEntity("PROD-2");
         setHoveredRow(null);
         await wait(700); if (!guard()) return;
 
         // Change status in form
         setFormValues((prev) => ({ ...prev,
-status: "In Review" }));
+status: "Out of Stock" }));
         setFormDirty(true);
         flashFormField("status");
         await wait(500); if (!guard()) return;
@@ -610,15 +576,15 @@ status: "In Review" }));
         // ── Phase 2: CARDS view — browse cards ──
         setViewMode("cards");
         await wait(600); if (!guard()) return;
-        setHoveredRow(43);
+        setHoveredRow("PROD-1");
         await wait(400); if (!guard()) return;
-        setHoveredRow(41);
+        setHoveredRow("PROD-3");
         await wait(400); if (!guard()) return;
-        setHoveredRow(39);
+        setHoveredRow("PROD-5");
         await wait(400); if (!guard()) return;
 
         // Open an entity from cards view
-        openEntity(39);
+        openEntity("PROD-5");
         setHoveredRow(null);
         await wait(600); if (!guard()) return;
 
@@ -627,9 +593,9 @@ status: "In Review" }));
         await wait(400); if (!guard()) return;
 
         // Browse more
-        setHoveredRow(37);
+        setHoveredRow("PROD-7");
         await wait(300); if (!guard()) return;
-        setHoveredRow(36);
+        setHoveredRow("PROD-8");
         await wait(300); if (!guard()) return;
         setHoveredRow(null);
         await wait(300); if (!guard()) return;
@@ -637,17 +603,17 @@ status: "In Review" }));
         // ── Phase 3: LIST view — quick browse ──
         setViewMode("list");
         await wait(500); if (!guard()) return;
-        setHoveredRow(43);
+        setHoveredRow("PROD-1");
         await wait(250); if (!guard()) return;
-        setHoveredRow(42);
+        setHoveredRow("PROD-2");
         await wait(250); if (!guard()) return;
-        setHoveredRow(40);
+        setHoveredRow("PROD-4");
         await wait(250); if (!guard()) return;
-        setHoveredRow(39);
+        setHoveredRow("PROD-5");
         await wait(300); if (!guard()) return;
 
-        // Open entity 39
-        openEntity(39);
+        // Open entity PROD-5
+        openEntity("PROD-5");
         setHoveredRow(null);
         await wait(500); if (!guard()) return;
 
@@ -716,29 +682,29 @@ y: 0 });
         await wait(400); if (!guard()) return;
 
         // Quick browse
-        setHoveredRow(43);
+        setHoveredRow("PROD-1");
         await wait(200); if (!guard()) return;
-        setHoveredRow(42);
+        setHoveredRow("PROD-2");
         await wait(200); if (!guard()) return;
-        setHoveredRow(40);
+        setHoveredRow("PROD-4");
         await wait(200); if (!guard()) return;
-        setHoveredRow(43);
+        setHoveredRow("PROD-1");
         await wait(350); if (!guard()) return;
 
-        // Inline table edit: change 43 Published → Draft
+        // Inline table edit: change PROD-1 Available → Discontinued
         setTableOverrides((prev) => ({ ...prev,
-43: { status: "Draft" } }));
-        flashCell(43, "status");
+"PROD-1": { status: "Discontinued" } }));
+        flashCell("PROD-1", "status");
         await wait(600); if (!guard()) return;
 
-        // Open entity 43 to see the change
-        openEntity(43);
+        // Open entity PROD-1 to see the change
+        openEntity("PROD-1");
         setHoveredRow(null);
         await wait(500); if (!guard()) return;
 
         // Revert status in form
         setFormValues((prev) => ({ ...prev,
-status: "Published" }));
+status: "Available" }));
         setFormDirty(true);
         flashFormField("status");
         await wait(400); if (!guard()) return;
@@ -749,7 +715,7 @@ status: "Published" }));
         setIsSaving(false);
         setFormDirty(false);
         setTableOverrides((prev) => ({ ...prev,
-43: { status: "Published" } }));
+"PROD-1": { status: "Available" } }));
         await wait(350); if (!guard()) return;
 
         // Close
@@ -773,15 +739,15 @@ status: "Published" }));
   /* ── Drawer nav items (production-identical: DrawerNavigationItem.tsx) ── */
   const NAV_ITEMS = [
     { icon: "folder",
-label: "POSTS",
+label: "PRODUCTS",
 key: "posts" as const,
 active: activeCollection === "posts" },
     { icon: "person",
-label: "AUTHORS",
+label: "USERS",
 key: "authors" as const,
 active: false },
     { icon: "sell",
-label: "TAGS",
+label: "ORDERS",
 key: "tags" as const,
 active: activeCollection === "tags" }
   ];
@@ -808,7 +774,7 @@ width: "100%" }}
             <span className="text-xs text-text-secondary dark:text-surface-500">/</span>
             {/* Breadcrumb entry */}
             <div className="flex flex-row items-center gap-2 whitespace-nowrap">
-              <span className="text-sm text-surface-900 dark:text-surface-200">{activeCollection === "posts" ? "Posts" : "Tags"}</span>
+              <span className="text-sm text-surface-900 dark:text-surface-200">{activeCollection === "posts" ? "Products" : "Orders"}</span>
               <span className="text-xs text-surface-accent-500 dark:text-surface-accent-400 bg-surface-100 dark:bg-surface-700 px-1 py-0 rounded">
                 {activeCollection === "posts" ? "9" : "8"}
               </span>
@@ -989,8 +955,8 @@ width: "100%" }}
                 <ColHeader icon="short_text" label="Title" width={280}/>
                 <ColHeader icon="image" label="Image" width={120} showFilter={false} align="center"/>
                 <ColHeader icon="list" label="Status" width={140}/>
-                <ColHeader icon="add_link" label="Author" width={200}/>
-                <ColHeader icon="add_link" label="Tags" width={240}/>
+                <ColHeader icon="sell" label="Brand" width={200}/>
+                <ColHeader icon="folder" label="Category" width={240}/>
                 <div className="flex items-center justify-center w-16 text-surface-400">
                   <MI size={22}>add</MI>
                 </div>
@@ -1241,7 +1207,7 @@ width: "100%" }}
                 <MI size={16}>code</MI>
               </button>
               <button className="px-3 py-2 text-xs text-surface-900 dark:text-white font-medium border-b-2 border-primary">
-                Post
+                Product
               </button>
             </div>
 
@@ -1269,7 +1235,7 @@ width: "100%" }}
                 {/* Path */}
                 <div className="w-full rounded-md bg-surface-100 dark:bg-surface-800/40 px-3 py-1.5 mb-6">
                   <code className="text-[11px] text-surface-500">
-                    posts/{selectedEntityId}
+                    products/{selectedEntityId}
                   </code>
                 </div>
 
@@ -1325,23 +1291,20 @@ width: "100%" }}
                     </div>
                   </div>
 
-                  {/* Author field */}
+                  {/* Brand field */}
                   <div className="relative rounded-md bg-surface-100 dark:bg-surface-800/60 min-h-[48px] flex flex-col justify-center">
                     <span className="absolute top-1.5 left-3 text-[10px] font-medium text-surface-400">
-                      Author
+                      Brand
                     </span>
                     <div className="px-3 pt-6 pb-2 flex items-center justify-between">
-                      {formValues.author ? (
+                      {formValues.brand ? (
                         <div className="flex items-center gap-2">
                           <MI size={20} className="text-primary">
-                            person
+                            sell
                           </MI>
                           <div>
                             <div className="text-sm font-medium text-surface-900 dark:text-white">
-                              {formValues.author.name}
-                            </div>
-                            <div className="text-xs text-surface-500">
-                              {formValues.author.email}
+                              {formValues.brand}
                             </div>
                           </div>
                         </div>
@@ -1354,35 +1317,26 @@ width: "100%" }}
                     </div>
                   </div>
 
-                  {/* Tags field */}
+                  {/* Category field */}
                   <div className="relative rounded-md bg-surface-100 dark:bg-surface-800/60 min-h-[48px] flex flex-col justify-center">
                     <span className="absolute top-1.5 left-3 text-[10px] font-medium text-surface-400">
-                      Tags
+                      Category
                     </span>
                     <div className="px-3 pt-6 pb-2 flex items-center justify-between gap-2">
                       <div className="flex flex-wrap gap-1 flex-1">
-                        {(formValues.tags || []).map((tag: string) => (
+                        {formValues.category ? (
                           <span
-                            key={tag}
                             className="rounded-lg inline-flex items-center gap-0.5 px-2 py-0.5 text-xs bg-surface-200 dark:bg-surface-700 text-surface-700 dark:text-surface-200"
                           >
                             <MI
                               size={12}
                               className="text-primary opacity-70"
                             >
-                              tag
+                              folder
                             </MI>
-                            {tag}
-                            <MI
-                              size={14}
-                              className="text-surface-400 ml-0.5"
-                            >
-                              close
-                            </MI>
+                            {formValues.category}
                           </span>
-                        ))}
-                        {(!formValues.tags ||
-                          formValues.tags.length === 0) && (
+                        ) : (
                           <span className="text-surface-400 text-sm">
                             —
                           </span>

@@ -6,7 +6,7 @@ import { DatabasePoolManager } from "./databasePoolManager";
 import { DrizzleClient } from "./interfaces";
 import { User, RebaseClient } from "@rebasepro/types";
 import { sql as drizzleSql } from "drizzle-orm";
-import { buildPropertyCallbacks } from "@rebasepro/common";
+import { buildPropertyCallbacks, updateDateAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import {
     DataDriver,
@@ -397,6 +397,17 @@ propertyCallbacks: undefined };
                 if (result) updatedValues = mergeDeep(updatedValues, result);
             }
 
+        }
+
+        // Apply autoValue timestamps (on_create / on_update) at the application layer.
+        // This handles updated_at fields for all writes that flow through the Rebase backend.
+        if (resolvedCollection?.properties) {
+            updatedValues = updateDateAutoValues({
+                inputValues: updatedValues,
+                properties: resolvedCollection.properties,
+                status: status ?? "new",
+                timestampNowValue: new Date()
+            });
         }
 
         try {

@@ -103,13 +103,33 @@ password })
 }
 
 /**
- * Login with Google token (ID token or access token)
+ * Google login payload — one of the three supported flows.
  */
-export async function googleLogin(token: string, tokenType: "idToken" | "accessToken" = "idToken"): Promise<AuthResponse> {
+export type GoogleLoginPayload =
+    | { idToken: string }
+    | { accessToken: string }
+    | { code: string; redirectUri: string };
+
+/**
+ * Login with Google.
+ *
+ * Overload 1 (legacy): `googleLogin("token", "idToken" | "accessToken")`
+ * Overload 2 (code flow): `googleLogin({ code, redirectUri })`
+ */
+export async function googleLogin(payload: GoogleLoginPayload): Promise<AuthResponse>;
+export async function googleLogin(token: string, tokenType?: "idToken" | "accessToken"): Promise<AuthResponse>;
+export async function googleLogin(
+    tokenOrPayload: string | GoogleLoginPayload,
+    tokenType: "idToken" | "accessToken" = "idToken"
+): Promise<AuthResponse> {
+    const body = typeof tokenOrPayload === "string"
+        ? { [tokenType]: tokenOrPayload }
+        : tokenOrPayload;
+
     const response = await fetchWithHandling(`${baseApiUrl}/api/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [tokenType]: token })
+        body: JSON.stringify(body)
     });
 
     return handleResponse<AuthResponse>(response);

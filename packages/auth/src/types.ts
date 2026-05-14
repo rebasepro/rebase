@@ -5,8 +5,11 @@ import { AuthController, Role, User } from "@rebasepro/types";
  * with additional methods for email/password and Google login
  */
 export type RebaseAuthController = AuthController & {
-    /** Login with Google token (ID token from One Tap, or access token from popup) */
-    googleLogin: (token: string, tokenType?: "idToken" | "accessToken") => Promise<void>;
+    /** Login with Google — accepts legacy (token, tokenType) or code-flow payload */
+    googleLogin: {
+        (token: string, tokenType?: "idToken" | "accessToken"): Promise<void>;
+        (payload: { code: string; redirectUri: string }): Promise<void>;
+    };
     /** Generic OAuth login — works with any provider. Posts payload to /auth/{providerId}. */
     oauthLogin: (providerId: string, payload: Record<string, unknown>) => Promise<void>;
     /** Login with email and password */

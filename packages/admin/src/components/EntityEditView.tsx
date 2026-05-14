@@ -1,7 +1,7 @@
 import type { EntityCollection, EntityCustomViewParams } from "@rebasepro/types";
 import type { FormContext } from "../types/fields";
 import type { PluginFormActionProps } from "@rebasepro/types";
-import React, { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity, EntityStatus } from "@rebasepro/types";
 import { PluginProviderStack } from "@rebasepro/core";
 
@@ -188,7 +188,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
     const customizationController = useCustomizationController();
     const plugins = customizationController.plugins;
 
-    const formActionTopProps: PluginFormActionProps = {
+    const formActionTopProps: PluginFormActionProps = useMemo(() => ({
         entityId,
         parentCollectionSlugs, parentEntityIds,
         path: path,
@@ -198,7 +198,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
         formContext: formContext as FormContext<Record<string, unknown>> | undefined,
         openEntityMode: layout,
         disabled: false
-    };
+    }), [entityId, parentCollectionSlugs, parentEntityIds, path, status, collection, context, formContext, layout]);
     const pluginActionsTop = useSlot("form.actions.top", formActionTopProps);
 
     const defaultSelectedView = useMemo(() => resolveDefaultSelectedView(
@@ -235,8 +235,44 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
 
     const mainViewVisible = selectedTab === MAIN_TAB_VALUE || Boolean(selectedSecondaryForm);
 
-    const customViewsView: any[] | undefined = customViews && resolvedEntityViews
-        .filter(e => !e.includeActions)
+    // Track which custom view tabs have been visited so we keep them mounted
+    // (preserving their state) but don't eagerly mount tabs never visited.
+    const mountedTabsRef = useRef<Set<string>>(new Set());
+    if (selectedTab) {
+        mountedTabsRef.current.add(selectedTab);
+    }
+
+    // Memoize the read-only fallback form context to avoid recreating it every render
+    const readOnlyFormContext = useMemo<FormContext<M> | undefined>(() => {
+        if (formContext) return undefined; // not needed when real formContext exists
+        if (!entityId) return undefined;
+        const formexStub = createFormexStub<M>(usedEntity?.values ?? {} as M);
+        return {
+            entityId,
+            disabled: false,
+            openEntityMode: layout,
+            status: status,
+            values: usedEntity?.values ?? ({} as M),
+            setFieldValue: (key: string, value: any) => {
+                throw new Error("You can't update values in read only mode");
+            },
+            save: () => {
+                throw new Error("You can't save in read only mode");
+            },
+            collection,
+            path: path,
+            entity: usedEntity,
+            savingError: undefined,
+            formex: formexStub
+        };
+    }, [formContext, entityId, layout, status, usedEntity, collection, path]);
+
+    const nonActionCustomViews = useMemo(() =>
+        resolvedEntityViews.filter(e => !e.includeActions),
+        [resolvedEntityViews]
+    );
+
+    const customViewsView: any[] | undefined = customViews && nonActionCustomViews
         .map((customView) => {
 
             if (!customView)
@@ -251,30 +287,19 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                 return null;
             }
 
-            const formexStub = createFormexStub<M>(usedEntity?.values ?? {} as M);
-            const usedFormContext: FormContext<M> = formContext ?? {
-                entityId,
-                disabled: false,
-                openEntityMode: layout,
-                status: status,
-                values: usedEntity?.values ?? ({} as M),
-                setFieldValue: (key: string, value: any) => {
-                    throw new Error("You can't update values in read only mode");
-                },
-                save: () => {
-                    throw new Error("You can't save in read only mode");
-                },
-                collection,
-                path: path,
-                entity: usedEntity,
-                savingError: undefined,
-                formex: formexStub
-            };
+            // Only mount tabs that have been visited at least once
+            const isActive = selectedTab === customView.key;
+            const hasBeenMounted = mountedTabsRef.current.has(customView.key);
+            if (!isActive && !hasBeenMounted) {
+                return null;
+            }
+
+            const usedFormContext: FormContext<M> = formContext ?? readOnlyFormContext!;
 
             return <div
                 className={cls(defaultBorderMixin,
                     "relative flex-1 w-full h-full overflow-auto",
-                    { "hidden": selectedTab !== customView.key }
+                    { "hidden": !isActive }
                 )}
                 key={`custom_view_${customView.key}`}
                 role="tabpanel">
@@ -292,7 +317,9 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
 
     const globalLoading = (dataLoading && !usedEntity) || (canEdit === undefined && (status === "existing" || status === "copy"));
 
-    const jsonView = <div
+    // Only mount JSON view when its tab is selected (or was previously selected)
+    const jsonTabMounted = mountedTabsRef.current.has(JSON_TAB_VALUE);
+    const jsonView = (selectedTab === JSON_TAB_VALUE || jsonTabMounted) ? <div
         className={cls("relative flex-1 h-full overflow-auto w-full",
             { "hidden": selectedTab !== JSON_TAB_VALUE })}
         key={"json_view"}
@@ -301,11 +328,11 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
             <EntityJsonPreview
                 values={formContext?.values ?? entity?.values ?? {}} />
         </ErrorBoundary>
-    </div>;
+    </div> : null;
 
-    const historyView = includeHistoryView ? <div
-        className={cls("relative flex-1 h-full overflow-auto w-full",
-            { "hidden": selectedTab !== HISTORY_TAB_VALUE })}
+    // Only mount history view when its tab is actually selected
+    const historyView = includeHistoryView && selectedTab === HISTORY_TAB_VALUE ? <div
+        className={"relative flex-1 h-full overflow-auto w-full"}
         key={"history_view"}
         role="tabpanel">
         <ErrorBoundary>
@@ -354,7 +381,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
         );
     }).filter(Boolean);
 
-    const onSideTabClick = (value: string) => {
+    const onSideTabClick = useCallback((value: string) => {
         setSelectedTab(value);
         if (status === "existing") {
             onTabChange?.({
@@ -364,7 +391,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                 collection
             });
         }
-    };
+    }, [status, onTabChange, path, entityId, collection]);
 
     const entityReadOnlyView = !canEdit && entity ? <div
         className={cls("flex-1 flex flex-row w-full overflow-y-auto justify-center", (canEdit || !mainViewVisible || selectedSecondaryForm) ? "hidden" : "")}>

@@ -360,13 +360,18 @@ roles: customRoles.map(r => r.id) };
         }
     }, [handleAuthSuccess]);
 
-    // Google login with ID token or access token
-    const googleLogin = useCallback(async (token: string, tokenType: "idToken" | "accessToken" = "idToken") => {
+    // Google login — supports legacy (token, tokenType) and code-flow payload
+    const googleLogin = useCallback(async (
+        tokenOrPayload: string | { code: string; redirectUri: string },
+        tokenType?: "idToken" | "accessToken"
+    ) => {
         setAuthLoading(true);
         setAuthProviderError(null);
 
         try {
-            const response = await authApi.googleLogin(token, tokenType);
+            const response = typeof tokenOrPayload === "string"
+                ? await authApi.googleLogin(tokenOrPayload, tokenType ?? "idToken")
+                : await authApi.googleLogin(tokenOrPayload);
             await handleAuthSuccess(response.user, response.tokens);
         } catch (error: unknown) {
             setAuthProviderError(error as Error);

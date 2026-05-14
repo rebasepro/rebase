@@ -43,7 +43,7 @@ export interface RebaseAuthConfig {
      */
     serviceKey?: string;
     email?: EmailConfig;
-    google?: { clientId: string };
+    google?: { clientId: string; clientSecret?: string };
     linkedin?: { clientId: string; clientSecret: string };
     github?: { clientId: string; clientSecret: string };
     microsoft?: { clientId: string; clientSecret: string; tenantId?: string };
@@ -355,7 +355,7 @@ collectionRegistry });
 
         if (config.auth.google?.clientId) {
             const { createGoogleProvider } = await import("./auth");
-            oauthProviders.push(createGoogleProvider(config.auth.google.clientId));
+            oauthProviders.push(createGoogleProvider(config.auth.google));
         }
 
         if (config.auth.linkedin?.clientId && config.auth.linkedin?.clientSecret) {

@@ -9,6 +9,7 @@ export type { PasswordValidationResult } from "./password";
 
 // OAuth Providers
 export { createGoogleProvider } from "./google-oauth";
+export type { GoogleProviderConfig } from "./google-oauth";
 export { createLinkedinProvider } from "./linkedin-oauth";
 export { createGitHubProvider } from "./github-oauth";
 export { createMicrosoftProvider } from "./microsoft-oauth";

@@ -9,6 +9,7 @@ import { EntityEditView } from "./EntityEditView";
 import { useSideDialogContext } from "./SideDialogs";
 import { IconButton } from "@rebasepro/ui";
 import { useLocation, useNavigate } from "react-router-dom";
+import { removeInitialAndTrailingSlashes } from "@rebasepro/common";
 import { saveEntityToMemoryCache } from "@rebasepro/core";
 import { useCollectionRegistryController, useSideEntityController } from "../index";
 import { useUrlController } from "../index";
@@ -147,13 +148,16 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
                         selectedTab,
                         collection
                     }) => {
-                        sideEntityController.replace({
-                            path: path,
-                            entityId,
-                            selectedTab,
-                            updateUrl: true,
-                            collection
-                        });
+                        // Only update the URL to reflect the new tab — don't call
+                        // sideEntityController.replace() which would recreate the
+                        // entire EntitySidePanel component, causing a full
+                        // unmount/remount and expensive re-render of the form.
+                        if (entityId) {
+                            const collectionPath = removeInitialAndTrailingSlashes(path);
+                            const tabSuffix = selectedTab ? "/" + selectedTab : "";
+                            const fullUrl = urlController.buildUrlCollectionPath(`${collectionPath}/${entityId}${tabSuffix}#side`);
+                            navigate(fullUrl, { replace: true, state: location.state });
+                        }
                     }}
                     formProps={formProps}
                 />

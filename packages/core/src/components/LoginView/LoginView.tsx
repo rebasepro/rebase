@@ -6,11 +6,12 @@ declare global {
         google?: {
             accounts: {
                 oauth2: {
-                    initTokenClient(config: {
+                    initCodeClient(config: {
                         client_id: string;
                         scope: string;
-                        callback: (response: { access_token?: string; error?: string }) => void;
-                    }): { requestAccessToken(): void };
+                        ux_mode: "popup" | "redirect";
+                        callback: (response: { code?: string; error?: string }) => void;
+                    }): { requestCode(): void };
                 };
             };
         };
@@ -363,24 +364,30 @@ function GoogleLoginButton({
     googleClientId: string,
     authController: AuthControllerExtended
 }) {
-    const tokenClientRef = useRef<{ requestAccessToken(): void } | null>(null);
+    const codeClientRef = useRef<{ requestCode(): void } | null>(null);
 
     useEffect(() => {
         if (!authController.googleLogin) return;
 
         const google = window.google;
-        if (!google || tokenClientRef.current) return;
+        if (!google || codeClientRef.current) return;
 
-        tokenClientRef.current = google.accounts.oauth2.initTokenClient({
+        codeClientRef.current = google.accounts.oauth2.initCodeClient({
             client_id: googleClientId,
             scope: "openid email profile",
-            callback: async (response: { access_token?: string; error?: string }) => {
-                if (response.error || !response.access_token) {
+            ux_mode: "popup",
+            callback: async (response: { code?: string; error?: string }) => {
+                if (response.error || !response.code) {
                     console.error("Google login error:", response.error);
                     return;
                 }
                 try {
-                    await authController.googleLogin!(response.access_token, "accessToken");
+                    // Send the authorization code to the backend.
+                    // redirectUri "postmessage" is required when using popup ux_mode.
+                    await authController.googleLogin!({
+                        code: response.code,
+                        redirectUri: "postmessage"
+                    });
                 } catch (err: unknown) {
                     console.error("Google login error:", err);
                 }
@@ -389,11 +396,11 @@ function GoogleLoginButton({
     }, [googleClientId, authController]);
 
     const handleClick = () => {
-        if (!tokenClientRef.current) {
+        if (!codeClientRef.current) {
             console.error("Google Sign-In not loaded");
             return;
         }
-        tokenClientRef.current.requestAccessToken();
+        codeClientRef.current.requestCode();
     };
 
     return (

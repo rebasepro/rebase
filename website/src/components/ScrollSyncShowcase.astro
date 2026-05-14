@@ -6,7 +6,7 @@
 import { EntityViewDemo } from './demos/EntityViewDemo';
 import { SchemaEditorDemo } from './SchemaEditorDemo';
 import { SQLEditorDemo } from './demos/SQLEditorDemo';
-import { RichTextEditorDemo } from './demos/RichTextEditorDemo';
+
 import { getLangFromUrl, useTranslations } from '../i18n/ui';
 
 const lang = getLangFromUrl(Astro.url);
@@ -62,18 +62,7 @@ const t = useTranslations(lang);
                                 </div>
                             </a>
                         </li>
-                        <li>
-                            <a href="#screen-4" data-index-item class="group block" data-active="false">
-                                <div class="flex items-center gap-3">
-                                    <span class="text-2xl font-medium tracking-tight text-white sm:text-3xl transition-opacity group-data-[active=false]:opacity-40 group-data-[active=true]:opacity-100">{t('showcase.sync.tab4.title')}</span>
-                                </div>
-                                <div class="overflow-hidden transition-all duration-300 ease-out group-data-[active=false]:max-h-0 group-data-[active=true]:max-h-60">
-                                    <p class="text-base text-surface-400 pt-2 pb-1 opacity-0 group-data-[active=true]:opacity-100 transition-opacity duration-300 delay-75">
-                                        {t('showcase.sync.tab4.desc')}
-                                    </p>
-                                </div>
-                            </a>
-                        </li>
+
                     </ol>
                 </nav>
             </aside>
@@ -119,18 +108,7 @@ const t = useTranslations(lang);
                         </section>
                     </div>
 
-                    <!-- Screen 4: Rich Text Editor -->
-                    <div id="screen-4" class="scroll-mt-32">
-                        <h3 class="lg:hidden text-2xl font-medium tracking-tight text-white mb-6">{t('showcase.sync.tab4.title')}</h3>
-                        <section data-screen class="w-full will-change-transform">
-                            <div class="relative rounded-2xl p-[1px]">
-                                <div class="relative rounded-2xl overflow-hidden ring-1 ring-white/10 bg-surface-950">
-                                    <div class="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-violet-500/10 blur-3xl"></div>
-                                    <RichTextEditorDemo client:load />
-                                </div>
-                            </div>
-                        </section>
-                    </div>
+
 
                 </div>
             </div>
