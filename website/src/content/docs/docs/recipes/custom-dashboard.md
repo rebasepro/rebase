@@ -1,7 +1,6 @@
 ---
 title: "Recipe: Custom Dashboard"
 sidebar_label: Custom Dashboard
-slug: docs/recipes/custom-dashboard
 description: Build a custom dashboard view with charts, stats, and data visualizations using Rebase hooks.
 ---
 

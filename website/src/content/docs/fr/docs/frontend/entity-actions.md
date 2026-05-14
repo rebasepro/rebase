@@ -1,7 +1,6 @@
 ---
 title: Actions d'Entité
 sidebar_label: Actions d'Entité
-slug: fr/docs/frontend/entity-actions
 description: Ajoutez des boutons d'action personnalisés aux entités pour l'archivage, la publication, l'exportation, le clonage, et plus encore.
 ---
 

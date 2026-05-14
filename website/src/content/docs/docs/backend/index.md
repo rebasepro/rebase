@@ -1,7 +1,6 @@
 ---
 title: Backend Overview
 sidebar_label: Backend
-slug: docs/backend
 description: The Rebase backend provides a complete server with REST API, authentication, storage, WebSocket real-time, and entity history — all initialized with a single function call.
 ---
 

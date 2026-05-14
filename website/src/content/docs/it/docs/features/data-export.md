@@ -1,7 +1,6 @@
 ---
 title: Esportazione Dati
 sidebar_label: Esportazione Dati
-slug: it/docs/features/data-export
 description: Esporta i dati della collezione nei formati CSV e JSON.
 ---
 

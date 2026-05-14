@@ -1,7 +1,6 @@
 ---
 title: Data Export
 sidebar_label: Data Export
-slug: docs/features/data-export
 description: Export collection data to CSV and JSON formats.
 ---
 

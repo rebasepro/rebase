@@ -1,7 +1,6 @@
 ---
 title: Référence des Hooks
 sidebar_label: Hooks
-slug: fr/docs/hooks
 description: Hooks React fournis par Rebase pour accéder à l'authentification, aux données, à la navigation, aux panneaux latéraux, au stockage et à l'état de l'interface utilisateur.
 ---
 

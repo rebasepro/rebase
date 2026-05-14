@@ -1,7 +1,6 @@
 ---
 title: Cron Jobs
 sidebar_label: Cron Jobs
-slug: docs/backend/cron-jobs
 description: Schedule recurring background tasks with Rebase's built-in cron job system. Define jobs as TypeScript files, monitor them in Studio, and manage them via the REST API.
 ---
 

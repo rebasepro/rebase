@@ -1,7 +1,6 @@
 ---
 title: SDK del Cliente
 sidebar_label: SDK del Cliente
-slug: es/docs/sdk
 description: Utilice el SDK del Cliente de Rebase para interactuar con su backend desde cualquier aplicación JavaScript — operaciones de datos, autenticación, almacenamiento y suscripciones en tiempo real.
 ---
 

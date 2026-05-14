@@ -1,7 +1,6 @@
 ---
 title: Entitätsansichten
 sidebar_label: Entitätsansichten
-slug: de/docs/frontend/entity-views
 description: Fügen Sie benutzerdefinierte Tabs und Ansichten zu Entitätsdetailseiten für Vorschauen, Analysen, verknüpfte Daten oder benutzerdefinierte Benutzeroberflächen hinzu.
 ---
 

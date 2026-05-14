@@ -1,7 +1,6 @@
 ---
 title: Plugin System
 sidebar_label: Plugins
-slug: docs/plugins
 description: Extend Rebase with plugins — inject UI components, modify collections, add toolbar actions, and create custom field builders.
 ---
 

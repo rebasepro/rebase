@@ -1,7 +1,6 @@
 ---
 title: Vue d'ensemble de l'architecture
 sidebar_label: Architecture
-slug: fr/docs/architecture
 description: Comprenez comment le backend, le frontend, le SDK client et la base de données de Rebase s'intègrent pour former un Backend-as-a-Service complet.
 ---
 

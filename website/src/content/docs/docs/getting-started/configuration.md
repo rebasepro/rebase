@@ -1,7 +1,6 @@
 ---
 title: Environment & Configuration
 sidebar_label: Configuration
-slug: docs/getting-started/configuration
 description: All environment variables and configuration options for Rebase projects.
 ---
 

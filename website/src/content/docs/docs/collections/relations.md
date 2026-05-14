@@ -1,7 +1,6 @@
 ---
 title: Relations
 sidebar_label: Relations
-slug: docs/collections/relations
 description: Define one-to-one, one-to-many, and many-to-many SQL relations between collections with foreign keys, junction tables, and multi-hop joins.
 ---
 

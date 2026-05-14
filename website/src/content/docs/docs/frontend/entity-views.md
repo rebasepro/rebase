@@ -1,7 +1,6 @@
 ---
 title: Entity Views
 sidebar_label: Entity Views
-slug: docs/frontend/entity-views
 description: Add custom tabs and views to entity detail pages for previews, analytics, related data, or custom UI.
 ---
 

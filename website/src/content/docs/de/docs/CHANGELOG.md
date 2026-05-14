@@ -1,5 +1,4 @@
 ---
-slug: de/docs/changelog
 title: Änderungsprotokoll
 ---
 ## [3.1.0] - 2026-02-20

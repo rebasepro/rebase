@@ -1,7 +1,6 @@
 ---
 title: Démarrage rapide
 sidebar_label: Démarrage rapide
-slug: fr/docs/getting-started/quickstart
 description: Créez un nouveau projet Rebase et faites-le fonctionner localement en moins de 2 minutes.
 ---
 

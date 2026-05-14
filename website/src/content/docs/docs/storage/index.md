@@ -1,7 +1,6 @@
 ---
 title: Storage
 sidebar_label: Storage
-slug: docs/storage
 description: Configure file storage with local filesystem or S3-compatible backends for file uploads, images, and media.
 ---
 

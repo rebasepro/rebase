@@ -1,7 +1,6 @@
 ---
 title: Frontend Overview
 sidebar_label: Frontend
-slug: docs/frontend
 description: Build and customize the Rebase admin panel with React — controllers, scaffold, routing, and views.
 ---
 

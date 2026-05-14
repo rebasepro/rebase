@@ -1,7 +1,6 @@
 ---
 title: View Modes
 sidebar_label: View Modes
-slug: docs/frontend/view-modes
 description: Configure table, cards, and Kanban board views for your collections.
 ---
 

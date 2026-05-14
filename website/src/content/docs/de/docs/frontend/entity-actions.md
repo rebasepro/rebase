@@ -1,7 +1,6 @@
 ---
 title: Entitätsaktionen
 sidebar_label: Entitätsaktionen
-slug: de/docs/frontend/entity-actions
 description: Fügen Sie Entitäten benutzerdefinierte Aktionsschaltflächen für Archivierung, Veröffentlichung, Export, Klonen und mehr hinzu.
 ---
 

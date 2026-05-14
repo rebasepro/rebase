@@ -1,7 +1,6 @@
 ---
 title: Modos de Vista
 sidebar_label: Modos de Vista
-slug: es/docs/frontend/view-modes
 description: Configure vistas de tabla, tarjetas y tablero Kanban para sus colecciones.
 ---
 

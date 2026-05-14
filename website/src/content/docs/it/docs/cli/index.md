@@ -1,7 +1,6 @@
 ---
 title: Riferimento CLI
 sidebar_label: CLI
-slug: it/docs/cli
 description: Comandi Rebase CLI per l'inizializzazione del progetto, la generazione dello schema, le migrazioni del database e la generazione dell'SDK.
 ---
 

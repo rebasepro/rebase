@@ -1,7 +1,6 @@
 ---
 title: Deployment
 sidebar_label: Deployment
-slug: docs/getting-started/deployment
 description: Deploy your Rebase project to production using Docker, cloud platforms, or manual setups.
 ---
 

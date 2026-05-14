@@ -1,7 +1,6 @@
 ---
 title: Stockage
 sidebar_label: Stockage
-slug: fr/docs/storage
 description: Configurez le stockage de fichiers avec un système de fichiers local ou des backends compatibles S3 pour les téléchargements de fichiers, les images et les médias.
 ---
 

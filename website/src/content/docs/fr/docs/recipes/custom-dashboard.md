@@ -1,7 +1,6 @@
 ---
 title: "Recette : Tableau de bord personnalisé"
 sidebar_label: Tableau de bord personnalisé
-slug: fr/docs/recipes/custom-dashboard
 description: Créez une vue de tableau de bord personnalisée avec des graphiques, des statistiques et des visualisations de données à l'aide des hooks Rebase.
 ---
 

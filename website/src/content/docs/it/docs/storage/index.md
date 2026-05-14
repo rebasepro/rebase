@@ -1,7 +1,6 @@
 ---
 title: Archiviazione
 sidebar_label: Archiviazione
-slug: it/docs/storage
 description: Configura l'archiviazione dei file con filesystem locale o backend compatibili S3 per upload di file, immagini e media.
 ---
 

@@ -1,7 +1,6 @@
 ---
 title: Vistas de Entidade
 sidebar_label: Vistas de Entidade
-slug: pt/docs/frontend/entity-views
 description: Adicione abas e vistas personalizadas às páginas de detalhe da entidade para pré-visualizações, análises, dados relacionados ou UI personalizada.
 ---
 

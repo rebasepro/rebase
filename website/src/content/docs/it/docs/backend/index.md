@@ -1,7 +1,6 @@
 ---
 title: Panoramica del Backend
 sidebar_label: Backend
-slug: it/docs/backend
 description: Il backend di Rebase fornisce un server completo con API REST, autenticazione, archiviazione, tempo reale WebSocket e cronologia delle entità — tutto inizializzato con una singola chiamata di funzione.
 ---
 

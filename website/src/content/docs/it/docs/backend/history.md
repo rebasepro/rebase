@@ -1,7 +1,6 @@
 ---
 title: Cronologia Entità
 sidebar_label: Cronologia Entità
-slug: it/docs/backend/history
 description: Tieni traccia di ogni modifica alle tue entità con una traccia di audit completa — chi ha modificato cosa, quando, e lo snapshot completo prima/dopo.
 ---
 

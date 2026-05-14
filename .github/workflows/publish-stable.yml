@@ -4,11 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g., 3.3.0). Leave empty for auto-patch bump."
-        required: false
+        description: "Version bump: patch, minor, major, or explicit (e.g. 0.2.0)"
+        required: true
         type: string
+        default: "patch"
       dry_run:
-        description: "Dry run — skip actual npm publish"
+        description: "Dry run — skip npm publish and GitHub release"
         required: false
         type: boolean
         default: false
@@ -21,14 +22,14 @@ jobs:
   publish-stable:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # push tags + release
+      contents: write   # push tags + create release
       id-token: write   # npm provenance
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0  # full history for changelog generation
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup pnpm
@@ -59,37 +60,115 @@ jobs:
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
+      # ── Version calculation ─────────────────────────────────
       - name: Determine version
         id: version
         run: |
-          if [ -n "${{ inputs.version }}" ]; then
-            VERSION="${{ inputs.version }}"
-          else
-            # Auto-bump: read current version from root package.json
-            CURRENT=$(node -e "console.log(require('./package.json').version)" 2>/dev/null || echo "0.0.0")
-            # Bump patch
-            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-            VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "📦 Publishing version: $VERSION"
+          CURRENT=$(node -e "console.log(require('./lerna.json').version)")
+          BUMP="${{ inputs.version }}"
 
+          if [[ "$BUMP" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            VERSION="$BUMP"
+          else
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+            case "$BUMP" in
+              patch) VERSION="$MAJOR.$MINOR.$((PATCH + 1))" ;;
+              minor) VERSION="$MAJOR.$((MINOR + 1)).0" ;;
+              major) VERSION="$((MAJOR + 1)).0.0" ;;
+              *) echo "❌ Invalid bump: $BUMP" && exit 1 ;;
+            esac
+          fi
+
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "📦 Releasing: $CURRENT → $VERSION"
+
+      # ── Changelog generation ────────────────────────────────
+      - name: Generate changelog
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          LAST_TAG=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || echo "")
+          RELEASE_DATE=$(date +%Y-%m-%d)
+
+          if [ -n "$LAST_TAG" ]; then
+            RANGE="${LAST_TAG}..HEAD"
+          else
+            RANGE="HEAD"
+          fi
+
+          # Categorize commits
+          FEATURES=""
+          FIXES=""
+          REFACTORS=""
+          CHORES=""
+          OTHER=""
+
+          while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            HASH="${line%% *}"
+            MSG="${line#* }"
+            SHORT="${HASH:0:7}"
+            case "$MSG" in
+              feat:*|feat\(*\):*)   FEATURES+="- ${MSG#*: } (\`$SHORT\`)"$'\n' ;;
+              fix:*|fix\(*\):*)     FIXES+="- ${MSG#*: } (\`$SHORT\`)"$'\n' ;;
+              refactor:*|refactor\(*\):*) REFACTORS+="- ${MSG#*: } (\`$SHORT\`)"$'\n' ;;
+              chore:*|ci:*|build:*) CHORES+="- ${MSG#*: } (\`$SHORT\`)"$'\n' ;;
+              *)                     OTHER+="- $MSG (\`$SHORT\`)"$'\n' ;;
+            esac
+          done <<< "$(git log --oneline --no-merges "$RANGE" 2>/dev/null || true)"
+
+          # Build markdown
+          BODY="## [${VERSION}] - ${RELEASE_DATE}"$'\n'
+          [ -n "$FEATURES" ] && BODY+=$'\n'"### ✨ Features"$'\n\n'"$FEATURES"
+          [ -n "$FIXES" ]    && BODY+=$'\n'"### 🐛 Bug Fixes"$'\n\n'"$FIXES"
+          [ -n "$REFACTORS" ] && BODY+=$'\n'"### ♻️ Refactors"$'\n\n'"$REFACTORS"
+          [ -n "$CHORES" ]   && BODY+=$'\n'"### 🔧 Maintenance"$'\n\n'"$CHORES"
+          [ -n "$OTHER" ]    && BODY+=$'\n'"### Other"$'\n\n'"$OTHER"
+
+          # Save for GitHub release body
+          echo "$BODY" > /tmp/release-notes.md
+
+          # Prepend to CHANGELOG.md
+          if [ -f "CHANGELOG.md" ]; then
+            TEMP=$(mktemp)
+            { head -1 CHANGELOG.md; echo ""; echo "$BODY"; tail -n +2 CHANGELOG.md; } > "$TEMP"
+            mv "$TEMP" CHANGELOG.md
+          else
+            { echo "# Changelog"; echo ""; echo "$BODY"; } > CHANGELOG.md
+          fi
+
+          echo "📝 Changelog generated"
+
+      # ── Version bump ────────────────────────────────────────
       - name: Bump versions
         run: |
           VERSION="${{ steps.version.outputs.version }}"
 
-          # Bump version in all publishable packages (node, not npm, to avoid workspace:* validation)
-          pnpm --filter './packages/*' -r exec node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version='$VERSION';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+          # Bump all publishable packages
+          pnpm --filter './packages/*' -r exec node -e "
+            const fs=require('fs');
+            const p=JSON.parse(fs.readFileSync('package.json','utf8'));
+            p.version='$VERSION';
+            fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');
+          "
 
-          # Also bump root package.json to track the current version
-          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version='$VERSION';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+          # Bump lerna.json
+          node -e "
+            const fs=require('fs');
+            const p=JSON.parse(fs.readFileSync('lerna.json','utf8'));
+            p.version='$VERSION';
+            fs.writeFileSync('lerna.json',JSON.stringify(p,null,2)+'\n');
+          "
 
           # Commit and tag
           git add -A
           git commit -m "chore: release v$VERSION" --no-verify
-          git tag "v$VERSION"
+          git tag -a "v$VERSION" -m "Release v$VERSION"
 
+      # ── Publish ─────────────────────────────────────────────
       - name: Configure npm auth
+        if: ${{ !inputs.dry_run }}
         run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -102,28 +181,35 @@ jobs:
 
       - name: Push tags
         if: ${{ !inputs.dry_run }}
-        run: |
-          git push --follow-tags
+        run: git push origin main --follow-tags
 
+      # ── GitHub Release ──────────────────────────────────────
       - name: Create GitHub Release
         if: ${{ !inputs.dry_run }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "v${{ steps.version.outputs.version }}"
-          name: "v${{ steps.version.outputs.version }}"
-          generate_release_notes: true
-          draft: false
-          prerelease: false
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" \
+            --title "v${{ steps.version.outputs.version }}" \
+            --notes-file /tmp/release-notes.md \
+            --latest
 
+      # ── Summary ─────────────────────────────────────────────
       - name: Summary
         run: |
-          echo "### 🚀 Stable Release Published" >> $GITHUB_STEP_SUMMARY
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "### 🚀 Release v${VERSION}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** \`${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** \`${{ steps.version.outputs.current }}\` → \`${VERSION}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Dry Run:** \`${{ inputs.dry_run }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Install with:" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "pnpm add @rebasepro/core@latest" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.dry_run }}" != "true" ]; then
+            echo "**📦 npm:** [@rebasepro packages](https://www.npmjs.com/org/rebasepro)" >> $GITHUB_STEP_SUMMARY
+            echo "**🏷 Release:** [v${VERSION}](https://github.com/rebasepro/rebase/releases/tag/v${VERSION})" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Install with:" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+            echo "pnpm add @rebasepro/core@${VERSION}" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi

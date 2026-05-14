@@ -1,7 +1,6 @@
 ---
 title: Propiedades
 sidebar_label: Propiedades
-slug: es/docs/collections/properties
 description: Los tipos de propiedades definen el tipo de dato, la validación y la renderización de la interfaz de usuario para cada campo en una colección. Rebase soporta los tipos cadena, número, booleano, fecha, array, mapa, referencia, relación y geopunto.
 ---
 

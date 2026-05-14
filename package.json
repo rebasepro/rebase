@@ -43,7 +43,11 @@
         "build": "pnpm --filter './packages/*' -r run build && pnpm --filter './app' -r run build",
         "build:stream": "lerna run build --stream --loglevel=info",
         "clean": "lerna run clean",
-        "release": "git push origin main:release",
+        "release": "./scripts/release.sh",
+        "release:patch": "./scripts/release.sh patch",
+        "release:minor": "./scripts/release.sh minor",
+        "release:major": "./scripts/release.sh major",
+        "release:dry": "./scripts/release.sh patch --dry-run",
         "e2e": "npx playwright test -c e2e/playwright.config.ts",
         "kill": "pkill -f 'rebase.*dev' || true; pkill -f 'tsx watch' || true; pkill -f vite || true"
     },

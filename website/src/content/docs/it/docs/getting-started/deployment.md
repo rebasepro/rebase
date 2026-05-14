@@ -1,7 +1,6 @@
 ---
 title: Distribuzione
 sidebar_label: Distribuzione
-slug: it/docs/getting-started/deployment
 description: Distribuisci il tuo progetto Rebase in produzione utilizzando Docker, piattaforme cloud o configurazioni manuali.
 ---
 

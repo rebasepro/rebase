@@ -1,7 +1,6 @@
 ---
 title: Azioni Entità
 sidebar_label: Azioni Entità
-slug: it/docs/frontend/entity-actions
 description: Aggiungi pulsanti di azione personalizzati alle entità per archiviazione, pubblicazione, esportazione, clonazione e altro.
 ---
 

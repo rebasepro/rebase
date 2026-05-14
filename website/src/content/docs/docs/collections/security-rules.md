@@ -1,7 +1,6 @@
 ---
 title: Security Rules (RLS)
 sidebar_label: Security Rules
-slug: docs/collections/security-rules
 description: Define Row Level Security policies for your collections using convenience shortcuts or raw SQL expressions.
 ---
 

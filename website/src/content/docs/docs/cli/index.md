@@ -1,7 +1,6 @@
 ---
 title: CLI Reference
 sidebar_label: CLI
-slug: docs/cli
 description: Rebase CLI commands for project initialization, schema generation, database migrations, and SDK generation.
 ---
 

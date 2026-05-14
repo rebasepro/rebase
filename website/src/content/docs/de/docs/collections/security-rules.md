@@ -1,7 +1,6 @@
 ---
 title: Sicherheitsregeln (RLS)
 sidebar_label: Sicherheitsregeln
-slug: de/docs/collections/security-rules
 description: Definieren Sie Row Level Security (RLS)-Richtlinien für Ihre Sammlungen mithilfe von praktischen Shortcuts oder rohen SQL-Ausdrücken.
 ---
 

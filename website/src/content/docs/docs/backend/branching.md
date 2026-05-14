@@ -1,7 +1,6 @@
 ---
 title: Database Branching
 sidebar_label: Branching
-slug: docs/backend/branching
 description: Create isolated database branches for development, staging, and testing using PostgreSQL's CREATE DATABASE ... TEMPLATE — instant, full-fidelity copies with zero downtime.
 ---
 

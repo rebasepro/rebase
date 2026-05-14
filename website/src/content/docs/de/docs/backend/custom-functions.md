@@ -1,7 +1,6 @@
 ---
 title: Benutzerdefinierte Funktionen
 sidebar_label: Benutzerdefinierte Funktionen
-slug: de/docs/backend/custom-functions
 description: Fügen Sie benutzerdefinierte Hono API-Endpunkte neben Ihren Rebase CRUD-Routen hinzu. Automatische Erkennung aus einem Verzeichnis, mit vollem Zugriff auf die Backend-Instanz.
 ---
 

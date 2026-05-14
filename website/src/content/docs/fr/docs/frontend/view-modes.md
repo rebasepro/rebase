@@ -1,7 +1,6 @@
 ---
 title: Modes d'affichage
 sidebar_label: Modes d'affichage
-slug: fr/docs/frontend/view-modes
 description: Configurez les vues tableau, cartes et Kanban pour vos collections.
 ---
 

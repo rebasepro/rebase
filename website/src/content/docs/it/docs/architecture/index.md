@@ -1,7 +1,6 @@
 ---
 title: Panoramica dell'Architettura
 sidebar_label: Architettura
-slug: it/docs/architecture
 description: Scopri come il backend, il frontend, l'SDK client e il database di Rebase si integrano per formare un Backend-as-a-Service completo.
 ---
 

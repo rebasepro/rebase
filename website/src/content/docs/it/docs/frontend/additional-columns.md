@@ -1,7 +1,6 @@
 ---
 title: Colonne Aggiuntive
 sidebar_label: Colonne Aggiuntive
-slug: it/docs/frontend/additional-columns
 description: Aggiungi colonne calcolate/virtuali alle tabelle di collezione che derivano valori dai dati dell'entità.
 ---
 

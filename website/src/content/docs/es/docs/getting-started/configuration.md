@@ -1,7 +1,6 @@
 ---
 title: Entorno y Configuración
 sidebar_label: Configuración
-slug: es/docs/getting-started/configuration
 description: Todas las variables de entorno y opciones de configuración para proyectos Rebase.
 ---
 

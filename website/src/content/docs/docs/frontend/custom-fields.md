@@ -1,7 +1,6 @@
 ---
 title: Custom Fields
 sidebar_label: Custom Fields
-slug: docs/frontend/custom-fields
 description: Build custom form fields for entity editing with full access to the form context, entity values, and Rebase hooks.
 ---
 

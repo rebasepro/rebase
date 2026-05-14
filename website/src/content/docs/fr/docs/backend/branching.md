@@ -1,7 +1,6 @@
 ---
 title: Branchement de base de données
 sidebar_label: Branchement
-slug: fr/docs/backend/branching
 description: Créez des branches de base de données isolées pour le développement, la pré-production et les tests en utilisant CREATE DATABASE ... TEMPLATE de PostgreSQL — des copies instantanées et fidèles sans temps d'arrêt.
 ---
 

@@ -1,7 +1,6 @@
 ---
 title: Vues d'entité
 sidebar_label: Vues d'entité
-slug: fr/docs/frontend/entity-views
 description: Ajoutez des onglets et des vues personnalisés aux pages de détails d'entité pour des aperçus, des analyses, des données connexes ou une interface utilisateur personnalisée.
 ---
 

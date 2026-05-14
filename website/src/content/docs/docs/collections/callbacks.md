@@ -1,7 +1,6 @@
 ---
 title: Entity Callbacks
 sidebar_label: Callbacks
-slug: docs/collections/callbacks
 description: Use lifecycle callbacks to run custom logic when entities are created, updated, read, or deleted. Includes the context.data API for cross-collection operations.
 ---
 

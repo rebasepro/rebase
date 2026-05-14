@@ -1,7 +1,6 @@
 ---
 title: Entity History
 sidebar_label: Entity History
-slug: docs/backend/history
 description: Track every change to your entities with a full audit trail — who changed what, when, and the complete before/after snapshot.
 ---
 

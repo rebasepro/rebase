@@ -1,7 +1,6 @@
 ---
 title: Custom Functions
 sidebar_label: Custom Functions
-slug: docs/backend/custom-functions
 description: Add custom Hono API endpoints alongside your Rebase CRUD routes. Auto-discovered from a directory, with full access to the backend instance.
 ---
 

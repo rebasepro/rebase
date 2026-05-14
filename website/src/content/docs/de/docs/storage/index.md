@@ -1,7 +1,6 @@
 ---
 title: Speicher
 sidebar_label: Speicher
-slug: de/docs/storage
 description: Konfigurieren Sie die Dateispeicherung mit lokalem Dateisystem oder S3-kompatiblen Backends für Datei-Uploads, Bilder und Medien.
 ---
 

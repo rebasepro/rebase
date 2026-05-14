@@ -1,7 +1,6 @@
 ---
 title: Additional Columns
 sidebar_label: Additional Columns
-slug: docs/frontend/additional-columns
 description: Add computed/virtual columns to collection tables that derive values from entity data.
 ---
 

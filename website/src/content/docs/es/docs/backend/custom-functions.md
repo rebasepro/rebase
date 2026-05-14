@@ -1,7 +1,6 @@
 ---
 title: Funciones Personalizadas
 sidebar_label: Funciones Personalizadas
-slug: es/docs/backend/custom-functions
 description: Añada puntos finales de API Hono personalizados junto con sus rutas CRUD de Rebase. Auto-descubiertos desde un directorio, con acceso completo a la instancia de backend.
 ---
 

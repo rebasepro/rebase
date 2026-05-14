@@ -1,5 +1,4 @@
 ---
-slug: it/docs/changelog
 title: Registro modifiche
 ---
 ## [3.1.0] - 2026-02-20

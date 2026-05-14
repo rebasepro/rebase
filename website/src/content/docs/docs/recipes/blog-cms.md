@@ -1,7 +1,6 @@
 ---
 title: "Recipe: Blog CMS"
 sidebar_label: Blog CMS
-slug: docs/recipes/blog-cms
 description: Build a complete blog CMS with articles, authors, categories, rich text editing, and image uploads.
 ---
 

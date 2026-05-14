@@ -1,7 +1,6 @@
 ---
 title: "Receta: Panel de Control Personalizado"
 sidebar_label: Panel de Control Personalizado
-slug: es/docs/recipes/custom-dashboard
 description: Construya una vista de panel de control personalizada con gráficos, estadísticas y visualizaciones de datos utilizando los hooks de Rebase.
 ---
 

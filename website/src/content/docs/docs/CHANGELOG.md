@@ -1,5 +1,4 @@
 ---
-slug: docs/changelog
 title: Changelog
 ---
 # Changelog

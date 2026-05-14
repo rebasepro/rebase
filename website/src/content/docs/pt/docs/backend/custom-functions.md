@@ -1,7 +1,6 @@
 ---
 title: Funções Personalizadas
 sidebar_label: Funções Personalizadas
-slug: pt/docs/backend/custom-functions
 description: Adicione endpoints de API Hono personalizados ao lado das suas rotas CRUD do Rebase. Descobertos automaticamente a partir de um diretório, com acesso total à instância de backend.
 ---
 

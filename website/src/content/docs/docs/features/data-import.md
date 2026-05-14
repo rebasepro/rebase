@@ -1,7 +1,6 @@
 ---
 title: Data Import
 sidebar_label: Data Import
-slug: docs/features/data-import
 description: Import data from CSV, JSON, and Excel files into your collections with field mapping and validation.
 ---
 

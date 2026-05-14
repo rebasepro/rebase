@@ -1,7 +1,6 @@
 ---
 title: Entity Actions
 sidebar_label: Entity Actions
-slug: docs/frontend/entity-actions
 description: Add custom action buttons to entities for archiving, publishing, exporting, cloning, and more.
 ---
 

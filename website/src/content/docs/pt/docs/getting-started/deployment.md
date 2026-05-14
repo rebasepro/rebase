@@ -1,7 +1,6 @@
 ---
 title: Implantação
 sidebar_label: Implantação
-slug: pt/docs/getting-started/deployment
 description: Implante seu projeto Rebase em produção usando Docker, plataformas de nuvem ou configurações manuais.
 ---
 

@@ -1,7 +1,6 @@
 ---
 title: Campos Personalizados
 sidebar_label: Campos Personalizados
-slug: es/docs/frontend/custom-fields
 description: Cree campos de formulario personalizados para la edición de entidades con acceso completo al contexto del formulario, los valores de la entidad y los hooks de Rebase.
 ---
 

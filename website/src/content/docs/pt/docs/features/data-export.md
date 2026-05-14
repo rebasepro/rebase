@@ -1,7 +1,6 @@
 ---
 title: Exportação de Dados
 sidebar_label: Exportação de Dados
-slug: pt/docs/features/data-export
 description: Exporte dados de coleções para os formatos CSV e JSON.
 ---
 

@@ -1,7 +1,6 @@
 ---
 title: Benutzerdefinierte Felder
 sidebar_label: Benutzerdefinierte Felder
-slug: de/docs/frontend/custom-fields
 description: Erstellen Sie benutzerdefinierte Formularfelder für die Entitätsbearbeitung mit vollem Zugriff auf den Formular-Kontext, Entitätswerte und Rebase-Hooks.
 ---
 

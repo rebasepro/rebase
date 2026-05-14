@@ -1,7 +1,6 @@
 ---
 title: Schema come Codice
 sidebar_label: Schema come Codice
-slug: it/docs/architecture/schema-as-code
 description: Come Rebase utilizza le collezioni TypeScript come unica fonte di verità per lo schema del tuo database, l'interfaccia utente e l'API.
 ---
 

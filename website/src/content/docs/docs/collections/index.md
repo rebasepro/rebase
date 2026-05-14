@@ -1,7 +1,6 @@
 ---
 title: Collections
 sidebar_label: Collections
-slug: docs/collections
 description: Collections are the core building block of Rebase — each collection maps to a database table and defines its schema, relations, security, and UI behavior.
 ---
 

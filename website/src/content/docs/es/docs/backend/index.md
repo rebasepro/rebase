@@ -1,7 +1,6 @@
 ---
 title: Descripción general del backend
 sidebar_label: Backend
-slug: es/docs/backend
 description: El backend de Rebase proporciona un servidor completo con API REST, autenticación, almacenamiento, tiempo real con WebSocket e historial de entidades, todo inicializado con una única llamada a función.
 ---
 

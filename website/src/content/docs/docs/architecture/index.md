@@ -1,7 +1,6 @@
 ---
 title: Architecture Overview
 sidebar_label: Architecture
-slug: docs/architecture
 description: Understand how Rebase's backend, frontend, client SDK, and database integrate to form a complete Backend-as-a-Service.
 ---
 

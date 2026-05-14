@@ -1,7 +1,6 @@
 ---
 title: Datenbank-Branching
 sidebar_label: Branching
-slug: de/docs/backend/branching
 description: Erstellen Sie isolierte Datenbank-Branches für Entwicklung, Staging und Tests mithilfe von PostgreSQLs CREATE DATABASE ... TEMPLATE – sofortige, originalgetreue Kopien ohne Ausfallzeiten.
 ---
 

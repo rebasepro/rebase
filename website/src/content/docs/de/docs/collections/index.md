@@ -1,7 +1,6 @@
 ---
 title: Sammlungen
 sidebar_label: Sammlungen
-slug: de/docs/collections
 description: Sammlungen sind der zentrale Baustein von Rebase – jede Sammlung bildet eine Datenbanktabelle ab und definiert deren Schema, Relationen, Sicherheit und UI-Verhalten.
 ---
 

@@ -1,7 +1,6 @@
 ---
 title: "Recipe: Webhook Integration"
 sidebar_label: Webhooks
-slug: docs/recipes/webhooks
 description: Use entity callbacks to send webhooks to external services when data changes.
 ---
 

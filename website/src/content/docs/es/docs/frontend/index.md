@@ -1,7 +1,6 @@
 ---
 title: Descripción general del Frontend
 sidebar_label: Frontend
-slug: es/docs/frontend
 description: "Crea y personaliza el panel de administración de Rebase con React: controladores, scaffold, enrutamiento y vistas."
 ---
 

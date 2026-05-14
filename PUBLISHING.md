@@ -1,75 +1,111 @@
-# Publishing Packages
+# Publishing & Releases
 
-This monorepo uses Lerna to manage and publish all packages. Publishing is done via CI when a version tag is pushed.
+This monorepo has a unified release system that handles **npm publishing**, **CHANGELOG generation**, and **GitHub Releases** in one step.
 
-## Workflow
-
-1. **Version locally** → Creates a git tag
-2. **Push to GitHub** → CI automatically publishes to npm
-
-## Stable Releases (publishes to `latest`)
+## Quick Start
 
 ```bash
-# Interactive - prompts for version type
-lerna version --no-private
+# Patch release: 0.1.1 → 0.1.2
+pnpm release:patch
 
-# Or specify the version bump directly
-lerna version patch --no-private   # 3.0.1 → 3.0.2
-lerna version minor --no-private   # 3.0.1 → 3.1.0
-lerna version major --no-private   # 3.0.1 → 4.0.0
+# Minor release: 0.1.1 → 0.2.0
+pnpm release:minor
+
+# Major release: 0.1.1 → 1.0.0
+pnpm release:major
+
+# Explicit version
+pnpm release 0.3.0
+
+# Preview what would happen (no changes)
+pnpm release:dry
+```
+
+## What the Release Script Does
+
+When you run `pnpm release:patch` (or any variant), it:
+
+1. **Validates** — ensures you're on `main`, working tree is clean, tools are installed
+2. **Calculates** the new version from the bump type
+3. **Generates a changelog** from conventional commits since the last tag
+4. **Bumps versions** in all 21 packages + `lerna.json`
+5. **Updates `CHANGELOG.md`** with the new entry
+6. **Builds & tests** — runs `pnpm build` and `pnpm test`
+7. **Commits & tags** — `chore: release vX.Y.Z` + annotated tag
+8. **Pushes** to `origin main` with tags
+9. **Publishes** all packages to npm
+10. **Creates a GitHub Release** with the changelog as the body
+
+## Commit Convention
+
+Use [Conventional Commits](https://www.conventionalcommits.org/) for automatic changelog categorization:
+
+| Prefix | Category | Example |
+|---|---|---|
+| `feat:` | ✨ Features | `feat: add search filtering` |
+| `fix:` | 🐛 Bug Fixes | `fix: resolve date picker crash` |
+| `refactor:` | ♻️ Refactors | `refactor: simplify auth flow` |
+| `docs:` | 📚 Documentation | `docs: update API reference` |
+| `chore:` | 🔧 Maintenance | `chore: update dependencies` |
+| `feat!:` | ⚠️ Breaking | `feat!: remove legacy API` |
+
+Commits that don't match a prefix go under "Other".
+
+## CI: GitHub Actions
+
+### Stable Release (manual trigger)
+
+The **Publish Stable Release** workflow in `.github/workflows/publish-stable.yml` can be triggered from the GitHub Actions tab:
+
+1. Go to **Actions** → **Publish Stable Release** → **Run workflow**
+2. Enter the version bump type (`patch`, `minor`, `major`, or explicit version)
+3. Optionally enable **dry run** to preview
+
+This does everything the local script does, but in CI.
+
+### Canary Release (automatic)
+
+Every push to `main` triggers `.github/workflows/publish-canary.yml`, which publishes a canary version:
+
+```
+0.0.1-canary.<short-sha>
+```
+
+Install the latest canary:
+```bash
+pnpm add @rebasepro/core@canary
 ```
 
 ## Pre-releases
 
-Use `--preid` to specify the pre-release identifier. The CI will automatically publish to the matching dist-tag.
+For pre-release channels, use the script with explicit versions:
 
 ```bash
-# Pre-release (publishes to `pre` dist-tag)
-lerna version prerelease --preid pre --no-private   # 3.0.1 → 3.0.2-pre.0
+# Beta
+pnpm release 0.2.0-beta.0
 
-# Next release (publishes to `next` dist-tag)
-lerna version prerelease --preid next --no-private  # 3.0.1 → 3.0.2-next.0
-
-# Canary release (publishes to `canary` dist-tag)
-lerna version prerelease --preid canary --no-private # 3.0.1 → 3.0.2-canary.0
+# RC
+pnpm release 0.2.0-rc.1
 ```
 
-## Automatic Canary Releases (push-to-publish)
+## Requirements
 
-Canary versions are published **automatically** on every push to the `canary` branch. No manual version bumping needed.
+- Must be on the `main` branch
+- Working tree must be clean
+- [`gh` CLI](https://cli.github.com/) must be installed and authenticated
+- `npm` must be authenticated (`npm login`)
 
-The CI workflow (`.github/workflows/publish-canary.yml`) will:
-1. Build all packages
-2. Generate a version like `3.1.0-canary.<short-git-sha>` (e.g., `3.1.0-canary.a1b2c3d`)
-3. Publish to npm with the `canary` dist-tag
+## Dry Run
 
-Install the latest canary with:
+Preview what a release would do without making any changes:
 
 ```bash
-npm install @rebasepro/core@canary
+pnpm release:dry
+# or
+./scripts/release.sh minor --dry-run
 ```
 
-> **Note:** If multiple pushes happen quickly to the same branch, earlier runs are automatically cancelled.
-
-## What Happens
-
-When you run `lerna version`:
-1. Updates all `package.json` files with the new version
-2. Creates a commit with the version bump
-3. Creates a git tag (e.g., `v3.0.2` or `v3.0.2-pre.0`)
-4. Pushes the commit and tag to GitHub
-
-When the tag is pushed, the CI workflow (`.github/workflows/publish.yml`):
-1. Builds all packages
-2. Detects the dist-tag from the version suffix
-3. Publishes to npm
-
-## Installing Pre-releases
-
-Users can install pre-release versions using:
-
-```bash
-npm install @rebasepro/core@pre
-npm install @rebasepro/core@next
-npm install @rebasepro/core@canary
-```
+This shows:
+- The calculated version
+- The generated changelog
+- What steps would be performed

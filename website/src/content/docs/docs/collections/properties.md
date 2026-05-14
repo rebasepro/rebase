@@ -1,7 +1,6 @@
 ---
 title: Properties
 sidebar_label: Properties
-slug: docs/collections/properties
 description: Property types define the data type, validation, and UI rendering for each field in a collection. Rebase supports string, number, boolean, date, array, map, reference, relation, and geopoint types.
 ---
 

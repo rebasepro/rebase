@@ -1,7 +1,6 @@
 ---
 title: Quickstart
 sidebar_label: Quickstart
-slug: docs/getting-started/quickstart
 description: Create a new Rebase project and get it running locally in under 2 minutes.
 ---
 

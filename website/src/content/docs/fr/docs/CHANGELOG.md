@@ -1,5 +1,4 @@
 ---
-slug: fr/docs/changelog
 title: Journal des modifications
 ---
 ## [3.1.0] - 2026-02-20

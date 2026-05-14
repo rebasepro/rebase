@@ -1,7 +1,6 @@
 ---
 title: Historial de Entidades
 sidebar_label: Historial de Entidades
-slug: es/docs/backend/history
 description: "Rastrea cada cambio en tus entidades con una auditoría completa: quién cambió qué, cuándo y una instantánea completa del antes/después."
 ---
 

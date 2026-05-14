@@ -1,7 +1,6 @@
 ---
 title: Zusätzliche Spalten
 sidebar_label: Zusätzliche Spalten
-slug: de/docs/frontend/additional-columns
 description: Fügen Sie berechnete/virtuelle Spalten zu Sammlungstabellen hinzu, die Werte aus Entitätsdaten ableiten.
 ---
 

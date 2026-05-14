@@ -1,7 +1,6 @@
 ---
 title: Proprietà
 sidebar_label: Proprietà
-slug: it/docs/collections/properties
 description: I tipi di proprietà definiscono il tipo di dato, la validazione e il rendering dell'interfaccia utente per ogni campo in una collection. Rebase supporta i tipi stringa, numero, booleano, data, array, mappa, riferimento, relazione e geopoint.
 ---
 

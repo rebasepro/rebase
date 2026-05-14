@@ -1,7 +1,6 @@
 ---
 title: Pluginsystem
 sidebar_label: Plugins
-slug: de/docs/plugins
 description: Erweitern Sie Rebase mit Plugins – injizieren Sie UI-Komponenten, modifizieren Sie Sammlungen, fügen Sie Toolbar-Aktionen hinzu und erstellen Sie benutzerdefinierte Feld-Builder.
 ---
 

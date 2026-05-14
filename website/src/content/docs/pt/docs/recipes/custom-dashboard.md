@@ -1,7 +1,6 @@
 ---
 title: "Receita: Dashboard Personalizado"
 sidebar_label: Dashboard Personalizado
-slug: pt/docs/recipes/custom-dashboard
 description: Crie uma visualização de dashboard personalizada com gráficos, estatísticas e visualizações de dados usando os hooks do Rebase.
 ---
 

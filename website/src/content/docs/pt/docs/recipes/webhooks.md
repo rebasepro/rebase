@@ -1,7 +1,6 @@
 ---
 title: "Receita: Integração de Webhook"
 sidebar_label: Webhooks
-slug: pt/docs/recipes/webhooks
 description: Utilize callbacks de entidade para enviar webhooks a serviços externos quando os dados mudam.
 ---
 

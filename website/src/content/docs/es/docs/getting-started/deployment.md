@@ -1,7 +1,6 @@
 ---
 title: Despliegue
 sidebar_label: Despliegue
-slug: es/docs/getting-started/deployment
 description: Despliega tu proyecto Rebase a producción usando Docker, plataformas en la nube o configuraciones manuales.
 ---
 
