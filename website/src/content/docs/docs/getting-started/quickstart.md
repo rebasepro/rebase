@@ -8,7 +8,7 @@ description: Create a new Rebase project and get it running locally in under 2 m
 ## Create a New Project
 
 ```bash
-pnpm dlx rebase init my-app
+pnpm dlx @rebasepro/cli init my-app
 ```
 
 This scaffolds a project with three packages:

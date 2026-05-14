@@ -14,7 +14,7 @@ const STEPS = [
     title: "Connect your Postgres",
     description:
       "Point Rebase at any existing Postgres database. It introspects your schema — tables, types, relations — instantly.",
-    code: "$ npx rebase init",
+    code: "$ npx @rebasepro/cli init",
     icon: "🔌"
   },
   {

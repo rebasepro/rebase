@@ -8,7 +8,7 @@ description: Créez un nouveau projet Rebase et faites-le fonctionner localement
 ## Créer un nouveau projet
 
 ```bash
-pnpm dlx rebase init my-app
+pnpm dlx @rebasepro/cli init my-app
 ```
 
 Ceci échafaude un projet avec trois packages :

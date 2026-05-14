@@ -8,7 +8,7 @@ description: Erstellen Sie ein neues Rebase-Projekt und bringen Sie es in wenige
 ## Erstellen Sie ein neues Projekt
 
 ```bash
-pnpm dlx rebase init my-app
+pnpm dlx @rebasepro/cli init my-app
 ```
 
 Dies erstellt ein Projekt mit drei Paketen:

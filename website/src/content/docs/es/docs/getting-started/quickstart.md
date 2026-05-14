@@ -8,7 +8,7 @@ description: Crea un nuevo proyecto Rebase y ejecútalo localmente en menos de 2
 ## Crear un Nuevo Proyecto
 
 ```bash
-pnpm dlx rebase init my-app
+pnpm dlx @rebasepro/cli init my-app
 ```
 
 Esto genera la estructura de un proyecto con tres paquetes:

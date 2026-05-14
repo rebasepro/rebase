@@ -32,8 +32,7 @@ export default defineConfig(() => ({
             output: {
                 globals: {
                     "json-logic-js": "jsonLogic",
-                    "fast-equals": "fastEquals",
-                    "lodash/cloneDeep.js": "cloneDeep"
+                    "fast-equals": "fastEquals"
                 }
             }
         }

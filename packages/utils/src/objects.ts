@@ -88,6 +88,32 @@ export function clone<T>(value: T): T {
     }
 }
 
+/**
+ * Deep clone a value, preserving function references and class instances.
+ * Unlike structuredClone, this handles objects that contain functions
+ * (e.g. EntityCollection with target(), childCollections(), callbacks).
+ */
+export function deepClone<T>(value: T): T {
+    if (value === null || value === undefined) return value;
+    if (typeof value === "function") return value;
+    if (typeof value !== "object") return value;
+
+    if (Array.isArray(value)) {
+        return value.map(item => deepClone(item)) as unknown as T;
+    }
+
+    // Preserve class instances (Date, GeoPoint, etc.) — don't recurse
+    if (Object.getPrototypeOf(value) !== Object.prototype) {
+        return value;
+    }
+
+    const result: Record<string, unknown> = {};
+    for (const key of Object.keys(value)) {
+        result[key] = deepClone((value as Record<string, unknown>)[key]);
+    }
+    return result as T;
+}
+
 function toPath(value: string | string[]) {
     if (Array.isArray(value)) return value; // Already in path array form.
     // Replace brackets with dots, remove leading/trailing dots, then split by dot.

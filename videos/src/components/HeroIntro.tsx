@@ -167,7 +167,7 @@ mass: 0.6 }
 
   // ── Typing effect for npx command ──
   const typingStart = 55;
-  const command = "npx rebase init";
+  const command = "npx @rebasepro/cli init";
   const charsTyped = Math.min(
     command.length,
     Math.max(0, Math.floor((frame - typingStart) / 2))

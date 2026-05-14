@@ -16,8 +16,7 @@ import {
 import { deepEqual } from "fast-equals";
 
 import { enumToObjectEntries, getSubcollections, getTableName, resolveCollectionRelations, findRelation, sanitizeRelation } from "../util";
-import cloneDeep from "lodash/cloneDeep.js";
-import { removeFunctions, mergeDeep } from "@rebasepro/utils";
+import { removeFunctions, mergeDeep, deepClone } from "@rebasepro/utils";
 
 export class CollectionRegistry {
 
@@ -83,7 +82,7 @@ export class CollectionRegistry {
         // (e.g. Tags from Posts.relations) using the raw module object (without injected views)
         // before the top-level Tags collection (with injected views) gets its turn.
         normalizedCollections.forEach((c, index) => {
-            const raw = cloneDeep(collections[index]);
+            const raw = deepClone(collections[index]);
             this.rootCollections.push(c);
             this.rawRootCollections.push(raw);
 
@@ -105,7 +104,7 @@ export class CollectionRegistry {
                 subcollections.forEach((subCollection) => {
                     if (!subCollection) return;
                     // Spread to avoid mutating the original target() return value
-                    this._registerRecursively(this.normalizeCollection({ ...subCollection }), cloneDeep(subCollection));
+                    this._registerRecursively(this.normalizeCollection({ ...subCollection }), deepClone(subCollection));
                 });
             }
         });
@@ -117,7 +116,7 @@ export class CollectionRegistry {
     }
 
     register(collection: EntityCollection, rawCollection?: EntityCollection) {
-        const raw = rawCollection ? cloneDeep(rawCollection) : cloneDeep(collection);
+        const raw = rawCollection ? deepClone(rawCollection) : deepClone(collection);
 
         this.rootCollections.push(collection);
         this.rawRootCollections.push(raw);
@@ -149,7 +148,7 @@ export class CollectionRegistry {
             subcollections.forEach((subCollection) => {
                 if (!subCollection) return;
                 // Spread to avoid mutating the original target() return value
-                this._registerRecursively(this.normalizeCollection({ ...subCollection }), cloneDeep(subCollection));
+                this._registerRecursively(this.normalizeCollection({ ...subCollection }), deepClone(subCollection));
             });
         }
     }

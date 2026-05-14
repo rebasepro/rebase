@@ -41,7 +41,7 @@ Rebase is a **developer-first**, open-source headless CMS and admin panel framew
 ### ✨ Key Highlights
 
 - 🔓 **No Vendor Lock-in** — Self-host anywhere. Full control over your infrastructure, code, and database.
-- ⚡ **Instant Setup** — `npx create-rebase-app` scaffolds a production-ready project in seconds.
+- ⚡ **Instant Setup** — `npx @rebasepro/cli init` scaffolds a production-ready project in seconds.
 - 🗄️ **PostgreSQL First** — First-class Postgres support with Drizzle ORM, schema introspection, and automatic migrations.
 - 🧩 **Radical Extensibility** — Not constrained to pre-built widgets. If you can build it in React, you can build it in Rebase.
 - 🎨 **Premium UI** — Fast, accessible design system built on Tailwind CSS v4 and Radix UI.
@@ -54,7 +54,7 @@ Rebase is a **developer-first**, open-source headless CMS and admin panel framew
 Scaffold a complete, self-hosted Rebase application connected to your database:
 
 ```bash
-npx create-rebase-app my-rebase-app
+npx @rebasepro/cli init my-rebase-app
 ```
 
 Configure your database in `.env`, then start everything:
@@ -125,7 +125,7 @@ Drop custom Hono routes or scheduled tasks into the `functions/` and `crons/` di
 Auto-generate fully typed **TypeScript SDKs** from your collection definitions. Use them in any frontend, script, or service to interact with your Rebase backend with complete type safety.
 
 ```bash
-npx rebase generate-sdk
+npx @rebasepro/cli generate-sdk
 ```
 
 ### 🤖 MCP Server
