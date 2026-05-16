@@ -442,7 +442,9 @@ width: 240 }}
    Exact Scaffold.tsx + DefaultDrawer.tsx + DefaultAppBar.tsx
    layout from production
    ═══════════════════════════════════════════════════════════ */
-export function EntityViewDemo() {
+export type DemoViewMode = "list" | "table" | "cards" | "kanban";
+
+export function EntityViewDemo({ fixedViewMode }: { fixedViewMode?: DemoViewMode } = {}) {
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [formDirty, setFormDirty] = useState(false);
@@ -457,8 +459,7 @@ export function EntityViewDemo() {
   // Active collection (for switching between list/kanban)
   const [activeCollection, setActiveCollection] = useState<"posts" | "tags">("posts");
   // Current view mode
-  type DemoViewMode = "list" | "table" | "cards" | "kanban";
-  const [viewMode, setViewMode] = useState<DemoViewMode>("table");
+  const [viewMode, setViewMode] = useState<DemoViewMode>(fixedViewMode ?? "table");
   // Kanban drag animation state
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0,
@@ -516,20 +517,112 @@ field });
     const animateKanbanDrag = async (targetX: number, targetY: number, steps = 30) => {
       for (let i = 0; i <= steps; i++) {
         const progress = i / steps;
-        // Ease-out curve
         const ease = 1 - Math.pow(1 - progress, 3);
         const x = ease * targetX;
         const y = ease * targetY + Math.sin(progress * Math.PI) * -8;
-        setDragOffset({ x,
-y });
+        setDragOffset({ x, y });
         await new Promise(r => { timer = setTimeout(r, 16); });
         if (!isMounted) return;
       }
     };
 
-    const loop = async () => {
+    // ── TABLE / SPREADSHEET focused loop ──
+    const loopTable = async () => {
       while (isMounted) {
-        // ── Phase 1: TABLE view — Browse rows, inline-edit ──
+        setActiveCollection("posts");
+        setHoveredRow("PROD-1");
+        await wait(350); if (!guard()) return;
+        setHoveredRow("PROD-2");
+        await wait(300); if (!guard()) return;
+        setHoveredRow("PROD-4");
+        await wait(300); if (!guard()) return;
+
+        setTableOverrides((prev) => ({ ...prev, "PROD-4": { status: "Available" } }));
+        flashCell("PROD-4", "status");
+        await wait(700); if (!guard()) return;
+
+        setHoveredRow("PROD-5");
+        await wait(300); if (!guard()) return;
+        setHoveredRow("PROD-2");
+        await wait(300); if (!guard()) return;
+
+        openEntity("PROD-2");
+        setHoveredRow(null);
+        await wait(700); if (!guard()) return;
+
+        setFormValues((prev) => ({ ...prev, status: "Out of Stock" }));
+        setFormDirty(true);
+        flashFormField("status");
+        await wait(500); if (!guard()) return;
+
+        setIsSaving(true);
+        await wait(450); if (!guard()) return;
+        setIsSaving(false);
+        setFormDirty(false);
+        await wait(350); if (!guard()) return;
+
+        closePanel();
+        await wait(400); if (!guard()) return;
+
+        // Reset
+        setHoveredRow(null);
+        setTableOverrides({});
+        await wait(500); if (!guard()) return;
+      }
+    };
+
+    // ── KANBAN focused loop ──
+    const loopKanban = async () => {
+      while (isMounted) {
+        setActiveCollection("posts");
+
+        setKanbanHighlight("871090");
+        await wait(500); if (!guard()) return;
+        setKanbanHighlight("870984");
+        await wait(400); if (!guard()) return;
+        setKanbanHighlight(null);
+        await wait(300); if (!guard()) return;
+
+        setDragSourceColumn("in_progress");
+        setDraggedCardId("870984");
+        setDragOffset({ x: 0, y: 0 });
+        await wait(200); if (!guard()) return;
+        setDropTargetColumn("review");
+        await animateKanbanDrag(260, -60);
+        if (!guard()) return;
+        await wait(300); if (!guard()) return;
+        setDraggedCardId(null);
+        setDragOffset({ x: 0, y: 0 });
+        setDropTargetColumn(null);
+        setDragSourceColumn(null);
+        await wait(600); if (!guard()) return;
+
+        setKanbanHighlight("871492");
+        await wait(500); if (!guard()) return;
+        setKanbanHighlight("871388");
+        await wait(400); if (!guard()) return;
+        setKanbanHighlight(null);
+        await wait(300); if (!guard()) return;
+
+        setDragSourceColumn("backlog");
+        setDraggedCardId("871388");
+        setDragOffset({ x: 0, y: 0 });
+        await wait(200); if (!guard()) return;
+        setDropTargetColumn("in_progress");
+        await animateKanbanDrag(240, -30);
+        if (!guard()) return;
+        await wait(300); if (!guard()) return;
+        setDraggedCardId(null);
+        setDragOffset({ x: 0, y: 0 });
+        setDropTargetColumn(null);
+        setDragSourceColumn(null);
+        await wait(800); if (!guard()) return;
+      }
+    };
+
+    // ── FULL cycle (default — all view modes) ──
+    const loopAll = async () => {
+      while (isMounted) {
         setActiveCollection("posts");
         setViewMode("table");
         setHoveredRow("PROD-1");
@@ -539,9 +632,7 @@ y });
         setHoveredRow("PROD-4");
         await wait(300); if (!guard()) return;
 
-        // Inline edit: change entity PROD-4 status from Out of Stock → Available
-        setTableOverrides((prev) => ({ ...prev,
-"PROD-4": { status: "Available" } }));
+        setTableOverrides((prev) => ({ ...prev, "PROD-4": { status: "Available" } }));
         flashCell("PROD-4", "status");
         await wait(700); if (!guard()) return;
 
@@ -550,30 +641,24 @@ y });
         setHoveredRow("PROD-2");
         await wait(300); if (!guard()) return;
 
-        // Open entity PROD-2
         openEntity("PROD-2");
         setHoveredRow(null);
         await wait(700); if (!guard()) return;
 
-        // Change status in form
-        setFormValues((prev) => ({ ...prev,
-status: "Out of Stock" }));
+        setFormValues((prev) => ({ ...prev, status: "Out of Stock" }));
         setFormDirty(true);
         flashFormField("status");
         await wait(500); if (!guard()) return;
 
-        // Save
         setIsSaving(true);
         await wait(450); if (!guard()) return;
         setIsSaving(false);
         setFormDirty(false);
         await wait(350); if (!guard()) return;
 
-        // Close
         closePanel();
         await wait(400); if (!guard()) return;
 
-        // ── Phase 2: CARDS view — browse cards ──
         setViewMode("cards");
         await wait(600); if (!guard()) return;
         setHoveredRow("PROD-1");
@@ -583,16 +668,13 @@ status: "Out of Stock" }));
         setHoveredRow("PROD-5");
         await wait(400); if (!guard()) return;
 
-        // Open an entity from cards view
         openEntity("PROD-5");
         setHoveredRow(null);
         await wait(600); if (!guard()) return;
 
-        // Close
         closePanel();
         await wait(400); if (!guard()) return;
 
-        // Browse more
         setHoveredRow("PROD-7");
         await wait(300); if (!guard()) return;
         setHoveredRow("PROD-8");
@@ -600,7 +682,6 @@ status: "Out of Stock" }));
         setHoveredRow(null);
         await wait(300); if (!guard()) return;
 
-        // ── Phase 3: LIST view — quick browse ──
         setViewMode("list");
         await wait(500); if (!guard()) return;
         setHoveredRow("PROD-1");
@@ -612,22 +693,18 @@ status: "Out of Stock" }));
         setHoveredRow("PROD-5");
         await wait(300); if (!guard()) return;
 
-        // Open entity PROD-5
         openEntity("PROD-5");
         setHoveredRow(null);
         await wait(500); if (!guard()) return;
 
-        // Close
         closePanel();
         await wait(400); if (!guard()) return;
 
-        // ── Phase 4: KANBAN view — drag and drop ──
         setViewMode("kanban");
         setHoveredRow(null);
         setTableOverrides({});
         await wait(800); if (!guard()) return;
 
-        // Hover over cards briefly
         setKanbanHighlight("871090");
         await wait(500); if (!guard()) return;
         setKanbanHighlight("870984");
@@ -635,24 +712,20 @@ status: "Out of Stock" }));
         setKanbanHighlight(null);
         await wait(300); if (!guard()) return;
 
-        // Drag card from "In Progress" to "Review" column
         setDragSourceColumn("in_progress");
         setDraggedCardId("870984");
-        setDragOffset({ x: 0,
-y: 0 });
+        setDragOffset({ x: 0, y: 0 });
         await wait(200); if (!guard()) return;
         setDropTargetColumn("review");
         await animateKanbanDrag(260, -60);
         if (!guard()) return;
         await wait(300); if (!guard()) return;
         setDraggedCardId(null);
-        setDragOffset({ x: 0,
-y: 0 });
+        setDragOffset({ x: 0, y: 0 });
         setDropTargetColumn(null);
         setDragSourceColumn(null);
         await wait(600); if (!guard()) return;
 
-        // Highlight another card
         setKanbanHighlight("871492");
         await wait(500); if (!guard()) return;
         setKanbanHighlight("871388");
@@ -660,28 +733,23 @@ y: 0 });
         setKanbanHighlight(null);
         await wait(300); if (!guard()) return;
 
-        // Drag card from "Backlog" to "In Progress"
         setDragSourceColumn("backlog");
         setDraggedCardId("871388");
-        setDragOffset({ x: 0,
-y: 0 });
+        setDragOffset({ x: 0, y: 0 });
         await wait(200); if (!guard()) return;
         setDropTargetColumn("in_progress");
         await animateKanbanDrag(240, -30);
         if (!guard()) return;
         await wait(300); if (!guard()) return;
         setDraggedCardId(null);
-        setDragOffset({ x: 0,
-y: 0 });
+        setDragOffset({ x: 0, y: 0 });
         setDropTargetColumn(null);
         setDragSourceColumn(null);
         await wait(800); if (!guard()) return;
 
-        // ── Phase 5: Back to TABLE — quick edit cycle ──
         setViewMode("table");
         await wait(400); if (!guard()) return;
 
-        // Quick browse
         setHoveredRow("PROD-1");
         await wait(200); if (!guard()) return;
         setHoveredRow("PROD-2");
@@ -691,50 +759,44 @@ y: 0 });
         setHoveredRow("PROD-1");
         await wait(350); if (!guard()) return;
 
-        // Inline table edit: change PROD-1 Available → Discontinued
-        setTableOverrides((prev) => ({ ...prev,
-"PROD-1": { status: "Discontinued" } }));
+        setTableOverrides((prev) => ({ ...prev, "PROD-1": { status: "Discontinued" } }));
         flashCell("PROD-1", "status");
         await wait(600); if (!guard()) return;
 
-        // Open entity PROD-1 to see the change
         openEntity("PROD-1");
         setHoveredRow(null);
         await wait(500); if (!guard()) return;
 
-        // Revert status in form
-        setFormValues((prev) => ({ ...prev,
-status: "Available" }));
+        setFormValues((prev) => ({ ...prev, status: "Available" }));
         setFormDirty(true);
         flashFormField("status");
         await wait(400); if (!guard()) return;
 
-        // Save
         setIsSaving(true);
         await wait(450); if (!guard()) return;
         setIsSaving(false);
         setFormDirty(false);
-        setTableOverrides((prev) => ({ ...prev,
-"PROD-1": { status: "Available" } }));
+        setTableOverrides((prev) => ({ ...prev, "PROD-1": { status: "Available" } }));
         await wait(350); if (!guard()) return;
 
-        // Close
         closePanel();
         await wait(400); if (!guard()) return;
 
-        // Reset
         setHoveredRow(null);
         setTableOverrides({});
         await wait(300); if (!guard()) return;
       }
     };
 
-    loop();
+    if (fixedViewMode === "table") loopTable();
+    else if (fixedViewMode === "kanban") loopKanban();
+    else loopAll();
+
     return () => {
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [openEntity, closePanel]);
+  }, [openEntity, closePanel, fixedViewMode]);
 
   /* ── Drawer nav items (production-identical: DrawerNavigationItem.tsx) ── */
   const NAV_ITEMS = [

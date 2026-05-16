@@ -80,9 +80,6 @@ importers:
       '@rebasepro/server-core':
         specifier: workspace:*
         version: link:../../packages/server-core
-      '@rebasepro/server-mongodb':
-        specifier: workspace:*
-        version: link:../../packages/server-mongodb
       '@rebasepro/server-postgresql':
         specifier: workspace:*
         version: link:../../packages/server-postgresql

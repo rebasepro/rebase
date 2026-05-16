@@ -14,7 +14,6 @@ import {
     logger
 } from "@rebasepro/server-core";
 import { createPostgresDatabaseConnection, createPostgresBootstrapper } from "@rebasepro/server-postgresql";
-import { createMongoDBConnection, createMongoBootstrapper } from "@rebasepro/server-mongodb";
 import { enums, relations, tables } from "./schema.generated.js";
 import { env } from "./env.js";
 
@@ -44,23 +43,11 @@ app.use("/*", secureHeaders({
 }));
 
 // ─── Database ────────────────────────────────────────────────────────
-const isMongo = env.DATABASE_URL.startsWith("mongodb://") || env.DATABASE_URL.startsWith("mongodb+srv://");
-
-let postgresResources: any;
-let mongoResources: any;
-
-if (isMongo) {
-    mongoResources = await createMongoDBConnection(
-        env.DATABASE_URL,
-        "rebase_app"
-    );
-} else {
-    postgresResources = createPostgresDatabaseConnection(env.DATABASE_URL, undefined, {
-        max: env.DB_POOL_MAX,
-        idleTimeoutMillis: env.DB_POOL_IDLE_TIMEOUT,
-        connectionTimeoutMillis: env.DB_POOL_CONNECT_TIMEOUT
-    });
-}
+const postgresResources = createPostgresDatabaseConnection(env.DATABASE_URL, undefined, {
+    max: env.DB_POOL_MAX,
+    idleTimeoutMillis: env.DB_POOL_IDLE_TIMEOUT,
+    connectionTimeoutMillis: env.DB_POOL_CONNECT_TIMEOUT
+});
 
 // ─── Start ───────────────────────────────────────────────────────────
 async function startServer() {
@@ -77,17 +64,12 @@ async function startServer() {
         server,
         app,
         bootstrappers: [
-            isMongo
-                ? createMongoBootstrapper({
-                    connection: mongoResources.db,
-                    client: mongoResources.client
-                })
-                : createPostgresBootstrapper({
-                    connection: postgresResources.db,
-                    schema: { tables, enums, relations },
-                    adminConnectionString: env.ADMIN_CONNECTION_STRING || env.DATABASE_URL,
-                    connectionString: postgresResources.connectionString
-                })
+            createPostgresBootstrapper({
+                connection: postgresResources.db,
+                schema: { tables, enums, relations },
+                adminConnectionString: env.ADMIN_CONNECTION_STRING || env.DATABASE_URL,
+                connectionString: postgresResources.connectionString
+            })
         ],
         auth: {
             jwtSecret: env.JWT_SECRET,
@@ -189,11 +171,7 @@ async function startServer() {
             logger.info("HTTP server closed. Draining background tasks and database pool...");
             try {
                 await backend.shutdown();
-                if (isMongo) {
-                    await mongoResources.client.close();
-                } else {
-                    await postgresResources.pool.end();
-                }
+                await postgresResources.pool.end();
                 logger.info("Graceful shutdown complete.");
                 process.exit(0);
             } catch (shutdownErr) {

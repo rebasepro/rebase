@@ -7,6 +7,7 @@ import ordersCollection from "./orders";
 import orderItemsCollection from "./order_items";
 import ticketsCollection from "./tickets";
 import productLocalesCollection from "./product_locales";
+import exercisesCollection from "./exercises";
 
 export const collections = [
     authorsCollection,
@@ -17,5 +18,6 @@ export const collections = [
     ordersCollection,
     orderItemsCollection,
     ticketsCollection,
-    productLocalesCollection
+    productLocalesCollection,
+    exercisesCollection
 ];

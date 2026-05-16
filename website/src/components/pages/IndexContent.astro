@@ -3,12 +3,13 @@ const { lang, t } = Astro.props;
 import ScrollSyncShowcase from '../../components/ScrollSyncShowcase.astro';
 import CollectionPowerSection from '../../components/CollectionPowerSection.astro';
 import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
-import { EntityViewDemo } from '../../components/demos/EntityViewDemo';
+import { AdminDemoCarousel } from '../../components/demos/AdminDemoCarousel';
 import { KanbanDemo } from '../../components/demos/KanbanDemo';
 import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
 import { SdkMiniDemo } from '../../components/demos/SdkMiniDemo';
 import { RealtimeMiniDemo } from '../../components/demos/RealtimeMiniDemo';
 import RoadmapSection from '../../components/RoadmapSection.astro';
+import ABVariant from '../../components/ABVariant.astro';
 
 import ClientLogos from '../../components/ClientLogos.astro';
 import { languages, defaultLang, useTranslations } from '../../i18n/ui';
@@ -19,10 +20,10 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 ---
 
 
-    <main>
+    <main class="flex flex-col">
 
         <!-- Hero -->
-        <section class="relative isolate overflow-hidden bg-black pt-16 pb-24 sm:pt-20 sm:pb-28 lg:pt-24 lg:pb-32">
+        <section id="s-hero" class="relative isolate overflow-hidden bg-black pt-16 pb-24 sm:pt-20 sm:pb-28 lg:pt-24 lg:pb-32">
             <!-- Background gradient top shape -->
             <!-- Animated background orbs -->
             <div class="hero-orb hero-orb-1" aria-hidden="true"></div>
@@ -43,9 +44,21 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
                 <!-- Headline -->
                 <div class="relative">
                     <div class="absolute inset-0 pointer-events-none" aria-hidden="true" style="background: radial-gradient(ellipse 60% 80% at 50% 50%, rgba(0, 112, 244, 0.12) 0%, rgba(0, 80, 200, 0.06) 40%, transparent 75%); filter: blur(20px);"></div>
-                    <h1 class="relative mb-6 text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.08] text-white animate-on-scroll fade-in-up">
-                        {t('hero.title.part1')}<br/><span class="text-primary subtle-shimmer">{t('hero.title.part2')}</span>
-                    </h1>
+                    <ABVariant experiment="hero-headline" variant="control">
+                        <h1 class="relative mb-6 text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.08] text-white animate-on-scroll fade-in-up">
+                            {t('hero.title.part1')}<br/><span class="text-primary subtle-shimmer">{t('hero.title.part2')}</span>
+                        </h1>
+                    </ABVariant>
+                    <ABVariant experiment="hero-headline" variant="benefit">
+                        <h1 class="relative mb-6 text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.08] text-white animate-on-scroll fade-in-up">
+                            Ship Faster with<br/><span class="text-primary subtle-shimmer">Postgres Superpowers.</span>
+                        </h1>
+                    </ABVariant>
+                    <ABVariant experiment="hero-headline" variant="action">
+                        <h1 class="relative mb-6 text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.08] text-white animate-on-scroll fade-in-up">
+                            Build Your Backend<br/><span class="text-primary subtle-shimmer">in Minutes, Not Months.</span>
+                        </h1>
+                    </ABVariant>
                 </div>
                 <p class="mb-8 text-lg leading-8 text-surface-400 lg:text-xl sm:px-10 xl:px-40 animate-on-scroll fade-in-up" set:html={t('hero.subtitle')} />
                 
@@ -60,7 +73,7 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
                                     <span class="text-primary font-bold mr-3">~</span>
                                     <span class="text-white">pnpm dlx @rebasepro/cli init</span>
                                 </div>
-                                <button onclick="navigator.clipboard.writeText('pnpm dlx @rebasepro/cli init')" class="text-surface-500 hover:text-white transition-colors ml-4" aria-label="Copy command" title="Copy to clipboard">
+                                <button data-track-copy="hero" onclick="navigator.clipboard.writeText('pnpm dlx @rebasepro/cli init')" class="text-surface-500 hover:text-white transition-colors ml-4" aria-label="Copy command" title="Copy to clipboard">
                                     <svg class="lucide lucide-copy" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
                                 </button>
                             </div>
@@ -77,7 +90,7 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
         </section>
 
         <!-- Social proof -->
-        <section class="bg-black py-20 sm:py-28">
+        <section id="s-social-proof" class="bg-black py-20 sm:py-28">
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
                 <p class="text-center text-sm text-surface-500 mb-8 animate-on-scroll fade-in">{t('social.title')}</p>
                 <ClientLogos />
@@ -86,7 +99,7 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
 
         <!-- Product demo -->
-        <section class="bg-black border-b border-surface-900 relative pt-32 pb-40 sm:pt-48 sm:pb-56">
+        <section id="s-demo-terminal" class="bg-black border-b border-surface-900 relative pt-32 pb-40 sm:pt-48 sm:pb-56">
             <!-- subtle separator line -->
             <div class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-surface-700/40 to-transparent"></div>
 
@@ -137,7 +150,7 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
                                             <span class="text-primary font-bold">~</span>
                                             <span class="text-white">pnpm dlx @rebasepro/cli init</span>
                                         </div>
-                                        <button onclick="navigator.clipboard.writeText('pnpm dlx @rebasepro/cli init')" class="text-surface-500 hover:text-white transition-colors" aria-label="Copy command" title="Copy to clipboard">
+                                        <button data-track-copy="demo-terminal" onclick="navigator.clipboard.writeText('pnpm dlx @rebasepro/cli init')" class="text-surface-500 hover:text-white transition-colors" aria-label="Copy command" title="Copy to clipboard">
                                             
 <svg
   class="lucide lucide-copy"
@@ -225,53 +238,17 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
         </section>
 
 
-        <!-- Interactive admin demo -->
-        <section class="bg-black relative py-24 sm:py-32">
+        <section id="s-demo-carousel" class="bg-black relative py-24 sm:py-32">
             <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                <div class="w-full rounded-2xl overflow-hidden border border-surface-800/80 bg-surface-950 shadow-[0_0_0_1px_rgba(15,23,42,0.55),0_24px_120px_rgba(0,0,0,0.65)] pointer-events-none">
-                    <!-- Browser Chrome -->
-                    <div class="px-4 py-3 border-b border-surface-800/80 flex items-center gap-2 bg-surface-900/50 backdrop-blur-md">
-                        <div class="flex gap-1.5 w-16">
-                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
-                        </div>
-                        <div class="flex-1 flex justify-center">
-                            <div class="bg-surface-950/80 border border-surface-800/80 rounded-md px-3 py-1 text-[11px] font-mono text-surface-500 flex items-center gap-1.5">
-                                
-<svg
-  class="lucide lucide-lock"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-</svg>
-
-                                admin.yourdomain.com
-                            </div>
-                        </div>
-                        <div class="w-16"></div> <!-- Balance the layout -->
-                    </div>
-                    <div class="relative w-full">
-                        <EntityViewDemo client:load />
-                    </div>
-                </div>
-                <p class="mt-4 text-center text-xs sm:text-sm text-surface-500">
+                <AdminDemoCarousel client:load />
+                <p class="mt-2 text-center text-xs sm:text-sm text-surface-500">
                     A quick tour of the generated Rebase admin panel.
                 </p>
             </div>
         </section>
 
         <!-- How it works -->
-        <section class="relative py-28 sm:py-36 overflow-hidden bg-black">
+        <section id="s-how-it-works" class="relative py-28 sm:py-36 overflow-hidden bg-black">
             <div class="mx-auto max-w-7xl px-6 lg:px-12">
                 <div class="max-w-3xl mx-auto text-center mb-12 sm:mb-16 animate-on-scroll fade-in-up">
                     <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase">{t('howitworks.badge')}</h2>
@@ -347,7 +324,7 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
                                                 <span class="text-primary font-bold">~</span>
                                                 <span class="text-white">pnpm dlx @rebasepro/cli init</span>
                                             </div>
-                                            <button onclick="navigator.clipboard.writeText('pnpm dlx @rebasepro/cli init')" class="text-surface-500 hover:text-white transition-colors" aria-label="Copy command" title="Copy to clipboard">
+                                            <button data-track-copy="how-it-works" onclick="navigator.clipboard.writeText('pnpm dlx @rebasepro/cli init')" class="text-surface-500 hover:text-white transition-colors" aria-label="Copy command" title="Copy to clipboard">
                                                 
 <svg
   class="lucide lucide-copy"
@@ -445,7 +422,7 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
 
         <!-- Power features with videos -->
-        <section class="relative isolate bg-black py-28 sm:py-36 overflow-hidden">
+        <section id="s-power-features" class="relative isolate bg-black py-28 sm:py-36 overflow-hidden">
             <SectionBackgroundAccents blob={{ position: "bottom", size: "lg" }}/>
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
                 <div class="mx-auto max-w-2xl text-center mb-16 animate-on-scroll fade-in-up">
@@ -725,11 +702,13 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
             </div>
         </section>
 
-        <!-- One Collection. Everything. -->
-        <CollectionPowerSection/>
+        <div id="s-collection-power">
+            <!-- One Collection. Everything. -->
+            <CollectionPowerSection/>
+        </div>
 
         <!-- Built With Rebase: SustenTalent Use Case -->
-        <section class="relative isolate bg-black py-28 sm:py-36 overflow-hidden">
+        <section id="s-case-study" class="relative isolate bg-black py-28 sm:py-36 overflow-hidden">
             <div class="mx-auto max-w-7xl px-4">
                 <div class="mx-auto max-w-3xl lg:text-center animate-on-scroll fade-in-up">
                     <p class="text-base font-semibold leading-7 text-primary">{t('showcase.badge')}</p>
@@ -952,11 +931,13 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
             </div>
         </section>
 
-        <!-- Scroll-sync feature showcase -->
-        <ScrollSyncShowcase/>
+        <div id="s-scroll-sync">
+            <!-- Scroll-sync feature showcase -->
+            <ScrollSyncShowcase/>
+        </div>
 
         <!-- Two big punches — sell feelings, link to depth -->
-        <section class="relative isolate bg-black py-28 sm:py-36 overflow-hidden">
+        <section id="s-security" class="relative isolate bg-black py-28 sm:py-36 overflow-hidden">
             <SectionBackgroundAccents blob={{ position: "bottom", size: "md" }}/>
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -1084,7 +1065,7 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
         </section>
 
         <!-- FAQ -->
-        <section class="bg-black py-28 sm:py-36">
+        <section id="s-faq" class="bg-black py-28 sm:py-36">
             <div class="mx-auto max-w-7xl px-6">
                 <div class="mx-auto max-w-3xl text-center animate-on-scroll fade-in-up">
                     <h2 class="text-3xl sm:text-4xl font-semibold text-white">{t('faq.title')}</h2>
@@ -1123,11 +1104,13 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
         </section>
 
 
-        <!-- Roadmap -->
-        <RoadmapSection />
+        <div id="s-roadmap">
+            <!-- Roadmap -->
+            <RoadmapSection />
+        </div>
 
         <!-- Final CTA -->
-        <section class="relative isolate bg-black py-28 sm:py-36 overflow-hidden">
+        <section id="s-final-cta" class="relative isolate bg-black py-28 sm:py-36 overflow-hidden">
             <SectionBackgroundAccents topLine={true} blob={{ position: "top", size: "lg" }}/>
             <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
                 <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-4 animate-on-scroll fade-in-up">
@@ -1172,7 +1155,7 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
                                     <span class="text-primary font-bold mr-3">~</span>
                                     <span class="text-white">pnpm dlx @rebasepro/cli init</span>
                                 </div>
-                                <button onclick="navigator.clipboard.writeText('pnpm dlx @rebasepro/cli init')" class="text-surface-500 hover:text-white transition-colors" aria-label="Copy command" title="Copy to clipboard">
+                                <button data-track-copy="bottom-cta" onclick="navigator.clipboard.writeText('pnpm dlx @rebasepro/cli init')" class="text-surface-500 hover:text-white transition-colors" aria-label="Copy command" title="Copy to clipboard">
                                     
 <svg
   class="lucide lucide-copy"

@@ -1,0 +1,335 @@
+---
+/**
+ * A/B Testing Developer Panel
+ *
+ * Floating overlay for previewing experiment variants during development.
+ * Shows all active experiments, lets you switch variants instantly,
+ * and supports force-activating commented-out experiments via URL params.
+ *
+ * Only renders on localhost / dev environments.
+ *
+ * URL override: ?ab=experimentId:variantName (comma-separated for multiple)
+ * Example: ?ab=landing-order:proof-first,hero-cta:action-oriented
+ */
+import { EXPERIMENTS } from "../scripts/ab-testing";
+
+const isDev = import.meta.env.DEV;
+const experimentsJson = JSON.stringify(EXPERIMENTS);
+---
+
+{isDev && (
+<div id="ab-dev-panel" style="
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    z-index: 99999;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 13px;
+    line-height: 1.4;
+">
+    <!-- Toggle button -->
+    <button id="ab-dev-toggle" style="
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        border: 1px solid rgba(255,255,255,0.15);
+        background: rgba(15, 15, 20, 0.92);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        color: #a78bfa;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        transition: all 0.2s ease;
+    ">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+            <path d="M2 17l10 5 10-5"/>
+            <path d="M2 12l10 5 10-5"/>
+        </svg>
+    </button>
+
+    <!-- Panel -->
+    <div id="ab-dev-body" style="
+        display: none;
+        width: 320px;
+        max-height: 70vh;
+        overflow-y: auto;
+        border-radius: 12px;
+        border: 1px solid rgba(255,255,255,0.1);
+        background: rgba(12, 12, 18, 0.95);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05);
+        color: #e2e8f0;
+        padding: 0;
+    ">
+        <!-- Header -->
+        <div style="
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        ">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                    <path d="M2 17l10 5 10-5"/>
+                    <path d="M2 12l10 5 10-5"/>
+                </svg>
+                <span style="font-weight:600;font-size:13px;color:#f1f5f9;">A/B Testing</span>
+                <span style="
+                    font-size:10px;
+                    padding:2px 6px;
+                    border-radius:4px;
+                    background:rgba(167,139,250,0.15);
+                    color:#a78bfa;
+                    font-weight:500;
+                ">DEV</span>
+            </div>
+            <button id="ab-dev-close" style="
+                background:none;
+                border:none;
+                color:#64748b;
+                cursor:pointer;
+                padding:2px;
+                line-height:1;
+                font-size:16px;
+            ">✕</button>
+        </div>
+
+        <!-- Experiment list (populated by script) -->
+        <div id="ab-dev-experiments" style="padding:8px 0;"></div>
+
+        <!-- Empty state -->
+        <div id="ab-dev-empty" style="
+            padding: 24px 16px;
+            text-align: center;
+            color: #64748b;
+            display: none;
+        ">
+            <p style="margin:0 0 4px;">No active experiments</p>
+            <p style="margin:0;font-size:11px;color:#475569;">
+                Define experiments in<br>
+                <code style="color:#a78bfa;font-size:11px;">src/scripts/ab-testing.ts</code>
+            </p>
+        </div>
+
+        <!-- URL override hint -->
+        <div style="
+            padding: 8px 16px 12px;
+            border-top: 1px solid rgba(255,255,255,0.06);
+            font-size: 11px;
+            color: #475569;
+        ">
+            URL override: <code style="color:#94a3b8;font-size:10px;">?ab=id:variant</code>
+        </div>
+    </div>
+</div>
+
+<script is:inline define:vars={{ experimentsJson }}>
+(function() {
+    var EXPERIMENTS;
+    try { EXPERIMENTS = JSON.parse(experimentsJson); } catch(e) { return; }
+
+    var panel = document.getElementById("ab-dev-body");
+    var toggle = document.getElementById("ab-dev-toggle");
+    var close = document.getElementById("ab-dev-close");
+    var container = document.getElementById("ab-dev-experiments");
+    var empty = document.getElementById("ab-dev-empty");
+
+    // Toggle panel
+    var open = false;
+    toggle.addEventListener("click", function() {
+        open = !open;
+        panel.style.display = open ? "block" : "none";
+        toggle.style.display = open ? "none" : "flex";
+    });
+    close.addEventListener("click", function() {
+        open = false;
+        panel.style.display = "none";
+        toggle.style.display = "flex";
+    });
+
+    // Check URL overrides: ?ab=experimentId:variant,experimentId:variant
+    var urlParams = new URLSearchParams(window.location.search);
+    var abOverride = urlParams.get("ab");
+    var overrides = {};
+    if (abOverride) {
+        abOverride.split(",").forEach(function(pair) {
+            var parts = pair.split(":");
+            if (parts.length === 2) overrides[parts[0].trim()] = parts[1].trim();
+        });
+    }
+
+    function getCurrentVariant(id) {
+        return document.documentElement.getAttribute("data-ab-" + id);
+    }
+
+    function applyVariant(experimentId, variant, experiment) {
+        var H = document.documentElement;
+        H.setAttribute("data-ab-" + experimentId, variant);
+
+        // Update cookie
+        var m = document.cookie.match(/(^|;)\s*rb_ab\s*=\s*([^;]+)/);
+        var a = {};
+        if (m) try { a = JSON.parse(decodeURIComponent(m[2])); } catch(e) {}
+        a[experimentId] = variant;
+        var dm = location.hostname.indexOf("rebase.pro") > -1 ? ";domain=.rebase.pro" : "";
+        document.cookie = "rb_ab=" + encodeURIComponent(JSON.stringify(a)) +
+            ";path=/;max-age=7776000;samesite=lax" + dm;
+
+        // Rebuild AB styles
+        var css = "";
+        // Content variant CSS
+        EXPERIMENTS.forEach(function(exp) {
+            var v = H.getAttribute("data-ab-" + exp.id);
+            if (v && v !== "control") {
+                css += '[data-ab-show="' + exp.id + ':control"]{display:none!important}';
+                css += '[data-ab-show="' + exp.id + ':' + v + '"]{display:block!important}';
+            }
+            // Section reorder CSS
+            if (v && v !== "control" && exp.sectionOrders && exp.sectionOrders[v]) {
+                var so = exp.sectionOrders[v];
+                for (var sid in so) css += "#" + sid + "{order:" + so[sid] + "}";
+            }
+        });
+
+        var existing = document.getElementById("ab-styles");
+        if (existing) existing.remove();
+        if (css) {
+            var s = document.createElement("style");
+            s.id = "ab-styles";
+            s.textContent = css;
+            document.head.appendChild(s);
+        }
+
+        renderExperiments();
+    }
+
+    function renderExperiments() {
+        container.innerHTML = "";
+
+        if (!EXPERIMENTS.length) {
+            empty.style.display = "block";
+            return;
+        }
+        empty.style.display = "none";
+
+        EXPERIMENTS.forEach(function(exp) {
+            var isExpired = exp.expires && new Date(exp.expires).getTime() < Date.now();
+            var current = getCurrentVariant(exp.id) || "control";
+
+            var section = document.createElement("div");
+            section.style.cssText = "padding:8px 16px 12px;";
+
+            // Experiment header
+            var header = document.createElement("div");
+            header.style.cssText = "display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;";
+            header.innerHTML =
+                '<span style="font-weight:600;font-size:12px;color:#f1f5f9;">' + exp.id + '</span>' +
+                (isExpired
+                    ? '<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(239,68,68,0.15);color:#ef4444;">expired</span>'
+                    : (exp.expires
+                        ? '<span style="font-size:10px;color:#64748b;">→ ' + exp.expires + '</span>'
+                        : ''));
+            section.appendChild(header);
+
+            // Type indicator
+            if (exp.sectionOrders) {
+                var badge = document.createElement("div");
+                badge.style.cssText = "font-size:10px;color:#64748b;margin-bottom:6px;";
+                badge.textContent = "⇅ Section reorder experiment";
+                section.appendChild(badge);
+            }
+
+            // Variant buttons
+            var btnRow = document.createElement("div");
+            btnRow.style.cssText = "display:flex;gap:4px;flex-wrap:wrap;";
+
+            exp.variants.forEach(function(v) {
+                var isActive = v === current;
+                var btn = document.createElement("button");
+                btn.textContent = v;
+                btn.style.cssText =
+                    "padding:4px 10px;" +
+                    "border-radius:6px;" +
+                    "border:1px solid " + (isActive ? "rgba(167,139,250,0.5)" : "rgba(255,255,255,0.1)") + ";" +
+                    "background:" + (isActive ? "rgba(167,139,250,0.2)" : "rgba(255,255,255,0.03)") + ";" +
+                    "color:" + (isActive ? "#c4b5fd" : "#94a3b8") + ";" +
+                    "font-size:11px;" +
+                    "font-weight:" + (isActive ? "600" : "400") + ";" +
+                    "cursor:pointer;" +
+                    "transition:all 0.15s ease;";
+
+                btn.addEventListener("mouseenter", function() {
+                    if (!isActive) {
+                        btn.style.borderColor = "rgba(167,139,250,0.3)";
+                        btn.style.background = "rgba(167,139,250,0.1)";
+                    }
+                });
+                btn.addEventListener("mouseleave", function() {
+                    if (!isActive) {
+                        btn.style.borderColor = "rgba(255,255,255,0.1)";
+                        btn.style.background = "rgba(255,255,255,0.03)";
+                    }
+                });
+                btn.addEventListener("click", function() {
+                    applyVariant(exp.id, v, exp);
+                });
+
+                btnRow.appendChild(btn);
+            });
+
+            section.appendChild(btnRow);
+
+            // Section order preview for reorder experiments
+            if (exp.sectionOrders && current !== "control" && exp.sectionOrders[current]) {
+                var preview = document.createElement("div");
+                preview.style.cssText = "margin-top:8px;font-size:10px;color:#475569;max-height:100px;overflow-y:auto;";
+                var so = exp.sectionOrders[current];
+                var sorted = Object.keys(so).sort(function(a, b) { return so[a] - so[b]; });
+                preview.innerHTML = sorted.map(function(sid) {
+                    return '<div style="padding:1px 0;"><span style="color:#64748b;width:18px;display:inline-block;">' +
+                        so[sid] + '.</span> <span style="color:#94a3b8;">' + sid.replace('s-', '') + '</span></div>';
+                }).join('');
+                section.appendChild(preview);
+            }
+
+            container.appendChild(section);
+
+            // Separator
+            var sep = document.createElement("div");
+            sep.style.cssText = "height:1px;background:rgba(255,255,255,0.06);margin:0 16px;";
+            container.appendChild(sep);
+        });
+
+        // Remove last separator
+        if (container.lastChild) container.removeChild(container.lastChild);
+    }
+
+    // Apply URL overrides
+    for (var id in overrides) {
+        var exp = EXPERIMENTS.find(function(e) { return e.id === id; });
+        if (exp && exp.variants.indexOf(overrides[id]) !== -1) {
+            applyVariant(id, overrides[id], exp);
+        }
+    }
+
+    renderExperiments();
+
+    // Auto-open if URL overrides are present
+    if (Object.keys(overrides).length) {
+        open = true;
+        panel.style.display = "block";
+        toggle.style.display = "none";
+    }
+})();
+</script>
+)}

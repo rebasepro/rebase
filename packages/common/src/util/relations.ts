@@ -85,14 +85,31 @@ export function sanitizeRelation(relation: Partial<Relation>, sourceCollection: 
                     // Note: we intentionally do NOT require `through` here because the raw (unsanitized)
                     // relations won't have `through` populated yet — sanitizeRelation fills it in later.
                     // `cardinality: "many" + direction: "owning"` is sufficient to identify owning M2M.
+
+                    // 1. Check the explicit relations[] array
                     const targetRelations = getDataSourceCapabilities(targetCollection.driver).supportsRelations ? (((targetCollection as any).relations) || []) : [];
                     for (const targetRel of targetRelations) {
                         if (targetRel.cardinality === "many" &&
                             (targetRel.direction === "owning" || !targetRel.direction) &&
                             (targetRel.relationName === newRelation.inverseRelationName)) {
-                            // Found a corresponding owning many-to-many relation
                             isManyToManyInverse = true;
                             break;
+                        }
+                    }
+
+                    // 2. Also check the target's properties for inline relation definitions
+                    //    (e.g. posts.properties.tags = { type: "relation", cardinality: "many", direction: "owning" })
+                    if (!isManyToManyInverse && targetCollection.properties) {
+                        for (const [propKey, prop] of Object.entries(targetCollection.properties)) {
+                            if ((prop as Property).type !== "relation") continue;
+                            const relProp = prop as RelationProperty;
+                            const relName = relProp.relationName || propKey;
+                            if (relName === newRelation.inverseRelationName &&
+                                relProp.cardinality === "many" &&
+                                (relProp.direction === "owning" || !relProp.direction)) {
+                                isManyToManyInverse = true;
+                                break;
+                            }
                         }
                     }
                 } catch (e) {

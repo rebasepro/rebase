@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.1.2] - 2026-05-15
+
+### Improvements
+
+- **Removed `lodash` dependency** — Replaced `lodash/cloneDeep` with a custom `deepClone` utility in `@rebasepro/utils`. This eliminates the external dependency and fixes `npx create-rebase-app` failing due to missing `lodash` at runtime.
+- **New `deepClone` utility** — A lightweight deep-clone function that preserves function references and class instances (Date, GeoPoint, etc.), designed specifically for Rebase collection objects.
+
+### CI & Tooling
+
+- **Automated release pipeline** — New GitHub Actions workflow (`Publish Stable Release`) that handles version bumping, npm publishing, and GitHub Release creation in a single click from the Actions tab.
+- **Local release script** — `pnpm release:patch`, `pnpm release:minor`, `pnpm release:major` for releasing from the command line with the same pipeline.
+- **Canary releases** — Every push to `main` publishes a canary version to npm (`@canary` dist-tag).
+
+### Fixes
+
+- Fixed navigation utility tests to assert the correct call signature with `undefined` options parameter.
+- Updated package descriptions to reflect the Postgres-based architecture.
+
+---
+
 ## [0.1.0] - 2025-05-14
 
 🎉 **First public release of Rebase** — an open-source headless CMS and admin panel for Postgres.

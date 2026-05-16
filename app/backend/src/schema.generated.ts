@@ -3,6 +3,9 @@
 import { primaryKey, pgTable, integer, varchar, text, char, boolean, timestamp, date, time, jsonb, json, pgEnum, numeric, real, doublePrecision, bigint, serial, bigserial, pgPolicy, uuid } from 'drizzle-orm/pg-core';
 import { relations as drizzleRelations, sql } from 'drizzle-orm';
 
+export const exercisesDifficulty = pgEnum("exercises_difficulty", ['beginner', 'intermediate', 'advanced']);
+export const exercisesCategory = pgEnum("exercises_category", ['strength', 'cardio', 'flexibility', 'balance', 'plyometrics', 'calisthenics']);
+export const exercisesStatus = pgEnum("exercises_status", ['draft', 'published', 'archived']);
 export const ordersStatus = pgEnum("orders_status", ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded']);
 export const ordersPayment_status = pgEnum("orders_payment_status", ['unpaid', 'paid', 'partially_refunded', 'refunded']);
 export const ordersCurrency = pgEnum("orders_currency", ['USD', 'EUR', 'GBP', 'CAD', 'AUD']);
@@ -39,8 +42,32 @@ export const customers = pgTable("customers", {
     shipping_address: varchar("shipping_address"),
     billing_address: varchar("billing_address"),
     notes: varchar("notes"),
-    created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }),
-    updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' })
+    created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
+    updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`)
+}, (table) => ([
+    pgPolicy("test_policy", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
+])).enableRLS();
+
+export const exercises = pgTable("exercises", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: varchar("name").notNull(),
+    description: varchar("description"),
+    images: jsonb("images"),
+    video_url: varchar("video_url"),
+    difficulty: exercisesDifficulty("difficulty").notNull(),
+    category: exercisesCategory("category").notNull(),
+    equipment: jsonb("equipment"),
+    body_parts: jsonb("body_parts"),
+    instructions: varchar("instructions"),
+    default_reps: numeric("default_reps"),
+    default_sets: numeric("default_sets"),
+    rest_seconds: numeric("rest_seconds"),
+    calories_per_minute: numeric("calories_per_minute"),
+    is_compound: boolean("is_compound"),
+    is_featured: boolean("is_featured"),
+    status: exercisesStatus("status").notNull(),
+    created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
+    updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`)
 }, (table) => ([
     pgPolicy("test_policy", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
 ])).enableRLS();
@@ -76,8 +103,8 @@ export const orders = pgTable("orders", {
     order_date: timestamp("order_date", { withTimezone: true, mode: 'string' }).notNull(),
     shipped_date: timestamp("shipped_date", { withTimezone: true, mode: 'string' }),
     delivered_date: timestamp("delivered_date", { withTimezone: true, mode: 'string' }),
-    created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }),
-    updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' })
+    created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
+    updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`)
 }, (table) => ([
     pgPolicy("test_policy", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
 ])).enableRLS();
@@ -91,8 +118,8 @@ export const posts = pgTable("posts", {
     content: jsonb("content"),
     status: postsStatus("status").notNull(),
     publish_date: timestamp("publish_date", { withTimezone: true, mode: 'string' }),
-    created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }),
-    updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+    created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
+    updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
     author_id: uuid("author_id").references(() => authors.id, { onDelete: "set null" })
 }, (table) => ([
     pgPolicy("test_policy", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
@@ -132,8 +159,8 @@ export const products = pgTable("products", {
     review_count: numeric("review_count"),
     status: productsStatus("status").notNull(),
     is_featured: boolean("is_featured"),
-    created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }),
-    updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' })
+    created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
+    updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`)
 }, (table) => ([
     pgPolicy("test_policy", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
 ])).enableRLS();
@@ -154,8 +181,8 @@ export const tickets = pgTable("tickets", {
     category: ticketsCategory("category"),
     customer_id: uuid("customer_id").references(() => customers.id, { onDelete: "set null" }),
     assigned_to: varchar("assigned_to"),
-    created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }),
-    updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+    created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
+    updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
     __order: varchar("order")
 }, (table) => ([
     pgPolicy("test_policy", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
@@ -226,7 +253,7 @@ export const productsRelations = drizzleRelations(products, ({ one, many }) => (
 }));
 
 export const tagsRelations = drizzleRelations(tags, ({ one, many }) => ({
-    "posts": many(posts, { relationName: "posts_tag_id" })
+    "posts": many(postsTags, { relationName: "posts" })
 }));
 
 export const ticketsRelations = drizzleRelations(tickets, ({ one, many }) => ({
@@ -237,7 +264,7 @@ export const ticketsRelations = drizzleRelations(tickets, ({ one, many }) => ({
     })
 }));
 
-export const tables = { authors, customers, orderItems, orders, posts, postsTags, productLocales, products, tags, tickets };
-export const enums = { ordersStatus, ordersPayment_status, ordersCurrency, postsStatus, productsCategory, productsStatus, ticketsStatus, ticketsPriority, ticketsCategory };
+export const tables = { authors, customers, exercises, orderItems, orders, posts, postsTags, productLocales, products, tags, tickets };
+export const enums = { exercisesDifficulty, exercisesCategory, exercisesStatus, ordersStatus, ordersPayment_status, ordersCurrency, postsStatus, productsCategory, productsStatus, ticketsStatus, ticketsPriority, ticketsCategory };
 export const relations = { authorsRelations, customersRelations, orderItemsRelations, ordersRelations, postsRelations, postsTagsRelations, productLocalesRelations, productsRelations, tagsRelations, ticketsRelations };
 

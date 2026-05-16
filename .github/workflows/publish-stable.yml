@@ -29,7 +29,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # full history for changelog generation
+          fetch-depth: 0  # full history for changelog extraction
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup pnpm
@@ -83,62 +83,39 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "📦 Releasing: $CURRENT → $VERSION"
 
-      # ── Changelog generation ────────────────────────────────
-      - name: Generate changelog
-        id: changelog
+      # ── Extract release notes from CHANGELOG.md ─────────────
+      - name: Extract release notes
+        id: notes
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          LAST_TAG=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || echo "")
-          RELEASE_DATE=$(date +%Y-%m-%d)
 
-          if [ -n "$LAST_TAG" ]; then
-            RANGE="${LAST_TAG}..HEAD"
-          else
-            RANGE="HEAD"
-          fi
-
-          # Categorize commits
-          FEATURES=""
-          FIXES=""
-          REFACTORS=""
-          CHORES=""
-          OTHER=""
-
-          while IFS= read -r line; do
-            [ -z "$line" ] && continue
-            HASH="${line%% *}"
-            MSG="${line#* }"
-            SHORT="${HASH:0:7}"
-            case "$MSG" in
-              feat:*|feat\(*\):*)   FEATURES+="- ${MSG#*: } (\`$SHORT\`)"$'\n' ;;
-              fix:*|fix\(*\):*)     FIXES+="- ${MSG#*: } (\`$SHORT\`)"$'\n' ;;
-              refactor:*|refactor\(*\):*) REFACTORS+="- ${MSG#*: } (\`$SHORT\`)"$'\n' ;;
-              chore:*|ci:*|build:*) CHORES+="- ${MSG#*: } (\`$SHORT\`)"$'\n' ;;
-              *)                     OTHER+="- $MSG (\`$SHORT\`)"$'\n' ;;
-            esac
-          done <<< "$(git log --oneline --no-merges "$RANGE" 2>/dev/null || true)"
-
-          # Build markdown
-          BODY="## [${VERSION}] - ${RELEASE_DATE}"$'\n'
-          [ -n "$FEATURES" ] && BODY+=$'\n'"### ✨ Features"$'\n\n'"$FEATURES"
-          [ -n "$FIXES" ]    && BODY+=$'\n'"### 🐛 Bug Fixes"$'\n\n'"$FIXES"
-          [ -n "$REFACTORS" ] && BODY+=$'\n'"### ♻️ Refactors"$'\n\n'"$REFACTORS"
-          [ -n "$CHORES" ]   && BODY+=$'\n'"### 🔧 Maintenance"$'\n\n'"$CHORES"
-          [ -n "$OTHER" ]    && BODY+=$'\n'"### Other"$'\n\n'"$OTHER"
-
-          # Save for GitHub release body
-          echo "$BODY" > /tmp/release-notes.md
-
-          # Prepend to CHANGELOG.md
+          # Try to extract the section for this version from CHANGELOG.md
+          # Matches from "## [X.Y.Z]" or "## X.Y.Z" until the next "## " heading
+          NOTES=""
           if [ -f "CHANGELOG.md" ]; then
-            TEMP=$(mktemp)
-            { head -1 CHANGELOG.md; echo ""; echo "$BODY"; tail -n +2 CHANGELOG.md; } > "$TEMP"
-            mv "$TEMP" CHANGELOG.md
-          else
-            { echo "# Changelog"; echo ""; echo "$BODY"; } > CHANGELOG.md
+            NOTES=$(awk -v ver="$VERSION" '
+              BEGIN { found=0; buf="" }
+              /^## / {
+                if (found) exit
+                # Match ## [X.Y.Z] or ## X.Y.Z (with optional date)
+                if ($0 ~ "\\[" ver "\\]" || $0 ~ "^## " ver "[ \t-]" || $0 ~ "^## " ver "$") {
+                  found=1
+                  next
+                }
+              }
+              found { buf = buf $0 "\n" }
+              END { printf "%s", buf }
+            ' CHANGELOG.md | sed -e 's/^[[:space:]]*//' -e '/^$/N;/^\n$/d')
           fi
 
-          echo "📝 Changelog generated"
+          if [ -n "$NOTES" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "$NOTES" > /tmp/release-notes.md
+            echo "📝 Found release notes for v$VERSION in CHANGELOG.md"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "📝 No release notes found in CHANGELOG.md — will use GitHub auto-generated notes"
+          fi
 
       # ── Version bump ────────────────────────────────────────
       - name: Bump versions
@@ -184,14 +161,24 @@ jobs:
         run: git push origin main --follow-tags
 
       # ── GitHub Release ──────────────────────────────────────
-      - name: Create GitHub Release
-        if: ${{ !inputs.dry_run }}
+      - name: Create GitHub Release (with CHANGELOG notes)
+        if: ${{ !inputs.dry_run && steps.notes.outputs.found == 'true' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "v${{ steps.version.outputs.version }}" \
             --title "v${{ steps.version.outputs.version }}" \
             --notes-file /tmp/release-notes.md \
+            --latest
+
+      - name: Create GitHub Release (auto-generated notes)
+        if: ${{ !inputs.dry_run && steps.notes.outputs.found == 'false' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" \
+            --title "v${{ steps.version.outputs.version }}" \
+            --generate-notes \
             --latest
 
       # ── Summary ─────────────────────────────────────────────
@@ -202,7 +189,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** \`${{ steps.version.outputs.current }}\` → \`${VERSION}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Dry Run:** \`${{ inputs.dry_run }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Release notes:** ${{ steps.notes.outputs.found == 'true' && 'From CHANGELOG.md ✍️' || 'Auto-generated from PRs 🤖' }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           if [ "${{ inputs.dry_run }}" != "true" ]; then
             echo "**📦 npm:** [@rebasepro packages](https://www.npmjs.com/org/rebasepro)" >> $GITHUB_STEP_SUMMARY

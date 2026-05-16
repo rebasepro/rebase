@@ -8,6 +8,13 @@
       "when": 1778522317761,
       "tag": "0000_right_lady_deathstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1778971863268,
+      "tag": "0001_windy_roland_deschain",
+      "breakpoints": true
     }
   ]
 }

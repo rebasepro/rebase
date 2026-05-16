@@ -1,50 +1,84 @@
-const ANALYTICS_API_URL = "https://api.rebase.pro/analytics";
+/**
+ * Lightweight GA4-only analytics for the Rebase website.
+ * All events are sent via window.gtag. No custom API endpoint.
+ */
 
-export class Analytics {
-    private apiUrl: string;
-    private sessionId: string | null = null;
+function gtag(...args: any[]) {
+    if (typeof (window as any).gtag === "function") {
+        (window as any).gtag(...args);
+    }
+}
+
+class Analytics {
     private maxScroll = 0;
-    private pageLoadTime: number = Date.now();
+    private pageLoadTime = Date.now();
 
-    constructor(apiUrl: string) {
-        this.apiUrl = apiUrl;
-        this.sessionId = this.getOrCreateSessionId();
+    constructor() {
         this.initGlobalListeners();
     }
 
-    private getOrCreateSessionId(): string {
-        let sessionId = sessionStorage.getItem("analytics_session");
-        if (!sessionId) {
-            sessionId = "session_" + Math.random().toString(36).substring(2, 15);
-            sessionStorage.setItem("analytics_session", sessionId);
-        }
-        return sessionId;
-    }
-
     private initGlobalListeners() {
-        // Click tracking - global, doesn't need reset
+        // Click tracking
         document.addEventListener("click", (e) => {
             const target = e.target as HTMLElement;
+
+            // Generic button tracking via data-track attribute
             const trackedElement = target.closest("[data-track]");
             if (trackedElement) {
-                this.trackEvent("button_click", {
+                gtag("event", "button_click", {
                     element_id: trackedElement.id,
-                    element_text: trackedElement.textContent?.trim()
+                    element_text: trackedElement.textContent?.trim(),
                 });
             }
 
+            // Copy command tracking (e.g. "pnpm dlx @rebasepro/cli init")
+            const copyBtn = target.closest("[data-track-copy]") as HTMLElement | null;
+            if (copyBtn) {
+                const section = copyBtn.getAttribute("data-track-copy");
+                const command = copyBtn.getAttribute("onclick")
+                    ?.match(/writeText\(['"](.+?)['"]\)/)?.[1] || "unknown";
+                gtag("event", "copy_command", {
+                    event_category: "engagement",
+                    event_label: section,
+                    command,
+                });
+            }
+
+            // Demo CTA tracking — every link to demo.rebase.pro
+            const demoLink = target.closest('a[href*="demo.rebase.pro"]') as HTMLAnchorElement | null;
+            if (demoLink) {
+                let section = "unknown";
+                if (demoLink.closest("header")) {
+                    section = demoLink.id?.includes("mobile") ? "header-mobile" : "header-desktop";
+                } else if (demoLink.closest("footer")) {
+                    section = "footer";
+                } else {
+                    const sectionEl = demoLink.closest("section");
+                    const heading = sectionEl?.querySelector("h1, h2");
+                    section = heading?.textContent?.trim().slice(0, 60) || "page-cta";
+                }
+                gtag("event", "demo_cta_click", {
+                    event_category: "engagement",
+                    event_label: section,
+                    page: window.location.pathname,
+                    link_text: demoLink.textContent?.trim(),
+                });
+            }
+
+            // Outbound link tracking
             const link = target.closest('a[href^="http"]');
             if (link) {
                 const url = (link as HTMLAnchorElement).href;
                 if (!url.includes(window.location.hostname)) {
-                    this.trackEvent("outbound_link", {
-                        destination_url: url
+                    gtag("event", "outbound_link", {
+                        event_category: "engagement",
+                        destination_url: url,
                     });
                 }
             }
         });
 
-        // Scroll tracking - global listener, but we reset state
+        // Scroll depth tracking
         window.addEventListener("scroll", () => {
             const scrollPercent = (window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100;
             if (scrollPercent > this.maxScroll) {
@@ -52,70 +86,32 @@ export class Analytics {
             }
         });
 
-        // Browser close/reload
-        window.addEventListener("beforeunload", () => {
-            this.sendExitEvents();
-        });
+        // Send exit metrics on navigation / close
+        window.addEventListener("beforeunload", () => this.sendExitEvents());
+        document.addEventListener("astro:before-swap", () => this.sendExitEvents());
 
-        // Astro navigation (SPA-like)
-        document.addEventListener("astro:before-swap", () => {
-            this.sendExitEvents();
-        });
-
-        // Astro page load (New page ready)
+        // Reset on Astro page load
         document.addEventListener("astro:page-load", () => {
-            this.resetPageMetrics();
-            this.trackPageView();
+            this.maxScroll = 0;
+            this.pageLoadTime = Date.now();
+            gtag("event", "page_view", {
+                page_path: window.location.pathname,
+                page_title: document.title,
+            });
         });
-    }
-
-    private resetPageMetrics() {
-        this.maxScroll = 0;
-        this.pageLoadTime = Date.now();
     }
 
     private sendExitEvents() {
         const timeOnPage = Math.floor((Date.now() - this.pageLoadTime) / 1000);
 
         if (this.maxScroll > 0) {
-            this.trackEvent("scroll_depth", { scroll_percentage: this.maxScroll }, true);
+            gtag("event", "scroll_depth", { scroll_percentage: this.maxScroll });
         }
-
-        this.trackEvent("time_on_page", { duration_seconds: timeOnPage }, true);
-    }
-
-    public async trackEvent(eventType: string, eventData: any = {}, useBeacon = false) {
-        try {
-            const payload = {
-                event_type: eventType,
-                page_path: window.location.pathname,
-                page_title: document.title,
-                referrer: document.referrer,
-                screen_resolution: `${window.screen.width}x${window.screen.height}`,
-                viewport_size: `${window.innerWidth}x${window.innerHeight}`,
-                language: navigator.language,
-                session_id: this.sessionId,
-                event_data: eventData
-            };
-
-            console.debug("Analytics tracking:", eventType, payload);
-
-            if (useBeacon) {
-                // Disabled custom beacon, using GA4
-            } else {
-                // Disabled custom fetch, using GA4
-            }
-        } catch (error) {
-            console.error("Analytics error:", error);
-        }
-    }
-
-    public trackPageView() {
-        this.trackEvent("page_view");
+        gtag("event", "time_on_page", { duration_seconds: timeOnPage });
     }
 }
 
 // Initialize singleton
-if (!(window as any).analytics) {
-    (window as any).analytics = new Analytics(ANALYTICS_API_URL);
+if (!(window as any).__rb_analytics) {
+    (window as any).__rb_analytics = new Analytics();
 }

@@ -1,0 +1,303 @@
+---
+const { lang, t } = Astro.props;
+import { languages, defaultLang, useTranslations } from '../../i18n/ui';
+import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
+import { CodeBlock } from '../../components/CodeBlock.tsx';
+import ClientUIComponentsTeaser from '../../components/ClientUIComponentsTeaser.tsx';
+import { RebaseEditorDemo } from '../../components/RebaseEditorDemo.tsx';
+import "../../styles/editor.css";
+
+const initCode = `import { createRebaseClient } from "@rebasepro/client";
+import type { Database } from "./database.types";
+
+const rebase = createRebaseClient<Database>({
+  baseUrl: "https://api.myapp.com",
+});
+
+// Everything is dot-accessible:
+rebase.data      // → collection queries
+rebase.auth      // → sign in, sign up, sessions
+rebase.admin     // → user/role management
+rebase.storage   // → file upload/download`;
+
+const queryCode = `// Chained queries with full type safety
+const { data } = await rebase.data.posts
+  .where("status", "eq", "published")
+  .where("views", "gte", 100)
+  .orderBy("createdAt", "desc")
+  .limit(10)
+  .find();
+
+// Deep relation fetching — no N+1 queries
+const { data: posts } = await rebase.data.posts
+  .include("author", "tags")
+  .find();
+
+// Realtime listening
+const unsub = rebase.data.posts
+  .where("status", "eq", "published")
+  .listen(({ data }) => {
+    console.log("Live update:", data);
+  });`;
+
+const cliCommands = [
+  { cmd: "rebase init", desc: "Scaffold a new project with Postgres, auth, and admin panel", badge: "setup", color: "emerald" },
+  { cmd: "rebase schema generate", desc: "Generate Drizzle ORM schema from your TypeScript collections", badge: "schema", color: "blue" },
+  { cmd: "rebase schema introspect", desc: "Introspect an existing Postgres database into collection definitions", badge: "schema", color: "blue" },
+  { cmd: "rebase db push", desc: "Apply schema changes directly to the database (dev shortcut)", badge: "db", color: "amber" },
+  { cmd: "rebase db generate", desc: "Generate SQL migration files from schema diff", badge: "db", color: "amber" },
+  { cmd: "rebase db migrate", desc: "Run all pending migrations against the database", badge: "db", color: "amber" },
+  { cmd: "rebase generate-sdk", desc: "Generate a typed database.types.ts for end-to-end type safety", badge: "sdk", color: "purple" },
+  { cmd: "rebase dev", desc: "Start frontend + backend concurrently with hot reload", badge: "dev", color: "pink" },
+];
+---
+
+<main>
+
+  <!-- HERO -->
+  <section class="relative isolate overflow-hidden bg-black pt-28 pb-20 sm:pt-36 sm:pb-28 lg:pt-44 lg:pb-32">
+    <div class="pointer-events-none absolute inset-0 -z-10">
+      <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[600px] rounded-full bg-blue-500/8 blur-[120px]"></div>
+      <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:48px_48px] opacity-20"></div>
+    </div>
+    <div class="px-4 mx-auto max-w-7xl text-center lg:px-12">
+      <div class="inline-flex items-center py-1.5 px-4 mb-8 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10 mx-auto animate-on-scroll fade-in">
+        <span class="font-mono text-sm">npm i @rebasepro/cli @rebasepro/client</span>
+      </div>
+      <h1 class="mb-6 text-4xl font-bold tracking-tight leading-[1.1] md:text-6xl lg:text-7xl text-white animate-on-scroll fade-in-up">
+        Built for developers.<br/><span class="text-primary">By developers.</span>
+      </h1>
+      <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48 animate-on-scroll fade-in-up delay-100">
+        TypeScript SDK with full type safety. CLI for schema management. React extensibility. Self-hosted, open-source, MIT licensed.
+      </p>
+      <div class="flex items-center justify-center gap-x-4 animate-on-scroll fade-in-up delay-200">
+        <a href="/docs" class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-dark transition-all btn-glow">
+          Get Started
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </a>
+        <a href="https://github.com/nicegoodthings/rebase" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold">
+          View on GitHub
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65S8.93 17.38 9 18v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
+        </a>
+      </div>
+    </div>
+    <SectionBackgroundAccents bottomLine={true}/>
+  </section>
+
+
+  <!-- SDK -->
+  <section class="bg-black py-24 sm:py-32">
+    <div class="mx-auto max-w-7xl px-6 lg:px-8">
+      <div class="mx-auto max-w-2xl text-center mb-16 animate-on-scroll fade-in-up">
+        <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-500/20">Client SDK</div>
+        <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">One SDK. Every environment.</h2>
+        <p class="mt-4 text-lg text-surface-400">The same <code class="text-sm bg-surface-800 px-1.5 py-0.5 rounded text-surface-300">@rebasepro/client</code> runs in CMS plugins, frontend apps, and Node.js backends. Full TypeScript autocomplete, zero wrappers.</p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start mb-20">
+        <div class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl">
+          <CodeBlock language="typescript" code={initCode} client:load />
+        </div>
+        <div class="self-center">
+          <h3 class="text-2xl font-semibold text-white mb-4">Initialize in 3 lines</h3>
+          <p class="text-lg text-surface-400 mb-6">Pass your generated types and get full autocomplete on every collection, field, and relation. No code generation step at runtime.</p>
+          <ul class="space-y-3 text-surface-300">
+            <li class="flex gap-3"><span class="text-primary">✓</span> <strong class="text-white">Data queries</strong> with chaining, filtering, pagination</li>
+            <li class="flex gap-3"><span class="text-primary">✓</span> <strong class="text-white">Auth</strong> — email/password, OAuth, sessions</li>
+            <li class="flex gap-3"><span class="text-primary">✓</span> <strong class="text-white">Storage</strong> — upload, download, signed URLs</li>
+            <li class="flex gap-3"><span class="text-primary">✓</span> <strong class="text-white">Realtime</strong> — WebSocket subscriptions</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+        <div class="lg:order-last rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl">
+          <CodeBlock language="typescript" code={queryCode} client:load />
+        </div>
+        <div class="self-center">
+          <h3 class="text-2xl font-semibold text-white mb-4">Query like a pro</h3>
+          <p class="text-lg text-surface-400 mb-6">Chainable filters, deep relation fetching with zero N+1 queries, full-text search, and realtime subscriptions — all type-safe.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- CLI -->
+  <section class="bg-black py-24 sm:py-32">
+    <SectionBackgroundAccents topLine={true}/>
+    <div class="mx-auto max-w-7xl px-6 lg:px-8">
+      <div class="mx-auto max-w-2xl text-center mb-16 animate-on-scroll fade-in-up">
+        <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-cyan-500/10 text-cyan-400 ring-1 ring-inset ring-cyan-500/20">CLI</div>
+        <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">One CLI for the full lifecycle</h2>
+        <p class="mt-4 text-lg text-surface-400">Scaffold, introspect, migrate, generate SDKs, and run dev servers — all from one tool.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-5xl mx-auto">
+        {cliCommands.map((c) => (
+          <div class="group rounded-xl bg-surface-900/50 p-5 ring-1 ring-inset ring-surface-800 hover:ring-primary/30 transition-all duration-300 animate-on-scroll fade-in-up">
+            <div class="flex items-center gap-3 mb-2">
+              <span class={`inline-flex items-center py-0.5 px-2 text-[10px] font-bold uppercase rounded-full bg-${c.color}-500/10 text-${c.color}-400 ring-1 ring-inset ring-${c.color}-500/20`}>{c.badge}</span>
+              <code class="text-sm font-mono text-white font-semibold">{c.cmd}</code>
+            </div>
+            <p class="text-sm text-surface-400">{c.desc}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+
+  <!-- REACT EXTENSIBILITY -->
+  <section class="bg-black py-24 sm:py-32">
+    <SectionBackgroundAccents topLine={true} blob={{ position: "top", size: "md" }}/>
+    <div class="mx-auto max-w-7xl px-6 lg:px-8">
+      <div class="mx-auto max-w-2xl text-center mb-16 animate-on-scroll fade-in-up">
+        <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-violet-500/10 text-violet-400 ring-1 ring-inset ring-violet-500/20">Extensibility</div>
+        <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Pure React. Full control.</h2>
+        <p class="mt-4 text-lg text-surface-400">Custom fields, custom views, custom pages — anything you can build in React, you can add to Rebase. No proprietary templating.</p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-20">
+        <div class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl">
+          <CodeBlock language="typescript" code={`import { buildCollection } from "@rebasepro/core";
+
+export const productsCollection = buildCollection({
+    name: "Products",
+    path: "products",
+    callbacks: {
+        onSave: async ({ values }) => {
+            await sendSlackMessage("Product updated");
+            values.updatedAt = new Date();
+            return values;
+        }
+    }
+    // ...properties
+});`} client:load />
+        </div>
+        <div>
+          <h3 class="text-2xl font-semibold text-white mb-4">Schema as code, backed by Git</h3>
+          <p class="text-lg text-surface-400 mb-6">Define collections in TypeScript. Run lifecycle hooks on save, delete, and fetch. Your code is the single source of truth — fully versioned.</p>
+          <ul class="space-y-3 text-surface-300">
+            <li class="flex gap-3"><span class="text-primary">✓</span> <strong class="text-white">onSave / onDelete</strong> lifecycle callbacks</li>
+            <li class="flex gap-3"><span class="text-primary">✓</span> <strong class="text-white">Custom React views</strong> in the admin panel</li>
+            <li class="flex gap-3"><span class="text-primary">✓</span> <strong class="text-white">Custom field renderers</strong> for any data type</li>
+            <li class="flex gap-3"><span class="text-primary">✓</span> <strong class="text-white">AST mutation</strong> — GUI edits write clean TS back to repo</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- UI Components -->
+      <div class="mb-10 animate-on-scroll fade-in-up">
+        <h3 class="text-2xl font-semibold text-white mb-2">Battle-tested UI components</h3>
+        <p class="text-lg text-surface-400">Need a custom view? Use the Rebase UI library — buttons, tables, dialogs, selects, and more.</p>
+      </div>
+      <div class="mx-auto max-w-7xl min-h-64">
+        <ClientUIComponentsTeaser client:only="react">Loading...</ClientUIComponentsTeaser>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- SECURITY -->
+  <section class="bg-black py-24 sm:py-32">
+    <SectionBackgroundAccents topLine={true}/>
+    <div class="mx-auto max-w-7xl px-6 lg:px-8">
+      <div class="mx-auto max-w-2xl text-center mb-16 animate-on-scroll fade-in-up">
+        <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-orange-500/10 text-orange-400 ring-1 ring-inset ring-orange-500/20">Security</div>
+        <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Your data. Your infrastructure.</h2>
+        <p class="mt-4 text-lg text-surface-400">Self-hosted, open-source, zero vendor lock-in. Deploy anywhere, stop anytime — your data stays exactly where it is.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+        <div class="rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800 animate-on-scroll scale-in">
+          <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>
+          </div>
+          <h3 class="text-xl font-semibold text-white mb-3">100% Data Ownership</h3>
+          <p class="text-surface-400">Your data lives in your own PostgreSQL. Rebase never stores, accesses, or controls your content.</p>
+        </div>
+        <div class="rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800 animate-on-scroll scale-in">
+          <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+          </div>
+          <h3 class="text-xl font-semibold text-white mb-3">Multi-Layer Security</h3>
+          <p class="text-surface-400">RBAC at the app layer, RLS at the database layer, JWT auth, and your own network controls.</p>
+        </div>
+        <div class="rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800 animate-on-scroll scale-in">
+          <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+          </div>
+          <h3 class="text-xl font-semibold text-white mb-3">Transparent & Auditable</h3>
+          <p class="text-surface-400">MIT-licensed open source. Audit every line. No hidden servers, no telemetry, no surprises.</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="p-5 rounded-lg border bg-surface-900/50 border-surface-800">
+          <h5 class="font-semibold text-white mb-1">GDPR Ready</h5>
+          <p class="text-surface-400 text-sm">You're the data controller. Fulfill requests directly from your database.</p>
+        </div>
+        <div class="p-5 rounded-lg border bg-surface-900/50 border-surface-800">
+          <h5 class="font-semibold text-white mb-1">Data Residency</h5>
+          <p class="text-surface-400 text-sm">Choose your PostgreSQL deployment region for compliance.</p>
+        </div>
+        <div class="p-5 rounded-lg border bg-surface-900/50 border-surface-800">
+          <h5 class="font-semibold text-white mb-1">Zero Vendor Lock-in</h5>
+          <p class="text-surface-400 text-sm">Stop using Rebase anytime. Your data stays exactly where it is.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- SELF-HOSTED -->
+  <section class="bg-black py-24 sm:py-32">
+    <SectionBackgroundAccents topLine={true}/>
+    <div class="mx-auto max-w-7xl px-6 lg:px-8">
+      <div class="mx-auto max-w-3xl">
+        <div class="relative flex flex-col items-center text-center rounded-2xl bg-surface-900/50 p-16 ring-1 ring-inset ring-surface-800">
+          <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-6">Self-Hosted by Design</h2>
+          <ul class="space-y-4 mb-8 text-left">
+            <li class="flex items-start gap-4 text-lg">
+              <svg class="h-6 w-6 text-primary flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span class="text-surface-300">Full source code access (MIT license)</span>
+            </li>
+            <li class="flex items-start gap-4 text-lg">
+              <svg class="h-6 w-6 text-primary flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span class="text-surface-300">Deploy anywhere — Docker, VPS, Cloud Run, Vercel</span>
+            </li>
+            <li class="flex items-start gap-4 text-lg">
+              <svg class="h-6 w-6 text-primary flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span class="text-surface-300">Extend with custom React components & logic</span>
+            </li>
+          </ul>
+          <a href="/docs" class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-8 py-4 text-lg font-semibold text-white shadow-sm hover:bg-primary-dark transition-all btn-glow">
+            View Docs
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- FINAL CTA -->
+  <section class="relative isolate bg-black py-28 sm:py-36 overflow-hidden">
+    <SectionBackgroundAccents topLine={true} blob={{ position: "top", size: "lg" }}/>
+    <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
+      <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4 animate-on-scroll fade-in-up">Ready to Build?</h2>
+      <p class="text-lg text-surface-400 mb-10 max-w-2xl mx-auto animate-on-scroll fade-in-up delay-100">Dive into the open-source framework. Perfect for custom builds, agencies, and full control.</p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center animate-on-scroll fade-in-up delay-200">
+        <a href="https://demo.rebase.pro" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-surface-700 transition-all">
+          Try the Demo
+        </a>
+        <a href="/docs" class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-dark transition-all btn-glow">
+          Get Started
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+</main>

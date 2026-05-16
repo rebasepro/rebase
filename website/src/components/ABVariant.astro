@@ -1,0 +1,36 @@
+---
+/**
+ * A/B Test Variant Wrapper
+ *
+ * Wraps content that should only be shown for a specific experiment variant.
+ * The "control" variant is visible by default (SEO-safe, noscript-safe).
+ * Other variants are hidden via inline style and revealed by the AB head script.
+ *
+ * Usage:
+ *   <ABVariant experiment="hero-cta" variant="control">
+ *       <h1>Original Headline</h1>
+ *   </ABVariant>
+ *   <ABVariant experiment="hero-cta" variant="action-oriented">
+ *       <h1>Start Building Now →</h1>
+ *   </ABVariant>
+ */
+interface Props {
+    /** The experiment ID (must match an entry in EXPERIMENTS) */
+    experiment: string;
+    /** The variant name (e.g. "control", "action-oriented") */
+    variant: string;
+    /** Additional CSS class(es) */
+    class?: string;
+}
+
+const { experiment, variant, class: className } = Astro.props;
+const isControl = variant === "control";
+---
+
+<div
+    data-ab-show={`${experiment}:${variant}`}
+    class={className}
+    style={isControl ? undefined : "display:none"}
+>
+    <slot />
+</div>

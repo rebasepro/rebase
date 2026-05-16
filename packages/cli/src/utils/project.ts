@@ -66,16 +66,29 @@ export function getActiveBackendPlugin(backendDir: string): string | null {
 
     try {
         const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-        const deps = { ...pkg.dependencies,
-...pkg.devDependencies };
+        const deps = { ...pkg.dependencies, ...pkg.devDependencies };
 
-        // Find the first dependency that matches @rebasepro/server-* (database driver plugins),
-        // but not @rebasepro/server-core which is the framework itself
-        for (const dep of Object.keys(deps)) {
-            if (dep.startsWith("@rebasepro/server-") && dep !== "@rebasepro/server-core") {
-                return dep;
+        // Collect all @rebasepro/server-* driver plugins (exclude server-core)
+        const candidates = Object.keys(deps).filter(
+            dep => dep.startsWith("@rebasepro/server-") && dep !== "@rebasepro/server-core"
+        );
+
+        if (candidates.length === 0) return null;
+
+        // Prefer server-postgresql — it's the primary supported driver
+        if (candidates.includes("@rebasepro/server-postgresql")) {
+            return "@rebasepro/server-postgresql";
+        }
+
+        // Fallback: return the first candidate that actually has a CLI entry point
+        for (const candidate of candidates) {
+            if (resolvePluginCliScript(backendDir, candidate)) {
+                return candidate;
             }
         }
+
+        // Last resort: return whatever we found
+        return candidates[0];
     } catch {
         // Ignore parse errors
     }
