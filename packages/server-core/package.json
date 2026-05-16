@@ -1,7 +1,7 @@
 {
   "name": "@rebasepro/server-core",
   "type": "module",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Database-Agnostic Backend Core for Rebase",
   "funding": {
     "url": "https://github.com/sponsors/rebaseco"
