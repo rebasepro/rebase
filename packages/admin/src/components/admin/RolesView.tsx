@@ -4,7 +4,7 @@ import { useCollectionRegistryController } from "../../index";
 import { useSnackbarController, useTranslation } from "@rebasepro/core";
 import { getDataSourceCapabilities, Role, SecurityRule, UserManagementDelegate } from "@rebasepro/types";
 import { useBreadcrumbsController } from "../../index";
-import { Button, Chip, Container, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Paper, Table, TableBody, TableCell, TableHeader, TableRow, TextField, Typography, CircularProgress, CenteredView, Tooltip, Checkbox, LoadingButton, defaultBorderMixin , iconSize } from "@rebasepro/ui";
+import { Button, Chip, Container, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Label, Paper, Table, TableBody, TableCell, TableHeader, TableRow, TextField, Typography, CircularProgress, CenteredView, Tooltip, Checkbox, LoadingButton, defaultBorderMixin , iconSize } from "@rebasepro/ui";
 import { PlusIcon, Trash2Icon } from "lucide-react";
 import { RoleChip } from "./RoleChip";
 import { ConfirmationDialog } from "@rebasepro/core";
@@ -285,13 +285,13 @@ height: "100%" }}>
                         </div>
 
                         <div className="col-span-12 sm:col-span-4 flex items-start pt-2">
-                            <label className="flex items-center gap-2 cursor-pointer mt-3">
+                            <Label className="flex items-center gap-2 cursor-pointer mt-3">
                                 <Checkbox
                                     checked={isAdmin}
                                     onCheckedChange={(checked) => setIsAdmin(Boolean(checked))}
                                 />
-                                <span className="font-medium">{t("is_admin")}</span>
-                            </label>
+                                <Typography variant="body2" className="font-medium">{t("is_admin")}</Typography>
+                            </Label>
                         </div>
 
                         <div className="col-span-12">

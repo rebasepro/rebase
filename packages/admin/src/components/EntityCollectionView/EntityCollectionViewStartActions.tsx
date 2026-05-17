@@ -81,19 +81,23 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
         navigate(collectionUrl);
     }, [navigate, urlController, path]);
 
-    const backButton = compact && (
-        <Tooltip title={t("back")} key={"back_tooltip"}>
-            <IconButton
-                size="small"
-                onClick={handleBackClick}
-                className="mr-1"
-            >
-                <ArrowLeftIcon size={iconSize.small}/>
-            </IconButton>
-        </Tooltip>
+    const backButton = (
+        <div key={"back_wrapper"} className={cls(
+            "transition-all duration-300 ease-out overflow-hidden",
+            compact ? "max-w-[40px] opacity-100" : "max-w-0 opacity-0"
+        )}>
+            <Tooltip title={t("back")} key={"back_tooltip"}>
+                <IconButton
+                    size="small"
+                    onClick={handleBackClick}
+                    className="mr-1"
+                >
+                    <ArrowLeftIcon size={iconSize.small}/>
+                </IconButton>
+            </Tooltip>
+        </div>
     );
 
-    // Filters button
     const filtersButton = resolvedProperties && tableController.setFilterValues && (
         <Tooltip title={t("filters")}
             key={"filters_tooltip"}>
@@ -109,7 +113,7 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
                         startIcon={<FilterIcon size={iconSize.small}/>}
                         className={cls(activeFilterCount > 0 && "text-primary")}
                     >
-                        {t("filters")}{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+                        {activeFilterCount > 0 ? `(${activeFilterCount})` : t("filters")}
                     </Button>
                 ) : (
                     <Button

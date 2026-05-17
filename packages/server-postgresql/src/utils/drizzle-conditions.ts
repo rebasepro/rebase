@@ -64,8 +64,14 @@ export class DrizzleConditionBuilder {
     ): SQL | null {
         switch (op) {
             case "==":
+                if (value === null || value === undefined) {
+                    return sql`${column} IS NULL`;
+                }
                 return eq(column, value);
             case "!=":
+                if (value === null || value === undefined) {
+                    return sql`${column} IS NOT NULL`;
+                }
                 return sql`${column} != ${value}`;
             case ">":
                 return sql`${column} > ${value}`;

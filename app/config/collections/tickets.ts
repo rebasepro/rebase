@@ -141,27 +141,25 @@ const ticketsCollection: PostgresCollection = {
         {
             label: "Urgent & High priority",
             filterValues: {
-                priority: ["in", ["urgent", "high"]],
-                status: ["in", ["open", "in_progress"]]
+                priority: ["in", ["urgent", "high"]]
             }
         },
         {
-            label: "Open bugs",
+            label: "Bugs",
             filterValues: {
-                category: ["==", "bug"],
-                status: ["in", ["open", "in_progress"]]
+                category: ["==", "bug"]
             }
         },
         {
-            label: "Waiting on customer",
+            label: "Feature requests",
             filterValues: {
-                status: ["==", "waiting"]
+                category: ["==", "feature_request"]
             }
         },
         {
-            label: "All resolved",
+            label: "Unassigned",
             filterValues: {
-                status: ["==", "resolved"]
+                assigned_to: ["==", null]
             }
         }
     ]

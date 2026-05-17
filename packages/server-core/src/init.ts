@@ -707,7 +707,7 @@ latencyMs };
 
     // ── Graceful Shutdown ─────────────────────────────────────────────────
     const shutdown = (timeoutMs = 15_000): Promise<void> => {
-        return new Promise<void>((resolve) => {
+        return new Promise<void>(async (resolve) => {
             logger.info("Shutting down Rebase Backend...");
 
             // 1. Stop cron scheduler
@@ -716,13 +716,30 @@ latencyMs };
                 logger.info("Cron scheduler stopped");
             }
 
-            // 2. Close the HTTP server (stop accepting, drain in-flight)
+            // 2. Tear down realtime services (LISTEN clients, debounce timers,
+            //    subscriptions). Must happen BEFORE pool.end() so that pending
+            //    timer callbacks don't fire against a closed pool.
+            for (const [key, rt] of Object.entries(realtimeServices)) {
+                try {
+                    if (typeof (rt as any).destroy === "function") {
+                        await (rt as any).destroy();
+                        logger.info(`Realtime service "${key}" destroyed`);
+                    } else if (typeof (rt as any).stopListening === "function") {
+                        await (rt as any).stopListening();
+                        logger.info(`Realtime service "${key}" LISTEN client stopped`);
+                    }
+                } catch (err) {
+                    logger.warn(`Error destroying realtime service "${key}":`, { error: err });
+                }
+            }
+
+            // 3. Close the HTTP server (stop accepting, drain in-flight)
             config.server.close(() => {
                 logger.info("HTTP server closed");
                 resolve();
             });
 
-            // 3. Force-resolve after timeout (unless disabled with 0)
+            // 4. Force-resolve after timeout (unless disabled with 0)
             if (timeoutMs > 0) {
                 setTimeout(() => {
                     logger.warn(`Forced shutdown after ${timeoutMs / 1000}s timeout`);

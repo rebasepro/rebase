@@ -142,11 +142,8 @@ async function startServer() {
         const projectRoot = path.resolve(__dirname, "../..");
         const actualPort = await listenWithPortRetry(server, env.PORT, { portFileDir: projectRoot });
 
-        // Clean up port file on exit
-        const cleanup = () => cleanupDevPortFile(projectRoot);
-        process.on("SIGINT", cleanup);
-        process.on("SIGTERM", cleanup);
-        process.on("exit", cleanup);
+        // Clean up port file on exit (covers all exit paths including graceful shutdown)
+        process.on("exit", () => cleanupDevPortFile(projectRoot));
 
         logger.info(`Server running at http://localhost:${actualPort}`);
     } else {
@@ -163,28 +160,28 @@ async function startServer() {
 
         logger.info(`Received ${signal}, waiting for HTTP connections to drain...`);
 
-        // Stop accepting new connections
-        server.close(async (err) => {
-            if (err) {
-                logger.error("Error closing HTTP server:", { error: err instanceof Error ? err : new Error(String(err)) });
-            }
-            logger.info("HTTP server closed. Draining background tasks and database pool...");
-            try {
-                await backend.shutdown();
-                await postgresResources.pool.end();
-                logger.info("Graceful shutdown complete.");
-                process.exit(0);
-            } catch (shutdownErr) {
-                logger.error("Error during shutdown cleanup:", { error: shutdownErr instanceof Error ? shutdownErr : new Error(String(shutdownErr)) });
-                process.exit(1);
-            }
-        });
-
-        // Fallback force exit
-        setTimeout(() => {
+        // Fallback force exit (must be set before any awaits)
+        const forceTimer = setTimeout(() => {
             logger.error("Shutdown timed out after 15 seconds. Forcefully exiting.");
             process.exit(1);
-        }, 15000).unref();
+        }, 15000);
+        forceTimer.unref();
+
+        try {
+            // backend.shutdown() already calls server.close() internally
+            // and drains in-flight requests — do NOT call server.close() separately
+            // or the second close() will deadlock (callback never fires on an
+            // already-closing server).
+            await backend.shutdown();
+            logger.info("HTTP server closed. Closing database pool...");
+            await postgresResources.pool.end();
+            clearTimeout(forceTimer);
+            logger.info("Graceful shutdown complete.");
+            process.exit(0);
+        } catch (shutdownErr) {
+            logger.error("Error during shutdown cleanup:", { error: shutdownErr instanceof Error ? shutdownErr : new Error(String(shutdownErr)) });
+            process.exit(1);
+        }
     };
 
     process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));

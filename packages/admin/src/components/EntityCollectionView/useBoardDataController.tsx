@@ -159,6 +159,34 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
         };
     }, []);
 
+    /**
+     * Check if a column value is excluded by the active filter on the columnProperty.
+     * E.g. if the user sets "Status IN (Open, In Progress)", this returns true
+     * for "Waiting on Customer" since that column should show as empty.
+     */
+    const isColumnExcludedByFilter = useCallback((column: string, filterValues?: FilterValues<string>, colProperty?: string): boolean => {
+        if (!filterValues || !colProperty) return false;
+        const filterForColumn = filterValues[colProperty as keyof typeof filterValues];
+        if (!filterForColumn || !Array.isArray(filterForColumn)) return false;
+
+        const [op, val] = filterForColumn as [string, unknown];
+
+        if (op === "==" && typeof val === "string") {
+            return column !== val;
+        }
+        if (op === "!=" && typeof val === "string") {
+            return column === val;
+        }
+        if (op === "in" && Array.isArray(val)) {
+            return !val.map(String).includes(column);
+        }
+        if (op === "not-in" && Array.isArray(val)) {
+            return val.map(String).includes(column);
+        }
+
+        return false;
+    }, []);
+
     // Helper function to subscribe to a single column - uses refs to avoid dependency issues
     const subscribeToColumn = useCallback((column: string, itemCount: number) => {
         // Skip if we're in the middle of cleanup
@@ -172,6 +200,24 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
         const currentOrderProperty = orderPropertyRef.current;
         const currentSearchString = searchStringRef.current;
         const currentResolvedPath = resolvedPathRef.current;
+
+        // If the column is excluded by the active filter on the column property,
+        // set it as empty immediately without querying.
+        const excluded = isColumnExcludedByFilter(column, currentFilterValues, currentColumnProperty);
+        console.log(`[useBoardDataController] subscribeToColumn("${column}") colProp="${currentColumnProperty}" excluded=${excluded} filterValues=`, JSON.stringify(currentFilterValues));
+        if (excluded) {
+            setColumnData(prev => ({
+                ...prev,
+                [column]: {
+                    entities: [],
+                    loading: false,
+                    hasMore: false,
+                    error: undefined,
+                    totalCount: 0
+                }
+            }));
+            return;
+        }
 
         // Build where map for this column
         const whereMap: Record<string, string> = {};
@@ -403,6 +449,12 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
             currentColumns.forEach(column => {
                 const itemCount = currentColumnItemCounts[column] ?? pageSize;
                 subscribeToColumn(column, itemCount);
+
+                // Skip count query for columns excluded by the filter — subscribeToColumn
+                // already set them to totalCount: 0.
+                if (isColumnExcludedByFilter(column, currentFilterValues, currentColumnProperty)) {
+                    return;
+                }
 
                 // Count query for column (for display in column header)
                 const accessor = currentDataClient.collection(currentResolvedPath);

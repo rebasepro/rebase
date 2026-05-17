@@ -382,7 +382,7 @@ export async function runSeed() {
         const ticketIds = Array.from({ length: 60 }, (_, i) => generateUUID("ticket", i));
 
         console.log("🧹 Clearing existing data...");
-        await db.execute("TRUNCATE TABLE posts, authors, tags, products, orders, order_items, customers, tickets, posts_tags, product_locales RESTART IDENTITY CASCADE;");
+        await db.execute("TRUNCATE TABLE posts, authors, tags, products, orders, order_items, customers, tickets, posts_tags, product_locales, exercises RESTART IDENTITY CASCADE;");
 
         // ── Authors ───────────────────────────────────────────────────
         console.log(`👤 Generating ${NUM_AUTHORS} authors...`);

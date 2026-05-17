@@ -2,7 +2,7 @@ import type { Properties } from "@rebasepro/types";
 import type { ArrayProperty, MapProperty, Property, StringProperty } from "@rebasepro/types";
 import { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import React from "react";
-import { Skeleton } from "@rebasepro/ui";
+import { Skeleton, Table, TableBody, TableRow, TableCell, Typography } from "@rebasepro/ui";
 import { getThumbnailMeasure } from "../util";
 
 export interface SkeletonPropertyComponentProps {
@@ -103,33 +103,32 @@ function renderMap<T extends Record<string, any>>(property: MapProperty, size: P
         );
 
     return (
-        <table className="table-auto">
-            <tbody>
+        <Table className="table-auto">
+            <TableBody>
                 {mapPropertyKeys &&
                     mapPropertyKeys.map((key, index) => {
                         return (
-                            <tr
-                                key={`map_preview_table__${index}`}
-                                className="border-b last:border-b-0">
-                                <th key={`table-cell-title--${key}`}
+                            <TableRow
+                                key={`map_preview_table__${index}`}>
+                                <TableCell key={`table-cell-title--${key}`}
                                     className="align-top"
                                     style={{ width: "30%" }}>
-                                    <p className="text-xs text-secondary">
+                                    <Typography variant="caption" color="secondary">
                                         {property.properties![key].name}
-                                    </p>
-                                </th>
-                                <th key={`table-cell-${key}`}
+                                    </Typography>
+                                </TableCell>
+                                <TableCell key={`table-cell-${key}`}
                                     style={{ width: "70%" }}>
                                     {property.properties && property.properties[key] &&
                                         <SkeletonPropertyComponent
                                             property={property.properties[key]}
                                             size={"medium"}/>}
-                                </th>
-                            </tr>
+                                </TableCell>
+                            </TableRow>
                         );
                     })}
-            </tbody>
-        </table>
+            </TableBody>
+        </Table>
     );
 }
 
@@ -142,28 +141,28 @@ function renderArrayOfMaps(properties: Properties, size: PreviewSize, previewPro
     }
 
     return (
-        <table className="table-auto">
-            <tbody>
+        <Table className="table-auto">
+            <TableBody>
                 {
                     [0, 1, 2].map((value, index) => {
                         return (
-                            <tr key={`table_${value}_${index}`}>
+                            <TableRow key={`table_${value}_${index}`}>
                                 {tableProperties && tableProperties.map(
                                     (key) => (
-                                        <th
+                                        <TableCell
                                             key={`table-cell-${key}`}
                                         >
                                             <SkeletonPropertyComponent
                                                 property={(properties)[key]}
                                                 size={"medium"}/>
-                                        </th>
+                                        </TableCell>
                                     )
                                 )}
-                            </tr>
+                            </TableRow>
                         );
                     })}
-            </tbody>
-        </table>
+            </TableBody>
+        </Table>
     );
 }
 

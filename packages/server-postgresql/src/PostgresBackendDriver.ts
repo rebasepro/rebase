@@ -664,7 +664,23 @@ searchString }
         const targetDb = this.getTargetDb(options?.database);
 
         try {
+            // Determine if we actually need to switch roles.
+            // Skip SET LOCAL ROLE when the requested role matches the current session role,
+            // as it's a no-op that can fail on managed Postgres setups where the connection
+            // user doesn't have permission to SET ROLE.
+            let needsRoleSwitch = false;
             if (options?.role) {
+                try {
+                    const currentRoleResult = await targetDb.execute(drizzleSql.raw("SELECT current_user AS role"));
+                    const currentRole = (currentRoleResult.rows?.[0] as Record<string, unknown>)?.role as string | undefined;
+                    needsRoleSwitch = !!currentRole && currentRole !== options.role;
+                } catch {
+                    // If we can't determine the current role, attempt the switch anyway
+                    needsRoleSwitch = true;
+                }
+            }
+
+            if (needsRoleSwitch && options?.role) {
                 const safeRole = options.role.replace(/"/g, '""');
                 return await targetDb.transaction(async (tx) => {
                     await tx.execute(drizzleSql.raw(`SET LOCAL ROLE "${safeRole}"`));

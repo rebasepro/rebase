@@ -1,4 +1,4 @@
-import { ChipColorKey, ChipColorScheme, getColorSchemeForKey, cls } from "@rebasepro/ui";
+import { ChipColorKey, ChipColorScheme, getColorSchemeForKey, cls, Typography } from "@rebasepro/ui";
 import React, { useMemo } from "react";
 
 export interface BoardColumnTitleProps {
@@ -23,10 +23,11 @@ export function BoardColumnTitle({
     }, [color]);
 
     return (
-        <h4
+        <Typography
+            variant="subtitle2"
+            component="h4"
             className={
                 cls("py-3 px-3 transition-colors duration-200 flex-grow select-none relative outline-none focus:outline focus:outline-2 focus:outline-offset-2 flex items-center gap-3",
-                    "text-sm font-semibold text-surface-900 dark:text-surface-200",
                     className)
             }
             {...props}
@@ -40,6 +41,6 @@ export function BoardColumnTitle({
                 />
             )}
             {children}
-        </h4>
+        </Typography>
     );
 }

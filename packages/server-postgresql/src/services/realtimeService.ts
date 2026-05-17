@@ -866,6 +866,41 @@ roles: authContext.roles },
         return parentPaths;
     }
     // =============================================================================
+    // Lifecycle / Cleanup
+    // =============================================================================
+
+    /**
+     * Gracefully tear down all realtime resources.
+     *
+     * This MUST be called during process shutdown, **before** `pool.end()`.
+     * It ensures:
+     *  1. All debounced refetch timers are cancelled (prevents queries after pool closes).
+     *  2. All subscription state and callbacks are cleared.
+     *  3. The dedicated LISTEN client (outside the pool) is disconnected.
+     *  4. All WebSocket clients are removed (but not forcefully closed — the
+     *     HTTP server close will handle that).
+     */
+    async destroy(): Promise<void> {
+        // 1. Cancel every pending debounced refetch timer
+        for (const [key, timer] of this.refetchTimers) {
+            clearTimeout(timer);
+            this.refetchTimers.delete(key);
+        }
+
+        // 2. Clear subscriptions and callbacks
+        this._subscriptions.clear();
+        this.subscriptionCallbacks.clear();
+
+        // 3. Disconnect the dedicated LISTEN client
+        await this.stopListening();
+
+        // 4. Drop client references (don't close — server.close drains them)
+        this.clients.clear();
+
+        this.debugLog("🧹 [RealtimeService] destroy() complete — all resources released.");
+    }
+
+    // =============================================================================
     // Cross-Instance LISTEN/NOTIFY
     // =============================================================================
 

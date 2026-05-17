@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { User } from "@rebasepro/types";
 import { useSnackbarController, useAuthController, useTranslation } from "@rebasepro/core";
 import { useBreadcrumbsController } from "../../index";
-import { Button, Container, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Table, TableBody, TableCell, TableHeader, TableRow, TextField, Typography, CircularProgress, CenteredView, Tooltip, MultiSelect, MultiSelectItem, LoadingButton, SearchBar, Select, SelectItem, Skeleton , iconSize } from "@rebasepro/ui";
+import { Alert, Button, Container, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Table, TableBody, TableCell, TableHeader, TableRow, TextField, Typography, CircularProgress, CenteredView, Tooltip, MultiSelect, MultiSelectItem, LoadingButton, SearchBar, Select, SelectItem, Skeleton , iconSize } from "@rebasepro/ui";
 import { MailIcon, KeyRoundIcon, PlusIcon, Trash2Icon, CopyIcon, CheckCircleIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { RoleChip } from "./RoleChip";
 import { UserManagementDelegate, Role, UserCreationResult } from "@rebasepro/types";
@@ -516,12 +516,12 @@ message: t("password_copied") ?? "Password copied to clipboard" });
                 </DialogTitle>
                 <DialogContent>
                     <div className="flex flex-col gap-4 py-2">
-                        <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                            <Typography className="text-green-800 dark:text-green-200">
+                        <Alert color="success">
+                            <Typography>
                                 {(t("invitation_sent") ?? "An invitation email has been sent to {{email}}. They can use the link to set their password.")
                                     .replace("{{email}}", result.user.email ?? "")}
                             </Typography>
-                        </div>
+                        </Alert>
                     </div>
                 </DialogContent>
                 <DialogActions>
@@ -542,12 +542,12 @@ message: t("password_copied") ?? "Password copied to clipboard" });
                 </DialogTitle>
                 <DialogContent>
                     <div className="flex flex-col gap-4 py-2">
-                        <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-                            <Typography className="text-amber-800 dark:text-amber-200" variant="body2">
+                        <Alert color="warning">
+                            <Typography variant="body2">
                                 {t("temporary_password_description") ??
                                     "Email is not configured. Share this temporary password with the user securely. It will not be shown again."}
                             </Typography>
-                        </div>
+                        </Alert>
 
                         <div>
                             <Typography variant="caption" color="secondary" className="mb-1">

@@ -1,6 +1,6 @@
 
 import React, { useCallback, useState } from "react";
-import { Button, cls, Dialog, DialogActions, DialogContent, DialogTitle, Typography , iconSize } from "@rebasepro/ui";
+import { Alert, Button, cls, Dialog, DialogActions, DialogContent, DialogTitle, Typography , iconSize } from "@rebasepro/ui";
 import { CodeIcon } from "lucide-react";
 import { EntityCollection } from "@rebasepro/types";
 import { validateCollectionJson, CollectionValidationError } from "../../validateCollectionJson";
@@ -112,13 +112,13 @@ export function CollectionJsonImportDialog({
                 />
 
                 {errors.length > 0 && touched && (
-                    <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-md border border-red-200 dark:border-red-800">
-                        <Typography variant="body2" className="font-medium text-red-700 dark:text-red-400 mb-2">
+                    <Alert color="error">
+                        <Typography variant="body2" className="font-medium mb-2">
                             Validation errors:
                         </Typography>
                         <ul className="list-disc list-inside space-y-1">
                             {errors.map((error, index) => (
-                                <li key={index} className="text-sm text-red-600 dark:text-red-400">
+                                <li key={index} className="text-sm">
                                     {error.path ? (
                                         <>
                                             <code className="bg-red-100 dark:bg-red-900/40 px-1 rounded">
@@ -132,15 +132,15 @@ export function CollectionJsonImportDialog({
                                 </li>
                             ))}
                         </ul>
-                    </div>
+                    </Alert>
                 )}
 
                 {isValid && (
-                    <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-md border border-green-200 dark:border-green-800">
-                        <Typography variant="body2" className="text-green-700 dark:text-green-400">
+                    <Alert color="success">
+                        <Typography variant="body2">
                             ✓ JSON is valid and ready to import
                         </Typography>
-                    </div>
+                    </Alert>
                 )}
             </DialogContent>
             <DialogActions>

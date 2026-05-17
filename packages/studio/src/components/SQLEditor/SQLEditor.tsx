@@ -743,7 +743,7 @@ role: selectedRole });
         } finally {
             updateActiveTab({ loading: false });
         }
-    }, [activeTab.sql, autoLimit, databaseAdmin, history, updateActiveTab]);
+    }, [activeTab.sql, autoLimit, databaseAdmin, history, updateActiveTab, selectedDatabase, selectedRole]);
 
     const handleRun = useCallback(async (selectedText?: string) => {
         const sqlTarget = selectedText || activeTab.sql;
