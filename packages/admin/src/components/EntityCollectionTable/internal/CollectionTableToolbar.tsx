@@ -52,12 +52,7 @@ export function CollectionTableToolbar({
             <div className="flex items-center gap-1 md:mr-4 mr-2 min-w-0">
 
                 {/* View toggle — hidden in compact */}
-                <div className={cls(
-                    "transition-all duration-300 ease-out overflow-hidden",
-                    compact ? "max-w-0 opacity-0" : "max-w-[200px] opacity-100"
-                )}>
-                    {viewModeToggle}
-                </div>
+                {!compact && viewModeToggle}
 
                 {title && <div className={"flex items-center"}>
                     {title}
@@ -70,28 +65,21 @@ export function CollectionTableToolbar({
             <div className="flex items-center gap-1">
 
                 {/* Loading spinner — hidden in compact */}
-                {largeLayout && <div className={cls(
-                    "mr-4 transition-all duration-300 ease-out overflow-hidden",
-                    compact ? "w-0 opacity-0" : "w-[22px] opacity-100"
-                )}>
-                    {loading &&
-                        <CircularProgress size={"smallest"}/>}
-                </div>}
+                {largeLayout && !compact && loading && (
+                    <div className="mr-4">
+                        <CircularProgress size={"smallest"}/>
+                    </div>
+                )}
 
                 {/* Search bar — hidden in compact */}
-                <div className={cls(
-                    "transition-all duration-300 ease-out",
-                    compact ? "max-w-0 opacity-0 overflow-hidden" : "max-w-[300px] opacity-100"
-                )}>
-                    {onTextSearch &&
-                        <SearchBar
-                            key={"search-bar"}
-                            size={"small"}
-                            placeholder={t("search")}
-                            onTextSearch={onTextSearch}
-                            expandable={true}
-                            initialValue={initialSearchText}/>}
-                </div>
+                {!compact && onTextSearch &&
+                    <SearchBar
+                        key={"search-bar"}
+                        size={"small"}
+                        placeholder={t("search")}
+                        onTextSearch={onTextSearch}
+                        expandable={true}
+                        initialValue={initialSearchText}/>}
 
                 {/* Secondary actions — always inline */}
                 <div className="flex items-center gap-1">

@@ -81,21 +81,16 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
         navigate(collectionUrl);
     }, [navigate, urlController, path]);
 
-    const backButton = (
-        <div key={"back_wrapper"} className={cls(
-            "transition-all duration-300 ease-out overflow-hidden",
-            compact ? "max-w-[40px] opacity-100" : "max-w-0 opacity-0"
-        )}>
-            <Tooltip title={t("back")} key={"back_tooltip"}>
-                <IconButton
-                    size="small"
-                    onClick={handleBackClick}
-                    className="mr-1"
-                >
-                    <ArrowLeftIcon size={iconSize.small}/>
-                </IconButton>
-            </Tooltip>
-        </div>
+    const backButton = compact && (
+        <Tooltip title={t("back")} key={"back_tooltip"}>
+            <IconButton
+                size="small"
+                onClick={handleBackClick}
+                className="mr-1"
+            >
+                <ArrowLeftIcon size={iconSize.small}/>
+            </IconButton>
+        </Tooltip>
     );
 
     const filtersButton = resolvedProperties && tableController.setFilterValues && (
