@@ -7,6 +7,7 @@ import { ErrorBoundary , iconSize } from "@rebasepro/ui";
 import { ArrowLeftIcon, FilterIcon } from "lucide-react";
 import { ClearFilterSortButton } from "../ClearFilterSortButton";
 import { FiltersDialog } from "./FiltersDialog";
+import { FilterPresetsButton } from "./FilterPresetsButton";
 import { Badge, Button, cls, IconButton, Tooltip } from "@rebasepro/ui";
 import { toArray } from "@rebasepro/utils";
 import { useNavigate } from "react-router-dom";
@@ -124,13 +125,23 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
         </Tooltip>
     );
 
+    const filterPresetsButton = collection.filterPresets?.length ? (
+        <FilterPresetsButton
+            key={"filter_presets"}
+            filterPresets={collection.filterPresets}
+            tableController={tableController}
+            compact={compact}
+        />
+    ) : null;
+
     const actions: React.ReactNode[] = [
         backButton,
         filtersButton,
         <ClearFilterSortButton
             key={"clear_filter"}
             tableController={tableController}
-            enabled={!collection.fixedFilter}/>
+            enabled={!collection.fixedFilter}/>,
+        filterPresetsButton
     ];
 
     const pluginActionsStart = useSlot("collection.actions.start", actionProps);

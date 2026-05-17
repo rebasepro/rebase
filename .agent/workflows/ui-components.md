@@ -76,3 +76,24 @@ Each collection view mode has a standard icon from Lucide. When building view sw
 | `kanban` | `Columns` | Board with columns |
 | `list` | `List` | Compact list view |
 
+---
+
+## Agent Enforcement Rules (MANDATORY)
+
+1. **UI Kit First**: The `@rebasepro/ui` component library is the single source of truth for all UI elements. When writing new code, **always** use the UI kit component if one exists. Never introduce a raw HTML element (`<table>`, `<input>`, `<label>`, `<h1>`–`<h6>`, etc.) when a kit equivalent is available.
+
+2. **Proactive Notification**: When performing **any** task (bug fix, feature, refactor), if you encounter an existing file that uses a raw HTML element or hand-rolled styled component where a `@rebasepro/ui` equivalent exists, **immediately tell the user**. Do NOT silently fix it — describe the violation and which kit component should replace it, then let the user decide.
+
+3. **Common Replacements Reference**:
+   | Raw / Legacy | UI Kit Replacement |
+   |--------------|--------------------|
+   | `<input type="radio">` | `RadioGroup` |
+   | `<input type="checkbox">` | `Checkbox` |
+   | `<label>` | `Label` / `InputLabel` |
+   | `<table>`, `<tr>`, `<td>`, `<th>` | `Table`, `TableHeader`, `TableRow`, `TableCell` |
+   | `<h1>`–`<h6>`, `<p>`, `<span>` (for text) | `Typography` |
+   | Hand-rolled alert/banner div | `Alert` |
+   | Hand-rolled badge/pill span | `Badge` / `Chip` |
+   | Hardcoded `border-gray-*` | `defaultBorderMixin` |
+   | Hardcoded `text-gray-*` / `text-slate-*` | `text-surface-*` design tokens |
+

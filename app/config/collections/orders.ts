@@ -264,6 +264,34 @@ const ordersCollection: PostgresCollection = {
             ],
             using: "true"
         }
+    ],
+    filterPresets: [
+        {
+            label: "Shipped orders",
+            filterValues: {
+                status: ["==", "shipped"]
+            }
+        },
+        {
+            label: "Pending & paid",
+            filterValues: {
+                status: ["==", "pending"],
+                payment_status: ["==", "paid"]
+            }
+        },
+        {
+            label: "High-value orders (> $500)",
+            filterValues: {
+                total: [">", 500]
+            },
+            sort: ["total", "desc"]
+        },
+        {
+            label: "Cancelled / Refunded",
+            filterValues: {
+                status: ["in", ["cancelled", "refunded"]]
+            }
+        }
     ]
 };
 

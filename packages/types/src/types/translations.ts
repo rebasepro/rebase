@@ -446,6 +446,15 @@ export interface RebaseTranslations {
 
     no_filterable_properties: string;
     apply_filters: string;
+
+    // ─── Filter Presets ──────────────────────────────────────────
+    /** Label shown on the filter presets dropdown trigger */
+    filter_presets?: string;
+    /** Tooltip shown when hovering over a preset entry */
+    filter_preset_apply?: string;
+    /** Shown when a preset is active, with {{label}} interpolation */
+    filter_preset_active?: string;
+
     list: string;
     table_view_mode: string;
     cards: string;

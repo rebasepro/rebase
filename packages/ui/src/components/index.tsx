@@ -22,6 +22,7 @@ export * from "./DialogContent";
 export * from "./DialogTitle";
 export * from "./ExpandablePanel";
 export * from "./FileUpload";
+export * from "./FilterChip";
 export * from "./IconButton";
 export * from "./InputLabel";
 export * from "./InfoLabel";

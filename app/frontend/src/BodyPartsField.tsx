@@ -1,8 +1,7 @@
 import React, { useCallback, useMemo } from "react";
 import type { FieldProps } from "@rebasepro/admin";
 import type { ArrayProperty } from "@rebasepro/types";
-import { Typography, cls } from "@rebasepro/ui";
-import { defaultBorderMixin, fieldBackgroundMixin } from "@rebasepro/ui/styles";
+import { Typography, cls, defaultBorderMixin, fieldBackgroundMixin } from "@rebasepro/ui";
 
 import bodyFrontImg from "./assets/body_front.png";
 import bodyBackImg from "./assets/body_back.png";

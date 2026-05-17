@@ -238,6 +238,35 @@ color: "red" }
                 hideFromNavigation: false
             }
         }
+    ],
+    filterPresets: [
+        {
+            label: "Active products",
+            filterValues: {
+                status: ["==", "active"]
+            }
+        },
+        {
+            label: "Low stock (< 10)",
+            filterValues: {
+                stock_quantity: ["<", 10],
+                status: ["==", "active"]
+            },
+            sort: ["stock_quantity", "asc"]
+        },
+        {
+            label: "Featured items",
+            filterValues: {
+                is_featured: ["==", true]
+            }
+        },
+        {
+            label: "Top rated (4+)",
+            filterValues: {
+                rating: [">=", 4]
+            },
+            sort: ["rating", "desc"]
+        }
     ]
 };
 

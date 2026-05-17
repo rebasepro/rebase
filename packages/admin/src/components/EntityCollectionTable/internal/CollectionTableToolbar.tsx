@@ -49,7 +49,7 @@ export function CollectionTableToolbar({
         <div
             className={cls(defaultBorderMixin, "no-scrollbar min-h-[52px] overflow-x-auto px-2 md:px-4 bg-surface-50 dark:bg-surface-900 border-b flex flex-row justify-between items-center w-full")}>
 
-            <div className="flex items-center gap-1 md:mr-4 mr-2">
+            <div className="flex items-center gap-1 md:mr-4 mr-2 min-w-0">
 
                 {/* View toggle — hidden in compact */}
                 <div className={cls(

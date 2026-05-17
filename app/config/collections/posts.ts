@@ -156,6 +156,33 @@ const postsCollection: PostgresCollection = {
     ],
     entityViews: [
         "blog_preview"
+    ],
+    filterPresets: [
+        {
+            label: "Published",
+            filterValues: {
+                status: ["==", "published"]
+            },
+            sort: ["publish_date", "desc"]
+        },
+        {
+            label: "Drafts",
+            filterValues: {
+                status: ["==", "draft"]
+            }
+        },
+        {
+            label: "Needs review",
+            filterValues: {
+                status: ["==", "needs_review"]
+            }
+        },
+        {
+            label: "Archived",
+            filterValues: {
+                status: ["==", "archived"]
+            }
+        }
     ]
 };
 

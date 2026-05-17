@@ -124,7 +124,8 @@ const exercisesCollection: PostgresCollection = {
                 ]
             },
             ui: {
-                Field: "../../frontend/src/BodyPartsField"
+                Field: "../../frontend/src/BodyPartsField",
+                Preview: "../../frontend/src/BodyPartsPreview"
             },
             description: "Muscle groups targeted by this exercise"
         },
@@ -209,6 +210,28 @@ const exercisesCollection: PostgresCollection = {
         "is_featured",
         "created_at",
         "updated_at"
+    ],
+    filterPresets: [
+        {
+            label: "Beginner bodyweight",
+            filterValues: {
+                difficulty: ["==", "beginner"],
+                category: ["==", "calisthenics"]
+            }
+        },
+        {
+            label: "Published strength",
+            filterValues: {
+                category: ["==", "strength"],
+                status: ["==", "published"]
+            }
+        },
+        {
+            label: "Cardio exercises",
+            filterValues: {
+                category: ["==", "cardio"]
+            }
+        }
     ]
 };
 

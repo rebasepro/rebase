@@ -7,7 +7,7 @@ import { createPostgresDatabaseConnection } from "@rebasepro/server-postgresql";
 import { env } from "./env.js";
 import {
     authors, posts, tags, products, orders,
-    postsTags, customers, orderItems, tickets, productLocales
+    postsTags, customers, orderItems, tickets, productLocales, exercises
 } from "./schema.generated.js";
 import fs from "fs";
 import path from "path";
@@ -790,6 +790,358 @@ tag_id: tagIds[t - 1] });
         }
         console.log(`  ✅ ${NUM_TICKETS} support tickets`);
 
+        // ── 6. Exercises ──────────────────────────────────────────────
+        console.log("\n🏋️ Seeding exercises...");
+        const exerciseImagePaths = await seedAssets("exercise_images", "exercise_images/");
+
+        const exerciseData: Array<{
+            name: string; description: string; difficulty: string; category: string;
+            equipment: string[]; body_parts: string[]; instructions: string;
+            default_reps: number | null; default_sets: number; rest_seconds: number;
+            calories_per_minute: number; is_compound: boolean; is_featured: boolean;
+            status: string; image_file?: string; video_url?: string;
+        }> = [
+            {
+                name: "Barbell Bench Press",
+                description: "The king of chest exercises. The flat barbell bench press is a compound movement that primarily targets the pectoralis major, with secondary engagement of the anterior deltoids and triceps.",
+                difficulty: "intermediate", category: "strength",
+                equipment: ["barbell", "bench"],
+                body_parts: ["chest", "shoulders", "triceps"],
+                instructions: "## Setup\n1. Lie flat on a bench with feet firmly on the floor\n2. Grip the barbell slightly wider than shoulder-width\n3. Unrack the bar and hold it above your chest\n\n## Execution\n1. Lower the bar slowly to your mid-chest\n2. Touch your chest lightly without bouncing\n3. Press the bar back up explosively to the starting position\n4. Keep your shoulder blades retracted throughout\n\n> **Tip:** Maintain a slight arch in your lower back for stability.",
+                default_reps: 8, default_sets: 4, rest_seconds: 90, calories_per_minute: 7,
+                is_compound: true, is_featured: true, status: "published", image_file: "bench_press.png",
+                video_url: "https://www.youtube.com/watch?v=rT7DgCr-3pg"
+            },
+            {
+                name: "Barbell Back Squat",
+                description: "The fundamental lower body exercise. Back squats build overall leg strength and size, targeting quads, glutes, and hamstrings while engaging the core for stabilization.",
+                difficulty: "intermediate", category: "strength",
+                equipment: ["barbell"],
+                body_parts: ["quads", "glutes", "hamstrings", "lower_back", "abs"],
+                instructions: "## Setup\n1. Position the barbell on your upper traps\n2. Stand with feet shoulder-width apart, toes slightly out\n3. Brace your core and unrack the bar\n\n## Execution\n1. Initiate the movement by pushing your hips back\n2. Descend until your thighs are at least parallel to the floor\n3. Drive through your heels to stand back up\n4. Keep your chest up and knees tracking over your toes\n\n> **Tip:** Aim for depth — hip crease below the knee for full ROM.",
+                default_reps: 6, default_sets: 4, rest_seconds: 120, calories_per_minute: 9,
+                is_compound: true, is_featured: true, status: "published", image_file: "squat.png",
+                video_url: "https://www.youtube.com/watch?v=ultWZbUMPL8"
+            },
+            {
+                name: "Conventional Deadlift",
+                description: "The ultimate posterior chain builder. Deadlifts develop raw pulling strength across the back, glutes, and hamstrings, making it one of the most functional lifts.",
+                difficulty: "advanced", category: "strength",
+                equipment: ["barbell"],
+                body_parts: ["lower_back", "upper_back", "glutes", "hamstrings", "forearms"],
+                instructions: "## Setup\n1. Stand with feet hip-width apart, bar over mid-foot\n2. Hinge at the hips and grip the bar just outside your knees\n3. Drop your hips, lift your chest, and pull the slack out of the bar\n\n## Execution\n1. Drive through your feet and extend your hips and knees simultaneously\n2. Keep the bar close to your body throughout\n3. Lock out at the top with hips fully extended\n4. Lower the bar under control back to the floor\n\n> **Tip:** Never round your lower back. Think \"push the floor away\" rather than \"pull the bar up.\"",
+                default_reps: 5, default_sets: 3, rest_seconds: 180, calories_per_minute: 10,
+                is_compound: true, is_featured: true, status: "published", image_file: "deadlift.png"
+            },
+            {
+                name: "Pull-Up",
+                description: "A bodyweight staple for building a wide, V-shaped back. Pull-ups target the latissimus dorsi, biceps, and forearms with unmatched efficiency.",
+                difficulty: "intermediate", category: "calisthenics",
+                equipment: ["pull_up_bar"],
+                body_parts: ["upper_back", "biceps", "forearms", "shoulders"],
+                instructions: "## Setup\n1. Hang from a pull-up bar with an overhand grip, slightly wider than shoulder-width\n2. Engage your lats and retract your shoulder blades\n\n## Execution\n1. Pull yourself up until your chin clears the bar\n2. Squeeze your back muscles at the top\n3. Lower yourself under control to a full dead hang\n4. Avoid swinging or kipping\n\n> **Tip:** If you can't do full pull-ups, start with negatives (slow lowering phase).",
+                default_reps: 8, default_sets: 3, rest_seconds: 90, calories_per_minute: 8,
+                is_compound: true, is_featured: true, status: "published", image_file: "pullup.png"
+            },
+            {
+                name: "Forearm Plank",
+                description: "The gold standard of core stability. Planks build isometric endurance in the entire anterior chain — abs, obliques, and hip flexors — while also engaging the shoulders and lower back.",
+                difficulty: "beginner", category: "calisthenics",
+                equipment: ["none"],
+                body_parts: ["abs", "obliques", "lower_back", "shoulders"],
+                instructions: "## Setup\n1. Place your forearms on the floor, elbows directly below shoulders\n2. Extend your legs back, toes on the ground\n\n## Execution\n1. Lift your body into a straight line from head to heels\n2. Brace your core as if bracing for a punch\n3. Hold for the prescribed time\n4. Don't let your hips sag or pike up\n\n> **Tip:** Squeeze your glutes and quads for extra stability.",
+                default_reps: null, default_sets: 3, rest_seconds: 60, calories_per_minute: 4,
+                is_compound: false, is_featured: false, status: "published", image_file: "plank.png"
+            },
+            {
+                name: "Dumbbell Bicep Curl",
+                description: "A classic isolation exercise for building bicep size and peak. The dumbbell variation allows for natural wrist rotation (supination) through the movement.",
+                difficulty: "beginner", category: "strength",
+                equipment: ["dumbbell"],
+                body_parts: ["biceps", "forearms"],
+                instructions: "## Setup\n1. Stand with a dumbbell in each hand, arms at your sides\n2. Palms facing forward, feet shoulder-width apart\n\n## Execution\n1. Curl the weights up by bending at the elbow\n2. Keep your upper arms stationary — no swinging\n3. Squeeze your biceps at the top\n4. Lower under control to full extension\n\n> **Tip:** Alternate arms or curl both simultaneously — both are effective.",
+                default_reps: 12, default_sets: 3, rest_seconds: 60, calories_per_minute: 5,
+                is_compound: false, is_featured: false, status: "published", image_file: "bicep_curl.png"
+            },
+            {
+                name: "Walking Lunges",
+                description: "A unilateral leg exercise that builds single-leg strength, balance, and coordination. Targets quads, glutes, and hip flexors while challenging stability.",
+                difficulty: "beginner", category: "strength",
+                equipment: ["dumbbell"],
+                body_parts: ["quads", "glutes", "hamstrings", "hip_flexors", "calves"],
+                instructions: "## Setup\n1. Stand tall holding dumbbells at your sides\n2. Feet hip-width apart\n\n## Execution\n1. Step forward with one leg into a deep lunge\n2. Lower your back knee toward the floor\n3. Push through the front heel and step the back leg forward into the next lunge\n4. Continue alternating legs\n\n> **Tip:** Keep your torso upright and core braced throughout.",
+                default_reps: 12, default_sets: 3, rest_seconds: 60, calories_per_minute: 6,
+                is_compound: true, is_featured: false, status: "published", image_file: "lunges.png"
+            },
+            {
+                name: "Overhead Shoulder Press",
+                description: "A foundational pressing movement for building strong, capped deltoids. The standing variation also requires significant core stabilization.",
+                difficulty: "intermediate", category: "strength",
+                equipment: ["barbell"],
+                body_parts: ["shoulders", "triceps", "upper_back", "abs"],
+                instructions: "## Setup\n1. Grip the barbell at shoulder width, resting it on your front deltoids\n2. Stand with feet shoulder-width apart, core braced\n\n## Execution\n1. Press the bar overhead in a straight line\n2. Push your head through once the bar passes your forehead\n3. Lock out at the top with arms fully extended\n4. Lower the bar under control back to your shoulders\n\n> **Tip:** Avoid excessive back lean — if you need to lean, the weight is too heavy.",
+                default_reps: 8, default_sets: 4, rest_seconds: 90, calories_per_minute: 6,
+                is_compound: true, is_featured: true, status: "published", image_file: "shoulder_press.png"
+            },
+            {
+                name: "Romanian Deadlift",
+                description: "A hip-hinge variation that isolates the hamstrings and glutes through an eccentric-focused stretch under load.",
+                difficulty: "intermediate", category: "strength",
+                equipment: ["barbell"],
+                body_parts: ["hamstrings", "glutes", "lower_back"],
+                instructions: "## Setup\n1. Hold a barbell at hip height with an overhand grip\n2. Feet hip-width apart, slight bend in the knees\n\n## Execution\n1. Push your hips back while lowering the bar along your legs\n2. Keep the bar close to your shins\n3. Lower until you feel a deep stretch in your hamstrings\n4. Drive your hips forward to return to standing\n\n> **Tip:** This is NOT a squat — minimal knee bend, maximal hip hinge.",
+                default_reps: 10, default_sets: 3, rest_seconds: 90, calories_per_minute: 7,
+                is_compound: true, is_featured: false, status: "published", image_file: "romanian_deadlift.png"
+            },
+            {
+                name: "Dumbbell Lateral Raise",
+                description: "An isolation exercise targeting the medial deltoid, essential for building shoulder width and the \"capped\" shoulder look.",
+                difficulty: "beginner", category: "strength",
+                equipment: ["dumbbell"],
+                body_parts: ["shoulders"],
+                instructions: "## Setup\n1. Stand with a light dumbbell in each hand at your sides\n\n## Execution\n1. Raise both arms out to the sides until parallel with the floor\n2. Lead with your elbows, slight bend in the arms\n3. Pause at the top for a one-second squeeze\n4. Lower slowly — don't just drop them\n\n> **Tip:** Use lighter weight with strict form. Momentum defeats the purpose.",
+                default_reps: 15, default_sets: 3, rest_seconds: 45, calories_per_minute: 4,
+                is_compound: false, is_featured: false, status: "published", image_file: "lateral_raise.png"
+            },
+            {
+                name: "Barbell Row",
+                description: "A horizontal pulling movement that builds thickness in the mid-back, lats, and rear deltoids.",
+                difficulty: "intermediate", category: "strength",
+                equipment: ["barbell"],
+                body_parts: ["upper_back", "biceps", "forearms", "lower_back"],
+                instructions: "## Setup\n1. Hinge forward at the hips, holding a barbell with an overhand grip\n2. Back flat, chest up, knees slightly bent\n\n## Execution\n1. Pull the bar toward your lower chest / upper abdomen\n2. Squeeze your shoulder blades together at the top\n3. Lower the bar under control\n\n> **Tip:** Aim for a 45-degree torso angle for best lat activation.",
+                default_reps: 8, default_sets: 4, rest_seconds: 90, calories_per_minute: 7,
+                is_compound: true, is_featured: false, status: "published", image_file: "barbell_row.png"
+            },
+            {
+                name: "Tricep Dips",
+                description: "A bodyweight pressing exercise emphasizing the triceps. Can be performed on parallel bars or a bench.",
+                difficulty: "intermediate", category: "calisthenics",
+                equipment: ["none"],
+                body_parts: ["triceps", "chest", "shoulders"],
+                instructions: "## Setup\n1. Grip parallel dip bars and support yourself with straight arms\n\n## Execution\n1. Lower your body by bending your elbows until upper arms are parallel to the floor\n2. Keep elbows close to your body for tricep focus\n3. Press back up to full lockout\n\n> **Tip:** Lean slightly forward for more chest engagement, stay upright for tricep focus.",
+                default_reps: 10, default_sets: 3, rest_seconds: 90, calories_per_minute: 7,
+                is_compound: true, is_featured: false, status: "published", image_file: "tricep_dips.png"
+            },
+            {
+                name: "Kettlebell Swing",
+                description: "An explosive hip-hinge movement that builds power, cardiovascular endurance, and posterior chain strength.",
+                difficulty: "intermediate", category: "cardio",
+                equipment: ["kettlebell"],
+                body_parts: ["glutes", "hamstrings", "lower_back", "shoulders", "abs"],
+                instructions: "## Setup\n1. Stand with feet slightly wider than shoulder-width\n2. Hold a kettlebell with both hands in front of you\n\n## Execution\n1. Hinge at the hips and swing the kettlebell between your legs\n2. Explosively drive your hips forward to swing the bell to chest height\n3. Let the bell swing back down and repeat\n4. Power comes from the HIPS, not the arms\n\n> **Tip:** At the top, your body should form a straight line — glutes squeezed, core tight.",
+                default_reps: 15, default_sets: 4, rest_seconds: 60, calories_per_minute: 12,
+                is_compound: true, is_featured: true, status: "published", image_file: "kettlebell_swing.png"
+            },
+            {
+                name: "Cable Face Pull",
+                description: "A corrective and hypertrophy exercise for the rear deltoids and rotator cuff. Essential for shoulder health and posture.",
+                difficulty: "beginner", category: "strength",
+                equipment: ["cable_machine"],
+                body_parts: ["shoulders", "upper_back"],
+                instructions: "## Setup\n1. Set a cable pulley to upper chest height with a rope attachment\n\n## Execution\n1. Pull the rope toward your face, splitting the ends past your ears\n2. Externally rotate your shoulders at the end position\n3. Squeeze your rear delts and hold for one second\n4. Return under control\n\n> **Tip:** This is a prehab exercise — prioritize form over weight.",
+                default_reps: 15, default_sets: 3, rest_seconds: 45, calories_per_minute: 3,
+                is_compound: false, is_featured: false, status: "published", image_file: "face_pull.png"
+            },
+            {
+                name: "Box Jump",
+                description: "An explosive plyometric exercise for developing lower body power, fast-twitch muscle fibers, and athletic performance.",
+                difficulty: "intermediate", category: "plyometrics",
+                equipment: ["box"],
+                body_parts: ["quads", "glutes", "calves", "hip_flexors"],
+                instructions: "## Setup\n1. Stand facing a sturdy box, feet shoulder-width apart\n\n## Execution\n1. Swing your arms back and dip into a quarter squat\n2. Explode upward, jumping onto the box\n3. Land softly with both feet fully on the box\n4. Stand up tall, then step down (don't jump down)\n\n> **Tip:** Start with a lower box and progress gradually. Land quietly!",
+                default_reps: 8, default_sets: 4, rest_seconds: 90, calories_per_minute: 10,
+                is_compound: true, is_featured: false, status: "published", image_file: "box_jump.png"
+            },
+            {
+                name: "Resistance Band Pull-Apart",
+                description: "A simple but effective exercise for rear deltoid and scapular health. Great as a warm-up or high-rep finisher.",
+                difficulty: "beginner", category: "strength",
+                equipment: ["resistance_band"],
+                body_parts: ["shoulders", "upper_back"],
+                instructions: "## Setup\n1. Hold a resistance band at shoulder height with arms extended\n\n## Execution\n1. Pull the band apart by squeezing your shoulder blades together\n2. Keep arms straight throughout\n3. Return to the starting position slowly\n\n> **Tip:** Use a lighter band and do high reps (20+) for best results.",
+                default_reps: 20, default_sets: 3, rest_seconds: 30, calories_per_minute: 3,
+                is_compound: false, is_featured: false, status: "published", image_file: "band_pull_apart.png"
+            },
+            {
+                name: "TRX Row",
+                description: "A bodyweight rowing movement using suspension straps. Adjustable difficulty by changing your body angle.",
+                difficulty: "beginner", category: "calisthenics",
+                equipment: ["trx"],
+                body_parts: ["upper_back", "biceps", "forearms", "abs"],
+                instructions: "## Setup\n1. Hold TRX handles with arms extended, lean back\n2. Walk your feet forward to increase difficulty\n\n## Execution\n1. Pull your chest toward the handles\n2. Keep your body in a straight line\n3. Squeeze your shoulder blades at the top\n4. Lower yourself slowly to full arm extension\n\n> **Tip:** The more horizontal your body, the harder it gets.",
+                default_reps: 12, default_sets: 3, rest_seconds: 60, calories_per_minute: 5,
+                is_compound: true, is_featured: false, status: "published", image_file: "trx_row.png"
+            },
+            {
+                name: "Standing Calf Raise",
+                description: "An isolation exercise targeting the gastrocnemius and soleus muscles of the calves. Important for balanced leg development.",
+                difficulty: "beginner", category: "strength",
+                equipment: ["dumbbell"],
+                body_parts: ["calves"],
+                instructions: "## Setup\n1. Stand on the edge of a step or platform with heels hanging off\n2. Hold dumbbells at your sides for added resistance\n\n## Execution\n1. Rise up onto your toes as high as possible\n2. Hold the top position for 2 seconds\n3. Lower your heels below the platform for a full stretch\n\n> **Tip:** Slow eccentrics (3-second lowering) dramatically improve results.",
+                default_reps: 15, default_sets: 4, rest_seconds: 45, calories_per_minute: 3,
+                is_compound: false, is_featured: false, status: "published", image_file: "calf_raise.png"
+            },
+            {
+                name: "Medicine Ball Slam",
+                description: "A full-body explosive exercise that builds power and serves as high-intensity cardio. Great for stress relief too.",
+                difficulty: "beginner", category: "plyometrics",
+                equipment: ["medicine_ball"],
+                body_parts: ["abs", "shoulders", "upper_back", "quads"],
+                instructions: "## Setup\n1. Stand with feet shoulder-width apart holding a medicine ball overhead\n\n## Execution\n1. Brace your core and slam the ball into the ground as hard as possible\n2. Hinge at the hips and follow through\n3. Catch the ball on the bounce (or pick it up)\n4. Repeat with maximum intensity\n\n> **Tip:** Use a slam ball (dead bounce), not a standard medicine ball.",
+                default_reps: 12, default_sets: 3, rest_seconds: 60, calories_per_minute: 11,
+                is_compound: true, is_featured: false, status: "published", image_file: "med_ball_slam.png"
+            },
+            {
+                name: "Pigeon Pose Stretch",
+                description: "A deep hip opener that stretches the glutes, hip flexors, and piriformis. Essential for mobility and injury prevention.",
+                difficulty: "beginner", category: "flexibility",
+                equipment: ["none"],
+                body_parts: ["glutes", "hip_flexors"],
+                instructions: "## Setup\n1. Start in a high plank or all-fours position\n\n## Execution\n1. Bring your right knee forward and place it behind your right wrist\n2. Extend your left leg straight back\n3. Lower your hips toward the floor\n4. Hold for 30-60 seconds per side\n5. Keep your hips square to the floor\n\n> **Tip:** Place a yoga block under your hip if you can't reach the floor comfortably.",
+                default_reps: null, default_sets: 2, rest_seconds: 0, calories_per_minute: 2,
+                is_compound: false, is_featured: false, status: "draft", image_file: "pigeon_pose.png"
+            },
+            {
+                name: "Burpee",
+                description: "The ultimate full-body conditioning exercise. Burpees combine a squat, push-up, and explosive jump into one brutally effective movement.",
+                difficulty: "intermediate", category: "cardio",
+                equipment: ["none"],
+                body_parts: ["quads", "chest", "shoulders", "abs", "glutes"],
+                instructions: "## Setup\n1. Stand with feet shoulder-width apart\n\n## Execution\n1. Drop into a squat and place your hands on the floor\n2. Kick your feet back into a push-up position\n3. Perform a push-up\n4. Jump your feet back toward your hands\n5. Explode upward into a jump with arms overhead\n\n> **Tip:** For a scaled version, skip the push-up or step back instead of jumping.",
+                default_reps: 10, default_sets: 3, rest_seconds: 60, calories_per_minute: 14,
+                is_compound: true, is_featured: true, status: "published", image_file: "burpee.png"
+            },
+            {
+                name: "Mountain Climbers",
+                description: "A dynamic bodyweight exercise that elevates heart rate while strengthening the core, shoulders, and hip flexors.",
+                difficulty: "beginner", category: "cardio",
+                equipment: ["none"],
+                body_parts: ["abs", "hip_flexors", "shoulders", "quads"],
+                instructions: "## Setup\n1. Start in a high plank position with hands under shoulders\n\n## Execution\n1. Drive one knee toward your chest\n2. Quickly switch legs, extending the bent leg back\n3. Alternate rapidly in a running motion\n4. Keep your hips level — no bouncing\n\n> **Tip:** The faster you go, the more cardio benefit. Slow down for core focus.",
+                default_reps: 20, default_sets: 3, rest_seconds: 45, calories_per_minute: 11,
+                is_compound: true, is_featured: false, status: "published", image_file: "mountain_climber.png"
+            },
+            {
+                name: "Russian Twist",
+                description: "A rotational core exercise that targets the obliques and transverse abdominis. Excellent for building rotational power.",
+                difficulty: "beginner", category: "strength",
+                equipment: ["dumbbell"],
+                body_parts: ["obliques", "abs", "hip_flexors"],
+                instructions: "## Setup\n1. Sit on the floor with knees bent, feet elevated slightly\n2. Lean back to about 45 degrees, holding a weight at chest height\n\n## Execution\n1. Rotate your torso to touch the weight to the floor on one side\n2. Rotate through center to the other side\n3. Keep your core braced and back straight throughout\n\n> **Tip:** Don't rush — control the rotation for maximum oblique engagement.",
+                default_reps: 20, default_sets: 3, rest_seconds: 45, calories_per_minute: 5,
+                is_compound: false, is_featured: false, status: "published", image_file: "russian_twist.png"
+            },
+            {
+                name: "Push-Up",
+                description: "The foundational bodyweight upper-body exercise. Push-ups build chest, shoulder, and tricep strength with zero equipment needed.",
+                difficulty: "beginner", category: "calisthenics",
+                equipment: ["none"],
+                body_parts: ["chest", "triceps", "shoulders", "abs"],
+                instructions: "## Setup\n1. Place hands slightly wider than shoulder-width on the floor\n2. Extend legs back, body in a straight line\n\n## Execution\n1. Lower your chest toward the floor by bending your elbows\n2. Go until your chest is just above the ground\n3. Push back up to full arm extension\n4. Keep your core tight — no sagging hips\n\n> **Tip:** Elevate your hands on a bench to make it easier, or elevate your feet to make it harder.",
+                default_reps: 15, default_sets: 3, rest_seconds: 60, calories_per_minute: 7,
+                is_compound: true, is_featured: true, status: "published", image_file: "push_up.png"
+            },
+            {
+                name: "Barbell Hip Thrust",
+                description: "The most effective exercise for glute hypertrophy and strength. Hip thrusts produce peak glute activation unmatched by squats or deadlifts.",
+                difficulty: "intermediate", category: "strength",
+                equipment: ["barbell", "bench"],
+                body_parts: ["glutes", "hamstrings", "quads"],
+                instructions: "## Setup\n1. Sit on the floor with your upper back against a bench\n2. Roll a loaded barbell over your legs to your hip crease\n3. Plant feet flat, shoulder-width apart\n\n## Execution\n1. Drive through your heels to lift your hips\n2. Squeeze your glutes hard at the top\n3. Your shins should be vertical at full extension\n4. Lower under control and repeat\n\n> **Tip:** Use a barbell pad for comfort. Full hip extension at the top is critical.",
+                default_reps: 10, default_sets: 4, rest_seconds: 90, calories_per_minute: 6,
+                is_compound: true, is_featured: false, status: "published", image_file: "hip_thrust.png"
+            },
+            {
+                name: "Farmer's Walk",
+                description: "A loaded carry exercise that builds grip strength, core stability, and total-body conditioning. Simple but devastatingly effective.",
+                difficulty: "beginner", category: "strength",
+                equipment: ["dumbbell"],
+                body_parts: ["forearms", "abs", "shoulders", "upper_back", "calves"],
+                instructions: "## Setup\n1. Stand between two heavy dumbbells or kettlebells\n2. Deadlift them to your sides\n\n## Execution\n1. Stand tall with shoulders pulled back\n2. Walk in a straight line with controlled, even steps\n3. Keep your core braced and don't lean to either side\n4. Walk for distance (20-40m) or time (30-60s)\n\n> **Tip:** Go heavier than you think. Your grip will be the limiting factor.",
+                default_reps: null, default_sets: 3, rest_seconds: 90, calories_per_minute: 8,
+                is_compound: true, is_featured: false, status: "published", image_file: "farmers_walk.png"
+            },
+            {
+                name: "Cable Woodchop",
+                description: "A rotational movement that trains the obliques and core through a diagonal pulling pattern. Great for athletic performance.",
+                difficulty: "intermediate", category: "strength",
+                equipment: ["cable_machine"],
+                body_parts: ["obliques", "abs", "shoulders"],
+                instructions: "## Setup\n1. Set a cable pulley to the highest position\n2. Stand sideways to the machine, feet shoulder-width apart\n\n## Execution\n1. Grab the handle with both hands\n2. Pull diagonally across your body from high to low\n3. Rotate through your core — arms stay mostly straight\n4. Control the return to the starting position\n\n> **Tip:** The power comes from your core rotation, not your arms. Pivot on your back foot.",
+                default_reps: 12, default_sets: 3, rest_seconds: 60, calories_per_minute: 5,
+                is_compound: true, is_featured: false, status: "published", image_file: "cable_woodchop.png"
+            },
+            {
+                name: "Goblet Squat",
+                description: "A beginner-friendly squat variation that teaches perfect squat mechanics. The front-loaded weight naturally promotes an upright torso.",
+                difficulty: "beginner", category: "strength",
+                equipment: ["kettlebell"],
+                body_parts: ["quads", "glutes", "abs"],
+                instructions: "## Setup\n1. Hold a kettlebell or dumbbell at chest height with both hands\n2. Feet slightly wider than shoulder-width, toes slightly out\n\n## Execution\n1. Push your hips back and squat down\n2. Keep the weight close to your chest\n3. Go as deep as your mobility allows\n4. Drive through your heels to stand back up\n\n> **Tip:** Use your elbows to push your knees out at the bottom for better depth.",
+                default_reps: 12, default_sets: 3, rest_seconds: 60, calories_per_minute: 7,
+                is_compound: true, is_featured: false, status: "published", image_file: "goblet_squat.png"
+            },
+            {
+                name: "Bulgarian Split Squat",
+                description: "A single-leg squat variation with the rear foot elevated. Builds unilateral leg strength, balance, and addresses muscular imbalances.",
+                difficulty: "intermediate", category: "strength",
+                equipment: ["dumbbell", "bench"],
+                body_parts: ["quads", "glutes", "hamstrings", "hip_flexors"],
+                instructions: "## Setup\n1. Stand 2-3 feet in front of a bench\n2. Place one foot behind you on the bench, laces down\n3. Hold dumbbells at your sides\n\n## Execution\n1. Lower your back knee toward the floor\n2. Keep your front knee tracking over your toes\n3. Descend until your front thigh is parallel to the floor\n4. Push through your front heel to stand back up\n\n> **Tip:** The closer you stand to the bench, the more quad-dominant. Farther = more glute.",
+                default_reps: 10, default_sets: 3, rest_seconds: 60, calories_per_minute: 7,
+                is_compound: true, is_featured: false, status: "published"
+            },
+            {
+                name: "Hanging Leg Raise",
+                description: "An advanced core exercise performed hanging from a bar. Targets the lower abs and hip flexors with intense tension.",
+                difficulty: "advanced", category: "calisthenics",
+                equipment: ["pull_up_bar"],
+                body_parts: ["abs", "obliques", "hip_flexors"],
+                instructions: "## Setup\n1. Hang from a pull-up bar with an overhand grip\n2. Arms fully extended, shoulders engaged\n\n## Execution\n1. Keeping legs straight, raise them until they're parallel to the floor (or higher)\n2. Pause at the top and squeeze your abs\n3. Lower your legs slowly — don't swing\n4. Maintain a slight posterior pelvic tilt throughout\n\n> **Tip:** Bend your knees to make it easier. For a challenge, raise your toes to the bar.",
+                default_reps: 10, default_sets: 3, rest_seconds: 60, calories_per_minute: 5,
+                is_compound: false, is_featured: false, status: "published"
+            }
+        ];
+
+        // Build a map from filename to storage path
+        const exerciseImageMap: Record<string, string> = {};
+        for (const p of exerciseImagePaths) {
+            const filename = p.split("/").pop() || "";
+            exerciseImageMap[filename] = p;
+        }
+
+        const exerciseValues = exerciseData.map((ex, i) => {
+            const images = ex.image_file && exerciseImageMap[ex.image_file]
+                ? [exerciseImageMap[ex.image_file]]
+                : [];
+            return {
+                id: generateUUID("exercise", i),
+                name: ex.name,
+                description: ex.description,
+                images: images.length > 0 ? JSON.stringify(images) : null,
+                video_url: ex.video_url || null,
+                difficulty: ex.difficulty as any,
+                category: ex.category as any,
+                equipment: JSON.stringify(ex.equipment),
+                body_parts: JSON.stringify(ex.body_parts),
+                instructions: ex.instructions,
+                default_reps: ex.default_reps != null ? String(ex.default_reps) : null,
+                default_sets: String(ex.default_sets),
+                rest_seconds: String(ex.rest_seconds),
+                calories_per_minute: String(ex.calories_per_minute),
+                is_compound: ex.is_compound,
+                is_featured: ex.is_featured,
+                status: ex.status as any,
+                created_at: randomDate(90, 0),
+                updated_at: randomDate(14, 0)
+            };
+        });
+
+        await db.insert(exercises).values(exerciseValues);
+        console.log(`  ✅ ${exerciseValues.length} exercises`);
+
         // ── Summary ───────────────────────────────────────────────────
         const statusCounts: Record<string, number> = {};
         postValues.forEach(p => { statusCounts[p.status] = (statusCounts[p.status] || 0) + 1; });
@@ -800,7 +1152,7 @@ tag_id: tagIds[t - 1] });
         console.log("\n🎉 Database seeded successfully!");
         console.log(`   ${NUM_AUTHORS} authors, ${NUM_TAGS} tags, ${POST_COUNT} posts`);
         console.log(`   40 customers, ${allProducts.length} products, ${NUM_ORDERS} orders`);
-        console.log(`   ${NUM_TICKETS} tickets`);
+        console.log(`   ${NUM_TICKETS} tickets, ${exerciseValues.length} exercises`);
         console.log(`   Post statuses: ${Object.entries(statusCounts).map(([k, v]) => `${k}=${v}`).join(", ")}`);
         console.log(`   Ticket statuses: ${Object.entries(ticketStatusCounts).map(([k, v]) => `${k}=${v}`).join(", ")}`);
 

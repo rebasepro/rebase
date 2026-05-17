@@ -414,6 +414,12 @@ export const en: RebaseTranslations = {
 
     no_filterable_properties: "No filterable properties available",
     apply_filters: "Apply filters",
+
+    // ─── Filter Presets ──────────────────────────────────────────
+    filter_presets: "Presets",
+    filter_preset_apply: "Apply preset",
+    filter_preset_active: "Active: {{label}}",
+
     list: "List",
     table_view_mode: "Table",
     cards: "Cards",

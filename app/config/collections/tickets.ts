@@ -136,6 +136,34 @@ const ticketsCollection: PostgresCollection = {
         "created_at",
         "updated_at",
         "__order"
+    ],
+    filterPresets: [
+        {
+            label: "Urgent & High priority",
+            filterValues: {
+                priority: ["in", ["urgent", "high"]],
+                status: ["in", ["open", "in_progress"]]
+            }
+        },
+        {
+            label: "Open bugs",
+            filterValues: {
+                category: ["==", "bug"],
+                status: ["in", ["open", "in_progress"]]
+            }
+        },
+        {
+            label: "Waiting on customer",
+            filterValues: {
+                status: ["==", "waiting"]
+            }
+        },
+        {
+            label: "All resolved",
+            filterValues: {
+                status: ["==", "resolved"]
+            }
+        }
     ]
 };
 

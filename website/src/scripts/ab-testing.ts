@@ -70,6 +70,12 @@ export const EXPERIMENTS: Experiment[] = [
         weights: [34, 33, 33],
         expires: "2026-08-01",
     },
+    {
+        id: "navigation-structure",
+        variants: ["control", "flat-nav"],
+        weights: [50, 50],
+        expires: "2026-08-01",
+    },
 ];
 
 // ─── Client-side Helpers ─────────────────────────────────────

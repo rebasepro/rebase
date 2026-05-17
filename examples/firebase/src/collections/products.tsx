@@ -203,5 +203,27 @@ export const productsCollection = buildCollection({
                 name: "Tag"
             }
         }
-    }
+    },
+    filterPresets: [
+        {
+            label: "Available products",
+            filterValues: {
+                available: ["==", true]
+            }
+        },
+        {
+            label: "Public & available",
+            filterValues: {
+                public: ["==", true],
+                available: ["==", true]
+            }
+        },
+        {
+            label: "High price (> €100)",
+            filterValues: {
+                price: [">", 100]
+            },
+            sort: ["price", "desc"]
+        }
+    ]
 });

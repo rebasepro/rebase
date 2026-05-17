@@ -201,6 +201,25 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
     readonly defaultFilter?: FilterValues<Extract<keyof M, string> | (string & {})>; // setting FilterValues<M> can break defining collections by code
 
     /**
+     * Pre-defined filter presets that appear as quick-access options in the
+     * collection toolbar. Each preset applies a set of filters (and
+     * optionally a sort order) with a single click.
+     *
+     * ```ts
+     * filterPresets: [
+     *   {
+     *     label: "Shipped this month",
+     *     filterValues: {
+     *       status: ["==", "shipped"],
+     *       order_date: [">=", new Date(Date.now() - 30 * 86400000)]
+     *     }
+     *   }
+     * ]
+     * ```
+     */
+    readonly filterPresets?: FilterPreset<Extract<keyof M, string> | (string & {})>[];
+
+    /**
      * Default sort applied to this collection.
      * When setting this prop, entities will have a default order
      * applied in the collection.
@@ -645,6 +664,36 @@ export type WhereFilterOp =
  */
 export type FilterValues<Key extends string> =
     Partial<Record<Key, [WhereFilterOp, unknown]>>;
+
+/**
+ * A pre-defined filter preset for quick access in the collection toolbar.
+ * Users can select a preset to instantly apply a set of filters and
+ * optionally a sort order.
+ *
+ * @group Models
+ */
+export interface FilterPreset<Key extends string = string> {
+    /**
+     * Display label shown in the preset menu.
+     * If omitted, a summary is auto-generated from the filter keys.
+     */
+    label?: string;
+
+    /**
+     * The filter values to apply when this preset is selected.
+     */
+    filterValues: FilterValues<Key>;
+
+    /**
+     * Optional sort override to apply alongside the filter values.
+     */
+    sort?: [Key, "asc" | "desc"];
+}
+
+/**
+ * @deprecated Use {@link FilterPreset} instead.
+ */
+export type QuickFilter<Key extends string = string> = FilterPreset<Key>;
 
 /**
  * Used to indicate valid filter combinations (e.g. created in Firestore)
