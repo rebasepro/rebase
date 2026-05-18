@@ -477,7 +477,7 @@ function PropertyEditFormFields({
                 </Typography>
             </InfoLabel>}
 
-            <div className="flex mt-2 justify-between">
+            <div className="flex mt-2 items-start justify-between">
                 <div className={"w-full flex flex-col gap-2"}>
                     <WidgetSelectView
                         initialProperty={values}
@@ -509,10 +509,10 @@ function PropertyEditFormFields({
                 {onDelete && values?.id &&
                     <IconButton
                         variant={"ghost"}
-                        className="m-4"
+                        className="mt-1 shrink-0"
                         disabled={disabled}
                         onClick={() => setDeleteDialogOpen(true)}>
-                        <Trash2Icon/>
+                        <Trash2Icon size={iconSize.small}/>
                     </IconButton>}
             </div>
 

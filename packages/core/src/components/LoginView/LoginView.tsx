@@ -190,7 +190,7 @@ export function LoginView({
     return (
         <div
             className={cls(
-                "relative flex items-center justify-center h-screen w-screen p-4 transition-opacity duration-500 bg-white dark:bg-surface-900",
+                "relative flex items-center justify-center h-screen w-screen p-4 transition-opacity duration-500 bg-surface-50 dark:bg-surface-800",
                 fadeIn ? "opacity-100" : "opacity-0"
             )}>
 

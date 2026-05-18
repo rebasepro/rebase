@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rebase OG Image</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: '#0070f4',
+                        surface: {
+                            400: '#9ca3af',
+                            500: '#6b7280',
+                            900: '#111827',
+                            950: '#030712'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #000000;
+            margin: 0;
+            padding: 0;
+            width: 1200px;
+            height: 630px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="bg-black text-white font-sans antialiased">
+    <!-- Centered radial gradient glow -->
+    <div class="absolute inset-0 pointer-events-none" aria-hidden="true" style="background: radial-gradient(ellipse 70% 50% at 50% 40%, rgba(0, 112, 244, 0.25) 0%, rgba(0, 80, 200, 0.12) 40%, transparent 80%);"></div>
+    
+    <div class="absolute inset-0 pointer-events-none" aria-hidden="true" style="background: radial-gradient(ellipse 60% 80% at 50% 50%, rgba(0, 112, 244, 0.15) 0%, rgba(0, 80, 200, 0.08) 40%, transparent 75%); filter: blur(20px);"></div>
+
+    <div class="flex flex-col items-center justify-center h-full w-full relative z-10">
+        <!-- Logo -->
+        <div class="flex items-center mb-10">
+            <svg class="h-16 w-16 mr-4" viewBox="0 0 583 583" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="291.5" cy="291.5" r="291.5" fill="#0070F4"/>
+                <ellipse cx="292" cy="291.5" rx="173" ry="173.5" fill="#FF3773"/>
+                <path d="M465 291.5C465 268.847 460.525 246.416 451.831 225.487C443.137 204.558 430.394 185.542 414.329 169.524C398.265 153.506 379.194 140.8 358.204 132.131C337.215 123.462 314.719 119 292 119C269.281 119 246.785 123.462 225.796 132.131C204.806 140.8 185.735 153.506 169.671 169.524C153.606 185.542 140.863 204.558 132.169 225.487C123.475 246.416 119 268.847 119 291.5L292 291.5H465Z" fill="#FFA400"/>
+            </svg>
+            <span class="text-4xl font-semibold text-white tracking-tight">Rebase</span>
+        </div>
+
+        <!-- Headline -->
+        <h1 class="text-center text-6xl font-bold tracking-tight leading-[1.08] text-white">
+            Ship Faster with<br/><span class="text-primary">Postgres Superpowers.</span>
+        </h1>
+        
+        <!-- Subtitle -->
+        <p class="mt-8 text-2xl leading-8 text-surface-400 text-center max-w-[800px]">
+            The open-source backend that turns your Postgres database into a complete API and admin panel instantly.
+        </p>
+    </div>
+</body>
+</html>

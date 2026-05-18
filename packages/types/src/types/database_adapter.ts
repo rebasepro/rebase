@@ -3,13 +3,8 @@
  *
  * Pluggable database abstraction for Rebase.
  *
- * A `DatabaseAdapter` provides a simplified alternative to `BackendBootstrapper`
- * that focuses purely on data persistence and related concerns (realtime, history).
- * Unlike `BackendBootstrapper`, it does NOT handle authentication — auth is
- * managed separately by an `AuthAdapter`.
- *
- * The existing `BackendBootstrapper` continues to work (soft-deprecated).
- * New integrations should prefer `DatabaseAdapter`.
+ * A `DatabaseAdapter` focuses purely on data persistence and related concerns (realtime, history).
+ * It does NOT handle authentication — auth is managed separately by an `AuthAdapter`.
  *
  * @example
  * ```ts
@@ -35,9 +30,6 @@ import type {
 
 /**
  * A `DatabaseAdapter` provides data persistence for Rebase.
- *
- * It is the successor to `BackendBootstrapper`, focused purely on the
- * database layer without conflating auth concerns.
  *
  * @group Backend
  */

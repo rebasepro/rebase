@@ -51,6 +51,10 @@ export const en = {
   "features.kanban.badge": "Drag & drop",
   "features.kanban.desc":
     "Drag cards between columns to update status fields instantly. Your Postgres records, visualized.",
+  "features.customization.title": "Extreme customization",
+  "features.customization.badge": "BYO Components",
+  "features.customization.desc":
+    "Bring your own React components to completely transform how fields look and behave in the admin.",
   "features.history.title": "Data history & audit",
   "features.history.badge": "Versioning",
   "features.history.desc":

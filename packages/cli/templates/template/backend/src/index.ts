@@ -13,7 +13,7 @@ import {
     cleanupDevPortFile,
     logger
 } from "@rebasepro/server-core";
-import { createPostgresDatabaseConnection, createPostgresBootstrapper } from "@rebasepro/server-postgresql";
+import { createPostgresDatabaseConnection, createPostgresAdapter } from "@rebasepro/server-postgresql";
 import { enums, relations, tables } from "./schema.generated";
 import { env } from "./env";
 
@@ -54,16 +54,14 @@ async function startServer() {
         functionsDir: path.resolve(__dirname, "../functions"),
         server,
         app,
-        bootstrappers: [
-            createPostgresBootstrapper({
-                connection: db,
-                schema: { tables,
+        database: createPostgresAdapter({
+            connection: db,
+            schema: { tables,
 enums,
 relations },
-                adminConnectionString: env.ADMIN_CONNECTION_STRING || databaseUrl,
-                connectionString
-            })
-        ],
+            adminConnectionString: env.ADMIN_CONNECTION_STRING || databaseUrl,
+            connectionString
+        }),
         auth: {
             jwtSecret,
             accessExpiresIn: env.JWT_ACCESS_EXPIRES_IN,

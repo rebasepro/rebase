@@ -48,4 +48,9 @@ When contributing to the Rebase monorepo, you MUST adhere strictly to the follow
 - **Never hardcode English strings in UI components**: If a translation key is missing, add it to `packages/core/src/locales/en.ts` first, then use `t("your_key")`.
 - **Locale files are the single source of truth**: All translation strings live in the locale files under `packages/core/src/locales/`.
 
+## 10. No Process or Legacy Comments
+- **Clean state documentation**: Documentation and comments must describe what the code *is* and what it *does*, not what it *used to be* or the *process* of how it evolved.
+- **No legacy references**: Never include phrases like "this is the modern alternative to X", "this is the successor to Y", or "we migrated this because Z". 
+- **Treat the codebase as new**: The user considers this a new project. Historical context about soft-deprecations or transitions should be kept out of inline source code comments.
+
 *These rules were instated because lazy abstractions, dynamic requires, and hacking around problems instead of fixing the root cause have previously caused critical technical debt and system instability.*

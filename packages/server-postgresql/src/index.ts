@@ -11,3 +11,4 @@ export * from "./websocket";
 export * from "./collections/PostgresCollectionRegistry";
 export * from "./services/BranchService";
 export * from "./PostgresBootstrapper";
+export * from "./PostgresAdapter";

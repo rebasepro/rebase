@@ -72,20 +72,15 @@ export interface RebaseBackendConfig {
     /**
      * Database bootstrappers.
      *
-     * Accepts **either**:
-     * - Legacy `BackendBootstrapper[]` — existing behavior, handles both DB and auth
-     * - A single `DatabaseAdapter` — new focused adapter, DB only
-     *
      * When a `DatabaseAdapter` is provided, it is internally wrapped to conform
      * to the `BackendBootstrapper` protocol. Auth is handled separately by the
      * `auth` property (which can be either `RebaseAuthConfig` or `AuthAdapter`).
      */
     bootstrappers?: BackendBootstrapper[];
     /**
-     * Database adapter (alternative to `bootstrappers`).
+     * Database adapter.
      *
      * When set, this takes precedence over `bootstrappers`.
-     * Use this for new integrations; `bootstrappers` is for backward compatibility.
      *
      * @example
      * ```ts

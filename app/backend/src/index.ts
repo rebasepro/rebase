@@ -13,7 +13,7 @@ import {
     cleanupDevPortFile,
     logger
 } from "@rebasepro/server-core";
-import { createPostgresDatabaseConnection, createPostgresBootstrapper } from "@rebasepro/server-postgresql";
+import { createPostgresDatabaseConnection, createPostgresAdapter } from "@rebasepro/server-postgresql";
 import { enums, relations, tables } from "./schema.generated.js";
 import { env } from "./env.js";
 
@@ -63,14 +63,12 @@ async function startServer() {
         cronsDir: path.resolve(__dirname, "../crons"),
         server,
         app,
-        bootstrappers: [
-            createPostgresBootstrapper({
-                connection: postgresResources.db,
-                schema: { tables, enums, relations },
-                adminConnectionString: env.ADMIN_CONNECTION_STRING || env.DATABASE_URL,
-                connectionString: postgresResources.connectionString
-            })
-        ],
+        database: createPostgresAdapter({
+            connection: postgresResources.db,
+            schema: { tables, enums, relations },
+            adminConnectionString: env.ADMIN_CONNECTION_STRING || env.DATABASE_URL,
+            connectionString: postgresResources.connectionString
+        }),
         auth: {
             jwtSecret: env.JWT_SECRET,
             accessExpiresIn: env.JWT_ACCESS_EXPIRES_IN,
