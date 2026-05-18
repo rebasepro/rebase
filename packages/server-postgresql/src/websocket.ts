@@ -1,6 +1,6 @@
 import { RealtimeService } from "./services/realtimeService";
 import { PostgresBackendDriver } from "./PostgresBackendDriver";
-import { DataDriver, DeleteEntityProps, FetchCollectionProps, FetchEntityProps, SaveEntityProps, TableMetadata, BranchInfo, isSQLAdmin, isSchemaAdmin } from "@rebasepro/types";
+import { DataDriver, DeleteEntityProps, FetchCollectionProps, FetchEntityProps, SaveEntityProps, TableMetadata, BranchInfo, isSQLAdmin, isSchemaAdmin, AuthAdapter } from "@rebasepro/types";
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
@@ -9,9 +9,19 @@ import { extractUserFromToken, AccessTokenPayload } from "@rebasepro/server-core
 // @ts-ignore
 import { AuthConfig } from "@rebasepro/server-core";
 
+/**
+ * Normalized user identity for WebSocket sessions.
+ * Unifies the legacy `AccessTokenPayload` and the new `AuthenticatedUser` shapes.
+ */
+interface WsUserIdentity {
+    userId: string;
+    roles: string[];
+    isAdmin: boolean;
+}
+
 interface ClientSession {
     ws: WebSocket;
-    user?: AccessTokenPayload;
+    user?: WsUserIdentity;
     authenticated: boolean;
     /** Sliding window message counter for rate limiting */
     messageCount: number;
@@ -42,7 +52,10 @@ const ADMIN_ONLY_TYPES = new Set([
  * Check if the current session belongs to an admin user.
  */
 function isAdminSession(session: ClientSession | undefined): boolean {
-    if (!session?.user?.roles) return false;
+    if (!session?.user) return false;
+    // Fast path: new adapter-aware sessions set isAdmin directly
+    if (session.user.isAdmin) return true;
+    if (!session.user.roles) return false;
     return session.user.roles.some((r: unknown) => {
         if (typeof r === "string") return r === "admin";
         if (r && typeof r === "object" && "isAdmin" in r) return (r as { isAdmin: boolean }).isAdmin;
@@ -55,7 +68,8 @@ export function createPostgresWebSocket(
     server: Server,
     realtimeService: RealtimeService,
     driver: PostgresBackendDriver,
-    authConfig?: AuthConfig
+    authConfig?: AuthConfig,
+    authAdapter?: AuthAdapter
 ) {
     const isProduction = process.env.NODE_ENV === "production";
     /** Debug logger that is suppressed in production to prevent PII/data leaks */
@@ -74,7 +88,11 @@ export function createPostgresWebSocket(
         console.error("❌ [WebSocket Server] Error:", err);
     });
 
-    const requireAuth = authConfig?.requireAuth !== false && authConfig?.jwtSecret;
+    // Auth is required when either: an adapter is present (secure by default),
+    // OR the legacy config has a jwtSecret and requireAuth !== false.
+    const requireAuth = authAdapter
+        ? true
+        : (authConfig?.requireAuth !== false && !!authConfig?.jwtSecret);
 
     wss.on("connection", (ws) => {
         const clientId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -123,21 +141,53 @@ code } }
                         return;
                     }
 
-                    const user = extractUserFromToken(token);
-                    if (user) {
+                    // Use the auth adapter when available (custom auth, Clerk, etc.)
+                    // Fall back to legacy JWT extraction otherwise.
+                    let verifiedUser: WsUserIdentity | null = null;
+
+                    if (authAdapter) {
+                        try {
+                            const adapterUser = authAdapter.verifyToken
+                                ? await authAdapter.verifyToken(token)
+                                : await authAdapter.verifyRequest(new Request("http://localhost/_ws_auth", {
+                                    headers: { Authorization: `Bearer ${token}` },
+                                }));
+
+                            if (adapterUser) {
+                                verifiedUser = {
+                                    userId: adapterUser.uid,
+                                    roles: adapterUser.roles,
+                                    isAdmin: adapterUser.isAdmin,
+                                };
+                            }
+                        } catch {
+                            // Adapter threw — treat as invalid token
+                        }
+                    } else {
+                        // Legacy JWT path
+                        const jwtPayload = extractUserFromToken(token);
+                        if (jwtPayload) {
+                            verifiedUser = {
+                                userId: jwtPayload.userId,
+                                roles: jwtPayload.roles ?? [],
+                                isAdmin: (jwtPayload.roles ?? []).some((r: string) => r === "admin"),
+                            };
+                        }
+                    }
+
+                    if (verifiedUser) {
                         const session = clientSessions.get(clientId);
                         if (session) {
-                            session.user = user;
+                            session.user = verifiedUser;
                             session.authenticated = true;
                         }
                         wsDebug(`[WS] replying AUTH_SUCCESS for requestId ${requestId}`);
                         ws.send(JSON.stringify({
                             type: "AUTH_SUCCESS",
                             requestId,
-                            payload: { userId: user.userId,
-roles: user.roles }
+                            payload: { userId: verifiedUser.userId, roles: verifiedUser.roles }
                         }));
-                        wsDebug(`🔐 [WebSocket Server] Client ${clientId} authenticated as ${user.userId}`);
+                        wsDebug(`🔐 [WebSocket Server] Client ${clientId} authenticated as ${verifiedUser.userId}`);
                     } else {
                         wsDebug(`[WS] replying AUTH_ERROR for requestId ${requestId} (invalid token)`);
                         sendError("AUTH_ERROR", "INVALID_TOKEN", "Invalid or expired token");

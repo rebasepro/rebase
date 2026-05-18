@@ -2,7 +2,8 @@ import { MiddlewareHandler, Context } from "hono";
 import { DataDriver } from "@rebasepro/types";
 import { verifyAccessToken, AccessTokenPayload } from "./jwt";
 import { HonoEnv } from "../api/types";
-import { timingSafeEqual } from "crypto";
+import { scopeDataDriver } from "./rls-scope";
+import { safeCompare } from "./crypto-utils";
 
 /**
  * Result from a custom auth validator.
@@ -203,23 +204,6 @@ export function extractUserFromToken(token: string): AccessTokenPayload | null {
 }
 
 /**
- * Helper to scope a DataDriver via withAuth() for RLS.
- * SECURITY: If withAuth() is available but fails, the error is re-thrown
- * so the request is denied rather than proceeding with unscoped access.
- */
-async function scopeDataDriver(
-    driver: DataDriver,
-    user: { uid: string; roles?: string[] }
-): Promise<DataDriver> {
-    if ("withAuth" in driver && typeof (driver as Record<string, unknown>).withAuth === "function") {
-        // Fail closed — do NOT catch and swallow errors here.
-        // If RLS scoping fails the request must be rejected.
-        return await (driver as unknown as { withAuth: (user: Record<string, unknown>) => Promise<DataDriver> }).withAuth(user);
-    }
-    return driver;
-}
-
-/**
  * Create a configurable auth middleware that handles:
  * 1. Token extraction (via custom validator or JWT Bearer token)
  * 2. RLS-scoped DataDriver via withAuth()
@@ -237,34 +221,6 @@ async function scopeDataDriver(
  * This is the single source of truth for HTTP auth in Rebase.
  * Use this instead of manually parsing tokens in route handlers.
  */
-/**
- * Constant-time string comparison to prevent timing attacks on service keys.
- *
- * We intentionally avoid early-returning on length mismatch because that
- * would leak the key's length through timing differences. Instead, both
- * inputs are padded to the same length so `timingSafeEqual` always runs
- * over equal-length buffers.
- */
-function safeCompare(a: string, b: string): boolean {
-    const maxLen = Math.max(a.length, b.length);
-    // Pad both to maxLen so timingSafeEqual always compares equal-length buffers.
-    // If the original lengths differ the result will be false due to the padding
-    // difference, but the comparison still takes constant time.
-    const bufA = Buffer.alloc(maxLen);
-    const bufB = Buffer.alloc(maxLen);
-    bufA.write(a);
-    bufB.write(b);
-    try {
-        const isEqual = timingSafeEqual(bufA, bufB);
-        // Even though padding makes mismatched-length strings compare as
-        // different bytes, we still need to verify lengths match to avoid
-        // a padded shorter string accidentally equaling a longer one that
-        // has trailing null bytes.
-        return isEqual && a.length === b.length;
-    } catch {
-        return false;
-    }
-}
 
 export function createAuthMiddleware(options: AuthMiddlewareOptions): MiddlewareHandler<HonoEnv> {
     const { driver, requireAuth: enforceAuth = true, validator, serviceKey } = options;

@@ -33,3 +33,10 @@ export { createAdminRoutes } from "./admin-routes";
 
 
 export { createRateLimiter, defaultAuthLimiter, strictAuthLimiter } from "./rate-limiter";
+
+// Auth Adapters
+export { createBuiltinAuthAdapter } from "./builtin-auth-adapter";
+export type { BuiltinAuthAdapterConfig } from "./builtin-auth-adapter";
+export { createCustomAuthAdapter } from "./custom-auth-adapter";
+export { createAdapterAuthMiddleware } from "./adapter-middleware";
+export type { AdapterAuthMiddlewareOptions } from "./adapter-middleware";

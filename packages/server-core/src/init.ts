@@ -1,4 +1,4 @@
-import { DataDriver, EntityCollection, BackendBootstrapper, BootstrappedAuth, RealtimeProvider, HealthCheckResult, InitializedDriver, isSQLAdmin, BackendHooks } from "@rebasepro/types";
+import { DataDriver, EntityCollection, BackendBootstrapper, BootstrappedAuth, RealtimeProvider, HealthCheckResult, InitializedDriver, isSQLAdmin, BackendHooks, AuthAdapter, DatabaseAdapter } from "@rebasepro/types";
 import { BackendCollectionRegistry } from "./collections/BackendCollectionRegistry";
 import { loadCollectionsFromDirectory } from "./collections/loader";
 import { DriverRegistry, DEFAULT_DRIVER_ID, DefaultDriverRegistry } from "./services/driver-registry";
@@ -6,6 +6,8 @@ import { Server } from "http";
 
 import { RestApiGenerator } from "./api/rest/api-generator";
 import { createAuthMiddleware } from "./auth/middleware";
+import { createAdapterAuthMiddleware } from "./auth/adapter-middleware";
+import { createBuiltinAuthAdapter } from "./auth/builtin-auth-adapter";
 import { errorHandler } from "./api/errors";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -66,11 +68,49 @@ export interface RebaseBackendConfig {
     server: Server;
     app: Hono<HonoEnv>;
     basePath?: string;
-    bootstrappers: BackendBootstrapper[];
+
+    /**
+     * Database bootstrappers.
+     *
+     * Accepts **either**:
+     * - Legacy `BackendBootstrapper[]` — existing behavior, handles both DB and auth
+     * - A single `DatabaseAdapter` — new focused adapter, DB only
+     *
+     * When a `DatabaseAdapter` is provided, it is internally wrapped to conform
+     * to the `BackendBootstrapper` protocol. Auth is handled separately by the
+     * `auth` property (which can be either `RebaseAuthConfig` or `AuthAdapter`).
+     */
+    bootstrappers?: BackendBootstrapper[];
+    /**
+     * Database adapter (alternative to `bootstrappers`).
+     *
+     * When set, this takes precedence over `bootstrappers`.
+     * Use this for new integrations; `bootstrappers` is for backward compatibility.
+     *
+     * @example
+     * ```ts
+     * import { createPostgresAdapter } from "@rebasepro/server-postgresql";
+     * database: createPostgresAdapter({ connection: db, schema }),
+     * ```
+     */
+    database?: DatabaseAdapter;
+
     logging?: {
         level?: "error" | "warn" | "info" | "debug";
     };
-    auth?: RebaseAuthConfig;
+
+    /**
+     * Authentication configuration.
+     *
+     * Accepts **either**:
+     * - `RebaseAuthConfig` — legacy config, auto-wrapped in `RebaseBuiltinAuthAdapter`
+     * - `AuthAdapter` — new pluggable adapter for external auth (Clerk, Auth0, etc.)
+     *
+     * When a plain config object is provided, the built-in adapter is created
+     * automatically from the bootstrapper's `initializeAuth()` result.
+     */
+    auth?: RebaseAuthConfig | AuthAdapter;
+
     /**
      * Storage configuration. Accepts:
      *
@@ -116,6 +156,34 @@ export interface RebaseBackendConfig {
      * handles collection CRUD operations.
      */
     hooks?: BackendHooks;
+}
+
+/**
+ * Type guard to detect whether the `auth` config is an `AuthAdapter`
+ * (has a `verifyRequest` method) vs a plain `RebaseAuthConfig` (plain object).
+ */
+export function isAuthAdapter(auth: RebaseAuthConfig | AuthAdapter): auth is AuthAdapter {
+    return typeof auth === "object" && auth !== null && "verifyRequest" in auth && typeof (auth as AuthAdapter).verifyRequest === "function";
+}
+
+/**
+ * Type guard to detect whether `database` is a `DatabaseAdapter`.
+ */
+export function isDatabaseAdapter(db: unknown): db is DatabaseAdapter {
+    return typeof db === "object" && db !== null && "initializeDriver" in db && "type" in db && !("initializeAuth" in db);
+}
+
+/**
+ * Resolve the `requireAuth` flag from either a `RebaseAuthConfig` or an `AuthAdapter`.
+ *
+ * - `RebaseAuthConfig` has an explicit `requireAuth` boolean
+ * - `AuthAdapter` always implies auth is required (secure by default)
+ * - If no auth config is provided at all, default to `true`
+ */
+function resolveRequireAuth(auth?: RebaseAuthConfig | AuthAdapter): boolean {
+    if (!auth) return true;
+    if (isAuthAdapter(auth)) return true; // AuthAdapters are always secure-by-default
+    return (auth as RebaseAuthConfig).requireAuth !== false;
 }
 
 export interface RebaseBackendInstance {
@@ -205,10 +273,33 @@ dir: config.collectionsDir });
 
     const realtimeServices: Record<string, RealtimeProvider> = {};
     const delegates: Record<string, DataDriver> = {};
-    const bootstrappers = config.bootstrappers || [];
+
+    // ─── Resolve bootstrappers ───────────────────────────────────────────
+    // Support both legacy `bootstrappers` array and new `database` adapter.
+    // A DatabaseAdapter is wrapped into the BackendBootstrapper protocol so
+    // the rest of the coordinator doesn't need to branch.
+    let bootstrappers: BackendBootstrapper[] = config.bootstrappers || [];
+    if (config.database) {
+        const dbAdapter = config.database;
+        logger.info("Using DatabaseAdapter", { type: dbAdapter.type });
+        const wrappedBootstrapper: BackendBootstrapper = {
+            type: dbAdapter.type,
+            initializeDriver: (initConfig: unknown) =>
+                dbAdapter.initializeDriver(initConfig as import("@rebasepro/types").DatabaseAdapterInitConfig),
+            initializeRealtime: dbAdapter.initializeRealtime
+                ? (_config: unknown, driverResult: InitializedDriver) =>
+                    dbAdapter.initializeRealtime!(driverResult)
+                : undefined,
+            initializeHistory: dbAdapter.initializeHistory,
+            initializeWebsockets: dbAdapter.initializeWebsockets,
+            getAdmin: dbAdapter.getAdmin,
+            mountRoutes: dbAdapter.mountRoutes,
+        };
+        bootstrappers = [wrappedBootstrapper];
+    }
 
     if (bootstrappers.length === 0) {
-        throw new Error("No bootstrappers provided. Cannot initialize database drivers.");
+        throw new Error("No bootstrappers or database adapter provided. Cannot initialize database drivers.");
     }
 
     let defaultDriverId = DEFAULT_DRIVER_ID;
@@ -250,36 +341,74 @@ collectionRegistry });
     // 2. Initialize Auth & History via the default driver's bootstrapper
     let authConfigResult: BootstrappedAuth | undefined = undefined;
     let serviceKey: string | undefined;
+    let authAdapter: AuthAdapter | undefined;
 
     if (config.auth) {
-        // Secure JWT setup proactively within core package memory to eliminate dual-package hazards
-        const safeAuthConfig = config.auth;
-        if (safeAuthConfig.jwtSecret) {
-            configureJwt({
-                secret: safeAuthConfig.jwtSecret,
-                accessExpiresIn: safeAuthConfig.accessExpiresIn || "1h",
-                refreshExpiresIn: safeAuthConfig.refreshExpiresIn || "30d"
-            });
-        }
+        if (isAuthAdapter(config.auth)) {
+            // ── New path: User provided an AuthAdapter directly ──────────
+            authAdapter = config.auth;
+            serviceKey = authAdapter.serviceKey;
 
-        // ── Service Key Validation ───────────────────────────────────────
-        if (safeAuthConfig.serviceKey) {
-            if (safeAuthConfig.serviceKey.length < 32) {
-                throw new Error(
-                    "REBASE_SERVICE_KEY is too short. Must be at least 32 characters. " +
-                    "Generate one with: node -e \"console.log(require('crypto').randomBytes(48).toString('base64'))\""
-                );
+            if (authAdapter.initialize) {
+                await authAdapter.initialize();
             }
-            serviceKey = safeAuthConfig.serviceKey;
-            logger.info("Service key configured for script/server-to-server authentication");
-        }
 
-        if (defaultBootstrapper.initializeAuth) {
-            logger.info("Bootstrapping authentication via driver protocol");
-            authConfigResult = await defaultBootstrapper.initializeAuth(config.auth, defaultDriverResult);
-            logger.info("Authentication initialized");
+            logger.info("Using AuthAdapter", { id: authAdapter.id });
+
+            // Populate legacy authConfigResult for backward compatibility
+            // (the return type still exposes `auth?: BootstrappedAuth`)
+            authConfigResult = {
+                userService: authAdapter.userManagement ?? {},
+                roleService: authAdapter.roleManagement ?? {},
+            };
         } else {
-            logger.warn("Auth requested but default bootstrapper does not support initializeAuth");
+            // ── Legacy path: RebaseAuthConfig — wrap in built-in adapter ──
+            const safeAuthConfig = config.auth as RebaseAuthConfig;
+            if (safeAuthConfig.jwtSecret) {
+                configureJwt({
+                    secret: safeAuthConfig.jwtSecret,
+                    accessExpiresIn: safeAuthConfig.accessExpiresIn || "1h",
+                    refreshExpiresIn: safeAuthConfig.refreshExpiresIn || "30d"
+                });
+            }
+
+            // ── Service Key Validation ───────────────────────────────────
+            if (safeAuthConfig.serviceKey) {
+                if (safeAuthConfig.serviceKey.length < 32) {
+                    throw new Error(
+                        "REBASE_SERVICE_KEY is too short. Must be at least 32 characters. " +
+                        "Generate one with: node -e \"console.log(require('crypto').randomBytes(48).toString('base64'))\""
+                    );
+                }
+                serviceKey = safeAuthConfig.serviceKey;
+                logger.info("Service key configured for script/server-to-server authentication");
+            }
+
+            if (defaultBootstrapper.initializeAuth) {
+                logger.info("Bootstrapping authentication via driver protocol");
+                authConfigResult = await defaultBootstrapper.initializeAuth(config.auth, defaultDriverResult);
+
+                // Build the built-in auth adapter from bootstrapper results
+                if (authConfigResult) {
+                    const oauthProviders: OAuthProvider<unknown>[] = [...(safeAuthConfig.providers || [])];
+                    // OAuth providers are resolved later in route mounting,
+                    // but we need them here for the adapter
+                    authAdapter = createBuiltinAuthAdapter({
+                        authRepository: authConfigResult.authRepository as import("./auth/interfaces").AuthRepository ?? authConfigResult.userService as import("./auth/interfaces").AuthRepository,
+                        emailService: authConfigResult.emailService as import("./email").EmailService,
+                        emailConfig: safeAuthConfig.email,
+                        allowRegistration: safeAuthConfig.allowRegistration ?? false,
+                        defaultRole: safeAuthConfig.defaultRole,
+                        oauthProviders,
+                        serviceKey,
+                        hooks: config.hooks,
+                    });
+                }
+
+                logger.info("Authentication initialized");
+            } else {
+                logger.warn("Auth requested but default bootstrapper does not support initializeAuth");
+            }
         }
     }
 
@@ -350,87 +479,109 @@ collectionRegistry });
     // basePath already resolved above
 
     // 4. Mount API Routes
-    if (config.auth && authConfigResult) {
-        const oauthProviders: OAuthProvider<any>[] = [...(config.auth.providers || [])];
-
-        if (config.auth.google?.clientId) {
-            const { createGoogleProvider } = await import("./auth");
-            oauthProviders.push(createGoogleProvider(config.auth.google));
-        }
-
-        if (config.auth.linkedin?.clientId && config.auth.linkedin?.clientSecret) {
-            const { createLinkedinProvider } = await import("./auth");
-            oauthProviders.push(createLinkedinProvider(config.auth.linkedin as { clientId: string; clientSecret: string }));
-        }
-
-        if (config.auth.github?.clientId && config.auth.github?.clientSecret) {
-            const { createGitHubProvider } = await import("./auth");
-            oauthProviders.push(createGitHubProvider(config.auth.github));
-        }
-
-        if (config.auth.microsoft?.clientId && config.auth.microsoft?.clientSecret) {
-            const { createMicrosoftProvider } = await import("./auth");
-            oauthProviders.push(createMicrosoftProvider(config.auth.microsoft));
-        }
-
-        if (config.auth.apple?.clientId && config.auth.apple?.teamId && config.auth.apple?.keyId && config.auth.apple?.privateKey) {
-            const { createAppleProvider } = await import("./auth");
-            oauthProviders.push(createAppleProvider(config.auth.apple));
-        }
-
-        if (config.auth.facebook?.clientId && config.auth.facebook?.clientSecret) {
-            const { createFacebookProvider } = await import("./auth");
-            oauthProviders.push(createFacebookProvider(config.auth.facebook));
-        }
-
-        if (config.auth.twitter?.clientId && config.auth.twitter?.clientSecret) {
-            const { createTwitterProvider } = await import("./auth");
-            oauthProviders.push(createTwitterProvider(config.auth.twitter));
-        }
-
-        if (config.auth.discord?.clientId && config.auth.discord?.clientSecret) {
-            const { createDiscordProvider } = await import("./auth");
-            oauthProviders.push(createDiscordProvider(config.auth.discord));
-        }
-
-        if (config.auth.gitlab?.clientId && config.auth.gitlab?.clientSecret) {
-            const { createGitLabProvider } = await import("./auth");
-            oauthProviders.push(createGitLabProvider(config.auth.gitlab));
-        }
-
-        if (config.auth.bitbucket?.clientId && config.auth.bitbucket?.clientSecret) {
-            const { createBitbucketProvider } = await import("./auth");
-            oauthProviders.push(createBitbucketProvider(config.auth.bitbucket));
-        }
-
-        if (config.auth.slack?.clientId && config.auth.slack?.clientSecret) {
-            const { createSlackProvider } = await import("./auth");
-            oauthProviders.push(createSlackProvider(config.auth.slack));
-        }
-
-        if (config.auth.spotify?.clientId && config.auth.spotify?.clientSecret) {
-            const { createSpotifyProvider } = await import("./auth");
-            oauthProviders.push(createSpotifyProvider(config.auth.spotify));
-        }
-
-        const authRoutes = createAuthRoutes({
-            authRepo: authConfigResult.authRepository as import("./auth/interfaces").AuthRepository ?? authConfigResult.userService as import("./auth/interfaces").AuthRepository,
-            emailService: authConfigResult.emailService as import("./email").EmailService,
-            emailConfig: config.auth.email,
-            allowRegistration: config.auth.allowRegistration ?? false,
-            defaultRole: config.auth.defaultRole,
-            oauthProviders
+    if (config.auth && authAdapter) {
+        // ── Auth Capabilities Endpoint ───────────────────────────────────
+        // Exposes adapter capabilities so the frontend knows what's available
+        // (login form vs external redirect, OAuth providers, etc.)
+        config.app.get(`${basePath}/auth/config`, async (c) => {
+            const capabilities = await authAdapter!.getCapabilities();
+            return c.json(capabilities);
         });
-        config.app.route(`${basePath}/auth`, authRoutes);
 
-        const adminRoutes = createAdminRoutes({
-            authRepo: authConfigResult.authRepository as import("./auth/interfaces").AuthRepository ?? authConfigResult.userService as import("./auth/interfaces").AuthRepository,
-            emailService: authConfigResult.emailService as import("./email").EmailService,
-            emailConfig: config.auth.email,
-            serviceKey,
-            hooks: config.hooks
-        });
-        config.app.route(`${basePath}/admin`, adminRoutes);
+        if (!isAuthAdapter(config.auth)) {
+            // ── Legacy path: register OAuth providers and mount built-in routes
+            const safeAuthConfig = config.auth as RebaseAuthConfig;
+            const oauthProviders: OAuthProvider<any>[] = [...(safeAuthConfig.providers || [])];
+
+            if (safeAuthConfig.google?.clientId) {
+                const { createGoogleProvider } = await import("./auth");
+                oauthProviders.push(createGoogleProvider(safeAuthConfig.google));
+            }
+
+            if (safeAuthConfig.linkedin?.clientId && safeAuthConfig.linkedin?.clientSecret) {
+                const { createLinkedinProvider } = await import("./auth");
+                oauthProviders.push(createLinkedinProvider(safeAuthConfig.linkedin as { clientId: string; clientSecret: string }));
+            }
+
+            if (safeAuthConfig.github?.clientId && safeAuthConfig.github?.clientSecret) {
+                const { createGitHubProvider } = await import("./auth");
+                oauthProviders.push(createGitHubProvider(safeAuthConfig.github));
+            }
+
+            if (safeAuthConfig.microsoft?.clientId && safeAuthConfig.microsoft?.clientSecret) {
+                const { createMicrosoftProvider } = await import("./auth");
+                oauthProviders.push(createMicrosoftProvider(safeAuthConfig.microsoft));
+            }
+
+            if (safeAuthConfig.apple?.clientId && safeAuthConfig.apple?.teamId && safeAuthConfig.apple?.keyId && safeAuthConfig.apple?.privateKey) {
+                const { createAppleProvider } = await import("./auth");
+                oauthProviders.push(createAppleProvider(safeAuthConfig.apple));
+            }
+
+            if (safeAuthConfig.facebook?.clientId && safeAuthConfig.facebook?.clientSecret) {
+                const { createFacebookProvider } = await import("./auth");
+                oauthProviders.push(createFacebookProvider(safeAuthConfig.facebook));
+            }
+
+            if (safeAuthConfig.twitter?.clientId && safeAuthConfig.twitter?.clientSecret) {
+                const { createTwitterProvider } = await import("./auth");
+                oauthProviders.push(createTwitterProvider(safeAuthConfig.twitter));
+            }
+
+            if (safeAuthConfig.discord?.clientId && safeAuthConfig.discord?.clientSecret) {
+                const { createDiscordProvider } = await import("./auth");
+                oauthProviders.push(createDiscordProvider(safeAuthConfig.discord));
+            }
+
+            if (safeAuthConfig.gitlab?.clientId && safeAuthConfig.gitlab?.clientSecret) {
+                const { createGitLabProvider } = await import("./auth");
+                oauthProviders.push(createGitLabProvider(safeAuthConfig.gitlab));
+            }
+
+            if (safeAuthConfig.bitbucket?.clientId && safeAuthConfig.bitbucket?.clientSecret) {
+                const { createBitbucketProvider } = await import("./auth");
+                oauthProviders.push(createBitbucketProvider(safeAuthConfig.bitbucket));
+            }
+
+            if (safeAuthConfig.slack?.clientId && safeAuthConfig.slack?.clientSecret) {
+                const { createSlackProvider } = await import("./auth");
+                oauthProviders.push(createSlackProvider(safeAuthConfig.slack));
+            }
+
+            if (safeAuthConfig.spotify?.clientId && safeAuthConfig.spotify?.clientSecret) {
+                const { createSpotifyProvider } = await import("./auth");
+                oauthProviders.push(createSpotifyProvider(safeAuthConfig.spotify));
+            }
+
+            // Re-create the built-in adapter with all resolved OAuth providers
+            authAdapter = createBuiltinAuthAdapter({
+                authRepository: authConfigResult!.authRepository as import("./auth/interfaces").AuthRepository ?? authConfigResult!.userService as import("./auth/interfaces").AuthRepository,
+                emailService: authConfigResult!.emailService as import("./email").EmailService,
+                emailConfig: safeAuthConfig.email,
+                allowRegistration: safeAuthConfig.allowRegistration ?? false,
+                defaultRole: safeAuthConfig.defaultRole,
+                oauthProviders,
+                serviceKey,
+                hooks: config.hooks,
+            });
+        }
+
+        // ── Mount auth & admin routes via the adapter ────────────────────
+        if (authAdapter.createAuthRoutes) {
+            const authRoutes = authAdapter.createAuthRoutes();
+            if (authRoutes) {
+                config.app.route(`${basePath}/auth`, authRoutes);
+                logger.info("Auth routes mounted via adapter", { adapter: authAdapter.id });
+            }
+        }
+
+        if (authAdapter.createAdminRoutes) {
+            const adminRoutes = authAdapter.createAdminRoutes();
+            if (adminRoutes) {
+                config.app.route(`${basePath}/admin`, adminRoutes);
+                logger.info("Admin routes mounted via adapter", { adapter: authAdapter.id });
+            }
+        }
     }
 
     if (config.collectionsDir) {
@@ -438,7 +589,13 @@ collectionRegistry });
             const { createSchemaEditorRoutes } = await import("./api/schema-editor-routes");
             const schemaEditorRoutes = createSchemaEditorRoutes(config.collectionsDir);
 
-            if (config.auth?.requireAuth !== false && !!config.auth?.jwtSecret) {
+            if (authAdapter && !isAuthAdapter(config.auth!)) {
+                const safeAuth = config.auth as RebaseAuthConfig;
+                if (safeAuth.requireAuth !== false && !!safeAuth.jwtSecret) {
+                    schemaEditorRoutes.use("/*", requireAuth, requireAdmin);
+                }
+            } else if (authAdapter) {
+                // External auth adapter — still protect schema editor
                 schemaEditorRoutes.use("/*", requireAuth, requireAdmin);
             }
 
@@ -458,7 +615,7 @@ collectionRegistry });
 
         const storageRoutes = createStorageRoutes({
             controller: storageController,
-            requireAuth: config.auth?.requireAuth ?? true
+            requireAuth: resolveRequireAuth(config.auth)
         });
 
         // Apply a permissive body limit specifically for the upload endpoint
@@ -484,7 +641,7 @@ collectionRegistry });
         // Secure by default: require auth when auth is configured.
         // Developers who intentionally want public data access (relying
         // entirely on Postgres RLS) must explicitly set `auth.requireAuth: false`.
-        const dataRequireAuth = config.auth?.requireAuth !== false;
+        const dataRequireAuth = resolveRequireAuth(config.auth);
 
         if (!dataRequireAuth) {
             logger.warn(
@@ -495,11 +652,21 @@ collectionRegistry });
             );
         }
 
-        dataRouter.use("/*", createAuthMiddleware({
-            driver: defaultDriver,
-            requireAuth: dataRequireAuth,
-            serviceKey
-        }));
+        // Use adapter middleware when an AuthAdapter is available,
+        // falling back to the legacy JWT middleware otherwise.
+        if (authAdapter) {
+            dataRouter.use("/*", createAdapterAuthMiddleware({
+                adapter: authAdapter,
+                driver: defaultDriver,
+                requireAuth: dataRequireAuth,
+            }));
+        } else {
+            dataRouter.use("/*", createAuthMiddleware({
+                driver: defaultDriver,
+                requireAuth: dataRequireAuth,
+                serviceKey
+            }));
+        }
 
         // Mount history routes BEFORE the REST API subcollection catch-all so
         // that /:slug/:entityId/history is matched by the dedicated handler first.
@@ -525,7 +692,7 @@ collectionRegistry });
         config.app.get(`${basePath}/docs`, (c) => {
             const spec = generateOpenApiSpec(activeCollections, {
                 basePath,
-                requireAuth: config.auth?.requireAuth !== false
+                requireAuth: resolveRequireAuth(config.auth)
             });
             return c.json(spec);
         });
@@ -570,8 +737,8 @@ collectionRegistry });
     let emailService: EmailService | undefined;
     if (authConfigResult?.emailService) {
         emailService = authConfigResult.emailService as EmailService;
-    } else if (config.auth?.email) {
-        emailService = createEmailService(config.auth.email);
+    } else if (config.auth && !isAuthAdapter(config.auth) && (config.auth as RebaseAuthConfig).email) {
+        emailService = createEmailService((config.auth as RebaseAuthConfig).email!);
     }
 
     if (emailService) {
@@ -607,13 +774,22 @@ collectionRegistry });
 
             // Custom functions follow the same auth policy as data routes.
             // Per-route auth can be further refined inside individual functions.
-            const functionsRequireAuth = config.auth?.requireAuth !== false;
+            const functionsRequireAuth = resolveRequireAuth(config.auth);
 
-            functionsRouter.use("/*", createAuthMiddleware({
-                driver: defaultDriver,
-                requireAuth: functionsRequireAuth,
-                serviceKey
-            }));
+            // Use adapter middleware when available, fallback to legacy
+            if (authAdapter) {
+                functionsRouter.use("/*", createAdapterAuthMiddleware({
+                    adapter: authAdapter,
+                    driver: defaultDriver,
+                    requireAuth: functionsRequireAuth,
+                }));
+            } else {
+                functionsRouter.use("/*", createAuthMiddleware({
+                    driver: defaultDriver,
+                    requireAuth: functionsRequireAuth,
+                    serviceKey
+                }));
+            }
 
             const fnRoutes = createFunctionRoutes(loadedFunctions);
             functionsRouter.route("/", fnRoutes);
@@ -652,7 +828,12 @@ path: `${basePath}/functions` });
             const cronRouter = new Hono<HonoEnv>();
 
             // Cron admin routes require authentication + admin role
-            if (config.auth?.requireAuth !== false && !!config.auth?.jwtSecret) {
+            if (authAdapter && !isAuthAdapter(config.auth!)) {
+                const safeAuth = config.auth as RebaseAuthConfig;
+                if (safeAuth.requireAuth !== false && !!safeAuth.jwtSecret) {
+                    cronRouter.use("/*", requireAuth, requireAdmin);
+                }
+            } else if (authAdapter) {
                 cronRouter.use("/*", requireAuth, requireAdmin);
             }
 
@@ -668,7 +849,7 @@ path: `${basePath}/cron` });
     }
 
     if ((defaultBootstrapper as BackendBootstrapper & { initializeWebsockets?: (...args: unknown[]) => unknown }).initializeWebsockets) {
-        await (defaultBootstrapper as BackendBootstrapper & { initializeWebsockets: (...args: unknown[]) => unknown }).initializeWebsockets(config.server, defaultRealtimeService, defaultDriver, config.auth);
+        await (defaultBootstrapper as BackendBootstrapper & { initializeWebsockets: (...args: unknown[]) => unknown }).initializeWebsockets(config.server, defaultRealtimeService, defaultDriver, config.auth, authAdapter);
     }
 
     logger.info("Rebase Backend Initialized");

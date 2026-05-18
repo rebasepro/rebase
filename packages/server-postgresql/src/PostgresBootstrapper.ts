@@ -19,6 +19,7 @@ import {
     DatabaseAdmin,
     RealtimeProvider,
     type DataDriver,
+    type AuthAdapter,
     EntityCollection
 } from "@rebasepro/types";
 import { PostgresBackendDriver } from "./PostgresBackendDriver";
@@ -218,13 +219,14 @@ authRepository };
             // Currently Postgres doesn't need additional routes beyond what the coordinator mounts.
         },
 
-        async initializeWebsockets(server: unknown, realtimeService: RealtimeProvider, driver: DataDriver, config?: unknown): Promise<void> {
+        async initializeWebsockets(server: unknown, realtimeService: RealtimeProvider, driver: DataDriver, config?: unknown, adapter?: unknown): Promise<void> {
             const { createPostgresWebSocket } = await import("./websocket");
             createPostgresWebSocket(
                 server as import("http").Server,
                 realtimeService as RealtimeService,
                 driver as PostgresBackendDriver,
-                config as AuthConfig
+                config as AuthConfig,
+                adapter as AuthAdapter | undefined
             );
         }
     };
