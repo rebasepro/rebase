@@ -1,9 +1,10 @@
 ---
 import SectionBackgroundAccents from "./SectionBackgroundAccents.astro";
-import { getLangFromUrl, useTranslations } from "../i18n/ui";
+import { getLangFromUrl, useTranslations, useTranslatedPath } from "../i18n/ui";
 
 const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
+const translatePath = useTranslatedPath(lang);
 
 const footerNavs = [
     {
@@ -73,7 +74,7 @@ const footerNavs = [
         <div class="flex flex-col md:flex-row md:justify-between gap-8">
             <div>
                 <div class="mb-6 md:mb-0">
-                    <a href="/" class="flex items-center">
+                    <a href={translatePath("/")} class="flex items-center">
                         <span class="self-center text-lg font-semibold whitespace-nowrap text-white">Rebase</span>
                     </a>
                 </div>
@@ -89,7 +90,7 @@ const footerNavs = [
                             {nav.links.map((link) => (
                                 <li>
                                     <a
-                                        href={link.url}
+                                        href={link.external ? link.url : translatePath(link.url)}
                                         target={link.external ? "_blank" : "_self"}
                                         rel={link.external ? "noopener noreferrer" : ""}
                                         class="hover:underline hover:text-primary-light transition-colors duration-200"

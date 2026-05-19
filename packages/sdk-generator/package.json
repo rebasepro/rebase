@@ -4,7 +4,7 @@
   "description": "Generate a typed JS SDK from Rebase collection definitions",
   "main": "./dist/index.cjs",
   "module": "./dist/index.es.js",
-  "types": "./dist/index.d.ts",
+  "types": "./dist/sdk-generator/src/index.d.ts",
   "type": "module",
   "source": "src/index.ts",
   "publishConfig": {
@@ -39,7 +39,7 @@
   },
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./dist/sdk-generator/src/index.d.ts",
       "import": "./dist/index.es.js",
       "require": "./dist/index.cjs"
     }

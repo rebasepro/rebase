@@ -115,12 +115,20 @@
         function closeModal() {
             banner.classList.add("hidden");
             document.body.classList.remove("cookie-modal-open");
+            const shell = document.getElementById("app-shell");
+            if (shell) {
+                shell.removeAttribute("inert");
+            }
         }
 
         if (!cookieConsent) {
             // Show modal and block scrolling
             banner.classList.remove("hidden");
             document.body.classList.add("cookie-modal-open");
+            const shell = document.getElementById("app-shell");
+            if (shell) {
+                shell.setAttribute("inert", "");
+            }
             
             // Trigger reflow
             banner.offsetHeight;
@@ -139,6 +147,10 @@
             // Ensure banner stays hidden if consent was already given
             banner.classList.add("hidden");
             document.body.classList.remove("cookie-modal-open");
+            const shell = document.getElementById("app-shell");
+            if (shell) {
+                shell.removeAttribute("inert");
+            }
         }
 
         // Handle accept button

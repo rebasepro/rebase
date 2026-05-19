@@ -157,6 +157,9 @@ export async function generateSdkCommand(args: GenerateSDKArgs): Promise<void> {
     console.log(chalk.cyan("  → Loading collection definitions..."));
     const collections = await loadCollections(resolvedCollectionsDir);
 
+    // Sort collections alphabetically by slug to ensure deterministic SDK generation
+    collections.sort((a, b) => a.slug.localeCompare(b.slug));
+
     if (collections.length === 0) {
         console.log(chalk.red("  ✗ No collections found. Nothing to generate."));
         process.exit(1);

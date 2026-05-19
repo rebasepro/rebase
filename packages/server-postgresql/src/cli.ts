@@ -604,8 +604,10 @@ async function doctorPluginCommand(rawArgs: string[]): Promise<void> {
         {
             "--collections": String,
             "--schema": String,
+            "--sdk": String,
             "-c": "--collections",
-            "-s": "--schema"
+            "-s": "--schema",
+            "-k": "--sdk"
         },
         {
             argv: rawArgs.slice(1), // skip "doctor"
@@ -627,12 +629,14 @@ async function doctorPluginCommand(rawArgs: string[]): Promise<void> {
 
     const collectionsPath = parsedArgs["--collections"] || path.join("..", "shared", "collections");
     const schemaPath = parsedArgs["--schema"] || path.join("src", "schema.generated.ts");
+    const sdkPath = parsedArgs["--sdk"] || path.join("..", "generated", "sdk", "database.types.ts");
 
     const cmdParts = [
         tsxBin,
         doctorScript,
         `--collections=${collectionsPath}`,
-        `--schema=${schemaPath}`
+        `--schema=${schemaPath}`,
+        `--sdk=${sdkPath}`
     ];
 
     try {

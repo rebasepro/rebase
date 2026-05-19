@@ -92,9 +92,6 @@ importers:
       hono:
         specifier: ^4.2.0
         version: 4.12.10
-      zod:
-        specifier: 4.3.6
-        version: 4.3.6
     devDependencies:
       '@faker-js/faker':
         specifier: 10.4.0
@@ -1306,6 +1303,9 @@ importers:
       '@rebasepro/common':
         specifier: workspace:*
         version: link:../common
+      '@rebasepro/sdk-generator':
+        specifier: workspace:*
+        version: link:../sdk-generator
       '@rebasepro/server-core':
         specifier: workspace:*
         version: link:../server-core

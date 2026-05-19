@@ -1,7 +1,7 @@
 ---
 import NavigationDropdown from "./NavigationDropdown.astro";
 import LanguageSelect from "./LanguageSelect.astro";
-import { getLangFromUrl, useTranslations } from "../i18n/ui";
+import { getLangFromUrl, useTranslations, useTranslatedPath } from "../i18n/ui";
 import ABVariant from "./ABVariant.astro";
 
 import {
@@ -11,27 +11,28 @@ import {
 const currentPath = Astro.url.pathname.replace(/\/$/, "");
 const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
+const translatePath = useTranslatedPath(lang);
 
 const navLinks = [
     {
-        href: "/features",
+        href: translatePath("/features"),
         label: t("nav.product"),
         dropdown: [
             [
                 {
-                    href: "/features",
+                    href: translatePath("/features"),
                     label: t("nav.features"),
                     description: t("nav.features.desc"),
                     icon: Layers
                 },
                 {
-                    href: "/studio",
+                    href: translatePath("/studio"),
                     label: t("nav.studio"),
                     description: t("nav.studio.desc"),
                     icon: LayoutDashboard
                 },
                 {
-                    href: "/editing",
+                    href: translatePath("/editing"),
                     label: t("nav.editing"),
                     description: t("nav.editing.desc"),
                     icon: FilePenLine
@@ -39,13 +40,13 @@ const navLinks = [
             ],
             [
                 {
-                    href: "/backend",
+                    href: translatePath("/backend"),
                     label: t("nav.backend"),
                     description: t("nav.backend.desc"),
                     icon: Server
                 },
                 {
-                    href: "/ai",
+                    href: translatePath("/ai"),
                     label: t("nav.ai"),
                     description: t("nav.ai.desc"),
                     icon: Bot
@@ -54,18 +55,18 @@ const navLinks = [
         ]
     },
     {
-        href: "/developers",
+        href: translatePath("/developers"),
         label: t("nav.developers"),
         dropdown: [
             [
                 {
-                    href: "/developers",
+                    href: translatePath("/developers"),
                     label: t("nav.devOverview"),
                     description: t("nav.devOverview.desc"),
                     icon: Code
                 },
                 {
-                    href: "/sdk",
+                    href: translatePath("/sdk"),
                     label: t("nav.sdk"),
                     description: t("nav.sdk.desc"),
                     icon: Terminal
@@ -73,13 +74,13 @@ const navLinks = [
             ],
             [
                 {
-                    href: "/cli",
+                    href: translatePath("/cli"),
                     label: t("nav.cli"),
                     description: t("nav.cli.desc"),
                     icon: SquareTerminal
                 },
                 {
-                    href: "/security",
+                    href: translatePath("/security"),
                     label: t("nav.security"),
                     description: t("nav.security.desc"),
                     icon: ShieldCheck
@@ -88,18 +89,18 @@ const navLinks = [
         ]
     },
     {
-        href: "/why-rebase",
+        href: translatePath("/why-rebase"),
         label: t("nav.solutions"),
         dropdown: [
             [
                 {
-                    href: "/startups",
+                    href: translatePath("/startups"),
                     label: t("nav.startups"),
                     description: t("nav.startups.desc"),
                     icon: Rocket
                 },
                 {
-                    href: "/why-rebase",
+                    href: translatePath("/why-rebase"),
                     label: t("nav.whyRebase"),
                     description: t("nav.whyRebase.desc"),
                     icon: ArrowRightLeft
@@ -107,7 +108,7 @@ const navLinks = [
             ],
             [
                 {
-                    href: "/agencies",
+                    href: translatePath("/agencies"),
                     label: t("nav.agencies"),
                     description: t("nav.agencies.desc"),
                     icon: Briefcase
@@ -116,22 +117,22 @@ const navLinks = [
         ]
     },
     {
-        href: "/docs",
+        href: translatePath("/docs"),
         label: t("nav.docs")
     },
 ];
 
 const flatNavLinks = [
-    { href: "/product", label: t("nav.product") },
-    { href: "/developers-hub", label: t("nav.developers") },
-    { href: "/pricing", label: "Pricing" },
-    { href: "/docs", label: t("nav.docs") }
+    { href: translatePath("/product"), label: t("nav.product") },
+    { href: translatePath("/developers-hub"), label: t("nav.developers") },
+    { href: translatePath("/pricing"), label: "Pricing" },
+    { href: translatePath("/docs"), label: t("nav.docs") }
 ];
 ---
 <header class="bg-black/40 backdrop-blur sticky top-0 z-20">
     <nav class="mx-auto flex max-w-7xl items-center justify-between py-2 px-4 lg:px-8" aria-label="Global">
         <div class="flex items-center">
-            <a href="/" class="flex items-center -m-1.5 p-1.5 relative z-50 mr-6" transition:name="site-logo">
+            <a id="header-logo-link" href={translatePath("/")} class="flex items-center -m-1.5 p-1.5 relative z-50 mr-6" transition:name="site-logo">
                 <img src="/img/rebase_logo.svg" class="h-8 w-8 mr-4" alt="Rebase Logo" transition:name="logo-image"/>
                 <span class="self-center text-lg font-semibold whitespace-nowrap text-white"
                       transition:name="logo-text">Rebase</span>
@@ -423,11 +424,11 @@ const flatNavLinks = [
         desktopLinks.forEach(link => trackHeaderLinkClick(link, 'desktop_nav', false));
 
         // Track desktop CTA button
-        const desktopCTA = document.querySelector('header nav a[href*="/docs"].hidden.sm\\:inline-flex');
+        const desktopCTA = document.getElementById('header-start-building-desktop');
         if (desktopCTA) trackHeaderLinkClick(desktopCTA, 'desktop_cta', false);
 
         // Track logo link
-        const logoLink = document.querySelector('header a[href="/"]');
+        const logoLink = document.getElementById('header-logo-link');
         if (logoLink) trackHeaderLinkClick(logoLink, 'logo', false);
 
         // Track mobile menu links

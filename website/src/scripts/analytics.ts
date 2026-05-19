@@ -35,8 +35,7 @@ class Analytics {
             const copyBtn = target.closest("[data-track-copy]") as HTMLElement | null;
             if (copyBtn) {
                 const section = copyBtn.getAttribute("data-track-copy");
-                const command = copyBtn.getAttribute("onclick")
-                    ?.match(/writeText\(['"](.+?)['"]\)/)?.[1] || "unknown";
+                const command = copyBtn.getAttribute("data-command") || "unknown";
                 gtag("event", "copy_command", {
                     event_category: "engagement",
                     event_label: section,

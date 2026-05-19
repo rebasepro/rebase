@@ -10,6 +10,39 @@ Rebase was built to be completely modular. While the `initializeRebaseBackend` c
 
 The `@rebasepro/server-postgresql` package is completely framework-agnostic. It depends only on Drizzle ORM and standard Node.js `http.Server`.
 
+## Environment Configuration
+
+Rebase provides a centralized `loadEnv()` utility in `@rebasepro/server-core` that validates your environment variables against a strict Zod schema. Call it **after** loading your `.env` file:
+
+```typescript
+import dotenv from "dotenv";
+import { loadEnv } from "@rebasepro/server-core";
+
+dotenv.config({ path: "../../.env" });
+
+// Basic — just Rebase env vars:
+export const env = loadEnv();
+
+// Extended — add your own typed vars:
+import { z } from "zod";
+export const env = loadEnv({
+    extend: z.object({
+        SMTP_HOST: z.string().optional(),
+        SMTP_PORT: z.string().default("587").transform(Number),
+        STRIPE_SECRET_KEY: z.string(),
+    })
+});
+// env.SMTP_HOST  → string | undefined  (fully typed)
+// env.STRIPE_SECRET_KEY → string        (validated, required)
+```
+
+**Key behaviors:**
+- Auto-generates ephemeral `JWT_SECRET` and `REBASE_SERVICE_KEY` in development so you can start without manual setup.
+- Blocks auto-generated secrets in production — you must set them explicitly.
+- Validates that `CORS_ORIGINS` or `FRONTEND_URL` is set in production.
+
+See `.env.example` in the scaffolded app for the full list of supported variables.
+
 ## Using Rebase with Express
 
 Here is a complete example of how to initialize the Rebase PostgreSQL adapter and Realtime WebSockets inside a standard Express application.

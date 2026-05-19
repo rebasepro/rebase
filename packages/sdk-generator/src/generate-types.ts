@@ -101,8 +101,11 @@ export function generateTypedefs(collections: EntityCollection[]): string {
 
                 let fkType = "string | number";
                 try {
-                    const target = relation.target();
-                    if (target.properties) {
+                    let target = relation.target();
+                    if (target && (target.default || target.__esModule)) {
+                        target = target.default || target;
+                    }
+                    if (target && target.properties) {
                         const idProp = Object.entries(target.properties).find(([_, p]: [string, any]) => p.isId);
                         if (idProp) {
                             fkType = (idProp[1] as Property).type === "number" ? "number" : "string";

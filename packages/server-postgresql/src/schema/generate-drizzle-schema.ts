@@ -89,6 +89,9 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
             return;
         }
 
+        // Sort collections by slug alphabetically to ensure deterministic schema generation
+        collections.sort((a, b) => a.slug.localeCompare(b.slug));
+
         const schemaContent = await generateSchema(collections);
 
         if (outputPath) {

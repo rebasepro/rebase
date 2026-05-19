@@ -10,9 +10,11 @@ import { runDoctor } from "./doctor";
 async function main() {
     const collectionsArg = process.argv.find((a) => a.startsWith("--collections="));
     const schemaArg = process.argv.find((a) => a.startsWith("--schema="));
+    const sdkArg = process.argv.find((a) => a.startsWith("--sdk="));
 
     const collectionsPath = collectionsArg?.split("=")[1] ?? path.join("..", "shared", "collections");
     const schemaPath = schemaArg?.split("=")[1] ?? path.join("src", "schema.generated.ts");
+    const sdkPath = sdkArg?.split("=")[1] ?? path.join("..", "generated", "sdk", "database.types.ts");
 
     // Load .env
     try {
@@ -32,6 +34,7 @@ async function main() {
     const report = await runDoctor({
         collectionsPath: path.resolve(process.cwd(), collectionsPath),
         schemaPath: path.resolve(process.cwd(), schemaPath),
+        sdkPath: path.resolve(process.cwd(), sdkPath),
         databaseUrl: databaseUrl ?? undefined
     });
 

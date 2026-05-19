@@ -66,6 +66,7 @@
   },
   "dependencies": {
     "@rebasepro/common": "workspace:*",
+    "@rebasepro/sdk-generator": "workspace:*",
     "@rebasepro/server-core": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@rebasepro/utils": "workspace:*",

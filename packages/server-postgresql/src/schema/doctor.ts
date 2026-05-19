@@ -14,6 +14,7 @@ import { pathToFileURL } from "url";
 import chalk from "chalk";
 import { EntityCollection, isPostgresCollection, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty } from "@rebasepro/types";
 import { generateSchema } from "./generate-drizzle-schema-logic";
+import { generateTypedefs } from "@rebasepro/sdk-generator";
 import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
 
@@ -35,7 +36,7 @@ export type IssueSeverity = "error" | "warning" | "info";
 
 export interface DoctorIssue {
     severity: IssueSeverity;
-    category: "missing_table" | "missing_column" | "type_mismatch" | "missing_constraint" | "schema_stale" | "missing_enum" | "enum_value_mismatch" | "missing_foreign_key";
+    category: "missing_table" | "missing_column" | "type_mismatch" | "missing_constraint" | "schema_stale" | "missing_enum" | "enum_value_mismatch" | "missing_foreign_key" | "sdk_stale";
     table?: string;
     column?: string;
     expected?: string;
@@ -46,6 +47,7 @@ export interface DoctorIssue {
 
 export interface DoctorReport {
     collectionsToSchema: { passed: boolean; issues: DoctorIssue[] };
+    collectionsToSdk: { passed: boolean; issues: DoctorIssue[] };
     schemaToDatabase: { passed: boolean; issues: DoctorIssue[] };
     summary: { passed: number; warnings: number; errors: number };
 }
@@ -139,6 +141,9 @@ export async function loadCollections(collectionsPath: string): Promise<EntityCo
         }
     }
 
+    // Sort collections by slug alphabetically to ensure deterministic comparison
+    collections.sort((a, b) => a.slug.localeCompare(b.slug));
+
     return collections;
 }
 
@@ -201,6 +206,56 @@ issues };
 
     return { passed: issues.length === 0,
 issues };
+}
+
+export async function checkCollectionsVsSdk(
+    collections: EntityCollection[],
+    sdkFilePath: string
+): Promise<{ passed: boolean; issues: DoctorIssue[] }> {
+    const issues: DoctorIssue[] = [];
+
+    // Check if SDK file exists
+    if (!fs.existsSync(sdkFilePath)) {
+        issues.push({
+            severity: "warning",
+            category: "sdk_stale",
+            message: `Generated SDK typedefs file does not exist at "${sdkFilePath}".`,
+            fix: "Run `rebase generate-sdk`"
+        });
+        return { passed: false, issues };
+    }
+
+    try {
+        const expectedSdk = generateTypedefs(collections);
+        const actualSdk = await fsPromises.readFile(sdkFilePath, "utf-8");
+
+        // Normalize whitespace for comparison
+        const normalize = (s: string) =>
+            s
+                .replace(/\/\/.*$/gm, "") // strip single-line comments
+                .replace(/\/\*[\s\S]*?\*\//g, "") // strip multi-line comments
+                .replace(/\s+/g, " ")
+                .trim();
+
+        if (normalize(expectedSdk) !== normalize(actualSdk)) {
+            issues.push({
+                severity: "warning",
+                category: "sdk_stale",
+                message: "Generated SDK types are out of date — collection definitions have changed since last SDK generation.",
+                fix: "Run `rebase generate-sdk`"
+            });
+        }
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        issues.push({
+            severity: "warning",
+            category: "sdk_stale",
+            message: `Could not regenerate SDK types for comparison: ${message}`,
+            fix: "Run `rebase generate-sdk` to verify"
+        });
+    }
+
+    return { passed: issues.length === 0, issues };
 }
 
 // ── Phase 2: Collections ↔ Database ──────────────────────────────────────
@@ -489,6 +544,13 @@ export function renderReport(report: DoctorReport): void {
         report.schemaToDatabase.issues
     );
 
+    // Phase 3
+    renderPhase(
+        "Collections → SDK Types",
+        report.collectionsToSdk.passed,
+        report.collectionsToSdk.issues
+    );
+
     // Summary
     console.log(chalk.gray("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
     const { passed, warnings, errors } = report.summary;
@@ -554,7 +616,8 @@ function formatCategory(cat: DoctorIssue["category"]): string {
         schema_stale: "Stale Schema",
         missing_enum: "Missing Enum",
         enum_value_mismatch: "Enum Value Mismatch",
-        missing_foreign_key: "Missing Foreign Key"
+        missing_foreign_key: "Missing Foreign Key",
+        sdk_stale: "Stale SDK Types"
     };
     return labels[cat];
 }
@@ -564,6 +627,7 @@ function formatCategory(cat: DoctorIssue["category"]): string {
 export async function runDoctor(options: {
     collectionsPath: string;
     schemaPath: string;
+    sdkPath: string;
     databaseUrl?: string;
 }): Promise<DoctorReport> {
     console.log("");
@@ -591,14 +655,19 @@ issues: [] };
         console.log(chalk.gray("    Set DATABASE_URL in your .env to enable full drift detection."));
     }
 
-    const allIssues = [...collectionsToSchema.issues, ...schemaToDatabase.issues];
+    // Phase 3: Collections ↔ SDK Types
+    console.log(chalk.gray("  Checking Collections → SDK Types..."));
+    const collectionsToSdk = await checkCollectionsVsSdk(collections, options.sdkPath);
+
+    const allIssues = [...collectionsToSchema.issues, ...schemaToDatabase.issues, ...collectionsToSdk.issues];
     const summary = {
-        passed: [collectionsToSchema, schemaToDatabase].filter((p) => p.passed).length,
+        passed: [collectionsToSchema, schemaToDatabase, collectionsToSdk].filter((p) => p.passed).length,
         warnings: allIssues.filter((i) => i.severity === "warning").length,
         errors: allIssues.filter((i) => i.severity === "error").length
     };
 
     const report: DoctorReport = { collectionsToSchema,
+collectionsToSdk,
 schemaToDatabase,
 summary };
     renderReport(report);

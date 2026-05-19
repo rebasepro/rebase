@@ -6,87 +6,468 @@
 export interface Database {
   authors: {
     Row: {
-      id?: number;
+      id?: string;
       name: string;
       email: string;
       picture?: string;
+      bio?: string;
+      twitter?: string;
+      github?: string;
+      website?: string;
       userid?: string;
-      profile?: { id: string | number; path: string; __type: "relation"; data?: any };
     };
     Insert: {
-      id?: number;
+      id?: string;
       name: string;
       email: string;
       picture?: string;
+      bio?: string;
+      twitter?: string;
+      github?: string;
+      website?: string;
       userid?: string;
     };
     Update: {
-      id?: number;
+      id?: string;
       name?: string;
       email?: string;
       picture?: string;
+      bio?: string;
+      twitter?: string;
+      github?: string;
+      website?: string;
       userid?: string;
     };
   };
-  profiles: {
+  customers: {
     Row: {
-      id: number;
-      bio?: string;
-      website?: string;
-      authorId?: string | number;
-      author?: { id: string | number; path: string; __type: "relation"; data?: any };
+      id?: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone?: string;
+      avatar?: string;
+      company?: string;
+      isVip?: boolean;
+      lifetimeValue?: number;
+      totalOrders?: number;
+      shippingAddress?: string;
+      billingAddress?: string;
+      notes?: string;
+      createdAt?: string;
+      updatedAt?: string;
     };
     Insert: {
-      id: number;
-      bio?: string;
-      website?: string;
-      authorId?: string | number;
+      id?: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone?: string;
+      avatar?: string;
+      company?: string;
+      isVip?: boolean;
+      lifetimeValue?: number;
+      totalOrders?: number;
+      shippingAddress?: string;
+      billingAddress?: string;
+      notes?: string;
+      createdAt?: string;
+      updatedAt?: string;
     };
     Update: {
-      id?: number;
-      bio?: string;
-      website?: string;
-      authorId?: string | number;
+      id?: string;
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+      phone?: string;
+      avatar?: string;
+      company?: string;
+      isVip?: boolean;
+      lifetimeValue?: number;
+      totalOrders?: number;
+      shippingAddress?: string;
+      billingAddress?: string;
+      notes?: string;
+      createdAt?: string;
+      updatedAt?: string;
+    };
+  };
+  exercises: {
+    Row: {
+      id?: string;
+      name: string;
+      description?: string;
+      images?: Array<string>;
+      videoUrl?: string;
+      difficulty: "beginner" | "intermediate" | "advanced";
+      category: "strength" | "cardio" | "flexibility" | "balance" | "plyometrics" | "calisthenics";
+      equipment?: Array<"none" | "barbell" | "dumbbell" | "kettlebell" | "resistance_band" | "cable_machine" | "pull_up_bar" | "bench" | "medicine_ball" | "foam_roller" | "trx" | "box">;
+      bodyParts?: Array<"head_neck" | "shoulders" | "chest" | "upper_back" | "lower_back" | "biceps" | "triceps" | "forearms" | "abs" | "obliques" | "glutes" | "quads" | "hamstrings" | "calves" | "hip_flexors">;
+      instructions?: string;
+      defaultReps?: number;
+      defaultSets?: number;
+      restSeconds?: number;
+      caloriesPerMinute?: number;
+      isCompound?: boolean;
+      isFeatured?: boolean;
+      status: "draft" | "published" | "archived";
+      createdAt?: string;
+      updatedAt?: string;
+    };
+    Insert: {
+      id?: string;
+      name: string;
+      description?: string;
+      images?: Array<string>;
+      videoUrl?: string;
+      difficulty: "beginner" | "intermediate" | "advanced";
+      category: "strength" | "cardio" | "flexibility" | "balance" | "plyometrics" | "calisthenics";
+      equipment?: Array<"none" | "barbell" | "dumbbell" | "kettlebell" | "resistance_band" | "cable_machine" | "pull_up_bar" | "bench" | "medicine_ball" | "foam_roller" | "trx" | "box">;
+      bodyParts?: Array<"head_neck" | "shoulders" | "chest" | "upper_back" | "lower_back" | "biceps" | "triceps" | "forearms" | "abs" | "obliques" | "glutes" | "quads" | "hamstrings" | "calves" | "hip_flexors">;
+      instructions?: string;
+      defaultReps?: number;
+      defaultSets?: number;
+      restSeconds?: number;
+      caloriesPerMinute?: number;
+      isCompound?: boolean;
+      isFeatured?: boolean;
+      status: "draft" | "published" | "archived";
+      createdAt?: string;
+      updatedAt?: string;
+    };
+    Update: {
+      id?: string;
+      name?: string;
+      description?: string;
+      images?: Array<string>;
+      videoUrl?: string;
+      difficulty?: "beginner" | "intermediate" | "advanced";
+      category?: "strength" | "cardio" | "flexibility" | "balance" | "plyometrics" | "calisthenics";
+      equipment?: Array<"none" | "barbell" | "dumbbell" | "kettlebell" | "resistance_band" | "cable_machine" | "pull_up_bar" | "bench" | "medicine_ball" | "foam_roller" | "trx" | "box">;
+      bodyParts?: Array<"head_neck" | "shoulders" | "chest" | "upper_back" | "lower_back" | "biceps" | "triceps" | "forearms" | "abs" | "obliques" | "glutes" | "quads" | "hamstrings" | "calves" | "hip_flexors">;
+      instructions?: string;
+      defaultReps?: number;
+      defaultSets?: number;
+      restSeconds?: number;
+      caloriesPerMinute?: number;
+      isCompound?: boolean;
+      isFeatured?: boolean;
+      status?: "draft" | "published" | "archived";
+      createdAt?: string;
+      updatedAt?: string;
+    };
+  };
+  orderItems: {
+    Row: {
+      id?: string;
+      productName: string;
+      sku?: string;
+      quantity: number;
+      unitPrice: number;
+      lineTotal?: number;
+      orderId?: string;
+      productId?: string;
+      order?: { id: string | number; path: string; __type: "relation"; data?: any };
+      product?: { id: string | number; path: string; __type: "relation"; data?: any };
+    };
+    Insert: {
+      id?: string;
+      productName: string;
+      sku?: string;
+      quantity: number;
+      unitPrice: number;
+      lineTotal?: number;
+      orderId?: string | number;
+      productId?: string | number;
+    };
+    Update: {
+      id?: string;
+      productName?: string;
+      sku?: string;
+      quantity?: number;
+      unitPrice?: number;
+      lineTotal?: number;
+      orderId?: string | number;
+      productId?: string | number;
+    };
+  };
+  orders: {
+    Row: {
+      id?: string;
+      orderNumber: string;
+      status: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled" | "refunded";
+      paymentStatus: "unpaid" | "paid" | "partially_refunded" | "refunded";
+      subtotal?: number;
+      taxAmount?: number;
+      shippingCost?: number;
+      discountAmount?: number;
+      total: number;
+      currency?: "USD" | "EUR" | "GBP" | "CAD" | "AUD";
+      shippingAddress?: string;
+      trackingNumber?: string;
+      notes?: string;
+      orderDate: string;
+      shippedDate?: string;
+      deliveredDate?: string;
+      createdAt?: string;
+      updatedAt?: string;
+      customerId?: string;
+      customer?: { id: string | number; path: string; __type: "relation"; data?: any };
+    };
+    Insert: {
+      id?: string;
+      orderNumber: string;
+      status: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled" | "refunded";
+      paymentStatus: "unpaid" | "paid" | "partially_refunded" | "refunded";
+      subtotal?: number;
+      taxAmount?: number;
+      shippingCost?: number;
+      discountAmount?: number;
+      total: number;
+      currency?: "USD" | "EUR" | "GBP" | "CAD" | "AUD";
+      shippingAddress?: string;
+      trackingNumber?: string;
+      notes?: string;
+      orderDate: string;
+      shippedDate?: string;
+      deliveredDate?: string;
+      createdAt?: string;
+      updatedAt?: string;
+      customerId?: string | number;
+    };
+    Update: {
+      id?: string;
+      orderNumber?: string;
+      status?: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled" | "refunded";
+      paymentStatus?: "unpaid" | "paid" | "partially_refunded" | "refunded";
+      subtotal?: number;
+      taxAmount?: number;
+      shippingCost?: number;
+      discountAmount?: number;
+      total?: number;
+      currency?: "USD" | "EUR" | "GBP" | "CAD" | "AUD";
+      shippingAddress?: string;
+      trackingNumber?: string;
+      notes?: string;
+      orderDate?: string;
+      shippedDate?: string;
+      deliveredDate?: string;
+      createdAt?: string;
+      updatedAt?: string;
+      customerId?: string | number;
     };
   };
   posts: {
     Row: {
-      id: number;
+      id?: string;
       title: string;
-      content?: string;
-      status?: "draft" | "review" | "published" | "archived";
-      authorId?: string | number;
+      slug: string;
+      heroImage?: string;
+      excerpt?: string;
+      content?: Array<any>;
+      status: "draft" | "needs_review" | "published" | "archived";
+      publishDate?: string;
+      createdAt?: string;
+      updatedAt?: string;
+      authorId?: string;
       author?: { id: string | number; path: string; __type: "relation"; data?: any };
-      profile?: { id: string | number; path: string; __type: "relation"; data?: any };
       tags?: Array<{ id: string | number; path: string; __type: "relation"; data?: any }>;
     };
     Insert: {
-      id: number;
+      id?: string;
       title: string;
-      content?: string;
-      status?: "draft" | "review" | "published" | "archived";
+      slug: string;
+      heroImage?: string;
+      excerpt?: string;
+      content?: Array<any>;
+      status: "draft" | "needs_review" | "published" | "archived";
+      publishDate?: string;
+      createdAt?: string;
+      updatedAt?: string;
       authorId?: string | number;
     };
     Update: {
-      id?: number;
+      id?: string;
       title?: string;
-      content?: string;
-      status?: "draft" | "review" | "published" | "archived";
+      slug?: string;
+      heroImage?: string;
+      excerpt?: string;
+      content?: Array<any>;
+      status?: "draft" | "needs_review" | "published" | "archived";
+      publishDate?: string;
+      createdAt?: string;
+      updatedAt?: string;
       authorId?: string | number;
+    };
+  };
+  productLocales: {
+    Row: {
+      id: string;
+      locale: string;
+      name?: string;
+      description?: string;
+      productId?: string;
+      product?: { id: string | number; path: string; __type: "relation"; data?: any };
+    };
+    Insert: {
+      id?: string;
+      locale: string;
+      name?: string;
+      description?: string;
+      productId?: string | number;
+    };
+    Update: {
+      id?: string;
+      locale?: string;
+      name?: string;
+      description?: string;
+      productId?: string | number;
+    };
+  };
+  products: {
+    Row: {
+      id?: string;
+      name: string;
+      sku: string;
+      description?: string;
+      images?: Array<string>;
+      availableLocales?: Array<string>;
+      brand?: string;
+      category: "electronics" | "clothing" | "home_garden" | "sports" | "books" | "food_beverage" | "health_beauty" | "toys";
+      price: number;
+      compareAtPrice?: number;
+      cost?: number;
+      stockQuantity: number;
+      lowStockThreshold?: number;
+      weightGrams?: number;
+      rating?: number;
+      reviewCount?: number;
+      status: "draft" | "active" | "archived";
+      isFeatured?: boolean;
+      createdAt?: string;
+      updatedAt?: string;
+    };
+    Insert: {
+      id?: string;
+      name: string;
+      sku: string;
+      description?: string;
+      images?: Array<string>;
+      availableLocales?: Array<string>;
+      brand?: string;
+      category: "electronics" | "clothing" | "home_garden" | "sports" | "books" | "food_beverage" | "health_beauty" | "toys";
+      price: number;
+      compareAtPrice?: number;
+      cost?: number;
+      stockQuantity: number;
+      lowStockThreshold?: number;
+      weightGrams?: number;
+      rating?: number;
+      reviewCount?: number;
+      status: "draft" | "active" | "archived";
+      isFeatured?: boolean;
+      createdAt?: string;
+      updatedAt?: string;
+    };
+    Update: {
+      id?: string;
+      name?: string;
+      sku?: string;
+      description?: string;
+      images?: Array<string>;
+      availableLocales?: Array<string>;
+      brand?: string;
+      category?: "electronics" | "clothing" | "home_garden" | "sports" | "books" | "food_beverage" | "health_beauty" | "toys";
+      price?: number;
+      compareAtPrice?: number;
+      cost?: number;
+      stockQuantity?: number;
+      lowStockThreshold?: number;
+      weightGrams?: number;
+      rating?: number;
+      reviewCount?: number;
+      status?: "draft" | "active" | "archived";
+      isFeatured?: boolean;
+      createdAt?: string;
+      updatedAt?: string;
     };
   };
   tags: {
     Row: {
-      id: number;
+      id: string;
       name: string;
     };
     Insert: {
-      id: number;
+      id?: string;
       name: string;
     };
     Update: {
-      id?: number;
+      id?: string;
       name?: string;
     };
   };
+  tickets: {
+    Row: {
+      id?: string;
+      ticketNumber: string;
+      subject: string;
+      description?: string;
+      resolutionNotes?: string;
+      status: "open" | "in_progress" | "waiting" | "resolved" | "closed";
+      priority: "low" | "medium" | "high" | "urgent";
+      category?: "bug" | "feature_request" | "question" | "billing" | "account" | "other";
+      assignedTo?: string;
+      createdAt?: string;
+      updatedAt?: string;
+      order?: string;
+      customerId?: string;
+      customer?: { id: string | number; path: string; __type: "relation"; data?: any };
+    };
+    Insert: {
+      id?: string;
+      ticketNumber: string;
+      subject: string;
+      description?: string;
+      resolutionNotes?: string;
+      status: "open" | "in_progress" | "waiting" | "resolved" | "closed";
+      priority: "low" | "medium" | "high" | "urgent";
+      category?: "bug" | "feature_request" | "question" | "billing" | "account" | "other";
+      assignedTo?: string;
+      createdAt?: string;
+      updatedAt?: string;
+      order?: string;
+      customerId?: string | number;
+    };
+    Update: {
+      id?: string;
+      ticketNumber?: string;
+      subject?: string;
+      description?: string;
+      resolutionNotes?: string;
+      status?: "open" | "in_progress" | "waiting" | "resolved" | "closed";
+      priority?: "low" | "medium" | "high" | "urgent";
+      category?: "bug" | "feature_request" | "question" | "billing" | "account" | "other";
+      assignedTo?: string;
+      createdAt?: string;
+      updatedAt?: string;
+      order?: string;
+      customerId?: string | number;
+    };
+  };
 }
+
+export type CollectionName = keyof Database;
+export type CollectionsDictionary = { [K in CollectionName]: K };
+
+export const collectionsDictionary = {
+  authors: "authors",
+  customers: "customers",
+  exercises: "exercises",
+  orderItems: "order_items",
+  orders: "orders",
+  posts: "posts",
+  productLocales: "product_locales",
+  products: "products",
+  tags: "tags",
+  tickets: "tickets",
+} as const;

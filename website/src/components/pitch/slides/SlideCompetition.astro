@@ -2,50 +2,111 @@
 import PitchSlide from '../PitchSlide.astro';
 const TOTAL = 12;
 
-const yes = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-400"><path d="M20 6 9 17l-5-5"/></svg>`;
-const no = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-surface-300"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`;
-const partial = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-amber-400"><path d="M5 12h14"/></svg>`;
+const yesSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-400"><path d="M20 6 9 17l-5-5"/></svg>`;
+const noSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-surface-400"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`;
+const partialSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-amber-400"><path d="M5 12h14"/></svg>`;
 
+const y = yesSvg;
+const p = (tip: string) => `<span data-tip="${tip}" class="tip">${partialSvg}</span>`;
+const n = (tip: string) => `<span data-tip="${tip}" class="tip">${noSvg}</span>`;
+
+// Payload CMS = pa
 const rows = [
-    { feat: "Open Source (MIT)", r: yes, su: yes, re: no, st: partial, di: partial },
-    { feat: "Works with YOUR Postgres", r: yes, su: no, re: yes, st: no, di: yes },
-    { feat: "Auto-generated Admin", r: yes, su: no, re: yes, st: yes, di: yes },
-    { feat: "Typed REST & GraphQL APIs", r: yes, su: yes, re: no, st: yes, di: yes },
-    { feat: "TypeScript SDK", r: yes, su: yes, re: no, st: partial, di: yes },
-    { feat: "Real-time WebSockets", r: yes, su: yes, re: no, st: no, di: no },
-    { feat: "Row-Level Security", r: yes, su: yes, re: no, st: no, di: partial },
-    { feat: "React Extensibility", r: yes, su: no, re: partial, st: no, di: no },
-    { feat: "No per-seat pricing", r: yes, su: partial, re: no, st: partial, di: partial },
-    { feat: "European HQ", r: yes, su: no, re: no, st: no, di: no },
+    { feat: "Open Source",
+        r: y, su: y, re: n("Proprietary, closed-source"), st: y, di: p("BSL → MSCL license, not MIT"), pa: y },
+    { feat: "BYO Postgres",
+        r: y, su: p("Cloud provisions DB; BYO only when self-hosted"), re: y, st: y, di: y, pa: y },
+    { feat: "Schema as Code",
+        r: y, su: n("Schema lives in DB; SQL migrations only"), re: n("No schema layer; connects to existing DBs"), st: p("JSON schema files, not TypeScript"), di: n("Schema introspected from DB, not code-first"), pa: y },
+    { feat: "CMS Views",
+        r: y, su: n("Table Editor only; no content-managed views"), re: n("App builder, not a CMS"), st: y, di: y, pa: y },
+    { feat: "Admin UI",
+        r: y, su: y, re: y, st: n("Content manager only; no raw DB access"), di: p("Data Studio; no raw SQL editor"), pa: n("Content editor only; no DB-level admin") },
+    { feat: "App Builder",
+        r: n("Not a drag-and-drop app builder"), su: n("Backend-as-a-Service, not an app builder"), re: y, st: n("CMS, not an app builder"), di: n("CMS, not an app builder"), pa: n("CMS framework, not an app builder") },
+    { feat: "Typed SDK",
+        r: y, su: y, re: n("No client SDK; embeds queries in apps"), st: y, di: y, pa: y },
+    { feat: "Real-time",
+        r: y, su: y, re: n("Polling-based; no native WebSocket push"), st: n("No built-in real-time; requires custom setup"), di: y, pa: n("No native WebSocket; custom implementation needed") },
+    { feat: "RLS",
+        r: y, su: y, re: n("No row-level security; relies on app-level auth"), st: p("App-level access control, not DB-native RLS"), di: p("App-level permissions, not DB-native RLS"), pa: p("App-level access control, not DB-native RLS") },
+    { feat: "Audit Trail",
+        r: y, su: n("No built-in; requires supa_audit extension or custom triggers"), re: n("Tracks app actions, not entity-level data changes"), st: p("Content History in Growth/Enterprise plans only"), di: y, pa: y },
+    { feat: "DB Branching",
+        r: y, su: y, re: n("No concept of DB branching"), st: n("No built-in; manual DB management required"), di: n("No built-in DB branching"), pa: n("No built-in; relies on Git for schema branching") },
+    { feat: "Import/Export",
+        r: y, su: p("CSV import in Table Editor; no Excel or export wizard"), re: p("File upload components; no built-in wizard"), st: p("CLI export/import only; no admin GUI"), di: y, pa: y },
+    { feat: "Custom UI",
+        r: y, su: n("Dashboard not extensible with custom components"), re: y, st: n("Admin panel not extensible with custom React"), di: p("Vue-based extensions only, not React"), pa: y },
+    { feat: "Auth & JWT",
+        r: y, su: y, re: n("No built-in auth; connects to external IdPs"), st: y, di: y, pa: y },
+    { feat: "No Per-Seat",
+        r: y, su: p("Free tier; per-project pricing on paid plans"), re: n("Per-seat pricing on all plans"), st: p("Free self-host; per-seat on Cloud"), di: p("Free under $5M revenue; paid above"), pa: y },
+    { feat: "EU HQ",
+        r: y, su: n("US-based (San Francisco)"), re: n("US-based (San Francisco)"), st: y, di: n("US-based (New York)"), pa: n("US-based (Grand Rapids, MI)") },
 ];
 ---
 <PitchSlide id="slide-competition" slideNumber={9} totalSlides={TOTAL}>
-    <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase mb-4">Competitive Landscape</p>
-    <h2 class="text-3xl font-bold text-white mb-8">The only open-source, schema-driven full-stack platform.</h2>
-    <div class="overflow-hidden rounded-xl border border-surface-700">
-        <table class="w-full text-sm">
+    <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase mb-3">Competitive Landscape</p>
+    <h2 class="text-2xl font-bold text-white mb-5">The only platform combining CMS, database admin, and full-stack tooling.</h2>
+    <div class="overflow-visible rounded-xl border border-surface-700">
+        <table class="w-full text-xs">
             <thead>
                 <tr class="bg-surface-900/60 text-left">
-                    <th class="p-4 text-surface-300 font-medium"></th>
-                    <th class="p-4 text-primary font-bold"><a href="https://rebase.pro" target="_blank" rel="noopener" class="hover:underline">Rebase</a></th>
-                    <th class="p-4 text-surface-300 font-medium"><a href="https://supabase.com" target="_blank" rel="noopener" class="hover:text-white transition-colors">Supabase</a></th>
-                    <th class="p-4 text-surface-300 font-medium"><a href="https://retool.com" target="_blank" rel="noopener" class="hover:text-white transition-colors">Retool</a></th>
-                    <th class="p-4 text-surface-300 font-medium"><a href="https://strapi.io" target="_blank" rel="noopener" class="hover:text-white transition-colors">Strapi</a></th>
-                    <th class="p-4 text-surface-300 font-medium"><a href="https://directus.io" target="_blank" rel="noopener" class="hover:text-white transition-colors">Directus</a></th>
+                    <th class="px-2 py-1.5 text-surface-300 font-medium"></th>
+                    <th class="px-2 py-1.5 text-primary font-bold"><a href="https://rebase.pro" target="_blank" rel="noopener" class="hover:underline">Rebase</a></th>
+                    <th class="px-2 py-1.5 text-surface-300 font-medium"><a href="https://supabase.com" target="_blank" rel="noopener" class="hover:text-white transition-colors">Supabase</a></th>
+                    <th class="px-2 py-1.5 text-surface-300 font-medium"><a href="https://retool.com" target="_blank" rel="noopener" class="hover:text-white transition-colors">Retool</a></th>
+                    <th class="px-2 py-1.5 text-surface-300 font-medium"><a href="https://strapi.io" target="_blank" rel="noopener" class="hover:text-white transition-colors">Strapi</a></th>
+                    <th class="px-2 py-1.5 text-surface-300 font-medium"><a href="https://directus.io" target="_blank" rel="noopener" class="hover:text-white transition-colors">Directus</a></th>
+                    <th class="px-2 py-1.5 text-surface-300 font-medium"><a href="https://payloadcms.com" target="_blank" rel="noopener" class="hover:text-white transition-colors">Payload</a></th>
                 </tr>
             </thead>
-            <tbody class="text-xs">
+            <tbody>
                 {rows.map((row, i) => (
                     <tr class={i % 2 === 0 ? "bg-surface-900/20" : ""}>
-                        <td class="p-3 text-surface-300 font-medium">{row.feat}</td>
-                        <td class="p-3" set:html={row.r}></td>
-                        <td class="p-3" set:html={row.su}></td>
-                        <td class="p-3" set:html={row.re}></td>
-                        <td class="p-3" set:html={row.st}></td>
-                        <td class="p-3" set:html={row.di}></td>
+                        <td class="px-2 py-1 text-surface-300 font-medium whitespace-nowrap">{row.feat}</td>
+                        <td class="px-2 py-1" set:html={row.r}></td>
+                        <td class="px-2 py-1" set:html={row.su}></td>
+                        <td class="px-2 py-1" set:html={row.re}></td>
+                        <td class="px-2 py-1" set:html={row.st}></td>
+                        <td class="px-2 py-1" set:html={row.di}></td>
+                        <td class="px-2 py-1" set:html={row.pa}></td>
                     </tr>
                 ))}
             </tbody>
         </table>
     </div>
 </PitchSlide>
+
+<style is:global>
+    .tip {
+        position: relative;
+        cursor: help;
+        display: inline-flex;
+    }
+    .tip::after {
+        content: attr(data-tip);
+        position: absolute;
+        bottom: calc(100% + 6px);
+        left: 50%;
+        transform: translateX(-50%);
+        background: #1e1e2e;
+        color: #e0e0e0;
+        border: 1px solid #444;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 11px;
+        line-height: 1.4;
+        width: max-content;
+        max-width: 320px;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.15s;
+        z-index: 100;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+    .tip:hover::after {
+        opacity: 1;
+    }
+</style>
