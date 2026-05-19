@@ -16,8 +16,7 @@
         "@rebasepro/server-postgresql": "workspace:*",
         "dotenv": "^16.0.0",
         "drizzle-orm": "^0.44.4",
-        "hono": "^4.2.0",
-        "zod": "4.3.6"
+        "hono": "^4.2.0"
     },
     "devDependencies": {
         "@faker-js/faker": "10.4.0",

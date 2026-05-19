@@ -62,5 +62,9 @@ export * from "./serve-spa";
 // Dev-mode port resolution (retry on EADDRINUSE)
 export * from "./utils/dev-port";
 
+// Environment validation
+export { loadEnv } from "./env";
+export type { RebaseEnv } from "./env";
+
 // Backend bootstrappers (pluggable driver initialization)
 
