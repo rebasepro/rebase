@@ -1,0 +1,74 @@
+---
+import PitchSlide from '../PitchSlide.astro';
+const TOTAL = 12;
+---
+<PitchSlide id="slide-traction" slideNumber={7} totalSlides={TOTAL}>
+    <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase mb-4">Traction & Validation</p>
+    <h2 class="text-4xl md:text-5xl font-bold text-white mb-3">Proven technology. <span class="text-primary">Growing fast.</span></h2>
+
+    {/* Heritage — FireCMS track record */}
+    <div class="rounded-xl border border-primary/20 bg-primary/5 p-5 mb-6">
+        <div class="flex items-center gap-2 mb-3">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            <h3 class="text-white font-semibold text-sm">Our Track Record — <a href="https://firecms.co" target="_blank" rel="noopener" class="text-primary hover:underline">FireCMS</a> (2020–present)</h3>
+        </div>
+        <p class="text-surface-300 text-xs mb-4">Rebase is the next-generation evolution of FireCMS, our open-source CMS. Same founding team, expanded from a CMS into a full-stack app platform built on PostgreSQL.</p>
+        <div class="grid grid-cols-4 gap-4">
+            {[
+                { val: "10K+", label: "Projects worldwide", color: "text-primary", href: "https://firecms.co" },
+                { val: "1.2K", label: "GitHub Stars", color: "text-amber-400", href: "https://github.com/firecmsco/firecms" },
+                { val: "200K+", label: "npm Downloads", color: "text-emerald-400", href: "https://www.npmjs.com/package/firecms" },
+                { val: "219", label: "Contributors & Forks", color: "text-violet-400", href: "https://github.com/firecmsco/firecms/forks" },
+            ].map(s => (
+                <a href={s.href} target="_blank" rel="noopener" class="text-center hover:bg-surface-800/50 rounded-lg p-2 transition-colors">
+                    <div class={`text-2xl font-black mb-0.5 ${s.color}`}>{s.val}</div>
+                    <p class="text-[10px] text-surface-300">{s.label}</p>
+                </a>
+            ))}
+        </div>
+    </div>
+
+    {/* Rebase — current status */}
+    <h3 class="text-white font-semibold mb-3 text-sm">Rebase Platform — Current Status</h3>
+    <div class="grid grid-cols-2 gap-4 mb-4">
+        <div class="rounded-xl border border-surface-700 bg-surface-900/40 p-4">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20">Live</span>
+                <span class="text-white font-semibold text-sm">Production Case Studies</span>
+            </div>
+            <div class="space-y-2">
+                <a href="https://medicalmotion.com" target="_blank" rel="noopener" class="flex items-center gap-2 hover:text-white transition-colors">
+                    <img src="/img/logos/mm_logo.webp" alt="MedicalMotion" class="h-4" />
+                    <span class="text-surface-300 text-xs"><strong class="text-white">MedicalMotion</strong> — AI-powered digital therapy for 50K+ patients. Rebase powers patient data, therapy plans, and content delivery.</span>
+                </a>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-surface-300"><strong class="text-white">SustenTalent</strong> — Talent marketplace for sustainability professionals. Entire backend built on Rebase.</span>
+                </div>
+            </div>
+        </div>
+        <div class="rounded-xl border border-surface-700 bg-surface-900/40 p-4">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary ring-1 ring-primary/20">Milestones</span>
+                <span class="text-white font-semibold text-sm">Where We Are</span>
+            </div>
+            <ul class="space-y-1.5 text-xs text-surface-300">
+                <li class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-400"><path d="M20 6 9 17l-5-5"/></svg>
+                    Core platform shipped & open-sourced (MIT)
+                </li>
+                <li class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-400"><path d="M20 6 9 17l-5-5"/></svg>
+                    2 production customers live
+                </li>
+                <li class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-400"><path d="M20 6 9 17l-5-5"/></svg>
+                    Pro tier launched (€29/mo per project)
+                </li>
+                <li class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg>
+                    Cloud platform in development
+                </li>
+            </ul>
+        </div>
+    </div>
+</PitchSlide>

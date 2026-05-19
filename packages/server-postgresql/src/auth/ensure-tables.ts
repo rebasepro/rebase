@@ -62,6 +62,9 @@ export async function ensureAuthTablesExist(db: NodePgDatabase): Promise<void> {
                 password_hash TEXT,
                 display_name TEXT,
                 photo_url TEXT,
+                email_verified BOOLEAN DEFAULT FALSE,
+                email_verification_token TEXT,
+                email_verification_sent_at TIMESTAMP WITH TIME ZONE,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
             )
@@ -181,9 +184,6 @@ export async function ensureAuthTablesExist(db: NodePgDatabase): Promise<void> {
             )
         `);
 
-        // Apply any schema alterations for existing databases
-        await applyInternalMigrations(db);
-
         // Create the `auth` schema with Supabase-style helper functions for RLS.
         //   auth.uid()   → returns the current user's ID (reads app.user_id)
         //   auth.jwt()   → returns the full JWT claims as JSONB (reads app.jwt)
@@ -261,121 +261,3 @@ async function seedDefaultRoles(db: NodePgDatabase): Promise<void> {
     console.log("✅ Default roles created: admin, editor, viewer");
 }
 
-/**
- * Apply idempotent alterations for internal Rebase tables.
- * This runs after CREATE TABLE IF NOT EXISTS to ensure existing
- * databases get new columns without needing external Drizzle migrations.
- */
-async function applyInternalMigrations(db: NodePgDatabase): Promise<void> {
-    try {
-        // Users Table Migrations
-        await db.execute(sql`
-            ALTER TABLE rebase.users 
-            ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE,
-            ADD COLUMN IF NOT EXISTS email_verification_token TEXT,
-            ADD COLUMN IF NOT EXISTS email_verification_sent_at TIMESTAMP WITH TIME ZONE
-        `);
-
-        // Migrate Old OAuth Data to user_identities table
-
-        // 1. Check if legacy columns exist
-        const columnsCheck = await db.execute(sql`
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_schema='rebase' AND table_name='users' AND column_name IN ('google_id', 'linkedin_id', 'provider')
-        `);
-        const existingColumns = columnsCheck.rows.map(r => r.column_name);
-
-        if (existingColumns.includes("google_id")) {
-            // Migrate google users
-            await db.execute(sql`
-                INSERT INTO rebase.user_identities (user_id, provider, provider_id)
-                SELECT id, 'google', google_id
-                FROM rebase.users
-                WHERE google_id IS NOT NULL
-                ON CONFLICT (provider, provider_id) DO NOTHING
-            `);
-        }
-
-        if (existingColumns.includes("linkedin_id")) {
-            // Migrate linkedin users
-            await db.execute(sql`
-                INSERT INTO rebase.user_identities (user_id, provider, provider_id)
-                SELECT id, 'linkedin', linkedin_id
-                FROM rebase.users
-                WHERE linkedin_id IS NOT NULL
-                ON CONFLICT (provider, provider_id) DO NOTHING
-            `);
-        }
-
-        // Now drop legacy columns safely if they exist
-        if (existingColumns.length > 0) {
-            await db.execute(sql`
-                ALTER TABLE rebase.users
-                DROP COLUMN IF EXISTS provider,
-                DROP COLUMN IF EXISTS google_id,
-                DROP COLUMN IF EXISTS linkedin_id
-            `);
-
-            // Drop legacy indexes
-            await db.execute(sql`DROP INDEX IF EXISTS rebase.idx_users_google_id`);
-            await db.execute(sql`DROP INDEX IF EXISTS rebase.idx_users_linkedin_id`);
-
-            console.log("✅ Migrated to user_identities and dropped legacy columns.");
-        }
-
-        // Roles Table Migrations
-        await db.execute(sql`
-            ALTER TABLE rebase.roles 
-            ADD COLUMN IF NOT EXISTS collection_permissions JSONB
-        `);
-
-        // Refresh Tokens Table Migrations
-        await db.execute(sql`
-            ALTER TABLE rebase.refresh_tokens 
-            ADD COLUMN IF NOT EXISTS user_agent TEXT,
-            ADD COLUMN IF NOT EXISTS ip_address TEXT
-        `);
-
-        const constraintCheck = await db.execute(sql`
-            SELECT 1 FROM information_schema.table_constraints 
-            WHERE constraint_name = 'unique_device_session' 
-            AND table_schema = 'rebase'
-            AND table_name = 'refresh_tokens'
-        `);
-
-        if (constraintCheck.rows.length === 0) {
-            try {
-                await db.execute(sql`
-                    ALTER TABLE rebase.refresh_tokens
-                    ADD CONSTRAINT unique_device_session UNIQUE (user_id, user_agent, ip_address)
-                `);
-                console.log("✅ Added unique_device_session constraint");
-            } catch (e: unknown) {
-                const errorMessage = e instanceof Error ? e.message : String(e);
-                if (errorMessage.includes("could not create unique index")) {
-                    console.warn("⚠️ Duplicate sessions found, cleaning up before adding constraint...");
-                    await db.execute(sql`
-                        DELETE FROM rebase.refresh_tokens a
-                        USING rebase.refresh_tokens b
-                        WHERE a.user_id = b.user_id 
-                        AND COALESCE(a.user_agent, '') = COALESCE(b.user_agent, '')
-                        AND COALESCE(a.ip_address, '') = COALESCE(b.ip_address, '')
-                        AND a.created_at < b.created_at
-                    `);
-                    await db.execute(sql`
-                        ALTER TABLE rebase.refresh_tokens
-                        ADD CONSTRAINT unique_device_session UNIQUE (user_id, user_agent, ip_address)
-                    `).catch((retryErr: unknown) => {
-                        const retryMessage = retryErr instanceof Error ? retryErr.message : String(retryErr);
-                        console.error("Failed to add unique_device_session constraint after cleanup:", retryMessage);
-                    });
-                } else {
-                    console.error("Constraint migration issue:", errorMessage);
-                }
-            }
-        }
-    } catch (error) {
-        console.error("❌ Failed to run internal migrations:", error);
-    }
-}

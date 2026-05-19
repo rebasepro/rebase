@@ -44,6 +44,19 @@ export const en = {
   "showcase.case.feat3.title": "Out-of-the-box Admin",
   "showcase.case.feat3.desc":
     "The staff uses the generated Rebase admin panel to moderate job postings, verify companies, and manage the proprietary interests taxonomy.",
+  "showcase.case2.badge": "Digital Pain Therapy",
+  "showcase.case2.title": "MedicalMotion",
+  "showcase.case2.desc":
+    "A certified digital medical device (app) using AI to provide personalized holistic pain therapy. Rebase powers everything behind the scenes, from patient data management to clinical tracking and content delivery.",
+  "showcase.case2.feat1.title": "Secure Patient Data",
+  "showcase.case2.feat1.desc":
+    "Medical patient profiles, therapy plans, and sensitive health records are stored securely, with row-level security configured via the Rebase schema.",
+  "showcase.case2.feat2.title": "Content Delivery",
+  "showcase.case2.feat2.desc":
+    "Rebase delivers the daily therapy plans, physiotherapy video exercises, and educational content seamlessly through generated APIs.",
+  "showcase.case2.feat3.title": "Clinical Tracking",
+  "showcase.case2.feat3.desc":
+    "Internal teams use the Rebase admin panel to monitor app engagement, manage the exercise library, and generate health reports.",
   "features.title": "Everything your schema generates",
   "features.subtitle":
     "Production-grade features, all driven by your TypeScript schema. Every view updates in real time.",

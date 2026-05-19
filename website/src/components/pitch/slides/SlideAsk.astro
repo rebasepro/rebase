@@ -1,0 +1,145 @@
+---
+import PitchSlide from '../PitchSlide.astro';
+const TOTAL = 12;
+---
+<PitchSlide id="slide-ask" slideNumber={12} totalSlides={TOTAL}>
+    <div class="flex flex-col gap-4">
+        <div class="text-center">
+            <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase mb-2">The Ask</p>
+            <h2 class="text-5xl font-bold text-white"><a href="https://eic.ec.europa.eu/eic-funding-opportunities/eic-accelerator_en" target="_blank" rel="noopener" class="hover:underline">€2.5M EIC Grant</a></h2>
+            <p class="text-surface-300 text-sm mt-1">24-month execution plan · 8–12 new EU hires</p>
+        </div>
+
+        {/* Revenue projection — compact chart */}
+        <div class="rounded-xl border border-surface-700 bg-surface-900/40 px-5 py-4">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-white font-semibold text-xs">Revenue Projection</h3>
+                <div class="flex items-center gap-4 text-[10px] text-surface-400">
+                    <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-[#0070f4] inline-block"></span> Base</span>
+                    <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-[#0070f4]/30 inline-block"></span> Conservative</span>
+                </div>
+            </div>
+            <svg viewBox="0 0 560 120" class="w-full" style="height:120px" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#0070f4" stop-opacity="0.2"/>
+                        <stop offset="100%" stop-color="#0070f4" stop-opacity="0.01"/>
+                    </linearGradient>
+                </defs>
+
+                {/* Axes */}
+                <line x1="40" y1="100" x2="540" y2="100" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+                <line x1="40" y1="100" x2="40" y2="10" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+
+                {/* Horizontal grid */}
+                <line x1="40" y1="70" x2="540" y2="70" stroke="rgba(255,255,255,0.04)" stroke-width="1" stroke-dasharray="3,3"/>
+                <line x1="40" y1="40" x2="540" y2="40" stroke="rgba(255,255,255,0.04)" stroke-width="1" stroke-dasharray="3,3"/>
+
+                {/* Y labels */}
+                <text x="36" y="103" fill="rgba(255,255,255,0.3)" font-size="8" text-anchor="end" font-family="system-ui">€0</text>
+                <text x="36" y="73" fill="rgba(255,255,255,0.3)" font-size="8" text-anchor="end" font-family="system-ui">€250K</text>
+                <text x="36" y="43" fill="rgba(255,255,255,0.3)" font-size="8" text-anchor="end" font-family="system-ui">€500K</text>
+
+                {/* X labels */}
+                <text x="40" y="113" fill="rgba(255,255,255,0.3)" font-size="8" text-anchor="middle" font-family="system-ui">M0</text>
+                <text x="165" y="113" fill="rgba(255,255,255,0.3)" font-size="8" text-anchor="middle" font-family="system-ui">M6</text>
+                <text x="290" y="113" fill="rgba(255,255,255,0.3)" font-size="8" text-anchor="middle" font-family="system-ui">M12</text>
+                <text x="415" y="113" fill="rgba(255,255,255,0.3)" font-size="8" text-anchor="middle" font-family="system-ui">M18</text>
+                <text x="540" y="113" fill="rgba(255,255,255,0.3)" font-size="8" text-anchor="middle" font-family="system-ui">M24</text>
+
+                {/* Vertical milestone guides */}
+                <line x1="165" y1="10" x2="165" y2="100" stroke="rgba(255,255,255,0.05)" stroke-width="1" stroke-dasharray="2,3"/>
+                <line x1="290" y1="10" x2="290" y2="100" stroke="rgba(255,255,255,0.05)" stroke-width="1" stroke-dasharray="2,3"/>
+                <line x1="415" y1="10" x2="415" y2="100" stroke="rgba(255,255,255,0.05)" stroke-width="1" stroke-dasharray="2,3"/>
+
+                {/* Base area fill */}
+                <path d="M40,100 C80,99 130,97 190,92 C270,82 340,65 415,40 L540,22 L540,100 Z" fill="url(#areaGrad)"/>
+
+                {/* Conservative line (dashed) */}
+                <path d="M40,100 C90,99 160,96 230,90 C310,82 370,72 415,58 L540,42" fill="none" stroke="#0070f4" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.35"/>
+
+                {/* Base line */}
+                <path d="M40,100 C80,99 130,97 190,92 C270,82 340,65 415,40 L540,22" fill="none" stroke="#0070f4" stroke-width="2"/>
+
+                {/* M6 dot + label */}
+                <circle cx="165" cy="95" r="3" fill="#0070f4"/>
+                <text x="165" y="88" fill="#0070f4" font-size="7" font-weight="600" text-anchor="middle" font-family="system-ui">Cloud Launch</text>
+
+                {/* M12 dot + label */}
+                <circle cx="290" cy="80" r="3" fill="#0070f4"/>
+                <text x="290" y="73" fill="#0070f4" font-size="7" font-weight="600" text-anchor="middle" font-family="system-ui">1K Projects</text>
+
+                {/* M18 dot + label */}
+                <circle cx="415" cy="40" r="4" fill="#0070f4" stroke="#000" stroke-width="1.5"/>
+                <text x="415" y="32" fill="#0070f4" font-size="8" font-weight="700" text-anchor="middle" font-family="system-ui">€500K ARR</text>
+
+                {/* M24 dot + label */}
+                <circle cx="540" cy="22" r="4" fill="#34d399" stroke="#000" stroke-width="1.5"/>
+                <text x="530" y="16" fill="#34d399" font-size="8" font-weight="700" text-anchor="end" font-family="system-ui">Break-even</text>
+            </svg>
+            <div class="flex items-center justify-between text-[10px] text-surface-400 mt-1">
+                <span><strong class="text-white">Today:</strong> Pre-revenue · 2 production customers · Pro tier launched (€29/mo)</span>
+                <span><strong class="text-emerald-400">Target:</strong> Self-sustaining by M24, Series A ready</span>
+            </div>
+        </div>
+
+        {/* Budget breakdown — compact */}
+        <div class="overflow-hidden rounded-xl border border-surface-700">
+            <table class="w-full text-[11px]">
+                <thead>
+                    <tr class="bg-surface-900/60 text-left">
+                        <th class="px-3 py-2 text-surface-300 font-semibold">Work Package</th>
+                        <th class="px-3 py-2 text-surface-300 font-semibold">Budget</th>
+                        <th class="px-3 py-2 text-surface-300 font-semibold">Timeline</th>
+                        <th class="px-3 py-2 text-surface-300 font-semibold">Key Deliverables</th>
+                    </tr>
+                </thead>
+                <tbody class="text-surface-300">
+                    <tr class="border-t border-surface-800">
+                        <td class="px-3 py-1.5 font-medium text-white">WP1 — Rebase Cloud</td>
+                        <td class="px-3 py-1.5 text-primary font-bold">€700K</td>
+                        <td class="px-3 py-1.5">M1–M18</td>
+                        <td class="px-3 py-1.5">Managed EU hosting, auto-scaling, one-click deploy</td>
+                    </tr>
+                    <tr class="border-t border-surface-800 bg-surface-900/20">
+                        <td class="px-3 py-1.5 font-medium text-white">WP2 — AI & Agents</td>
+                        <td class="px-3 py-1.5 text-primary font-bold">€500K</td>
+                        <td class="px-3 py-1.5">M3–M20</td>
+                        <td class="px-3 py-1.5">AI-powered queries, automated app scaffolding, agent integration</td>
+                    </tr>
+                    <tr class="border-t border-surface-800">
+                        <td class="px-3 py-1.5 font-medium text-white">WP3 — Core Platform</td>
+                        <td class="px-3 py-1.5 text-primary font-bold">€400K</td>
+                        <td class="px-3 py-1.5">M1–M24</td>
+                        <td class="px-3 py-1.5">Multi-database support, plugin marketplace, enterprise security</td>
+                    </tr>
+                    <tr class="border-t border-surface-800 bg-surface-900/20">
+                        <td class="px-3 py-1.5 font-medium text-white">WP4 — Go-to-Market</td>
+                        <td class="px-3 py-1.5 text-primary font-bold">€450K</td>
+                        <td class="px-3 py-1.5">M1–M24</td>
+                        <td class="px-3 py-1.5">Developer advocacy, EU conference circuit, community</td>
+                    </tr>
+                    <tr class="border-t border-surface-800">
+                        <td class="px-3 py-1.5 font-medium text-white">WP5 — Team & Ops</td>
+                        <td class="px-3 py-1.5 text-primary font-bold">€450K</td>
+                        <td class="px-3 py-1.5">M1–M24</td>
+                        <td class="px-3 py-1.5">8–12 EU hires, legal, GDPR certification</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="flex items-center justify-between">
+            <div class="text-surface-300 text-[11px]">
+                <strong class="text-white">Milestones:</strong> Cloud launch (M6) · 1K projects (M12) · €500K ARR (M18) · Break-even (M24)
+            </div>
+            <div class="text-right">
+                <p class="text-white font-semibold text-sm"><a href="https://rebase.pro" target="_blank" rel="noopener" class="hover:text-primary transition-colors">rebase.pro</a></p>
+                <p class="text-surface-400 text-[10px]">
+                    <a href="mailto:hello@rebase.pro" class="hover:text-white transition-colors">hello@rebase.pro</a> ·
+                    <a href="https://github.com/firecmsco/firecms" target="_blank" rel="noopener" class="hover:text-white transition-colors">GitHub</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</PitchSlide>

@@ -1,0 +1,28 @@
+---
+import { languages, defaultLang } from '../../i18n/ui';
+import "../../styles/global.css";
+import "../../styles/pitch.css";
+import { ViewTransitions } from "astro:transitions";
+import PitchDeckContent from "../../components/pages/PitchDeckContent.astro";
+
+export function getStaticPaths() {
+  return Object.keys(languages).map((lang) => ({
+    params: { lang: lang === defaultLang ? undefined : lang },
+  }));
+}
+---
+
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Rebase — EIC Accelerator Pitch Deck</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="shortcut icon" href="/favicon.svg" type="image/x-icon">
+    <ViewTransitions/>
+</head>
+<body class="font-sans bg-black text-surface-300 antialiased overflow-hidden print:overflow-visible" style="color-scheme: dark;">
+    <PitchDeckContent />
+</body>
+</html>

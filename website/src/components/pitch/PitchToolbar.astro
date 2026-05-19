@@ -1,0 +1,39 @@
+---
+// Toolbar: slide navigation + PDF export
+---
+
+<nav class="pitch-toolbar fixed top-0 inset-x-0 z-50 bg-surface-950/80 backdrop-blur-xl border-b border-surface-700 print:hidden">
+    <div class="max-w-7xl mx-auto px-6 py-2.5 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <img src="/favicon.svg" alt="Rebase" class="h-5 w-5" />
+            <span class="text-sm font-semibold text-white">EIC Accelerator Pitch</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20 font-medium">Confidential</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <!-- Slide navigation -->
+            <button id="slide-prev" aria-label="Previous slide" class="p-1.5 rounded-lg text-surface-300 hover:text-white hover:bg-surface-800/60 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <span id="slide-counter" class="text-xs font-mono text-surface-300 min-w-[3.5rem] text-center tabular-nums">1 / 12</span>
+            <button id="slide-next" aria-label="Next slide" class="p-1.5 rounded-lg text-surface-300 hover:text-white hover:bg-surface-800/60 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+            <div class="w-px h-5 bg-surface-800 mx-1"></div>
+            <!-- Actions -->
+            <a href="/" class="text-xs text-surface-300 hover:text-white transition-colors px-2 py-1">← Site</a>
+            <button
+                id="export-pdf-btn"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary-dark transition-colors"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg>
+                PDF
+            </button>
+        </div>
+    </div>
+</nav>
+
+<script>
+    document.getElementById('export-pdf-btn')?.addEventListener('click', () => {
+        window.print();
+    });
+</script>

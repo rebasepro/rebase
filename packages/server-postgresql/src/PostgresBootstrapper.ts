@@ -2,11 +2,6 @@
  * PostgresBootstrapper
  *
  * Implements the `BackendBootstrapper` interface for PostgreSQL.
- * Encapsulates all Postgres-specific initialization logic that was previously
- * hardcoded inside `initializeRebaseBackend()`.
- *
- * Third-party drivers (MongoDB, MySQL, etc.) can implement their own
- * bootstrapper following this pattern and pass it to the coordinator.
  */
 
 import { getTableName, isTable, Relations, sql } from "drizzle-orm";

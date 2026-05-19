@@ -669,7 +669,7 @@ searchString }
             // as it's a no-op that can fail on managed Postgres setups where the connection
             // user doesn't have permission to SET ROLE.
             let needsRoleSwitch = false;
-            if (options?.role) {
+            if (options?.role && process.env.DISABLE_DB_ROLE_SWITCHING !== "true") {
                 try {
                     const currentRoleResult = await targetDb.execute(drizzleSql.raw("SELECT current_user AS role"));
                     const currentRole = (currentRoleResult.rows?.[0] as Record<string, unknown>)?.role as string | undefined;

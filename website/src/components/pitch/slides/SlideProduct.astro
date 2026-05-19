@@ -1,0 +1,20 @@
+---
+import PitchSlide from '../PitchSlide.astro';
+import { EntityViewDemo } from '../../demos/EntityViewDemo';
+const TOTAL = 12;
+---
+<PitchSlide id="slide-product" slideNumber={5} totalSlides={TOTAL}>
+    <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase mb-4">Product</p>
+    <h2 class="text-3xl font-bold text-white mb-2">A full admin panel from your database — instantly.</h2>
+    <p class="text-surface-300 mb-6 text-sm">Table views, inline editing, auto-generated forms, rich-text editor, file uploads — all auto-generated from your existing database schema, so your team can focus on the product, not the plumbing.</p>
+
+    {/* Interactive demo for presentation mode */}
+    <div class="rounded-xl overflow-hidden ring-1 ring-surface-700/50 shadow-2xl max-h-[55vh] print:hidden">
+        <EntityViewDemo client:only="react" />
+    </div>
+
+    {/* Static screenshot for PDF / print */}
+    <div class="hidden print:block rounded-xl overflow-hidden ring-1 ring-surface-700/50 shadow-2xl">
+        <img src="/img/blog/rebase_demo.png" alt="Rebase admin panel — auto-generated data table with inline editing, image previews, category filters, and product management" class="w-full h-auto" />
+    </div>
+</PitchSlide>

@@ -1,0 +1,105 @@
+---
+import "../../styles/pitch.css";
+import "../../styles/editor.css";
+import PitchToolbar from "../pitch/PitchToolbar.astro";
+import SlideCover from "../pitch/slides/SlideCover.astro";
+import SlideTeam from "../pitch/slides/SlideTeam.astro";
+import SlideProblem from "../pitch/slides/SlideProblem.astro";
+import SlideSolution from "../pitch/slides/SlideSolution.astro";
+import SlideProduct from "../pitch/slides/SlideProduct.astro";
+import SlideMarket from "../pitch/slides/SlideMarket.astro";
+import SlideTraction from "../pitch/slides/SlideTraction.astro";
+import SlideBusiness from "../pitch/slides/SlideBusiness.astro";
+import SlideCompetition from "../pitch/slides/SlideCompetition.astro";
+import SlideEU from "../pitch/slides/SlideEU.astro";
+import SlideRoadmap from "../pitch/slides/SlideRoadmap.astro";
+import SlideAsk from "../pitch/slides/SlideAsk.astro";
+---
+
+<PitchToolbar />
+<main id="pitch-deck" class="relative w-full h-screen overflow-hidden bg-black print:overflow-visible print:h-auto">
+    <SlideCover />
+    <SlideTeam />
+    <SlideProblem />
+    <SlideSolution />
+    <SlideProduct />
+    <SlideMarket />
+    <SlideTraction />
+    <SlideBusiness />
+    <SlideCompetition />
+    <SlideEU />
+    <SlideRoadmap />
+    <SlideAsk />
+</main>
+
+<script>
+    document.addEventListener('astro:page-load', () => {
+        const deck = document.getElementById('pitch-deck');
+        if (!deck) return;
+
+        const slides = Array.from(deck.querySelectorAll('.pitch-slide')) as HTMLElement[];
+        const total = slides.length;
+        let current = 0;
+
+        const counterEl = document.getElementById('slide-counter');
+        const prevBtn = document.getElementById('slide-prev');
+        const nextBtn = document.getElementById('slide-next');
+
+        function showSlide(index: number) {
+            current = Math.max(0, Math.min(total - 1, index));
+            slides.forEach((s, i) => {
+                if (i === current) {
+                    s.style.opacity = '1';
+                    s.style.pointerEvents = 'auto';
+                    s.style.position = 'absolute';
+                    s.style.inset = '0';
+                    s.style.zIndex = '1';
+                } else {
+                    s.style.opacity = '0';
+                    s.style.pointerEvents = 'none';
+                    s.style.position = 'absolute';
+                    s.style.inset = '0';
+                    s.style.zIndex = '0';
+                }
+            });
+            if (counterEl) counterEl.textContent = `${current + 1} / ${total}`;
+            if (prevBtn) (prevBtn as HTMLButtonElement).disabled = current === 0;
+            if (nextBtn) (nextBtn as HTMLButtonElement).disabled = current === total - 1;
+        }
+
+        // Init
+        showSlide(0);
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'ArrowDown' || e.key === 'PageDown') {
+                e.preventDefault();
+                showSlide(current + 1);
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') {
+                e.preventDefault();
+                showSlide(current - 1);
+            } else if (e.key === 'Home') {
+                e.preventDefault();
+                showSlide(0);
+            } else if (e.key === 'End') {
+                e.preventDefault();
+                showSlide(total - 1);
+            }
+        });
+
+        // Button navigation
+        prevBtn?.addEventListener('click', () => showSlide(current - 1));
+        nextBtn?.addEventListener('click', () => showSlide(current + 1));
+
+        // Scroll / wheel navigation (debounced)
+        let wheelCooldown = false;
+        deck.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            if (wheelCooldown) return;
+            wheelCooldown = true;
+            if (e.deltaY > 0) showSlide(current + 1);
+            else if (e.deltaY < 0) showSlide(current - 1);
+            setTimeout(() => { wheelCooldown = false; }, 400);
+        }, { passive: false });
+    });
+</script>

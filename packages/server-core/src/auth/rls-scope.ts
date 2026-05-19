@@ -6,8 +6,8 @@
  * This is database-specific (e.g. Postgres SET LOCAL ROLE) and is not
  * part of the core DataDriver interface.
  *
- * This module provides the shared duck-typing logic used by both the
- * legacy auth middleware and the new adapter-aware middleware.
+ * This module provides the shared duck-typing logic used by the
+ * adapter-aware middleware.
  *
  * @module
  */

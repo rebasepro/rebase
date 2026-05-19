@@ -75,7 +75,7 @@ export const de = {
   "faq.title": "Häufig gestellte Fragen",
   "faq.q1": "Welche Datenbank unterstützt Rebase?",
   "faq.a1":
-    'Rebase baut auf <strong class="text-white font-medium">PostgreSQL</strong> auf. Du verbindest deine eigene Postgres-Datenbank — Rebase analysiert das Schema und generiert automatisch ein vollständiges Admin-Interface. Keine zusätzliche Datenbank, keine Datenmigration erforderlich.',
+    'Rebase wurde entwickelt, um <strong class="text-white font-medium">JEDE Datenbank</strong> oder <strong class="text-white font-medium">JEDEN Backend</strong> über Adapter zu unterstützen. Du verbindest deine eigene Datenbank — Rebase analysiert das Schema und generiert automatisch ein vollständiges Admin-Interface. Keine zusätzliche Datenbank, keine Datenmigration erforderlich. Es unterstützt auch Firebase und MongoDB von Haus aus.',
   "faq.q2": "Wie unterscheidet sich Rebase von Retool oder Supabase?",
   "faq.a2":
     'Im Gegensatz zu Retool ist Rebase Open-Source ohne Preisbindung pro Nutzer, und es ist ein echtes React-Framework, das du mit deinem eigenen Code erweitern kannst. Im Gegensatz zu Supabase arbeitet Rebase mit <em class="text-white">deiner bestehenden</em> Postgres-Datenbank — es ist kein BaaS, das deine Infrastruktur besitzt. Du behältst die volle Kontrolle.',

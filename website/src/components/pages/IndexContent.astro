@@ -69,11 +69,11 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
                         <div class="absolute -inset-1 rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 opacity-0 group-hover:opacity-100 blur-lg transition-opacity duration-500" aria-hidden="true"></div>
                         <div class="relative rounded-xl bg-surface-900/80 border border-surface-700/80 shadow-[0_0_0_1px_rgba(15,23,42,0.6),0_16px_48px_rgba(0,0,0,0.5)] overflow-hidden group-hover:border-primary/40 transition-colors duration-300">
                             <div class="px-5 py-4 flex items-center justify-between">
-                                <div class="font-mono text-sm sm:text-base">
+                                <div class="font-mono text-sm sm:text-base flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
                                     <span class="text-primary font-bold mr-3">~</span>
                                     <span class="text-white">pnpm dlx @rebasepro/cli init</span>
                                 </div>
-                                <button data-track-copy="hero" onclick="navigator.clipboard.writeText('pnpm dlx @rebasepro/cli init')" class="text-surface-500 hover:text-white transition-colors ml-4" aria-label="Copy command" title="Copy to clipboard">
+                                <button data-track-copy="hero" onclick="navigator.clipboard.writeText('pnpm dlx @rebasepro/cli init')" class="shrink-0 text-surface-500 hover:text-white transition-colors" aria-label="Copy command" title="Copy to clipboard">
                                     <svg class="lucide lucide-copy" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
                                 </button>
                             </div>
@@ -146,11 +146,11 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
                             <div class="relative z-10 font-mono text-[13px] sm:text-sm text-surface-200 space-y-4 px-5 py-5 bg-gradient-to-b from-surface-900/50 to-transparent">
                                 <div>
                                     <div class="flex gap-3 items-center justify-between">
-                                        <div class="flex gap-3 items-center">
+                                        <div class="flex gap-3 items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
                                             <span class="text-primary font-bold">~</span>
                                             <span class="text-white">pnpm dlx @rebasepro/cli init</span>
                                         </div>
-                                        <button data-track-copy="demo-terminal" onclick="navigator.clipboard.writeText('pnpm dlx @rebasepro/cli init')" class="text-surface-500 hover:text-white transition-colors" aria-label="Copy command" title="Copy to clipboard">
+                                        <button data-track-copy="demo-terminal" onclick="navigator.clipboard.writeText('pnpm dlx @rebasepro/cli init')" class="shrink-0 text-surface-500 hover:text-white transition-colors" aria-label="Copy command" title="Copy to clipboard">
                                             
 <svg
   class="lucide lucide-copy"
@@ -320,11 +320,11 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
                                             <div class="w-8"></div> <!-- spacer -->
                                         </div>
                                         <div class="px-3 py-2 flex items-center justify-between bg-gradient-to-b from-surface-900/50 to-transparent">
-                                            <div class="font-mono text-[13px] flex items-center gap-2">
+                                            <div class="font-mono text-[13px] flex items-center gap-2 whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
                                                 <span class="text-primary font-bold">~</span>
                                                 <span class="text-white">pnpm dlx @rebasepro/cli init</span>
                                             </div>
-                                            <button data-track-copy="how-it-works" onclick="navigator.clipboard.writeText('pnpm dlx @rebasepro/cli init')" class="text-surface-500 hover:text-white transition-colors" aria-label="Copy command" title="Copy to clipboard">
+                                            <button data-track-copy="how-it-works" onclick="navigator.clipboard.writeText('pnpm dlx @rebasepro/cli init')" class="shrink-0 text-surface-500 hover:text-white transition-colors" aria-label="Copy command" title="Copy to clipboard">
                                                 
 <svg
   class="lucide lucide-copy"
@@ -702,216 +702,311 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
                 </div>
             </div>
 
-            <div class="mx-auto max-w-7xl px-6 lg:px-8 mt-24">
+            <div class="relative w-full overflow-hidden mt-24">
+                <div id="case-studies-slider" class="flex overflow-x-auto snap-x snap-mandatory no-scrollbar scroll-smooth">
+                    <!-- Case Study 1: SustenTalent -->
+                    <div class="min-w-full w-full snap-center shrink-0 px-6 lg:px-8 max-w-7xl mx-auto flex-none">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mx-auto max-w-7xl">
+                            <!-- Left: Text content -->
+                            <div class="animate-on-scroll fade-in-up">
+                                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-surface-700 bg-surface-900/50 text-surface-300 text-sm font-medium mb-6">
+                                    <svg class="lucide lucide-briefcase" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                                        <rect width="20" height="14" x="2" y="6" rx="2" />
+                                    </svg>
+                                    {t('showcase.case.badge')}
+                                </div>
+                                <h3 class="text-3xl font-bold tracking-tight text-white sm:text-4xl mb-4">
+                                    {t('showcase.case.title')}
+                                </h3>
+                                <p class="text-lg text-surface-400 leading-relaxed mb-8">
+                                    {t('showcase.case.desc')}
+                                </p>
 
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-                    <!-- Left: Text content -->
-                    <div class="animate-on-scroll fade-in-up">
-                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-surface-700 bg-surface-900/50 text-surface-300 text-sm font-medium mb-6">
-                            
-<svg
-  class="lucide lucide-briefcase"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-  <rect width="20" height="14" x="2" y="6" rx="2" />
-</svg>
-
-                            {t('showcase.case.badge')}
-                        </div>
-                        <h3 class="text-3xl font-bold tracking-tight text-white sm:text-4xl mb-4">
-                            {t('showcase.case.title')}
-                        </h3>
-                        <p class="text-lg text-surface-400 leading-relaxed mb-8">
-                            {t('showcase.case.desc')}
-                        </p>
-
-                        <div class="space-y-6">
-                            <div class="flex gap-4">
-                                <div class="flex-shrink-0 mt-1 h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center ring-1 ring-primary/20">
+                                <div class="space-y-6">
+                                    <div class="flex gap-4">
+                                        <div class="flex-shrink-0 mt-1 h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center ring-1 ring-primary/20">
+                                            <svg class="lucide lucide-circle-user" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <circle cx="12" cy="12" r="10" />
+                                                <circle cx="12" cy="10" r="3" />
+                                                <path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662" />
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <h4 class="text-white font-semibold mb-1">{t('showcase.case.feat1.title')}</h4>
+                                            <p class="text-surface-400 text-sm leading-relaxed">
+                                                {t('showcase.case.feat1.desc')}
+                                            </p>
+                                        </div>
+                                    </div>
                                     
-<svg
-  class="lucide lucide-circle-user"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <circle cx="12" cy="12" r="10" />
-  <circle cx="12" cy="10" r="3" />
-  <path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662" />
-</svg>
+                                    <div class="flex gap-4">
+                                        <div class="flex-shrink-0 mt-1 h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center ring-1 ring-primary/20">
+                                            <svg class="lucide lucide-table" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M12 3v18" />
+                                                <rect width="18" height="18" x="3" y="3" rx="2" />
+                                                <path d="M3 9h18" />
+                                                <path d="M3 15h18" />
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <h4 class="text-white font-semibold mb-1">{t('showcase.case.feat2.title')}</h4>
+                                            <p class="text-surface-400 text-sm leading-relaxed">
+                                                {t('showcase.case.feat2.desc')}
+                                            </p>
+                                        </div>
+                                    </div>
 
-                                </div>
-                                <div>
-                                    <h4 class="text-white font-semibold mb-1">{t('showcase.case.feat1.title')}</h4>
-                                    <p class="text-surface-400 text-sm leading-relaxed">
-                                        {t('showcase.case.feat1.desc')}
-                                    </p>
-                                </div>
-                            </div>
-                            
-                            <div class="flex gap-4">
-                                <div class="flex-shrink-0 mt-1 h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center ring-1 ring-primary/20">
-                                    
-<svg
-  class="lucide lucide-table"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M12 3v18" />
-  <rect width="18" height="18" x="3" y="3" rx="2" />
-  <path d="M3 9h18" />
-  <path d="M3 15h18" />
-</svg>
-
-                                </div>
-                                <div>
-                                    <h4 class="text-white font-semibold mb-1">{t('showcase.case.feat2.title')}</h4>
-                                    <p class="text-surface-400 text-sm leading-relaxed">
-                                        {t('showcase.case.feat2.desc')}
-                                    </p>
+                                    <div class="flex gap-4">
+                                        <div class="flex-shrink-0 mt-1 h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center ring-1 ring-primary/20">
+                                            <svg class="lucide lucide-shield-alert" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+                                                <path d="M12 8v4" />
+                                                <path d="M12 16h.01" />
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <h4 class="text-white font-semibold mb-1">{t('showcase.case.feat3.title')}</h4>
+                                            <p class="text-surface-400 text-sm leading-relaxed">
+                                                {t('showcase.case.feat3.desc')}
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div class="flex gap-4">
-                                <div class="flex-shrink-0 mt-1 h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center ring-1 ring-primary/20">
-                                    
-<svg
-  class="lucide lucide-shield-alert"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
-  <path d="M12 8v4" />
-  <path d="M12 16h.01" />
-</svg>
+                            <!-- Right: Stacked app mockups -->
+                            <div class="relative animate-on-scroll fade-in-up delay-100 flex items-center justify-center mt-12 lg:mt-0">
+                                <!-- Background glow -->
+                                <div class="absolute inset-0 bg-gradient-to-tr from-primary/20 to-surface-800/20 blur-3xl rounded-full opacity-50"></div>
+                                
+                                <div class="relative w-full max-w-lg">
+                                    <!-- Top screenshot (App) — with fake job listing rows -->
+                                    <div class="relative z-20 rounded-2xl overflow-hidden ring-1 ring-white/10 bg-surface-950/80 backdrop-blur-sm shadow-[0_20px_50px_rgba(0,0,0,0.5)] mb-[-60px] w-5/6 mr-auto transform transition-transform hover:-translate-y-2 duration-500">
+                                        <div class="px-4 py-2.5 border-b border-white/5 flex items-center gap-2 bg-surface-900/50">
+                                            <div class="flex gap-1.5">
+                                                <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+                                                <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
+                                                <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
+                                            </div>
+                                            <div class="ml-4 text-xs font-mono text-surface-500">talent.sustentalent.com</div>
+                                        </div>
+                                        <!-- Fake app content -->
+                                        <div class="p-4 space-y-3 bg-gradient-to-b from-surface-900/50 to-transparent">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <span class="text-sm font-semibold text-white">Open Positions</span>
+                                                <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20">12 new</span>
+                                            </div>
+                                            <div class="rounded-lg border border-white/5 bg-surface-900/60 p-3 flex items-center gap-3">
+                                                <div class="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-none"><span class="text-primary text-xs font-bold">ST</span></div>
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="text-xs font-medium text-white truncate">Sustainability Analyst</div>
+                                                    <div class="text-[10px] text-surface-500">Berlin · Full-time</div>
+                                                </div>
+                                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary ring-1 ring-primary/20">New</span>
+                                            </div>
+                                            <div class="rounded-lg border border-white/5 bg-surface-900/60 p-3 flex items-center gap-3">
+                                                <div class="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-none"><span class="text-emerald-400 text-xs font-bold">EC</span></div>
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="text-xs font-medium text-white truncate">ESG Compliance Lead</div>
+                                                    <div class="text-[10px] text-surface-500">Remote · Contract</div>
+                                                </div>
+                                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20">Closing</span>
+                                            </div>
+                                            <div class="rounded-lg border border-white/5 bg-surface-900/60 p-3 flex items-center gap-3">
+                                                <div class="h-8 w-8 rounded-lg bg-violet-500/10 flex items-center justify-center flex-none"><span class="text-violet-400 text-xs font-bold">GE</span></div>
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="text-xs font-medium text-white truncate">Green Energy PM</div>
+                                                    <div class="text-[10px] text-surface-500">Milan · Full-time</div>
+                                                </div>
+                                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary ring-1 ring-primary/20">New</span>
+                                            </div>
+                                        </div>
+                                    </div>
 
-                                </div>
-                                <div>
-                                    <h4 class="text-white font-semibold mb-1">{t('showcase.case.feat3.title')}</h4>
-                                    <p class="text-surface-400 text-sm leading-relaxed">
-                                        {t('showcase.case.feat3.desc')}
-                                    </p>
+                                    <!-- Bottom screenshot (Admin Panel) -->
+                                    <div class="relative z-10 rounded-2xl overflow-hidden ring-1 ring-white/10 bg-surface-900/90 backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.5)] w-[90%] ml-auto transform transition-transform hover:translate-x-2 duration-500">
+                                        <div class="px-4 py-2.5 border-b border-white/5 flex items-center gap-2 bg-surface-950/50">
+                                            <div class="flex gap-1.5">
+                                                <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+                                                <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
+                                                <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
+                                            </div>
+                                            <div class="ml-4 text-xs font-mono text-surface-500">admin.sustentalent.com</div>
+                                        </div>
+                                        <!-- Fake admin table -->
+                                        <div class="bg-gradient-to-t from-surface-950/50 to-transparent">
+                                            <div class="px-4 py-2 flex items-center gap-4 text-[10px] font-medium text-surface-500 border-b border-white/5 bg-surface-950/30">
+                                                <span class="w-24">Company</span>
+                                                <span class="flex-1">Status</span>
+                                                <span class="w-16 text-right">Jobs</span>
+                                            </div>
+                                            <div class="px-4 py-2.5 flex items-center gap-4 border-b border-white/5">
+                                                <span class="w-24 text-xs text-white truncate">EcoVentures</span>
+                                                <span class="flex-1"><span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">Verified</span></span>
+                                                <span class="w-16 text-right text-xs text-surface-400">24</span>
+                                            </div>
+                                            <div class="px-4 py-2.5 flex items-center gap-4 border-b border-white/5">
+                                                <span class="w-24 text-xs text-white truncate">GreenTech AG</span>
+                                                <span class="flex-1"><span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">Pending</span></span>
+                                                <span class="w-16 text-right text-xs text-surface-400">8</span>
+                                            </div>
+                                            <div class="px-4 py-2.5 flex items-center gap-4">
+                                                <span class="w-24 text-xs text-white truncate">SolarWind EU</span>
+                                                <span class="flex-1"><span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">Verified</span></span>
+                                                <span class="w-16 text-right text-xs text-surface-400">15</span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Right: Stacked app mockups -->
-                    <div class="relative animate-on-scroll fade-in-up delay-100 flex items-center justify-center mt-12 lg:mt-0">
-                        <!-- Background glow -->
-                        <div class="absolute inset-0 bg-gradient-to-tr from-primary/20 to-surface-800/20 blur-3xl rounded-full opacity-50"></div>
-                        
-                        <div class="relative w-full max-w-lg">
-                            <!-- Top screenshot (App) — with fake job listing rows -->
-                            <div class="relative z-20 rounded-2xl overflow-hidden ring-1 ring-white/10 bg-surface-950/80 backdrop-blur-sm shadow-[0_20px_50px_rgba(0,0,0,0.5)] mb-[-60px] w-5/6 mr-auto transform transition-transform hover:-translate-y-2 duration-500">
-                                <div class="px-4 py-2.5 border-b border-white/5 flex items-center gap-2 bg-surface-900/50">
-                                    <div class="flex gap-1.5">
-                                        <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-                                        <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                                        <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
-                                    </div>
-                                    <div class="ml-4 text-xs font-mono text-surface-500">talent.sustentalent.com</div>
+                    <!-- Case Study 2: MedicalMotion -->
+                    <div class="min-w-full w-full snap-center shrink-0 px-6 lg:px-8 max-w-7xl mx-auto flex-none">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mx-auto max-w-7xl">
+                            <!-- Left: Text content -->
+                            <div class="animate-on-scroll fade-in-up">
+                                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-surface-700 bg-surface-900/50 text-surface-300 text-sm font-medium mb-6">
+                                    <svg class="lucide lucide-heart-pulse" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M12 5 9.04 9.2a2 2 0 0 0-.27 1.35l.81 3.52a2 2 0 0 0 3.7.3l.5-.83a2 2 0 0 1 3.56.23l.36.96"/></svg>
+                                    {t('showcase.case2.badge')}
                                 </div>
-                                <!-- Fake app content -->
-                                <div class="p-4 space-y-3 bg-gradient-to-b from-surface-900/50 to-transparent">
-                                    <div class="flex items-center justify-between mb-2">
-                                        <span class="text-sm font-semibold text-white">Open Positions</span>
-                                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20">12 new</span>
-                                    </div>
-                                    <div class="rounded-lg border border-white/5 bg-surface-900/60 p-3 flex items-center gap-3">
-                                        <div class="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-none"><span class="text-primary text-xs font-bold">ST</span></div>
-                                        <div class="flex-1 min-w-0">
-                                            <div class="text-xs font-medium text-white truncate">Sustainability Analyst</div>
-                                            <div class="text-[10px] text-surface-500">Berlin · Full-time</div>
+                                <h3 class="text-3xl font-bold tracking-tight text-white sm:text-4xl mb-4">
+                                    {t('showcase.case2.title')}
+                                </h3>
+                                <p class="text-lg text-surface-400 leading-relaxed mb-8">
+                                    {t('showcase.case2.desc')}
+                                </p>
+
+                                <div class="space-y-6">
+                                    <div class="flex gap-4">
+                                        <div class="flex-shrink-0 mt-1 h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center ring-1 ring-primary/20">
+                                            <svg class="lucide lucide-shield" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
                                         </div>
-                                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary ring-1 ring-primary/20">New</span>
-                                    </div>
-                                    <div class="rounded-lg border border-white/5 bg-surface-900/60 p-3 flex items-center gap-3">
-                                        <div class="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-none"><span class="text-emerald-400 text-xs font-bold">EC</span></div>
-                                        <div class="flex-1 min-w-0">
-                                            <div class="text-xs font-medium text-white truncate">ESG Compliance Lead</div>
-                                            <div class="text-[10px] text-surface-500">Remote · Contract</div>
+                                        <div>
+                                            <h4 class="text-white font-semibold mb-1">{t('showcase.case2.feat1.title')}</h4>
+                                            <p class="text-surface-400 text-sm leading-relaxed">
+                                                {t('showcase.case2.feat1.desc')}
+                                            </p>
                                         </div>
-                                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20">Closing</span>
                                     </div>
-                                    <div class="rounded-lg border border-white/5 bg-surface-900/60 p-3 flex items-center gap-3">
-                                        <div class="h-8 w-8 rounded-lg bg-violet-500/10 flex items-center justify-center flex-none"><span class="text-violet-400 text-xs font-bold">GE</span></div>
-                                        <div class="flex-1 min-w-0">
-                                            <div class="text-xs font-medium text-white truncate">Green Energy PM</div>
-                                            <div class="text-[10px] text-surface-500">Milan · Full-time</div>
+                                    
+                                    <div class="flex gap-4">
+                                        <div class="flex-shrink-0 mt-1 h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center ring-1 ring-primary/20">
+                                            <svg class="lucide lucide-video" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
                                         </div>
-                                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary ring-1 ring-primary/20">New</span>
+                                        <div>
+                                            <h4 class="text-white font-semibold mb-1">{t('showcase.case2.feat2.title')}</h4>
+                                            <p class="text-surface-400 text-sm leading-relaxed">
+                                                {t('showcase.case2.feat2.desc')}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex gap-4">
+                                        <div class="flex-shrink-0 mt-1 h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center ring-1 ring-primary/20">
+                                            <svg class="lucide lucide-activity" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.48 12H2"/></svg>
+                                        </div>
+                                        <div>
+                                            <h4 class="text-white font-semibold mb-1">{t('showcase.case2.feat3.title')}</h4>
+                                            <p class="text-surface-400 text-sm leading-relaxed">
+                                                {t('showcase.case2.feat3.desc')}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Bottom screenshot (Admin Panel) — with fake admin table rows -->
-                            <div class="relative z-10 rounded-2xl overflow-hidden ring-1 ring-white/10 bg-surface-900/90 backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.5)] w-[90%] ml-auto transform transition-transform hover:translate-x-2 duration-500">
-                                <div class="px-4 py-2.5 border-b border-white/5 flex items-center gap-2 bg-surface-950/50">
-                                    <div class="flex gap-1.5">
-                                        <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-                                        <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                                        <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
+                            <!-- Right: Stacked app mockups -->
+                            <div class="relative animate-on-scroll fade-in-up delay-100 flex items-center justify-center mt-12 lg:mt-0">
+                                <!-- Background glow -->
+                                <div class="absolute inset-0 bg-gradient-to-tr from-rose-500/20 to-primary/20 blur-3xl rounded-full opacity-50"></div>
+                                
+                                <div class="relative w-full max-w-lg">
+                                    <!-- Top screenshot (App) -->
+                                    <div class="relative z-20 rounded-2xl overflow-hidden ring-1 ring-white/10 bg-surface-950/80 backdrop-blur-sm shadow-[0_20px_50px_rgba(0,0,0,0.5)] mb-[-60px] w-5/6 mr-auto transform transition-transform hover:-translate-y-2 duration-500">
+                                        <div class="px-4 py-2.5 border-b border-white/5 flex items-center gap-2 bg-surface-900/50">
+                                            <div class="flex gap-1.5">
+                                                <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+                                                <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
+                                                <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
+                                            </div>
+                                            <div class="ml-4 text-xs font-mono text-surface-500">app.medicalmotion.com</div>
+                                        </div>
+                                        <!-- Fake app content -->
+                                        <div class="p-4 space-y-3 bg-gradient-to-b from-surface-900/50 to-transparent">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <span class="text-sm font-semibold text-white">Today's Therapy</span>
+                                                <span class="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 ring-1 ring-rose-500/20">3 pending</span>
+                                            </div>
+                                            <div class="rounded-lg border border-white/5 bg-surface-900/60 p-3 flex items-center gap-3">
+                                                <div class="h-8 w-8 rounded-lg bg-rose-500/10 flex items-center justify-center flex-none"><span class="text-rose-400 text-xs font-bold">N</span></div>
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="text-xs font-medium text-white truncate">Neck Mobility Routine</div>
+                                                    <div class="text-[10px] text-surface-500">10 mins · Video guide</div>
+                                                </div>
+                                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary ring-1 ring-primary/20">Start</span>
+                                            </div>
+                                            <div class="rounded-lg border border-white/5 bg-surface-900/60 p-3 flex items-center gap-3">
+                                                <div class="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-none"><span class="text-primary text-xs font-bold">P</span></div>
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="text-xs font-medium text-white truncate">Posture Correction</div>
+                                                    <div class="text-[10px] text-surface-500">5 mins · Audio guide</div>
+                                                </div>
+                                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-surface-800 text-surface-400 ring-1 ring-white/10">Next</span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="ml-4 text-xs font-mono text-surface-500">admin.sustentalent.com</div>
-                                </div>
-                                <!-- Fake admin table -->
-                                <div class="bg-gradient-to-t from-surface-950/50 to-transparent">
-                                    <div class="px-4 py-2 flex items-center gap-4 text-[10px] font-medium text-surface-500 border-b border-white/5 bg-surface-950/30">
-                                        <span class="w-24">Company</span>
-                                        <span class="flex-1">Status</span>
-                                        <span class="w-16 text-right">Jobs</span>
-                                    </div>
-                                    <div class="px-4 py-2.5 flex items-center gap-4 border-b border-white/5">
-                                        <span class="w-24 text-xs text-white truncate">EcoVentures</span>
-                                        <span class="flex-1"><span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">Verified</span></span>
-                                        <span class="w-16 text-right text-xs text-surface-400">24</span>
-                                    </div>
-                                    <div class="px-4 py-2.5 flex items-center gap-4 border-b border-white/5">
-                                        <span class="w-24 text-xs text-white truncate">GreenTech AG</span>
-                                        <span class="flex-1"><span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">Pending</span></span>
-                                        <span class="w-16 text-right text-xs text-surface-400">8</span>
-                                    </div>
-                                    <div class="px-4 py-2.5 flex items-center gap-4">
-                                        <span class="w-24 text-xs text-white truncate">SolarWind EU</span>
-                                        <span class="flex-1"><span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">Verified</span></span>
-                                        <span class="w-16 text-right text-xs text-surface-400">15</span>
+
+                                    <!-- Bottom screenshot (Admin Panel) -->
+                                    <div class="relative z-10 rounded-2xl overflow-hidden ring-1 ring-white/10 bg-surface-900/90 backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.5)] w-[90%] ml-auto transform transition-transform hover:translate-x-2 duration-500">
+                                        <div class="px-4 py-2.5 border-b border-white/5 flex items-center gap-2 bg-surface-950/50">
+                                            <div class="flex gap-1.5">
+                                                <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+                                                <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
+                                                <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
+                                            </div>
+                                            <div class="ml-4 text-xs font-mono text-surface-500">admin.medicalmotion.com</div>
+                                        </div>
+                                        <!-- Interactive Custom Field -->
+                                        <div class="bg-gradient-to-t from-surface-950/50 to-transparent">
+                                            <BodyPartsDemo client:load />
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+
+                <!-- Controls -->
+                <div class="flex justify-center gap-4 mt-8 px-6">
+                    <button id="case-prev" class="p-2.5 rounded-full border border-surface-700 bg-surface-900/50 text-surface-400 hover:text-white hover:bg-surface-800 transition-colors" aria-label="Previous case study">
+                        <svg class="lucide lucide-chevron-left" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                    </button>
+                    <button id="case-next" class="p-2.5 rounded-full border border-surface-700 bg-surface-900/50 text-surface-400 hover:text-white hover:bg-surface-800 transition-colors" aria-label="Next case study">
+                        <svg class="lucide lucide-chevron-right" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                    </button>
+                </div>
             </div>
+
+            <script>
+                document.addEventListener('DOMContentLoaded', () => {
+                    const slider = document.getElementById('case-studies-slider');
+                    const prevBtn = document.getElementById('case-prev');
+                    const nextBtn = document.getElementById('case-next');
+                    
+                    if (slider && prevBtn && nextBtn) {
+                        prevBtn.addEventListener('click', () => {
+                            slider.scrollBy({ left: -slider.offsetWidth, behavior: 'smooth' });
+                        });
+                        nextBtn.addEventListener('click', () => {
+                            slider.scrollBy({ left: slider.offsetWidth, behavior: 'smooth' });
+                        });
+                    }
+                });
+            </script>
         </section>
 
         <div id="s-scroll-sync">
@@ -1102,7 +1197,7 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
                 <p class="text-surface-400 mb-6 text-lg max-w-xl mx-auto animate-on-scroll fade-in-up" set:html={t('cta.subtitle')}>
                 </p>
                 <div class="mb-10 animate-on-scroll fade-in-up">
-                    <div class="inline-block w-full max-w-[320px] text-left relative group">
+                    <div class="inline-block w-full max-w-[380px] text-left relative group">
                         <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-500" aria-hidden="true" style="background: radial-gradient(200px 100px at 50% 100%, rgba(0,112,244,0.15), transparent 100%); z-index: 0;"></div>
                         <div class="rounded-xl bg-surface-900/80 border border-surface-800/80 shadow-[0_0_0_1px_rgba(15,23,42,0.6),0_24px_80px_rgba(0,0,0,0.65)] overflow-hidden relative z-10 group-hover:border-primary/40 transition-colors duration-300">
                             <div class="flex items-center justify-between px-4 py-2.5 border-b border-surface-800/80 bg-surface-950/50">
@@ -1134,11 +1229,11 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
                                 <div class="w-10"></div> <!-- spacer -->
                             </div>
                             <div class="px-5 py-4 flex items-center justify-between bg-gradient-to-b from-surface-900/50 to-transparent">
-                                <div class="font-mono text-sm">
+                                <div class="font-mono text-sm flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
                                     <span class="text-primary font-bold mr-3">~</span>
                                     <span class="text-white">pnpm dlx @rebasepro/cli init</span>
                                 </div>
-                                <button data-track-copy="bottom-cta" onclick="navigator.clipboard.writeText('pnpm dlx @rebasepro/cli init')" class="text-surface-500 hover:text-white transition-colors" aria-label="Copy command" title="Copy to clipboard">
+                                <button data-track-copy="bottom-cta" onclick="navigator.clipboard.writeText('pnpm dlx @rebasepro/cli init')" class="shrink-0 text-surface-500 hover:text-white transition-colors" aria-label="Copy command" title="Copy to clipboard">
                                     
 <svg
   class="lucide lucide-copy"

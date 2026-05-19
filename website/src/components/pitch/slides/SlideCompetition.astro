@@ -1,0 +1,51 @@
+---
+import PitchSlide from '../PitchSlide.astro';
+const TOTAL = 12;
+
+const yes = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-400"><path d="M20 6 9 17l-5-5"/></svg>`;
+const no = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-surface-300"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`;
+const partial = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-amber-400"><path d="M5 12h14"/></svg>`;
+
+const rows = [
+    { feat: "Open Source (MIT)", r: yes, su: yes, re: no, st: partial, di: partial },
+    { feat: "Works with YOUR Postgres", r: yes, su: no, re: yes, st: no, di: yes },
+    { feat: "Auto-generated Admin", r: yes, su: no, re: yes, st: yes, di: yes },
+    { feat: "Typed REST & GraphQL APIs", r: yes, su: yes, re: no, st: yes, di: yes },
+    { feat: "TypeScript SDK", r: yes, su: yes, re: no, st: partial, di: yes },
+    { feat: "Real-time WebSockets", r: yes, su: yes, re: no, st: no, di: no },
+    { feat: "Row-Level Security", r: yes, su: yes, re: no, st: no, di: partial },
+    { feat: "React Extensibility", r: yes, su: no, re: partial, st: no, di: no },
+    { feat: "No per-seat pricing", r: yes, su: partial, re: no, st: partial, di: partial },
+    { feat: "European HQ", r: yes, su: no, re: no, st: no, di: no },
+];
+---
+<PitchSlide id="slide-competition" slideNumber={9} totalSlides={TOTAL}>
+    <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase mb-4">Competitive Landscape</p>
+    <h2 class="text-3xl font-bold text-white mb-8">The only open-source, schema-driven full-stack platform.</h2>
+    <div class="overflow-hidden rounded-xl border border-surface-700">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="bg-surface-900/60 text-left">
+                    <th class="p-4 text-surface-300 font-medium"></th>
+                    <th class="p-4 text-primary font-bold"><a href="https://rebase.pro" target="_blank" rel="noopener" class="hover:underline">Rebase</a></th>
+                    <th class="p-4 text-surface-300 font-medium"><a href="https://supabase.com" target="_blank" rel="noopener" class="hover:text-white transition-colors">Supabase</a></th>
+                    <th class="p-4 text-surface-300 font-medium"><a href="https://retool.com" target="_blank" rel="noopener" class="hover:text-white transition-colors">Retool</a></th>
+                    <th class="p-4 text-surface-300 font-medium"><a href="https://strapi.io" target="_blank" rel="noopener" class="hover:text-white transition-colors">Strapi</a></th>
+                    <th class="p-4 text-surface-300 font-medium"><a href="https://directus.io" target="_blank" rel="noopener" class="hover:text-white transition-colors">Directus</a></th>
+                </tr>
+            </thead>
+            <tbody class="text-xs">
+                {rows.map((row, i) => (
+                    <tr class={i % 2 === 0 ? "bg-surface-900/20" : ""}>
+                        <td class="p-3 text-surface-300 font-medium">{row.feat}</td>
+                        <td class="p-3" set:html={row.r}></td>
+                        <td class="p-3" set:html={row.su}></td>
+                        <td class="p-3" set:html={row.re}></td>
+                        <td class="p-3" set:html={row.st}></td>
+                        <td class="p-3" set:html={row.di}></td>
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    </div>
+</PitchSlide>

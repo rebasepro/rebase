@@ -11,7 +11,6 @@ import { AuthConfig } from "@rebasepro/server-core";
 
 /**
  * Normalized user identity for WebSocket sessions.
- * Unifies the legacy `AccessTokenPayload` and the new `AuthenticatedUser` shapes.
  */
 interface WsUserIdentity {
     userId: string;
@@ -89,7 +88,7 @@ export function createPostgresWebSocket(
     });
 
     // Auth is required when either: an adapter is present (secure by default),
-    // OR the legacy config has a jwtSecret and requireAuth !== false.
+    // OR the config has a jwtSecret and requireAuth !== false.
     const requireAuth = authAdapter
         ? true
         : (authConfig?.requireAuth !== false && !!authConfig?.jwtSecret);
@@ -142,7 +141,7 @@ code } }
                     }
 
                     // Use the auth adapter when available (custom auth, Clerk, etc.)
-                    // Fall back to legacy JWT extraction otherwise.
+                    // Fall back to JWT extraction otherwise.
                     let verifiedUser: WsUserIdentity | null = null;
 
                     if (authAdapter) {
@@ -164,7 +163,7 @@ code } }
                             // Adapter threw — treat as invalid token
                         }
                     } else {
-                        // Legacy JWT path
+                        // Standard JWT path
                         const jwtPayload = extractUserFromToken(token);
                         if (jwtPayload) {
                             verifiedUser = {

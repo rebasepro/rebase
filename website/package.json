@@ -26,6 +26,7 @@
         "@rebasepro/plugin-data-enhancement": "^0.0.1",
         "@rebasepro/ui": "^0.0.1",
         "@rollup/plugin-yaml": "^4.1.2",
+        "@rollup/rollup-darwin-arm64": "4.60.4",
         "@tailwindcss/vite": "^4.1.14",
         "@types/react": "^19.0.8",
         "@types/react-dom": "^19.0.3",

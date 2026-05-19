@@ -36,7 +36,7 @@ export function RichTextEditorDemo() {
     }, []);
 
     return (
-        <div className="w-full h-full min-h-[400px] bg-[#0A0A0A] text-surface-200 flex flex-col font-sans select-none pointer-events-none relative">
+        <div className="w-full h-[600px] bg-[#0A0A0A] text-surface-200 flex flex-col font-sans select-none pointer-events-none relative">
             {/* Fake toolbar */}
             <div className="h-12 border-b border-surface-800/60 bg-surface-900/40 flex items-center px-4 gap-4 shrink-0">
                 <div className="flex gap-2">

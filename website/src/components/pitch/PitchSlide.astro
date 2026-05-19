@@ -1,0 +1,27 @@
+---
+interface Props {
+    id: string;
+    slideNumber?: number;
+    totalSlides?: number;
+}
+const { id, slideNumber, totalSlides } = Astro.props;
+---
+
+<section
+    id={id}
+    class="pitch-slide relative w-full flex flex-col justify-center overflow-hidden bg-black"
+    style="min-height: 100vh; height: 100vh; page-break-after: always; break-after: page;"
+>
+    <div class="flex-1 flex flex-col justify-center px-8 sm:px-16 lg:px-24 py-12 max-w-[1400px] mx-auto w-full">
+        <slot />
+    </div>
+    {slideNumber && totalSlides && (
+        <div class="absolute bottom-4 right-8 text-xs text-surface-300 font-mono print:text-surface-300">
+            {slideNumber} / {totalSlides}
+        </div>
+    )}
+    <div class="absolute bottom-4 left-8 flex items-center gap-2 opacity-40">
+        <img src="/favicon.svg" alt="" class="h-4 w-4" />
+        <span class="text-[10px] font-medium text-surface-300 tracking-wider uppercase">Rebase</span>
+    </div>
+</section>

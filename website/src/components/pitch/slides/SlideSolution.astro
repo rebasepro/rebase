@@ -1,0 +1,71 @@
+---
+import PitchSlide from '../PitchSlide.astro';
+const TOTAL = 12;
+---
+<PitchSlide id="slide-solution" slideNumber={4} totalSlides={TOTAL}>
+    <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase mb-4">The Solution</p>
+    <h2 class="text-4xl md:text-5xl font-bold text-white mb-4">Connect your database.<br/><span class="text-primary">Get your entire platform.</span></h2>
+    <p class="text-lg text-surface-300 max-w-3xl mb-8">Rebase reads your existing database and instantly generates everything a team needs to build and ship — admin panel, APIs, user management, and more. No months of development. No vendor lock-in.</p>
+
+    {/* Before / After comparison — the key "aha" moment for non-technical readers */}
+    <div class="grid grid-cols-2 gap-6 mb-8">
+        <div class="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-6">
+            <div class="text-xs font-bold text-rose-400 uppercase tracking-wider mb-4">Without Rebase</div>
+            <ul class="space-y-2.5 text-sm text-surface-300">
+                <li class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-rose-400 flex-shrink-0"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    6–12 months to build admin + APIs
+                </li>
+                <li class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-rose-400 flex-shrink-0"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    €200K+ in development costs
+                </li>
+                <li class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-rose-400 flex-shrink-0"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    Locked into proprietary US platforms
+                </li>
+                <li class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-rose-400 flex-shrink-0"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    Data leaves the EU (CLOUD Act risk)
+                </li>
+            </ul>
+        </div>
+        <div class="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-6">
+            <div class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-4">With Rebase</div>
+            <ul class="space-y-2.5 text-sm text-surface-300">
+                <li class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-400 flex-shrink-0"><path d="M20 6 9 17l-5-5"/></svg>
+                    Full admin + APIs in minutes, not months
+                </li>
+                <li class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-400 flex-shrink-0"><path d="M20 6 9 17l-5-5"/></svg>
+                    Free open-source core (MIT license)
+                </li>
+                <li class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-400 flex-shrink-0"><path d="M20 6 9 17l-5-5"/></svg>
+                    Self-host on any EU cloud — no lock-in
+                </li>
+                <li class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-400 flex-shrink-0"><path d="M20 6 9 17l-5-5"/></svg>
+                    GDPR-compliant, EU-built, data stays in Europe
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    {/* What you get — simplified, non-technical language */}
+    <div class="grid grid-cols-3 md:grid-cols-6 gap-3">
+        {[
+            { label: "Admin Panel", color: "text-primary" },
+            { label: "REST & GraphQL APIs", color: "text-emerald-400" },
+            { label: "User Management", color: "text-violet-400" },
+            { label: "File Storage", color: "text-amber-400" },
+            { label: "Real-time Updates", color: "text-cyan-400" },
+            { label: "AI Integration", color: "text-rose-400" },
+        ].map(item => (
+            <div class="rounded-lg border border-surface-700 bg-surface-900/40 p-3 text-center">
+                <p class={`text-xs font-semibold ${item.color}`}>{item.label}</p>
+            </div>
+        ))}
+    </div>
+</PitchSlide>

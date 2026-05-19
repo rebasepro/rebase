@@ -3,6 +3,7 @@
  *
  * Pluggable database abstraction for Rebase.
  *
+ *
  * A `DatabaseAdapter` focuses purely on data persistence and related concerns (realtime, history).
  * It does NOT handle authentication — auth is managed separately by an `AuthAdapter`.
  *

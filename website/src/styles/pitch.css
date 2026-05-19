@@ -1,0 +1,49 @@
+/* Presentation mode — slides stacked via absolute positioning */
+.pitch-slide {
+    transition: opacity 0.3s ease;
+}
+
+/* Print styles for PDF export — all slides visible, one per page */
+@media print {
+    @page {
+        size: A4 landscape;
+        margin: 0;
+    }
+    html, body {
+        background: #000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+    }
+    .pitch-toolbar { display: none !important; }
+    #pitch-deck {
+        overflow: visible !important;
+        height: auto !important;
+        position: static !important;
+    }
+    .pitch-slide {
+        position: static !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        min-height: 100vh !important;
+        max-height: 100vh !important;
+        overflow: hidden !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        background: #000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+        z-index: auto !important;
+    }
+    .pitch-slide:last-child {
+        page-break-after: auto !important;
+        break-after: auto !important;
+    }
+}

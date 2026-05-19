@@ -92,7 +92,7 @@ export default function ClientUIComponentsTeaser() {
                     <Button color="neutral" size="small" onClick={() => setDialogOpen(true)}>Open Dialog</Button>
                     <Button color="neutral" size="small" onClick={() => setSheetOpen(true)}>Open side
                         sheet
-                        <ArrowRightToLine size={"small"}/>
+                        <ArrowRightToLine size={16}/>
                     </Button>
                     <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
 

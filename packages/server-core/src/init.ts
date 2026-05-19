@@ -71,10 +71,6 @@ export interface RebaseBackendConfig {
 
     /**
      * Database bootstrappers.
-     *
-     * When a `DatabaseAdapter` is provided, it is internally wrapped to conform
-     * to the `BackendBootstrapper` protocol. Auth is handled separately by the
-     * `auth` property (which can be either `RebaseAuthConfig` or `AuthAdapter`).
      */
     bootstrappers?: BackendBootstrapper[];
     /**
@@ -98,8 +94,8 @@ export interface RebaseBackendConfig {
      * Authentication configuration.
      *
      * Accepts **either**:
-     * - `RebaseAuthConfig` — legacy config, auto-wrapped in `RebaseBuiltinAuthAdapter`
-     * - `AuthAdapter` — new pluggable adapter for external auth (Clerk, Auth0, etc.)
+     * - `RebaseAuthConfig` — built-in configuration
+     * - `AuthAdapter` — pluggable adapter for external auth (Clerk, Auth0, etc.)
      *
      * When a plain config object is provided, the built-in adapter is created
      * automatically from the bootstrapper's `initializeAuth()` result.
@@ -222,7 +218,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         configureLogLevel();
     }
 
-    logger.info("Initializing Rebase Backend (Bootstrapper Protocol V2)");
+    logger.info("Initializing Rebase Backend");
 
     const basePath = config.basePath || "/api";
     const isProduction = process.env.NODE_ENV === "production";
@@ -270,9 +266,6 @@ dir: config.collectionsDir });
     const delegates: Record<string, DataDriver> = {};
 
     // ─── Resolve bootstrappers ───────────────────────────────────────────
-    // Support both legacy `bootstrappers` array and new `database` adapter.
-    // A DatabaseAdapter is wrapped into the BackendBootstrapper protocol so
-    // the rest of the coordinator doesn't need to branch.
     let bootstrappers: BackendBootstrapper[] = config.bootstrappers || [];
     if (config.database) {
         const dbAdapter = config.database;
@@ -350,14 +343,14 @@ collectionRegistry });
 
             logger.info("Using AuthAdapter", { id: authAdapter.id });
 
-            // Populate legacy authConfigResult for backward compatibility
+            // Populate authConfigResult for backward compatibility
             // (the return type still exposes `auth?: BootstrappedAuth`)
             authConfigResult = {
                 userService: authAdapter.userManagement ?? {},
                 roleService: authAdapter.roleManagement ?? {},
             };
         } else {
-            // ── Legacy path: RebaseAuthConfig — wrap in built-in adapter ──
+            // ── RebaseAuthConfig — wrap in built-in adapter ──
             const safeAuthConfig = config.auth as RebaseAuthConfig;
             if (safeAuthConfig.jwtSecret) {
                 configureJwt({
@@ -484,7 +477,7 @@ collectionRegistry });
         });
 
         if (!isAuthAdapter(config.auth)) {
-            // ── Legacy path: register OAuth providers and mount built-in routes
+            // ── Register OAuth providers and mount built-in routes ──
             const safeAuthConfig = config.auth as RebaseAuthConfig;
             const oauthProviders: OAuthProvider<any>[] = [...(safeAuthConfig.providers || [])];
 
@@ -648,7 +641,7 @@ collectionRegistry });
         }
 
         // Use adapter middleware when an AuthAdapter is available,
-        // falling back to the legacy JWT middleware otherwise.
+        // falling back to the built-in JWT middleware otherwise.
         if (authAdapter) {
             dataRouter.use("/*", createAdapterAuthMiddleware({
                 adapter: authAdapter,
@@ -771,7 +764,7 @@ collectionRegistry });
             // Per-route auth can be further refined inside individual functions.
             const functionsRequireAuth = resolveRequireAuth(config.auth);
 
-            // Use adapter middleware when available, fallback to legacy
+            // Use adapter middleware when available, fallback to built-in
             if (authAdapter) {
                 functionsRouter.use("/*", createAdapterAuthMiddleware({
                     adapter: authAdapter,

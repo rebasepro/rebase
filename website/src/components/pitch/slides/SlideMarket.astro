@@ -1,0 +1,46 @@
+---
+import PitchSlide from '../PitchSlide.astro';
+const TOTAL = 12;
+---
+<PitchSlide id="slide-market" slideNumber={6} totalSlides={TOTAL}>
+    <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase mb-4">Market Opportunity</p>
+    <h2 class="text-4xl md:text-5xl font-bold text-white mb-10">A massive, growing market.</h2>
+    <div class="grid grid-cols-3 gap-8 mb-10">
+        <div class="text-center">
+            <div class="text-5xl font-black text-primary mb-2">$58B</div>
+            <p class="text-sm text-surface-300 font-medium">Low-Code / No-Code</p>
+            <p class="text-xs text-surface-300">TAM by 2029 · <a href="https://www.gartner.com/en/newsroom/press-releases/2024-09-17-gartner-forecasts-worldwide-low-code-development-technologies-market-to-reach-58-billion-in-2029" target="_blank" rel="noopener" class="underline hover:text-white transition-colors">Gartner, Sep 2024</a></p>
+        </div>
+        <div class="text-center">
+            <div class="text-5xl font-black text-emerald-400 mb-2">$15B</div>
+            <p class="text-sm text-surface-300 font-medium">BaaS Market</p>
+            <p class="text-xs text-surface-300">SAM by 2030 · <a href="https://www.grandviewresearch.com/industry-analysis/backend-as-a-service-market-report" target="_blank" rel="noopener" class="underline hover:text-white transition-colors">Grand View Research</a></p>
+        </div>
+        <div class="text-center">
+            <div class="text-5xl font-black text-amber-400 mb-2">$2B</div>
+            <p class="text-sm text-surface-300 font-medium">Open-Source App Platforms</p>
+            <p class="text-xs text-surface-300">SOM — company estimate based on Directus, Strapi, Supabase revenues</p>
+        </div>
+    </div>
+    <div class="rounded-xl border border-surface-700 bg-surface-900/40 p-6">
+        <h3 class="text-white font-semibold mb-3">Key Trends Driving Adoption</h3>
+        <div class="grid grid-cols-2 gap-4 text-sm text-surface-300">
+            <div class="flex items-start gap-2.5">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary mt-0.5 flex-shrink-0"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                <span><strong class="text-white">PostgreSQL dominance</strong> — <a href="https://survey.stackoverflow.co/2025/technology#most-popular-technologies-database-database" target="_blank" rel="noopener" class="underline hover:text-white transition-colors">#1 DB with 55% usage</a> (Stack Overflow Survey, 2025)</span>
+            </div>
+            <div class="flex items-start gap-2.5">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-400 mt-0.5 flex-shrink-0"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+                <span><strong class="text-white">Open-source preference</strong> — <a href="https://github.blog/news-insights/octoverse/octoverse-2024/" target="_blank" rel="noopener" class="underline hover:text-white transition-colors">OSS contributions up 25% YoY</a> (GitHub Octoverse, 2024)</span>
+            </div>
+            <div class="flex items-start gap-2.5">
+                <span class="mt-0.5 flex-shrink-0">🇪🇺</span>
+                <span><strong class="text-white">Digital sovereignty</strong> — <a href="https://commission.europa.eu/about/departments-and-executive-agencies/digital-services/open-source-software-strategy_en" target="_blank" rel="noopener" class="underline hover:text-white transition-colors">EU Open Source Strategy</a> pushes for European-built platforms</span>
+            </div>
+            <div class="flex items-start gap-2.5">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-amber-400 mt-0.5 flex-shrink-0"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                <span><strong class="text-white">Platform engineering</strong> — <a href="https://www.gartner.com/en/articles/what-is-platform-engineering" target="_blank" rel="noopener" class="underline hover:text-white transition-colors">80% of large orgs will have platform teams by 2026</a> (Gartner)</span>
+            </div>
+        </div>
+    </div>
+</PitchSlide>
