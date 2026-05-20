@@ -80,7 +80,7 @@ export function setIn<T>(obj: T, path: string, value: unknown): T {
 
 export function clone<T>(value: T): T {
     if (Array.isArray(value)) {
-        return [...value] as unknown as T;
+        return [...value] as T;
     } else if (typeof value === "object" && value !== null) {
         return { ...value } as T;
     } else {
@@ -99,7 +99,7 @@ export function deepClone<T>(value: T): T {
     if (typeof value !== "object") return value;
 
     if (Array.isArray(value)) {
-        return value.map(item => deepClone(item)) as unknown as T;
+        return value.map(item => deepClone(item)) as T;
     }
 
     // Preserve class instances (Date, GeoPoint, etc.) — don't recurse
@@ -176,9 +176,9 @@ export function mergeDeep<T extends object, U extends object>(
                 continue;
             }
 
-            if ((sourceValue as unknown) instanceof Date) {
+            if (sourceValue instanceof Date) {
                 // If source value is a Date, create a new Date instance.
-                (output as Record<string, unknown>)[key] = new Date((sourceValue as unknown as Date).getTime());
+                (output as Record<string, unknown>)[key] = new Date(sourceValue.getTime());
             } else if (Array.isArray(sourceValue)) {
                 if (Array.isArray(outputValue)) {
                     const newArray = [];
@@ -304,7 +304,7 @@ export function getHashValue<T>(v: T): string | null {
         else if (v instanceof Date)
             return v.toLocaleString();
         else if (v instanceof GeoPoint)
-            return hash(v as unknown as Record<string, unknown>);
+            return hash(v as Record<string, unknown>);
     }
     return hash(v as object, { ignoreUnknown: true });
 }
@@ -384,7 +384,7 @@ export function removePropsIfExisting(source: Record<string, unknown> | unknown[
             if (res[i] === comparison[i]) {
                 res.splice(i, 1);
             } else if (isObject(res[i]) && isObject(comparison[i])) {
-                res[i] = removePropsIfExisting(res[i] as Record<string, unknown>, (comparison as unknown as unknown[])[i] as Record<string, unknown>);
+                res[i] = removePropsIfExisting(res[i] as unknown as Record<string, unknown>, (comparison as unknown as unknown[])[i] as Record<string, unknown>);
             }
         }
     } else {

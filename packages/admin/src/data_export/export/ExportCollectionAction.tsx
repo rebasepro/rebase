@@ -70,7 +70,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
                     return {
                         [column.key]: await column.builder({
                             entity,
-                            context: context as unknown as RebaseContext
+                            context: context as RebaseContext
                         })
                     };
                 }))).reduce((a, b) => ({ ...a,
@@ -87,7 +87,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
                         return {
                             [field.key]: await field.value({
                                 entity,
-                                context: context as unknown as RebaseContext
+                                context: context as RebaseContext
                             })
                         };
                     }))).reduce((a, b) => ({ ...a,

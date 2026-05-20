@@ -13,7 +13,7 @@ import { getTableName } from "@rebasepro/common";
 
 /**
  * Interface for Drizzle column metadata introspection.
- * Replaces unsafe `as unknown as Record<string, unknown>` double-cast chains.
+ * Replaces unsafe `as Record<string, unknown>` double-cast chains.
  */
 export interface DrizzleColumnMeta {
     columnType?: string;

@@ -351,9 +351,7 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
 
     // Backfill order values for all entities
     const handleBackfill = useCallback(async () => {
-        console.log("handleBackfill called", { orderProperty });
         if (!orderProperty) {
-            console.log("No orderProperty, returning");
             return;
         }
         analyticsController.onAnalyticsEvent?.("kanban_backfill_order", {
@@ -363,19 +361,16 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
 
         try {
             // Fetch ALL documents from collection (not relying on loaded entities)
-            console.log("Fetching all documents from collection...");
             const allDocsRes = await dataClient.collection(fullPath).find({
                 limit: 10000 // Fetch all
             });
             const allDocs = allDocsRes.data as Entity<M>[];
-            console.log(`Fetched ${allDocs.length} documents`);
 
             // Find entities missing order property
             const entitiesToUpdate = allDocs.filter((entity: Entity<M>) => {
                 const orderValue = entity.values?.[orderProperty];
                 return orderValue === undefined || orderValue === null;
             });
-            console.log(`${entitiesToUpdate.length} entities need order values`);
 
             // Generate string fractional keys for all entities that need them
             const keys = generateNKeysBetween(null, null, entitiesToUpdate.length);
@@ -404,9 +399,7 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
                 );
             });
 
-            console.log(`Total updates to run: ${updates.length}`);
             await Promise.all(updates);
-            console.log("All updates complete");
             setShowBackfillDialog(false);
 
             // Reset missing count to hide banner

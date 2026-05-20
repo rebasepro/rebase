@@ -104,7 +104,7 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                     name,
                     value: typedValue
                 }
-            } as unknown as ChangeEvent<HTMLSelectElement>;
+            } as ChangeEvent<HTMLSelectElement>;
             onChange(event);
         }
     }, [onChange, onValueChange, name, dataType]);

@@ -1159,7 +1159,7 @@ export class RelationService {
                 if (parentFKValue !== null && parentFKValue !== undefined) {
                     await tx.update(targetTable)
                         .set({ [targetFKColName]: null })
-                        .where(eq(targetFKCol, parentFKValue as unknown as string));
+                        .where(eq(targetFKCol, String(parentFKValue)));
                 }
                 continue;
             }
@@ -1172,7 +1172,7 @@ export class RelationService {
             if (parentFKValue !== null && parentFKValue !== undefined) {
                 await tx.update(targetTable)
                     .set({ [targetFKColName]: null })
-                    .where(eq(targetFKCol, parentFKValue as unknown as string));
+                    .where(eq(targetFKCol, String(parentFKValue)));
             } else {
                 console.warn(`Cannot set joinPath relation '${relation.relationName}' because parent FK value is null/undefined`);
                 continue;

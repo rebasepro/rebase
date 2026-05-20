@@ -88,7 +88,7 @@ export const BooleanSwitchWithLabel = function BooleanSwitchWithLabel({
                 if (props.allowIndeterminate) {
                     if (value === null || value === undefined) onValueChange?.(true)
                     else if (value) onValueChange?.(false)
-                    else onValueChange?.(null as unknown as boolean);
+                    else onValueChange?.(null as unknown as boolean); // SAFETY: null represents indeterminate state when allowIndeterminate is true
                 } else {
                     onValueChange?.(!value);
                 }

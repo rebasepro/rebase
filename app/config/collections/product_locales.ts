@@ -45,4 +45,15 @@ const productLocalesCollection: PostgresCollection = {
     }
 };
 
+
+productLocalesCollection.securityRules = [
+    {
+        name: "product_locales_public_access",
+        mode: "permissive",
+        operation: "all",
+        pgRoles: ["public"],
+        using: "true"
+    }
+];
+
 export default productLocalesCollection;

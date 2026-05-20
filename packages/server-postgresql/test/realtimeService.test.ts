@@ -3,12 +3,13 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { EntityCollection } from "@rebasepro/types";
 
+const mockFetchCollection = jest.fn().mockResolvedValue([{ id: 1, path: "posts", values: { title: "Refetched Title" } }]);
+const mockFetchEntity = jest.fn().mockResolvedValue({ id: 1, path: "posts", values: { title: "Refetched Entity Title" } });
+
 jest.mock("../src/services/entityService", () => ({
     EntityService: jest.fn().mockImplementation(() => ({
-        fetchCollection: jest.fn().mockResolvedValue([{ id: 1,
-_rebase_invalidated: false }]),
-        fetchEntity: jest.fn().mockResolvedValue({ id: 1,
-_rebase_invalidated: false }),
+        fetchCollection: mockFetchCollection,
+        fetchEntity: mockFetchEntity,
         searchEntities: jest.fn().mockResolvedValue([])
     }))
 }));
@@ -134,7 +135,7 @@ values: { _rebase_invalidated: true } } as any;
             await Promise.resolve();
 
             // It should fetch the collection with auth
-            expect(mockDriver.fetchCollection).toHaveBeenCalled();
+            expect(mockFetchCollection).toHaveBeenCalled();
 
             // It should send the refetched data
             expect(ws.send).toHaveBeenCalled();
@@ -207,8 +208,7 @@ values: { _rebase_invalidated: true } } as any;
             await Promise.resolve();
 
             // It should fetch the single entity
-            expect(mockDriver.fetchEntity).toHaveBeenCalledWith(expect.objectContaining({ path: "posts",
-entityId: "1" }));
+            expect(mockFetchEntity).toHaveBeenCalledWith("posts", "1", undefined);
 
             // It should send entity update
             expect(ws.send).toHaveBeenCalled();

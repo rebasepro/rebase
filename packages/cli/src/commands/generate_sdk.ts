@@ -36,7 +36,7 @@ async function loadCollections(collectionsDir: string): Promise<EntityCollection
     let jiti: (id: string, userOptions?: Record<string, unknown>) => (modulePath: string) => Record<string, unknown>;
     try {
         const jitiModule = await import("jiti");
-        jiti = (jitiModule.default || jitiModule) as unknown as typeof jiti;
+        jiti = (jitiModule.default || jitiModule) as typeof jiti;
     } catch {
         throw new Error(
             "Could not load 'jiti'. Install it with: pnpm add -D jiti\n" +

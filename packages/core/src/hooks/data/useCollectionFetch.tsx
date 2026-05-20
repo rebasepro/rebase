@@ -150,7 +150,7 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
             return () => {
             };
         }
-    }, [path, itemCount, currentSort, sortByProperty, filterValues, searchString]);
+    }, [path, itemCount, currentSort, sortByProperty, filterValues, searchString, dataClient, collection]);
 
     return useMemo(() => ({
         data,

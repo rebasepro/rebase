@@ -39,7 +39,7 @@ export function getPropertyPaths(
 
         // For arrays with object items, add the nested paths too
         if (property.type === "array" && property.of) {
-            const ofPropertyOrBuilder = property.of as unknown as Property;
+            const ofPropertyOrBuilder = property.of as Property;
             // Skip if the array's 'of' is a PropertyBuilder
             if (!isPropertyBuilder(ofPropertyOrBuilder)) {
                 const ofProperty = ofPropertyOrBuilder as Property;

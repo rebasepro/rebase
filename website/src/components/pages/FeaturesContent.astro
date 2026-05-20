@@ -10,6 +10,8 @@ import SpotlightCard from '../../components/SpotlightCard.astro';
 import { Terminal, ShieldCheck, Folder, Network, ClipboardList, History } from "lucide-react";
 import { SchemaEditorDemo } from '../../components/SchemaEditorDemo';
 import UsageExamples from '../../components/UsageExamples.astro';
+import { ContentEditorDemo } from '../../components/demos/ContentEditorDemo';
+import { DataTalkDemo } from '../../components/DataTalkDemo';
 
 
 
@@ -50,15 +52,9 @@ import UsageExamples from '../../components/UsageExamples.astro';
                     <p class="mt-6 text-lg leading-8 text-surface-400">Inline editing, real-time filters, Kanban views, and a Notion-style rich text editor — all reading and writing directly to your Postgres tables.</p>
                 </div>
                 <div class="mx-auto max-w-[800px] lg:max-w-[1000px]">
-                    <video
-                            class="aspect-[607/373] bg-surface-950 border border-surface-800 rounded-xl flex flex-col items-center justify-center gap-4"
-                            style="pointer-events: none;"
-                            loop
-                            autoplay
-                            muted
-                            playsinline>
-                        <source src="/img/landing_1080.webm" type="video/webm"/>
-                    </video>
+                    <div class="rounded-xl overflow-hidden ring-1 ring-surface-800 bg-surface-950 shadow-2xl">
+                        <ContentEditorDemo client:load />
+                    </div>
                 </div>
             </div>
         </section>
@@ -221,17 +217,10 @@ import UsageExamples from '../../components/UsageExamples.astro';
                             and translations. Accept suggestions across multiple fields in one click.</p>
                         <p class="text-surface-400 leading-7">Beyond the UI, expose your CMS to external AI agents via our built-in <b>Model Context Protocol (MCP) server</b>, allowing autonomous systems to safely query and mutate your Postgres data.</p>
                     </div>
-                    <!-- Video right (wide 1240:780) -->
                     <div class="lg:col-span-8">
-                        <video
-                                class="aspect-[1240/780] bg-surface-950 border border-surface-800 rounded-xl w-full"
-                                style="pointer-events: none;"
-                                loop
-                                autoplay
-                                muted
-                                playsinline>
-                            <source src="/img/data_enhancement.webm" type="video/webm"/>
-                        </video>
+                        <div class="rounded-xl overflow-hidden ring-1 ring-surface-800 bg-surface-950 shadow-2xl">
+                            <DataTalkDemo client:only="react" />
+                        </div>
                     </div>
                 </div>
             </div>

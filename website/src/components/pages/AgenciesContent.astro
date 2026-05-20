@@ -9,6 +9,7 @@ import ClientLogos from '../../components/ClientLogos.astro';
 import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
 import BrowserFrame from '../../components/BrowserFrame.astro';
 import UsageExamples from '../../components/UsageExamples.astro';
+import { BodyPartsDemo } from '../../components/demos/BodyPartsDemo';
 
 
 
@@ -181,15 +182,8 @@ import UsageExamples from '../../components/UsageExamples.astro';
             <SectionBackgroundAccents topLine={true}/>
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center animate-on-scroll fade-in-up">
-                    <div class="rounded-xl ring-1 ring-inset ring-surface-800 overflow-hidden">
-                        <video
-                                class="w-full h-auto"
-                                loop
-                                autoplay
-                                muted
-                                playsinline>
-                            <source src="/img/custom_fields_dark_wide.mp4" type="video/mp4"/>
-                        </video>
+                    <div class="rounded-xl ring-1 ring-inset ring-surface-800 overflow-hidden bg-surface-950">
+                        <BodyPartsDemo client:only="react" />
                     </div>
                     <div>
                         <div class="flex items-center mb-4">

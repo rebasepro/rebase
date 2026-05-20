@@ -35,7 +35,7 @@ const proseWeightOverrides = [
     "prose-a:font-normal"
 ].join(" ");
 
-const md = new MarkdownIt({ html: true });
+const md = new MarkdownIt({ html: false });
 /**
  * @group Preview components
  */

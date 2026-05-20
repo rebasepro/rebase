@@ -12,6 +12,7 @@ import ClientUIComponentsTeaser from '../../components/ClientUIComponentsTeaser.
 
 import { RebaseEditorDemo } from '../../components/RebaseEditorDemo.tsx';
 import "../../styles/editor.css";
+import { CustomFieldsDemo } from '../../components/demos/CustomFieldsDemo';
 
 
 
@@ -196,25 +197,8 @@ validation: {
 
 
                 <div class="mt-16 sm:mt-36 lg:grid lg:grid-cols-12 gap-12 items-center">
-                    <div class="lg:order-last  relative w-full rounded-2xl overflow-hidden ring-1 ring-surface-800 lg:col-span-8">
-
-                        <video
-                                style="pointer-events: none; aspect-ratio: 3/2;"
-                                width="100%"
-                                loop
-                                autoplay
-                                muted>
-                            <!--<source-->
-                            <!--        src="/img/mm_body_demo_2025.webm"-->
-                            <!--        type="video/webm"-->
-                            <!--/>-->
-                            <source
-                                    src="/img/mm_body_demo_wide.mp4"
-                                    type="video/mp4"
-                            />
-                        </video>
-
-
+                    <div class="lg:order-last relative w-full rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-950 lg:col-span-8">
+                        <CustomFieldsDemo client:only="react" />
                     </div>
                     <div class="mt-8 lg:mt-0 self-start lg:col-span-4">
                         <h3 class="text-xl font-semibold text-white">Radical React Extensibility</h3>

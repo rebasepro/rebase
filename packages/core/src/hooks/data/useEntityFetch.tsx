@@ -40,6 +40,16 @@ export function populateEntityFetchCache<M extends Record<string, any>>(path: st
 }
 
 /**
+ * Clear the entity fetch cache. Call this on auth state changes (e.g. logout)
+ * to prevent stale data from a previous session leaking into the next.
+ */
+export function clearEntityFetchCache(): void {
+    for (const key of Object.keys(CACHE)) {
+        delete CACHE[key];
+    }
+}
+
+/**
  * This hook is used to fetch an entity.
  * It gives real time updates if the driver supports it.
  * @param path
@@ -119,7 +129,7 @@ export function useEntityFetch<M extends Record<string, any>, USER extends User 
             return () => {
             };
         }
-    }, [entityId, path]);
+    }, [entityId, path, dataClient, collection, useCache, databaseId]);
 
     return useMemo(() => ({
         entity,

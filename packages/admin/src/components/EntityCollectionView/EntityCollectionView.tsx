@@ -771,8 +771,8 @@ export const EntityCollectionView = React.memo(
                 propertyKey,
                 onHover,
                 path,
-                collection: collection as unknown as EntityCollection,
-                tableController: tableController as unknown as EntityTableController,
+                collection: collection as EntityCollection,
+                tableController: tableController as EntityTableController,
                 parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY, parentEntityIds: parentEntityIds ?? EMPTY_ARRAY
             };
             return <>{headerActionContributions.map((s, i) => (

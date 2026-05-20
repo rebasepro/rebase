@@ -283,29 +283,18 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             });
 
             // Send initial data
-            let entities;
-            if (this.driver) {
-                entities = await this.driver.fetchCollection({
-                    path: request.path,
-                    collection: collection,
-                    filter: request.filter,
-                    orderBy: request.orderBy,
-                    order: request.order,
-                    limit: request.limit,
-                    startAfter: request.startAfter,
-                    searchString: request.searchString
-                });
-            } else {
-                entities = await this.entityService.fetchCollection(request.path, {
+            const entities = await this.fetchCollectionWithAuth(
+                request.path,
+                {
                     filter: request.filter,
                     orderBy: request.orderBy,
                     order: request.order,
                     limit: request.limit,
                     startAfter: request.startAfter as Record<string, unknown> | undefined,
-                    databaseId: request.collection?.databaseId,
                     searchString: request.searchString
-                });
-            }
+                },
+                authContext
+            );
 
             this.sendCollectionUpdate(clientId, subscriptionId, entities);
 
@@ -338,20 +327,11 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             });
 
             // Send initial data
-            let entity;
-            if (this.driver) {
-                entity = await this.driver.fetchEntity({
-                    path: request.path,
-                    entityId: request.entityId,
-                    collection: collection
-                });
-            } else {
-                entity = await this.entityService.fetchEntity(
-                    request.path,
-                    request.entityId,
-                    request.collection?.databaseId
-                );
-            }
+            const entity = await this.fetchEntityWithAuth(
+                request.path,
+                String(request.entityId),
+                authContext
+            );
 
             this.sendEntityUpdate(clientId, subscriptionId, entity || null);
 
@@ -565,29 +545,28 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 searchString: collectionRequest.searchString
             });
 
-            // If we have auth context, wrap in a transaction with session vars
-            if (authContext) {
-                return await this.db.transaction(async (tx) => {
-                    await tx.execute(drizzleSql`SELECT set_config('app.user_id', ${authContext.userId}, true)`);
-                    await tx.execute(drizzleSql`SELECT set_config('app.user_roles', ${authContext.roles.join(",")}, true)`);
-                    await tx.execute(drizzleSql`SELECT set_config('app.jwt', ${JSON.stringify({ sub: authContext.userId,
-roles: authContext.roles })}, true)`);
-                    const txEntityService = new EntityService(tx, this.registry);
-                    let fetchedEntities;
-                    if (collectionRequest.searchString) {
-                        fetchedEntities = await txEntityService.searchEntities(
-                            notifyPath,
-                            collectionRequest.searchString,
-                            {
+            // Always wrap in a transaction with session vars, defaulting to anonymous context if missing
+            const activeAuth = authContext || { userId: "anon", roles: ["anon"] };
+            return await this.db.transaction(async (tx) => {
+                await tx.execute(drizzleSql`SELECT set_config('app.user_id', ${activeAuth.userId}, true)`);
+                await tx.execute(drizzleSql`SELECT set_config('app.user_roles', ${activeAuth.roles.join(",")}, true)`);
+                await tx.execute(drizzleSql`SELECT set_config('app.jwt', ${JSON.stringify({ sub: activeAuth.userId, roles: activeAuth.roles })}, true)`);
+                const txEntityService = new EntityService(tx, this.registry);
+                let fetchedEntities;
+                if (collectionRequest.searchString) {
+                    fetchedEntities = await txEntityService.searchEntities(
+                        notifyPath,
+                        collectionRequest.searchString,
+                        {
                             filter: collectionRequest.filter as FilterValues<string>,
                             orderBy: collectionRequest.orderBy,
                             order: collectionRequest.order,
                             limit: collectionRequest.limit,
                             databaseId: collectionRequest.databaseId
                         }
-                        );
-                    } else {
-                        fetchedEntities = await txEntityService.fetchCollection(notifyPath, {
+                    );
+                } else {
+                    fetchedEntities = await txEntityService.fetchCollection(notifyPath, {
                         filter: collectionRequest.filter as FilterValues<string>,
                         orderBy: collectionRequest.orderBy,
                         order: collectionRequest.order,
@@ -596,52 +575,48 @@ roles: authContext.roles })}, true)`);
                         startAfter: collectionRequest.startAfter,
                         databaseId: collectionRequest.databaseId
                     });
-                    }
+                }
 
-                    // Re-apply `afterRead` lifecycle hooks to ensure consistent data structures
-                    // between the initial driver fetch and this RLS-bound refetch.
-                    const registryCollection = this.registry.getCollectionByPath(notifyPath);
-                    const resolvedCollection = collection ? { ...collection,
+                // Re-apply `afterRead` lifecycle hooks to ensure consistent data structures
+                // between the initial driver fetch and this RLS-bound refetch.
+                const registryCollection = this.registry.getCollectionByPath(notifyPath);
+                const resolvedCollection = collection ? { ...collection,
 ...registryCollection } as EntityCollection : registryCollection as EntityCollection;
 
-                    const callbacks = resolvedCollection?.callbacks;
-                    const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
+                const callbacks = resolvedCollection?.callbacks;
+                const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
 
-                    if (callbacks?.afterRead || propertyCallbacks?.afterRead) {
-                        const contextForCallback = {
-                            user: { uid: authContext.userId,
-roles: authContext.roles },
-                            driver: this.driver,
-                            data: this.driver ? (this.driver as unknown as Record<string, unknown>).data : undefined
-                        } as unknown as RebaseCallContext;
+                if (callbacks?.afterRead || propertyCallbacks?.afterRead) {
+                    const contextForCallback = {
+                        user: { uid: activeAuth.userId, roles: activeAuth.roles },
+                        driver: this.driver,
+                        data: this.driver ? (this.driver as unknown as Record<string, unknown>).data : undefined
+                    } as unknown as RebaseCallContext;
 
-                        return await Promise.all(fetchedEntities.map(async (entity) => {
-                            let processedEntity = entity;
-                            if (callbacks?.afterRead) {
-                                processedEntity = await callbacks.afterRead({
-                                    collection: resolvedCollection,
-                                    path: notifyPath,
-                                    entity: processedEntity,
-                                    context: contextForCallback
-                                }) ?? processedEntity;
-                            }
-                            if (propertyCallbacks?.afterRead) {
-                                processedEntity = await propertyCallbacks.afterRead({
-                                    collection: resolvedCollection,
-                                    path: notifyPath,
-                                    entity: processedEntity,
-                                    context: contextForCallback
-                                }) ?? processedEntity;
-                            }
-                            return processedEntity;
-                        }));
-                    }
+                    return await Promise.all(fetchedEntities.map(async (entity) => {
+                        let processedEntity = entity;
+                        if (callbacks?.afterRead) {
+                            processedEntity = await callbacks.afterRead({
+                                collection: resolvedCollection,
+                                path: notifyPath,
+                                entity: processedEntity,
+                                context: contextForCallback
+                            }) ?? processedEntity;
+                        }
+                        if (propertyCallbacks?.afterRead) {
+                            processedEntity = await propertyCallbacks.afterRead({
+                                collection: resolvedCollection,
+                                path: notifyPath,
+                                entity: processedEntity,
+                                context: contextForCallback
+                            }) ?? processedEntity;
+                        }
+                        return processedEntity;
+                    }));
+                }
 
-                    return fetchedEntities;
-                });
-            }
-
-            return fetchFn();
+                return fetchedEntities;
+            });
         }
 
         // No driver — use entityService directly (no auth wrapping possible)
@@ -726,7 +701,7 @@ roles: authContext.roles },
      */
     private async fetchEntityWithAuth(
         notifyPath: string,
-        entityId: string,
+        entityId: string | number,
         authContext?: SubscriptionAuthContext
     ): Promise<Entity | undefined> {
         if (this.driver) {
@@ -737,56 +712,51 @@ roles: authContext.roles },
                 collection
             });
 
-            // If we have auth context, wrap in a transaction with session vars
-            if (authContext) {
-                return await this.db.transaction(async (tx) => {
-                    await tx.execute(drizzleSql`SELECT set_config('app.user_id', ${authContext.userId}, true)`);
-                    await tx.execute(drizzleSql`SELECT set_config('app.user_roles', ${authContext.roles.join(",")}, true)`);
-                    await tx.execute(drizzleSql`SELECT set_config('app.jwt', ${JSON.stringify({ sub: authContext.userId,
-roles: authContext.roles })}, true)`);
-                    const txEntityService = new EntityService(tx, this.registry);
-                    let processedEntity = await txEntityService.fetchEntity(notifyPath, entityId, collection?.databaseId);
+            // Always wrap in a transaction with session vars, defaulting to anonymous context if missing
+            const activeAuth = authContext || { userId: "anon", roles: ["anon"] };
+            return await this.db.transaction(async (tx) => {
+                await tx.execute(drizzleSql`SELECT set_config('app.user_id', ${activeAuth.userId}, true)`);
+                await tx.execute(drizzleSql`SELECT set_config('app.user_roles', ${activeAuth.roles.join(",")}, true)`);
+                await tx.execute(drizzleSql`SELECT set_config('app.jwt', ${JSON.stringify({ sub: activeAuth.userId, roles: activeAuth.roles })}, true)`);
+                const txEntityService = new EntityService(tx, this.registry);
+                let processedEntity = await txEntityService.fetchEntity(notifyPath, entityId, collection?.databaseId);
 
-                    if (processedEntity) {
-                        const registryCollection = this.registry.getCollectionByPath(notifyPath);
-                        const resolvedCollection = collection ? { ...collection,
+                if (processedEntity) {
+                    const registryCollection = this.registry.getCollectionByPath(notifyPath);
+                    const resolvedCollection = collection ? { ...collection,
 ...registryCollection } as EntityCollection : registryCollection as EntityCollection;
 
-                        const callbacks = resolvedCollection?.callbacks;
-                        const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
+                    const callbacks = resolvedCollection?.callbacks;
+                    const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
 
-                        if (callbacks?.afterRead || propertyCallbacks?.afterRead) {
-                            const contextForCallback = {
-                                user: { uid: authContext.userId,
-roles: authContext.roles },
-                                driver: this.driver,
-                                data: this.driver ? (this.driver as unknown as Record<string, unknown>).data : undefined
-                            } as unknown as RebaseCallContext;
+                    if (callbacks?.afterRead || propertyCallbacks?.afterRead) {
+                        const contextForCallback = {
+                            user: { uid: activeAuth.userId, roles: activeAuth.roles },
+                            driver: this.driver,
+                            data: this.driver ? (this.driver as unknown as Record<string, unknown>).data : undefined
+                        } as unknown as RebaseCallContext;
 
-                            if (callbacks?.afterRead) {
-                                processedEntity = await callbacks.afterRead({
-                                    collection: resolvedCollection,
-                                    path: notifyPath,
-                                    entity: processedEntity,
-                                    context: contextForCallback
-                                }) ?? processedEntity;
-                            }
-                            if (propertyCallbacks?.afterRead) {
-                                processedEntity = await propertyCallbacks.afterRead({
-                                    collection: resolvedCollection,
-                                    path: notifyPath,
-                                    entity: processedEntity,
-                                    context: contextForCallback
-                                }) ?? processedEntity;
-                            }
+                        if (callbacks?.afterRead) {
+                            processedEntity = await callbacks.afterRead({
+                                collection: resolvedCollection,
+                                path: notifyPath,
+                                entity: processedEntity,
+                                context: contextForCallback
+                            }) ?? processedEntity;
+                        }
+                        if (propertyCallbacks?.afterRead) {
+                            processedEntity = await propertyCallbacks.afterRead({
+                                collection: resolvedCollection,
+                                path: notifyPath,
+                                entity: processedEntity,
+                                context: contextForCallback
+                            }) ?? processedEntity;
                         }
                     }
+                }
 
-                    return processedEntity;
-                });
-            }
-
-            return fetchFn();
+                return processedEntity;
+            });
         }
 
         return await this.entityService.fetchEntity(notifyPath, entityId);

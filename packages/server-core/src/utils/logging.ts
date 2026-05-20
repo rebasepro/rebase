@@ -21,8 +21,8 @@ debug: 3 };
  */
 export function resetConsole() {
     // Store original methods if not already stored
-    if (!(global as unknown as Record<string, unknown>).__originalConsole) {
-        (global as unknown as Record<string, unknown>).__originalConsole = {
+    if (!(global as Record<string, unknown>).__originalConsole) {
+        (global as Record<string, unknown>).__originalConsole = {
             log: console.log,
             warn: console.warn,
             error: console.error,
@@ -30,7 +30,7 @@ export function resetConsole() {
         };
     }
 
-    const original = (global as unknown as Record<string, unknown>).__originalConsole as Console;
+    const original = (global as Record<string, unknown>).__originalConsole as Console;
     console.log = original.log;
     console.warn = original.warn;
     console.error = original.error;

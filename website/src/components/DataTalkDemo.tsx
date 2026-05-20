@@ -25,12 +25,30 @@ export interface Exchange {
 
 type TimeoutId = ReturnType<typeof setTimeout> | null;
 
+const defaultExchanges: Exchange[] = [
+    {
+        query: "Show me all products with their categories",
+        responseText: "Here are your products with category details:",
+        showProductsTable: true
+    },
+    {
+        query: "List all active users sorted by creation date",
+        responseText: "Here are all active users, sorted by most recent:",
+        showUsersTable: true
+    },
+    {
+        query: "Generate a query to find products over 100 euros",
+        responseText: "Here's the query to filter products above 100 euros:",
+        code: `const expensive = await rebase.products.findMany({\n  where: { price: { gt: 100 } },\n  orderBy: { price: "desc" }\n});`
+    }
+];
+
 export function DataTalkDemo({
-                                 exchanges,
+                                 exchanges = defaultExchanges,
                                  height
                              }: {
     height?: string | number;
-    exchanges: Exchange[]
+    exchanges?: Exchange[]
 }): React.JSX.Element {
     const [currentExchangeIndex, setCurrentExchangeIndex] = useState(0);
     const [displayText, setDisplayText] = useState("");

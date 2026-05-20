@@ -9,6 +9,8 @@ import { RLSEditorDemo } from '../../components/demos/RLSEditorDemo';
 import { KanbanDemo } from '../../components/demos/KanbanDemo';
 import { RichTextEditorDemo } from '../../components/demos/RichTextEditorDemo';
 import { SpreadsheetDemo } from '../../components/demos/SpreadsheetDemo';
+import { AdminDemoCarousel } from '../../components/demos/AdminDemoCarousel';
+import { DataTalkDemo } from '../../components/DataTalkDemo';
 import { Terminal, ShieldCheck, Folder, Network, History, Bot, Zap, Database, Layers } from "lucide-react";
 import "../../styles/editor.css";
 
@@ -91,9 +93,7 @@ const mcpCode = `<span class="text-surface-500">// .cursor/mcp.json</span>
         <p class="mt-4 text-lg text-surface-400">Inline editing, real-time filters, Kanban views, and a Notion-style rich text editor — all reading and writing directly to your Postgres tables.</p>
       </div>
       <div class="mx-auto max-w-[1000px]">
-        <video class="aspect-[607/373] bg-surface-950 border border-surface-800 rounded-xl" style="pointer-events:none;" loop autoplay muted playsinline>
-          <source src="/img/landing_1080.webm" type="video/webm"/>
-        </video>
+        <AdminDemoCarousel client:load />
       </div>
     </div>
   </section>
@@ -259,9 +259,9 @@ const mcpCode = `<span class="text-surface-500">// .cursor/mcp.json</span>
           <p class="text-lg text-surface-400">Expose your CMS to external AI agents via the built-in <b>MCP server</b>, allowing autonomous systems to safely query and mutate your data.</p>
         </div>
         <div class="lg:col-span-8">
-          <video class="aspect-[1240/780] bg-surface-950 border border-surface-800 rounded-xl w-full" style="pointer-events:none;" loop autoplay muted playsinline>
-            <source src="/img/data_enhancement.webm" type="video/webm"/>
-          </video>
+          <div class="rounded-xl overflow-hidden ring-1 ring-surface-800 bg-surface-950 shadow-2xl">
+            <DataTalkDemo client:only="react" />
+          </div>
         </div>
       </div>
 

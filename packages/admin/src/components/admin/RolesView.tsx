@@ -307,7 +307,7 @@ height: "100%" }}>
                     <LoadingButton
                         variant="filled"
                         type="submit"
-                        disabled={!isNewRole && !isAdmin}
+                        disabled={isSubmitting}
                         loading={isSubmitting}
                     >
                         {isNewRole ? t("create_role") : t("update")}

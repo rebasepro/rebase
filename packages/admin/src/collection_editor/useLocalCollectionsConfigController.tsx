@@ -16,7 +16,6 @@ export function useLocalCollectionsConfigController(
     const parsedCollections = baseCollections;
 
     const request = async (endpoint: string, payload: Record<string, unknown>) => {
-        console.log("dispatching dev server request", endpoint, payload);
         try {
             let token = options?.getAuthToken ? await options.getAuthToken() : null;
             let baseUrl = typeof clientOrUrl === "string" ? clientOrUrl : "";
@@ -38,7 +37,6 @@ export function useLocalCollectionsConfigController(
                 headers,
                 body: JSON.stringify(payload)
             });
-            console.log("dev server response", endpoint, response.status);
             if (!response.ok) {
                 const text = await response.text();
                 let err: Record<string, unknown> = {};

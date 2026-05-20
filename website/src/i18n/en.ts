@@ -91,13 +91,13 @@ export const en = {
   "faq.title": "Frequently asked questions",
   "faq.q1": "What database does Rebase support?",
   "faq.a1":
-    'Rebase is built on <strong class="text-white font-medium">PostgreSQL</strong>. You connect your own Postgres database — Rebase introspects the schema and generates a full admin interface automatically. No extra database, no data migration required.',
+    '<strong class="text-white font-medium">PostgreSQL</strong> is the primary focus — Rebase goes deep on Postgres so every feature (RLS, enums, constraints, relations) works natively. That said, the architecture is database-agnostic and can be adapted to other databases. You bring your own database instance; Rebase never hosts or copies your data.',
   "faq.q2": "How is Rebase different from Retool or Supabase?",
   "faq.a2":
     "Unlike Retool, Rebase is open-source with no per-seat pricing lock-in, and it's a real React framework you can extend with your own code. Unlike Supabase, Rebase works with <em class=\"text-white\">your existing</em> Postgres database — it's not a BaaS that owns your infrastructure. You keep full control.",
   "faq.q3": "Can I use Rebase with an existing database?",
   "faq.a3":
-    "Absolutely. Connect any Postgres database and Rebase will introspect the schema to generate a full admin panel automatically. You can then refine the UI visually or in TypeScript. Rebase works equally well for brand-new projects and existing databases.",
+    "Absolutely. Point Rebase at any Postgres connection string and it will read your tables, columns, foreign keys, enums, and constraints to generate a complete admin panel. Existing data appears instantly — no migration, no duplication, no schema re-definition needed.",
   "faq.q4": "Is Rebase open-source?",
   "faq.a4":
     "Yes. Rebase is completely free and MIT-licensed. Everything — the schema editor, data import/export, user management UI, and all features — is included at no cost.",

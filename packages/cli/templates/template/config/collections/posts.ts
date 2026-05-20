@@ -71,21 +71,7 @@ const postsCollection: EntityCollection = {
                 target: () => tagsCollection
             }
         }
-    },
-    relations: [
-        {
-            relationName: "author",
-            target: () => authorsCollection,
-            cardinality: "one",
-            direction: "owning"
-        },
-        {
-            relationName: "tags",
-            target: () => tagsCollection,
-            cardinality: "many",
-            direction: "owning"
-        }
-    ]
+    }
 };
 
 export default postsCollection;

@@ -68,7 +68,8 @@ function getOrCreateLazy<P>(
     const cached = lazyCache.get(key);
     if (cached) return cached as React.ComponentType<P>;
 
-    const LazyComponent = lazy(loader) as unknown as React.ComponentType<P>;
+    // SAFETY: React.lazy returns LazyExoticComponent which is structurally compatible with ComponentType<P>
+    const LazyComponent = lazy(loader) as React.ComponentType<P>;
     lazyCache.set(key, LazyComponent);
     return LazyComponent;
 }
@@ -100,7 +101,7 @@ export function resolveComponentRef<P = unknown>(
     //    The object has { __rebaseLazy: true, load: () => import(...) }.
     if (isLazyComponentRef(ref)) {
         return getOrCreateLazy<P>(
-            ref as unknown as object,
+            ref as object,
             () => (ref as LazyComponentRef<P>).load()
         );
     }

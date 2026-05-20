@@ -232,17 +232,21 @@ code } }
                 // Helper to get correctly scoped delegate for the current request
                 const getScopedDelegate = async (): Promise<DataDriver> => {
                     const session = clientSessions.get(clientId);
-                    if (session?.user && "withAuth" in driver && typeof (driver as unknown as Record<string, unknown>).withAuth === "function") {
+                    if ("withAuth" in driver && typeof (driver as unknown as Record<string, unknown>).withAuth === "function") {
                         try {
-                            // Map AccessTokenPayload back to User interface for withAuth (roles are already string IDs from JWT)
-                            const userForAuth: Record<string, unknown> = {
-                                uid: session.user.userId,
-                                roles: session.user.roles ?? []
-                            };
+                            const userForAuth = session?.user
+                                ? {
+                                    uid: session.user.userId,
+                                    roles: session.user.roles ?? []
+                                }
+                                : {
+                                    uid: "anon",
+                                    roles: ["anon"]
+                                };
                             return await (driver as unknown as { withAuth: (user: Record<string, unknown>) => Promise<DataDriver> }).withAuth(userForAuth);
                         } catch (e) {
-                            console.error("Failed to create authenticated delegate for WS request", e);
-                            return driver;
+                            console.error("Failed to create RLS scoped delegate for WS request", e);
+                            throw new Error("Internal authentication error");
                         }
                     }
                     return driver;
@@ -527,9 +531,8 @@ colors: true }));
                         // Attach auth context from the WS session so RLS-aware refetches work
                         const session = clientSessions.get(clientId);
                         const authContext = session?.user
-                            ? { userId: session.user.userId,
-roles: session.user.roles ?? [] }
-                            : undefined;
+                            ? { userId: session.user.userId, roles: session.user.roles ?? [] }
+                            : { userId: "anon", roles: ["anon"] };
                         // Let RealtimeService handle these messages
                         await realtimeService.handleClientMessage(clientId, {
                             type,

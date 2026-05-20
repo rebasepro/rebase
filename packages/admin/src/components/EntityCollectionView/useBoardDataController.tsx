@@ -204,7 +204,6 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
         // If the column is excluded by the active filter on the column property,
         // set it as empty immediately without querying.
         const excluded = isColumnExcludedByFilter(column, currentFilterValues, currentColumnProperty);
-        console.log(`[useBoardDataController] subscribeToColumn("${column}") colProp="${currentColumnProperty}" excluded=${excluded} filterValues=`, JSON.stringify(currentFilterValues));
         if (excluded) {
             setColumnData(prev => ({
                 ...prev,
@@ -338,8 +337,6 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
             }
 
             const newHasMore = entities.length >= itemCount;
-
-            console.log(`[useBoardDataController] Listener update for col ${column}. Length: ${processed.length}. Entities:`, processed.map(e => e.id));
 
             // Compare with current state — skip update if identical to avoid UI flash
             setColumnData(prev => {
@@ -654,7 +651,6 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
                     };
                 }
 
-                console.log(`[useBoardDataController] moveItemOptimistically: ${itemId} from ${sourceColumn} (${updated[sourceColumn].entities.length}) to ${targetColumn} (${updated[targetColumn].entities.length})`);
             } else if (sourceColumn !== targetColumn) {
                 // If item not found locally but counts need update
                 if (updated[sourceColumn]?.totalCount !== undefined) {

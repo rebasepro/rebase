@@ -405,7 +405,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                             // Add where condition for the current entity
                             if (pks.length === 1) {
                                 const sourceIdField = sourceTable[pks[0].fieldName as keyof typeof sourceTable] as AnyPgColumn;
-                                query = query.where(eq(sourceIdField, currentEntityId)) as unknown as typeof query;
+                                query = query.where(eq(sourceIdField, currentEntityId)) as typeof query;
                             } else {
                                 // For composite keys, we would need to map the split parts. For now log a warning.
                                 console.warn(`Join path resolution for composite primary keys is not yet fully supported: ${collection.slug}`);

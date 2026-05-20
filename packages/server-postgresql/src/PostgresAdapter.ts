@@ -1,4 +1,4 @@
-import { DatabaseAdapter, InitializedDriver, RealtimeProvider, DataDriver, DatabaseAdmin } from "@rebasepro/types";
+import { DatabaseAdapter, InitializedDriver, RealtimeProvider, DataDriver, DatabaseAdmin, BootstrappedAuth } from "@rebasepro/types";
 import { createPostgresBootstrapper } from "./PostgresBootstrapper";
 // @ts-ignore
 import type { PostgresDriverConfig } from "@rebasepro/server-core";
@@ -19,6 +19,13 @@ export function createPostgresAdapter(pgConfig: PostgresDriverConfig): DatabaseA
         async initializeRealtime(driverResult) {
             if (bootstrapper.initializeRealtime) {
                 return bootstrapper.initializeRealtime({}, driverResult);
+            }
+            return undefined;
+        },
+        
+        async initializeAuth(config, driverResult) {
+            if (bootstrapper.initializeAuth) {
+                return bootstrapper.initializeAuth(config, driverResult);
             }
             return undefined;
         },

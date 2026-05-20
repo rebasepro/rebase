@@ -1,18 +1,20 @@
 import { jest } from "@jest/globals";
 import { RestApiGenerator } from "./api-generator";
-import type { DataDriver, EntityCollection, FetchCollectionProps } from "@rebasepro/types";
+import type { DataDriver, Entity, EntityCollection, FetchCollectionProps } from "@rebasepro/types";
 
 /**
  * Minimal mock DataDriver for testing.
  */
 function createMockDriver(overrides?: Partial<DataDriver>): DataDriver {
     return {
-        fetchCollection: jest.fn().mockResolvedValue([]),
-        fetchEntity: jest.fn().mockResolvedValue(null),
-        saveEntity: jest.fn().mockResolvedValue({ id: "1", path: "test", values: {} }),
-        deleteEntity: jest.fn().mockResolvedValue(undefined),
-        countEntities: jest.fn().mockResolvedValue(0),
-        ...overrides,
+        fetchCollection: jest.fn<DataDriver["fetchCollection"]>().mockResolvedValue([]),
+        fetchEntity: jest.fn<DataDriver["fetchEntity"]>().mockResolvedValue(undefined),
+        saveEntity: jest.fn<DataDriver["saveEntity"]>().mockResolvedValue({ id: "1",
+path: "test",
+values: {} } as Entity),
+        deleteEntity: jest.fn<DataDriver["deleteEntity"]>().mockResolvedValue(undefined),
+        countEntities: jest.fn<NonNullable<DataDriver["countEntities"]>>().mockResolvedValue(0),
+        ...overrides
     } as unknown as DataDriver;
 }
 
@@ -21,7 +23,7 @@ function createTestCollection(slug: string): EntityCollection {
         slug,
         name: slug.charAt(0).toUpperCase() + slug.slice(1),
         path: slug,
-        properties: {},
+        properties: {}
     } as unknown as EntityCollection;
 }
 
@@ -31,7 +33,7 @@ describe("RestApiGenerator - Count Endpoint", () => {
 
     beforeEach(() => {
         driver = createMockDriver({
-            countEntities: jest.fn().mockResolvedValue(42),
+            countEntities: jest.fn<NonNullable<DataDriver["countEntities"]>>().mockResolvedValue(42)
         });
         collection = createTestCollection("products");
     });
@@ -93,10 +95,10 @@ describe("RestApiGenerator - Count Endpoint", () => {
 
     it("GET /products/count should not be confused with GET /products/:id", async () => {
         // Ensure the count route is registered before the :id route
-        const fetchEntity = jest.fn().mockResolvedValue(null);
+        const fetchEntity = jest.fn<DataDriver["fetchEntity"]>().mockResolvedValue(undefined);
         const driverCustom = createMockDriver({
-            countEntities: jest.fn().mockResolvedValue(99),
-            fetchEntity,
+            countEntities: jest.fn<NonNullable<DataDriver["countEntities"]>>().mockResolvedValue(99),
+            fetchEntity: fetchEntity as unknown as DataDriver["fetchEntity"]
         });
         const generator = new RestApiGenerator([collection], driverCustom);
         const app = generator.generateRoutes();

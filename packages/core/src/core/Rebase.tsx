@@ -89,7 +89,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
             loading: false,
             users: [],
             getUser: (uid: string) => null
-        } as unknown as UserManagementDelegate<USER>, [plugins, _userManagement]);
+        } as UserManagementDelegate<USER>, [plugins, _userManagement]);
 
     // Auth fallback logic
     const clientAuthController = useAuthSubscription(authControllerProp ? undefined : client?.auth);

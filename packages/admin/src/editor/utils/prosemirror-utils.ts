@@ -12,7 +12,7 @@ export function isNodeActive(state: EditorState, type: NodeType, attrs: Record<s
     if (!state || !type) return false;
     const selection = state.selection;
     const { $from, to } = selection;
-    const node = selection instanceof TextSelection ? undefined : (selection as unknown as { node?: ProseMirrorNode }).node;
+    const node = selection instanceof TextSelection ? undefined : (selection as { node?: ProseMirrorNode }).node;
     if (node) {
         return node.type === type && (!attrs || Object.keys(attrs).every((key) => node.attrs[key] === attrs[key]));
     }

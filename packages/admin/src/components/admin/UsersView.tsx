@@ -377,7 +377,7 @@ roles: ["w-16", "w-16"] }
 
                         {displayUsers.length === 0 && !tableLoading && !delegateLoading && (
                             <TableRow>
-                                <TableCell colspan={5}>
+                                <TableCell colspan={6}>
                                     <CenteredView className="flex flex-col gap-4 my-8 items-center">
                                         <Typography variant="label">
                                             {usersError
@@ -566,7 +566,7 @@ message: t("password_copied") ?? "Password copied to clipboard" });
                                 <code className="flex-grow bg-surface-100 dark:bg-surface-900 border border-surface-300 dark:border-surface-600 rounded px-3 py-2 font-mono text-base select-all">
                                     {result.temporaryPassword}
                                 </code>
-                                <Tooltip title={t("copy_password") ?? "CopyIcon password"} asChild>
+                                <Tooltip title={t("copy_password") ?? "Copy password"} asChild>
                                     <IconButton onClick={handleCopyPassword}>
                                         {copied ? <CheckCircleIcon className="text-green-600"/> : <CopyIcon/>}
                                     </IconButton>

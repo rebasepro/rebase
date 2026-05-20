@@ -213,7 +213,7 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
             : <>
                 {additionalField.value?.({
                     entity,
-                    context: context as unknown as RebaseContext
+                    context: context as RebaseContext
                 })?.toString()}
             </>;
 

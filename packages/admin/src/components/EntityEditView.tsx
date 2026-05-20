@@ -310,7 +310,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                             parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
                             entity={usedEntity}
                             modifiedValues={usedFormContext?.formex?.values ?? usedEntity?.values}
-                            formContext={usedFormContext as unknown as FormContext<Record<string, unknown>>}
+                            formContext={usedFormContext as FormContext<Record<string, unknown>>}
                         />}
                     </Suspense>
                 </ErrorBoundary>

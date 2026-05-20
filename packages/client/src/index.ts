@@ -163,7 +163,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
                 method: "POST",
                 body: payload ? JSON.stringify(payload) : undefined
             });
-            return res.data ?? (res as unknown as T);
+            return res.data ?? (res as T);
         },
         data: dataProxy,
         email: undefined

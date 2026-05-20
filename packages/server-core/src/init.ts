@@ -278,6 +278,7 @@ dir: config.collectionsDir });
                 ? (_config: unknown, driverResult: InitializedDriver) =>
                     dbAdapter.initializeRealtime!(driverResult)
                 : undefined,
+            initializeAuth: dbAdapter.initializeAuth,
             initializeHistory: dbAdapter.initializeHistory,
             initializeWebsockets: dbAdapter.initializeWebsockets,
             getAdmin: dbAdapter.getAdmin,

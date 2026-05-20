@@ -71,7 +71,7 @@ const backend = await initializeRebaseBackend({
         refreshExpiresIn: "30d",     // Refresh token TTL
         allowRegistration: false,    // First user can always register
         seedDefaultRoles: true,      // Create default admin/editor/viewer roles
-        defaultRole: "admin",        // Default role for new users
+        defaultRole: "viewer",        // Default role for new users (cannot be "admin")
         serviceKey: process.env.REBASE_SERVICE_KEY, // Optional: service-to-service auth
         google: {                    // Optional: Google OAuth
             clientId: process.env.GOOGLE_CLIENT_ID!,

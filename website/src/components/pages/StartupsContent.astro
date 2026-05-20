@@ -11,6 +11,7 @@ import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.
 // import Header from '../../components/Header.astro';
 // import Footer from '../../components/Footer.astro';
 import ScreenshotsMarquee from '../../components/ScreenshotsMarquee.astro';
+import { SpreadsheetDemo } from '../../components/demos/SpreadsheetDemo';
 import ClientLogos from '../../components/ClientLogos.astro';
 
 
@@ -153,15 +154,8 @@ const spreadsheetIcon = `<svg class="h-10 w-10 mb-4 text-primary" fill="none" vi
                     Build with Rebase
                 </a>
             </div>
-            <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 mt-12">
-                <video
-                        class="w-full h-auto"
-                        loop
-                        autoplay
-                        muted
-                        playsinline>
-                    <source src="/img/schema_editor.webm" type="video/webm"/>
-                </video>
+            <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-950 mt-12">
+                <SpreadsheetDemo client:load />
             </div>
         </div>
     </section>

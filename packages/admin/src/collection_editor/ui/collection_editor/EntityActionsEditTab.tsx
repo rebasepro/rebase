@@ -137,7 +137,6 @@ export function EntityActionsEditTab({
                 open={addEntityActionDialogOpen}
                 onClose={(selectedActionKey) => {
                     if (selectedActionKey) {
-                        console.log("Selected action key:", selectedActionKey);
                         const value = [...(values.entityActions ?? []), selectedActionKey]
                             // only actions that are defined in the registry
                             .filter((e: string | EntityAction<any>): e is string => typeof e === "string" && (contextEntityActions ?? []).some(action => action.key === e));

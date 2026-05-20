@@ -6,8 +6,8 @@
     "type": "module",
     "scripts": {
         "dev": "tsx watch --watch=\"../config/**/*\" src/index.ts",
-        "build": "tsc --noEmit",
-        "start": "tsx src/index.ts"
+        "build": "rebase schema generate --collections ../config/collections && tsc",
+        "start": "node dist/backend/src/index.js"
     },
     "dependencies": {
         "{{PROJECT_NAME}}-config": "*",

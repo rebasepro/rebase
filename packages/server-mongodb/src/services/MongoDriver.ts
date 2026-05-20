@@ -73,7 +73,7 @@ export class MongoDriver implements DataDriver {
             orderBy,
             order,
             searchString,
-            collection: collection as unknown as EntityCollection
+            collection: collection as EntityCollection
         });
     }
 

@@ -409,7 +409,7 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
     return (
         <Portal.Root asChild
             container={container}>
-            <Formex value={formex as unknown as FormexController<Record<string, unknown>>}>
+            <Formex value={formex as FormexController<Record<string, unknown>>}>
                 {draggable}
             </Formex>
         </Portal.Root>

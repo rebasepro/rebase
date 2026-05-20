@@ -162,7 +162,7 @@ export function ImportCollectionAction<M extends Record<string, unknown>, USER e
 
                 {step === "import_data_saving" && importConfig &&
                     <ImportSaveInProgress importConfig={importConfig}
-                        collection={collection as unknown as EntityCollection}
+                        collection={collection as EntityCollection}
                         path={path}
                         onImportSuccess={(importedCollection) => {
                             handleClose();

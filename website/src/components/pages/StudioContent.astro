@@ -9,6 +9,7 @@ import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.
 import { SQLEditorDemo } from '../../components/demos/SQLEditorDemo';
 import { RLSEditorDemo } from '../../components/demos/RLSEditorDemo';
 import { SchemaBuilderMiniDemo } from '../../components/demos/SchemaBuilderMiniDemo';
+import { SchemaEditorDemo } from '../../components/SchemaEditorDemo';
 import { RbacMiniDemo } from '../../components/demos/RbacMiniDemo';
 import "../../styles/editor.css";
 
@@ -93,10 +94,8 @@ const collectionEditorHtml = `<span class="text-primary-light">import</span> { b
               <li class="flex gap-3"><span class="text-primary">✓</span> Validation rules with Zod schema generation</li>
             </ul>
           </div>
-          <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800">
-            <video class="w-full h-auto" loop autoplay muted playsinline>
-              <source src="/img/schema_editor.webm" type="video/webm"/>
-            </video>
+          <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-950" style="height: 500px;">
+            <SchemaEditorDemo client:load />
           </div>
         </div>
       </div>

@@ -27,7 +27,8 @@ import {
     TablePolicyInfo,
     SQLAdmin,
     SchemaAdmin,
-    DatabaseAdmin
+    DatabaseAdmin,
+    RestFetchService
 } from "@rebasepro/types";
 import { buildRebaseData } from "@rebasepro/common";
 // @ts-ignore
@@ -839,6 +840,7 @@ searchString }
                 }
             }
         }
+        // SAFETY: Raw SQL result rows are typed as QueryResultRow[]; the query shape matches TableColumnInfo
         const typedColumns = columns as unknown as TableColumnInfo[];
 
         // 2. Fetch Foreign Keys
@@ -857,7 +859,8 @@ searchString }
                   AND ccu.table_schema = tc.table_schema
             WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = ${safeName};
         `);
-        const foreignKeys = fkResult.rows as unknown as TableForeignKeyInfo[];
+        // SAFETY: Raw SQL result rows match TableForeignKeyInfo shape from the SELECT aliases
+        const foreignKeys = fkResult.rows as TableForeignKeyInfo[];
 
         // 3. Fetch Junction Tables (Many-to-Many)
         // A simple junction table is one that has foreign keys to our table and other tables
@@ -877,7 +880,8 @@ searchString }
               AND ccu1.table_name = ${safeName}
               AND ccu2.table_name != ${safeName};
         `);
-        const junctions = junctionsResult.rows as unknown as TableJunctionInfo[];
+        // SAFETY: Raw SQL result rows match TableJunctionInfo shape from the SELECT aliases
+        const junctions = junctionsResult.rows as TableJunctionInfo[];
 
         // 4. Fetch RLS Policies
         const policiesResult = await this.db.execute(drizzleSql`
@@ -890,7 +894,8 @@ searchString }
             FROM pg_policy
             WHERE polrelid = (SELECT oid FROM pg_class WHERE relname = ${safeName} AND relnamespace = 'public'::regnamespace);
         `);
-        const policies = policiesResult.rows as unknown as TablePolicyInfo[];
+        // SAFETY: Raw SQL result rows match TablePolicyInfo shape from the SELECT aliases
+        const policies = policiesResult.rows as TablePolicyInfo[];
 
         return {
             columns: typedColumns,
@@ -936,6 +941,22 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
      * Typed admin capabilities — delegates to the base driver.
      */
     admin: DatabaseAdmin;
+
+    get restFetchService(): RestFetchService | undefined {
+        if (!this.delegate.restFetchService) return undefined;
+        return {
+            fetchCollectionForRest: async (collectionPath, options, include) => {
+                return this.withTransaction(async (delegate) => {
+                    return delegate.restFetchService.fetchCollectionForRest(collectionPath, options, include);
+                });
+            },
+            fetchEntityForRest: async (collectionPath, entityId, include, databaseId) => {
+                return this.withTransaction(async (delegate) => {
+                    return delegate.restFetchService.fetchEntityForRest(collectionPath, entityId, include, databaseId);
+                });
+            }
+        };
+    }
 
     private async withTransaction<T>(
         operation: (delegate: PostgresBackendDriver) => Promise<T>

@@ -113,4 +113,15 @@ const authorsCollection: EntityCollection = {
     ]
 };
 
+
+authorsCollection.securityRules = [
+    {
+        name: "authors_public_access",
+        mode: "permissive",
+        operation: "all",
+        pgRoles: ["public"],
+        using: "true"
+    }
+];
+
 export default authorsCollection;

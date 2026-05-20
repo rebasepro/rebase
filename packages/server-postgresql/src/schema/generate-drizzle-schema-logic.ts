@@ -19,23 +19,23 @@ const resolveColumnName = (propName: string, prop?: Property | null): string => 
 
 const getPrimaryKeyProp = (collection: EntityCollection): { name: string, type: "string" | "number", isUuid: boolean } => {
     if (collection.properties) {
-        const idPropEntry = Object.entries(collection.properties).find(([_, prop]) => "isId" in (prop as object) && Boolean((prop as unknown as Record<string, unknown>).isId));
+        const idPropEntry = Object.entries(collection.properties).find(([_, prop]) => "isId" in (prop as unknown as object) && Boolean((prop as unknown as Record<string, unknown>).isId));
         if (idPropEntry) {
-            const prop = idPropEntry[1] as Property;
-            const isUuid = prop.type === "string" && "isId" in prop && (prop as StringProperty).isId === "uuid";
+            const prop = idPropEntry[1] as unknown as Property;
+            const isUuid = prop.type === "string" && "isId" in prop && (prop as unknown as StringProperty).isId === "uuid";
             return { name: idPropEntry[0],
 type: prop.type === "number" ? "number" : "string",
 isUuid };
         }
     }
     // Fallback
-    const idProp = collection.properties?.["id"] as Property | undefined;
+    const idProp = collection.properties?.["id"] as unknown as Property | undefined;
     if (idProp?.type === "number") {
         return { name: "id",
 type: "number",
 isUuid: false };
     }
-    const isUuid = idProp?.type === "string" && "isId" in idProp && (idProp as StringProperty).isId === "uuid";
+    const isUuid = idProp?.type === "string" && "isId" in idProp && (idProp as unknown as StringProperty).isId === "uuid";
     return { name: "id",
 type: "string",
 isUuid: isUuid ?? false };
@@ -53,7 +53,7 @@ const isIdProperty = (propName: string, prop: Property, collection: EntityCollec
     if ("isId" in prop && Boolean(prop.isId)) return true;
 
     // We only fallback to "id" if NO property is explicitly marked with `isId: true` or a generator string
-    const hasExplicitId = Object.values(collection.properties ?? {}).some(p => "isId" in (p as object) && Boolean((p as unknown as Record<string, unknown>).isId));
+    const hasExplicitId = Object.values(collection.properties ?? {}).some(p => "isId" in (p as unknown as object) && Boolean((p as unknown as Record<string, unknown>).isId));
     return !hasExplicitId && propName === "id";
 };
 
@@ -63,7 +63,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
 
     switch (prop.type) {
         case "string": {
-            const stringProp = prop as StringProperty;
+            const stringProp = prop as unknown as StringProperty;
             if (stringProp.enum) {
                 const enumName = getEnumVarName(getTableName(collection), propName);
                 columnDefinition = `${enumName}("${colName}")`;
@@ -97,7 +97,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
             break;
         }
         case "number": {
-            const numProp = prop as NumberProperty;
+            const numProp = prop as unknown as NumberProperty;
             const isId = isIdProperty(propName, prop, collection);
 
             let baseType = (numProp.validation?.integer || isId) ? `integer("${colName}")` : `numeric("${colName}")`;

@@ -234,7 +234,7 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
         onValueChange,
         size: size ?? "m",
         selectionStore
-    } as unknown as EntityCollectionTableController<any>), [setPopupCell, select, onValueChange, size, selectionStore]);
+    } as EntityCollectionTableController<any>), [setPopupCell, select, onValueChange, size, selectionStore]);
 
     return (
         <SelectableTableContext.Provider

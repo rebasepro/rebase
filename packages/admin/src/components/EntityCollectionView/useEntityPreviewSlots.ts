@@ -352,7 +352,7 @@ id });
             // cardinality:"one" → single EntityRelation
             const isRelation = "__type" in val && (val as Record<string, unknown>).__type === "relation";
             if (isRelation) {
-                const relation = val as unknown as EntityRelation;
+                const relation = val as EntityRelation;
                 const displayName = resolveRelationDisplayName(relation, prop);
                 totalCount = 1;
                 if (displayName) {

@@ -44,8 +44,8 @@ cp .env.example .env
 3. Generate schema and push to database:
 
 ```bash
-rebase schema generate
-rebase db push
+pnpm run schema:generate   # or: npm run schema:generate
+pnpm run db:push            # or: npm run db:push
 ```
 
 4. Start the dev server:

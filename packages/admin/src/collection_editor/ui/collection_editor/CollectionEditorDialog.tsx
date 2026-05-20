@@ -418,7 +418,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                 if (success) {
                     aiModifiedPaths?.clearAllPaths();
                     formexController.resetForm({ values: newCollectionState });
-                    handleClose(newCollectionState as unknown as EntityCollection);
+                    handleClose(newCollectionState as EntityCollection);
                 }
                 return;
             }
@@ -456,7 +456,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                 if (success) {
                     formexController.resetForm({ values: initialValues });
                     setNextMode();
-                    handleClose(newCollectionState as unknown as EntityCollection);
+                    handleClose(newCollectionState as EntityCollection);
                 }
             } else {
                 setNextMode();
@@ -549,7 +549,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
         importConfig.setInUse(true);
         buildEntityPropertiesFromData(data, getInferenceType)
             .then((properties: Record<string, unknown>) => {
-                const res = cleanPropertiesFromImport(properties as unknown as Properties);
+                const res = cleanPropertiesFromImport(properties as Properties);
 
                 importConfig.setIdColumn(res.idColumn);
                 importConfig.setImportData(data);
@@ -914,7 +914,7 @@ function applyPropertiesConfig(property: Property, propertyConfigs: Record<strin
     if (propertyConfigs && internalProperty && typeof internalProperty === "object" && internalProperty.propertyConfig) {
         const propertyConfig = propertyConfigs[internalProperty.propertyConfig];
         if (propertyConfig && isPropertyBuilder(propertyConfig.property as Property)) {
-            internalProperty = propertyConfig.property as unknown as Property;
+            internalProperty = propertyConfig.property as Property;
         } else {
 
             if (propertyConfig) {

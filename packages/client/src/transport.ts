@@ -166,7 +166,7 @@ export function createTransport(config: RebaseClientConfig): Transport {
         const res = await fetchFn(url, { ...init,
 headers });
 
-        if (res.status === 204) return undefined as unknown as T;
+        if (res.status === 204) return undefined as T; // SAFETY: HTTP 204 No Content has no body
 
         const text = await res.text().catch(() => "");
         let body: any = {};
@@ -193,7 +193,7 @@ headers });
                 const retryHeaders = getHeaders(retryToken, init) as Record<string, string>;
                 const retryRes = await fetchFn(url, { ...init,
 headers: retryHeaders });
-                if (retryRes.status === 204) return undefined as unknown as T;
+                if (retryRes.status === 204) return undefined as T; // SAFETY: HTTP 204 No Content has no body
                 const retryText = await retryRes.text().catch(() => "");
                 let retryBody: any = {};
                 if (retryText) {

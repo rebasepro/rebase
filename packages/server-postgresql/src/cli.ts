@@ -11,14 +11,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 function resolveLocalBin(binName: string): string | null {
     let cwd = process.cwd();
     // Try to find node_modules/.bin upwards
-    while (cwd !== "/") {
+    while (true) {
         const candidate = path.join(cwd, "node_modules", ".bin", binName);
         if (fs.existsSync(candidate)) return candidate;
-        cwd = path.dirname(cwd);
+        const parent = path.dirname(cwd);
+        if (parent === cwd) break;
+        cwd = parent;
     }
-    // Fall back to globally installed binary via which
+    // Fall back to globally installed binary via which/where
     try {
-        const globalPath = execSync(`which ${binName}`, { encoding: "utf-8" }).trim();
+        const cmd = process.platform === "win32" ? `where ${binName}` : `which ${binName}`;
+        const globalPath = execSync(cmd, { encoding: "utf-8" }).trim().split("\n")[0].trim();
         if (globalPath && fs.existsSync(globalPath)) return globalPath;
     } catch {
         // not found globally

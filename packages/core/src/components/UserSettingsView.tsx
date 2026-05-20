@@ -22,7 +22,7 @@ interface ExtendedAuthController {
 }
 
 export function UserSettingsView() {
-    const authController = useAuthController() as unknown as ExtendedAuthController;
+    const authController = useAuthController() as ExtendedAuthController;
     const user = authController.user;
     const { t } = useTranslation();
 

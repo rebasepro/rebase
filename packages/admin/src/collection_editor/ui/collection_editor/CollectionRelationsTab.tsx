@@ -148,7 +148,7 @@ relationName: e.target.value } : null)}
                                                 const targetFn = () => collections?.find(c => c.slug === val) || { slug: val };
                                                 (targetFn as { slug?: string }).slug = val;
                                                 return { ...prev,
-target: targetFn as unknown as Relation["target"] };
+target: targetFn as Relation["target"] };
                                             });
                                         }}
                                     >

@@ -27,6 +27,7 @@ import type {
     DatabaseAdmin,
     InitializedDriver,
     RealtimeProvider,
+    BootstrappedAuth,
 } from "./backend";
 
 /**
@@ -59,6 +60,14 @@ export interface DatabaseAdapter {
      * change notifications.
      */
     initializeRealtime?(driverResult: InitializedDriver): Promise<RealtimeProvider | undefined>;
+
+    /**
+     * Initialize auth tables / services if this driver supports them.
+     */
+    initializeAuth?(
+        config: unknown,
+        driverResult: InitializedDriver,
+    ): Promise<BootstrappedAuth | undefined>;
 
     /**
      * Initialize entity history tracking.

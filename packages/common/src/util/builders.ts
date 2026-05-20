@@ -50,6 +50,7 @@ export function buildProperty<T, P extends Property = Property>(
     P extends ArrayProperty ? ArrayProperty :
     P extends MapProperty ? MapProperty : never {
 
+    // SAFETY: Identity function — P is a subtype of the conditional return type by definition
     return property as unknown as ReturnType<typeof buildProperty<T, P>>;
 }
 

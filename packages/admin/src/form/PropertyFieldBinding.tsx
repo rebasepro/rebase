@@ -123,13 +123,6 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
                 } else {
                     const propertyConfig = getFieldConfig(resolvedProperty, customizationController.propertyConfigs);
                     if (!propertyConfig) {
-                        console.log("INTERNAL: Could not find field config for property", {
-                            propertyKey,
-                            property,
-                            resolvedProperty,
-                            fields: customizationController.propertyConfigs,
-                            propertyConfig
-                        });
                         throw new Error(`INTERNAL: Could not find field config for property ${propertyKey}`);
                     }
                     const configProperty = resolveProperty({

@@ -384,8 +384,9 @@ export const VirtualTable = React.memo<VirtualTableProps<any>>(
                     className,
                     draggingColumnId && "overflow-hidden"
                 )}>
+                {/* SAFETY: T extends Record<string, any> is structurally assignable to Record<string, unknown> */}
                 <VirtualListContext.Provider
-                    value={virtualListController as unknown as VirtualTableContextProps<Record<string, unknown>>}>
+                    value={virtualListController as VirtualTableContextProps<Record<string, unknown>>}>
 
                     <MemoizedList
                         outerRef={tableRef}

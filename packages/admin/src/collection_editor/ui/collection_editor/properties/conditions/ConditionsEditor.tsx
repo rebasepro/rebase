@@ -806,17 +806,12 @@ export function ConditionsEditor({ disabled, collectionProperties }: ConditionsE
     // Get current conditions from form values
     const conditions: Record<string, unknown> = (values as PropertyWithId & { conditions?: Record<string, unknown> }).conditions ?? {};
 
-    // DEBUG: Log conditions to see what's being loaded
-    console.log("[ConditionsEditor] Loaded conditions:", conditions);
-
     const activeConditions: { type: ConditionType; group: ConditionGroup }[] = [];
 
     for (const type of CONDITION_TYPES) {
         const jsonLogic = conditions[type.id as keyof typeof conditions];
         if (jsonLogic) {
-            console.log(`[ConditionsEditor] Parsing ${type.id}:`, jsonLogic);
             const group = jsonLogicToGroup(jsonLogic as Record<string, any>);
-            console.log("[ConditionsEditor] Parsed group:", group);
             if (group) {
                 activeConditions.push({ type: type.id,
 group });

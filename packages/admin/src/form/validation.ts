@@ -78,7 +78,7 @@ export function mapPropertyToZod(propertyContext: PropertyContext<Property>): Zo
 
     // Log the error but don't crash the form
     console.error("Unsupported data type in zod mapping", property);
-    const dataType = "dataType" in (property as unknown as Record<string, unknown>) ? String((property as unknown as Record<string, unknown>).dataType) : "unknown";
+    const dataType = "dataType" in (property as Record<string, unknown>) ? String((property as Record<string, unknown>).dataType) : "unknown";
     return z.any().refine(
         () => false,
         { message: `Unsupported data type: ${dataType}` }

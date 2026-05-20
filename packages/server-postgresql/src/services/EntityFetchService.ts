@@ -606,7 +606,7 @@ export class EntityFetchService {
                 const row = await qb.findFirst({
                     where: eq(idField, parsedId),
                     with: withConfig
-                } as unknown as Parameters<NonNullable<typeof qb>["findFirst"]>[0]);
+                } as Parameters<NonNullable<typeof qb>["findFirst"]>[0]);
 
                 if (!row) return undefined;
 
@@ -729,7 +729,7 @@ export class EntityFetchService {
                 );
 
 
-                const results = await qb.findMany(queryOpts as unknown as Parameters<NonNullable<typeof qb>["findMany"]>[0]);
+                const results = await qb.findMany(queryOpts as Parameters<NonNullable<typeof qb>["findMany"]>[0]);
 
                 const entities = (results as Record<string, unknown>[]).map(row =>
                     this.drizzleResultToEntity<M>(row, collection, collectionPath, idInfo, options.databaseId, idInfoArray)
@@ -1192,7 +1192,7 @@ export class EntityFetchService {
                 );
 
 
-                const results = await qb.findMany(queryOpts as unknown as Parameters<NonNullable<typeof qb>["findMany"]>[0]);
+                const results = await qb.findMany(queryOpts as Parameters<NonNullable<typeof qb>["findMany"]>[0]);
 
                 const restRows = (results as Record<string, unknown>[]).map(row =>
                     this.drizzleResultToRestRow(row, collection, idInfo, idInfoArray)
@@ -1306,7 +1306,7 @@ export class EntityFetchService {
                 const row = await qb.findFirst({
                     where: eq(idField, parsedId),
                     ...(withConfig ? { with: withConfig } : {})
-                } as unknown as Parameters<NonNullable<typeof qb>["findFirst"]>[0]);
+                } as Parameters<NonNullable<typeof qb>["findFirst"]>[0]);
 
                 if (!row) return null;
 
@@ -1516,7 +1516,7 @@ export class EntityFetchService {
             }
 
 
-            const results = await queryTarget.findMany(queryOpts as unknown as Parameters<NonNullable<typeof queryTarget>["findMany"]>[0]);
+            const results = await queryTarget.findMany(queryOpts as Parameters<NonNullable<typeof queryTarget>["findMany"]>[0]);
 
             // Flatten the nested Drizzle results into REST format
             return results.map((row: Record<string, unknown>) => {

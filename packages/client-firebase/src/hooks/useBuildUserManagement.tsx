@@ -91,7 +91,7 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<any> = 
 
     const users = usersWithRoleIds.map(u => ({
         ...u,
-    }) as unknown as USER);
+    }) as USER);
 
     const [rolesError, setRolesError] = React.useState<Error | undefined>();
     const [usersError, setUsersError] = React.useState<Error | undefined>();

@@ -108,7 +108,7 @@ export const errorHandler: ErrorHandler = (err, c) => {
             logMessage = `Database schema mismatch (${issue} missing): ${cause.message}. Did you forget to run migrations ('pnpm db:push' or 'pnpm db:migrate')?`;
         }
     } else if ("code" in error && error.code === "ENETUNREACH") {
-         const netErr = error as unknown as PgLikeError;
+         const netErr = error as PgLikeError;
          logMessage = `Network unreachable. Cannot connect to service at ${netErr.address}:${netErr.port}.`;
     } else if ("code" in error && (error.code === "42703" || error.code === "42P01")) {
         const issue = error.code === "42703" ? "column" : "table";

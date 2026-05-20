@@ -38,4 +38,15 @@ const tagsCollection: EntityCollection = {
     ]
 };
 
+
+tagsCollection.securityRules = [
+    {
+        name: "tags_public_access",
+        mode: "permissive",
+        operation: "all",
+        pgRoles: ["public"],
+        using: "true"
+    }
+];
+
 export default tagsCollection;
