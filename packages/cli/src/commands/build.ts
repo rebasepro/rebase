@@ -6,7 +6,7 @@
  * uses the correct workspace-aware command.
  */
 import chalk from "chalk";
-import execa from "execa";
+import { execa } from "execa";
 import { requireProjectRoot } from "../utils/project";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 

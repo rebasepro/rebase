@@ -8,11 +8,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "fs";
 import path from "path";
 import os from "os";
-import { promisify } from "util";
-import ncp from "ncp";
+import { cp } from "fs/promises";
 import { configureEnvFile } from "./init.js";
-
-const copy = promisify(ncp);
 
 let tmpDir: string;
 
@@ -45,8 +42,8 @@ async function simulateInit(projectName: string): Promise<string> {
     const targetDir = path.join(tmpDir, projectName);
     fs.mkdirSync(targetDir, { recursive: true });
 
-    await copy(TEMPLATE_DIR, targetDir, {
-        clobber: false,
+    await cp(TEMPLATE_DIR, targetDir, {
+        recursive: true,
         filter: (source: string) => {
             const basename = path.basename(source);
             return basename !== "node_modules" && basename !== ".DS_Store";

@@ -6,6 +6,26 @@ import { useData, useRebaseContext } from "@rebasepro/core";
 const DEFAULT_PAGE_SIZE = 20;
 
 /**
+ * Shallow equality for entity value records.
+ * Handles primitives and reference equality for nested values.
+ * Avoids JSON.stringify allocation on every comparison.
+ */
+function shallowEqualValues(
+    a: Record<string, unknown> | undefined,
+    b: Record<string, unknown> | undefined
+): boolean {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    if (keysA.length !== keysB.length) return false;
+    for (const key of keysA) {
+        if (a[key] !== b[key]) return false;
+    }
+    return true;
+}
+
+/**
  * Data state for a single board column
  */
 export interface BoardColumnData<M extends Record<string, unknown> = Record<string, unknown>> {
@@ -351,9 +371,9 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
                             identical = false;
                             break;
                         }
-                        // Deep-compare values by JSON serialization
-                        // This covers order key, column assignment, and all other fields
-                        if (JSON.stringify(a.values) !== JSON.stringify(b.values)) {
+                        // Shallow-compare values to avoid JSON.stringify allocations
+                        // entity.values are flat records from the DB, so shallow suffices
+                        if (!shallowEqualValues(a.values, b.values)) {
                             identical = false;
                             break;
                         }

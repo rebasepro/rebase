@@ -2,7 +2,7 @@
  * CLI command: rebase db <action>
  */
 import chalk from "chalk";
-import execa from "execa";
+import { execa } from "execa";
 import {
     requireProjectRoot,
     requireBackendDir,

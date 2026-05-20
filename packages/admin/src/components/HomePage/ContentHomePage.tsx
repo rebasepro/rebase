@@ -362,7 +362,7 @@ export function ContentHomePage({
                     modifiers={dndModifiers}
                 >
                     <SortableContext
-                        key={JSON.stringify(containers)}
+                        key={containers.join(",")}
                         items={containers}
                         strategy={verticalListSortingStrategy}
                     >

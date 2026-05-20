@@ -21,8 +21,7 @@
     "@rebasepro/core": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@rebasepro/ui": "workspace:*",
-    "@rebasepro/utils": "workspace:*",
-    "react-compiler-runtime": "1.0.0"
+    "@rebasepro/utils": "workspace:*"
   },
   "peerDependencies": {
     "react": ">=19.0.0",
@@ -55,7 +54,6 @@
     "@vitejs/plugin-react": "^4.3.4",
     "babel-jest": "^29.7.0",
     "babel-plugin-react-compiler": "^19.0.0-beta-af1b7da-20250417",
-    "eslint-plugin-react-compiler": "^19.1.0-rc.2",
     "jest": "^29.7.0",
     "ts-jest": "^29.4.5",
     "typescript": "^5.9.3",

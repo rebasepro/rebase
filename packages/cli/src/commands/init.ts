@@ -4,15 +4,15 @@ import chalk from "chalk";
 import path from "path";
 import fs from "fs";
 import { promisify } from "util";
-import execa from "execa";
-import ncp from "ncp";
+import { execa } from "execa";
+import { cp } from "fs/promises";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import type { PackageManager, PMCommands } from "../utils/package-manager";
 
 const access = promisify(fs.access);
-const copy = promisify(ncp);
+
 
 // Resolve template path relative to this file
 const __filename = fileURLToPath(import.meta.url);
@@ -165,9 +165,8 @@ async function createProject(options: InitOptions) {
     // Copy template files
     console.log(chalk.gray("  Copying project files..."));
     try {
-        await copy(options.templateDirectory, options.targetDirectory, {
-            clobber: false,
-            dot: true,
+        await cp(options.templateDirectory, options.targetDirectory, {
+            recursive: true,
             filter: (source: string) => {
                 const basename = path.basename(source);
                 // Skip node_modules and .DS_Store

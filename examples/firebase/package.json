@@ -17,7 +17,7 @@
     "react-dom": "^19.2.3",
     "react-router": "^7.3.0",
     "react-router-dom": "^7.3.0",
-    "typeface-rubik": "^1.1.13"
+    "@fontsource/rubik": "^5.2.5"
   },
   "scripts": {
     "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f",

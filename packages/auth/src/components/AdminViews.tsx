@@ -1,15 +1,44 @@
-
-import React, { useCallback, useMemo, useState } from "react";
-import {
-    useSnackbarController,
-    ConfirmationDialog,
-    useAuthController
-} from "@rebasepro/core";
+import React, { useState } from "react";
+import { ConfirmationDialog, useAuthController, useSnackbarController } from "@rebasepro/core";
 import { AppView, EntityCollection, Role, SecurityRule, User } from "@rebasepro/types";
 
-import { Button, Chip, Container, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Paper, Table, TableBody, TableCell, TableHeader, TableRow, TextField, Typography, CircularProgress, CenteredView, Tooltip, Checkbox, MultiSelect, MultiSelectItem, LoadingButton, getColorSchemeForSeed, ChipColorScheme, ChipColorKey } from "@rebasepro/ui";
+import {
+    Button,
+    CenteredView,
+    Checkbox,
+    Chip,
+    ChipColorKey,
+    ChipColorScheme,
+    CircularProgress,
+    Container,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    getColorSchemeForSeed,
+    IconButton,
+    LoadingButton,
+    MultiSelect,
+    MultiSelectItem,
+    Table,
+    TableBody,
+    TableCell,
+    TableHeader,
+    TableRow,
+    TextField,
+    Tooltip,
+    Typography
+} from "@rebasepro/ui";
 import { PlusIcon, Trash2Icon } from "lucide-react";
 import { UserManagement } from "../hooks/useBackendUserManagement";
+
+/** Order-independent equality for string arrays (avoids JSON.stringify + .sort() mutation). */
+function areSameStringArrays(a: string[], b: string[]): boolean {
+    if (a.length !== b.length) return false;
+    if (a.length === 0) return true;
+    const setB = new Set(b);
+    return a.every(v => setB.has(v));
+}
 
 interface AdminViewsProps {
     userManagement: UserManagement;
@@ -326,7 +355,7 @@ message: error instanceof Error ? error.message : "Failed to save user" });
     const dirty = isNewUser ||
         displayName !== (userProp?.displayName || "") ||
         email !== (userProp?.email || "") ||
-        JSON.stringify(selectedRoleIds.sort()) !== JSON.stringify((userProp?.roles || []).sort());
+        !areSameStringArrays(selectedRoleIds, userProp?.roles || []);
 
     return (
         <Dialog open={open} onOpenChange={(open) => !open ? handleClose() : undefined} maxWidth="4xl">

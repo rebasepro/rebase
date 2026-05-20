@@ -6,7 +6,7 @@
  * runs the start script in the backend workspace.
  */
 import chalk from "chalk";
-import execa from "execa";
+import { execa } from "execa";
 import { requireProjectRoot, findEnvFile } from "../utils/project";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 

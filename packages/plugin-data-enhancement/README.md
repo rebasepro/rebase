@@ -25,7 +25,7 @@ No need to add any subscription key or anything like that.
 ```tsx
 import React from "react";
 import { Rebase } from "@rebasepro/core";
-import "typeface-rubik";
+import "@fontsource/rubik";
 import "@fontsource/jetbrains-mono";
 
 import { useDataEnhancementPlugin } from "@rebasepro/data_enhancement";

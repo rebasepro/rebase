@@ -1,7 +1,7 @@
 import React from "react";
 
 import "@fontsource/jetbrains-mono";
-import "typeface-rubik";
+import "@fontsource/rubik";
 
 import { useRebaseAuthController, useBackendUserManagement, RebaseAuth } from "@rebasepro/auth";
 import { Rebase } from "@rebasepro/core";

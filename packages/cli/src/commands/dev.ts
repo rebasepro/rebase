@@ -16,7 +16,7 @@
  */
 import arg from "arg";
 import chalk from "chalk";
-import execa, { ExecaChildProcess } from "execa";
+import { execa, execaCommandSync, type ResultPromise } from "execa";
 import path from "path";
 import fs from "fs";
 import {
@@ -107,7 +107,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     console.log(chalk.bold("  🚀 Rebase Dev Server"));
     console.log("");
 
-    const children: ExecaChildProcess[] = [];
+    const children: ResultPromise[] = [];
 
     // --- State for printing the banner ---
     let frontendUrl = "";
@@ -156,7 +156,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             if (child.pid && !child.killed) {
                 try {
                     if (process.platform === "win32") {
-                        execa.commandSync(`taskkill /pid ${child.pid} /T /F`);
+                        execaCommandSync(`taskkill /pid ${child.pid} /T /F`);
                     } else {
                         process.kill(-child.pid, "SIGKILL");
                     }

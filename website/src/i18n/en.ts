@@ -11,7 +11,7 @@ export const en = {
   "demo.init": "✔ Initialized Rebase in current directory.",
   "demo.pull": "✔ Introspected PostgreSQL schema. Generated types.",
   "demo.dev": "✔ Admin panel, API, and WebSocket server running.",
-  "social.title": "Trusted by developers and startups building on Postgres",
+  "social.title": "Trusted by developers and startups around the world",
   "howitworks.badge": "Time reclaimed",
   "howitworks.title":
     'What you\'ll <span class="text-primary">never build again.</span>',

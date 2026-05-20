@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from "react";
 
-import "typeface-rubik";
+import "@fontsource/rubik";
 import "@fontsource/jetbrains-mono";
 
 import { Authenticator } from "@rebasepro/types";

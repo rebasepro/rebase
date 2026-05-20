@@ -5,7 +5,7 @@
  * the generated Drizzle schema, and the live PostgreSQL database.
  */
 import chalk from "chalk";
-import execa from "execa";
+import { execa } from "execa";
 import {
     requireProjectRoot,
     requireBackendDir,

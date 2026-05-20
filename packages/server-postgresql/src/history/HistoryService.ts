@@ -210,6 +210,29 @@ export class HistoryService {
 
 
 /**
+ * Deep equality without JSON.stringify.
+ * Handles primitives, arrays, Dates, and plain objects recursively.
+ */
+function deepEqual(a: unknown, b: unknown): boolean {
+    if (a === b) return true;
+    if (a == null || b == null) return false;
+    if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
+    if (Array.isArray(a) && Array.isArray(b)) {
+        if (a.length !== b.length) return false;
+        return a.every((v, i) => deepEqual(v, b[i]));
+    }
+    if (typeof a === "object" && typeof b === "object") {
+        const aObj = a as Record<string, unknown>;
+        const bObj = b as Record<string, unknown>;
+        const aKeys = Object.keys(aObj);
+        const bKeys = Object.keys(bObj);
+        if (aKeys.length !== bKeys.length) return false;
+        return aKeys.every(k => deepEqual(aObj[k], bObj[k]));
+    }
+    return false;
+}
+
+/**
  * Shallow comparison to find top-level keys that changed between two objects.
  */
 export function findChangedFields(
@@ -230,12 +253,12 @@ export function findChangedFields(
         if (key.startsWith("__")) continue;
 
         if (oldVal !== newVal) {
-            // For objects/arrays, use JSON comparison
+            // For objects/arrays, use structural comparison
             if (
                 typeof oldVal === "object" && oldVal !== null &&
                 typeof newVal === "object" && newVal !== null
             ) {
-                if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+                if (!deepEqual(oldVal, newVal)) {
                     changed.push(key);
                 }
             } else {

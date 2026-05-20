@@ -53,7 +53,6 @@
     "@types/react-dom": "^19.0.3",
     "@types/react-measure": "^2.0.12",
     "@vitejs/plugin-react": "^4.3.4",
-    "eslint-plugin-react-compiler": "beta",
     "jest": "^29.7.0",
     "ts-jest": "^29.3.1",
     "typescript": "^5.8.3",

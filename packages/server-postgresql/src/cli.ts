@@ -1,6 +1,6 @@
 import arg from "arg";
 import chalk from "chalk";
-import execa from "execa";
+import { execa } from "execa";
 import path from "path";
 import fs from "fs";
 import { execSync } from "child_process";
