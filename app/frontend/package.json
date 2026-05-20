@@ -4,7 +4,8 @@
     "private": true,
     "type": "module",
     "dependencies": {
-        "@fontsource/jetbrains-mono": "^5.2.5",
+        "@fontsource/jetbrains-mono": "^5.2.8",
+        "@fontsource/rubik": "^5.2.8",
         "@rebasepro/admin": "workspace:*",
         "@rebasepro/auth": "workspace:*",
         "@rebasepro/client": "workspace:*",
@@ -15,10 +16,9 @@
         "@rebasepro/types": "workspace:*",
         "@rebasepro/ui": "workspace:*",
         "@tailwindcss/typography": "^0.5.19",
-        "react": "^19.0.0",
-        "react-dom": "^19.0.0",
-        "react-router-dom": "^7.0.0",
-        "@fontsource/rubik": "^5.2.5"
+        "react": "^19.2.6",
+        "react-dom": "^19.2.6",
+        "react-router-dom": "^7.15.1"
     },
     "scripts": {
         "login": "rebase login",
@@ -42,19 +42,19 @@
         ]
     },
     "devDependencies": {
-        "@tailwindcss/vite": "^4.1.12",
-        "@types/react": "^19.0.8",
-        "@types/react-dom": "^19.0.3",
-        "@vitejs/plugin-react": "^4.3.4",
-        "eslint-plugin-import": "^2.31.0",
-        "eslint-plugin-n": "^17.15.1",
-        "eslint-plugin-promise": "^7.2.1",
-        "eslint-plugin-react": "^7.37.4",
-        "eslint-plugin-react-hooks": "^5.1.0",
-        "eslint-plugin-react-refresh": "^0.4.18",
+        "@tailwindcss/vite": "^4.3.0",
+        "@types/react": "^19.2.15",
+        "@types/react-dom": "^19.2.3",
+        "@vitejs/plugin-react": "^4.7.0",
+        "eslint-plugin-import": "^2.32.0",
+        "eslint-plugin-n": "^17.24.0",
+        "eslint-plugin-promise": "^7.3.0",
+        "eslint-plugin-react": "^7.37.5",
+        "eslint-plugin-react-hooks": "^5.2.0",
+        "eslint-plugin-react-refresh": "^0.4.26",
         "rollup-plugin-visualizer": "7.0.1",
-        "typescript": "^5.8.3",
-        "vite": "^5.4.17",
-        "vite-plugin-svgr": "^4.3.0"
+        "typescript": "^5.9.3",
+        "vite": "^5.4.21",
+        "vite-plugin-svgr": "^4.5.0"
     }
 }

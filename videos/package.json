@@ -6,15 +6,15 @@
     "type": "module",
     "dependencies": {
         "@remotion/cli": "4.0.456",
-        "react": "^19.0.0",
-        "react-dom": "^19.0.0",
+        "react": "^19.2.6",
+        "react-dom": "^19.2.6",
         "remotion": "4.0.456"
     },
     "devDependencies": {
-        "@types/react": "^19.0.8",
-        "@types/react-dom": "^19.0.3",
+        "@types/react": "^19.2.15",
+        "@types/react-dom": "^19.2.3",
         "puppeteer": "24.42.0",
-        "typescript": "^5.8.3"
+        "typescript": "^5.9.3"
     },
     "scripts": {
         "dev": "remotion studio",

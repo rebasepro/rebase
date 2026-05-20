@@ -14,13 +14,13 @@
     "dev": "tsc --watch"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.2.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@rebasepro/client": "workspace:*",
-    "dotenv": "^16.0.0"
+    "dotenv": "^16.6.1"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "typescript": "^5.0.0"
+    "@types/node": "^20.19.41",
+    "typescript": "^5.9.3"
   },
   "files": [
     "bin/",

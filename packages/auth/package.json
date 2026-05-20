@@ -29,11 +29,11 @@
     "./package.json": "./package.json"
   },
   "devDependencies": {
-    "@types/node": "^20.19.17",
-    "@types/react": "^19.0.8",
-    "@types/react-dom": "^19.0.3",
+    "@types/node": "^20.19.41",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
     "typescript": "^5.9.3",
-    "vite": "^7.2.4"
+    "vite": "^7.3.3"
   },
   "scripts": {
     "dev": "vite",
