@@ -58,7 +58,7 @@ export function RichTextEditorDemo() {
 
             {/* Editor body */}
             <div className="flex-1 p-8 lg:p-12 overflow-hidden flex flex-col gap-6 max-w-3xl mx-auto w-full relative">
-                <h1 className="text-4xl font-bold text-white tracking-tight">Product Update: Q3 Features</h1>
+                <div className="text-4xl font-bold text-white tracking-tight">Product Update: Q3 Features</div>
                 
                 <p className="text-lg text-surface-400 leading-relaxed">
                     We've been working hard on the latest features for the Rebase editing experience. Here's a quick look at what's new.

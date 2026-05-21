@@ -429,4 +429,7 @@ export const es = {
   "about.join.discord": "Únete a nuestro Discord",
   "index.meta.title": "Rebase — La Plataforma de Aplicaciones Impulsada por Esquemas para Postgres",
   "index.meta.description": "Define tu esquema una vez en TypeScript. Obtén un panel de administración listo para producción, APIs REST y GraphQL, un SDK tipado y sincronización en tiempo real, todo generado instantáneamente. Código abierto, autoalojado.",
+  "mosaic.badge": "Flexibilidad Infinita",
+  "mosaic.title": "Un marco visual para cualquier caso de uso.",
+  "mosaic.subtitle": "Desde comercio electrónico y gestión de activos hasta constructores visuales y edición de código en vivo. La interfaz impulsada por esquemas de Rebase se adapta a cualquier panel de control o editor.",
 };

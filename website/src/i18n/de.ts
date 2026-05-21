@@ -419,4 +419,7 @@ export const de = {
   "about.join.discord": "Treten Sie unserem Discord bei",
   "index.meta.title": "Rebase — Die Schema-gesteuerte App-Plattform für Postgres",
   "index.meta.description": "Definieren Sie Ihr Schema einmalig in TypeScript. Erhalten Sie ein produktionsbereites Admin-Panel, REST- & GraphQL-APIs, ein typisiertes SDK und Echtzeit-Synchronisation — alles sofort generiert. Open-Source, selbst gehostet.",
+  "mosaic.badge": "Unendliche Flexibilität",
+  "mosaic.title": "Ein visuelles Framework für jeden Anwendungsfall.",
+  "mosaic.subtitle": "Von E-Commerce und Digital Asset Management bis hin zu visuellen Editoren und Live-Code-Anpassungen. Die Schema-gesteuerte UI von Rebase passt sich jedem Dashboard oder Editor an.",
 };

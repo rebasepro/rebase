@@ -10,7 +10,7 @@ Il branching del database ti permette di creare **copie istantanee e isolate** d
 
 Questo è simile al branching di Git, ma per il tuo database. Crea un branch, sperimenta con migrazioni o dati, e cancellalo quando hai finito. Il tuo database di produzione non viene mai toccato.
 
-## How It Works
+## Come funziona
 
 Rebase utilizza `CREATE DATABASE ... TEMPLATE` nativo di PostgreSQL per creare i branch. Questo è:
 
@@ -24,7 +24,7 @@ I metadati del branch sono memorizzati in una tabella `rebase.branches` nel data
 
 L'API di branching è disponibile tramite l'interfaccia `DatabaseAdmin` del backend:
 
-### Create a Branch
+### Creazione di un branch
 
 ```typescript
 // Create a branch from the default database
@@ -50,14 +50,14 @@ const branches = await admin.listBranches();
 // ]
 ```
 
-### Get Branch Info
+### Ottenere informazioni sul branch
 
 ```typescript
 const branch = await admin.getBranchInfo("feature_auth");
 // { name: "feature_auth", parentDatabase: "rebase", createdAt: ..., sizeBytes: ... }
 ```
 
-### Delete a Branch
+### Eliminazione di un branch
 
 ```typescript
 await admin.deleteBranch("feature_auth");

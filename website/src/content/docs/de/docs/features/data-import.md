@@ -23,7 +23,7 @@ Der Import-Assistent übernimmt die Spaltenzuordnung, Datentypumwandlung und Val
 5. Zeigen Sie eine Vorschau der Daten an und beheben Sie Validierungsfehler
 6. Klicken Sie auf **Importieren**, um alle Entitäten zu speichern
 
-![Data import interface](/img/data_import.png)
+![Datenimport-Benutzeroberfläche](/img/data_import.png)
 
 ## Konfiguration
 

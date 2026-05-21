@@ -64,7 +64,7 @@ const { data, meta } = await client.data.products.find({
 // meta has { total, limit, offset, hasMore }
 ```
 
-### Find by ID
+### Buscar por ID
 
 ```typescript
 const product = await client.data.products.findById(42);
@@ -102,7 +102,7 @@ const updated = await client.data.products.update(42, {
 await client.data.products.delete(42);
 ```
 
-## Fluent Query Builder
+## Constructor de consultas fluido
 
 Encadene métodos para consultas más expresivas:
 
@@ -147,7 +147,7 @@ const { data } = await client.data.products
 
 Las relaciones se pueden incluir en los resultados de la consulta para que las entidades relacionadas se devuelvan junto con los datos primarios, en lugar de solo sus IDs de clave foránea.
 
-### Using `include()` (Fluent)
+### Uso de `include()` (Fluido)
 
 ```typescript
 // Include specific relations
@@ -161,7 +161,7 @@ const { data } = await client.data.posts
     .find();
 ```
 
-### Using `find({ include })` (Params)
+### Uso de `find({ include })` (Parámetros)
 
 ```typescript
 const { data } = await client.data.posts.find({
@@ -169,7 +169,7 @@ const { data } = await client.data.posts.find({
 });
 ```
 
-### Combining with Filters
+### Combinación con filtros
 
 ```typescript
 const { data } = await client.data.posts
@@ -180,7 +180,7 @@ const { data } = await client.data.posts
     .find();
 ```
 
-### Reading Relation Data
+### Lectura de datos de relación
 
 Cuando se incluyen relaciones, la respuesta contiene **tanto** la clave foránea escalar como el objeto de relación hidratado:
 
@@ -215,7 +215,7 @@ relations: [
 client.data.articles.include("author", "categories").find()
 ```
 
-## Real-time Subscriptions
+## Suscripciones en tiempo real
 
 Suscríbase a los cambios de colección a través de WebSocket:
 
@@ -303,7 +303,7 @@ const result = await client.call<{ summary: string }>("generate-summary", {
 });
 ```
 
-## Using with React
+## Uso con React
 
 En un frontend de Rebase, el cliente se crea típicamente una vez y se comparte a través de un contexto:
 

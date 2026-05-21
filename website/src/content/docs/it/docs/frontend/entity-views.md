@@ -13,7 +13,7 @@ Le viste entità ti permettono di aggiungere **schede** personalizzate alla pagi
 - **Analisi** o grafici
 - **Editor personalizzati** (testo RTF, editor di mappe)
 
-## Adding Entity Views
+## Aggiunta di viste entità
 
 ```typescript
 const articlesCollection: EntityCollection = {
@@ -35,7 +35,7 @@ const articlesCollection: EntityCollection = {
 };
 ```
 
-## Building an Entity View
+## Costruzione di una vista entità
 
 ```tsx
 import { EntityCustomViewParams } from "@rebasepro/types";

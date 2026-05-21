@@ -1,6 +1,6 @@
 ---
-title: Client SDK
-sidebar_label: Client SDK
+title: Client-SDK
+sidebar_label: Client-SDK
 description: Verwenden Sie das Rebase Client SDK, um von jeder JavaScript-Anwendung aus mit Ihrem Backend zu interagieren – Datenoperationen, Authentifizierung, Speicherung und Echtzeit-Abonnements.
 ---
 
@@ -102,7 +102,7 @@ const updated = await client.data.products.update(42, {
 await client.data.products.delete(42);
 ```
 
-## Fluent Query Builder
+## Fluent-Query-Builder
 
 Verketten Sie Methoden für ausdrucksstärkere Abfragen:
 

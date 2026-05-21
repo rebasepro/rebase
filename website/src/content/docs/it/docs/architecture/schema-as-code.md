@@ -100,8 +100,16 @@ CREATE TABLE products (
 );
 ```
 
+## Sicurezza e Oggetti di Database Non Mappati
+
+Quando Rebase aggiorna lo schema del database, mappa le definizioni delle collezioni TypeScript sulle tabelle del database. Per garantire che **gli oggetti del database non mappati (ad esempio tabelle, viste, enum) non vengano mai eliminati o modificati**, Rebase implementa diversi livelli di sicurezza:
+
+1. **Filtraggio Rigido delle Tabelle (`tablesFilter`)**: La configurazione Drizzle generata limita dinamicamente la sincronizzazione alle sole tabelle esportate nello schema generato. Eventuali tabelle non riconosciute o tabelle di sistemi legacy esistenti nel database vengono ignorate dal motore di sincronizzazione.
+2. **Restrizioni sullo Schema (`schemaFilter`)**: La sincronizzazione del database è limitata esclusivamente allo schema `public`. Le tabelle interne del database, gli schemi personalizzati e le tabelle specifiche delle estensioni non vengono toccate.
+3. **Protezione dei Ruoli e delle Estensioni**: Drizzle è configurato per non gestire i ruoli del database (`entities.roles: false`) o le tabelle di supporto di estensioni come PostGIS.
+4. **Conferma Interattiva in Modalità di Sviluppo**: Quando si esegue `rebase db push` in sviluppo, la CLI viene eseguita con i flag `--strict` e `--verbose`, il che assicura che gli sviluppatori debbano esaminare e approvare esplicitamente qualsiasi azione SQL distruttiva prima che venga eseguita.
+
 ## Prossimi Passi
 
 - **[Collezioni](/docs/collections)** — Riferimento completo alla configurazione delle collezioni
 - **[Proprietà](/docs/collections/properties)** — Mappature dettagliate dei tipi di colonna
----

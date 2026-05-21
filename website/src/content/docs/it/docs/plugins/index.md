@@ -112,7 +112,7 @@ import { useDataEnhancementPlugin } from "@rebasepro/data_enhancement";
 const enhancementPlugin = useDataEnhancementPlugin();
 ```
 
-![Data enhancement](/img/data_enhancement.png)
+![Miglioramento dei dati](/img/data_enhancement.png)
 
 ## Iniezione di Collezioni
 

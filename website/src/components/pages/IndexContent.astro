@@ -2,6 +2,7 @@
 const { lang, t } = Astro.props;
 import ScrollSyncShowcase from '../../components/ScrollSyncShowcase.astro';
 import CollectionPowerSection from '../../components/CollectionPowerSection.astro';
+import PayloadMosaicDemo from '../../components/demos/PayloadMosaicDemo';
 import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
 import { AdminDemoCarousel } from '../../components/demos/AdminDemoCarousel';
 import { BodyPartsDemo } from '../../components/demos/BodyPartsDemo';
@@ -693,6 +694,25 @@ const translatePath = useTranslatedPath(lang);
             <CollectionPowerSection/>
         </div>
 
+        <!-- Visual Mosaic Showcase -->
+        <section id="s-mosaic-showcase" class="relative isolate bg-black py-28 sm:py-36 overflow-hidden border-t border-surface-900">
+            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+                <div class="mx-auto max-w-3xl text-center mb-16 animate-on-scroll fade-in-up">
+                    <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">{t('mosaic.badge')}</p>
+                    <h2 class="mt-4 text-3xl font-bold tracking-tight text-white sm:text-5xl">
+                        {t('mosaic.title')}
+                    </h2>
+                    <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed">
+                        {t('mosaic.subtitle')}
+                    </p>
+                </div>
+
+                <div class="max-w-7xl mx-auto animate-on-scroll fade-in-up delay-100">
+                    <PayloadMosaicDemo client:load />
+                </div>
+            </div>
+        </section>
+
         <!-- Built With Rebase: SustenTalent Use Case -->
         <section id="s-case-study" class="relative isolate bg-black py-28 sm:py-36 overflow-hidden">
             <div class="mx-auto max-w-7xl px-4">
@@ -706,7 +726,7 @@ const translatePath = useTranslatedPath(lang);
             </div>
 
             <div class="relative w-full overflow-hidden mt-24">
-                <div id="case-studies-slider" class="flex overflow-x-hidden snap-x snap-mandatory scroll-smooth">
+                <div id="case-studies-slider" class="flex overflow-x-hidden snap-x snap-mandatory scroll-smooth no-scrollbar [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     <!-- Case Study 1: MedicalMotion -->
                     <div class="min-w-full w-full snap-center shrink-0 px-6 lg:px-8 max-w-7xl mx-auto flex-none">
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mx-auto max-w-7xl">

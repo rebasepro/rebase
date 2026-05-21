@@ -30,13 +30,13 @@ const productsCollection: EntityCollection = {
 
 ## Visualização em Lista
 
-![List View screenshot placeholder](/img/features/list-view.png)
+![Espaço reservado para captura de tela de visualização em lista](/img/features/list-view.png)
 
 A visualização em lista é o modo de visualização padrão clássico e limpo do CMS, mostrando entidades em um formato de lista direta, sem a densidade de uma planilha.
 
 ## Visualização em Tabela
 
-![Table View screenshot placeholder](/img/features/table-view.png)
+![Espaço reservado para captura de tela de visualização em tabela](/img/features/table-view.png)
 
 A visualização padrão é uma planilha virtualizada de alto desempenho com:
 
@@ -62,7 +62,7 @@ Controle a altura da linha com `defaultSize`:
 
 ## Visualização Kanban
 
-![Kanban View screenshot placeholder](/img/features/kanban-view.png)
+![Espaço reservado para captura de tela de visualização Kanban](/img/features/kanban-view.png)
 
 Configure um quadro Kanban especificando qual propriedade enum usar como colunas:
 
@@ -95,7 +95,7 @@ Arrastar e soltar entre colunas atualiza automaticamente o campo enum e a ordem 
 
 ## Visualização em Cartões
 
-![Cards View screenshot placeholder](/img/features/cards-view.png)
+![Espaço reservado para captura de tela de visualização em cartões](/img/features/cards-view.png)
 
 Os cartões exibem entidades como cartões visuais — úteis para conteúdo com muitas imagens:
 

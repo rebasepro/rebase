@@ -98,7 +98,7 @@ await initializeRebaseBackend({
 - Servidor **WebSocket** — sincronización de entidades en tiempo real a través de Postgres LISTEN/NOTIFY
 - **Historial** — registro de auditoría en cada cambio de entidad
 
-## Shared Collections (`shared/`)
+## Colecciones compartidas (`shared/`)
 
 Las colecciones son la **única fuente de verdad** para tu modelo de datos. Se definen en TypeScript y son consumidas tanto por el frontend (para la generación de la interfaz de usuario) como por el backend (para la generación de esquemas y el enrutamiento de la API).
 
@@ -118,7 +118,7 @@ export const productsCollection: EntityCollection = {
 
 El `slug` se convierte en la ruta URL en la interfaz de administración y en el endpoint de la API REST (`/api/data/products`). La `table` se mapea al nombre de la tabla de PostgreSQL.
 
-## How They Connect
+## Cómo se conectan
 
 1. **Tú defines** colecciones en `shared/`
 2. **El backend** las lee para generar esquemas de Drizzle y montar rutas REST

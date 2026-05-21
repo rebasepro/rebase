@@ -100,6 +100,15 @@ CREATE TABLE products (
 );
 ```
 
+## Segurança e Objetos de Banco de Dados Não Mapeados
+
+Quando o Rebase atualiza o schema do banco de dados, ele mapeia as definições de coleção TypeScript para as tabelas do banco de dados. Para garantir que **os objetos do banco de dados não mapeados (por exemplo, tabelas, views, enums) nunca sejam descartados ou modificados**, o Rebase implementa várias camadas de segurança:
+
+1. **Filtragem Estrita de Tabelas (`tablesFilter`)**: A configuração Drizzle gerada restringe dinamicamente a sincronização apenas às tabelas exportadas no schema gerado. Quaisquer tabelas não reconhecidas ou tabelas de sistemas legados existentes no banco de dados são ignoradas pelo mecanismo de sincronização.
+2. **Restrições de Schema (`schemaFilter`)**: A sincronização do banco de dados é restrita exclusivamente ao schema `public`. Tabelas de banco de dados internas, schemas personalizados e tabelas específicas de extensões não são tocadas.
+3. **Proteção de Funções e Extensões**: O Drizzle é configurado para não gerenciar funções de banco de dados (`entities.roles: false`) ou tabelas auxiliares de extensões como PostGIS.
+4. **Confirmação Interativa no Modo de Desenvolvimento**: Ao executar `rebase db push` em desenvolvimento, a CLI é executada com as flags `--strict` e `--verbose`, o que garante que os desenvolvedores devem revisar e aprovar explicitamente quaisquer ações SQL destrutivas antes de serem executadas.
+
 ## Próximos Passos
 
 - **[Coleções](/docs/collections)** — Referência completa de configuração de coleção

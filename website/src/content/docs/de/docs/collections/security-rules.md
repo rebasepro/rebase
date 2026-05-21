@@ -184,7 +184,7 @@ securityRules: [
 ]
 ```
 
-### Multi-Tenant SaaS
+### Mandantenfähiges SaaS
 
 ```typescript
 securityRules: [

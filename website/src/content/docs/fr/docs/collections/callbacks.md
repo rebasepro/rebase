@@ -191,7 +191,7 @@ properties: {
 }
 ```
 
-## The `context.data` API
+## L'API `context.data`
 
 Chaque rappel reçoit un objet `context` qui inclut `context.data` — une couche d'accès aux données unifiée pour effectuer des **opérations inter-collections** à partir des hooks de cycle de vie.
 

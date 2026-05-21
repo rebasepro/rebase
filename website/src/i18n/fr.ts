@@ -431,4 +431,7 @@ export const fr = {
   "about.join.discord": "Rejoignez notre Discord",
   "index.meta.title": "Rebase — La plateforme d'applications pilotée par schéma pour Postgres",
   "index.meta.description": "Définissez votre schéma une seule fois en TypeScript. Obtenez un panneau d'administration prêt pour la production, des API REST et GraphQL, un SDK typé et une synchronisation en temps réel — le tout généré instantanément. Open-source, auto-hébergé.",
+  "mosaic.badge": "Flexibilité Infinie",
+  "mosaic.title": "Un framework visuel pour tous vos cas d'usage.",
+  "mosaic.subtitle": "Du e-commerce et de la gestion d'actifs aux éditeurs visuels et à la modification de code en direct. L'interface de Rebase s'adapte à tous les besoins d'administration.",
 };

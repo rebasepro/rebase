@@ -30,13 +30,13 @@ const productsCollection: EntityCollection = {
 
 ## Listenansicht
 
-![List View screenshot placeholder](/img/features/list-view.png)
+![Screenshot-Platzhalter für Listenansicht](/img/features/list-view.png)
 
 Die Listenansicht ist der klassische, saubere CMS-Standardansichtsmodus, der Entitäten in einem unkomplizierten Listenformat ohne die Dichte einer Tabelle darstellt.
 
 ## Tabellenansicht
 
-![Table View screenshot placeholder](/img/features/table-view.png)
+![Screenshot-Platzhalter für Tabellenansicht](/img/features/table-view.png)
 
 Die Standardansicht ist eine hochleistungsfähige virtualisierte Tabelle mit:
 
@@ -62,7 +62,7 @@ Steuern Sie die Zeilenhöhe mit `defaultSize`:
 
 ## Kanban-Ansicht
 
-![Kanban View screenshot placeholder](/img/features/kanban-view.png)
+![Screenshot-Platzhalter für Kanban-Ansicht](/img/features/kanban-view.png)
 
 Konfigurieren Sie ein Kanban-Board, indem Sie festlegen, welche Enum-Eigenschaft als Spalten verwendet werden soll:
 
@@ -95,7 +95,7 @@ Drag-and-drop zwischen Spalten aktualisiert automatisch das Enum-Feld und die So
 
 ## Kartenansicht
 
-![Cards View screenshot placeholder](/img/features/cards-view.png)
+![Screenshot-Platzhalter für Kartenansicht](/img/features/cards-view.png)
 
 Karten zeigen Entitäten als visuelle Karten an – nützlich für inhaltsreiche Inhalte mit vielen Bildern:
 

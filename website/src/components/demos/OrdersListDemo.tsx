@@ -151,7 +151,7 @@ function OrderDetailPanel({ order, onClose, highlightedField }: {
           </div>
 
           {/* Title */}
-          <h2 className="text-xl font-semibold text-surface-900 dark:text-white leading-tight mb-2">{order.id}</h2>
+          <div className="text-xl font-semibold text-surface-900 dark:text-white leading-tight mb-2">{order.id}</div>
 
           {/* Path */}
           <div className="w-full rounded-md bg-surface-100 dark:bg-surface-800/40 px-3 py-1.5 mb-6">
@@ -419,7 +419,7 @@ export function OrdersListDemo() {
               {!panelOpen && (
                 <>
                   <div className="px-6 pt-4 pb-3 max-w-3xl mx-auto w-full">
-                    <h2 className="text-lg font-bold text-surface-900 dark:text-white mb-3">Orders</h2>
+                    <div className="text-lg font-bold text-surface-900 dark:text-white mb-3">Orders</div>
                     <div className="grid grid-cols-3 gap-2">
                       <KPICard title="Confirmed" subtitle="" value="15.0"
                         change={{ value: "+18.0%", positive: true }} icon={<Info size={14} />}

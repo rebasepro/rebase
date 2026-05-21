@@ -42,7 +42,7 @@ const ordersCollection: EntityCollection = {
 };
 ```
 
-## How It Works
+## Come funziona
 
 1. Il backend crea automaticamente una tabella `rebase.entity_history`
 2. Ad ogni creazione, aggiornamento o eliminazione, viene registrato uno snapshot con:

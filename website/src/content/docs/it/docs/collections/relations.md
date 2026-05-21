@@ -146,11 +146,11 @@ properties: {
 }
 ```
 
-![Relation field in form](/img/features/relation-form-field.png)
+![Campo relazione nel modulo](/img/features/relation-form-field.png)
 
 Quando si renderizza un'anteprima (come in una cella di tabella o un chip di riferimento), Rebase gestisce automaticamente l'idratazione:
 
-![Relation preview in table](/img/features/relation-table-preview.png)
+![Anteprima relazione nella tabella](/img/features/relation-table-preview.png)
 
 ## Join Multi-Salto
 

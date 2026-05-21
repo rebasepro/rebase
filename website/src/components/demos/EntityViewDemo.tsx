@@ -1290,9 +1290,9 @@ width: "100%" }}
                 </div>
 
                 {/* Title */}
-                <h2 className="text-xl font-semibold text-surface-900 dark:text-white leading-tight mb-2">
+                <div className="text-xl font-semibold text-surface-900 dark:text-white leading-tight mb-2">
                   {formValues.title || "Untitled"}
-                </h2>
+                </div>
 
                 {/* Path */}
                 <div className="w-full rounded-md bg-surface-100 dark:bg-surface-800/40 px-3 py-1.5 mb-6">

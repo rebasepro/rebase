@@ -52,6 +52,7 @@ Rebase will pioneer the "UI as a Code Generator" approach (similar to TinaCMS or
    - The server saves the file.
    - The backend detects the file change and dynamically restarts that specific route/schema on the Hono server.
    - Under the hood, Rebase calls Drizzle ORM to generate SQL and seamlessly migrate the Postgres database to match the new TS definition.
+   - **Database Safety Guardrails**: To prevent any loss of database objects or tables created outside the Rebase schema (e.g., legacy tables, external schemas, extension helper tables), the generated Drizzle configuration implements a strict `tablesFilter` that dynamically includes only the active collections, ensuring unrecognized database objects are never dropped or modified.
 
 4. **"The Git Commit" Feature**
    Because the Schema lives in code, Rebase embraces Git. When the visual UI saves the new AST change:

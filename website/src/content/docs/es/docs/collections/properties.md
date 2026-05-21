@@ -148,7 +148,7 @@ active: {
 }
 ```
 
-![Switch field](/img/fields/Switch.png)
+![Campo de interruptor](/img/fields/Switch.png)
 
 ## Propiedades de Fecha
 
@@ -173,7 +173,7 @@ event_date: {
 }
 ```
 
-![Date field](/img/fields/Date.png)
+![Campo de fecha](/img/fields/Date.png)
 
 ### Opciones de Fecha
 
@@ -227,7 +227,7 @@ content: {
 }
 ```
 
-![Block field](/img/fields/Block.png)
+![Campo de bloque](/img/fields/Block.png)
 
 ### Opciones de Array
 
@@ -261,7 +261,7 @@ metadata: {
 }
 ```
 
-![Group field](/img/fields/Group.png)
+![Campo de grupo](/img/fields/Group.png)
 
 ### Opciones de Mapa (Map)
 
@@ -299,7 +299,7 @@ enum: [
 ]
 ```
 
-![Select field](/img/fields/Select.png)
+![Campo de selección](/img/fields/Select.png)
 
 ## Validación
 

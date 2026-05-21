@@ -15,7 +15,7 @@ Utilisez les fonctions personnalisées pour :
 - **Points de terminaison publics** — formulaires de contact, capture de leads, vérifications de l'état de santé
 - **Requêtes agrégées** — statistiques de tableau de bord, rapports, analyses
 
-## Defining a Custom Function
+## Définir une fonction personnalisée
 
 Créez un fichier dans votre répertoire `backend/functions/` qui exporte par défaut une application Hono :
 
@@ -142,7 +142,7 @@ export default app;
 Le middleware JWT de Rebase est limité aux routes API intégrées (`/api/data`, `/api/auth`, etc.). Les routes de fonctions personnalisées obtiennent le **contexte utilisateur analysé**, mais vous devez appliquer le contrôle d'accès vous-même.
 :::
 
-## Accessing the Database
+## Accès à la base de données
 
 Les fonctions personnalisées s'exécutent aux côtés de Rebase, vous pouvez donc accéder à la base de données via deux approches :
 
@@ -197,7 +197,7 @@ export default app;
 L'instance Drizzle `db` utilisée par Rebase est la même que celle que vous passez à `createPostgresBootstrapper`. Vous pouvez la partager librement entre les fonctions personnalisées et Rebase.
 :::
 
-## Route Registration Order
+## Ordre d'enregistrement des routes
 
 Les fonctions personnalisées sont chargées et montées **après** que `initializeRebaseBackend()` ait terminé la configuration principale. L'ordre d'initialisation est :
 

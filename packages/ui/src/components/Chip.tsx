@@ -59,12 +59,46 @@ export function Chip({
 
     // Resolve theme-aware colors
     const dark = isDarkMode();
-    const bgColor = usedColorScheme
-        ? (dark && usedColorScheme.darkColor ? usedColorScheme.darkColor : usedColorScheme.color)
-        : undefined;
-    const textColor = usedColorScheme
-        ? (dark && usedColorScheme.darkText ? usedColorScheme.darkText : usedColorScheme.text)
-        : undefined;
+
+    // Helper to generate rgba from hex or standard colors
+    const getRgba = (hex: string, alpha: number): string => {
+        if (!hex || !hex.startsWith("#")) return hex;
+        let color = hex.slice(1);
+        if (color.length === 3) {
+            color = color[0] + color[0] + color[1] + color[1] + color[2] + color[2];
+        }
+        const r = parseInt(color.slice(0, 2), 16);
+        const g = parseInt(color.slice(2, 4), 16);
+        const b = parseInt(color.slice(4, 6), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    };
+
+    let textColor = "";
+    let bgColor = "";
+    let border = "";
+
+    if (error) {
+        textColor = dark ? "#f87171" : "#dc2626";
+    } else if (usedColorScheme) {
+        textColor = dark && usedColorScheme.darkText ? usedColorScheme.darkText : usedColorScheme.text;
+    } else {
+        textColor = dark ? "#d4d4d4" : "#404040";
+    }
+
+    if (outlined) {
+        bgColor = getRgba(textColor, dark ? 0.12 : 0.06);
+        border = `1px solid ${getRgba(textColor, dark ? 0.25 : 0.18)}`;
+    } else {
+        if (error) {
+            bgColor = dark ? "rgba(220, 38, 38, 0.2)" : "rgba(239, 68, 68, 0.15)";
+            border = `1px solid ${dark ? "rgba(220, 38, 38, 0.4)" : "rgba(239, 68, 68, 0.3)"}`;
+        } else if (usedColorScheme) {
+            bgColor = dark && usedColorScheme.darkColor ? usedColorScheme.darkColor : usedColorScheme.color;
+        } else {
+            bgColor = dark ? "#1f1f1f" : "#f4f4f5";
+            border = `1px solid ${dark ? "#2e2e30" : "#e4e4e7"}`;
+        }
+    }
 
     return (
         <div
@@ -73,13 +107,12 @@ export function Chip({
                 "items-center",
                 onClick ? "cursor-pointer hover:bg-surface-accent-300 dark:hover:bg-surface-accent-700" : "",
                 sizeClassNames[size],
-                error || !usedColorScheme ? "bg-surface-accent-200 dark:bg-surface-accent-800 text-surface-accent-800 dark:text-white" : "",
-                error ? "text-red-500 dark:text-red-400" : "",
                 className)}
             onClick={onClick}
             style={{
-                backgroundColor: error ? undefined : bgColor,
-                color: error ? undefined : textColor,
+                backgroundColor: bgColor,
+                color: textColor,
+                border: border || undefined,
                 overflow: "hidden",
                 ...style
             }}

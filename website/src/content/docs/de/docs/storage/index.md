@@ -95,7 +95,7 @@ properties: {
 }
 ```
 
-![File upload field](/img/fields/File_upload.png)
+![Datei-Upload-Feld](/img/fields/File_upload.png)
 
 ### Speicher-Konfigurationsoptionen
 
@@ -126,9 +126,9 @@ photos: {
 }
 ```
 
-![Multi file upload](/img/fields/Multi_file_upload.png)
+![Mehrfachdatei-Upload](/img/fields/Multi_file_upload.png)
 
-## Frontend: useStorageSource Hook
+## Frontend: useStorageSource-Hook
 
 Für programmatische Dateioperationen:
 

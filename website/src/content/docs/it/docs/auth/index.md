@@ -131,7 +131,7 @@ const userManagement = useBackendUserManagement({
 <Route path="/roles" element={<RolesView userManagement={userManagement} />} />
 ```
 
-![User management interface](/img/user_management.png)
+![Interfaccia gestione utenti](/img/user_management.png)
 
 ## Simulazione Ruoli (Modalità Sviluppo)
 

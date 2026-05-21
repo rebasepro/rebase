@@ -78,7 +78,7 @@ const collection: EntityCollection = {
 };
 ```
 
-![Collection actions](/img/collection_actions.png)
+![Azioni collezione](/img/collection_actions.png)
 
 ## Prossimi Passi
 

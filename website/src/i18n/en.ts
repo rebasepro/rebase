@@ -491,4 +491,7 @@ export const en = {
   "about.join.discord": "Join our Discord",
   "index.meta.title": "Rebase — The Schema-Driven App Platform for Postgres",
   "index.meta.description": "Define your schema once in TypeScript. Get a production-ready admin panel, REST & GraphQL APIs, a typed SDK, and real-time sync — all generated instantly. Open-source, self-hosted.",
+  "mosaic.badge": "Infinite Flexibility",
+  "mosaic.title": "A visual framework for any use case.",
+  "mosaic.subtitle": "From e-commerce and asset management to visual builders and live code edits. Rebase's schema-driven UI scales to meet any dashboard or editor requirement.",
 };

@@ -19,7 +19,7 @@ Alterne entre os modos usando o controlador de modo admin ou o seletor da UI na 
 
 Um editor visual de esquemas que permite criar e modificar coleções através de uma interface de arrastar e soltar. Ao salvar as alterações, ele usa [ts-morph](https://ts-morph.com/) para atualizar seus arquivos-fonte TypeScript via manipulação de AST — preservando todo o código existente e lógica personalizada.
 
-![Collection editor](/img/collection_editor.png)
+![Editor de coleção](/img/collection_editor.png)
 
 ```tsx
 import { RebaseCMS } from "@rebasepro/admin";

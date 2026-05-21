@@ -8,7 +8,7 @@ description: Construya una vista de panel de control personalizada con gráficos
 
 Construya una vista de panel de control personalizada que muestre análisis junto a su panel de administración.
 
-## Create the Dashboard Component
+## Crear el componente de panel de control
 
 ```tsx
 import { useRebaseContext } from "@rebasepro/core";
@@ -78,7 +78,7 @@ function StatCard({ title, value }: { title: string; value: string | number }) {
 }
 ```
 
-## Register as a Custom View
+## Registrar como vista personalizada
 
 ```typescript
 const views: CMSView[] = [

@@ -95,7 +95,7 @@ properties: {
 }
 ```
 
-![File upload field](/img/fields/File_upload.png)
+![Champ d'envoi de fichier](/img/fields/File_upload.png)
 
 ### Options de Configuration du Stockage
 
@@ -126,7 +126,7 @@ photos: {
 }
 ```
 
-![Multi file upload](/img/fields/Multi_file_upload.png)
+![Envoi de fichiers multiples](/img/fields/Multi_file_upload.png)
 
 ## Frontend : Hook useStorageSource
 

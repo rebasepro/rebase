@@ -100,6 +100,15 @@ CREATE TABLE products (
 );
 ```
 
+## Safety & Unmapped Database Objects
+
+When Rebase updates the database schema, it maps TypeScript collection definitions to database tables. To ensure that **unmapped database objects (e.g., tables, views, enums) are never dropped or modified**, Rebase implements several layers of safety:
+
+1. **Strict Table Filtering (`tablesFilter`)**: The generated Drizzle configuration dynamically restricts synchronization to only the tables exported in the generated schema. Any unrecognized tables or legacy systems' tables existing in the database are ignored by the sync engine.
+2. **Schema Restrictions (`schemaFilter`)**: The DB sync is restricted exclusively to the `public` schema. Internal database tables, custom schemas, and extension-specific tables are left untouched.
+3. **Roles and Extension Protection**: Drizzle is configured not to manage database roles (`entities.roles: false`) or helper tables from extensions like PostGIS.
+4. **Interactive Dev Mode Confirmation**: When running `rebase db push` in development, the CLI executes with `--strict` and `--verbose` flags, which ensures that developers must explicitly review and approve any destructive SQL actions before they are executed.
+
 ## Next Steps
 
 - **[Collections](/docs/collections)** — Full collection configuration reference

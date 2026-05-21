@@ -19,7 +19,7 @@ Alterna entre modos usando el controlador de modo de administración o el interr
 
 Un editor visual de esquemas que te permite crear y modificar colecciones a través de una interfaz de usuario de arrastrar y soltar. Cuando guardas los cambios, utiliza [ts-morph](https://ts-morph.com/) para actualizar tus archivos fuente de TypeScript mediante manipulación de AST — preservando todo el código existente y la lógica personalizada.
 
-![Collection editor](/img/collection_editor.png)
+![Editor de colecciones](/img/collection_editor.png)
 
 ```tsx
 import { RebaseCMS } from "@rebasepro/admin";
@@ -54,7 +54,7 @@ import { JSEditor } from "@rebasepro/studio";
 { slug: "js", name: "JS Console", view: <JSEditor /> }
 ```
 
-### RLS Policy Editor
+### Editor de políticas RLS
 
 Visualiza y gestiona políticas de Seguridad a Nivel de Fila (RLS) para tus tablas PostgreSQL:
 
@@ -74,7 +74,7 @@ import { StorageView } from "@rebasepro/studio";
 { slug: "storage", name: "Storage", view: <StorageView /> }
 ```
 
-## Adding Studio Views
+## Añadir vistas de Studio
 
 Las herramientas de Studio están automáticamente disponibles cuando incluyes el componente `RebaseStudio` dentro de tu aplicación:
 

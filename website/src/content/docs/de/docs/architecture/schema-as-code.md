@@ -100,8 +100,16 @@ CREATE TABLE products (
 );
 ```
 
+## Sicherheit und nicht gemappte Datenbankobjekte
+
+Wenn Rebase das Datenbankschema aktualisiert, ordnet es TypeScript-Sammlungsdefinitionen Datenbanktabellen zu. Um sicherzustellen, dass **nicht gemappte Datenbankobjekte (z. B. Tabellen, Sichten, Enums) niemals gelöscht oder geändert werden**, implementiert Rebase mehrere Sicherheitsebenen:
+
+1. **Strikte Tabellenfilterung (`tablesFilter`)**: Die generierte Drizzle-Konfiguration beschränkt die Synchronisierung dynamisch auf die im generierten Schema exportierten Tabellen. Alle nicht erkannten Tabellen oder Tabellen aus Legacy-Systemen, die in der Datenbank vorhanden sind, werden von der Synchronisierungs-Engine ignoriert.
+2. **Schema-Einschränkungen (`schemaFilter`)**: Die DB-Synchronisierung ist ausschließlich auf das `public`-Schema beschränkt. Interne Datenbanktabellen, benutzerdefinierte Schemata und erweiterungsspezifische Tabellen bleiben unberührt.
+3. **Rollen- und Erweiterungsschutz**: Drizzle ist so konfiguriert, dass es keine Datenbankrollen (`entities.roles: false`) oder Hilfstabellen von Erweiterungen wie PostGIS verwaltet.
+4. **Interaktive Bestätigung im Entwicklungsmodus**: Beim Ausführen von `rebase db push` in der Entwicklung wird die CLI mit den Flags `--strict` und `--verbose` ausgeführt. Dies stellt sicher, dass Entwickler alle destruktiven SQL-Aktionen vor der Ausführung explizit überprüfen und genehmigen müssen.
+
 ## Nächste Schritte
 
 - **[Sammlungen](/docs/collections)** — Vollständige Referenz zur Sammlungs-Konfiguration
 - **[Eigenschaften](/docs/collections/properties)** — Detaillierte Spaltentyp-Zuordnungen
----

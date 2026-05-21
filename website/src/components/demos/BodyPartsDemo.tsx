@@ -130,7 +130,7 @@ export function BodyPartsDemo() {
     );
 
     return (
-        <div className="w-full h-full bg-surface-950 flex p-3 sm:p-4 font-sans select-none overflow-hidden">
+        <div className="w-full h-full bg-surface-950 flex p-3 sm:p-4 font-sans select-none overflow-hidden no-scrollbar">
             <div className="flex flex-row gap-2 sm:gap-4 items-center justify-center w-full h-full max-w-full">
                 {/* Diagrams */}
                 <div className="rounded-xl border border-surface-800 bg-surface-900 p-2 flex-shrink-0">
@@ -160,8 +160,8 @@ export function BodyPartsDemo() {
                 </div>
 
                 {/* Right panel: quick select grid */}
-                <div className="flex-1 min-w-[110px] max-w-[140px] h-full py-1">
-                    <div className="grid grid-cols-1 gap-1 h-full max-h-[240px] overflow-y-auto pr-1 sm:pr-2 custom-scrollbar">
+                <div className="flex-1 min-w-[180px] max-w-[240px] h-full py-1">
+                    <div className="grid grid-cols-2 gap-1 h-full overflow-visible">
                         {ENUM_ENTRIES.map((entry) => {
                             const isActive = selected.includes(entry.id);
                             const isHovered = hoveredPart === entry.id;
