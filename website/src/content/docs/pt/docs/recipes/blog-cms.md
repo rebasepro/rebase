@@ -199,7 +199,7 @@ export const articlesCollection: EntityCollection = {
 
 ## Configuração
 
-1. Adicione as três coleções ao seu `shared/collections/index.ts`
+1. Adicione as três coleções ao seu `config/collections/index.ts`
 2. Execute `rebase schema generate`
 3. Execute `rebase db push`
 4. Reinicie o servidor de desenvolvimento

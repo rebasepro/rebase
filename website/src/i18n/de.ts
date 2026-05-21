@@ -78,7 +78,7 @@ export const de = {
     'Rebase wurde entwickelt, um <strong class="text-white font-medium">JEDE Datenbank</strong> oder <strong class="text-white font-medium">JEDEN Backend</strong> über Adapter zu unterstützen. Du verbindest deine eigene Datenbank — Rebase analysiert das Schema und generiert automatisch ein vollständiges Admin-Interface. Keine zusätzliche Datenbank, keine Datenmigration erforderlich. Es unterstützt auch Firebase und MongoDB von Haus aus.',
   "faq.q2": "Wie unterscheidet sich Rebase von Retool oder Supabase?",
   "faq.a2":
-    'Im Gegensatz zu Retool ist Rebase Open-Source ohne Preisbindung pro Nutzer, und es ist ein echtes React-Framework, das du mit deinem eigenen Code erweitern kannst. Im Gegensatz zu Supabase arbeitet Rebase mit <em class="text-white">deiner bestehenden</em> Postgres-Datenbank — es ist kein BaaS, das deine Infrastruktur besitzt. Du behältst die volle Kontrolle.',
+    'Im Gegensatz zu Retool ist Rebase Open-Source ohne Preisbindung pro Nutzer, und es ist ein echtes React-Framework, das du mit deinem eigenen Code erweitern kannst. Im Gegensatz zu Supabase arbeitet Rebase mit <em class="text-white">deiner bestehenden</em> Postgres-Datenbank — es besitzt deine Infrastruktur nicht. Du behältst die volle Kontrolle.',
   "faq.q3": "Kann ich Rebase mit einer bestehenden Datenbank nutzen?",
   "faq.a3":
     "Absolut. Verbinde jede beliebige Postgres-Datenbank, und Rebase wird das Schema analysieren, um automatisch ein vollständiges Admin-Panel zu generieren. Anschließend kannst du die UI visuell oder in TypeScript verfeinern. Rebase funktioniert für brandneue Projekte und bestehende Datenbanken gleichermaßen gut.",
@@ -422,4 +422,6 @@ export const de = {
   "mosaic.badge": "Unendliche Flexibilität",
   "mosaic.title": "Ein visuelles Framework für jeden Anwendungsfall.",
   "mosaic.subtitle": "Von E-Commerce und Digital Asset Management bis hin zu visuellen Editoren und Live-Code-Anpassungen. Die Schema-gesteuerte UI von Rebase passt sich jedem Dashboard oder Editor an.",
+  "pricing.meta.title": "Preise | Rebase",
+  "pricing.meta.description": "Wähle den passenden Plan für dein Team. Von freiem Open-Source-Self-Hosting bis hin zu Unternehmens-Zusammenarbeit und serverlosem Branching.",
 };

@@ -19,7 +19,7 @@ Rebase è una piattaforma full-stack con quattro livelli:
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Backend Layer                            │
 │  Hono HTTP Server  •  REST API  •  Auth  •  Storage  •  WS     │
-│  @rebasepro/backend                                             │
+│  @rebasepro/server-core                                             │
 └───────────────────────────┬─────────────────────────────────────┘
                             │ Drizzle ORM
                             ▼
@@ -36,19 +36,17 @@ Rebase è una piattaforma full-stack con quattro livelli:
 Il backend si inizializza tramite un sistema di bootstrapper basato su plugin. La logica specifica del database è disaccoppiata in un proprio pacchetto, e i bootstrappers gestiscono l'inizializzazione del database, dell'autenticazione e dei servizi interni.
 
 ```typescript
-import { createPostgresBootstrapper } from "@rebasepro/server-postgresql";
+import { createPostgresAdapter } from "@rebasepro/server-postgresql";
 
-bootstrappers: [
-    createPostgresBootstrapper({
+database: createPostgresAdapter({
         connectionString: process.env.DATABASE_URL!
     })
-]
 ```
 
 Le collezioni si risolvono automaticamente rispetto al bootstrapper configurato tramite il registro interno di iniezione delle dipendenze.
 
 :::tip
-Il `createPostgresBootstrapper` gestisce automaticamente il pooling delle connessioni al database, la risoluzione dello schema e la configurazione `LISTEN/NOTIFY` in tempo reale.
+Il `createPostgresAdapter` gestisce automaticamente il pooling delle connessioni al database, la risoluzione dello schema e la configurazione `LISTEN/NOTIFY` in tempo reale.
 :::
 
 ### Registro delle Collezioni
@@ -76,7 +74,7 @@ Come i driver, i backend di storage sono registrati in un registro. Puoi avere p
 | Package | Ruolo | Usato da |
 |---------|------|---------|
 | `@rebasepro/types` | Interfacce TypeScript per collezioni, proprietà, entità, plugin | Tutto |
-| `@rebasepro/backend` | Inizializzazione del server backend, REST API, autenticazione, storage, WebSocket | Backend |
+| `@rebasepro/server-core` | Inizializzazione del server backend, REST API, autenticazione, storage, WebSocket | Backend |
 | `@rebasepro/client` | SDK client — Trasporto HTTP, WebSocket, autenticazione | Frontend |
 | `@rebasepro/core` | Framework React — Scaffold, controller, moduli, routing, hook | Frontend |
 | `@rebasepro/ui` | Libreria di componenti UI standalone (Tailwind v4 + Radix) | Frontend |

@@ -1,0 +1,363 @@
+---
+const { lang, t } = Astro.props;
+import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
+---
+<main class="bg-black text-white">
+  <!-- Hero Section -->
+  <section class="relative isolate overflow-hidden bg-linear-to-br from-black to-surface-950 pt-24 pb-12 sm:pt-32 sm:pb-16 lg:pt-40 lg:pb-16">
+    <SectionBackgroundAccents topLine={true} blob={{ position: "top", size: "lg", opacity: 60 }}>
+      <div class="absolute -bottom-40 right-1/3 w-[700px] h-[700px] rounded-full bg-primary/5 blur-3xl opacity-50"></div>
+      <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:40px_40px] opacity-10"></div>
+    </SectionBackgroundAccents>
+
+    <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
+      <span class="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary ring-1 ring-inset ring-primary/20 mb-6">
+        Simple, Transparent Pricing
+      </span>
+      <h1 class="mb-6 text-4xl font-medium tracking-tight md:text-5xl lg:text-6xl text-white font-sans">
+        Deploy Rebase <span class="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-400">Your Way.</span>
+      </h1>
+      <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48 max-w-4xl mx-auto">
+        Start for free with self-hosted open-source, or let us manage the scaling, branching, and team collaboration with Rebase Cloud.
+      </p>
+
+      <!-- Billing Toggle -->
+      <div class="flex items-center justify-center gap-4 mt-8">
+        <span class="text-sm font-medium text-surface-300">Bill Monthly</span>
+        <button
+          type="button"
+          class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-surface-700 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-black"
+          role="switch"
+          aria-checked="false"
+          id="billing-toggle"
+        >
+          <span class="sr-only">Toggle annual billing</span>
+          <span
+            aria-hidden="true"
+            class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out translate-x-0"
+            id="billing-toggle-thumb"
+          ></span>
+        </button>
+        <span class="text-sm font-medium text-surface-300 flex items-center gap-2">
+          Bill Annually
+          <span class="inline-flex items-center rounded-full bg-green-500/10 px-2 py-0.5 text-xs font-semibold text-green-400 ring-1 ring-inset ring-green-500/20">
+            Save 20%
+          </span>
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing Cards -->
+  <section class="bg-black py-12 relative z-10">
+    <div class="mx-auto max-w-7xl px-6 lg:px-8">
+      <div class="isolate mx-auto grid max-w-md grid-cols-1 gap-8 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+        <!-- Self-Hosted Plan -->
+        <div class="relative flex flex-col justify-between rounded-3xl bg-surface-900/40 p-8 ring-1 ring-white/10 xl:p-10 hover:ring-white/20 transition-all duration-300">
+          <div>
+            <div class="flex items-center justify-between gap-x-4">
+              <h3 class="text-lg font-semibold leading-8 text-white">Self-Hosted</h3>
+              <span class="inline-flex items-center rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-white">OSS Community</span>
+            </div>
+            <p class="mt-4 text-sm leading-6 text-surface-400">Run Rebase on your own server. MIT licensed, no artificial limits, fully customizable.</p>
+            <p class="mt-6 flex items-baseline gap-x-1">
+              <span class="text-4xl font-bold tracking-tight text-white">$0</span>
+              <span class="text-sm font-semibold leading-6 text-surface-400">/forever</span>
+            </p>
+            <ul role="list" class="mt-8 space-y-3 text-sm leading-6 text-surface-300">
+              <li class="flex gap-x-3">
+                <svg class="h-6 w-5 flex-none text-primary" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/>
+                </svg>
+                MIT Licensed (Use anywhere)
+              </li>
+              <li class="flex gap-x-3">
+                <svg class="h-6 w-5 flex-none text-primary" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/>
+                </svg>
+                Unlimited databases & rows
+              </li>
+              <li class="flex gap-x-3">
+                <svg class="h-6 w-5 flex-none text-primary" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/>
+                </svg>
+                TypeScript local schema editor
+              </li>
+              <li class="flex gap-x-3">
+                <svg class="h-6 w-5 flex-none text-primary" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/>
+                </svg>
+                REST, GraphQL, & WebSockets
+              </li>
+              <li class="flex gap-x-3 text-surface-500">
+                <svg class="h-6 w-5 flex-none text-surface-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+                No managed hosting & backups
+              </li>
+              <li class="flex gap-x-3 text-surface-500">
+                <svg class="h-6 w-5 flex-none text-surface-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+                No serverless db branching
+              </li>
+            </ul>
+          </div>
+          <a
+            href="https://github.com/rebasepro/rebase"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="mt-8 block rounded-xl bg-white/10 px-3 py-3 text-center text-sm font-semibold leading-6 text-white hover:bg-white/20 transition-all"
+          >
+            Deploy on GitHub
+          </a>
+        </div>
+
+        <!-- Cloud Pro Plan -->
+        <div class="relative flex flex-col justify-between rounded-3xl bg-surface-900/60 p-8 ring-2 ring-primary xl:p-10 hover:shadow-2xl hover:shadow-primary/10 transition-all duration-300">
+          <!-- Premium Badge Glow -->
+          <div class="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-primary to-blue-500 px-4 py-1 text-xs font-semibold text-white shadow-lg shadow-primary/20">
+            Most Popular
+          </div>
+          <div>
+            <div class="flex items-center justify-between gap-x-4 mt-2">
+              <h3 class="text-lg font-semibold leading-8 text-white">Cloud Pro</h3>
+            </div>
+            <p class="mt-4 text-sm leading-6 text-surface-400">Perfect for scaling apps. Let us handle hosting, secure branching, and database synchronization.</p>
+            <p class="mt-6 flex items-baseline gap-x-1">
+              <span class="text-4xl font-bold tracking-tight text-white transition-all duration-300" id="pro-price">$29</span>
+              <span class="text-sm font-semibold leading-6 text-surface-400">/month</span>
+            </p>
+            <p class="text-xs text-primary mt-1 hidden" id="pro-price-yearly-note">Billed annually ($276/yr)</p>
+            <ul role="list" class="mt-8 space-y-3 text-sm leading-6 text-surface-300">
+              <li class="flex gap-x-3">
+                <svg class="h-6 w-5 flex-none text-primary" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/>
+                </svg>
+                <span><strong>Instant Branching</strong> (Like Git for DB)</span>
+              </li>
+              <li class="flex gap-x-3">
+                <svg class="h-6 w-5 flex-none text-primary" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/>
+                </svg>
+                Fully Managed Serverless DB
+              </li>
+              <li class="flex gap-x-3">
+                <svg class="h-6 w-5 flex-none text-primary" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/>
+                </svg>
+                Up to 5 team members
+              </li>
+              <li class="flex gap-x-3">
+                <svg class="h-6 w-5 flex-none text-primary" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/>
+                </svg>
+                10 GB database storage
+              </li>
+              <li class="flex gap-x-3">
+                <svg class="h-6 w-5 flex-none text-primary" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/>
+                </svg>
+                Automated daily backups (7-day PITR)
+              </li>
+              <li class="flex gap-x-3">
+                <svg class="h-6 w-5 flex-none text-primary" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/>
+                </svg>
+                Priority email & Discord support
+              </li>
+            </ul>
+          </div>
+          <a
+            href="https://demo.rebase.pro"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="mt-8 block rounded-xl bg-primary px-3 py-3 text-center text-sm font-semibold leading-6 text-white hover:bg-primary-dark shadow-md transition-all btn-glow"
+          >
+            Start 14-Day Free Trial
+          </a>
+        </div>
+
+        <!-- Enterprise Plan -->
+        <div class="relative flex flex-col justify-between rounded-3xl bg-surface-900/40 p-8 ring-1 ring-white/10 xl:p-10 hover:ring-white/20 transition-all duration-300">
+          <div>
+            <div class="flex items-center justify-between gap-x-4">
+              <h3 class="text-lg font-semibold leading-8 text-white">Enterprise</h3>
+              <span class="inline-flex items-center rounded-full bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-400 ring-1 ring-inset ring-blue-500/20">Custom SLA</span>
+            </div>
+            <p class="mt-4 text-sm leading-6 text-surface-400">Custom deployment, VPC peering, advanced compliance controls, and 24/7 priority SLA support.</p>
+            <p class="mt-6 flex items-baseline gap-x-1">
+              <span class="text-4xl font-bold tracking-tight text-white">Custom</span>
+            </p>
+            <ul role="list" class="mt-8 space-y-3 text-sm leading-6 text-surface-300">
+              <li class="flex gap-x-3">
+                <svg class="h-6 w-5 flex-none text-primary" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/>
+                </svg>
+                Dedicated database nodes (VPC Peering)
+              </li>
+              <li class="flex gap-x-3">
+                <svg class="h-6 w-5 flex-none text-primary" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/>
+                </svg>
+                SSO, SAML, & advanced RBAC
+              </li>
+              <li class="flex gap-x-3">
+                <svg class="h-6 w-5 flex-none text-primary" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/>
+                </svg>
+                Unlimited team members
+              </li>
+              <li class="flex gap-x-3">
+                <svg class="h-6 w-5 flex-none text-primary" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/>
+                </svg>
+                SOC2, HIPAA-compliant databases
+              </li>
+              <li class="flex gap-x-3">
+                <svg class="h-6 w-5 flex-none text-primary" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/>
+                </svg>
+                Dedicated Solutions Architect
+              </li>
+              <li class="flex gap-x-3">
+                <svg class="h-6 w-5 flex-none text-primary" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/>
+                </svg>
+                24/7 custom SLA support & Slack bridge
+              </li>
+            </ul>
+          </div>
+          <a
+            href="mailto:enterprise@rebase.pro?subject=Rebase%20Enterprise%20Inquiry"
+            class="mt-8 block rounded-xl bg-white/10 px-3 py-3 text-center text-sm font-semibold leading-6 text-white hover:bg-white/20 transition-all"
+          >
+            Contact Sales
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Detailed Feature Comparison Table -->
+  <section class="bg-black py-16 sm:py-24 relative z-10 border-t border-surface-900">
+    <div class="mx-auto max-w-7xl px-6 lg:px-8">
+      <div class="mx-auto max-w-3xl text-center mb-16">
+        <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Compare plans & features</h2>
+        <p class="mt-4 text-surface-400">Everything you need to know about the capabilities of each Rebase environment.</p>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-sm">
+          <thead>
+            <tr class="border-b border-surface-800">
+              <th class="py-4 pr-4 font-semibold text-white w-1/4">Features</th>
+              <th class="py-4 px-4 font-semibold text-white w-1/4">Self-Hosted</th>
+              <th class="py-4 px-4 font-semibold text-primary w-1/4">Cloud Pro</th>
+              <th class="py-4 pl-4 font-semibold text-white w-1/4">Enterprise</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-surface-900 text-surface-300">
+            <!-- Databases & Infrastructure -->
+            <tr class="bg-surface-950/20">
+              <td colspan="4" class="py-3 font-semibold text-white">Database & Infrastructure</td>
+            </tr>
+            <tr>
+              <td class="py-4 pr-4 font-medium text-white">Database Nodes</td>
+              <td class="py-4 px-4">Your own (Postgres)</td>
+              <td class="py-4 px-4 text-primary">Managed Serverless</td>
+              <td class="py-4 pl-4">Dedicated Multi-region</td>
+            </tr>
+            <tr>
+              <td class="py-4 pr-4 font-medium text-white">Storage limit</td>
+              <td class="py-4 px-4">Unlimited (Disk-based)</td>
+              <td class="py-4 px-4 text-primary">10 GB included</td>
+              <td class="py-4 pl-4">Custom (Starts at 100 GB)</td>
+            </tr>
+            <tr>
+              <td class="py-4 pr-4 font-medium text-white">Branching</td>
+              <td class="py-4 px-4">Local Git branch</td>
+              <td class="py-4 px-4 text-primary">Instant database branches</td>
+              <td class="py-4 pl-4">Dedicated branch isolation</td>
+            </tr>
+            <!-- Security & Compliance -->
+            <tr class="bg-surface-950/20">
+              <td colspan="4" class="py-3 font-semibold text-white">Security & Compliance</td>
+            </tr>
+            <tr>
+              <td class="py-4 pr-4 font-medium text-white">Authentication</td>
+              <td class="py-4 px-4">JWT / Core Auth</td>
+              <td class="py-4 px-4 text-primary">Managed Auth & Sessions</td>
+              <td class="py-4 pl-4">Custom SSO, SAML, & Okta</td>
+            </tr>
+            <tr>
+              <td class="py-4 pr-4 font-medium text-white">RBAC & RLS Policies</td>
+              <td class="py-4 px-4">Yes (Defined in schema)</td>
+              <td class="py-4 px-4 text-primary">Yes (Defined in schema)</td>
+              <td class="py-4 pl-4">Yes + Custom audit compliance</td>
+            </tr>
+            <tr>
+              <td class="py-4 pr-4 font-medium text-white">Audit Logs</td>
+              <td class="py-4 px-4">Local SQLite/Postgres</td>
+              <td class="py-4 px-4 text-primary">14-day history</td>
+              <td class="py-4 pl-4">Unlimited (Export to SIEM)</td>
+            </tr>
+            <!-- Support & SLAs -->
+            <tr class="bg-surface-950/20">
+              <td colspan="4" class="py-3 font-semibold text-white">Support & SLAs</td>
+            </tr>
+            <tr>
+              <td class="py-4 pr-4 font-medium text-white">SLA Support</td>
+              <td class="py-4 px-4">Community (Discord/GitHub)</td>
+              <td class="py-4 px-4 text-primary">Next business day (Email)</td>
+              <td class="py-4 pl-4">99.9% uptime SLA, 24/7 phone</td>
+            </tr>
+            <tr>
+              <td class="py-4 pr-4 font-medium text-white">Dedicated Engineer</td>
+              <td class="py-4 px-4">No</td>
+              <td class="py-4 px-4 text-primary">No</td>
+              <td class="py-4 pl-4">Yes</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script is:inline>
+  function setupPricingToggle() {
+    const toggleBtn = document.getElementById('billing-toggle');
+    const thumb = document.getElementById('billing-toggle-thumb');
+    const proPrice = document.getElementById('pro-price');
+    const yearlyNote = document.getElementById('pro-price-yearly-note');
+    
+    if (!toggleBtn || !thumb || !proPrice || toggleBtn.dataset.initialized) return;
+    toggleBtn.dataset.initialized = "true";
+
+    toggleBtn.addEventListener('click', () => {
+      const isAnnually = toggleBtn.getAttribute('aria-checked') === 'true';
+      if (isAnnually) {
+        // Switch to Monthly
+        toggleBtn.setAttribute('aria-checked', 'false');
+        thumb.className = "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out translate-x-0";
+        toggleBtn.className = "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-surface-700 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-black";
+        
+        proPrice.textContent = "$29";
+        yearlyNote.classList.add('hidden');
+      } else {
+        // Switch to Annually
+        toggleBtn.setAttribute('aria-checked', 'true');
+        thumb.className = "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out translate-x-5";
+        toggleBtn.className = "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-primary transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-black";
+        
+        proPrice.textContent = "$23";
+        yearlyNote.classList.remove('hidden');
+      }
+    });
+  }
+
+  document.addEventListener('astro:page-load', setupPricingToggle);
+  // Fallback for initial load if page-load doesn't fire
+  setupPricingToggle();
+</script>

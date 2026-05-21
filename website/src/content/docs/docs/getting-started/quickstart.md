@@ -16,7 +16,7 @@ This scaffolds a project with three packages:
 |--------|-------------|
 | `frontend/` | React SPA — Vite + TypeScript with the Rebase admin UI |
 | `backend/` | Node.js server — Hono, PostgreSQL via Drizzle ORM, WebSocket |
-| `shared/` | TypeScript collection definitions shared by both sides |
+| `config/` | Config files and collection definitions shared by both sides |
 
 ## Prerequisites
 
@@ -32,7 +32,7 @@ After scaffolding, edit the `.env` file at the project root:
 # PostgreSQL connection string
 DATABASE_URL=postgresql://username:password@localhost:5432/your_database
 
-# JWT secret for authentication (generate a strong random string)
+# JWT secret for authentication (auto-generated in development if omitted)
 JWT_SECRET=change-me-to-a-random-secret
 
 # Frontend URL for CORS
@@ -41,6 +41,16 @@ VITE_API_URL=http://localhost:3001
 # Optional: Google OAuth client ID
 # VITE_GOOGLE_CLIENT_ID=your-google-client-id
 ```
+
+## Introspect an Existing Database (Optional)
+
+If you are connecting to an existing database with pre-existing tables, you can introspect it to automatically generate your TypeScript collection files:
+
+```bash
+pnpm rebase schema introspect
+```
+
+This will analyze your database tables and generate corresponding TypeScript files in `config/collections/` so you don't have to write them manually.
 
 ## Start the Dev Servers
 
@@ -70,9 +80,9 @@ When you open `http://localhost:5173`, you'll see the login screen. The **first 
 
 ## Define Your First Collection
 
-Open `shared/collections/` and create a new file:
+Open `config/collections/` and create a new file:
 
-```typescript title="shared/collections/products.ts"
+```typescript title="config/collections/products.ts"
 import { EntityCollection } from "@rebasepro/types";
 
 export const productsCollection: EntityCollection = {
@@ -124,6 +134,7 @@ Restart the dev servers and your new **Products** collection appears in the navi
 | Command | Description |
 |---------|-------------|
 | `rebase schema generate` | Generate Drizzle schema from your TypeScript collections |
+| `rebase schema introspect` | Generate TypeScript collections from an existing database |
 | `rebase db push` | Push schema changes directly to the database (dev only) |
 | `rebase db generate` | Generate SQL migration files |
 | `rebase db migrate` | Run pending migrations |

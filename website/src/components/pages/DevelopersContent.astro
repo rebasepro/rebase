@@ -2,499 +2,22 @@
 const { lang, t } = Astro.props;
 
 import { languages, defaultLang, useTranslations } from '../../i18n/ui';
-
-
-
 import { CodeBlock } from '../../components/CodeBlock.tsx';
 import ClientLogos from '../../components/ClientLogos.astro';
 import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
 import ClientUIComponentsTeaser from '../../components/ClientUIComponentsTeaser.tsx';
 
-import { RebaseEditorDemo } from '../../components/RebaseEditorDemo.tsx';
+import { SchemaBuilderMiniDemo } from '../../components/demos/SchemaBuilderMiniDemo.tsx';
+import { SdkMiniDemo } from '../../components/demos/SdkMiniDemo.tsx';
+import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo.tsx';
+import { CustomFieldsDemo } from '../../components/demos/CustomFieldsDemo.tsx';
+import { RLSEditorDemo } from '../../components/demos/RLSEditorDemo.tsx';
+import { TerminalInit } from '../../components/demos/TerminalInit.tsx';
 import "../../styles/editor.css";
-import { CustomFieldsDemo } from '../../components/demos/CustomFieldsDemo';
 
-
-
----
-
-
-    <main>
-        <section
-                class="relative isolate overflow-hidden bg-linear-to-br from-black to-surface-950 pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
-            <!-- Background accents and subtle grid -->
-            <div class="pointer-events-none absolute inset-0 -z-10">
-                <div class="absolute -bottom-40 right-1/3 w-[700px] h-[700px] rounded-full bg-blue-500/5 blur-3xl opacity-50"></div>
-                <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:40px_40px] opacity-10"></div>
-            </div>
-
-            <div class="px-4 mx-auto max-w-7xl text-center lg:px-12">
-                <h1 class="mb-6 text-4xl font-medium tracking-tight md:text-5xl lg:text-6xl text-white font-sans">
-                    Your admin panel shouldn't<br/> make you write CRUD.
-                </h1>
-                <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
-                    Pure React and TypeScript. Schema-as-code. Full control — from custom fields to entire pages.
-                </p>
-            </div>
-            <SectionBackgroundAccents bottomLine={true}/>
-        </section>
-
-        <section class="relative isolate bg-black py-16">
-            <div class="mx-auto max-w-7xl px-8 lg:px-12">
-                <h2 class="text-center text-lg font-semibold leading-8 text-surface-400">
-                    Trusted by developers at forward-thinking companies
-                </h2>
-                <div class="mx-auto mt-4 mb-8">
-                    <ClientLogos/>
-                </div>
-            </div>
-            <SectionBackgroundAccents bottomLine={true}/>
-        </section>
-
-        <section class="bg-black py-16 sm:py-24">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
-                <div class="mx-auto max-w-2xl text-center mb-16">
-                    <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Self-Hosted by Design</h2>
-                    <p class="mt-4 text-lg leading-8 text-surface-400">Deploy Rebase on your own infrastructure for maximum control, deep customization, and full data privacy.</p>
-                </div>
-                <div class="mx-auto max-w-3xl">
-                    <div class="relative flex flex-col items-center text-center rounded-2xl bg-surface-900/50 p-16 ring-1 ring-inset ring-surface-800">
-                        <ul class="space-y-4 mb-8 text-left">
-                            <li class="flex items-start gap-4 text-lg">
-                                <svg class="h-6 w-6 text-primary flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                                <span class="text-surface-300">Full source code access (MIT license)</span>
-                            </li>
-                            <li class="flex items-start gap-4 text-lg">
-                                <svg class="h-6 w-6 text-primary flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                                <span class="text-surface-300">Deploy anywhere on your own infrastructure</span>
-                            </li>
-                            <li class="flex items-start gap-4 text-lg">
-                                <svg class="h-6 w-6 text-primary flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                                <span class="text-surface-300">Extend with custom React components & logic</span>
-                            </li>
-                        </ul>
-                        <a href="/docs" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-x-2 rounded-md border border-surface-700 bg-surface-800 px-8 py-4 text-lg font-semibold text-white shadow-sm hover:bg-surface-700 transition-all duration-200 ease-in-out">
-                            View Docs
-                            
-<svg
-  class="lucide lucide-arrow-right"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M5 12h14" />
-  <path d="m12 5 7 7-7 7" />
-</svg>
-
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="bg-black py-16 sm:py-24">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
-                <div class="mx-auto max-w-2xl lg:text-center">
-                    <h2 class="text-base font-semibold leading-7 text-primary">A Toolkit That Just Works</h2>
-                    <p class="mt-2 text-3xl font-medium tracking-tight text-white sm:text-4xl">Everything you need.
-                        Nothing you don't.</p>
-                    <p class="mt-6 text-lg leading-8 text-surface-400">
-                        Stop reinventing the wheel. Rebase provides a production-ready toolkit of components and logic,
-                        so you can focus on the features that make your app unique.
-                    </p>
-                </div>
-
-                <div class="mt-16 sm:mt-24 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-48">
-                    <div class="relative w-full rounded-2xl overflow-visible ring-1 ring-surface-800 mb-16">
-                        <div class="w-full rounded-2xl overflow-hidden ring-1 ring-surface-800 ">
-                            <CodeBlock
-                                    language="typescript"
-                                    code={`import { buildProperty } from "@rebasepro/core";
-
-const price = buildProperty({
-name: "Price",
-description: "Price with range validation",
-dataType: "number",
-validation: {
-    required: true,
-    requiredMessage: "Price must be between 0 and 1000",
-    min: 0,
-    max: 1000
-}
-});`}
-                                    client:load
-                            />
-                        </div>
-                        <div
-                                class={"absolute p-1 flex justify-center z-10 -bottom-[140px] right-0"}>
-                            <img loading="lazy"
-                                 src={"/img/price.png"}
-                                 width="500"
-                                 alt="Price textfield preview"
-                            />
-                        </div>
-                    </div>
-                    <div class="mt-8 lg:mt-0 self-start">
-                        <h3 class="text-xl font-semibold text-white">Schema as Code, Backed by Git</h3>
-                        <p class="mt-4 text-lg text-surface-400">
-                            Define your data models in pure TypeScript, or construct them visually using the <strong>Rebase Studio</strong> GUI. Even when non-technical users add fields via the UI, Rebase uses AST mutation to surgically write clean TypeScript back to your repo. Your code remains the single source of truth, fully versioned in Git.
-                        </p>
-                        <p class="mt-4 text-lg text-surface-400">
-                            From a single collection definition, Rebase instantly generates:
-                        </p>
-                        <ul class="mt-6 space-y-3 text-lg text-surface-400">
-                            <li class="flex items-start gap-3">
-                                <svg class="h-6 w-6 text-primary flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                                <span><strong class="text-white font-medium">Admin Views & Forms</strong> for data management</span>
-                            </li>
-                            <li class="flex items-start gap-3">
-                                <svg class="h-6 w-6 text-primary flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                                <span><strong class="text-white font-medium">DB Schema</strong> synchronization</span>
-                            </li>
-                            <li class="flex items-start gap-3">
-                                <svg class="h-6 w-6 text-primary flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                                <span><strong class="text-white font-medium">Instant APIs</strong> (REST & GraphQL)</span>
-                            </li>
-                            <li class="flex items-start gap-3">
-                                <svg class="h-6 w-6 text-primary flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                                <span><strong class="text-white font-medium">Typed SDK</strong> for end-to-end type safety</span>
-                            </li>
-                            <li class="flex items-start gap-3">
-                                <svg class="h-6 w-6 text-primary flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                                <span><strong class="text-white font-medium">Database Branching</strong> for isolated dev/staging environments</span>
-                            </li>
-                            <li class="flex items-start gap-3">
-                                <svg class="h-6 w-6 text-primary flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                                <span><strong class="text-white font-medium">Custom API Functions</strong> with auto-discovered Hono routes</span>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-
-
-                <div class="mt-16 sm:mt-36 lg:grid lg:grid-cols-12 gap-12 items-center">
-                    <div class="lg:order-last relative w-full rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-950 lg:col-span-8">
-                        <CustomFieldsDemo client:only="react" />
-                    </div>
-                    <div class="mt-8 lg:mt-0 self-start lg:col-span-4">
-                        <h3 class="text-xl font-semibold text-white">Radical React Extensibility</h3>
-                        <p class="mt-4 text-lg text-surface-400">
-                            If you can build it in React, you can build it in Rebase. Create your own custom form
-                            fields or build <strong>entirely new top-level views</strong> (like a custom dashboard) and
-                            add them to the main navigation. No black boxes, no weird proprietary templating languages. Just standard React components.
-                        </p>
-                    </div>
-                </div>
-
-                <div class="mt-16 sm:mt-24 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-                    <div class="relative w-full rounded-2xl overflow-hidden">
-                        <CodeBlock
-                                language="typescript"
-                                code={`import { buildCollection } from "@rebasepro/core";
-
-export const productsCollection = buildCollection({
-    name: "Products",
-    path: "products",
-    callbacks: {
-        onSave: async ({ values }) => {
-            // e.g., send a notification
-            await sendSlackMessage("Product updated: \${values.name}");
-
-            // e.g., modify data before saving
-            values.updatedAt = new Date();
-            return values;
-        }
-    }
-    // ...properties
-});`}
-                                client:load
-                        />
-                    </div>
-                    <div class="mt-8 lg:mt-0 self-start">
-                        <h3 class="text-xl font-semibold text-white">Built-in Business Logic</h3>
-                        <p class="mt-4 text-lg text-surface-400">
-                            Run your custom code during the data lifecycle. Use <strong><code>onSave</code></strong>,
-                            <strong><code>onDelete</code></strong>, and other
-                            callbacks to trigger cloud functions, send notifications, clean data, or integrate with
-                            third-party APIs right from your CMS configuration.
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Client SDK -->
-                <div class="mt-16 sm:mt-24 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-                    <div class="mt-8 lg:mt-0 lg:order-1 self-start">
-                        <h3 class="text-xl font-semibold text-white">A Truly Typed Client SDK</h3>
-                        <p class="mt-4 text-lg text-surface-400">
-                            Query your database from any frontend securely with the Universal Client SDK. Powered by Drizzle ORM, it provides perfect TypeScript autocomplete and eliminates N+1 query issues instantly by effortlessly resolving deep relational data with the <code>with</code> clause.
-                        </p>
-                    </div>
-                    <div class="relative w-full lg:order-2 rounded-2xl overflow-hidden shadow-[0_0_20px_rgba(56,189,248,0.15)] ring-1 ring-surface-800">
-                        <CodeBlock
-                                language="typescript"
-                                code={`import { createRebaseClient } from "@rebasepro/client";
-
-// Perfect type inference automatically applied!
-const posts = await rebaseClient.data.posts.findMany({
-    // Type-safe deep relation fetching. No N+1 queries.
-    with: {
-        author: true,
-        comments: {
-            with: { author: true }
-        }
-    },
-    where: "status = 'published'",
-    orderBy: "createdAt DESC",
-    limit: 10
-});
-
-console.log(posts[0].author.name); // 100% type-safe`}
-                                client:load
-                        />
-                    </div>
-                </div>
-
-            </div>
-        </section>
-
-        <!-- Isomorphic SDK -->
-        <section class="relative isolate bg-black py-24 sm:py-32 overflow-hidden border-t border-surface-800/40">
-            <SectionBackgroundAccents blob={{ position: "top", size: "md" }}/>
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
-                <div class="mx-auto max-w-2xl text-center mb-16 animate-on-scroll fade-in-up">
-                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-6">
-                        
-<svg
-  class="lucide lucide-repeat"
-  xmlns="http://www.w3.org/2000/svg"
-  width="16"
-  height="16"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="m17 2 4 4-4 4" />
-  <path d="M3 11v-1a4 4 0 0 1 4-4h14" />
-  <path d="m7 22-4-4 4-4" />
-  <path d="M21 13v1a4 4 0 0 1-4 4H3" />
-</svg>
-
-                        Isomorphic
-                    </div>
-                    <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">One SDK. Every environment.</h2>
-                    <p class="mt-4 text-lg text-surface-400">The same <code class="text-sm bg-surface-800 px-1.5 py-0.5 rounded text-surface-300">@rebasepro/client</code> runs in your CMS plugins, your user-facing apps, and your Node.js backend. No wrappers, no adapters — one API everywhere.</p>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto animate-on-scroll fade-in-up delay-100">
-                    <!-- CMS -->
-                    <div class="group relative rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 p-6 flex flex-col">
-                        <div class="flex items-center gap-3 mb-5">
-                            <div class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 ring-1 ring-blue-500/20">
-                                
-<svg
-  class="lucide lucide-layout-dashboard"
-  xmlns="http://www.w3.org/2000/svg"
-  width="16"
-  height="16"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <rect width="7" height="9" x="3" y="3" rx="1" />
-  <rect width="7" height="5" x="14" y="3" rx="1" />
-  <rect width="7" height="9" x="14" y="12" rx="1" />
-  <rect width="7" height="5" x="3" y="16" rx="1" />
-</svg>
-
-                            </div>
-                            <div>
-                                <div class="text-sm font-semibold text-white">CMS Plugin</div>
-                                <div class="text-xs text-surface-500">Admin panel extension</div>
-                            </div>
-                        </div>
-                        <div class="rounded-xl bg-[#1e1e1e] p-4 ring-1 ring-white/5 font-mono text-[11px] leading-relaxed flex-1">
-                            <div class="text-[#6A9955] mb-1">// CMS custom view</div>
-                            <div><span class="text-[#569cd6]">const</span> <span class="text-[#d4d4d4]">{"{ data } ="}</span> <span class="text-[#c586c0]">await</span></div>
-                            <div class="ml-2"><span class="text-[#9cdcfe]">rebase</span>.<span class="text-[#9cdcfe]">data</span>.<span class="text-[#9cdcfe]">posts</span>.<span class="text-[#dcdcaa]">find</span>({"{"}</div>
-                            <div class="ml-4"><span class="text-[#9cdcfe]">orderBy</span>: <span class="text-[#ce9178]">"createdAt:desc"</span></div>
-                            <div class="ml-2">{"}"});</div>
-                        </div>
-                    </div>
-
-                    <!-- Frontend App -->
-                    <div class="group relative rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 p-6 flex flex-col">
-                        <div class="flex items-center gap-3 mb-5">
-                            <div class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 ring-1 ring-emerald-500/20">
-                                
-<svg
-  class="lucide lucide-circle"
-  xmlns="http://www.w3.org/2000/svg"
-  width="16"
-  height="16"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <circle cx="12" cy="12" r="10" />
-</svg>
-
-                            </div>
-                            <div>
-                                <div class="text-sm font-semibold text-white">Frontend App</div>
-                                <div class="text-xs text-surface-500">React, Next.js, Vue…</div>
-                            </div>
-                        </div>
-                        <div class="rounded-xl bg-[#1e1e1e] p-4 ring-1 ring-white/5 font-mono text-[11px] leading-relaxed flex-1">
-                            <div class="text-[#6A9955] mb-1">// User-facing app</div>
-                            <div><span class="text-[#569cd6]">const</span> <span class="text-[#d4d4d4]">{"{ data } ="}</span> <span class="text-[#c586c0]">await</span></div>
-                            <div class="ml-2"><span class="text-[#9cdcfe]">rebase</span>.<span class="text-[#9cdcfe]">data</span>.<span class="text-[#9cdcfe]">posts</span>.<span class="text-[#dcdcaa]">find</span>({"{"}</div>
-                            <div class="ml-4"><span class="text-[#9cdcfe]">orderBy</span>: <span class="text-[#ce9178]">"createdAt:desc"</span></div>
-                            <div class="ml-2">{"}"});</div>
-                        </div>
-                    </div>
-
-                    <!-- Backend -->
-                    <div class="group relative rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 p-6 flex flex-col">
-                        <div class="flex items-center gap-3 mb-5">
-                            <div class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 ring-1 ring-amber-500/20">
-                                
-<svg
-  class="lucide lucide-server"
-  xmlns="http://www.w3.org/2000/svg"
-  width="16"
-  height="16"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <rect width="20" height="8" x="2" y="2" rx="2" ry="2" />
-  <rect width="20" height="8" x="2" y="14" rx="2" ry="2" />
-  <line x1="6" x2="6.01" y1="6" y2="6" />
-  <line x1="6" x2="6.01" y1="18" y2="18" />
-</svg>
-
-                            </div>
-                            <div>
-                                <div class="text-sm font-semibold text-white">Node.js Backend</div>
-                                <div class="text-xs text-surface-500">API routes, cron jobs…</div>
-                            </div>
-                        </div>
-                        <div class="rounded-xl bg-[#1e1e1e] p-4 ring-1 ring-white/5 font-mono text-[11px] leading-relaxed flex-1">
-                            <div class="text-[#6A9955] mb-1">// Server-side script</div>
-                            <div><span class="text-[#569cd6]">const</span> <span class="text-[#d4d4d4]">{"{ data } ="}</span> <span class="text-[#c586c0]">await</span></div>
-                            <div class="ml-2"><span class="text-[#9cdcfe]">rebase</span>.<span class="text-[#9cdcfe]">data</span>.<span class="text-[#9cdcfe]">posts</span>.<span class="text-[#dcdcaa]">find</span>({"{"}</div>
-                            <div class="ml-4"><span class="text-[#9cdcfe]">orderBy</span>: <span class="text-[#ce9178]">"createdAt:desc"</span></div>
-                            <div class="ml-2">{"}"});</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mt-10 text-center animate-on-scroll fade-in-up delay-200">
-                    <p class="text-surface-500 text-sm">Same types. Same queries. Same auth. Zero platform-specific code.</p>
-                    <a href="/sdk"
-                       class="inline-flex items-center gap-2 mt-4 text-sm font-semibold text-white hover:text-primary transition-colors">
-                        Explore the SDK
-                        
-<svg
-  class="lucide lucide-arrow-right"
-  xmlns="http://www.w3.org/2000/svg"
-  width="16"
-  height="16"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M5 12h14" />
-  <path d="m12 5 7 7-7 7" />
-</svg>
-
-                    </a>
-                </div>
-            </div>
-        </section>
-
-        <!-- What Can You Build Section with icon accents -->
-        <section class="relative isolate bg-black py-24 sm:py-32 overflow-hidden">
-            <SectionBackgroundAccents topLine={true}/>
-
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
-                <div class="w-full lg:w-[400px] mb-20 mt-16">
-                    <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Everything for your<br/>UI
-                        needs</h2>
-                    <!--<p class="mt-6 text-lg leading-8 text-surface-400">Powerful features that make data management a breeze</p>-->
-                    <p class="mt-6 text-lg leading-8 text-surface-400">
-                        If you need to create custom views or components, you can use our battle-tested Rebase UI
-                        components.
-                    </p>
-                </div>
-
-                <div class="mx-auto mt-16 max-w-7xl min-h-64">
-                    <div class="text-center">
-                        <ClientUIComponentsTeaser client:only="react">
-                            Loading...
-                        </ClientUIComponentsTeaser>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-
-        <section class="bg-black py-16 sm:py-24 ">
-            <div class="mx-auto max-w-7xl px-6">
-                <div class="mx-auto max-w-2xl text-center mb-16">
-                    <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Build Custom
-                        Views</h2>
-                    <p class="mt-6 text-lg leading-8 text-surface-400">Use all the built-in data hooks to create your own
-                        React components and add them directly to
-                        the main navigation, or to documents</p>
-                </div>
-                <div class="lg:grid lg:grid-cols-12">
-                    <div class="lg:px-8 lg:col-span-6 relative rounded-2xl overflow-hidden">
-                        <CodeBlock
-                                language="typescript"
-                                code={`export function ProductDetailPreview({ modifiedValues }: {
+const productDetailPreviewCode = `export function ProductDetailPreview({ modifiedValues }: {
     modifiedValues?: EntityValues<Product>;
 }) {
-
     const snackbarController = useSnackbarController();
     const [quantity, setQuantity] = React.useState(1);
 
@@ -508,109 +31,462 @@ console.log(posts[0].author.name); // 100% type-safe`}
     return (
         <div className="p-8">
             <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-
                 {/* Product Image */}
                 {mainImage && (
-                    <img
-                        alt="Product"
-                        className="aspect-square object-cover w-full rounded-lg"
-                        src={mainImage}
-                    />
+                    <img alt="Product" className="aspect-square object-cover w-full rounded-lg" src={mainImage} />
                 )}
-
-                {/* Product Details */}
+                {/* Details */}
                 <div className="grid gap-4 content-center">
-                    <div className="flex items-start">
-                        <h1 className="flex-grow text-3xl font-bold">
-                            {name ?? "Product name"}
-                        </h1>
-                        <div className="text-3xl font-semibold ml-auto">
-                            \${price}
-                        </div>
-                    </div>
-
+                    <h1 className="text-3xl font-bold">{name ?? "Product name"}</h1>
+                    <div className="text-3xl font-semibold">\\\${price}</div>
                     <Markdown source={description ?? ""} />
-
-                    <QuantitySelect onSelected={(quantity) => snackbarController.open({
-                                                    type: "success",
-                                                    message: \`Added \\\${ quantity } items to cart\`
-                                                })}/>
+                    <QuantitySelect onSelected={(qty) => snackbarController.open({
+                        type: "success",
+                        message: \\\`Added \\\${qty} items to cart\\\`
+                    })}/>
                 </div>
             </div>
         </div>
     );
-}
-                            `}
-                                client:load
+}`;
+---
+
+<main class="bg-black text-surface-300 overflow-hidden font-sans">
+    
+    <!-- -- HERO SECTION -- -->
+    <section class="relative isolate overflow-hidden pt-24 pb-20 sm:pt-32 sm:pb-28 lg:pt-40 lg:pb-32 bg-radial-at-t from-surface-900/50 via-black to-black border-b border-surface-800/40">
+        <!-- Background accents and subtle grid -->
+        <div class="pointer-events-none absolute inset-0 -z-10">
+            <div class="absolute -top-40 left-1/3 w-[800px] h-[800px] rounded-full bg-primary/10 blur-3xl opacity-60"></div>
+            <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:40px_40px] opacity-10"></div>
+        </div>
+
+        <div class="px-4 mx-auto max-w-7xl text-center lg:px-12">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary-light text-xs font-semibold mb-6 animate-pulse">
+                <span>*</span> Open Source Schema-as-Code Framework
+            </div>
+            <h1 class="mb-6 text-4xl font-extrabold tracking-tight md:text-5xl lg:text-7xl text-white font-sans leading-none">
+                Your admin panel shouldn't<br class="hidden sm:inline"/> make you write CRUD.
+            </h1>
+            <p class="mb-10 text-lg leading-8 text-surface-400 lg:text-xl max-w-3xl mx-auto font-medium">
+                Define your data schema in pure TypeScript. Rebase instantly handles database migrations, generates API endpoints, and delivers a premium React admin console.
+            </p>
+            <div class="flex justify-center items-center">
+                <div class="relative rounded-lg border border-surface-800/80 bg-surface-900/40 hover:border-primary/30 transition-all duration-200 px-4 py-3.5 flex items-center justify-between gap-3 text-sm font-mono text-white min-w-[260px] sm:min-w-[280px]">
+                    <div class="flex items-center gap-2">
+                        <span class="text-primary font-bold select-none">&gt;</span>
+                        <span class="text-white select-all">pnpm dlx @rebasepro/cli init</span>
+                    </div>
+                    <button data-track-copy="developers-hero" data-command="pnpm dlx @rebasepro/cli init" class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors cursor-pointer" aria-label="Copy command" title="Copy to clipboard">
+                        <svg class="lucide lucide-copy w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <SectionBackgroundAccents bottomLine={false}/>
+    </section>
+
+    <!-- -- CLIENT LOGOS SECTION -- -->
+    <section class="relative isolate bg-black py-12 border-b border-surface-800/40">
+        <div class="mx-auto max-w-7xl px-8 lg:px-12">
+            <h2 class="text-center text-xs font-bold leading-8 text-surface-500 uppercase tracking-widest">
+                Trusted by engineering teams at forward-thinking companies
+            </h2>
+            <div class="mx-auto mt-4">
+                <ClientLogos/>
+            </div>
+        </div>
+    </section>
+
+    <!-- -- CORE DEVELOPER COMPONENTS SHOWCASE -- -->
+    <section id="features" class="bg-black py-20 sm:py-28 relative border-b border-surface-800/40">
+        <div class="pointer-events-none absolute inset-0 -z-10">
+            <div class="absolute top-1/3 left-10 w-[600px] h-[600px] rounded-full bg-blue-500/5 blur-3xl opacity-30"></div>
+            <div class="absolute bottom-1/3 right-10 w-[600px] h-[600px] rounded-full bg-primary/5 blur-3xl opacity-20"></div>
+        </div>
+
+        <div class="mx-auto max-w-7xl px-6 lg:px-8 space-y-32">
+            
+            <!-- -- FEATURE 1: VISUAL RLS EDITOR -- -->
+            <div class="space-y-8">
+                <div class="max-w-3xl">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-xs font-semibold mb-4">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                        Postgres Row-Level Security
+                    </div>
+                    <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+                        Visual Database Security Policies
+                    </h2>
+                    <p class="mt-4 text-base text-surface-400">
+                        Write database security rules visually inside the admin console. Presets automatically compile to Postgres-compliant SQL and sync live with Postgres.
+                    </p>
+                </div>
+                
+                <!-- Browser Frame for RLS editor -->
+                <div class="w-full rounded-2xl border border-surface-800 bg-surface-950/90 shadow-2xl overflow-hidden">
+                    <div class="flex items-center justify-between px-4 py-3 border-b border-surface-800/60 bg-surface-900/30">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
+                            <span class="text-[11px] font-mono text-surface-500 ml-3">rebase-console / policies_manager.sql</span>
+                        </div>
+                        <span class="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            Security Engine Active
+                        </span>
+                    </div>
+                    <div class="p-6 bg-[#09090b]">
+                        <RLSEditorDemo client:only="react" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- -- FEATURE 2: SCHEMA-AS-CODE -- -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+                <div class="lg:col-span-5 space-y-6">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary-light text-xs font-semibold">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+                        AST Code Mutation
+                    </div>
+                    <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+                        Schema-as-Code & Sync
+                    </h2>
+                    <p class="text-base text-surface-400">
+                        Define collections in pure TypeScript schema models. Visual additions automatically execute AST mutations, writing code directly back to your repository.
+                    </p>
+                    <div class="text-[11px] text-surface-500 font-mono bg-surface-900/40 p-3 rounded border border-surface-800/40">
+                        <span>Active Driver: </span>
+                        <code class="text-amber-400 font-bold">drizzle-kit push:pg</code>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-7 rounded-2xl border border-surface-800 bg-surface-950/80 shadow-2xl overflow-hidden">
+                    <div class="flex items-center px-4 py-2.5 border-b border-surface-800/60 bg-surface-900/30 text-[10px] font-mono text-surface-500">
+                        schema/posts.ts
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2">
+                        <!-- TypeScript Editor Mock -->
+                        <div class="p-5 bg-[#0f0f11] font-mono text-[10.5px] leading-relaxed border-r border-surface-800/40 whitespace-pre-wrap"><span class="text-purple-400">import</span> &#123; <span class="text-blue-300">buildCollection</span>, <span class="text-blue-300">buildProperty</span> &#125; <span class="text-purple-400">from</span> <span class="text-green-400">"@rebasepro/core"</span>;
+
+<span class="text-purple-400">export const</span> posts = <span class="text-blue-400">buildCollection</span>(&#123;
+  name: <span class="text-green-400">"Posts"</span>,
+  properties: &#123;
+    id: <span class="text-blue-400">buildProperty</span>(&#123; dataType: <span class="text-green-400">"string"</span> &#125;),
+    title: <span class="text-blue-400">buildProperty</span>(&#123; dataType: <span class="text-green-400">"string"</span> &#125;),
+<span class="text-green-300/80 bg-green-500/5 pl-1 border-l-2 border-green-500 inline-block w-full">    status: <span class="text-blue-400">buildProperty</span>(&#123; dataType: <span class="text-green-400">"string"</span> &#125;)</span>
+  &#125;
+&#125;);</div>
+                        <!-- Live visual builder preview -->
+                        <div class="p-5 bg-[#09090b] flex flex-col justify-center">
+                            <SchemaBuilderMiniDemo client:only="react" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- -- FEATURE 3: TYPE-SAFE SDK & INSTANT API -- -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+                <div class="lg:col-span-7 rounded-2xl border border-surface-800 bg-surface-950/80 shadow-2xl overflow-hidden order-last lg:order-first">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-surface-800/60 bg-surface-900/30 text-[10px] font-mono text-surface-500">
+                        <span>Universal SDK autocomplete & API response</span>
+                        <span class="text-blue-400 font-bold bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20 text-[8px]">Type-Safe</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-12">
+                        <!-- Typing Console -->
+                        <div class="md:col-span-7 min-h-[280px] border-r border-surface-800/40">
+                            <SdkMiniDemo client:only="react" />
+                        </div>
+                        <!-- JSON Payload Inspector -->
+                        <div class="md:col-span-5 min-h-[280px]">
+                            <ApiMiniDemo client:only="react" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-5 space-y-6">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400 text-xs font-semibold">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        Isomorphic Drizzle-Like SDK
+                    </div>
+                    <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+                        A Truly Typed SDK
+                    </h2>
+                    <p class="text-base text-surface-400">
+                        Query database records cleanly with deep relational joins, zero N+1 query loops, and compile-time type validation mapping your database schemas.
+                    </p>
+                </div>
+            </div>
+
+            <!-- -- FEATURE 4: CUSTOM FIELDS -- -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+                <div class="lg:col-span-5 space-y-6">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-purple-500/30 bg-purple-500/10 text-purple-400 text-xs font-semibold">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+                        React Extensibility
+                    </div>
+                    <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+                        Custom Widget Extensions
+                    </h2>
+                    <p class="text-base text-surface-400">
+                        Register any standard React components directly into document schema fields. Rebase automatically binds value states and inputs without complex templates.
+                    </p>
+                </div>
+
+                <div class="lg:col-span-7 rounded-2xl border border-surface-800 bg-surface-950/80 shadow-2xl overflow-hidden">
+                    <div class="flex items-center px-4 py-2.5 border-b border-surface-800/60 bg-surface-900/30 text-[10px] font-mono text-surface-500">
+                        schema/fields_widgets.tsx
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2">
+                        <!-- Custom Component Registration -->
+                        <div class="p-5 bg-[#0f0f11] font-mono text-[10.5px] leading-relaxed border-r border-surface-800/40 whitespace-pre-wrap"><span class="text-purple-400">import</span> &#123; <span class="text-blue-300">buildProperty</span> &#125; <span class="text-purple-400">from</span> <span class="text-green-400">"@rebasepro/core"</span>;
+<span class="text-purple-400">import</span> &#123; <span class="text-blue-300">ColorPicker</span> &#125; <span class="text-purple-400">from</span> <span class="text-green-400">"./widgets"</span>;
+
+<span class="text-purple-400">export const</span> brand = <span class="text-blue-400">buildProperty</span>(&#123;
+  name: <span class="text-green-400">"Brand Color"</span>,
+  dataType: <span class="text-green-400">"string"</span>,
+  customFieldWidget: <span class="text-blue-300">ColorPicker</span>,
+  validation: &#123; required: <span class="text-amber-400">true</span> &#125;
+&#125;);</div>
+                        <!-- Live widget panel -->
+                        <div class="p-1 bg-[#09090b] flex flex-col justify-center">
+                            <CustomFieldsDemo client:only="react" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- -- ISOMORPHIC SDK ARCHITECTURE -- -->
+    <section class="relative isolate bg-black py-20 sm:py-28 overflow-hidden border-b border-surface-800/40">
+        <SectionBackgroundAccents blob={{ position: "top", size: "md" }}/>
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="mx-auto max-w-3xl text-center mb-16">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary-light text-xs font-semibold mb-6">
+                    <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    Isomorphic Architecture
+                </div>
+                <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">One SDK. Every environment.</h2>
+                <p class="mt-4 text-base text-surface-400">
+                    The same <code class="text-xs bg-surface-900 border border-surface-800 px-2 py-0.5 rounded text-surface-300 font-mono">@rebasepro/client</code> runs natively in your serverless functions, your user-facing apps, and your Node.js backend. Zero wrappers. Pure developer ergonomics.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+                <!-- Card 1: Serverless & Edge -->
+                <div class="group relative rounded-2xl bg-surface-900/40 border border-surface-800/60 hover:border-primary/40 transition-all duration-300 p-6 flex flex-col justify-between">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 border border-blue-500/20">
+                            <!-- Corrected Astro class styling + direct size attributes for icon -->
+                            <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-white">Serverless & Edge</div>
+                            <div class="text-[10px] text-surface-500 font-medium">Cloudflare Workers, Vercel Edge</div>
+                        </div>
+                    </div>
+                    <div class="rounded-xl bg-[#09090b] border border-surface-800/40 p-4 font-mono text-[11px] leading-relaxed">
+                        <div class="text-surface-500 mb-1">// Run on serverless runtime</div>
+                        <div><span class="text-[#569cd6]">const</span> <span class="text-[#d4d4d4]">{"{ data } ="}</span> <span class="text-[#c586c0]">await</span></div>
+                        <div class="ml-2"><span class="text-[#9cdcfe]">rebase</span>.<span class="text-[#9cdcfe]">data</span>.<span class="text-[#9cdcfe]">posts</span>.<span class="text-[#dcdcaa]">find</span>({"{"}</div>
+                        <div class="ml-4"><span class="text-[#9cdcfe]">orderBy</span>: <span class="text-[#ce9178]">"createdAt:desc"</span></div>
+                        <div class="ml-2">{"}"});</div>
+                    </div>
+                </div>
+
+                <!-- Card 2: Frontend App -->
+                <div class="group relative rounded-2xl bg-surface-900/40 border border-surface-800/60 hover:border-primary/40 transition-all duration-300 p-6 flex flex-col justify-between">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                            <!-- Corrected Astro class styling + direct size attributes for icon -->
+                            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-white">Frontend Apps</div>
+                            <div class="text-[10px] text-surface-500 font-medium">React, Next.js, Remix, Astro</div>
+                        </div>
+                    </div>
+                    <div class="rounded-xl bg-[#09090b] border border-surface-800/40 p-4 font-mono text-[11px] leading-relaxed">
+                        <div class="text-surface-500 mb-1">// Client-side app data query</div>
+                        <div><span class="text-[#569cd6]">const</span> <span class="text-[#d4d4d4]">{"{ data } ="}</span> <span class="text-[#c586c0]">await</span></div>
+                        <div class="ml-2"><span class="text-[#9cdcfe]">rebase</span>.<span class="text-[#9cdcfe]">data</span>.<span class="text-[#9cdcfe]">posts</span>.<span class="text-[#dcdcaa]">find</span>({"{"}</div>
+                        <div class="ml-4"><span class="text-[#9cdcfe]">orderBy</span>: <span class="text-[#ce9178]">"createdAt:desc"</span></div>
+                        <div class="ml-2">{"}"});</div>
+                    </div>
+                </div>
+
+                <!-- Card 3: Backend Service -->
+                <div class="group relative rounded-2xl bg-surface-900/40 border border-surface-800/60 hover:border-primary/40 transition-all duration-300 p-6 flex flex-col justify-between">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 border border-amber-500/20">
+                            <!-- Corrected Astro class styling + direct size attributes for icon -->
+                            <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-white">Backend Services</div>
+                            <div class="text-[10px] text-surface-500 font-medium">Node.js, Express, Hono, Fastify</div>
+                        </div>
+                    </div>
+                    <div class="rounded-xl bg-[#09090b] border border-surface-800/40 p-4 font-mono text-[11px] leading-relaxed">
+                        <div class="text-surface-500 mb-1">// Node backend servers</div>
+                        <div><span class="text-[#569cd6]">const</span> <span class="text-[#d4d4d4]">{"{ data } ="}</span> <span class="text-[#c586c0]">await</span></div>
+                        <div class="ml-2"><span class="text-[#9cdcfe]">rebase</span>.<span class="text-[#9cdcfe]">data</span>.<span class="text-[#9cdcfe]">posts</span>.<span class="text-[#dcdcaa]">find</span>({"{"}</div>
+                        <div class="ml-4"><span class="text-[#9cdcfe]">orderBy</span>: <span class="text-[#ce9178]">"createdAt:desc"</span></div>
+                        <div class="ml-2">{"}"});</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-12 text-center">
+                <p class="text-surface-500 text-xs">Same client library. Shared schema TS models. Unified authorization policies. Zero adapters.</p>
+                <a href="/docs" class="inline-flex items-center gap-1.5 mt-4 text-xs font-bold text-white hover:text-primary transition-colors uppercase tracking-wider">
+                    Explore SDK reference
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- -- UI COMPONENTS TEASER -- -->
+    <section class="relative isolate bg-black py-20 sm:py-28 overflow-hidden border-b border-surface-800/40">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="max-w-3xl mb-16">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary-light text-xs font-semibold mb-6">
+                    <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" /></svg>
+                    Rebase UI components
+                </div>
+                <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">Everything for your interface needs</h2>
+                <p class="mt-4 text-base text-surface-400">
+                    Need custom pages or fields? Build them in minutes using Rebase's library of layout widgets, cards, and input fields.
+                </p>
+            </div>
+
+            <div class="mx-auto mt-12 max-w-7xl min-h-64">
+                <div class="text-center">
+                    <ClientUIComponentsTeaser client:only="react">
+                        <div class="py-12 text-surface-500 font-mono text-xs">Loading Rebase UI Component preview...</div>
+                    </ClientUIComponentsTeaser>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- -- CUSTOM REACT VIEWS SECTION -- -->
+    <section class="bg-black py-20 sm:py-28 relative border-b border-surface-800/40">
+        <div class="mx-auto max-w-7xl px-6">
+            <div class="mx-auto max-w-3xl text-center mb-16">
+                <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">Build Custom Views</h2>
+                <p class="mt-4 text-base text-surface-400">
+                    Use our built-in React hooks to query data, handle errors, and manage transactions directly inside custom dashboards or document views.
+                </p>
+            </div>
+            
+            <div class="lg:grid lg:grid-cols-12 gap-8 items-stretch">
+                <!-- Code definition panel -->
+                <div class="lg:col-span-6 relative rounded-2xl overflow-hidden border border-surface-800/60 shadow-xl bg-surface-950 flex flex-col">
+                    <div class="flex items-center px-4 py-2 border-b border-surface-800/60 bg-surface-900/30 text-[10px] font-mono text-surface-500 shrink-0">
+                        src/components/ProductDetailPreview.tsx
+                    </div>
+                    <div class="flex-1 overflow-auto [&>div]:!border-none [&>div]:!rounded-none [&>div]:!shadow-none [&>div]:h-full">
+                        <CodeBlock
+                            language="typescript"
+                            code={productDetailPreviewCode}
+                            client:load
                         />
                     </div>
-                    <div class="lg:col-span-6 sticky top-20 self-start mt-8 lg:mt-0">
-                        <img src="/img/product_details_view.png"
-                             alt="Custom React component demo"
-                             class="w-full h-auto rounded-2xl ring-1 ring-surface-800 bg-surface-900"/>
-                    </div>
                 </div>
-
-            </div>
-        </section>
-
-
-        <section class="bg-black py-16 sm:py-24">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
-                <div class="mt-16 sm:mt-24 grid grid-cols-1 lg:grid-cols-6 gap-12 items-center">
-                    <div class="lg:order-last lg:col-span-4 relative w-full rounded-2xl overflow-hidden ring-1 ring-surface-800">
-                        <RebaseEditorDemo client:only="react"/>
-                    </div>
-                    <div class="mt-8 lg:mt-0 lg:col-span-2 self-start">
-                        <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Over 20+ Powerful Data
-                            Fields</h2>
-                        <p class="mt-4 text-lg text-surface-400">
-                            We've built all the complex fields you don't want to. Get a <strong>Notion-style rich text
-                            editor</strong>, file uploads and storage, <strong>relational data
-                            (references)</strong>, enums, arrays,
-                            maps, and more, all as pre-built components.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-
-
-        <section class="bg-black py-16 sm:py-24">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
-                <div class="mx-auto max-w-2xl text-center mb-16">
-                    <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Ready to Build?</h2>
-                    <p class="mt-4 text-lg leading-8 text-surface-400">Dive into the open-source framework. Perfect for custom builds, agencies, and full control.</p>
-                </div>
-                <div class="mt-8 flex justify-center">
-                    <a href="/docs" rel="noopener noreferrer"
-                       class="inline-flex items-center justify-center gap-x-2 rounded-md bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-dark transition-all duration-200 ease-in-out btn-glow">
-                        Read the Docs
+                <!-- Rendered visual snapshot -->
+                <div class="lg:col-span-6 mt-8 lg:mt-0 flex flex-col">
+                    <div class="w-full rounded-2xl border border-surface-800 bg-surface-950 overflow-hidden shadow-2xl flex flex-col flex-1">
+                        <!-- Window Titlebar -->
+                        <div class="flex items-center justify-between px-4 py-2.5 border-b border-surface-800/60 bg-surface-900/30 text-[10px] font-mono text-surface-500 shrink-0">
+                            <span>Live Component Preview</span>
+                        </div>
                         
-<svg
-  class="lucide lucide-arrow-right"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M5 12h14" />
-  <path d="m12 5 7 7-7 7" />
-</svg>
+                        <!-- Product Page Demo Content -->
+                        <div class="flex-1 flex flex-col bg-surface-950">
+                            <!-- Product Image — full-bleed hero -->
+                            <div class="relative w-full aspect-[16/10] overflow-hidden bg-black shrink-0">
+                                <img src="/img/pro_headphones.png" alt="Pro Studio Headphones" class="w-full h-full object-cover" loading="lazy" />
+                                <!-- Subtle gradient overlay for blending into details -->
+                                <div class="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-surface-950 to-transparent"></div>
+                                <!-- Floating badge -->
+                                <span class="absolute top-4 left-4 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 backdrop-blur-sm">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                    In Stock
+                                </span>
+                            </div>
 
-                    </a>
+                            <!-- Product Details -->
+                            <div class="flex-1 flex flex-col justify-between p-5 sm:p-6 space-y-4">
+                                <div class="space-y-3">
+                                    <div class="flex items-start justify-between gap-4">
+                                        <div>
+                                            <h3 class="text-base font-bold text-white leading-tight">Pro Studio Headphones</h3>
+                                            <p class="text-[10px] text-surface-500 font-mono mt-0.5">SKU: HEAD-X200</p>
+                                        </div>
+                                        <div class="text-xl font-extrabold text-white font-sans shrink-0">$299</div>
+                                    </div>
+
+                                    <p class="text-xs text-surface-400 leading-relaxed">
+                                        Studio-grade sound with active noise cancellation, 40-hour battery, and premium carbon fibre build.
+                                    </p>
+                                </div>
+
+                                <!-- Mock Controls -->
+                                <div class="space-y-3 pt-1">
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-[10px] text-surface-500 uppercase font-bold tracking-wider font-mono">Qty</span>
+                                        <div class="flex items-center border border-surface-800 bg-surface-900 rounded-lg overflow-hidden h-8">
+                                            <button class="px-2.5 text-surface-400 hover:text-white hover:bg-surface-800 transition-colors h-full">-</button>
+                                            <span class="px-3 text-xs text-white font-semibold font-mono">1</span>
+                                            <button class="px-2.5 text-surface-400 hover:text-white hover:bg-surface-800 transition-colors h-full">+</button>
+                                        </div>
+                                    </div>
+
+                                    <button class="w-full flex items-center justify-center gap-2 h-9 bg-primary hover:bg-primary-dark text-white rounded-lg text-xs font-bold transition-all duration-200 shadow-lg shadow-primary/20 cursor-default">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                                        </svg>
+                                        Add to Cart
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </section>
-    </main>
+        </div>
+    </section>
 
-    {/* The Layout component should include your Footer */}
+    <!-- -- GET STARTED CLI TERMINAL -- -->
+    <section class="bg-black py-20 sm:py-28 relative overflow-hidden bg-radial-at-b from-surface-950/70 via-black to-black">
+        <div class="pointer-events-none absolute inset-0 -z-10">
+            <div class="absolute -bottom-40 right-10 w-[700px] h-[700px] rounded-full bg-primary/5 blur-3xl opacity-50"></div>
+        </div>
+        
+        <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
+            <div class="mx-auto max-w-2xl mb-12">
+                <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-5xl leading-tight">Ready to build?</h2>
+                <p class="mt-4 text-base leading-relaxed text-surface-400">
+                    Dive into our open-source framework. Install the CLI tool, initialize your workspace, and start designing your next dashboard layout.
+                </p>
+            </div>
+            
+            <!-- Mock terminal component -->
+            <div class="mb-10 animate-on-scroll fade-in-up">
+                <TerminalInit client:only="react" />
+            </div>
 
+            <div class="flex justify-center gap-4">
+                <a href="/docs" class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-surface-900 border border-surface-800 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-surface-800 transition-all duration-200">
+                    Read installation guides
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                </a>
+            </div>
+        </div>
+    </section>
 
-
+</main>

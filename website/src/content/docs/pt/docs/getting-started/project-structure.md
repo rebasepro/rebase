@@ -27,7 +27,7 @@ my-app/
 │   ├── Dockerfile
 │   └── package.json
 │
-└── shared/                 # Definições de coleção
+└── config/                 # Definições de coleção
     └── collections/
         ├── index.ts        # Exporta todas as coleções
         └── products.ts     # Exemplo: coleção de produtos
@@ -49,7 +49,7 @@ const rebaseClient = createRebaseClient({
 });
 
 // As coleções são importadas via um módulo virtual Vite
-// que lê do diretório shared/
+// que lê do diretório config/
 ```
 
 ### Conceitos Chave
@@ -63,8 +63,8 @@ const rebaseClient = createRebaseClient({
 O backend é um **servidor Node.js** construído sobre [Hono](https://hono.dev/) (um framework HTTP rápido e leve). O ponto de entrada `index.ts` inicializa tudo:
 
 ```typescript title="backend/src/index.ts"
-import { initializeRebaseBackend } from "@rebasepro/backend";
-import { createPostgresBootstrapper } from "@rebasepro/postgresql-backend";
+import { initializeRebaseBackend } from "@rebasepro/server-core";
+import { createPostgresAdapter } from "@rebasepro/server-postgresql";
 import { Hono } from "hono";
 
 const app = new Hono();
@@ -72,13 +72,11 @@ const app = new Hono();
 await initializeRebaseBackend({
     app,
     server,
-    collectionsDir: "./shared/collections",
-    bootstrappers: [
-        createPostgresBootstrapper({
+    collectionsDir: "./config/collections",
+    database: createPostgresAdapter({
             connection: db,
             schema: { tables, enums, relations }
-        })
-    ],
+        }),
     auth: {
         jwtSecret: process.env.JWT_SECRET!,
         google: { clientId: process.env.GOOGLE_CLIENT_ID },
@@ -98,11 +96,11 @@ await initializeRebaseBackend({
 - Servidor **WebSocket** — sincronização de entidades em tempo real via Postgres LISTEN/NOTIFY
 - **Histórico** — registro de trilha de auditoria em cada alteração de entidade
 
-## Coleções Compartilhadas (`shared/`)
+## Coleções Compartilhadas (`config/`)
 
 As coleções são a **única fonte de verdade** para o seu modelo de dados. Elas são definidas como TypeScript e consumidas tanto pelo frontend (para geração da UI) quanto pelo backend (para geração de esquema e roteamento da API).
 
-```typescript title="shared/collections/products.ts"
+```typescript title="config/collections/products.ts"
 import { EntityCollection } from "@rebasepro/types";
 
 export const productsCollection: EntityCollection = {
@@ -120,7 +118,7 @@ O `slug` se torna o caminho da URL na UI de administração e o endpoint da API 
 
 ## Como Eles se Conectam
 
-1. **Você define** coleções em `shared/`
+1. **Você define** coleções em `config/`
 2. **O backend** as lê para gerar esquemas Drizzle e montar rotas REST
 3. **O frontend** as lê (via plugin Vite) para renderizar tabelas, formulários e navegação
 4. **A CLI** as lê para gerar arquivos de migração com `rebase schema generate`

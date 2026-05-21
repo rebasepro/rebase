@@ -1,13 +1,12 @@
 ---
 title: Introdução
 sidebar_label: Introdução
-slug: pt/docs/index
 description: Rebase é um Backend-as-a-Service e painel de administração de código aberto, construído com React e TypeScript. Defina seu esquema em TypeScript, e o Rebase gera uma UI CRUD completa, API REST, autenticação, armazenamento e sincronização em tempo real — tudo alimentado por PostgreSQL.
 ---
 
-<video className="intro_video" loop autoPlay muted>
-    <source src="/img/full_screen_dark.mp4" type="video/mp4"/>
-</video>
+import { AdminDemoCarousel } from "../../../../components/demos/AdminDemoCarousel";
+
+<AdminDemoCarousel client:only="react" height={400} showTabs={false} defaultTab={1} autoPlay={false} scale={0.75} />
 
 ## O que é Rebase?
 
@@ -59,6 +58,12 @@ Configure seu banco de dados em `.env`:
 ```bash
 DATABASE_URL=postgresql://user:password@localhost:5432/mydb
 JWT_SECRET=your-secret-key
+```
+
+Se você estiver se conectando a um banco de dados existente, poderá fazer a introspecção para gerar automaticamente seus arquivos de coleção:
+
+```bash
+pnpm rebase schema introspect
 ```
 
 Inicie tudo:

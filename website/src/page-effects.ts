@@ -48,5 +48,27 @@ document.addEventListener("astro:page-load", () => {
     el.classList.remove("in-view");
     observer.observe(el);
   });
+
+  // Global copy-btn logic
+  document.querySelectorAll(".copy-btn").forEach(button => {
+    button.addEventListener("click", () => {
+      const command = button.getAttribute("data-command");
+      if (command) {
+        navigator.clipboard.writeText(command).then(() => {
+          const originalText = button.getAttribute("title") || "Copy to clipboard";
+          button.setAttribute("title", "Copied!");
+          
+          button.classList.add("text-emerald-400");
+          button.classList.remove("text-surface-500");
+          
+          setTimeout(() => {
+            button.setAttribute("title", originalText);
+            button.classList.remove("text-emerald-400");
+            button.classList.add("text-surface-500");
+          }, 1500);
+        });
+      }
+    });
+  });
 });
 

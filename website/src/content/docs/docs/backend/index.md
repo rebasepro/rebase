@@ -20,19 +20,17 @@ Everything is initialized with a single function:
 
 ```typescript
 import { initializeRebaseBackend } from "@rebasepro/server-core";
-import { createPostgresBootstrapper } from "@rebasepro/server-postgresql";
+import { createPostgresAdapter } from "@rebasepro/server-postgresql";
 import { env } from "./env";
 
 const instance = await initializeRebaseBackend({
     app,
     server,
-    collectionsDir: "./shared/collections",
-    bootstrappers: [
-        createPostgresBootstrapper({
-            connection: db,
-            schema: { tables, enums, relations }
-        })
-    ],
+    collectionsDir: "./config/collections",
+    database: createPostgresAdapter({
+        connection: db,
+        schema: { tables, enums, relations }
+    }),
     auth: {
         jwtSecret: env.JWT_SECRET,
     },
@@ -73,11 +71,11 @@ interface RebaseBackendConfig {
     collections?: EntityCollection[];  // Your collection definitions
     collectionsDir?: string;  // Auto-load collections from a directory
 
-    // Bootstrappers (Databases, Auth, Realtime, etc.)
-    bootstrappers: BackendBootstrapper[];
+    // Database adapter (PostgreSQL, SQLite, etc.)
+    database?: DatabaseAdapter;
 
-    // Authentication
-    auth?: AuthConfig;
+    // Authentication configuration or custom adapter
+    auth?: RebaseAuthConfig | AuthAdapter;
 
     // File storage
     storage?: BackendStorageConfig | Record<string, BackendStorageConfig>;

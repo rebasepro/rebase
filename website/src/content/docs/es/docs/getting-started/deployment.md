@@ -61,10 +61,13 @@ Antes de desplegar a producción, asegúrate de:
 En producción, el backend puede servir el frontend como una SPA estática:
 
 ```typescript
-import { serveSPA } from "@rebasepro/backend";
+import { serveSPA } from "@rebasepro/server-core";
 
 // After initializeRebaseBackend()
-serveSPA(app, "./frontend/dist");
+import path from "path";
+
+// After initializeRebaseBackend()
+serveSPA(app, { frontendPath: path.resolve(process.cwd(), "../frontend/dist") });
 ```
 
 Primero, construye el frontend:

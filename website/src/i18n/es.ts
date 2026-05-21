@@ -79,7 +79,7 @@ export const es = {
     'Rebase está construido para soportar <strong class="text-white font-medium">CUALQUIER base de datos</strong>, o <strong class="text-white font-medium">CUALQUIER backend</strong> mediante adaptadores. Conectas tu propia base de datos — Rebase introspecciona el esquema y genera una interfaz de administración completa automáticamente. No se requiere base de datos adicional ni migración de datos. También soporta Firebase y MongoDB listos para usar.',
   "faq.q2": "¿En qué se diferencia Rebase de Retool o Supabase?",
   "faq.a2":
-    'A diferencia de Retool, Rebase es de código abierto sin bloqueo de precios por asiento, y es un framework React real que puedes extender con tu propio código. A diferencia de Supabase, Rebase funciona con <em class="text-white">tu base de datos Postgres existente</em> — no es un BaaS que controla tu infraestructura. Tú mantienes el control total.',
+    'A diferencia de Retool, Rebase es de código abierto sin bloqueo de precios por asiento, y es un framework React real que puedes extender con tu propio código. A diferencia de Supabase, Rebase funciona con <em class="text-white">tu base de datos Postgres existente</em> — no controla tu infraestructura. Tú mantienes el control total.',
   "faq.q3": "¿Puedo usar Rebase con una base de datos existente?",
   "faq.a3":
     "Absolutamente. Conecta cualquier base de datos Postgres y Rebase introspeccionará el esquema para generar un panel de administración completo automáticamente. Luego puedes refinar la UI visualmente o en TypeScript. Rebase funciona igual de bien para proyectos nuevos y bases de datos existentes.",
@@ -432,4 +432,6 @@ export const es = {
   "mosaic.badge": "Flexibilidad Infinita",
   "mosaic.title": "Un marco visual para cualquier caso de uso.",
   "mosaic.subtitle": "Desde comercio electrónico y gestión de activos hasta constructores visuales y edición de código en vivo. La interfaz impulsada por esquemas de Rebase se adapta a cualquier panel de control o editor.",
+  "pricing.meta.title": "Precios | Rebase",
+  "pricing.meta.description": "Elige el plan adecuado para tu equipo. Desde alojamiento propio gratuito de código abierto hasta colaboración empresarial y ramificación sin servidor.",
 };

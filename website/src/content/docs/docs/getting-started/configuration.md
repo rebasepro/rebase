@@ -15,7 +15,7 @@ All configuration is done via environment variables in your `.env` file at the p
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@localhost:5432/mydb` |
-| `JWT_SECRET` | Secret key for signing JWT tokens. Use a strong random string (min 32 chars). | `a1b2c3d4e5...` |
+| `JWT_SECRET` | Secret key for signing JWT tokens. Use a strong random string (min 32 chars). **Required in production** (auto-generated in development). | `a1b2c3d4e5...` |
 
 ### Frontend
 
@@ -30,29 +30,34 @@ All configuration is done via environment variables in your `.env` file at the p
 |----------|-------------|---------|
 | `PORT` | Port for the backend HTTP server | `3001` |
 | `LOG_LEVEL` | Logging verbosity: `error`, `warn`, `info`, `debug` | `info` |
-| `NODE_ENV` | Environment: `development` or `production` | `development` |
+| `NODE_ENV` | Environment: `development`, `production`, or `test` | `development` |
+| `CORS_ORIGINS` | Comma-separated list of allowed origins. **Required in production** if different from backend domain. | — |
+| `FRONTEND_URL` | URL of the frontend app. Used as an alternative to CORS_ORIGINS. | — |
 
 ### Authentication
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `JWT_SECRET` | Secret for JWT signing (required if auth is enabled) | — |
+| `JWT_SECRET` | Secret for JWT signing (required in production, auto-generated in development) | — |
 | `JWT_ACCESS_EXPIRES_IN` | Access token lifetime | `1h` |
 | `JWT_REFRESH_EXPIRES_IN` | Refresh token lifetime | `30d` |
 | `ALLOW_REGISTRATION` | Allow new users to register (`true`/`false`). First user can always register. | `true` |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID (backend validation) | — |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | — |
+| `REBASE_SERVICE_KEY` | Static admin API key. Bypasses normal JWT auth for server-to-server calls when passed as `Authorization: Bearer <key>`. (Auto-generated in development). | — |
 
 ### Storage
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `STORAGE_TYPE` | Storage backend: `local` or `s3` | `local` |
-| `STORAGE_BASE_PATH` | Base path for local storage | `./uploads` |
+| `STORAGE_PATH` | Base path for local storage | `./uploads` |
 | `S3_BUCKET` | S3 bucket name (when `STORAGE_TYPE=s3`) | — |
 | `S3_REGION` | AWS region | — |
 | `S3_ACCESS_KEY_ID` | AWS access key | — |
 | `S3_SECRET_ACCESS_KEY` | AWS secret key | — |
 | `S3_ENDPOINT` | Custom S3 endpoint (for MinIO, Cloudflare R2, etc.) | — |
+| `S3_FORCE_PATH_STYLE` | Force path-style URLs for S3 bucket (`true`/`false`) | `false` |
 
 ### Email (Optional)
 
@@ -60,29 +65,30 @@ All configuration is done via environment variables in your `.env` file at the p
 |----------|-------------|
 | `SMTP_HOST` | SMTP server host |
 | `SMTP_PORT` | SMTP server port |
+| `SMTP_SECURE` | Enable secure connection (`true`/`false`) |
 | `SMTP_USER` | SMTP username |
 | `SMTP_PASS` | SMTP password |
-| `EMAIL_FROM` | Sender address for system emails |
+| `SMTP_FROM` | Sender address for system emails |
 
 ## Backend Config Object
 
 The `RebaseBackendConfig` passed to `initializeRebaseBackend()` provides programmatic control:
 
 ```typescript
+import { initializeRebaseBackend } from "@rebasepro/server-core";
+import { createPostgresAdapter } from "@rebasepro/server-postgresql";
 import { env } from "./env";
 
 await initializeRebaseBackend({
     app,
     server,
-    collections,
+    collectionsDir: "./config/collections",
     basePath: "/api",        // Base path for all API routes (default: "/api")
 
-    bootstrappers: [         // Database and service bootstrappers
-        createPostgresBootstrapper({
-            connection: db,
-            schema: { tables, enums, relations }
-        })
-    ],
+    database: createPostgresAdapter({
+        connection: db,
+        schema: { tables, enums, relations }
+    }),
 
     auth: {                  // Authentication config
         jwtSecret: env.JWT_SECRET,
@@ -90,15 +96,28 @@ await initializeRebaseBackend({
         refreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN,
         requireAuth: true,    // Require auth for data API (default: true)
         allowRegistration: env.ALLOW_REGISTRATION,
-        google: {
-            clientId: env.GOOGLE_CLIENT_ID
-        }
+        google: env.GOOGLE_CLIENT_ID
+            ? {
+                clientId: env.GOOGLE_CLIENT_ID,
+                clientSecret: env.GOOGLE_CLIENT_SECRET
+            }
+            : undefined,
+        serviceKey: env.REBASE_SERVICE_KEY
     },
 
-    storage: {               // File storage config
-        type: "local",
-        basePath: "./uploads"
-    },
+    storage: env.STORAGE_TYPE === "s3"
+        ? {
+            type: "s3",
+            bucket: env.S3_BUCKET!,
+            region: env.S3_REGION,
+            accessKeyId: env.S3_ACCESS_KEY_ID,
+            secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+            endpoint: env.S3_ENDPOINT
+        }
+        : {
+            type: "local",
+            basePath: env.STORAGE_PATH || "./uploads"
+        },
 
     history: true,           // Enable entity change history
 

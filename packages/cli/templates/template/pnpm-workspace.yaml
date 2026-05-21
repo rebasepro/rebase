@@ -2,3 +2,9 @@ packages:
   - "frontend"
   - "backend"
   - "config"
+linkWorkspacePackages: true
+blockExoticSubdeps: false
+minimumReleaseAge: 0
+allowBuilds:
+  esbuild: true
+

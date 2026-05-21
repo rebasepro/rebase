@@ -55,6 +55,7 @@ export interface Experiment {
  *  s-how-it-works     — 3-step explainer
  *  s-power-features   — Feature video grid
  *  s-collection-power — "One Collection" section
+ *  s-mosaic-showcase  — Visual Mosaic Showcase
  *  s-case-study       — SustenTalent showcase
  *  s-scroll-sync      — Scroll-sync feature showcase
  *  s-security         — Security & open-source punches
@@ -76,6 +77,118 @@ export const EXPERIMENTS: Experiment[] = [
         weights: [50, 50],
         expires: "2026-08-01",
     },
+    {
+        id: "homepage-section-order",
+        variants: [
+            "control",
+            "demo-first",
+            "social-first",
+            "explain-first",
+            "features-focus",
+            "roadmap-first",
+            "high-velocity"
+        ],
+        weights: [16, 14, 14, 14, 14, 14, 14],
+        expires: "2026-09-01",
+        sectionOrders: {
+            "demo-first": {
+                "s-hero": 1,
+                "s-demo-terminal": 2,
+                "s-demo-carousel": 3,
+                "s-power-features": 4,
+                "s-scroll-sync": 5,
+                "s-mosaic-showcase": 6,
+                "s-collection-power": 7,
+                "s-social-proof": 8,
+                "s-how-it-works": 9,
+                "s-case-study": 10,
+                "s-security": 11,
+                "s-faq": 12,
+                "s-roadmap": 13,
+                "s-final-cta": 14
+            },
+            "social-first": {
+                "s-hero": 1,
+                "s-social-proof": 2,
+                "s-case-study": 3,
+                "s-security": 4,
+                "s-how-it-works": 5,
+                "s-collection-power": 6,
+                "s-mosaic-showcase": 7,
+                "s-demo-terminal": 8,
+                "s-demo-carousel": 9,
+                "s-power-features": 10,
+                "s-scroll-sync": 11,
+                "s-faq": 12,
+                "s-roadmap": 13,
+                "s-final-cta": 14
+            },
+            "explain-first": {
+                "s-hero": 1,
+                "s-how-it-works": 2,
+                "s-collection-power": 3,
+                "s-mosaic-showcase": 4,
+                "s-demo-terminal": 5,
+                "s-demo-carousel": 6,
+                "s-power-features": 7,
+                "s-scroll-sync": 8,
+                "s-case-study": 9,
+                "s-social-proof": 10,
+                "s-security": 11,
+                "s-faq": 12,
+                "s-roadmap": 13,
+                "s-final-cta": 14
+            },
+            "features-focus": {
+                "s-hero": 1,
+                "s-power-features": 2,
+                "s-scroll-sync": 3,
+                "s-mosaic-showcase": 4,
+                "s-collection-power": 5,
+                "s-demo-terminal": 6,
+                "s-demo-carousel": 7,
+                "s-social-proof": 8,
+                "s-how-it-works": 9,
+                "s-case-study": 10,
+                "s-security": 11,
+                "s-faq": 12,
+                "s-roadmap": 13,
+                "s-final-cta": 14
+            },
+            "roadmap-first": {
+                "s-hero": 1,
+                "s-roadmap": 2,
+                "s-security": 3,
+                "s-faq": 4,
+                "s-social-proof": 5,
+                "s-how-it-works": 6,
+                "s-collection-power": 7,
+                "s-case-study": 8,
+                "s-demo-terminal": 9,
+                "s-demo-carousel": 10,
+                "s-power-features": 11,
+                "s-scroll-sync": 12,
+                "s-mosaic-showcase": 13,
+                "s-final-cta": 14
+            },
+            "high-velocity": {
+                "s-hero": 1,
+                "s-demo-terminal": 2,
+                "s-how-it-works": 3,
+                "s-case-study": 4,
+                "s-social-proof": 5,
+                "s-demo-carousel": 6,
+                "s-power-features": 7,
+                "s-scroll-sync": 8,
+                "s-collection-power": 9,
+                "s-mosaic-showcase": 10,
+                "s-security": 11,
+                "s-faq": 12,
+                "s-roadmap": 13,
+                "s-final-cta": 14
+            }
+        }
+    }
 ];
 
 // ─── Client-side Helpers ─────────────────────────────────────

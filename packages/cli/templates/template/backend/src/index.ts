@@ -21,7 +21,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // ─── App ─────────────────────────────────────────────────────────────
-const app = new Hono<HonoEnv>();
+const app: Hono<HonoEnv> = new Hono<HonoEnv>();
 
 const isProduction = env.NODE_ENV === "production";
 const allowedOrigins = isProduction

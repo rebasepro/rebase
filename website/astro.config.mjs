@@ -51,7 +51,7 @@ export default defineConfig({
                     items: [
                         {
                             label: "Introduction",
-                            slug: "docs/index"
+                            slug: "docs"
                         },
                         {
                             label: "Quickstart",
@@ -308,12 +308,21 @@ slug: "docs/deployment/flyio" }
             yaml()
         ],
         resolve: {
-            dedupe: ["react", "react-dom"],
+            dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],
             alias: {
                 "@rebasepro/ui": path.resolve(new URL(".", import.meta.url).pathname, "../packages/ui/src"),
                 "@rebasepro/editor": path.resolve(new URL(".", import.meta.url).pathname, "../packages/editor/src"),
                 "@rebasepro/admin": path.resolve(new URL(".", import.meta.url).pathname, "../packages/admin/src")
             }
+        },
+        optimizeDeps: {
+            include: [
+                "react",
+                "react-dom",
+                "react/jsx-runtime",
+                "react/jsx-dev-runtime",
+                "react-dom/client"
+            ]
         },
         ssr: {
             noExternal: ["lucide-react"]

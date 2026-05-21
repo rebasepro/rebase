@@ -16,7 +16,7 @@ Ceci échafaude un projet avec trois packages :
 |--------|-------------|
 | `frontend/` | SPA React — Vite + TypeScript avec l'interface d'administration Rebase |
 | `backend/` | Serveur Node.js — Hono, PostgreSQL via Drizzle ORM, WebSocket |
-| `shared/` | Définitions de collections TypeScript partagées par les deux parties |
+| `config/` | Définitions de collections TypeScript partagées par les deux parties |
 
 ## Prérequis
 
@@ -70,9 +70,9 @@ Lorsque vous ouvrez `http://localhost:5173`, vous verrez l'écran de connexion. 
 
 ## Définir votre première collection
 
-Ouvrez `shared/collections/` et créez un nouveau fichier :
+Ouvrez `config/collections/` et créez un nouveau fichier :
 
-```typescript title="shared/collections/products.ts"
+```typescript title="config/collections/products.ts"
 import { EntityCollection } from "@rebasepro/types";
 
 export const productsCollection: EntityCollection = {

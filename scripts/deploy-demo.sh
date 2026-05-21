@@ -1,0 +1,100 @@
+#!/bin/bash
+set -euo pipefail
+
+# ─── Deploy Rebase Demo to Cloud Run ─────────────────────────────────
+# This script builds the Docker image via Cloud Build, pushes it to
+# Artifact Registry, and deploys (or updates) the Cloud Run service.
+#
+# Usage:
+#   pnpm deploy:demo          # full build + deploy
+#   pnpm deploy:demo --only-deploy   # skip build, just update the service image
+
+# ─── Configuration ───────────────────────────────────────────────────
+PROJECT="rebase-578f2"
+REGION="europe-west3"
+SERVICE="rebase-demo"
+IMAGE="europe-west3-docker.pkg.dev/${PROJECT}/rebase-demo/rebase-backend:latest"
+
+# ─── Colors ──────────────────────────────────────────────────────────
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+info()  { echo -e "${CYAN}ℹ ${NC} $*"; }
+ok()    { echo -e "${GREEN}✅${NC} $*"; }
+warn()  { echo -e "${YELLOW}⚠️ ${NC} $*"; }
+fail()  { echo -e "${RED}❌${NC} $*"; exit 1; }
+
+# ─── Pre-flight checks ──────────────────────────────────────────────
+command -v gcloud >/dev/null 2>&1 || fail "gcloud CLI not found. Install it: https://cloud.google.com/sdk/docs/install"
+
+CURRENT_PROJECT=$(gcloud config get-value project 2>/dev/null)
+if [ "$CURRENT_PROJECT" != "$PROJECT" ]; then
+  warn "Active gcloud project is '${CURRENT_PROJECT}', expected '${PROJECT}'."
+  info "Switching to project ${PROJECT}..."
+  gcloud config set project "$PROJECT"
+fi
+
+# ─── Parse flags ─────────────────────────────────────────────────────
+SKIP_BUILD=false
+for arg in "$@"; do
+  case "$arg" in
+    --only-deploy) SKIP_BUILD=true ;;
+    --help|-h)
+      echo "Usage: deploy-demo.sh [OPTIONS]"
+      echo ""
+      echo "Options:"
+      echo "  --only-deploy   Skip Cloud Build, just update the Cloud Run service image"
+      echo "  --help, -h      Show this help message"
+      exit 0
+      ;;
+    *) fail "Unknown flag: $arg" ;;
+  esac
+done
+
+# ─── Step 1: Build & Push via Cloud Build ────────────────────────────
+if [ "$SKIP_BUILD" = false ]; then
+  info "Building Docker image via Cloud Build..."
+  info "Image: ${IMAGE}"
+  echo ""
+
+  gcloud builds submit \
+    --config=cloudbuild.yaml \
+    --project="$PROJECT" \
+    .
+
+  ok "Image built and pushed to Artifact Registry."
+  echo ""
+else
+  warn "Skipping build (--only-deploy). Using existing image."
+  echo ""
+fi
+
+# ─── Step 2: Deploy to Cloud Run ────────────────────────────────────
+info "Deploying to Cloud Run service '${SERVICE}' in ${REGION}..."
+echo ""
+
+gcloud run deploy "$SERVICE" \
+  --image="$IMAGE" \
+  --region="$REGION" \
+  --project="$PROJECT" \
+  --port=3001 \
+  --allow-unauthenticated \
+  --memory=1Gi \
+  --cpu=1 \
+  --min-instances=0 \
+  --max-instances=3 \
+  --set-env-vars="NODE_ENV=production,CORS_ORIGINS=*,FORCE_LOCAL_STORAGE=true" \
+  --set-secrets="DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest,ADMIN_CONNECTION_STRING=ADMIN_CONNECTION_STRING:latest"
+
+echo ""
+ok "Deployment complete!"
+
+# ─── Print service URL ──────────────────────────────────────────────
+SERVICE_URL=$(gcloud run services describe "$SERVICE" --region="$REGION" --project="$PROJECT" --format='value(status.url)' 2>/dev/null || true)
+if [ -n "$SERVICE_URL" ]; then
+  echo ""
+  info "🌍 Service URL: ${GREEN}${SERVICE_URL}${NC}"
+fi

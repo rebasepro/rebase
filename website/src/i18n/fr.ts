@@ -79,7 +79,7 @@ export const fr = {
     'Rebase est conçu pour prendre en charge <strong class="text-white font-medium">N\'IMPORTE QUELLE base de données</strong>, ou <strong class="text-white font-medium">N\'IMPORTE QUEL backend</strong> via des adaptateurs. Vous connectez votre propre base de données — Rebase inspecte le schéma et génère automatiquement une interface d\'administration complète. Aucune base de données supplémentaire, aucune migration de données requise. Il prend également en charge Firebase et MongoDB prêts à l\'emploi.',
   "faq.q2": "En quoi Rebase est-il différent de Retool ou Supabase ?",
   "faq.a2":
-    "Contrairement à Retool, Rebase est open-source sans tarification par utilisateur, et c'est un véritable framework React que vous pouvez étendre avec votre propre code. Contrairement à Supabase, Rebase fonctionne avec <em class=\"text-white\">votre base de données Postgres existante</em> — ce n'est pas un BaaS qui possède votre infrastructure. Vous gardez un contrôle total.",
+    "Contrairement à Retool, Rebase est open-source sans tarification par utilisateur, et c'est un véritable framework React que vous pouvez étendre avec votre propre code. Contrairement à Supabase, Rebase fonctionne avec <em class=\"text-white\">votre base de données Postgres existante</em> — il ne possède pas votre infrastructure. Vous gardez un contrôle total.",
   "faq.q3": "Puis-je utiliser Rebase avec une base de données existante ?",
   "faq.a3":
     "Absolument. Connectez n'importe quelle base de données Postgres et Rebase inspectera le schéma pour générer automatiquement un panneau d'administration complet. Vous pouvez ensuite affiner l'UI visuellement ou en TypeScript. Rebase fonctionne aussi bien pour les nouveaux projets que pour les bases de données existantes.",
@@ -434,4 +434,6 @@ export const fr = {
   "mosaic.badge": "Flexibilité Infinie",
   "mosaic.title": "Un framework visuel pour tous vos cas d'usage.",
   "mosaic.subtitle": "Du e-commerce et de la gestion d'actifs aux éditeurs visuels et à la modification de code en direct. L'interface de Rebase s'adapte à tous les besoins d'administration.",
+  "pricing.meta.title": "Tarification | Rebase",
+  "pricing.meta.description": "Choisissez le bon plan pour votre équipe. De l'auto-hébergement open-source gratuit à la collaboration d'entreprise et au branchement sans serveur.",
 };

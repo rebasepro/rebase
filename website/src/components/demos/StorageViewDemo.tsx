@@ -167,7 +167,7 @@ path: prev ? `${prev}/${part}` : part });
     const allFolders = Object.keys(MOCK_FILES).filter(k => k !== "");
 
     return (
-        <div className="flex h-[480px] w-full rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl text-surface-300 text-sm">
+        <div className="flex h-[360px] w-full rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl text-surface-300 text-sm">
             {/* ── Sidebar ── */}
             <div className="w-[170px] border-r border-surface-800/40 flex flex-col shrink-0">
                 <div className="p-3 border-b border-surface-800/40 bg-surface-900/40 shrink-0">

@@ -11,6 +11,10 @@ import { RLSEditorDemo } from '../../components/demos/RLSEditorDemo';
 import { SchemaBuilderMiniDemo } from '../../components/demos/SchemaBuilderMiniDemo';
 import { SchemaEditorDemo } from '../../components/SchemaEditorDemo';
 import { RbacMiniDemo } from '../../components/demos/RbacMiniDemo';
+import { KanbanDemo } from '../../components/demos/KanbanDemo';
+import { RichTextEditorDemo } from '../../components/demos/RichTextEditorDemo';
+import { StorageViewDemo } from '../../components/demos/StorageViewDemo';
+import { SpreadsheetDemo } from '../../components/demos/SpreadsheetDemo';
 import "../../styles/editor.css";
 
 
@@ -197,26 +201,74 @@ const collectionEditorHtml = `<span class="text-primary-light">import</span> { b
       </div>
     </section>
 
-    <!-- Schema Inference -->
+    <!-- Kanban View -->
     <section class="bg-black py-16 sm:py-24">
       <div class="mx-auto max-w-7xl px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div>
-            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-amber-500/10 text-amber-400 ring-1 ring-inset ring-amber-500/20">
-              Zero-Config Start
+          <div class="lg:order-last">
+            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-violet-500/10 text-violet-400 ring-1 ring-inset ring-violet-500/20">
+              Kanban Boards
             </div>
-            <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Schema Inference</h2>
-            <p class="text-lg text-surface-400 mb-6">Point Rebase at your existing PostgreSQL database. It introspects your tables, columns, types, and relations — then generates a full admin panel automatically. No config files to write.</p>
+            <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Drag-and-Drop Management</h2>
+            <p class="text-lg text-surface-400 mb-6">Organize records visually by status, priority, or any enum field. Every drag writes directly to Postgres — no sync layer needed.</p>
+            <ul class="space-y-3 text-surface-300">
+              <li class="flex gap-3"><span class="text-primary">✓</span> Group by any enum or status field</li>
+              <li class="flex gap-3"><span class="text-primary">✓</span> Drag-and-drop to update records instantly</li>
+              <li class="flex gap-3"><span class="text-primary">✓</span> Inline card preview with key fields</li>
+              <li class="flex gap-3"><span class="text-primary">✓</span> Switch between Kanban and table views</li>
+            </ul>
           </div>
-          <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-900/50 p-8">
-            <div class="font-mono text-sm text-surface-300 space-y-3">
-              <div class="text-surface-500"># Connect to your existing database</div>
-              <div><span class="text-emerald-400">$</span> rebase introspect</div>
-              <div class="text-surface-500"># Rebase introspects your tables…</div>
-              <div class="text-amber-400">✓ Found 12 tables, 3 enums, 8 relations</div>
-              <div class="text-amber-400">✓ Generated collection definitions</div>
-              <div class="text-emerald-400">✓ Admin panel ready at localhost:3000</div>
+          <div class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl" style="height: 400px;">
+            <KanbanDemo client:only="react" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Rich Text Editor -->
+    <section class="bg-black py-16 sm:py-24">
+      <SectionBackgroundAccents topLine={true}/>
+      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div>
+            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-500/20">
+              Block Editor
             </div>
+            <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Notion-Style Rich Text</h2>
+            <p class="text-lg text-surface-400 mb-6">A block-based editor for long-form content. Headings, lists, images, code blocks, callouts — all stored as structured JSON in your database.</p>
+            <ul class="space-y-3 text-surface-300">
+              <li class="flex gap-3"><span class="text-primary">✓</span> Block-based editing with slash commands</li>
+              <li class="flex gap-3"><span class="text-primary">✓</span> Images, code blocks, callouts, and embeds</li>
+              <li class="flex gap-3"><span class="text-primary">✓</span> Structured JSON output for API consumption</li>
+              <li class="flex gap-3"><span class="text-primary">✓</span> Inline formatting: bold, italic, links, and more</li>
+            </ul>
+          </div>
+          <div class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl" style="height: 400px;">
+            <RichTextEditorDemo client:only="react" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Storage / File Manager -->
+    <section class="bg-black py-16 sm:py-24">
+      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div class="lg:order-last">
+            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-pink-500/10 text-pink-400 ring-1 ring-inset ring-pink-500/20">
+              File Storage
+            </div>
+            <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Digital Asset Manager</h2>
+            <p class="text-lg text-surface-400 mb-6">Upload, organize, and preview files directly from the admin panel. Assets are auto-linked to your database records with built-in metadata rendering.</p>
+            <ul class="space-y-3 text-surface-300">
+              <li class="flex gap-3"><span class="text-primary">✓</span> Drag-and-drop file upload</li>
+              <li class="flex gap-3"><span class="text-primary">✓</span> Folder organization and navigation</li>
+              <li class="flex gap-3"><span class="text-primary">✓</span> Image, video, and document preview</li>
+              <li class="flex gap-3"><span class="text-primary">✓</span> Auto-linked to collection records</li>
+            </ul>
+          </div>
+          <div class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl">
+            <StorageViewDemo client:only="react" />
           </div>
         </div>
       </div>
@@ -247,23 +299,7 @@ const collectionEditorHtml = `<span class="text-primary-light">import</span> { b
           <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
             <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
               <div class="flex items-center gap-2 mb-3">
-                
-<svg
-  class="lucide lucide-rows-2"
-  xmlns="http://www.w3.org/2000/svg"
-  width="14"
-  height="14"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <rect width="18" height="18" x="3" y="3" rx="2" />
-  <path d="M3 12h18" />
-</svg>
-
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M3 12h18" /></svg>
                 <span class="text-[10px] font-bold text-white">Spreadsheet View</span>
               </div>
               <div class="flex flex-col gap-1 flex-1">
@@ -288,24 +324,7 @@ const collectionEditorHtml = `<span class="text-primary-light">import</span> { b
           <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
             <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
               <div class="flex items-center gap-2 mb-3">
-                
-<svg
-  class="lucide lucide-history"
-  xmlns="http://www.w3.org/2000/svg"
-  width="14"
-  height="14"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-  <path d="M3 3v5h5" />
-  <path d="M12 7v5l4 2" />
-</svg>
-
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" /></svg>
                 <span class="text-[10px] font-bold text-white">Entity History</span>
               </div>
               <div class="flex flex-col gap-2 flex-1">
@@ -335,6 +354,186 @@ const collectionEditorHtml = `<span class="text-primary-light">import</span> { b
             <h3 class="text-base font-semibold text-white mb-2 mt-auto">Entity History</h3>
             <p class="text-sm text-surface-400">Full audit trail of every change. See who modified what, when, and revert to any previous state.</p>
           </div>
+
+          <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
+            <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
+              <div class="flex items-center gap-2 mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <span class="text-[10px] font-bold text-white">Users & Roles</span>
+              </div>
+              <div class="flex flex-col gap-1.5 flex-1">
+                <div class="flex items-center gap-2 text-[8px] font-mono">
+                  <div class="w-4 h-4 rounded-full bg-blue-500/30 flex items-center justify-center text-[6px] text-blue-300">A</div>
+                  <span class="text-surface-300">alice@co.com</span>
+                  <span class="ml-auto text-[7px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">admin</span>
+                </div>
+                <div class="flex items-center gap-2 text-[8px] font-mono">
+                  <div class="w-4 h-4 rounded-full bg-violet-500/30 flex items-center justify-center text-[6px] text-violet-300">B</div>
+                  <span class="text-surface-300">bob@co.com</span>
+                  <span class="ml-auto text-[7px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">editor</span>
+                </div>
+                <div class="flex items-center gap-2 text-[8px] font-mono">
+                  <div class="w-4 h-4 rounded-full bg-amber-500/30 flex items-center justify-center text-[6px] text-amber-300">C</div>
+                  <span class="text-surface-300">carol@co.com</span>
+                  <span class="ml-auto text-[7px] px-1.5 py-0.5 rounded bg-surface-700 text-surface-400">viewer</span>
+                </div>
+              </div>
+            </div>
+            <h3 class="text-base font-semibold text-white mb-2 mt-auto">Users & Roles</h3>
+            <p class="text-sm text-surface-400">Manage users, assign roles, and configure role-based access control from the admin panel.</p>
+          </div>
+
+          <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
+            <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
+              <div class="flex items-center gap-2 mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                <span class="text-[10px] font-bold text-white">Import & Export</span>
+              </div>
+              <div class="flex flex-col gap-1.5 flex-1">
+                <div class="flex items-center gap-2 text-[8px] font-mono">
+                  <span class="text-emerald-400">↑</span>
+                  <span class="text-surface-300">users.csv</span>
+                  <span class="ml-auto text-[7px] text-surface-500">2,481 rows</span>
+                </div>
+                <div class="flex items-center gap-2 text-[8px] font-mono">
+                  <span class="text-blue-400">↓</span>
+                  <span class="text-surface-300">orders.json</span>
+                  <span class="ml-auto text-[7px] text-surface-500">892 rows</span>
+                </div>
+                <div class="flex items-center gap-1 mt-1">
+                  <div class="flex-1 h-1 rounded-full bg-surface-800 overflow-hidden">
+                    <div class="h-full w-3/4 rounded-full bg-primary/60"></div>
+                  </div>
+                  <span class="text-[7px] text-surface-500">75%</span>
+                </div>
+              </div>
+            </div>
+            <h3 class="text-base font-semibold text-white mb-2 mt-auto">Import & Export</h3>
+            <p class="text-sm text-surface-400">Bulk import from CSV/JSON with field mapping. Export any collection with a single click.</p>
+          </div>
+
+          <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
+            <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
+              <div class="flex items-center gap-2 mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v6"/><path d="M12 15v6"/><path d="M3 12h6"/><path d="M15 12h6"/><path d="m5.6 5.6 4.3 4.3"/><path d="m14.1 14.1 4.3 4.3"/><path d="m5.6 18.4 4.3-4.3"/><path d="m14.1 9.9 4.3-4.3"/></svg>
+                <span class="text-[10px] font-bold text-white">Schema Visualizer</span>
+              </div>
+              <div class="flex flex-col gap-1 flex-1 items-center justify-center">
+                <div class="flex items-center gap-3">
+                  <div class="w-12 h-8 rounded border border-blue-500/30 bg-blue-500/10 flex items-center justify-center text-[7px] text-blue-300 font-mono">users</div>
+                  <div class="w-6 h-0 border-t border-dashed border-surface-600"></div>
+                  <div class="w-14 h-8 rounded border border-emerald-500/30 bg-emerald-500/10 flex items-center justify-center text-[7px] text-emerald-300 font-mono">orders</div>
+                </div>
+                <div class="flex items-center gap-3 mt-1">
+                  <div class="w-14 h-8 rounded border border-violet-500/30 bg-violet-500/10 flex items-center justify-center text-[7px] text-violet-300 font-mono">products</div>
+                  <div class="w-6 h-0 border-t border-dashed border-surface-600"></div>
+                  <div class="w-12 h-8 rounded border border-amber-500/30 bg-amber-500/10 flex items-center justify-center text-[7px] text-amber-300 font-mono">tags</div>
+                </div>
+              </div>
+            </div>
+            <h3 class="text-base font-semibold text-white mb-2 mt-auto">Schema Visualizer</h3>
+            <p class="text-sm text-surface-400">Interactive ERD showing tables, columns, and relationships in a visual diagram.</p>
+          </div>
+
+          <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
+            <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
+              <div class="flex items-center gap-2 mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+                <span class="text-[10px] font-bold text-white">Database Branches</span>
+              </div>
+              <div class="flex flex-col gap-1.5 flex-1">
+                <div class="flex items-center gap-2 text-[8px] font-mono">
+                  <div class="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
+                  <span class="text-surface-300">main</span>
+                  <span class="ml-auto text-[7px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">active</span>
+                </div>
+                <div class="flex items-center gap-2 text-[8px] font-mono">
+                  <div class="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
+                  <span class="text-surface-300">feat/auth</span>
+                  <span class="ml-auto text-[7px] text-surface-500">2h ago</span>
+                </div>
+                <div class="flex items-center gap-2 text-[8px] font-mono">
+                  <div class="w-1.5 h-1.5 rounded-full bg-amber-400"></div>
+                  <span class="text-surface-300">staging</span>
+                  <span class="ml-auto text-[7px] text-surface-500">1d ago</span>
+                </div>
+              </div>
+            </div>
+            <h3 class="text-base font-semibold text-white mb-2 mt-auto">Database Branches</h3>
+            <p class="text-sm text-surface-400">Create isolated database copies for development. Branch, experiment, and merge safely.</p>
+          </div>
+
+          <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
+            <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
+              <div class="flex items-center gap-2 mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                <span class="text-[10px] font-bold text-white">JS Console</span>
+              </div>
+              <div class="flex flex-col gap-1 flex-1 font-mono text-[7px]">
+                <div class="text-blue-300">const sdk = rebase();</div>
+                <div class="text-surface-300">const users = await sdk</div>
+                <div class="text-surface-300">  .collection("users")</div>
+                <div class="text-surface-300">  .find({ role: "admin" });</div>
+                <div class="text-emerald-400 mt-0.5">// → 3 results</div>
+              </div>
+            </div>
+            <h3 class="text-base font-semibold text-white mb-2 mt-auto">JS Console</h3>
+            <p class="text-sm text-surface-400">Run JavaScript with the Rebase SDK in a live sandbox. Test queries and automate tasks.</p>
+          </div>
+
+          <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
+            <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
+              <div class="flex items-center gap-2 mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span class="text-[10px] font-bold text-white">Cron Jobs</span>
+              </div>
+              <div class="flex flex-col gap-1.5 flex-1">
+                <div class="flex items-center gap-2 text-[8px] font-mono">
+                  <div class="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
+                  <span class="text-surface-300 truncate">daily-cleanup</span>
+                  <span class="ml-auto text-[7px] text-surface-500">0 3 * * *</span>
+                </div>
+                <div class="flex items-center gap-2 text-[8px] font-mono">
+                  <div class="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
+                  <span class="text-surface-300 truncate">sync-emails</span>
+                  <span class="ml-auto text-[7px] text-surface-500">*/15 * * * *</span>
+                </div>
+                <div class="flex items-center gap-2 text-[8px] font-mono">
+                  <div class="w-1.5 h-1.5 rounded-full bg-red-400"></div>
+                  <span class="text-surface-300 truncate">gen-reports</span>
+                  <span class="ml-auto text-[7px] text-surface-500">0 8 * * 1</span>
+                </div>
+              </div>
+            </div>
+            <h3 class="text-base font-semibold text-white mb-2 mt-auto">Cron Jobs</h3>
+            <p class="text-sm text-surface-400">Monitor and manage scheduled background tasks. View logs, status, and run history.</p>
+          </div>
+
+          <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
+            <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
+              <div class="flex items-center gap-2 mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                <span class="text-[10px] font-bold text-white">API Explorer</span>
+              </div>
+              <div class="flex flex-col gap-1.5 flex-1">
+                <div class="flex items-center gap-1 text-[8px] font-mono">
+                  <span class="px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[7px]">GET</span>
+                  <span class="text-surface-300">/api/users</span>
+                </div>
+                <div class="flex items-center gap-1 text-[8px] font-mono">
+                  <span class="px-1 py-0.5 rounded bg-blue-500/20 text-blue-400 text-[7px]">POST</span>
+                  <span class="text-surface-300">/api/orders</span>
+                </div>
+                <div class="flex items-center gap-1 text-[8px] font-mono">
+                  <span class="px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[7px]">PUT</span>
+                  <span class="text-surface-300">/api/users/:id</span>
+                </div>
+              </div>
+            </div>
+            <h3 class="text-base font-semibold text-white mb-2 mt-auto">API Explorer</h3>
+            <p class="text-sm text-surface-400">Interactive API documentation with live request testing. Browse and try every endpoint.</p>
+          </div>
+
 
         </div>
       </div>

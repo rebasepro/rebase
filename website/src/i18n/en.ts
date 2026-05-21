@@ -94,7 +94,7 @@ export const en = {
     '<strong class="text-white font-medium">PostgreSQL</strong> is the primary focus — Rebase goes deep on Postgres so every feature (RLS, enums, constraints, relations) works natively. That said, the architecture is database-agnostic and can be adapted to other databases. You bring your own database instance; Rebase never hosts or copies your data.',
   "faq.q2": "How is Rebase different from Retool or Supabase?",
   "faq.a2":
-    "Unlike Retool, Rebase is open-source with no per-seat pricing lock-in, and it's a real React framework you can extend with your own code. Unlike Supabase, Rebase works with <em class=\"text-white\">your existing</em> Postgres database — it's not a BaaS that owns your infrastructure. You keep full control.",
+    "Unlike Retool, Rebase is open-source with no per-seat pricing lock-in, and it's a real React framework you can extend with your own code. Unlike Supabase, Rebase works with <em class=\"text-white\">your existing</em> Postgres database — it doesn't own your infrastructure. You keep full control.",
   "faq.q3": "Can I use Rebase with an existing database?",
   "faq.a3":
     "Absolutely. Point Rebase at any Postgres connection string and it will read your tables, columns, foreign keys, enums, and constraints to generate a complete admin panel. Existing data appears instantly — no migration, no duplication, no schema re-definition needed.",
@@ -494,4 +494,69 @@ export const en = {
   "mosaic.badge": "Infinite Flexibility",
   "mosaic.title": "A visual framework for any use case.",
   "mosaic.subtitle": "From e-commerce and asset management to visual builders and live code edits. Rebase's schema-driven UI scales to meet any dashboard or editor requirement.",
+  "pricing.meta.title": "Pricing | Rebase",
+  "pricing.meta.description": "Choose the right plan for your team. From free open-source self-hosting to enterprise collaboration and serverless branching.",
+
+  // Footer
+  "footer.manifesto": "Our Manifesto",
+
+  // Manifesto Page
+  "manifesto.meta.title": "Our Manifesto — Why We're Building Rebase",
+  "manifesto.meta.description": "We're building the open-source, self-hosted foundation for every digital project. From weekend hacks to enterprise platforms — on Postgres, with no lock-in.",
+  "manifesto.badge": "A letter from the team",
+  "manifesto.hero.title": "Why we're building Rebase",
+  "manifesto.hero.subtitle": "And why we believe the future of application development is open, self-hosted, and built on Postgres.",
+
+  "manifesto.problem.title": "The problem we keep seeing",
+  "manifesto.problem.p1": "Every new project starts the same way. You need a database. You need an admin panel. You need authentication, an API layer, file storage, permissions. You've built all of this before — maybe dozens of times. And yet, every time, you start from scratch or lock yourself into a platform that owns your data and your roadmap.",
+  "manifesto.problem.p2": "The cloud platforms made it easy. Firebase, Supabase, the managed CMS tools — they let you skip the plumbing and get to building. But ease came with a price: vendor lock-in, opaque pricing, data you can't fully control, and an architecture you can't truly own.",
+  "manifesto.problem.p3": "On the other side, self-hosted tools exist, but they often feel like a different era. They're hard to set up, painful to customize, and designed for a world before AI, before TypeScript-everywhere, before developers expected tools to just work.",
+
+  "manifesto.origin.title": "Where we come from",
+  "manifesto.origin.p1": "We're not new to this. Before Rebase, we built <a href=\"https://firecms.co\" target=\"_blank\" rel=\"noopener\" class=\"text-primary hover:underline font-medium\">FireCMS</a> — an open-source CMS for Firebase that's been used in over 10,000 projects worldwide, trusted by teams at companies like Microsoft and IKEA. We spent years learning what developers actually need from an admin panel, what content editors struggle with, and where every CMS eventually breaks down.",
+  "manifesto.origin.p2": "FireCMS taught us a lot. It taught us that developers want flexibility, not lock-in. That end users want beauty and simplicity, not a wall of forms. That the best tools disappear into the background and let people focus on their actual work.",
+  "manifesto.origin.p3": "But FireCMS was tied to Firebase. And as we watched the industry move toward Postgres, toward open standards, toward data sovereignty — we knew it was time to build something bigger. Something that could be the foundation for any digital project, not just those on one cloud provider.",
+
+  "manifesto.beliefs.title": "What we believe",
+  "manifesto.beliefs.b1.title": "Open source is not a feature — it's a foundation",
+  "manifesto.beliefs.b1.desc": "Rebase is fully open source under the MIT license. Every package, every line of code. Not open-core with a bait-and-switch. Not source-available with restrictions. MIT — because we believe the infrastructure you build on should truly be yours.",
+  "manifesto.beliefs.b2.title": "Self-hosting should be as easy as using a cloud service",
+  "manifesto.beliefs.b2.desc": "If setting up your own instance takes more than a few minutes, we've failed. Rebase should be as frictionless to deploy as signing up for a SaaS. Docker, Railway, Fly, bare metal — wherever you want to run it, it should just work.",
+  "manifesto.beliefs.b3.title": "Your database is your truth",
+  "manifesto.beliefs.b3.desc": "We don't create shadow databases. We don't abstract your schema away behind proprietary layers. Rebase connects directly to your Postgres, reads your tables, and builds on top of what you already have. Your data never leaves your infrastructure.",
+  "manifesto.beliefs.b4.title": "From weekend project to enterprise — on the same platform",
+  "manifesto.beliefs.b4.desc": "We want Rebase to be what you reach for on a Saturday afternoon hack and what you deploy in production on Monday. The same tool for a solo developer prototyping an idea and for a team of fifty managing a complex internal platform. No artificial ceilings, no upgrade-to-unlock walls.",
+  "manifesto.beliefs.b5.title": "The repetitive parts should not exist",
+  "manifesto.beliefs.b5.desc": "Setting up an admin panel, writing CRUD endpoints, wiring authentication, building form validation, configuring file storage — this is solved-problem territory. You shouldn't spend another week on it. Define your schema, and let the platform generate the rest.",
+  "manifesto.beliefs.b6.title": "Europe needs its own infrastructure",
+  "manifesto.beliefs.b6.desc": "We're building Rebase from Europe, and we care deeply about data sovereignty, GDPR compliance, and digital independence. But this isn't just a European project — it's for anyone who believes their data should stay where they put it.",
+
+  "manifesto.audience.title": "Who is Rebase for",
+  "manifesto.audience.p1": "Rebase is for anyone who's tired of choosing between ease-of-use and ownership:",
+  "manifesto.audience.l1": "The developer who wants Firebase-like speed without Firebase-like lock-in",
+  "manifesto.audience.l2": "The startup that needs to move fast today and scale tomorrow — without re-platforming",
+  "manifesto.audience.l3": "The agency that's tired of rebuilding the same admin panel for every client project",
+  "manifesto.audience.l4": "The enterprise team that needs to keep data on their own infrastructure, with full audit trails",
+  "manifesto.audience.p2": "Rebase is highly modular — use the admin panel, the API layer, the SDK, or the full platform. Take only the parts you need, leave the rest. You decide how much of the stack you adopt.",
+
+  "manifesto.threeworlds.title": "Built for three worlds",
+  "manifesto.threeworlds.p1": "Most tools are designed for one audience. We're building for three — because we believe the best platform is one where everyone can work effectively:",
+  "manifesto.threeworlds.w1.title": "End Users",
+  "manifesto.threeworlds.w1.desc": "Beautiful, intuitive interfaces that non-technical people actually enjoy using.",
+  "manifesto.threeworlds.w2.title": "Developers",
+  "manifesto.threeworlds.w2.desc": "TypeScript-native, React-extensible, with APIs and SDKs that feel like they were made for you.",
+  "manifesto.threeworlds.w3.title": "AI Agents",
+  "manifesto.threeworlds.w3.desc": "MCP server, structured APIs, and machine-readable schemas — so agents can build with Rebase too.",
+
+  "manifesto.promise.title": "Our promise",
+  "manifesto.promise.p1": "We're not building Rebase to flip it or to lock you in. We're building it because we've spent our careers making developer tools, and we know this is what's missing: an open, beautiful, Postgres-native platform that respects your data, your time, and your intelligence.",
+  "manifesto.promise.p2": "We ship fast. We listen to our community. We believe in building in public. And we're just getting started.",
+
+  "manifesto.closing": "If any of this resonates with you — if you've felt the same frustration, if you believe the same things — come build with us.",
+  "manifesto.signature": "The Rebase Team",
+  "manifesto.signatureSubtitle": "Madrid · Building in the open since 2020",
+
+  "manifesto.cta.title": "Ready to build something?",
+  "manifesto.cta.getStarted": "Get Started",
+  "manifesto.cta.github": "View on GitHub",
 };

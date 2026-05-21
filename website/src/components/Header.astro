@@ -2,20 +2,32 @@
 import NavigationDropdown from "./NavigationDropdown.astro";
 import LanguageSelect from "./LanguageSelect.astro";
 import { getLangFromUrl, useTranslations, useTranslatedPath } from "../i18n/ui";
-import ABVariant from "./ABVariant.astro";
-
-import {
-    Layers, LayoutDashboard, Server, Bot, Code, Terminal, SquareTerminal, ShieldCheck, Rocket, ArrowRightLeft, Briefcase, FilePenLine
-} from "lucide-react";
 
 const currentPath = Astro.url.pathname.replace(/\/$/, "");
 const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
 const translatePath = useTranslatedPath(lang);
 
-const navLinks = [
+// SVG path data for nav icons (Lucide-style, 24×24 viewBox)
+const iconSvgPaths: Record<string, string> = {
+    "layers": "M12 2 2 7l10 5 10-5-10-5ZM2 17l10 5 10-5M2 12l10 5 10-5",
+    "layout-dashboard": "M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z",
+    "server": "M2 9a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9ZM2 17a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-2ZM6 10h.01M6 18h.01",
+    "bot": "M12 8V4H8M8 2h8M6 12h.01M18 12h.01M2 16h20M4 12a8 4 0 0 1 16 0v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4Z",
+    "code": "m16 18 6-6-6-6M8 6l-6 6 6 6",
+    "terminal": "m4 17 6-6-6-6M12 19h8",
+    "square-terminal": "M7 11l2-2-2-2M11 13h4M3 3h18a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z",
+    "shield-check": "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10ZM9 12l2 2 4-4",
+    "rocket": "M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09ZM12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2Z",
+    "git-compare-arrows": "M9 9H5v4M15 15h4v-4M5 9l4.5 4.5a7 7 0 0 0 5 2.07H19M19 15l-4.5-4.5a7 7 0 0 0-5-2.07H5",
+    "briefcase": "M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16M2 10a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8Z",
+    "edit-note": "M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5Z",
+};
+
+// Full dropdown navigation structure (control variant)
+const dropdownNavLinks = [
     {
-        href: translatePath("/features"),
+        href: translatePath("/product"),
         label: t("nav.product"),
         dropdown: [
             [
@@ -23,19 +35,19 @@ const navLinks = [
                     href: translatePath("/features"),
                     label: t("nav.features"),
                     description: t("nav.features.desc"),
-                    icon: Layers
+                    icon: "layers"
                 },
                 {
                     href: translatePath("/studio"),
                     label: t("nav.studio"),
                     description: t("nav.studio.desc"),
-                    icon: LayoutDashboard
+                    icon: "layout-dashboard"
                 },
                 {
                     href: translatePath("/editing"),
                     label: t("nav.editing"),
                     description: t("nav.editing.desc"),
-                    icon: FilePenLine
+                    icon: "edit-note"
                 },
             ],
             [
@@ -43,13 +55,13 @@ const navLinks = [
                     href: translatePath("/backend"),
                     label: t("nav.backend"),
                     description: t("nav.backend.desc"),
-                    icon: Server
+                    icon: "server"
                 },
                 {
                     href: translatePath("/ai"),
                     label: t("nav.ai"),
                     description: t("nav.ai.desc"),
-                    icon: Bot
+                    icon: "bot"
                 },
             ],
         ]
@@ -63,13 +75,13 @@ const navLinks = [
                     href: translatePath("/developers"),
                     label: t("nav.devOverview"),
                     description: t("nav.devOverview.desc"),
-                    icon: Code
+                    icon: "code"
                 },
                 {
                     href: translatePath("/sdk"),
                     label: t("nav.sdk"),
                     description: t("nav.sdk.desc"),
-                    icon: Terminal
+                    icon: "terminal"
                 },
             ],
             [
@@ -77,13 +89,13 @@ const navLinks = [
                     href: translatePath("/cli"),
                     label: t("nav.cli"),
                     description: t("nav.cli.desc"),
-                    icon: SquareTerminal
+                    icon: "square-terminal"
                 },
                 {
                     href: translatePath("/security"),
                     label: t("nav.security"),
                     description: t("nav.security.desc"),
-                    icon: ShieldCheck
+                    icon: "shield-check"
                 },
             ],
         ]
@@ -97,13 +109,13 @@ const navLinks = [
                     href: translatePath("/startups"),
                     label: t("nav.startups"),
                     description: t("nav.startups.desc"),
-                    icon: Rocket
+                    icon: "rocket"
                 },
                 {
                     href: translatePath("/why-rebase"),
                     label: t("nav.whyRebase"),
                     description: t("nav.whyRebase.desc"),
-                    icon: ArrowRightLeft
+                    icon: "git-compare-arrows"
                 },
             ],
             [
@@ -111,20 +123,19 @@ const navLinks = [
                     href: translatePath("/agencies"),
                     label: t("nav.agencies"),
                     description: t("nav.agencies.desc"),
-                    icon: Briefcase
+                    icon: "briefcase"
                 },
             ],
         ]
     },
-    {
-        href: translatePath("/docs"),
-        label: t("nav.docs")
-    },
+    { href: translatePath("/pricing"), label: "Pricing" },
+    { href: translatePath("/docs"), label: t("nav.docs") },
 ];
 
+// Flat navigation links (flat-nav variant)
 const flatNavLinks = [
     { href: translatePath("/product"), label: t("nav.product") },
-    { href: translatePath("/developers-hub"), label: t("nav.developers") },
+    { href: translatePath("/developers"), label: t("nav.developers") },
     { href: translatePath("/pricing"), label: "Pricing" },
     { href: translatePath("/docs"), label: t("nav.docs") }
 ];
@@ -137,27 +148,27 @@ const flatNavLinks = [
                 <span class="self-center text-lg font-semibold whitespace-nowrap text-white"
                       transition:name="logo-text">Rebase</span>
             </a>
-            <!-- Desktop Navigation -->
-            <ABVariant experiment="navigation-structure" variant="control" class="hidden lg:flex items-center gap-2 text-sm font-semibold">
-                {navLinks.map(link => (
+
+            <!-- ═══ CONTROL: Dropdown mega-nav ═══ -->
+            <div class="hidden lg:flex items-center gap-2 text-sm font-semibold" id="nav-desktop-control">
+                {dropdownNavLinks.map(link => (
                     link.dropdown ? (
                             <NavigationDropdown title={link.label} href={link.href}>
                                 <div class="grid grid-cols-2 gap-x-8 gap-y-4 max-w-3xl">
                                     {link.dropdown.map(column => (
                                             <div class="flex flex-col gap-4 ">
-                                                {column.map(subLink => {
-                                                    const IconComp = subLink.icon;
-                                                    return (
+                                                {column.map(subLink => (
                                                         <a href={subLink.href}
                                                            class="flex items-start gap-4 p-3 rounded-lg hover:bg-surface-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60">
-                                                            <IconComp class="text-primary w-6 h-6 flex-shrink-0" />
+                                                            <svg class="w-6 h-6 text-primary shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                                <path d={iconSvgPaths[subLink.icon] || ""} />
+                                                            </svg>
                                                             <div>
                                                                 <p class="font-semibold text-white">{subLink.label}</p>
                                                                 <p class="text-surface-400 text-sm">{subLink.description}</p>
                                                             </div>
                                                         </a>
-                                                    );
-                                                })}
+                                                ))}
                                             </div>
                                     ))}
                                 </div>
@@ -171,8 +182,10 @@ const flatNavLinks = [
                             </a>
                     )
                 ))}
-            </ABVariant>
-            <ABVariant experiment="navigation-structure" variant="flat-nav" class="hidden lg:flex items-center gap-2 text-sm font-semibold">
+            </div>
+
+            <!-- ═══ FLAT-NAV: Simple flat links ═══ -->
+            <div class="hidden items-center gap-2 text-sm font-semibold" id="nav-desktop-flat">
                 {flatNavLinks.map(link => (
                     <a
                         href={link.href}
@@ -181,7 +194,7 @@ const flatNavLinks = [
                         {link.label}
                     </a>
                 ))}
-            </ABVariant>
+            </div>
         </div>
         <div class="flex flex-1 justify-end items-center gap-4">
             <LanguageSelect iconOnly={true} />
@@ -206,22 +219,21 @@ const flatNavLinks = [
                     id="header-start-building-desktop"
             >
                 {t("nav.tryDemo")}
-<svg
-  class="lucide lucide-arrow-right"
-  xmlns="http://www.w3.org/2000/svg"
-  width="18"
-  height="18"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M5 12h14" />
-  <path d="m12 5 7 7-7 7" />
-</svg>
-
+                <svg
+                  class="lucide lucide-arrow-right"
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M5 12h14" />
+                  <path d="m12 5 7 7-7 7" />
+                </svg>
             </a>
             <!-- Mobile menu button -->
             <button
@@ -248,57 +260,90 @@ const flatNavLinks = [
         </div>
     </nav>
 
-    <!-- Mobile menu - Full Screen Overlay -->
+    <!-- ═══ Mobile menu: CONTROL (dropdown sub-menus) ═══ -->
     <div class="lg:hidden hidden fixed inset-0 z-50 overflow-y-auto h-screen" id="mobile-menu">
         <div class="flex flex-col items-center justify-center min-h-screen px-6 py-20 bg-black/95 backdrop-blur-lg">
             <nav class="flex flex-col items-center space-y-8 w-full max-w-md">
-                <ABVariant experiment="navigation-structure" variant="control" class="w-full flex flex-col items-center space-y-8">
-                    {navLinks.map((link, index) => (
-                        link.dropdown ? (
-                                <div class="w-full text-center">
-                                    <button
-                                            type="button"
-                                            id={`mobile-menu-toggle-${index}`}
-                                            class="flex items-center justify-center text-2xl font-semibold transition-colors w-full text-center py-3 rounded-lg text-surface-300 hover:bg-white/10 hover:text-white"
-                                            aria-expanded="false"
-                                            aria-controls={`mobile-submenu-${index}`}
-                                    >
-                                        {link.label}
-                                        <svg class="w-5 h-5 ml-2 transition-transform" viewBox="0 0 20 20" fill="currentColor">
-                                            <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/>
-                                        </svg>
-                                    </button>
-                                    <div class="hidden flex-col items-center space-y-4 mt-4"
-                                         id={`mobile-submenu-${index}`}>
-                                        {link.dropdown.flat().map(subLink => (
-                                                <a
-                                                        href={subLink.href}
-                                                        class={`block text-xl font-medium transition-colors w-full text-center py-2 rounded-lg ${
-                                                            currentPath === subLink.href
-                                                                ? "bg-primary/20 text-primary"
-                                                                : "text-surface-400 hover:bg-white/10 hover:text-white"
-                                                        }`}
-                                                >
-                                                    {subLink.label}
-                                                </a>
-                                        ))}
-                                    </div>
-                                </div>
-                        ) : (
-                                <a
-                                        href={link.href}
-                                        class={`block text-2xl font-semibold transition-colors w-full text-center py-3 rounded-lg ${
-                                            currentPath === link.href
-                                                ? "bg-primary/20 text-primary"
-                                                : "text-surface-300 hover:bg-white/10 hover:text-white"
-                                        }`}
+                {dropdownNavLinks.map((link, index) => (
+                    link.dropdown ? (
+                            <div class="w-full text-center">
+                                <button
+                                        type="button"
+                                        id={`mobile-menu-toggle-${index}`}
+                                        class="flex items-center justify-center text-2xl font-semibold transition-colors w-full text-center py-3 rounded-lg text-surface-300 hover:bg-white/10 hover:text-white"
+                                        aria-expanded="false"
+                                        aria-controls={`mobile-submenu-${index}`}
                                 >
                                     {link.label}
-                                </a>
-                        )
-                    ))}
-                </ABVariant>
-                <ABVariant experiment="navigation-structure" variant="flat-nav" class="w-full flex flex-col items-center space-y-8">
+                                    <svg class="w-5 h-5 ml-2 transition-transform" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/>
+                                    </svg>
+                                </button>
+                                <div class="hidden flex-col items-center space-y-4 mt-4"
+                                     id={`mobile-submenu-${index}`}>
+                                    {link.dropdown.flat().map(subLink => (
+                                            <a
+                                                    href={subLink.href}
+                                                    class={`block text-xl font-medium transition-colors w-full text-center py-2 rounded-lg ${
+                                                        currentPath === subLink.href
+                                                            ? "bg-primary/20 text-primary"
+                                                            : "text-surface-400 hover:bg-white/10 hover:text-white"
+                                                    }`}
+                                            >
+                                                {subLink.label}
+                                            </a>
+                                    ))}
+                                </div>
+                            </div>
+                    ) : (
+                            <a
+                                    href={link.href}
+                                    class={`block text-2xl font-semibold transition-colors w-full text-center py-3 rounded-lg ${
+                                        currentPath === link.href
+                                            ? "bg-primary/20 text-primary"
+                                            : "text-surface-300 hover:bg-white/10 hover:text-white"
+                                    }`}
+                            >
+                                {link.label}
+                            </a>
+                    )
+                ))}
+                <a
+                        href="https://demo.rebase.pro"
+                        target="_blank" rel="noopener noreferrer"
+                        class="mt-8 w-full inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 py-4 text-xl font-semibold text-white shadow-lg hover:bg-primary-dark transition-all duration-200 ease-in-out btn-glow"
+                        data-track
+                        id="header-start-building-mobile-control"
+                >
+                    {t("nav.tryDemo")}
+                    <svg
+                      class="lucide lucide-arrow-right"
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M5 12h14" />
+                      <path d="m12 5 7 7-7 7" />
+                    </svg>
+                </a>
+                <div class="mt-4 w-full flex justify-center">
+                    <LanguageSelect />
+                </div>
+            </nav>
+        </div>
+    </div>
+
+    <!-- ═══ Mobile menu: FLAT-NAV (simple list) ═══ -->
+    <div class="lg:hidden hidden fixed inset-0 z-50 overflow-y-auto h-screen" id="mobile-menu-flat">
+        <div class="flex flex-col items-center justify-center min-h-screen px-6 py-20 bg-black/95 backdrop-blur-lg">
+            <nav class="flex flex-col items-center space-y-8 w-full max-w-md">
+                <div class="w-full flex flex-col items-center space-y-8">
                     {flatNavLinks.map(link => (
                         <a
                             href={link.href}
@@ -311,32 +356,30 @@ const flatNavLinks = [
                             {link.label}
                         </a>
                     ))}
-                </ABVariant>
+                </div>
                 <a
                         href="https://demo.rebase.pro"
                         target="_blank" rel="noopener noreferrer"
                         class="mt-8 w-full inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 py-4 text-xl font-semibold text-white shadow-lg hover:bg-primary-dark transition-all duration-200 ease-in-out btn-glow"
                         data-track
-                        id="header-start-building-mobile"
+                        id="header-start-building-mobile-flat"
                 >
                     {t("nav.tryDemo")}
-                    
-<svg
-  class="lucide lucide-arrow-right"
-  xmlns="http://www.w3.org/2000/svg"
-  width="18"
-  height="18"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M5 12h14" />
-  <path d="m12 5 7 7-7 7" />
-</svg>
-
+                    <svg
+                      class="lucide lucide-arrow-right"
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M5 12h14" />
+                      <path d="m12 5 7 7-7 7" />
+                    </svg>
                 </a>
                 <div class="mt-4 w-full flex justify-center">
                     <LanguageSelect />
@@ -346,6 +389,24 @@ const flatNavLinks = [
     </div>
 </header>
 
+<style is:global>
+    /* ── Navigation-structure AB test ──
+       Default: control (dropdown mega-nav) is shown; flat-nav is hidden.
+       When the AB engine assigns "flat-nav", the html data attribute flips them.
+    */
+
+    /* Default state: control visible on lg+, flat hidden */
+    #nav-desktop-control { /* Already has: hidden lg:flex */ }
+    #nav-desktop-flat    { display: none !important; }
+
+    /* Flat-nav variant: hide control, show flat */
+    html[data-ab-navigation-structure="flat-nav"] #nav-desktop-control { display: none !important; }
+    html[data-ab-navigation-structure="flat-nav"] #nav-desktop-flat    { display: none; }
+    @media (min-width: 1024px) {
+        html[data-ab-navigation-structure="flat-nav"] #nav-desktop-flat { display: flex !important; }
+    }
+</style>
+
 <script is:inline>
     function setupHeader() {
         const mobileMenuButton = document.getElementById('mobile-menu-button');
@@ -354,12 +415,16 @@ const flatNavLinks = [
         }
         mobileMenuButton.dataset.initialized = 'true';
 
-        const mobileMenu = document.getElementById('mobile-menu');
+        // Determine which mobile menu to use based on AB variant
+        var variant = document.documentElement.getAttribute('data-ab-navigation-structure') || 'control';
+        var mobileMenuId = variant === 'flat-nav' ? 'mobile-menu-flat' : 'mobile-menu';
+        var mobileMenu = document.getElementById(mobileMenuId);
+
         const menuIconClosed = document.getElementById('menu-icon-closed');
         const menuIconOpen = document.getElementById('menu-icon-open');
 
-        mobileMenuButton.addEventListener('click', () => {
-            const isExpanded = mobileMenuButton.getAttribute('aria-expanded') === 'true';
+        mobileMenuButton.addEventListener('click', function() {
+            var isExpanded = mobileMenuButton.getAttribute('aria-expanded') === 'true';
 
             if (isExpanded) {
                 // Close menu
@@ -378,30 +443,33 @@ const flatNavLinks = [
             }
         });
 
-        const mobileMenuToggles = document.querySelectorAll('[id^="mobile-menu-toggle-"]');
-        mobileMenuToggles.forEach(toggle => {
-            toggle.addEventListener('click', () => {
-                const submenuId = toggle.getAttribute('aria-controls');
-                const submenu = document.getElementById(submenuId);
-                const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
+        // Mobile submenu toggles (control variant with dropdowns)
+        var mobileMenuToggles = document.querySelectorAll('[id^="mobile-menu-toggle-"]');
+        mobileMenuToggles.forEach(function(toggle) {
+            toggle.addEventListener('click', function() {
+                var submenuId = toggle.getAttribute('aria-controls');
+                var submenu = document.getElementById(submenuId);
+                var isExpanded = toggle.getAttribute('aria-expanded') === 'true';
 
                 toggle.setAttribute('aria-expanded', String(!isExpanded));
                 submenu.classList.toggle('hidden');
                 submenu.classList.toggle('flex');
-                toggle.querySelector('svg')?.classList.toggle('rotate-180');
+                var svg = toggle.querySelector('svg');
+                if (svg) svg.classList.toggle('rotate-180');
             });
         });
 
         // Track all header link clicks
-        function trackHeaderLinkClick(link, linkType, isMobile = false) {
+        function trackHeaderLinkClick(link, linkType, isMobile) {
+            if (isMobile === undefined) isMobile = false;
             if (!link.dataset.trackingAdded) {
                 link.dataset.trackingAdded = 'true';
                 link.addEventListener('click', function(e) {
-                    const href = link.getAttribute('href');
-                    const linkText = link.textContent?.trim() || '';
+                    var href = link.getAttribute('href');
+                    var linkText = (link.textContent || '').trim();
                     // Send analytics event
                     if (typeof window.gtag === 'function') {
-                        const eventName = 'header_link_click';
+                        var eventName = 'header_link_click';
                         window.gtag('event', eventName, {
                             event_category: 'header_navigation',
                             event_label: href,
@@ -414,26 +482,26 @@ const flatNavLinks = [
                     }
 
                     // Log to console for debugging
-                    console.log(`Header link clicked: ${linkText} (${href}) - ${linkType}${isMobile ? ' [mobile]' : ''}`);
+                    console.log('Header link clicked: ' + linkText + ' (' + href + ') - ' + linkType + (isMobile ? ' [mobile]' : ''));
                 });
             }
         }
 
         // Track desktop navigation links
-        const desktopLinks = document.querySelectorAll('header nav > div.hidden.lg\\:flex a');
-        desktopLinks.forEach(link => trackHeaderLinkClick(link, 'desktop_nav', false));
+        var desktopLinks = document.querySelectorAll('header nav > div.hidden.lg\\:flex a');
+        desktopLinks.forEach(function(link) { trackHeaderLinkClick(link, 'desktop_nav', false); });
 
         // Track desktop CTA button
-        const desktopCTA = document.getElementById('header-start-building-desktop');
+        var desktopCTA = document.getElementById('header-start-building-desktop');
         if (desktopCTA) trackHeaderLinkClick(desktopCTA, 'desktop_cta', false);
 
         // Track logo link
-        const logoLink = document.getElementById('header-logo-link');
+        var logoLink = document.getElementById('header-logo-link');
         if (logoLink) trackHeaderLinkClick(logoLink, 'logo', false);
 
-        // Track mobile menu links
-        const mobileLinks = document.querySelectorAll('#mobile-menu a');
-        mobileLinks.forEach(link => trackHeaderLinkClick(link, 'mobile_nav', true));
+        // Track mobile menu links (both menus)
+        var mobileLinks = document.querySelectorAll('#mobile-menu a, #mobile-menu-flat a');
+        mobileLinks.forEach(function(link) { trackHeaderLinkClick(link, 'mobile_nav', true); });
     }
 
     document.addEventListener('astro:page-load', setupHeader);

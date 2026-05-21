@@ -50,7 +50,7 @@ Genera el esquema Drizzle ORM a partir de tus colecciones TypeScript:
 rebase schema generate
 ```
 
-Esto lee tus colecciones de `shared/collections/` y genera `backend/src/schema.generated.ts` con definiciones de tablas Drizzle, enumeraciones y relaciones.
+Esto lee tus colecciones de `config/collections/` y genera `backend/src/schema.generated.ts` con definiciones de tablas Drizzle, enumeraciones y relaciones.
 
 ### `rebase db push`
 
@@ -92,12 +92,12 @@ Abre Drizzle Studio para explorar tu base de datos visualmente:
 rebase db studio
 ```
 
-### `rebase generate_sdk`
+### `rebase generate-sdk`
 
 Genera un SDK de cliente tipado a partir de tus definiciones de colección:
 
 ```bash
-rebase generate_sdk
+rebase generate-sdk
 ```
 
 Crea tipos TypeScript y un cliente con seguridad de tipos para todas tus colecciones.
@@ -116,7 +116,7 @@ rebase auth reset-password --email admin@example.com
 El flujo de trabajo típico para los cambios de esquema:
 
 ```bash
-# 1. Edit your collection in shared/collections/
+# 1. Edit your collection in config/collections/
 # 2. Generate the Drizzle schema
 rebase schema generate
 

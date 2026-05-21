@@ -444,7 +444,7 @@ width: 240 }}
    ═══════════════════════════════════════════════════════════ */
 export type DemoViewMode = "list" | "table" | "cards" | "kanban";
 
-export function EntityViewDemo({ fixedViewMode }: { fixedViewMode?: DemoViewMode } = {}) {
+export function EntityViewDemo({ fixedViewMode, height = 600 }: { fixedViewMode?: DemoViewMode; height?: number } = {}) {
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [formDirty, setFormDirty] = useState(false);
@@ -818,7 +818,7 @@ active: activeCollection === "tags" }
     /* ── Scaffold root: exact Scaffold.tsx line 106 ── */
     <div
       className="flex overflow-hidden bg-surface-50 dark:bg-surface-900 text-surface-900 dark:text-white pointer-events-none select-none relative"
-      style={{ height: 600,
+      style={{ height,
 width: "100%" }}
     >
       {/* ═══ AppBar — exact DefaultAppBar.tsx: absolute top-0, h-16, pl-24 ═══ */}

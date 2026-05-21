@@ -1,6 +1,5 @@
 ---
-
-import { languages, defaultLang, useTranslations } from '../../i18n/ui';
+import { languages, defaultLang, getLangFromUrl, useTranslatedPath } from '../../i18n/ui';
 
 export function getStaticPaths() {
   return Object.keys(languages).map((lang) => ({
@@ -8,44 +7,8 @@ export function getStaticPaths() {
   }));
 }
 
-const { lang } = Astro.params;
-const currentLang = lang || defaultLang;
-const t = useTranslations(currentLang as keyof typeof languages);
+const lang = getLangFromUrl(Astro.url);
+const translatePath = useTranslatedPath(lang);
 
-import Layout from '../../layouts/Layout.astro';
-
-const title = t("sdk.meta.title");
-const description = t("sdk.meta.description");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-import SdkContent from '../../components/pages/SdkContent.astro';
-const breadcrumbs = [
-    { name: "Home", url: "https://rebase.pro" },
-    { name: "Client SDK", url: "https://rebase.pro/sdk" }
-];
+return Astro.redirect(translatePath("/developers"), 301);
 ---
-<Layout title={title} description={description} breadcrumbs={breadcrumbs}>
-    <SdkContent lang={currentLang} t={t} />
-</Layout>

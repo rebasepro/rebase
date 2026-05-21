@@ -33,10 +33,12 @@ export const onRequest = defineMiddleware(async (context, next) => {
     // 2. Handle /docs/... routes
     const isDocRoute = restSegments[0] === "docs";
     if (isDocRoute) {
-      // Find MD/MDX file under src/content/docs/docs
+      // Find MD/MDX file under src/content/docs/[lang]/docs or src/content/docs/docs
       const docSubPath = restSegments.slice(1).join("/");
       
-      const contentDir = path.join(process.cwd(), "src/content/docs/docs");
+      const contentDir = lang === defaultLang
+        ? path.join(process.cwd(), "src/content/docs/docs")
+        : path.join(process.cwd(), "src/content/docs", lang, "docs");
       const mdPath = path.join(contentDir, docSubPath + ".md");
       const mdxPath = path.join(contentDir, docSubPath + ".mdx");
       const indexPath = path.join(contentDir, docSubPath, "index.md");

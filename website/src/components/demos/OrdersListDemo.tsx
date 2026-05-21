@@ -212,7 +212,7 @@ function OrderDetailPanel({ order, onClose, highlightedField }: {
 }
 
 /* ═══ MAIN COMPONENT ═══ */
-export function OrdersListDemo() {
+export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [highlightedKPI, setHighlightedKPI] = useState<number | null>(null);
@@ -313,7 +313,7 @@ export function OrdersListDemo() {
   return (
     <div
       className="flex overflow-hidden bg-surface-50 dark:bg-surface-900 text-surface-900 dark:text-white pointer-events-none select-none relative"
-      style={{ height: 600, width: "100%" }}
+      style={{ height, width: "100%" }}
     >
       {/* AppBar */}
       <div className="w-full h-16 transition-all ease-in duration-75 absolute top-0 max-w-full overflow-x-auto no-scrollbar flex flex-row gap-2 px-4 items-center pl-24 z-10">

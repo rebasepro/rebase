@@ -47,7 +47,7 @@ Toute la configuration est effectuée via des variables d'environnement dans vot
 | Variable | Description | Défaut |
 |----------|-------------|---------|
 | `STORAGE_TYPE` | Backend de stockage : `local` ou `s3` | `local` |
-| `STORAGE_BASE_PATH` | Chemin de base pour le stockage local | `./uploads` |
+| `STORAGE_PATH` | Chemin de base pour le stockage local | `./uploads` |
 | `S3_BUCKET` | Nom du bucket S3 (lorsque `STORAGE_TYPE=s3`) | — |
 | `S3_REGION` | Région AWS | — |
 | `S3_ACCESS_KEY_ID` | Clé d'accès AWS | — |
@@ -60,6 +60,7 @@ Toute la configuration est effectuée via des variables d'environnement dans vot
 |----------|-------------|
 | `SMTP_HOST` | Hôte du serveur SMTP |
 | `SMTP_PORT` | Port du serveur SMTP |
+| `SMTP_SECURE` | Enable secure connection (`true`/`false`) |
 | `SMTP_USER` | Nom d'utilisateur SMTP |
 | `SMTP_PASS` | Mot de passe SMTP |
 | `EMAIL_FROM` | Adresse de l'expéditeur pour les e-mails système |
@@ -78,7 +79,7 @@ await initializeRebaseBackend({
     basePath: "/api",        // Base path for all API routes (default: "/api")
 
     bootstrappers: [         // Database and service bootstrappers
-        createPostgresBootstrapper({
+        createPostgresAdapter({
             connection: db,
             schema: { tables, enums, relations }
         })

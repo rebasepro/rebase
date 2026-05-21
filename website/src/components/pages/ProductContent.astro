@@ -79,7 +79,7 @@ const honoCode = `<span class="text-blue-400">import</span> { initializeRebaseBa
         <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Edit like a spreadsheet. Save like a database.</h2>
         <p class="mt-4 text-lg text-surface-400">Inline editing, real-time filters, Kanban views, and a Notion-style rich text editor — all reading and writing directly to your Postgres tables.</p>
       </div>
-      <div class="mx-auto max-w-[1000px]">
+      <div class="mx-auto max-w-[1000px]" style="min-height: 700px;">
         <AdminDemoCarousel client:load />
       </div>
     </div>
@@ -101,8 +101,8 @@ const honoCode = `<span class="text-blue-400">import</span> { initializeRebaseBa
         <p class="mt-4 text-lg text-surface-400">Choose the view that fits your workflow. Edit collections visually, write document content, manage file assets, or execute bulk spreadsheet edits — all writing in real-time to Postgres.</p>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <!-- Card 1: Kanban Board (1/3 Width) -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Card 1: Kanban Board (50% Width) -->
         <div class="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-surface-800/80 bg-surface-950/40 backdrop-blur-md p-6 hover:border-primary/30 transition-all duration-300 shadow-[0_4px_30px_rgba(0,0,0,0.3)]">
           <div class="mb-6">
             <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-violet-500/10 text-violet-400 ring-1 ring-inset ring-violet-500/20">Kanban Boards</div>
@@ -114,8 +114,8 @@ const honoCode = `<span class="text-blue-400">import</span> { initializeRebaseBa
           </div>
         </div>
 
-        <!-- Card 2: Rich Text Editor (2/3 Width) -->
-        <div class="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-surface-800/80 bg-surface-950/40 backdrop-blur-md p-6 hover:border-primary/30 transition-all duration-300 shadow-[0_4px_30px_rgba(0,0,0,0.3)] lg:col-span-2">
+        <!-- Card 2: Rich Text Editor (50% Width) -->
+        <div class="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-surface-800/80 bg-surface-950/40 backdrop-blur-md p-6 hover:border-primary/30 transition-all duration-300 shadow-[0_4px_30px_rgba(0,0,0,0.3)]">
           <div class="mb-6">
             <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-500/20">Rich Text</div>
             <h3 class="text-xl font-medium text-white mb-2">Notion-style block editor</h3>
@@ -126,8 +126,8 @@ const honoCode = `<span class="text-blue-400">import</span> { initializeRebaseBa
           </div>
         </div>
 
-        <!-- Card 3: Spreadsheet View (Full Width / 3/3 Width) -->
-        <div class="group relative flex flex-col overflow-hidden rounded-2xl border border-surface-800/80 bg-surface-950/40 backdrop-blur-md p-6 hover:border-primary/30 transition-all duration-300 shadow-[0_4px_30px_rgba(0,0,0,0.3)] lg:col-span-3">
+        <!-- Card 3: Spreadsheet View (Full Width) -->
+        <div class="group relative flex flex-col overflow-hidden rounded-2xl border border-surface-800/80 bg-surface-950/40 backdrop-blur-md p-6 hover:border-primary/30 transition-all duration-300 shadow-[0_4px_30px_rgba(0,0,0,0.3)] lg:col-span-2">
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div class="lg:col-span-1">
               <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-cyan-500/10 text-cyan-400 ring-1 ring-inset ring-cyan-500/20">Spreadsheet View</div>
@@ -140,8 +140,8 @@ const honoCode = `<span class="text-blue-400">import</span> { initializeRebaseBa
           </div>
         </div>
 
-        <!-- Card 4: File Storage (Full Width / 3/3 Width) -->
-        <div class="group relative flex flex-col overflow-hidden rounded-2xl border border-surface-800/80 bg-surface-950/40 backdrop-blur-md p-6 hover:border-primary/30 transition-all duration-300 shadow-[0_4px_30px_rgba(0,0,0,0.3)] lg:col-span-3">
+        <!-- Card 4: File Storage (Full Width) -->
+        <div class="group relative flex flex-col overflow-hidden rounded-2xl border border-surface-800/80 bg-surface-950/40 backdrop-blur-md p-6 hover:border-primary/30 transition-all duration-300 shadow-[0_4px_30px_rgba(0,0,0,0.3)] lg:col-span-2">
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div class="lg:col-span-2 rounded-xl overflow-hidden ring-1 ring-surface-800 bg-surface-950 shadow-2xl">
               <StorageViewDemo client:only="react" />

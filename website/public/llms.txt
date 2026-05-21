@@ -8,9 +8,8 @@
 
 ## Introduction
 
-<video className="intro_video" loop autoPlay muted>
-    <source src="/img/full_screen_dark.mp4" type="video/mp4"/>
-</video>
+
+<AdminDemoCarousel client:only="react" height={400} showTabs={false} defaultTab={1} autoPlay={false} scale={0.75} />
 
 ### What is Rebase?
 
@@ -62,6 +61,12 @@ Configure your database in `.env`:
 ```bash
 DATABASE_URL=postgresql://user:password@localhost:5432/mydb
 JWT_SECRET=your-secret-key
+```
+
+If you are connecting to an existing database, you can introspect it to automatically generate your collection files:
+
+```bash
+pnpm rebase schema introspect
 ```
 
 Start everything:
@@ -117,7 +122,7 @@ This scaffolds a project with three packages:
 |--------|-------------|
 | `frontend/` | React SPA — Vite + TypeScript with the Rebase admin UI |
 | `backend/` | Node.js server — Hono, PostgreSQL via Drizzle ORM, WebSocket |
-| `shared/` | TypeScript collection definitions shared by both sides |
+| `config/` | Config files and collection definitions shared by both sides |
 
 ### Prerequisites
 
@@ -133,7 +138,7 @@ After scaffolding, edit the `.env` file at the project root:
 ## PostgreSQL connection string
 DATABASE_URL=postgresql://username:password@localhost:5432/your_database
 
-## JWT secret for authentication (generate a strong random string)
+## JWT secret for authentication (auto-generated in development if omitted)
 JWT_SECRET=change-me-to-a-random-secret
 
 ## Frontend URL for CORS
@@ -142,6 +147,16 @@ VITE_API_URL=http://localhost:3001
 ## Optional: Google OAuth client ID
 ## VITE_GOOGLE_CLIENT_ID=your-google-client-id
 ```
+
+### Introspect an Existing Database (Optional)
+
+If you are connecting to an existing database with pre-existing tables, you can introspect it to automatically generate your TypeScript collection files:
+
+```bash
+pnpm rebase schema introspect
+```
+
+This will analyze your database tables and generate corresponding TypeScript files in `config/collections/` so you don't have to write them manually.
 
 ### Start the Dev Servers
 
@@ -171,9 +186,9 @@ When you open `http://localhost:5173`, you'll see the login screen. The **first 
 
 ### Define Your First Collection
 
-Open `shared/collections/` and create a new file:
+Open `config/collections/` and create a new file:
 
-```typescript title="shared/collections/products.ts"
+```typescript title="config/collections/products.ts"
 
 export const productsCollection: EntityCollection = {
     slug: "products",
@@ -224,6 +239,7 @@ Restart the dev servers and your new **Products** collection appears in the navi
 | Command | Description |
 |---------|-------------|
 | `rebase schema generate` | Generate Drizzle schema from your TypeScript collections |
+| `rebase schema introspect` | Generate TypeScript collections from an existing database |
 | `rebase db push` | Push schema changes directly to the database (dev only) |
 | `rebase db generate` | Generate SQL migration files |
 | `rebase db migrate` | Run pending migrations |
@@ -260,7 +276,7 @@ my-app/
 │   ├── Dockerfile
 │   └── package.json
 │
-└── shared/                 ## Collection definitions
+└── config/                 ## Collection definitions and configurations
     └── collections/
         ├── index.ts        ## Exports all collections
         └── products.ts     ## Example: products collection
@@ -279,7 +295,7 @@ const rebaseClient = createRebaseClient({
 });
 
 // Collections are imported via a Vite virtual module
-// that reads from the shared/ directory
+// that reads from the config/ directory
 ```
 
 #### Key Concepts
@@ -299,16 +315,16 @@ const app = new Hono();
 await initializeRebaseBackend({
     app,
     server,
-    collectionsDir: "./shared/collections",
-    bootstrappers: [
-        createPostgresBootstrapper({
-            connection: db,
-            schema: { tables, enums, relations }
-        })
-    ],
+    collectionsDir: "./config/collections",
+    database: createPostgresAdapter({
+        connection: db,
+        schema: { tables, enums, relations }
+    }),
     auth: {
-        jwtSecret: process.env.JWT_SECRET!,
-        google: { clientId: process.env.GOOGLE_CLIENT_ID },
+        jwtSecret: process.env.JWT_SECRET,
+        google: process.env.GOOGLE_CLIENT_ID
+            ? { clientId: process.env.GOOGLE_CLIENT_ID }
+            : undefined,
     },
     storage: {
         type: "local",
@@ -325,11 +341,11 @@ await initializeRebaseBackend({
 - **WebSocket** server — real-time entity sync via Postgres LISTEN/NOTIFY
 - **History** — audit trail recording on every entity change
 
-### Shared Collections (`shared/`)
+### Collections (`config/collections/`)
 
 Collections are the **single source of truth** for your data model. They are defined as TypeScript and consumed by both the frontend (for UI generation) and the backend (for schema generation and API routing).
 
-```typescript title="shared/collections/products.ts"
+```typescript title="config/collections/products.ts"
 
 export const productsCollection: EntityCollection = {
     slug: "products",
@@ -346,7 +362,7 @@ The `slug` becomes the URL path in the admin UI and the REST API endpoint (`/api
 
 ### How They Connect
 
-1. **You define** collections in `shared/`
+1. **You define** collections in `config/collections/`
 2. **The backend** reads them to generate Drizzle schemas and mount REST routes
 3. **The frontend** reads them (via Vite plugin) to render tables, forms, and navigation
 4. **The CLI** reads them to generate migration files with `rebase schema generate`
@@ -371,7 +387,7 @@ All configuration is done via environment variables in your `.env` file at the p
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@localhost:5432/mydb` |
-| `JWT_SECRET` | Secret key for signing JWT tokens. Use a strong random string (min 32 chars). | `a1b2c3d4e5...` |
+| `JWT_SECRET` | Secret key for signing JWT tokens. Use a strong random string (min 32 chars). **Required in production** (auto-generated in development). | `a1b2c3d4e5...` |
 
 #### Frontend
 
@@ -386,29 +402,34 @@ All configuration is done via environment variables in your `.env` file at the p
 |----------|-------------|---------|
 | `PORT` | Port for the backend HTTP server | `3001` |
 | `LOG_LEVEL` | Logging verbosity: `error`, `warn`, `info`, `debug` | `info` |
-| `NODE_ENV` | Environment: `development` or `production` | `development` |
+| `NODE_ENV` | Environment: `development`, `production`, or `test` | `development` |
+| `CORS_ORIGINS` | Comma-separated list of allowed origins. **Required in production** if different from backend domain. | — |
+| `FRONTEND_URL` | URL of the frontend app. Used as an alternative to CORS_ORIGINS. | — |
 
 #### Authentication
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `JWT_SECRET` | Secret for JWT signing (required if auth is enabled) | — |
+| `JWT_SECRET` | Secret for JWT signing (required in production, auto-generated in development) | — |
 | `JWT_ACCESS_EXPIRES_IN` | Access token lifetime | `1h` |
 | `JWT_REFRESH_EXPIRES_IN` | Refresh token lifetime | `30d` |
 | `ALLOW_REGISTRATION` | Allow new users to register (`true`/`false`). First user can always register. | `true` |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID (backend validation) | — |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | — |
+| `REBASE_SERVICE_KEY` | Static admin API key. Bypasses normal JWT auth for server-to-server calls when passed as `Authorization: Bearer <key>`. (Auto-generated in development). | — |
 
 #### Storage
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `STORAGE_TYPE` | Storage backend: `local` or `s3` | `local` |
-| `STORAGE_BASE_PATH` | Base path for local storage | `./uploads` |
+| `STORAGE_PATH` | Base path for local storage | `./uploads` |
 | `S3_BUCKET` | S3 bucket name (when `STORAGE_TYPE=s3`) | — |
 | `S3_REGION` | AWS region | — |
 | `S3_ACCESS_KEY_ID` | AWS access key | — |
 | `S3_SECRET_ACCESS_KEY` | AWS secret key | — |
 | `S3_ENDPOINT` | Custom S3 endpoint (for MinIO, Cloudflare R2, etc.) | — |
+| `S3_FORCE_PATH_STYLE` | Force path-style URLs for S3 bucket (`true`/`false`) | `false` |
 
 #### Email (Optional)
 
@@ -416,9 +437,10 @@ All configuration is done via environment variables in your `.env` file at the p
 |----------|-------------|
 | `SMTP_HOST` | SMTP server host |
 | `SMTP_PORT` | SMTP server port |
+| `SMTP_SECURE` | Enable secure connection (`true`/`false`) |
 | `SMTP_USER` | SMTP username |
 | `SMTP_PASS` | SMTP password |
-| `EMAIL_FROM` | Sender address for system emails |
+| `SMTP_FROM` | Sender address for system emails |
 
 ### Backend Config Object
 
@@ -429,15 +451,13 @@ The `RebaseBackendConfig` passed to `initializeRebaseBackend()` provides program
 await initializeRebaseBackend({
     app,
     server,
-    collections,
+    collectionsDir: "./config/collections",
     basePath: "/api",        // Base path for all API routes (default: "/api")
 
-    bootstrappers: [         // Database and service bootstrappers
-        createPostgresBootstrapper({
-            connection: db,
-            schema: { tables, enums, relations }
-        })
-    ],
+    database: createPostgresAdapter({
+        connection: db,
+        schema: { tables, enums, relations }
+    }),
 
     auth: {                  // Authentication config
         jwtSecret: env.JWT_SECRET,
@@ -445,15 +465,28 @@ await initializeRebaseBackend({
         refreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN,
         requireAuth: true,    // Require auth for data API (default: true)
         allowRegistration: env.ALLOW_REGISTRATION,
-        google: {
-            clientId: env.GOOGLE_CLIENT_ID
-        }
+        google: env.GOOGLE_CLIENT_ID
+            ? {
+                clientId: env.GOOGLE_CLIENT_ID,
+                clientSecret: env.GOOGLE_CLIENT_SECRET
+            }
+            : undefined,
+        serviceKey: env.REBASE_SERVICE_KEY
     },
 
-    storage: {               // File storage config
-        type: "local",
-        basePath: "./uploads"
-    },
+    storage: env.STORAGE_TYPE === "s3"
+        ? {
+            type: "s3",
+            bucket: env.S3_BUCKET!,
+            region: env.S3_REGION,
+            accessKeyId: env.S3_ACCESS_KEY_ID,
+            secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+            endpoint: env.S3_ENDPOINT
+        }
+        : {
+            type: "local",
+            basePath: env.STORAGE_PATH || "./uploads"
+        },
 
     history: true,           // Enable entity change history
 
@@ -531,7 +564,7 @@ In production, the backend can serve the frontend as a static SPA:
 ```typescript
 
 // After initializeRebaseBackend()
-serveSPA(app, "./frontend/dist");
+serveSPA(app, { frontendPath: path.resolve(process.cwd(), "../frontend/dist") });
 ```
 
 Build the frontend first:
@@ -568,7 +601,7 @@ gcloud run deploy rebase-backend \
 ```
 
 :::caution
-Cloud Run instances are stateless. Use **S3 storage** instead of local filesystem for file uploads, and enable **cross-instance realtime** by providing a `connectionString` in your `PostgresBootstrapper` so WebSocket updates propagate across replicas.
+Cloud Run instances are stateless. Use **S3 storage** instead of local filesystem for file uploads, and enable **cross-instance realtime** by providing a `connectionString` in your `PostgresAdapter` configuration so WebSocket updates propagate across replicas.
 :::
 
 ### Changing the Base URL
@@ -1010,7 +1043,7 @@ Rebase is a full-stack platform with four layers:
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Backend Layer                            │
 │  Hono HTTP Server  •  REST API  •  Auth  •  Storage  •  WS     │
-│  @rebasepro/backend                                             │
+│  @rebasepro/server-core                                         │
 └───────────────────────────┬─────────────────────────────────────┘
                             │ Drizzle ORM
                             ▼
@@ -1022,23 +1055,21 @@ Rebase is a full-stack platform with four layers:
 
 ### Key Components
 
-#### Bootstrapper System
+#### Database Adapter System
 
-The backend initializes through a plugin-based bootstrapper system. Database-specific logic is decoupled into its own package, and bootstrappers handle initialization of the database, authentication, and internal services.
+The backend initializes through a unified database adapter pattern. Database-specific logic is decoupled into its own package, and the adapter handles connection pooling, schema resolution, and real-time event routing automatically.
 
 ```typescript
 
-bootstrappers: [
-    createPostgresBootstrapper({
-        connectionString: process.env.DATABASE_URL!
-    })
-]
+database: createPostgresAdapter({
+    connectionString: process.env.DATABASE_URL!
+})
 ```
 
-Collections automatically resolve against the configured bootstrapper through the internal dependency injection registry.
+Collections automatically resolve against the configured adapter through the internal dependency injection registry.
 
 :::tip
-The `createPostgresBootstrapper` handles database connection pooling, schema resolution, and real-time `LISTEN/NOTIFY` setup automatically.
+The `createPostgresAdapter` handles database connection pooling, schema resolution, and real-time `LISTEN/NOTIFY` setup automatically.
 :::
 
 #### Collection Registry
@@ -2748,13 +2779,11 @@ Everything is initialized with a single function:
 const instance = await initializeRebaseBackend({
     app,
     server,
-    collectionsDir: "./shared/collections",
-    bootstrappers: [
-        createPostgresBootstrapper({
-            connection: db,
-            schema: { tables, enums, relations }
-        })
-    ],
+    collectionsDir: "./config/collections",
+    database: createPostgresAdapter({
+        connection: db,
+        schema: { tables, enums, relations }
+    }),
     auth: {
         jwtSecret: env.JWT_SECRET,
     },
@@ -2795,11 +2824,11 @@ interface RebaseBackendConfig {
     collections?: EntityCollection[];  // Your collection definitions
     collectionsDir?: string;  // Auto-load collections from a directory
 
-    // Bootstrappers (Databases, Auth, Realtime, etc.)
-    bootstrappers: BackendBootstrapper[];
+    // Database adapter (PostgreSQL, SQLite, etc.)
+    database?: DatabaseAdapter;
 
-    // Authentication
-    auth?: AuthConfig;
+    // Authentication configuration or custom adapter
+    auth?: RebaseAuthConfig | AuthAdapter;
 
     // File storage
     storage?: BackendStorageConfig | Record<string, BackendStorageConfig>;
@@ -3281,7 +3310,6 @@ Rebase includes a complete authentication system:
 ### Backend Configuration
 
 ```typescript
-
 await initializeRebaseBackend({
     // ...
     auth: {
@@ -3290,23 +3318,31 @@ await initializeRebaseBackend({
         refreshExpiresIn: "30d",             // Refresh token lifetime
         requireAuth: true,                   // Require auth for data API
         allowRegistration: false,            // Allow new signups
-        oauthProviders: [
-            createGoogleProvider(process.env.GOOGLE_CLIENT_ID!),
-            createLinkedinProvider({
-                clientId: process.env.LINKEDIN_CLIENT_ID!,
-                clientSecret: process.env.LINKEDIN_CLIENT_SECRET!
-            })
-        ],
+        google: process.env.GOOGLE_CLIENT_ID ? {
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET
+        } : undefined,
+        linkedin: process.env.LINKEDIN_CLIENT_ID ? {
+            clientId: process.env.LINKEDIN_CLIENT_ID,
+            clientSecret: process.env.LINKEDIN_CLIENT_SECRET
+        } : undefined,
         email: {                             // Optional — for password reset
-            smtpHost: "smtp.gmail.com",
-            smtpPort: 587,
-            smtpUser: "noreply@example.com",
-            smtpPass: "app-password",
-            from: "Rebase <noreply@example.com>"
+            smtp: {
+                host: "smtp.gmail.com",
+                port: 587,
+                secure: false,
+                user: "noreply@example.com",
+                pass: "app-password",
+                from: "Rebase <noreply@example.com>"
+            }
         }
     }
 });
 ```
+
+#### Custom Auth Adapters
+
+Rebase allows complete replacement of the default authentication system via the `AuthAdapter` interface. Pass a custom adapter to the `auth` property to bypass the built-in JWT and user table mechanism entirely (for example, to integrate with Firebase Auth, Auth0, or an external corporate SSO provider).
 
 Auth tables (`rebase.users`, `rebase.roles`, `rebase.user_roles`, `rebase.refresh_tokens`) are **auto-created** on first startup.
 
@@ -5042,7 +5078,7 @@ Generate Drizzle ORM schema from your TypeScript collections:
 rebase schema generate
 ```
 
-This reads your collections from `shared/collections/` and generates `backend/src/schema.generated.ts` with Drizzle table definitions, enums, and relations.
+This reads your collections from `config/collections/` and generates `backend/src/schema.generated.ts` with Drizzle table definitions, enums, and relations.
 
 #### `rebase db push`
 
@@ -5084,15 +5120,23 @@ Open Drizzle Studio to browse your database visually:
 rebase db studio
 ```
 
-#### `rebase generate_sdk`
+#### `rebase generate-sdk`
 
 Generate a typed client SDK from your collection definitions:
 
 ```bash
-rebase generate_sdk
+rebase generate-sdk
 ```
 
 Creates TypeScript types and a type-safe client for all your collections.
+
+#### `rebase doctor`
+
+Run diagnostics to detect drift between your collections, the generated schema, and the current database state:
+
+```bash
+rebase doctor
+```
 
 #### `rebase auth`
 
@@ -5108,7 +5152,7 @@ rebase auth reset-password --email admin@example.com
 The typical workflow for schema changes:
 
 ```bash
-## 1. Edit your collection in shared/collections/
+## 1. Edit your collection in config/collections/
 ## 2. Generate the Drizzle schema
 rebase schema generate
 
@@ -5402,7 +5446,7 @@ export const articlesCollection: EntityCollection = {
 
 ### Setup
 
-1. Add all three collections to your `shared/collections/index.ts`
+1. Add all three collections to your `config/collections/index.ts`
 2. Run `rebase schema generate`
 3. Run `rebase db push`
 4. Restart the dev server

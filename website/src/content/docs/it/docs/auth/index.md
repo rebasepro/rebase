@@ -27,19 +27,23 @@ await initializeRebaseBackend({
         refreshExpiresIn: "30d",             // Refresh token lifetime
         requireAuth: true,                   // Require auth for data API
         allowRegistration: false,            // Allow new signups
-        oauthProviders: [
-            createGoogleProvider(process.env.GOOGLE_CLIENT_ID!),
-            createLinkedinProvider({
-                clientId: process.env.LINKEDIN_CLIENT_ID!,
-                clientSecret: process.env.LINKEDIN_CLIENT_SECRET!
-            })
-        ],
-        email: {                             // Optional — for password reset
-            smtpHost: "smtp.gmail.com",
-            smtpPort: 587,
-            smtpUser: "noreply@example.com",
-            smtpPass: "app-password",
-            from: "Rebase <noreply@example.com>"
+        google: process.env.GOOGLE_CLIENT_ID ? {
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET
+        } : undefined,
+        linkedin: process.env.LINKEDIN_CLIENT_ID ? {
+            clientId: process.env.LINKEDIN_CLIENT_ID,
+            clientSecret: process.env.LINKEDIN_CLIENT_SECRET
+        } : undefined,
+        email: {
+            smtp: {
+                host: "smtp.gmail.com",
+                port: 587,
+                secure: false,
+                user: "noreply@example.com",
+                pass: "app-password",
+                from: "Rebase <noreply@example.com>"
+            }
         }
     }
 });

@@ -19,7 +19,7 @@ Rebase is a full-stack platform with four layers:
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Backend Layer                            │
 │  Hono HTTP Server  •  REST API  •  Auth  •  Storage  •  WS     │
-│  @rebasepro/backend                                             │
+│  @rebasepro/server-core                                         │
 └───────────────────────────┬─────────────────────────────────────┘
                             │ Drizzle ORM
                             ▼
@@ -31,24 +31,22 @@ Rebase is a full-stack platform with four layers:
 
 ## Key Components
 
-### Bootstrapper System
+### Database Adapter System
 
-The backend initializes through a plugin-based bootstrapper system. Database-specific logic is decoupled into its own package, and bootstrappers handle initialization of the database, authentication, and internal services.
+The backend initializes through a unified database adapter pattern. Database-specific logic is decoupled into its own package, and the adapter handles connection pooling, schema resolution, and real-time event routing automatically.
 
 ```typescript
-import { createPostgresBootstrapper } from "@rebasepro/server-postgresql";
+import { createPostgresAdapter } from "@rebasepro/server-postgresql";
 
-bootstrappers: [
-    createPostgresBootstrapper({
-        connectionString: process.env.DATABASE_URL!
-    })
-]
+database: createPostgresAdapter({
+    connectionString: process.env.DATABASE_URL!
+})
 ```
 
-Collections automatically resolve against the configured bootstrapper through the internal dependency injection registry.
+Collections automatically resolve against the configured adapter through the internal dependency injection registry.
 
 :::tip
-The `createPostgresBootstrapper` handles database connection pooling, schema resolution, and real-time `LISTEN/NOTIFY` setup automatically.
+The `createPostgresAdapter` handles database connection pooling, schema resolution, and real-time `LISTEN/NOTIFY` setup automatically.
 :::
 
 ### Collection Registry

@@ -17,8 +17,6 @@ Rebase includes a complete authentication system:
 ## Backend Configuration
 
 ```typescript
-import { createGoogleProvider, createLinkedinProvider } from "@rebasepro/server-core";
-
 await initializeRebaseBackend({
     // ...
     auth: {
@@ -27,23 +25,31 @@ await initializeRebaseBackend({
         refreshExpiresIn: "30d",             // Refresh token lifetime
         requireAuth: true,                   // Require auth for data API
         allowRegistration: false,            // Allow new signups
-        oauthProviders: [
-            createGoogleProvider(process.env.GOOGLE_CLIENT_ID!),
-            createLinkedinProvider({
-                clientId: process.env.LINKEDIN_CLIENT_ID!,
-                clientSecret: process.env.LINKEDIN_CLIENT_SECRET!
-            })
-        ],
+        google: process.env.GOOGLE_CLIENT_ID ? {
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET
+        } : undefined,
+        linkedin: process.env.LINKEDIN_CLIENT_ID ? {
+            clientId: process.env.LINKEDIN_CLIENT_ID,
+            clientSecret: process.env.LINKEDIN_CLIENT_SECRET
+        } : undefined,
         email: {                             // Optional — for password reset
-            smtpHost: "smtp.gmail.com",
-            smtpPort: 587,
-            smtpUser: "noreply@example.com",
-            smtpPass: "app-password",
-            from: "Rebase <noreply@example.com>"
+            smtp: {
+                host: "smtp.gmail.com",
+                port: 587,
+                secure: false,
+                user: "noreply@example.com",
+                pass: "app-password",
+                from: "Rebase <noreply@example.com>"
+            }
         }
     }
 });
 ```
+
+### Custom Auth Adapters
+
+Rebase allows complete replacement of the default authentication system via the `AuthAdapter` interface. Pass a custom adapter to the `auth` property to bypass the built-in JWT and user table mechanism entirely (for example, to integrate with Firebase Auth, Auth0, or an external corporate SSO provider).
 
 Auth tables (`rebase.users`, `rebase.roles`, `rebase.user_roles`, `rebase.refresh_tokens`) are **auto-created** on first startup.
 

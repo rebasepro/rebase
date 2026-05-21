@@ -61,10 +61,11 @@ Before deploying to production, ensure:
 In production, the backend can serve the frontend as a static SPA:
 
 ```typescript
-import { serveSPA } from "@rebasepro/backend";
+import { serveSPA } from "@rebasepro/server-core";
+import path from "path";
 
 // After initializeRebaseBackend()
-serveSPA(app, "./frontend/dist");
+serveSPA(app, { frontendPath: path.resolve(process.cwd(), "../frontend/dist") });
 ```
 
 Build the frontend first:
@@ -101,7 +102,7 @@ gcloud run deploy rebase-backend \
 ```
 
 :::caution
-Cloud Run instances are stateless. Use **S3 storage** instead of local filesystem for file uploads, and enable **cross-instance realtime** by providing a `connectionString` in your `PostgresBootstrapper` so WebSocket updates propagate across replicas.
+Cloud Run instances are stateless. Use **S3 storage** instead of local filesystem for file uploads, and enable **cross-instance realtime** by providing a `connectionString` in your `PostgresAdapter` configuration so WebSocket updates propagate across replicas.
 :::
 
 ## Changing the Base URL

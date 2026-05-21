@@ -47,7 +47,7 @@ Toda la configuración se realiza a través de variables de entorno en tu archiv
 | Variable | Descripción | Valor por defecto |
 |----------|-------------|---------|
 | `STORAGE_TYPE` | Backend de almacenamiento: `local` o `s3` | `local` |
-| `STORAGE_BASE_PATH` | Ruta base para almacenamiento local | `./uploads` |
+| `STORAGE_PATH` | Ruta base para almacenamiento local | `./uploads` |
 | `S3_BUCKET` | Nombre del bucket de S3 (cuando `STORAGE_TYPE=s3`) | — |
 | `S3_REGION` | Región de AWS | — |
 | `S3_ACCESS_KEY_ID` | Clave de acceso de AWS | — |
@@ -60,6 +60,7 @@ Toda la configuración se realiza a través de variables de entorno en tu archiv
 |----------|-------------|
 | `SMTP_HOST` | Host del servidor SMTP |
 | `SMTP_PORT` | Puerto del servidor SMTP |
+| `SMTP_SECURE` | Enable secure connection (`true`/`false`) |
 | `SMTP_USER` | Nombre de usuario SMTP |
 | `SMTP_PASS` | Contraseña SMTP |
 | `EMAIL_FROM` | Dirección del remitente para correos electrónicos del sistema |
@@ -78,7 +79,7 @@ await initializeRebaseBackend({
     basePath: "/api",        // Ruta base para todas las rutas de la API (por defecto: "/api")
 
     bootstrappers: [         // Inicializadores de base de datos y servicios
-        createPostgresBootstrapper({
+        createPostgresAdapter({
             connection: db,
             schema: { tables, enums, relations }
         })

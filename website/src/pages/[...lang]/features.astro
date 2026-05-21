@@ -1,6 +1,5 @@
 ---
-
-import { languages, defaultLang, useTranslations } from '../../i18n/ui';
+import { languages, defaultLang, getLangFromUrl, useTranslatedPath } from '../../i18n/ui';
 
 export function getStaticPaths() {
   return Object.keys(languages).map((lang) => ({
@@ -8,22 +7,8 @@ export function getStaticPaths() {
   }));
 }
 
-const { lang } = Astro.params;
-const currentLang = lang || defaultLang;
-const t = useTranslations(currentLang as keyof typeof languages);
+const lang = getLangFromUrl(Astro.url);
+const translatePath = useTranslatedPath(lang);
 
-import Layout from '../../layouts/Layout.astro';
-
-
-const title = t("features.meta.title");
-const description = t("features.meta.description");
-
-import FeaturesContent from '../../components/pages/FeaturesContent.astro';
-const breadcrumbs = [
-    { name: "Home", url: "https://rebase.pro" },
-    { name: "Features", url: "https://rebase.pro/features" }
-];
+return Astro.redirect(translatePath("/product"), 301);
 ---
-<Layout title={title} description={description} breadcrumbs={breadcrumbs}>
-    <FeaturesContent lang={currentLang} t={t} />
-</Layout>

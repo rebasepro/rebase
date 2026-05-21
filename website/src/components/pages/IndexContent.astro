@@ -2,7 +2,7 @@
 const { lang, t } = Astro.props;
 import ScrollSyncShowcase from '../../components/ScrollSyncShowcase.astro';
 import CollectionPowerSection from '../../components/CollectionPowerSection.astro';
-import PayloadMosaicDemo from '../../components/demos/PayloadMosaicDemo';
+import RebaseMosaicDemo from '../../components/demos/RebaseMosaicDemo';
 import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
 import { AdminDemoCarousel } from '../../components/demos/AdminDemoCarousel';
 import { BodyPartsDemo } from '../../components/demos/BodyPartsDemo';
@@ -239,7 +239,9 @@ const translatePath = useTranslatedPath(lang);
 
         <section id="s-demo-carousel" class="bg-black relative py-24 sm:py-32">
             <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                <AdminDemoCarousel client:load />
+                <div style="min-height: 700px;">
+                    <AdminDemoCarousel client:load />
+                </div>
                 <p class="mt-2 text-center text-xs sm:text-sm text-surface-500">
                     A quick tour of the generated Rebase admin panel.
                 </p>
@@ -707,8 +709,8 @@ const translatePath = useTranslatedPath(lang);
                     </p>
                 </div>
 
-                <div class="max-w-7xl mx-auto animate-on-scroll fade-in-up delay-100">
-                    <PayloadMosaicDemo client:load />
+                <div class="max-w-7xl mx-auto animate-on-scroll fade-in-up delay-100" style="min-height: 760px;">
+                    <RebaseMosaicDemo client:load />
                 </div>
             </div>
         </section>
@@ -726,9 +728,9 @@ const translatePath = useTranslatedPath(lang);
             </div>
 
             <div class="relative w-full overflow-hidden mt-24">
-                <div id="case-studies-slider" class="flex overflow-x-hidden snap-x snap-mandatory scroll-smooth no-scrollbar [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div id="case-studies-slider" class="flex transition-transform duration-500 ease-in-out">
                     <!-- Case Study 1: MedicalMotion -->
-                    <div class="min-w-full w-full snap-center shrink-0 px-6 lg:px-8 max-w-7xl mx-auto flex-none">
+                    <div class="min-w-full w-full shrink-0 px-6 lg:px-8 max-w-7xl mx-auto flex-none">
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mx-auto max-w-7xl">
                             <!-- Left: Text content -->
                             <div class="animate-on-scroll fade-in-up">
@@ -851,7 +853,7 @@ const translatePath = useTranslatedPath(lang);
                     </div>
 
                     <!-- Case Study 2: SustenTalent -->
-                    <div class="min-w-full w-full snap-center shrink-0 px-6 lg:px-8 max-w-7xl mx-auto flex-none">
+                    <div class="min-w-full w-full shrink-0 px-6 lg:px-8 max-w-7xl mx-auto flex-none">
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mx-auto max-w-7xl">
                             <!-- Left: Text content -->
                             <div class="animate-on-scroll fade-in-up">
@@ -1035,12 +1037,16 @@ const translatePath = useTranslatedPath(lang);
                     const nextBtn = document.getElementById('case-next');
                     
                     if (slider && prevBtn && nextBtn) {
-                        prevBtn.addEventListener('click', () => {
-                            slider.scrollBy({ left: -slider.offsetWidth, behavior: 'smooth' });
-                        });
-                        nextBtn.addEventListener('click', () => {
-                            slider.scrollBy({ left: slider.offsetWidth, behavior: 'smooth' });
-                        });
+                        let currentSlide = 0;
+                        const totalSlides = slider.children.length;
+                        
+                        const goTo = (index: number) => {
+                            currentSlide = Math.max(0, Math.min(index, totalSlides - 1));
+                            slider.style.transform = `translateX(-${currentSlide * 100}%)`;
+                        };
+                        
+                        prevBtn.addEventListener('click', () => goTo(currentSlide - 1));
+                        nextBtn.addEventListener('click', () => goTo(currentSlide + 1));
                     }
                 });
             </script>
@@ -1356,29 +1362,6 @@ const translatePath = useTranslatedPath(lang);
 
     </main>
 
-<script>
-    document.addEventListener("astro:page-load", () => {
-        document.querySelectorAll(".copy-btn").forEach(button => {
-            button.addEventListener("click", () => {
-                const command = button.getAttribute("data-command");
-                if (command) {
-                    navigator.clipboard.writeText(command).then(() => {
-                        const originalText = button.getAttribute("title") || "Copy to clipboard";
-                        button.setAttribute("title", "Copied!");
-                        
-                        button.classList.add("text-emerald-400");
-                        button.classList.remove("text-surface-500");
-                        
-                        setTimeout(() => {
-                            button.setAttribute("title", originalText);
-                            button.classList.remove("text-emerald-400");
-                            button.classList.add("text-surface-500");
-                        }, 1500);
-                    });
-                }
-            });
-        });
-    });
-</script>
+
 
 

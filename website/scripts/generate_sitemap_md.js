@@ -90,7 +90,7 @@ This sitemap lists all pages of the Rebase website and documentation. It is form
         const langName = lang.toUpperCase();
         mdContent += `\n### ${langName} Documentation\n`;
         for (const slug of slugs) {
-            const fullUrl = `https://rebase.pro${langPrefix}/docs/${slug}`;
+            const fullUrl = `https://rebase.pro${langPrefix}/${slug}`;
             const cleanTitle = slug
                 .split("/")
                 .map(word => word.charAt(0).toUpperCase() + word.slice(1).replace("-", " "))

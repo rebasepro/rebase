@@ -1,7 +1,7 @@
 ---
 title: Project Structure
 sidebar_label: Project Structure
-description: Understand the structure of a Rebase project — frontend, backend, and shared collections.
+description: Understand the structure of a Rebase project — frontend, backend, and collections configuration.
 ---
 
 A Rebase starter project has three interconnected packages:
@@ -27,7 +27,7 @@ my-app/
 │   ├── Dockerfile
 │   └── package.json
 │
-└── shared/                 # Collection definitions
+└── config/                 # Collection definitions and configurations
     └── collections/
         ├── index.ts        # Exports all collections
         └── products.ts     # Example: products collection
@@ -49,7 +49,7 @@ const rebaseClient = createRebaseClient({
 });
 
 // Collections are imported via a Vite virtual module
-// that reads from the shared/ directory
+// that reads from the config/ directory
 ```
 
 ### Key Concepts
@@ -63,8 +63,8 @@ const rebaseClient = createRebaseClient({
 The backend is a **Node.js server** built on [Hono](https://hono.dev/) (a fast, lightweight HTTP framework). The entry point `index.ts` initializes everything:
 
 ```typescript title="backend/src/index.ts"
-import { initializeRebaseBackend } from "@rebasepro/backend";
-import { createPostgresBootstrapper } from "@rebasepro/postgresql-backend";
+import { initializeRebaseBackend } from "@rebasepro/server-core";
+import { createPostgresAdapter } from "@rebasepro/server-postgresql";
 import { Hono } from "hono";
 
 const app = new Hono();
@@ -72,16 +72,16 @@ const app = new Hono();
 await initializeRebaseBackend({
     app,
     server,
-    collectionsDir: "./shared/collections",
-    bootstrappers: [
-        createPostgresBootstrapper({
-            connection: db,
-            schema: { tables, enums, relations }
-        })
-    ],
+    collectionsDir: "./config/collections",
+    database: createPostgresAdapter({
+        connection: db,
+        schema: { tables, enums, relations }
+    }),
     auth: {
-        jwtSecret: process.env.JWT_SECRET!,
-        google: { clientId: process.env.GOOGLE_CLIENT_ID },
+        jwtSecret: process.env.JWT_SECRET,
+        google: process.env.GOOGLE_CLIENT_ID
+            ? { clientId: process.env.GOOGLE_CLIENT_ID }
+            : undefined,
     },
     storage: {
         type: "local",
@@ -98,11 +98,11 @@ await initializeRebaseBackend({
 - **WebSocket** server — real-time entity sync via Postgres LISTEN/NOTIFY
 - **History** — audit trail recording on every entity change
 
-## Shared Collections (`shared/`)
+## Collections (`config/collections/`)
 
 Collections are the **single source of truth** for your data model. They are defined as TypeScript and consumed by both the frontend (for UI generation) and the backend (for schema generation and API routing).
 
-```typescript title="shared/collections/products.ts"
+```typescript title="config/collections/products.ts"
 import { EntityCollection } from "@rebasepro/types";
 
 export const productsCollection: EntityCollection = {
@@ -120,7 +120,7 @@ The `slug` becomes the URL path in the admin UI and the REST API endpoint (`/api
 
 ## How They Connect
 
-1. **You define** collections in `shared/`
+1. **You define** collections in `config/collections/`
 2. **The backend** reads them to generate Drizzle schemas and mount REST routes
 3. **The frontend** reads them (via Vite plugin) to render tables, forms, and navigation
 4. **The CLI** reads them to generate migration files with `rebase schema generate`

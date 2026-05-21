@@ -1,5 +1,4 @@
 ---
-
 import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
 export function getStaticPaths() {
@@ -14,15 +13,13 @@ const t = useTranslations(currentLang as keyof typeof languages);
 
 import Layout from '../../layouts/Layout.astro';
 
-const title = t("studio.meta.title");
-const description = t("studio.meta.description");
-
-
+const title = "Rebase Studio — Visual Admin Panel for Postgres";
+const description = "A full-featured admin panel that generates real TypeScript code. Schema editor, SQL editor, RLS policies, Kanban boards, rich text, storage, and more.";
 
 import StudioContent from '../../components/pages/StudioContent.astro';
 const breadcrumbs = [
     { name: "Home", url: "https://rebase.pro" },
-    { name: "Rebase Studio", url: "https://rebase.pro/studio" }
+    { name: "Studio", url: "https://rebase.pro/studio" }
 ];
 ---
 <Layout title={title} description={description} breadcrumbs={breadcrumbs}>

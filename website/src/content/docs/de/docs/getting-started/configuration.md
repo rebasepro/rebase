@@ -47,7 +47,7 @@ Die gesamte Konfiguration erfolgt über Umgebungsvariablen in Ihrer `.env`-Datei
 | Variable | Beschreibung | Standard |
 |----------|-------------|---------|
 | `STORAGE_TYPE` | Speicher-Backend: `local` oder `s3` | `local` |
-| `STORAGE_BASE_PATH` | Basispfad für lokalen Speicher | `./uploads` |
+| `STORAGE_PATH` | Basispfad für lokalen Speicher | `./uploads` |
 | `S3_BUCKET` | S3-Bucket-Name (wenn `STORAGE_TYPE=s3`) | — |
 | `S3_REGION` | AWS-Region | — |
 | `S3_ACCESS_KEY_ID` | AWS-Zugriffsschlüssel | — |
@@ -60,6 +60,7 @@ Die gesamte Konfiguration erfolgt über Umgebungsvariablen in Ihrer `.env`-Datei
 |----------|-------------|
 | `SMTP_HOST` | SMTP-Server-Host |
 | `SMTP_PORT` | SMTP-Server-Port |
+| `SMTP_SECURE` | Enable secure connection (`true`/`false`) |
 | `SMTP_USER` | SMTP-Benutzername |
 | `SMTP_PASS` | SMTP-Passwort |
 | `EMAIL_FROM` | Absenderadresse für System-E-Mails |
@@ -78,7 +79,7 @@ await initializeRebaseBackend({
     basePath: "/api",        // Base path for all API routes (default: "/api")
 
     bootstrappers: [         // Database and service bootstrappers
-        createPostgresBootstrapper({
+        createPostgresAdapter({
             connection: db,
             schema: { tables, enums, relations }
         })
