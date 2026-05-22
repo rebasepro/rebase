@@ -87,6 +87,7 @@ export function RebaseLoginView({
     const [viewVisible, setViewVisible] = useState(true);
 
     const switchMode = (newMode: AuthMode) => {
+        authController.clearError();
         setViewVisible(false);
         setTimeout(() => {
             setMode(newMode);
@@ -205,7 +206,7 @@ export function RebaseLoginView({
                                         icon={<MailIcon/>}
                                         onClick={() => switchMode("login")}
                                     />
-                                    {googleEnabled && googleClientId && (
+                                    {googleEnabled && googleClientId && authController.capabilities?.enabledProviders?.includes("google") && (
                                         <GoogleLoginButton
                                             disabled={disabled}
                                             googleClientId={googleClientId}
@@ -348,7 +349,9 @@ function GoogleLoginButton({
             ux_mode: "popup",
             callback: async (response: { code?: string; error?: string }) => {
                 if (response.error || !response.code) {
-                    console.error("Google login error:", response.error);
+                    const msg = response.error || "No authorization code received";
+                    console.error("Google login error:", msg);
+                    authController.setAuthProviderError(new Error(`Google Sign-In failed: ${msg}`));
                     return;
                 }
                 try {
@@ -366,8 +369,10 @@ function GoogleLoginButton({
     }, [googleClientId, authController]);
 
     const handleClick = () => {
+        authController.clearError();
         if (!codeClientRef.current) {
             console.error("Google Sign-In not loaded");
+            authController.setAuthProviderError(new Error("Google Sign-In SDK not loaded. Please refresh the page."));
             return;
         }
         codeClientRef.current.requestCode();

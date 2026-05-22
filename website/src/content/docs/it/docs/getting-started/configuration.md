@@ -70,20 +70,20 @@ Tutta la configurazione viene gestita tramite variabili d'ambiente nel tuo file 
 Il `RebaseBackendConfig` passato a `initializeRebaseBackend()` fornisce controllo programmatico:
 
 ```typescript
+import { initializeRebaseBackend } from "@rebasepro/server-core";
+import { createPostgresAdapter } from "@rebasepro/server-postgresql";
 import { env } from "./env";
 
 await initializeRebaseBackend({
     app,
     server,
-    collections,
+    collectionsDir: "./config/collections",
     basePath: "/api",        // Base path for all API routes (default: "/api")
 
-    bootstrappers: [         // Database and service bootstrappers
-        createPostgresAdapter({
-            connection: db,
-            schema: { tables, enums, relations }
-        })
-    ],
+    database: createPostgresAdapter({
+        connection: db,
+        schema: { tables, enums, relations }
+    }),
 
     auth: {                  // Authentication config
         jwtSecret: env.JWT_SECRET,
@@ -91,15 +91,28 @@ await initializeRebaseBackend({
         refreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN,
         requireAuth: true,    // Require auth for data API (default: true)
         allowRegistration: env.ALLOW_REGISTRATION,
-        google: {
-            clientId: env.GOOGLE_CLIENT_ID
-        }
+        google: env.GOOGLE_CLIENT_ID
+            ? {
+                clientId: env.GOOGLE_CLIENT_ID,
+                clientSecret: env.GOOGLE_CLIENT_SECRET
+            }
+            : undefined,
+        serviceKey: env.REBASE_SERVICE_KEY
     },
 
-    storage: {               // File storage config
-        type: "local",
-        basePath: "./uploads"
-    },
+    storage: env.STORAGE_TYPE === "s3"
+        ? {
+            type: "s3",
+            bucket: env.S3_BUCKET!,
+            region: env.S3_REGION,
+            accessKeyId: env.S3_ACCESS_KEY_ID,
+            secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+            endpoint: env.S3_ENDPOINT
+        }
+        : {
+            type: "local",
+            basePath: env.STORAGE_PATH || "./uploads"
+        },
 
     history: true,           // Enable entity change history
 

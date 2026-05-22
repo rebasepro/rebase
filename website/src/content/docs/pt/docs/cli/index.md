@@ -102,6 +102,14 @@ rebase generate-sdk
 
 Cria tipos TypeScript e um cliente com segurança de tipo para todas as suas coleções.
 
+### `rebase doctor`
+
+Execute diagnósticos para detectar desvios (drift) entre suas coleções, o esquema gerado e o estado atual do banco de dados:
+
+```bash
+rebase doctor
+```
+
 ### `rebase auth`
 
 Comandos de gerenciamento de autenticação:

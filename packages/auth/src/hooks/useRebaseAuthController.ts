@@ -122,6 +122,10 @@ export function useRebaseAuthController(
         }
     }, [client, apiUrl]);
 
+    const clearError = useCallback(() => {
+        setAuthProviderError(null);
+    }, []);
+
     // Clear session and sign out
     const clearSessionAndSignOut = useCallback(() => {
         tokensRef.current = null;
@@ -742,6 +746,8 @@ roles: customRoles.map(r => r.id) };
         fetchSessions,
         revokeSession,
         revokeAllSessions,
+        clearError,
+        setAuthProviderError,
         extra,
         setExtra,
         capabilities: {

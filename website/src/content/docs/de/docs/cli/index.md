@@ -102,6 +102,14 @@ rebase generate-sdk
 
 Erstellt TypeScript-Typen und einen typsicheren Client für all Ihre Sammlungen.
 
+### `rebase doctor`
+
+Führen Sie Diagnosen aus, um Abweichungen (Drift) zwischen Ihren Sammlungen, dem generierten Schema und dem aktuellen Datenbankzustand zu erkennen:
+
+```bash
+rebase doctor
+```
+
 ### `rebase auth`
 
 Befehle zur Authentifizierungsverwaltung:

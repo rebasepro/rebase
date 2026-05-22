@@ -42,6 +42,10 @@ export type RebaseAuthController = AuthController & {
     revokeAllSessions: () => Promise<void>;
     /** Get internal API URL */
     getApiUrl?: () => string | undefined;
+    /** Clear the current auth provider error */
+    clearError: () => void;
+    /** Set or clear the auth provider error */
+    setAuthProviderError: (error: Error | null) => void;
 }
 
 /**

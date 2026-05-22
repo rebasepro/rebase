@@ -92,6 +92,7 @@ export function DemoLoginView({
     const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
     const switchMode = (newMode: AuthMode) => {
+        authController.clearError();
         setViewVisible(false);
         setTimeout(() => {
             setMode(newMode);
@@ -242,7 +243,7 @@ export function DemoLoginView({
                                         icon={<MailIcon/>}
                                         onClick={() => switchMode("login")}
                                     />
-                                    {googleEnabled && googleClientId && (
+                                    {googleEnabled && googleClientId && authController.capabilities?.enabledProviders?.includes("google") && (
                                         <GoogleLoginButton
                                             disabled={disabled || !privacyAccepted}
                                             googleClientId={googleClientId}
@@ -339,7 +340,6 @@ function GoogleLoginButton({
     authController: RebaseAuthController
 }) {
     const codeClientRef = useRef<{ requestCode(): void } | null>(null);
-    const [loginError, setLoginError] = useState<string | null>(null);
 
     // Use a ref for googleLogin to avoid stale closure inside initCodeClient callback
     const googleLoginRef = useRef(authController.googleLogin);
@@ -358,10 +358,9 @@ function GoogleLoginButton({
                 if (response.error || !response.code) {
                     const msg = response.error || "No authorization code received";
                     console.error("[GoogleLogin] Error:", msg);
-                    setLoginError(`Google Sign-In failed: ${msg}`);
+                    authController.setAuthProviderError(new Error(`Google Sign-In failed: ${msg}`));
                     return;
                 }
-                setLoginError(null);
                 try {
                     console.log("[GoogleLogin] Sending auth code to backend...");
                     // Send the authorization code to the backend.
@@ -372,37 +371,28 @@ function GoogleLoginButton({
                     });
                     console.log("[GoogleLogin] Backend auth succeeded, user should be set now");
                 } catch (err: unknown) {
-                    const msg = err instanceof Error ? err.message : String(err);
-                    console.error("[GoogleLogin] Backend auth failed:", msg);
-                    setLoginError(msg);
+                    console.error("[GoogleLogin] Backend auth failed:", err);
                 }
             }
         });
     }, [googleClientId]);
 
     const handleClick = () => {
-        setLoginError(null);
+        authController.clearError();
         if (!codeClientRef.current) {
-            setLoginError("Google Sign-In SDK not loaded. Please refresh the page.");
+            authController.setAuthProviderError(new Error("Google Sign-In SDK not loaded. Please refresh the page."));
             return;
         }
         codeClientRef.current.requestCode();
     };
 
     return (
-        <>
-            <LoginButton
-                disabled={disabled}
-                text="Sign in with Google"
-                icon={<GoogleIcon/>}
-                onClick={handleClick}
-            />
-            {loginError && (
-                <div className="w-full mt-2">
-                    <ErrorView error={loginError}/>
-                </div>
-            )}
-        </>
+        <LoginButton
+            disabled={disabled}
+            text="Sign in with Google"
+            icon={<GoogleIcon/>}
+            onClick={handleClick}
+        />
     );
 }
 

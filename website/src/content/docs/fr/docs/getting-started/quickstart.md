@@ -60,6 +60,16 @@ pnpm dev:backend   # Backend only
 pnpm dev:frontend  # Frontend only
 ```
 
+## Introspection d'une Base de Données Existante (Optionnel)
+
+Si vous vous connectez à une base de données existante avec des tables préexistantes, vous pouvez l'introspecter pour générer automatiquement vos fichiers de collection TypeScript :
+
+```bash
+pnpm rebase schema introspect
+```
+
+Cela analysera les tables, enums et relations de votre base de données et créera les fichiers de collection correspondants dans `config/collections/`.
+
 ## Première connexion
 
 Lorsque vous ouvrez `http://localhost:5173`, vous verrez l'écran de connexion. Le **premier utilisateur** à s'inscrire devient automatiquement un administrateur — c'est le flux d'amorçage.
@@ -124,6 +134,7 @@ Redémarrez les serveurs de développement et votre nouvelle collection **Produi
 | Commande | Description |
 |---------|-------------|
 | `rebase schema generate` | Générer le schéma Drizzle à partir de vos collections TypeScript |
+| `rebase schema introspect` | Générer des collections TypeScript à partir d'une base de données existante |
 | `rebase db push` | Pousser les modifications de schéma directement dans la base de données (dev seulement) |
 | `rebase db generate` | Générer les fichiers de migration SQL |
 | `rebase db migrate` | Exécuter les migrations en attente |

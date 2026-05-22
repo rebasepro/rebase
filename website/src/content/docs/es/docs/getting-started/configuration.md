@@ -70,40 +70,53 @@ Toda la configuración se realiza a través de variables de entorno en tu archiv
 El `RebaseBackendConfig` pasado a `initializeRebaseBackend()` proporciona control programático:
 
 ```typescript
+import { initializeRebaseBackend } from "@rebasepro/server-core";
+import { createPostgresAdapter } from "@rebasepro/server-postgresql";
 import { env } from "./env";
 
 await initializeRebaseBackend({
     app,
     server,
-    collections,
-    basePath: "/api",        // Ruta base para todas las rutas de la API (por defecto: "/api")
+    collectionsDir: "./config/collections",
+    basePath: "/api",        // Base path for all API routes (default: "/api")
 
-    bootstrappers: [         // Inicializadores de base de datos y servicios
-        createPostgresAdapter({
-            connection: db,
-            schema: { tables, enums, relations }
-        })
-    ],
+    database: createPostgresAdapter({
+        connection: db,
+        schema: { tables, enums, relations }
+    }),
 
-    auth: {                  // Configuración de autenticación
+    auth: {                  // Authentication config
         jwtSecret: env.JWT_SECRET,
         accessExpiresIn: env.JWT_ACCESS_EXPIRES_IN,
         refreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN,
-        requireAuth: true,    // Requiere autenticación para la API de datos (por defecto: true)
+        requireAuth: true,    // Require auth for data API (default: true)
         allowRegistration: env.ALLOW_REGISTRATION,
-        google: {
-            clientId: env.GOOGLE_CLIENT_ID
+        google: env.GOOGLE_CLIENT_ID
+            ? {
+                clientId: env.GOOGLE_CLIENT_ID,
+                clientSecret: env.GOOGLE_CLIENT_SECRET
+            }
+            : undefined,
+        serviceKey: env.REBASE_SERVICE_KEY
+    },
+
+    storage: env.STORAGE_TYPE === "s3"
+        ? {
+            type: "s3",
+            bucket: env.S3_BUCKET!,
+            region: env.S3_REGION,
+            accessKeyId: env.S3_ACCESS_KEY_ID,
+            secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+            endpoint: env.S3_ENDPOINT
         }
-    },
+        : {
+            type: "local",
+            basePath: env.STORAGE_PATH || "./uploads"
+        },
 
-    storage: {               // Configuración de almacenamiento de archivos
-        type: "local",
-        basePath: "./uploads"
-    },
+    history: true,           // Enable entity change history
 
-    history: true,           // Habilitar historial de cambios de entidad
-
-    enableSwagger: true,     // Habilitar la documentación OpenAPI en /api/data/docs
+    enableSwagger: true,     // Enable OpenAPI docs at /api/data/docs
 
     logging: {
         level: "info"

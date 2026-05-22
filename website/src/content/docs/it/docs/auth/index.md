@@ -51,6 +51,12 @@ await initializeRebaseBackend({
 
 Le tabelle di autenticazione (`rebase.users`, `rebase.roles`, `rebase.user_roles`, `rebase.refresh_tokens`) vengono **create automaticamente** al primo avvio.
 
+### Adattatori di Autenticazione Personalizzati
+
+Rebase consente la sostituzione completa del sistema di autenticazione predefinito tramite l'interfaccia `AuthAdapter`. Passa un adattatore personalizzato alla proprietà `auth` per bypassare completamente il meccanismo integrato di JWT e tabelle utenti (ad esempio, per integrare Firebase Auth, Auth0 o un provider SSO aziendale esterno).
+
+Le tabelle di autenticazione (`rebase.users`, `rebase.roles`, `rebase.user_roles`, `rebase.refresh_tokens`) vengono **create automaticamente** al primo avvio.
+
 ## Endpoint di Autenticazione
 
 | Metodo | Percorso | Descrizione |

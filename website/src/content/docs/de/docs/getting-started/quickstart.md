@@ -60,6 +60,16 @@ pnpm dev:backend   # Backend only
 pnpm dev:frontend  # Frontend only
 ```
 
+## Eine bestehende Datenbank introspektieren (Optional)
+
+Wenn Sie eine Verbindung zu einer bestehenden Datenbank mit bereits vorhandenen Tabellen herstellen, können Sie diese introspektieren, um Ihre TypeScript-Sammlungsdateien automatisch zu generieren:
+
+```bash
+pnpm rebase schema introspect
+```
+
+Dies analysiert Ihre Datenbanktabellen, Enums und Beziehungen und schreibt die entsprechenden Sammlungsdateien in `config/collections/`.
+
 ## Erster Login
 
 Wenn Sie `http://localhost:5173` öffnen, sehen Sie den Anmeldebildschirm. Der **erste Benutzer**, der sich registriert, wird automatisch zum Administrator – dies ist der Bootstrap-Prozess.
@@ -124,6 +134,7 @@ Starten Sie die Entwicklungs-Server neu und Ihre neue **Produkte**-Sammlung ersc
 | Befehl | Beschreibung |
 |---------|-------------|
 | `rebase schema generate` | Drizzle-Schema aus Ihren TypeScript-Sammlungen generieren |
+| `rebase schema introspect` | TypeScript-Sammlungen aus einer bestehenden Datenbank generieren |
 | `rebase db push` | Schema-Änderungen direkt an die Datenbank übertragen (nur Entwicklung) |
 | `rebase db generate` | SQL-Migrationsdateien generieren |
 | `rebase db migrate` | Ausstehende Migrationen ausführen |
