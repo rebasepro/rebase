@@ -42,12 +42,17 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "development": "./src/index.ts",
+      "development": "./dist/index.js",
       "import": "./dist/index.js"
+    },
+    "./editor": {
+      "types": "./dist/editor.d.ts",
+      "development": "./dist/editor.js",
+      "import": "./dist/editor.js"
     },
     "./collection_editor_ui": {
       "types": "./dist/collection_editor_ui.d.ts",
-      "development": "./src/collection_editor_ui.ts",
+      "development": "./dist/collection_editor_ui.js",
       "import": "./dist/collection_editor_ui.js"
     },
     "./package.json": "./package.json"

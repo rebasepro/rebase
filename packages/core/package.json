@@ -41,13 +41,13 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "development": "./src/index.ts",
+      "development": "./dist/index.es.js",
       "import": "./dist/index.es.js",
       "require": "./dist/index.umd.js"
     },
     "./vitePlugin": {
       "types": "./dist/vitePlugin.d.ts",
-      "development": "./src/vitePlugin.ts",
+      "development": "./dist/vitePlugin.js",
       "import": "./dist/vitePlugin.js",
       "require": "./dist/vitePlugin.js"
     },

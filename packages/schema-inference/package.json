@@ -19,7 +19,7 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "development": "./src/index.ts",
+      "development": "./dist/index.es.js",
       "import": "./dist/index.es.js",
       "require": "./dist/index.umd.cjs"
     },
