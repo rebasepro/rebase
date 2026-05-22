@@ -436,4 +436,11 @@ export const fr = {
   "mosaic.subtitle": "Du e-commerce et de la gestion d'actifs aux éditeurs visuels et à la modification de code en direct. L'interface de Rebase s'adapte à tous les besoins d'administration.",
   "pricing.meta.title": "Tarification | Rebase",
   "pricing.meta.description": "Choisissez le bon plan pour votre équipe. De l'auto-hébergement open-source gratuit à la collaboration d'entreprise et au branchement sans serveur.",
+
+  // Manifesto Banner
+  "banner.title.control": "Arrêtez de louer votre base de données. Possédez votre stack.",
+  "banner.title.mission": "Nous reprenons le contrôle de notre stack.",
+  "banner.title.founders": "Une lettre ouverte aux développeurs soucieux de la propriété de leurs données.",
+  "banner.cta": "Lire le Manifeste",
+  "banner.subtitle": "Notre manifeste sur la nécessité pour les outils de développement d'être ouverts, auto-hébergés et natifs de la base de données.",
 };

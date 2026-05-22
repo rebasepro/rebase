@@ -424,4 +424,11 @@ export const de = {
   "mosaic.subtitle": "Von E-Commerce und Digital Asset Management bis hin zu visuellen Editoren und Live-Code-Anpassungen. Die Schema-gesteuerte UI von Rebase passt sich jedem Dashboard oder Editor an.",
   "pricing.meta.title": "Preise | Rebase",
   "pricing.meta.description": "Wähle den passenden Plan für dein Team. Von freiem Open-Source-Self-Hosting bis hin zu Unternehmens-Zusammenarbeit und serverlosem Branching.",
+
+  // Manifesto Banner
+  "banner.title.control": "Hör auf, deine Datenbank zu mieten. Besitze deinen Stack.",
+  "banner.title.mission": "Wir holen uns die Kontrolle über unseren Stack zurück.",
+  "banner.title.founders": "Ein offener Brief an Entwickler, denen Datensouveränität wichtig ist.",
+  "banner.cta": "Das Manifest lesen",
+  "banner.subtitle": "Unser Manifest, warum Entwicklerwerkzeuge offen, selbst gehostet und datenbanknativ sein müssen.",
 };

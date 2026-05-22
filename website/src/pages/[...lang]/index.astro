@@ -17,6 +17,6 @@ const description = t("index.meta.description");
 
 import IndexContent from '../../components/pages/IndexContent.astro';
 ---
-<Layout title={title} description={description} lang={currentLang}>
+<Layout title={title} description={description} lang={currentLang} showBanner={true}>
     <IndexContent lang={currentLang} t={t} />
 </Layout>

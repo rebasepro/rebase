@@ -188,6 +188,12 @@ export const EXPERIMENTS: Experiment[] = [
                 "s-final-cta": 14
             }
         }
+    },
+    {
+        id: "manifesto-banner-text",
+        variants: ["control", "mission", "founders"],
+        weights: [34, 33, 33],
+        expires: "2026-09-01"
     }
 ];
 
@@ -225,6 +231,12 @@ export function trackConversion(experimentId: string, action: string): void {
     }
 }
 
+// Bind to window for inline scripts accessibility
+if (typeof window !== "undefined") {
+    (window as any).getVariant = getVariant;
+    (window as any).trackConversion = trackConversion;
+}
+
 // ─── Impression Tracking (auto-called on page load) ──────────
 
 function trackImpressions(): void {
@@ -249,3 +261,4 @@ function trackImpressions(): void {
 if (typeof document !== "undefined") {
     document.addEventListener("astro:page-load", trackImpressions);
 }
+

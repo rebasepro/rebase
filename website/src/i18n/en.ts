@@ -559,4 +559,11 @@ export const en = {
   "manifesto.cta.title": "Ready to build something?",
   "manifesto.cta.getStarted": "Get Started",
   "manifesto.cta.github": "View on GitHub",
+
+  // Manifesto Banner
+  "banner.title.control": "Stop renting your database. Own your stack.",
+  "banner.title.mission": "We are taking back control of our stack.",
+  "banner.title.founders": "An open letter to developers who care about data ownership.",
+  "banner.cta": "Read the Manifesto",
+  "banner.subtitle": "Our manifesto on why developer tools must be open, self-hosted, and database-native.",
 };

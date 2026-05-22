@@ -434,4 +434,11 @@ export const es = {
   "mosaic.subtitle": "Desde comercio electrónico y gestión de activos hasta constructores visuales y edición de código en vivo. La interfaz impulsada por esquemas de Rebase se adapta a cualquier panel de control o editor.",
   "pricing.meta.title": "Precios | Rebase",
   "pricing.meta.description": "Elige el plan adecuado para tu equipo. Desde alojamiento propio gratuito de código abierto hasta colaboración empresarial y ramificación sin servidor.",
+
+  // Manifesto Banner
+  "banner.title.control": "Deja de alquilar tu base de datos. Sé dueño de tu infraestructura.",
+  "banner.title.mission": "Estamos recuperando el control de nuestra infraestructura.",
+  "banner.title.founders": "Una carta abierta para desarrolladores que valoran la propiedad de sus datos.",
+  "banner.cta": "Leer el Manifiesto",
+  "banner.subtitle": "Nuestro manifiesto sobre por qué las herramientas de desarrollo deben ser abiertas, autohospedadas y nativas de la base de datos.",
 };
