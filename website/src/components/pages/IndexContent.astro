@@ -60,7 +60,38 @@ const translatePath = useTranslatedPath(lang);
                     </ABVariant>
                 </div>
                 <p class="mb-8 text-lg leading-8 text-surface-400 lg:text-xl sm:px-10 xl:px-40 animate-on-scroll fade-in-up" set:html={t('hero.subtitle')} />
-                
+
+                <!-- Hero CTA Buttons -->
+                <div class="mt-8 mb-10 flex flex-wrap items-center justify-center gap-y-4 gap-x-6 sm:gap-x-8 animate-on-scroll fade-in-up">
+                    <a href="https://demo.rebase.pro"
+                       target="_blank" rel="noopener noreferrer"
+                       id="hero-try-demo"
+                       class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-200 ease-in-out btn-glow">
+                        {t('hero.cta.demo')}
+                        <svg
+                          class="lucide lucide-arrow-right"
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <path d="M5 12h14" />
+                          <path d="m12 5 7 7-7 7" />
+                        </svg>
+                    </a>
+                    <a href="https://github.com/rebasepro/rebase"
+                       target="_blank" rel="noopener noreferrer"
+                       id="hero-view-github"
+                       class="inline-flex items-center gap-x-2 rounded-lg border border-white/10 bg-white/5 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-white/10 hover:border-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/20 transition-all duration-200 ease-in-out">
+                        <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"/></svg>
+                        {t('hero.cta.github')}
+                    </a>
+                </div>
 
                 <!-- Hero CLI command -->
                 <div class="mt-12 max-w-md mx-auto animate-on-scroll fade-in-up">
@@ -1056,6 +1087,201 @@ const translatePath = useTranslatedPath(lang);
             <!-- Scroll-sync feature showcase -->
             <ScrollSyncShowcase/>
         </div>
+
+        <!-- Testimonials Section -->
+        <section id="s-testimonials" class="relative isolate bg-black py-28 sm:py-36 overflow-hidden">
+            <SectionBackgroundAccents blob={{ position: "top", size: "md" }}/>
+            <div class="mx-auto max-w-7xl px-6 lg:px-8 relative z-10">
+                <!-- Section Header -->
+                <div class="mx-auto max-w-3xl text-center mb-16 sm:mb-20">
+                    <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-6 animate-on-scroll fade-in-up">
+                        <svg
+                          class="lucide lucide-message-square"
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                        </svg>
+                        {t('testimonials.badge')}
+                    </span>
+                    <h2 class="text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl animate-on-scroll fade-in-up">
+                        {t('testimonials.title')}
+                    </h2>
+                    <p class="mt-4 text-lg leading-8 text-surface-400 animate-on-scroll fade-in-up">
+                        {t('testimonials.subtitle')}
+                    </p>
+                </div>
+
+                <!-- Testimonials Grid -->
+                <div class="mx-auto grid max-w-2xl grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 lg:mx-0 lg:max-w-none">
+                    
+                    <!-- Card 1 -->
+                    <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-8 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 flex flex-col justify-between animate-on-scroll fade-in-up">
+                        <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%);"></div>
+                        <div class="relative z-10">
+                            <!-- Star Rating -->
+                            <div class="flex items-center gap-1 mb-4 text-amber-400">
+                                {[0, 1, 2, 3, 4].map(() => (
+                                    <svg class="h-4 w-4 fill-current" viewBox="0 0 20 20">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                    </svg>
+                                ))}
+                            </div>
+                            <p class="text-base text-surface-300 leading-relaxed italic mb-8">
+                                "{t('testimonials.1.quote')}"
+                            </p>
+                        </div>
+                        <div class="relative z-10 flex items-center gap-x-4 border-t border-white/5 pt-4">
+                            <div class="h-10 w-10 rounded-full bg-gradient-to-tr from-primary to-blue-500 flex items-center justify-center text-white font-bold text-sm border border-white/10 shadow-[0_2px_10px_rgba(0,112,244,0.3)]">
+                                {t('testimonials.1.name')[0]}
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-semibold text-white leading-none">{t('testimonials.1.name')}</h4>
+                                <span class="text-xs text-surface-500 mt-1 block">{t('testimonials.1.handle')} · {t('testimonials.1.role')}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 2 -->
+                    <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-8 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 flex flex-col justify-between animate-on-scroll fade-in-up delay-75">
+                        <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%);"></div>
+                        <div class="relative z-10">
+                            <div class="flex items-center gap-1 mb-4 text-amber-400">
+                                {[0, 1, 2, 3, 4].map(() => (
+                                    <svg class="h-4 w-4 fill-current" viewBox="0 0 20 20">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                    </svg>
+                                ))}
+                            </div>
+                            <p class="text-base text-surface-300 leading-relaxed italic mb-8">
+                                "{t('testimonials.2.quote')}"
+                            </p>
+                        </div>
+                        <div class="relative z-10 flex items-center gap-x-4 border-t border-white/5 pt-4">
+                            <div class="h-10 w-10 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white font-bold text-sm border border-white/10 shadow-[0_2px_10px_rgba(16,185,129,0.3)]">
+                                {t('testimonials.2.name')[0]}
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-semibold text-white leading-none">{t('testimonials.2.name')}</h4>
+                                <span class="text-xs text-surface-500 mt-1 block">{t('testimonials.2.handle')} · {t('testimonials.2.role')}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 3 -->
+                    <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-8 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 flex flex-col justify-between animate-on-scroll fade-in-up delay-150">
+                        <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%);"></div>
+                        <div class="relative z-10">
+                            <div class="flex items-center gap-1 mb-4 text-amber-400">
+                                {[0, 1, 2, 3, 4].map(() => (
+                                    <svg class="h-4 w-4 fill-current" viewBox="0 0 20 20">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                    </svg>
+                                ))}
+                            </div>
+                            <p class="text-base text-surface-300 leading-relaxed italic mb-8">
+                                "{t('testimonials.3.quote')}"
+                            </p>
+                        </div>
+                        <div class="relative z-10 flex items-center gap-x-4 border-t border-white/5 pt-4">
+                            <div class="h-10 w-10 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm border border-white/10 shadow-[0_2px_10px_rgba(168,85,247,0.3)]">
+                                {t('testimonials.3.name')[0]}
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-semibold text-white leading-none">{t('testimonials.3.name')}</h4>
+                                <span class="text-xs text-surface-500 mt-1 block">{t('testimonials.3.handle')} · {t('testimonials.3.role')}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 4 -->
+                    <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-8 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 flex flex-col justify-between animate-on-scroll fade-in-up">
+                        <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%);"></div>
+                        <div class="relative z-10">
+                            <div class="flex items-center gap-1 mb-4 text-amber-400">
+                                {[0, 1, 2, 3, 4].map(() => (
+                                    <svg class="h-4 w-4 fill-current" viewBox="0 0 20 20">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                    </svg>
+                                ))}
+                            </div>
+                            <p class="text-base text-surface-300 leading-relaxed italic mb-8">
+                                "{t('testimonials.4.quote')}"
+                            </p>
+                        </div>
+                        <div class="relative z-10 flex items-center gap-x-4 border-t border-white/5 pt-4">
+                            <div class="h-10 w-10 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white font-bold text-sm border border-white/10 shadow-[0_2px_10px_rgba(245,158,11,0.3)]">
+                                {t('testimonials.4.name')[0]}
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-semibold text-white leading-none">{t('testimonials.4.name')}</h4>
+                                <span class="text-xs text-surface-500 mt-1 block">{t('testimonials.4.handle')} · {t('testimonials.4.role')}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 5 -->
+                    <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-8 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 flex flex-col justify-between animate-on-scroll fade-in-up delay-75">
+                        <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%);"></div>
+                        <div class="relative z-10">
+                            <div class="flex items-center gap-1 mb-4 text-amber-400">
+                                {[0, 1, 2, 3, 4].map(() => (
+                                    <svg class="h-4 w-4 fill-current" viewBox="0 0 20 20">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                    </svg>
+                                ))}
+                            </div>
+                            <p class="text-base text-surface-300 leading-relaxed italic mb-8">
+                                "{t('testimonials.5.quote')}"
+                            </p>
+                        </div>
+                        <div class="relative z-10 flex items-center gap-x-4 border-t border-white/5 pt-4">
+                            <div class="h-10 w-10 rounded-full bg-gradient-to-tr from-rose-500 to-red-400 flex items-center justify-center text-white font-bold text-sm border border-white/10 shadow-[0_2px_10px_rgba(244,63,94,0.3)]">
+                                {t('testimonials.5.name')[0]}
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-semibold text-white leading-none">{t('testimonials.5.name')}</h4>
+                                <span class="text-xs text-surface-500 mt-1 block">{t('testimonials.5.handle')} · {t('testimonials.5.role')}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 6 -->
+                    <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-8 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 flex flex-col justify-between animate-on-scroll fade-in-up delay-150">
+                        <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%);"></div>
+                        <div class="relative z-10">
+                            <div class="flex items-center gap-1 mb-4 text-amber-400">
+                                {[0, 1, 2, 3, 4].map(() => (
+                                    <svg class="h-4 w-4 fill-current" viewBox="0 0 20 20">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                    </svg>
+                                ))}
+                            </div>
+                            <p class="text-base text-surface-300 leading-relaxed italic mb-8">
+                                "{t('testimonials.6.quote')}"
+                            </p>
+                        </div>
+                        <div class="relative z-10 flex items-center gap-x-4 border-t border-white/5 pt-4">
+                            <div class="h-10 w-10 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-400 flex items-center justify-center text-white font-bold text-sm border border-white/10 shadow-[0_2px_10px_rgba(6,182,212,0.3)]">
+                                {t('testimonials.6.name')[0]}
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-semibold text-white leading-none">{t('testimonials.6.name')}</h4>
+                                <span class="text-xs text-surface-500 mt-1 block">{t('testimonials.6.handle')} · {t('testimonials.6.role')}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
 
         <!-- Two big punches — sell feelings, link to depth -->
         <section id="s-security" class="relative isolate bg-black py-28 sm:py-36 overflow-hidden">

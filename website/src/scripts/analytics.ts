@@ -3,6 +3,8 @@
  * All events are sent via window.gtag. No custom API endpoint.
  */
 
+import { EXPERIMENTS, trackConversion } from "./ab-testing";
+
 function gtag(...args: any[]) {
     if (typeof (window as any).gtag === "function") {
         (window as any).gtag(...args);
@@ -15,6 +17,13 @@ class Analytics {
 
     constructor() {
         this.initGlobalListeners();
+    }
+
+    private trackAllExperimentConversions(action: string) {
+        for (const exp of EXPERIMENTS) {
+            if (exp.expires && new Date(exp.expires).getTime() < Date.now()) continue;
+            trackConversion(exp.id, action);
+        }
     }
 
     private initGlobalListeners() {
@@ -41,6 +50,7 @@ class Analytics {
                     event_label: section,
                     command,
                 });
+                this.trackAllExperimentConversions("command_copied");
             }
 
             // Demo CTA tracking — every link to demo.rebase.pro
@@ -62,17 +72,22 @@ class Analytics {
                     page: window.location.pathname,
                     link_text: demoLink.textContent?.trim(),
                 });
+                this.trackAllExperimentConversions("demo_click");
             }
 
-            // Outbound link tracking
-            const link = target.closest('a[href^="http"]');
+            // Outbound link tracking (including GitHub outbound clicks)
+            const link = target.closest('a[href^="http"]') as HTMLAnchorElement | null;
             if (link) {
-                const url = (link as HTMLAnchorElement).href;
+                const url = link.href;
                 if (!url.includes(window.location.hostname)) {
                     gtag("event", "outbound_link", {
                         event_category: "engagement",
                         destination_url: url,
                     });
+
+                    if (url.includes("github.com/rebasepro/rebase") || url.includes("github.com/rebasepro")) {
+                        this.trackAllExperimentConversions("github_click");
+                    }
                 }
             }
         });

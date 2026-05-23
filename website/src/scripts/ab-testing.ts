@@ -58,6 +58,7 @@ export interface Experiment {
  *  s-mosaic-showcase  — Visual Mosaic Showcase
  *  s-case-study       — SustenTalent showcase
  *  s-scroll-sync      — Scroll-sync feature showcase
+ *  s-testimonials     — Developer Testimonials Grid
  *  s-security         — Security & open-source punches
  *  s-faq              — FAQ accordion
  *  s-roadmap          — Roadmap timeline
@@ -97,15 +98,16 @@ export const EXPERIMENTS: Experiment[] = [
                 "s-demo-carousel": 3,
                 "s-power-features": 4,
                 "s-scroll-sync": 5,
-                "s-mosaic-showcase": 6,
-                "s-collection-power": 7,
-                "s-social-proof": 8,
-                "s-how-it-works": 9,
-                "s-case-study": 10,
-                "s-security": 11,
-                "s-faq": 12,
-                "s-roadmap": 13,
-                "s-final-cta": 14
+                "s-testimonials": 6,
+                "s-mosaic-showcase": 7,
+                "s-collection-power": 8,
+                "s-social-proof": 9,
+                "s-how-it-works": 10,
+                "s-case-study": 11,
+                "s-security": 12,
+                "s-faq": 13,
+                "s-roadmap": 14,
+                "s-final-cta": 15
             },
             "social-first": {
                 "s-hero": 1,
@@ -119,9 +121,10 @@ export const EXPERIMENTS: Experiment[] = [
                 "s-demo-carousel": 9,
                 "s-power-features": 10,
                 "s-scroll-sync": 11,
-                "s-faq": 12,
-                "s-roadmap": 13,
-                "s-final-cta": 14
+                "s-testimonials": 12,
+                "s-faq": 13,
+                "s-roadmap": 14,
+                "s-final-cta": 15
             },
             "explain-first": {
                 "s-hero": 1,
@@ -132,28 +135,30 @@ export const EXPERIMENTS: Experiment[] = [
                 "s-demo-carousel": 6,
                 "s-power-features": 7,
                 "s-scroll-sync": 8,
-                "s-case-study": 9,
-                "s-social-proof": 10,
-                "s-security": 11,
-                "s-faq": 12,
-                "s-roadmap": 13,
-                "s-final-cta": 14
+                "s-testimonials": 9,
+                "s-case-study": 10,
+                "s-social-proof": 11,
+                "s-security": 12,
+                "s-faq": 13,
+                "s-roadmap": 14,
+                "s-final-cta": 15
             },
             "features-focus": {
                 "s-hero": 1,
                 "s-power-features": 2,
                 "s-scroll-sync": 3,
-                "s-mosaic-showcase": 4,
-                "s-collection-power": 5,
-                "s-demo-terminal": 6,
-                "s-demo-carousel": 7,
-                "s-social-proof": 8,
-                "s-how-it-works": 9,
-                "s-case-study": 10,
-                "s-security": 11,
-                "s-faq": 12,
-                "s-roadmap": 13,
-                "s-final-cta": 14
+                "s-testimonials": 4,
+                "s-mosaic-showcase": 5,
+                "s-collection-power": 6,
+                "s-demo-terminal": 7,
+                "s-demo-carousel": 8,
+                "s-social-proof": 9,
+                "s-how-it-works": 10,
+                "s-case-study": 11,
+                "s-security": 12,
+                "s-faq": 13,
+                "s-roadmap": 14,
+                "s-final-cta": 15
             },
             "roadmap-first": {
                 "s-hero": 1,
@@ -168,8 +173,9 @@ export const EXPERIMENTS: Experiment[] = [
                 "s-demo-carousel": 10,
                 "s-power-features": 11,
                 "s-scroll-sync": 12,
-                "s-mosaic-showcase": 13,
-                "s-final-cta": 14
+                "s-testimonials": 13,
+                "s-mosaic-showcase": 14,
+                "s-final-cta": 15
             },
             "high-velocity": {
                 "s-hero": 1,
@@ -180,12 +186,13 @@ export const EXPERIMENTS: Experiment[] = [
                 "s-demo-carousel": 6,
                 "s-power-features": 7,
                 "s-scroll-sync": 8,
-                "s-collection-power": 9,
-                "s-mosaic-showcase": 10,
-                "s-security": 11,
-                "s-faq": 12,
-                "s-roadmap": 13,
-                "s-final-cta": 14
+                "s-testimonials": 9,
+                "s-collection-power": 10,
+                "s-mosaic-showcase": 11,
+                "s-security": 12,
+                "s-faq": 13,
+                "s-roadmap": 14,
+                "s-final-cta": 15
             }
         }
     },
