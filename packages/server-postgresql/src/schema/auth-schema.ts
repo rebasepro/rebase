@@ -1,4 +1,4 @@
-import { pgSchema, varchar, uuid, timestamp, boolean, jsonb, primaryKey, unique } from "drizzle-orm/pg-core";
+import { pgSchema, varchar, uuid, timestamp, boolean, jsonb, primaryKey, unique, text } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 /**
@@ -19,6 +19,7 @@ export const users = rebaseSchema.table("users", {
     emailVerified: boolean("email_verified").default(false).notNull(),
     emailVerificationToken: varchar("email_verification_token", { length: 255 }),
     emailVerificationSentAt: timestamp("email_verification_sent_at"),
+    billingPlan: text("billing_plan").default("free").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull()
 });

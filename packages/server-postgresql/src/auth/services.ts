@@ -64,6 +64,7 @@ export class UserService implements UserRepository {
             emailVerified: (row.email_verified as boolean | undefined) ?? false,
             emailVerificationToken: (row.email_verification_token as string | null) ?? null,
             emailVerificationSentAt: (row.email_verification_sent_at as Date | null) ?? null,
+            billingPlan: (row.billing_plan as string | null) ?? "free",
             createdAt: row.created_at as Date,
             updatedAt: row.updated_at as Date
         } as User;
@@ -173,6 +174,7 @@ updatedAt: new Date() })
             emailVerified: ((row.email_verified ?? row.emailVerified) as boolean | undefined) ?? false,
             emailVerificationToken: ((row.email_verification_token ?? row.emailVerificationToken) as string | null) ?? null,
             emailVerificationSentAt: ((row.email_verification_sent_at ?? row.emailVerificationSentAt) as Date | null) ?? null,
+            billingPlan: ((row.billing_plan ?? row.billingPlan) as string | null) ?? "free",
             createdAt: (row.created_at ?? row.createdAt) as Date,
             updatedAt: (row.updated_at ?? row.updatedAt) as Date
         })) as User[];

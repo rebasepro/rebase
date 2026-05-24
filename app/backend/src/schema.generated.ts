@@ -26,7 +26,9 @@ export const authors = pgTable("authors", {
     github: varchar("github"),
     website: varchar("website"),
     userId: varchar("user_id")
-}).enableRLS();
+}, (table) => ([
+    pgPolicy("authors_public_access", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
+])).enableRLS();
 
 export const customers = pgTable("customers", {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -138,7 +140,9 @@ export const productLocales = pgTable("product_locales", {
     locale: varchar("locale").notNull(),
     name: varchar("name"),
     description: varchar("description")
-}).enableRLS();
+}, (table) => ([
+    pgPolicy("product_locales_public_access", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
+])).enableRLS();
 
 export const products = pgTable("products", {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -168,7 +172,9 @@ export const products = pgTable("products", {
 export const tags = pgTable("tags", {
     id: uuid("id").primaryKey().defaultRandom().notNull(),
     name: varchar("name").notNull()
-}).enableRLS();
+}, (table) => ([
+    pgPolicy("tags_public_access", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
+])).enableRLS();
 
 export const tickets = pgTable("tickets", {
     id: uuid("id").primaryKey().defaultRandom(),

@@ -1,5 +1,5 @@
 ---
-import { languages, defaultLang, getLangFromUrl, useTranslatedPath } from '../../i18n/ui';
+import { languages, defaultLang, useTranslations, useTranslatedPath } from '../../i18n/ui';
 
 export function getStaticPaths() {
   return Object.keys(languages).map((lang) => ({
@@ -7,8 +7,31 @@ export function getStaticPaths() {
   }));
 }
 
-const lang = getLangFromUrl(Astro.url);
-const translatePath = useTranslatedPath(lang);
+const { lang } = Astro.params;
+const currentLang = lang || defaultLang;
+const t = useTranslations(currentLang as keyof typeof languages);
 
-return Astro.redirect(translatePath("/developers"), 301);
+import Layout from '../../layouts/Layout.astro';
+import SdkContent from '../../components/pages/SdkContent.astro';
+
+const title = t("sdk.meta.title");
+const description = t("sdk.meta.description");
+
+const translatePath = useTranslatedPath(currentLang as keyof typeof languages);
+const breadcrumbs = [
+    { name: "Home", url: "https://rebase.pro" },
+    { name: "Client SDK", url: "https://rebase.pro/sdk" }
+];
 ---
+<Layout title={title} description={description} breadcrumbs={breadcrumbs}>
+    <script is:inline slot="head" define:vars={{ targetUrl: translatePath("/developers") }}>
+      (function() {
+        try {
+          if (document.documentElement.getAttribute('data-ab-navigation-structure') === 'flat-nav') {
+            window.location.replace(targetUrl);
+          }
+        } catch(e) {}
+      })();
+    </script>
+    <SdkContent lang={currentLang} t={t} />
+</Layout>

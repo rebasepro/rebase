@@ -422,6 +422,9 @@ async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> 
     const drizzleKitArgs = [action];
     if (action === "push") {
         drizzleKitArgs.push("--strict", "--verbose");
+        if (_rawArgs.includes("--force")) {
+            drizzleKitArgs.push("--force");
+        }
     }
 
     try {

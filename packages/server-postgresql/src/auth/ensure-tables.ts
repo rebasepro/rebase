@@ -65,9 +65,15 @@ export async function ensureAuthTablesExist(db: NodePgDatabase): Promise<void> {
                 email_verified BOOLEAN DEFAULT FALSE,
                 email_verification_token TEXT,
                 email_verification_sent_at TIMESTAMP WITH TIME ZONE,
+                billing_plan TEXT DEFAULT 'free',
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
             )
+        `);
+
+        // Migration step: ensure billing_plan exists on existing setups
+        await db.execute(sql`
+            ALTER TABLE rebase.users ADD COLUMN IF NOT EXISTS billing_plan TEXT DEFAULT 'free'
         `);
 
         // Create index on email for faster lookups

@@ -716,6 +716,7 @@ collectionRegistry });
         baseUrl: "http://localhost",
         apiPath: basePath,
         websocketUrl: "",
+        token: serviceKey,
         fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
             return await config.app.request(input as string | Request | URL, init);
         }

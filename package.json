@@ -33,12 +33,16 @@
         "app",
         "app/frontend",
         "app/backend",
-        "app/config"
+        "app/config",
+        "saas/config",
+        "saas/backend",
+        "saas/frontend"
     ],
     "scripts": {
         "test": "pnpm -r test",
         "dev": "cd app && run-s dev",
         "web": "cd website && run-s dev",
+        "saas": "cd saas && pnpm run dev",
         "deploy:web": "cd website && run-s deploy",
         "build": "pnpm --filter './packages/*' -r run build && pnpm --filter './app' -r run build",
         "build:stream": "lerna run build --stream --loglevel=info",

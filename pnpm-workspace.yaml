@@ -7,5 +7,11 @@ packages:
   - videos
   - examples/*
   - examples/*/*
+  - saas/config
+  - saas/backend
+  - saas/frontend
+  - saas
+
+
 
 
