@@ -165,4 +165,19 @@ view: null! }],
         // Admin group should be sorted to the end automatically
         expect(adminEntry?.group).toBe("Admin");
     });
+
+    it("should respect custom group on adminViews", () => {
+        const { result } = renderHook(() => useTopLevelNavigation({
+            collections: [],
+            views: [],
+            adminViews: [{ name: "Custom Admin", slug: "custom", view: null!, group: "Settings" }],
+            urlController: mockCmsUrlController,
+            collectionRegistryController: mockCollectionRegistryController
+        }));
+
+        const nav = result.current.topLevelNavigation as NavigationResult;
+        expect(nav.navigationEntries).toHaveLength(1);
+        const adminEntry = nav.navigationEntries[0];
+        expect(adminEntry.group).toBe("Settings");
+    });
 });

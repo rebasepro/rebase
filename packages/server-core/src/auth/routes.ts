@@ -38,7 +38,7 @@ export interface AuthModuleConfig {
  * Helper to build standard auth response output
  */
 function buildAuthResponse(
-    user: { id: string; email: string; displayName?: string | null; photoUrl?: string | null; billingPlan?: string | null },
+    user: { id: string; email: string; displayName?: string | null; photoUrl?: string | null; metadata?: Record<string, any> | null },
     roleIds: string[],
     accessToken: string,
     refreshToken: string
@@ -50,7 +50,7 @@ function buildAuthResponse(
             displayName: user.displayName ?? null,
             photoURL: user.photoUrl ?? null,
             roles: roleIds,
-            billingPlan: user.billingPlan ?? "free"
+            metadata: user.metadata ?? {}
         },
         tokens: {
             accessToken,
@@ -729,7 +729,7 @@ message: "Session revoked successfully" });
                 photoURL: result.user.photoUrl,
                 emailVerified: result.user.emailVerified,
                 roles: result.roles.map(r => r.id),
-                billingPlan: result.user.billingPlan ?? "free"
+                metadata: result.user.metadata ?? {}
             }
         });
     });
@@ -768,7 +768,7 @@ message: "Session revoked successfully" });
                 photoURL: result.user.photoUrl,
                 emailVerified: result.user.emailVerified,
                 roles: result.roles.map(r => r.id),
-                billingPlan: result.user.billingPlan ?? "free"
+                metadata: result.user.metadata ?? {}
             }
         });
     });

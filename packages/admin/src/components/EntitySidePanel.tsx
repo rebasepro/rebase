@@ -64,7 +64,7 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
                 path: params.path,
                 entityId: params.entityId,
                 selectedTab: params.selectedTab,
-                updateUrl: true,
+                updateUrl: collection?.openEntityMode !== "dialog",
                 collection: params.collection
             });
         }
@@ -105,7 +105,7 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
             <ErrorBoundary>
                 <EntityEditView
                     {...props}
-                    layout={"side_panel"}
+                    layout={collection?.openEntityMode === "dialog" ? "dialog" : "side_panel"}
                     collection={collection as EntityCollection}
                     parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
                     onValuesModified={onValuesModified}
@@ -146,8 +146,11 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
                     onTabChange={({
                         entityId,
                         selectedTab,
-                        collection
+                        collection: paramCollection
                     }) => {
+                        if (collection?.openEntityMode === "dialog" || paramCollection?.openEntityMode === "dialog") {
+                            return;
+                        }
                         // Only update the URL to reflect the new tab — don't call
                         // sideEntityController.replace() which would recreate the
                         // entire EntitySidePanel component, causing a full

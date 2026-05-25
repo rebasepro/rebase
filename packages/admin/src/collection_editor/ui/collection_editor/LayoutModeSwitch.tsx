@@ -1,13 +1,13 @@
 import { cls, ToggleButtonGroup, Typography } from "@rebasepro/ui";
-import { ColumnsIcon, PanelLeftIcon, SquareIcon } from "lucide-react";
+import { ColumnsIcon, PanelLeftIcon, SquareIcon, AppWindow } from "lucide-react";
 
 export function LayoutModeSwitch({
     value,
     onChange,
     className
 }: {
-    value: "side_panel" | "full_screen" | "split";
-    onChange: (value: "side_panel" | "full_screen" | "split") => void;
+    value: "side_panel" | "full_screen" | "split" | "dialog";
+    onChange: (value: "side_panel" | "full_screen" | "split" | "dialog") => void;
     className?: string;
 }) {
 
@@ -32,10 +32,15 @@ export function LayoutModeSwitch({
                         value: "split",
                         label: "Split view",
                         icon: <PanelLeftIcon/>
+                    },
+                    {
+                        value: "dialog",
+                        label: "Centered dialog",
+                        icon: <AppWindow/>
                     }
                 ]}
             />
         </div>
-        <Typography variant={"caption"} color={"secondary"} className={"ml-3.5"}>Should documents be opened full screen or in an inline side dialog</Typography>
+        <Typography variant={"caption"} color={"secondary"} className={"ml-3.5"}>Should documents be opened full screen, inline side dialog, or centered dialog</Typography>
     </div>
 }

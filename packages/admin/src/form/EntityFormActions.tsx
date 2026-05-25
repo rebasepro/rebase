@@ -90,7 +90,7 @@ type ActionsViewProps<M extends Record<string, unknown>> = {
     disabled: boolean,
     status: "new" | "existing" | "copy",
     pluginActions?: any[],
-    openEntityMode: "side_panel" | "full_screen" | "split";
+    openEntityMode: "side_panel" | "full_screen" | "split" | "dialog";
     navigateBack: () => void;
     formContext: FormContext,
     formex: FormexController<any>;

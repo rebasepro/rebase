@@ -15,6 +15,7 @@ import { getFormFieldKeys } from "@rebasepro/core";
 import { Alert, Chip, cls, iconSize, paperMixin, Tooltip, Typography } from "@rebasepro/ui";
 import { Formex, FormexController, getIn, setIn, useCreateFormex } from "@rebasepro/formex";
 import { useAnalyticsController } from "@rebasepro/core";
+
 import { FormEntry, FormLayout, LabelWithIconAndTooltip, PropertyFieldBinding } from "../form";
 import { z } from "zod";
 import {
@@ -170,13 +171,13 @@ export function EntityForm<M extends Record<string, unknown>>({
     const collectionRegistryController = useCollectionRegistryController();
 
     const navigateBack = useCallback(() => {
-        if (openEntityMode === "side_panel") {
-            // If we are in side panel mode, we close the side panel
+        if (openEntityMode === "side_panel" || openEntityMode === "dialog") {
+            // If we are in side panel mode or dialog mode, we close the panel
             sideEntityController.close();
         } else {
             window.history.back();
         }
-    }, []);
+    }, [openEntityMode, sideEntityController]);
 
     const authController = useAuthController();
     const [status, setStatus] = useState<EntityStatus>(initialStatus);
@@ -755,7 +756,12 @@ export function EntityForm<M extends Record<string, unknown>>({
                     id={`form_${path}`}
                     className={cls("relative flex flex-row max-w-4xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-6xl w-full h-fit")}>
 
-                    <div className={cls("flex flex-col w-full pt-12 pb-16 px-4 sm:px-8 md:px-10")}>
+                    <div className={cls(
+                        "flex flex-col w-full",
+                        openEntityMode === "dialog"
+                            ? "pt-4 pb-12 px-6 sm:px-8"
+                            : "pt-12 pb-16 px-4 sm:px-8 md:px-10"
+                    )}>
                         <div
                             className={"flex flex-row gap-4 self-end sticky top-4 z-10"}>
 

@@ -134,7 +134,13 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
      * When editing an entity, you can choose to open the entity in a side dialog
      * or in a full screen dialog. Defaults to `full_screen`.
      */
-    openEntityMode?: "side_panel" | "full_screen" | "split";
+    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
+
+    /**
+     * Prevent default actions from being displayed or executed on this collection.
+     */
+    disableDefaultActions?: ("edit" | "copy" | "delete")[];
+
 
 
     /**

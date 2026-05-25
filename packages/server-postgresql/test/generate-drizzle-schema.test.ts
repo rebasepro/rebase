@@ -116,6 +116,8 @@ relationName: "tags" }
         expect(cleanResult).toContain("tag_id: varchar(\"tag_id\").notNull().references(() => tags.id, { onDelete: \"cascade\" })");
         expect(cleanResult).toContain("(table) => ({ pk: primaryKey({ columns: [table.post_id, table.tag_id] }) })");
         expect(cleanResult).toContain("export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({ \"tags\": many(postsToTags, { relationName: \"tags\" }) }));");
+        const expectedJunctionRelations = "export const postsToTagsRelations = drizzleRelations(postsToTags, ({ one, many }) => ({ \"post_id\": one(posts, { fields: [postsToTags.post_id], references: [posts.id], relationName: \"tags\" }), \"tag_id\": one(tags, { fields: [postsToTags.tag_id], references: [tags.id], relationName: \"posts_to_tags_tag_id\" }) }));";
+        expect(cleanResult).toContain(cleanSchema(expectedJunctionRelations));
     });
 
     describe("generateDrizzleSchema Column Types", () => {

@@ -130,10 +130,10 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             console.log("");
             console.log(chalk.cyan("┌────────────────────────────────────────────────────────────┐"));
             console.log(chalk.cyan("│                                                            │"));
-            console.log(chalk.cyan("│   ✨ Rebase Admin App is ready!                            │"));
+            console.log(chalk.cyan("│   ✦ Rebase Admin App is ready!                             │"));
             const cleanUrl = stripAnsi(frontendUrl);
-            const paddedUrl = cleanUrl.padEnd(40);
-            console.log(chalk.cyan("│   👉 Frontend URL: ") + chalk.white(paddedUrl) + chalk.cyan("│"));
+            const paddedUrl = cleanUrl.padEnd(41);
+            console.log(chalk.cyan("│   ➜ Frontend URL: ") + chalk.white(paddedUrl) + chalk.cyan("│"));
             console.log(chalk.cyan("│                                                            │"));
             console.log(chalk.cyan("└────────────────────────────────────────────────────────────┘"));
             console.log("");

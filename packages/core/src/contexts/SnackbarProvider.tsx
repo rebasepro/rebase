@@ -7,6 +7,7 @@ export const SnackbarProvider: React.FC<PropsWithChildren<{}>> = ({ children }) 
 
     return (
         <NotistackSnackbarProvider maxSnack={3}
+                                   preventDuplicate={true}
                                    autoHideDuration={3500}>
             {children}
         </NotistackSnackbarProvider>

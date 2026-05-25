@@ -45,48 +45,44 @@ delete: false },
  * Auto-create auth tables if they don't exist
  * This runs on startup to ensure the database is ready for auth
  */
-export async function ensureAuthTablesExist(db: NodePgDatabase): Promise<void> {
+export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: any): Promise<void> {
     console.log("🔍 Checking auth tables...");
 
     try {
         // ── Create the rebase schema ────────────────────────────────────
         await db.execute(sql`CREATE SCHEMA IF NOT EXISTS rebase`);
 
+        // Resolve dynamic user table name and ID type
+        let usersTableName = 'public."users"';
+        let userIdType = "TEXT";
+        if (registry) {
+            const usersTable = registry.getTable("users");
+            if (usersTable) {
+                const { getTableName } = await import("drizzle-orm");
+                usersTableName = `public."${getTableName(usersTable)}"`;
+
+                // Inspect users.id column to match referenced column type
+                if (usersTable.id) {
+                    const rawCol = usersTable.id as unknown as Record<string | symbol, unknown>;
+                    const columnType = rawCol.columnType;
+                    if (columnType === "PgUUID") {
+                        userIdType = "UUID";
+                    } else if (columnType === "PgSerial" || columnType === "PgInteger") {
+                        userIdType = "INTEGER";
+                    } else if (columnType === "PgBigInt" || columnType === "PgBigSerial") {
+                        userIdType = "BIGINT";
+                    }
+                }
+            }
+        }
+
         // ── Create tables (idempotent) ──────────────────────────────────
-
-        // Create users table
-        await db.execute(sql`
-            CREATE TABLE IF NOT EXISTS rebase.users (
-                id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-                email TEXT NOT NULL UNIQUE,
-                password_hash TEXT,
-                display_name TEXT,
-                photo_url TEXT,
-                email_verified BOOLEAN DEFAULT FALSE,
-                email_verification_token TEXT,
-                email_verification_sent_at TIMESTAMP WITH TIME ZONE,
-                billing_plan TEXT DEFAULT 'free',
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-            )
-        `);
-
-        // Migration step: ensure billing_plan exists on existing setups
-        await db.execute(sql`
-            ALTER TABLE rebase.users ADD COLUMN IF NOT EXISTS billing_plan TEXT DEFAULT 'free'
-        `);
-
-        // Create index on email for faster lookups
-        await db.execute(sql`
-            CREATE INDEX IF NOT EXISTS idx_users_email 
-            ON rebase.users(email)
-        `);
 
         // Create user_identities table
         await db.execute(sql`
             CREATE TABLE IF NOT EXISTS rebase.user_identities (
                 id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-                user_id TEXT NOT NULL REFERENCES rebase.users(id) ON DELETE CASCADE,
+                user_id ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
                 provider TEXT NOT NULL,
                 provider_id TEXT NOT NULL,
                 profile_data JSONB,
@@ -119,7 +115,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase): Promise<void> {
         // Create user_roles junction table
         await db.execute(sql`
             CREATE TABLE IF NOT EXISTS rebase.user_roles (
-                user_id TEXT NOT NULL REFERENCES rebase.users(id) ON DELETE CASCADE,
+                user_id ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
                 role_id TEXT NOT NULL REFERENCES rebase.roles(id) ON DELETE CASCADE,
                 PRIMARY KEY (user_id, role_id)
             )
@@ -135,7 +131,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase): Promise<void> {
         await db.execute(sql`
             CREATE TABLE IF NOT EXISTS rebase.refresh_tokens (
                 id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-                user_id TEXT NOT NULL REFERENCES rebase.users(id) ON DELETE CASCADE,
+                user_id ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
                 token_hash TEXT NOT NULL UNIQUE,
                 expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
                 user_agent TEXT,
@@ -161,7 +157,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase): Promise<void> {
         await db.execute(sql`
             CREATE TABLE IF NOT EXISTS rebase.password_reset_tokens (
                 id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-                user_id TEXT NOT NULL REFERENCES rebase.users(id) ON DELETE CASCADE,
+                user_id ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
                 token_hash TEXT NOT NULL UNIQUE,
                 expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
                 used_at TIMESTAMP WITH TIME ZONE,

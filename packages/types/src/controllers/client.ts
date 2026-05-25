@@ -61,6 +61,7 @@ export interface AdminUser {
     photoURL: string | null;
     provider: string;
     roles: string[];
+    metadata?: Record<string, any>;
     createdAt: string;
     updatedAt: string;
 }
@@ -92,8 +93,8 @@ export interface AdminAPI {
         orderDir?: "asc" | "desc";
     }): Promise<{ users: AdminUser[]; total: number; limit: number; offset: number }>;
     getUser(userId: string): Promise<{ user: AdminUser }>;
-    createUser(data: { email: string; displayName?: string; password?: string; roles?: string[] }): Promise<{ user: AdminUser }>;
-    updateUser(userId: string, data: { email?: string; displayName?: string; password?: string; roles?: string[] }): Promise<{ user: AdminUser }>;
+    createUser(data: { email: string; displayName?: string; password?: string; roles?: string[]; metadata?: Record<string, any> }): Promise<{ user: AdminUser }>;
+    updateUser(userId: string, data: { email?: string; displayName?: string; password?: string; roles?: string[]; metadata?: Record<string, any> }): Promise<{ user: AdminUser }>;
     deleteUser(userId: string): Promise<{ success: boolean }>;
     listRoles(): Promise<{ roles: AdminRole[] }>;
     getRole(roleId: string): Promise<{ role: AdminRole }>;

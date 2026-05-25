@@ -90,7 +90,44 @@ view: null! }
 
         const activeAdminViews = result.current.adminViews!;
         expect(activeAdminViews).toHaveLength(2);
-        expect(activeAdminViews.find(v => v.slug === "users")).toBeDefined();
-        expect(activeAdminViews.find(v => v.slug === "roles")).toBeDefined();
+        const usersView = activeAdminViews.find(v => v.slug === "users");
+        const rolesView = activeAdminViews.find(v => v.slug === "roles");
+        expect(usersView).toBeDefined();
+        expect(usersView?.group).toBe("Settings");
+        expect(rolesView).toBeDefined();
+        expect(rolesView?.group).toBe("Settings");
+    });
+
+    it("should NOT inject Users and Roles admin views if collections are registered", async () => {
+        const mockAuthController = {
+            initialLoading: false,
+            user: { uid: "test-user" }
+        } as unknown as AuthController;
+
+        const userManagementActive: { roles: boolean; users: boolean } = {
+            roles: true,
+            users: true
+        };
+
+        const mockCollections = [
+            { slug: "users", name: "Users" } as any,
+            { slug: "roles", name: "Roles" } as any
+        ];
+
+        const { result } = renderHook(() => useResolvedViews({
+            authController: mockAuthController,
+            views: undefined,
+            userManagement: userManagementActive,
+            driver: mockDataDriver,
+            collections: mockCollections
+        }));
+
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
+
+        const activeAdminViews = result.current.adminViews!;
+        expect(activeAdminViews).toHaveLength(0);
     });
 });
+

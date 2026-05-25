@@ -1,12 +1,12 @@
-# Rebase v4 Breaking Changes & Migration Guide
+# Rebase Breaking Changes & Migration Guide
 
-This document covers breaking changes and migration patterns for Rebase v4 (custom_backend branch). It serves as a reference for both developers and LLMs when migrating code from the `next` branch or earlier versions.
+This document covers breaking changes and migration patterns for Rebase (custom_backend branch), which was originally a fork of FireCMS 3. It serves as a reference for both developers and LLMs when migrating code from the `next` branch or earlier versions.
 
 ---
 
 ## Overview
 
-Rebase v4 introduces significant architectural changes to support multiple backends (PostgreSQL, MongoDB, Firestore, etc.). The key philosophy change is that **collections and properties are now pre-resolved** - there is no runtime resolution step.
+Rebase introduces significant architectural changes to support multiple backends (PostgreSQL, MongoDB, Firestore, etc.). The key philosophy change is that **collections and properties are now pre-resolved** - there is no runtime resolution step.
 
 ---
 
@@ -61,7 +61,7 @@ import { getEntityTitlePropertyKey, getEntityImagePreviewPropertyKey } from "../
 
 ### Property Type Field
 
-| Old (next branch) | New (v4) |
+| Old (next branch) | New (custom_backend) |
 |-------------------|----------|
 | `dataType: "string"` | `type: "string"` |
 | `dataType: "number"` | `type: "number"` |
@@ -72,7 +72,7 @@ import { getEntityTitlePropertyKey, getEntityImagePreviewPropertyKey } from "../
 
 ### Enum Values
 
-| Old (next branch) | New (v4) |
+| Old (next branch) | New (custom_backend) |
 |-------------------|----------|
 | `enumValues: [...]` | `enum: [...]` |
 | `stringProperty.enumValues` | `stringProperty.enum` |
@@ -83,7 +83,7 @@ import { getEntityTitlePropertyKey, getEntityImagePreviewPropertyKey } from "../
 // OLD (next branch)
 if (property.dataType === "string") { ... }
 
-// NEW (v4)
+// NEW (custom_backend)
 if ((property as any).type === "string") { ... }
 // Or with proper typing:
 if ("type" in property && property.type === "string") { ... }
@@ -95,7 +95,7 @@ if ("type" in property && property.type === "string") { ... }
 
 ### Filter and Sort
 
-| Old (next branch) | New (v4) |
+| Old (next branch) | New (custom_backend) |
 |-------------------|----------|
 | `initialFilter: {...}` | `filter: {...}` |
 | `initialSort: ["field", "asc"]` | `sort: ["field", "asc"]` |
@@ -108,7 +108,7 @@ if ("type" in property && property.type === "string") { ... }
 
 ### Resolution Functions
 
-In v4, collections and properties are **pre-resolved** at configuration time. The following functions/concepts no longer exist:
+In the custom_backend branch, collections and properties are **pre-resolved** at configuration time. The following functions/concepts no longer exist:
 
 | Removed | Replacement |
 |---------|-------------|
@@ -142,7 +142,7 @@ const resolvedCollection = resolveCollection({
 });
 const property = resolvedCollection.properties[key] as ResolvedProperty;
 
-// NEW (v4)
+// NEW (custom_backend)
 const resolvedPath = fullPath;  // No resolution needed
 const property = collection.properties[key] as Property;
 ```
@@ -157,7 +157,7 @@ const property = collection.properties[key] as Property;
 // OLD (next branch)
 const subcollections = collection.subcollections;
 
-// NEW (v4)
+// NEW (custom_backend)
 import { getSubcollections } from "@rebasepro/common";
 const subcollections = getSubcollections(collection);
 ```
@@ -172,7 +172,7 @@ The `EntityReference` class now takes a single props object:
 // OLD (next branch)
 new EntityReference(id, path)
 
-// NEW (v4)
+// NEW (custom_backend)
 new EntityReference({ id, path })
 // Or with datasource/database:
 new EntityReference({ id, path, datasource: "firestore", databaseId: "mydb" })
@@ -208,7 +208,7 @@ The `idPath` property has been removed. Use `path` instead:
 navigateToEntity({ entity, path, idPath, collection });
 <Component fullPath={idPath} />
 
-// NEW (v4)
+// NEW (custom_backend)
 navigateToEntity({ entity, path, collection });
 <Component fullPath={path} />
 ```
@@ -290,7 +290,7 @@ Don't compare against non-existent default values:
 // OLD (next branch) - checking if changed from defaults
 if (!isEqual(filterValues, collection.defaultFilter)) { ... }
 
-// NEW (v4) - just check if filter is set
+// NEW (custom_backend) - just check if filter is set
 if (filterValues && Object.keys(filterValues).length > 0) { ... }
 ```
 
@@ -298,7 +298,7 @@ if (filterValues && Object.keys(filterValues).length > 0) { ... }
 
 ## For LLMs: Key Migration Steps
 
-When migrating code from `next` branch to `custom_backend` (v4):
+When migrating code from `next` branch to `custom_backend`:
 
 1. **Replace imports**: `../../types` → `@rebasepro/types`
 2. **Replace comparison lib**: `react-fast-compare` → `fast-equals`
@@ -316,5 +316,5 @@ When migrating code from `next` branch to `custom_backend` (v4):
 ## Version Information
 
 - **Branch**: `custom_backend`
-- **Target**: Rebase v4 with PostgreSQL/multi-backend support
+- **Target**: Rebase with PostgreSQL/multi-backend support
 - **Last Updated**: 2026-02-04

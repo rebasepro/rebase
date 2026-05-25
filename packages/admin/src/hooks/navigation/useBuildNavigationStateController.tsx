@@ -89,7 +89,8 @@ export function useBuildNavigationStateController<EC extends EntityCollection, U
         plugins,
         adminMode,
         effectiveRoleController,
-        userManagement
+        userManagement,
+        collections
     });
 
     // Step 3: Compute top-level navigation (pure derived state)

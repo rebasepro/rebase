@@ -47,6 +47,13 @@ export interface EntityAction<M extends Record<string, unknown> = Record<string,
     isEnabled?(props: EntityActionClickProps<M, USER>): boolean;
 
     /**
+     * When true, this action is rendered inline on each row in the list view.
+     * By default, entity actions only appear in the table view and entity form.
+     * Use this for actions that should be easily accessible regardless of view mode.
+     */
+    showActionsInListView?: boolean;
+
+    /**
      * Show this action collapsed in the menu of the collection view.
      * Defaults to true
      * If false, the action will be shown in the menu
@@ -86,7 +93,7 @@ export type EntityActionClickProps<M extends Record<string, unknown>, USER exten
     /**
      * If the action is rendered in the form, is it open in a side panel or full screen?
      */
-    openEntityMode: "side_panel" | "full_screen" | "split";
+    openEntityMode: "side_panel" | "full_screen" | "split" | "dialog";
 
     /**
      * Optional selection controller, present if the action is being called from a collection view

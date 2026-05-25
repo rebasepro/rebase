@@ -30,7 +30,7 @@ export function navigateToEntity({
 }:
 
     {
-        openEntityMode: "side_panel" | "full_screen" | "split";
+        openEntityMode: "side_panel" | "full_screen" | "split" | "dialog";
         collection?: EntityCollection;
         entityId?: string | number;
         selectedTab?: string;
@@ -50,7 +50,8 @@ export function navigateToEntity({
         navigation: UrlController
     }) {
 
-    if (openEntityMode === "side_panel") {
+    if (openEntityMode === "side_panel" || openEntityMode === "dialog") {
+
 
         sideEntityController.open({
             entityId,
@@ -58,7 +59,7 @@ export function navigateToEntity({
             copy,
             selectedTab,
             collection,
-            updateUrl: true,
+            updateUrl: openEntityMode !== "dialog",
             onClose,
             defaultValues
         });

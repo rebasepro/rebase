@@ -146,7 +146,7 @@ export function RebaseRoute() {
         // Resolve the effective openEntityMode based on the current view mode.
         // Priority: collection.openEntityMode (explicit) > view-mode-based default.
         // View mode priority: URL __view param > saved user config > collection default.
-        let effectiveOpenMode: "side_panel" | "full_screen" | "split" | undefined = collection?.openEntityMode;
+        let effectiveOpenMode: "side_panel" | "full_screen" | "split" | "dialog" | undefined = collection?.openEntityMode;
         if (!effectiveOpenMode && collection) {
             const urlViewParam = new URLSearchParams(location.search).get("__view");
             let currentViewMode: ViewMode = collection.defaultViewMode ?? "list";

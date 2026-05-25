@@ -58,6 +58,7 @@ const isIdProperty = (propName: string, prop: Property, collection: EntityCollec
 };
 
 const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCollection, collections: EntityCollection[]): string | null => {
+
     const colName = resolveColumnName(propName, prop);
     let columnDefinition: string;
 
@@ -494,8 +495,23 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
     // Always import pgPolicy and sql — RLS is enabled on every table (secure by default)
     const pgCoreImports = ["primaryKey", "pgTable", "integer", "varchar", "text", "char", "boolean", "timestamp", "date", "time", "jsonb", "json", "pgEnum", "numeric", "real", "doublePrecision", "bigint", "serial", "bigserial", "pgPolicy"];
     if (hasUuid) pgCoreImports.push("uuid");
+
+    const uniqueSchemas = Array.from(new Set(
+        collections.map(c => c.databaseId).filter(Boolean)
+    ));
+    if (uniqueSchemas.length > 0) {
+        pgCoreImports.push("pgSchema");
+    }
+
     schemaContent += `import { ${pgCoreImports.join(", ")} } from 'drizzle-orm/pg-core';\n`;
     schemaContent += "import { relations as drizzleRelations, sql } from 'drizzle-orm';\n\n";
+
+    uniqueSchemas.forEach(schema => {
+        schemaContent += `export const ${schema}Schema = pgSchema("${schema}");\n`;
+    });
+    if (uniqueSchemas.length > 0) {
+        schemaContent += "\n";
+    }
 
     const exportedTableVars: string[] = [];
     const exportedEnumVars: string[] = [];
@@ -512,6 +528,7 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
     collections.forEach(collection => {
         const collectionPath = getTableName(collection);
         Object.entries(collection.properties ?? {}).forEach(([propName, prop]) => {
+
             if (("enum" in prop) && (prop.type === "string" || prop.type === "number") && prop.enum) {
                 const enumVarName = getEnumVarName(collectionPath, propName);
                 const enumDbName = `${collectionPath}_${resolveColumnName(propName, prop)}`;
@@ -564,6 +581,9 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
         const tableVarName = getTableVarName(tableName);
         if (isJunction && relation && sourceCollection && relation.through) {
             const targetCollection = relation.target();
+            const schema = targetCollection.databaseId || sourceCollection.databaseId;
+            const tableCreator = schema ? `${schema}Schema.table` : "pgTable";
+            const baseTableName = tableName.includes(".") ? tableName.split(".").pop()! : tableName;
             const {
                 sourceColumn,
                 targetColumn
@@ -577,14 +597,17 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
             const sourceId = getPrimaryKeyName(sourceCollection);
             const targetId = getPrimaryKeyName(targetCollection);
 
-            schemaContent += `export const ${tableVarName} = pgTable(\"${tableName}\", {\n`;
+            schemaContent += `export const ${tableVarName} = ${tableCreator}(\"${baseTableName}\", {\n`;
             schemaContent += `    ${sourceColumn}: ${sourceColType}(\"${sourceColumn}\").notNull().references(() => ${getTableVarName(getTableName(sourceCollection))}.${sourceId}, ${refOptions}),\n`;
             schemaContent += `    ${targetColumn}: ${targetColType}(\"${targetColumn}\").notNull().references(() => ${getTableVarName(getTableName(targetCollection))}.${targetId}, ${refOptions}),\n`;
             schemaContent += "}, (table) => ({\n";
             schemaContent += `    pk: primaryKey({ columns: [table.${sourceColumn}, table.${targetColumn}] })\n`;
             schemaContent += "}));\n\n";
         } else if (!isJunction) {
-            schemaContent += `export const ${tableVarName} = pgTable(\"${tableName}\", {\n`;
+            const schema = collection.databaseId;
+            const tableCreator = schema ? `${schema}Schema.table` : "pgTable";
+            const baseTableName = tableName.includes(".") ? tableName.split(".").pop()! : tableName;
+            schemaContent += `export const ${tableVarName} = ${tableCreator}(\"${baseTableName}\", {\n`;
             const columns = new Set<string>();
             Object.entries(collection.properties ?? {}).forEach(([propName, prop]) => {
                 const columnString = getDrizzleColumn(propName, prop as Property, collection, collections);
@@ -666,8 +689,12 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
                 tableRelations.push(`    "${relation.through.sourceColumn}": one(${sourceTableVar}, {\n        fields: [${tableVarName}.${relation.through.sourceColumn}],\n        references: [${sourceTableVar}.${sourceId}],\n        relationName: \"${owningRelationName}\"\n    })`);
 
                 // Target side one(): pairs with inverse table's many(junctionTable, { relationName })
-                const targetRelName = inverseRelationName ?? owningRelationName;
-                tableRelations.push(`    "${relation.through.targetColumn}": one(${targetTableVar}, {\n        fields: [${tableVarName}.${relation.through.targetColumn}],\n        references: [${targetTableVar}.${targetId}],\n        relationName: \"${targetRelName}\"\n    })`);
+                // Always emit a relationName to avoid collisions with the source-side's owningRelationName.
+                // When no inverse relation exists on the target collection, synthesize a unique name.
+                const targetRelationName = inverseRelationName
+                    ? inverseRelationName
+                    : `${tableName}_${relation.through.targetColumn}`;
+                tableRelations.push(`    "${relation.through.targetColumn}": one(${targetTableVar}, {\n        fields: [${tableVarName}.${relation.through.targetColumn}],\n        references: [${targetTableVar}.${targetId}],\n        relationName: "${targetRelationName}"\n    })`);
             }
         } else {
             const resolvedRelations = resolveCollectionRelations(collection);

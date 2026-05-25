@@ -1,14 +1,15 @@
 
 import type { EntityCollection, Property } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CollectionSize, Entity, EntityTableController, SelectionController } from "@rebasepro/types";
-import { getEntityImagePreviewPropertyKey } from "@rebasepro/common";
+import { CollectionSize, Entity, EntityAction, EntityTableController, SelectionController } from "@rebasepro/types";
 import {
     Checkbox,
     Chip,
     CircularProgress,
     cls,
     defaultBorderMixin,
+    IconButton,
+    Tooltip,
     Typography
 } from "@rebasepro/ui";
 import { PropertyPreview } from "../../preview";
@@ -17,10 +18,12 @@ import {
     useCustomizationController
 } from "@rebasepro/core";
 import { useAnalyticsController } from "@rebasepro/core";
-import { getEntityTitlePropertyKey, getEntityPreviewKeys } from "../../util/previews";
+import { getEntityPreviewKeys } from "../../util/previews";
 import { IconForView } from "@rebasepro/core";
 import { getValueInPath } from "@rebasepro/utils";
 import { useCollectionSlotKeys, resolveEntitySlots, type CollectionSlotKeys } from "./useEntityPreviewSlots";
+import { useCMSContext } from "../../hooks/useCMSContext";
+import { resolveEntityAction } from "../../util/resolutions";
 
 export type EntityCollectionListViewProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     collection: EntityCollection<M>;
@@ -45,6 +48,22 @@ export type EntityCollectionListViewProps<M extends Record<string, unknown> = Re
      * row is visually highlighted with a primary accent.
      */
     selectedEntityId?: string | number;
+
+    /**
+     * Callback to get entity actions for a given entity.
+     * Only actions with `showActionsInListView: true` will be rendered.
+     */
+    getActionsForEntity?: (params: { entity?: Entity<M>, customEntityActions?: EntityAction[] }) => EntityAction[];
+
+    /**
+     * Full path of the collection, used as context for action handlers.
+     */
+    path?: string;
+
+    /**
+     * How entities open when an action triggers navigation.
+     */
+    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 };
 
 type ListColumnDef = {
@@ -58,19 +77,6 @@ type ListColumnDef = {
     width: string;
 };
 
-/**
- * Get the number of preview property lines to show based on size
- */
-function getPreviewCount(size: CollectionSize): number {
-    switch (size) {
-        case "xs": return 0;
-        case "s": return 1;
-        case "m": return 2;
-        case "l": return 3;
-        case "xl": return 4;
-        default: return 2;
-    }
-}
 
 
 /**
@@ -106,6 +112,9 @@ const OVERSCAN_COUNT = 8;
 
 /** Threshold in pixels from the bottom of the scroll area to trigger loading more. */
 const LOAD_MORE_THRESHOLD = 400;
+
+/** Stable empty array for when no list-view actions are available. */
+const EMPTY_LIST_VIEW_ACTIONS: EntityAction[] = [];
 
 /**
  * Walk up the DOM from `element` to find the nearest scrollable ancestor.
@@ -262,11 +271,15 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
     emptyComponent,
 
     size = "m",
-    selectedEntityId
+    selectedEntityId,
+    getActionsForEntity,
+    path,
+    openEntityMode
 }: EntityCollectionListViewProps<M>) {
     const authController = useAuthController();
     const customizationController = useCustomizationController();
     const analyticsController = useAnalyticsController();
+    const context = useCMSContext();
 
     const containerRef = useRef<HTMLDivElement>(null);
     const [containerWidth, setContainerWidth] = useState(1200);
@@ -475,6 +488,15 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
         return highlightedEntities?.some(e => e.id === entity.id && e.path === entity.path) ?? false;
     }, [highlightedEntities]);
 
+    // ── Compute list-view-visible actions per entity ──
+    const getListViewActions = useCallback((entity: Entity<M>): EntityAction[] => {
+        if (!getActionsForEntity) return EMPTY_LIST_VIEW_ACTIONS;
+        const customEntityActions = (collection.entityActions ?? [])
+            .map(action => resolveEntityAction(action, customizationController.entityActions))
+            .filter(Boolean) as EntityAction<M>[];
+        const allActions = getActionsForEntity({ entity, customEntityActions });
+        return allActions.filter(a => a.showActionsInListView);
+    }, [getActionsForEntity, collection.entityActions, customizationController.entityActions]);
 
     const rowClasses = getRowClasses(size);
 
@@ -615,6 +637,11 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
                                         size={size}
                                         isLast={isLast}
                                         isActive={selectedEntityId !== undefined && entity.id === selectedEntityId}
+                                        listViewActions={getListViewActions(entity)}
+                                        context={context}
+                                        path={path}
+                                        selectionController={selectionController}
+                                        openEntityMode={openEntityMode}
                                     />
                                 </div>
                             );
@@ -668,7 +695,12 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     showImage,
     size,
     isLast,
-    isActive = false
+    isActive = false,
+    listViewActions = [],
+    context,
+    path,
+    selectionController,
+    openEntityMode
 }: {
     entity: Entity<M>;
     collection: EntityCollection<M>;
@@ -684,6 +716,11 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     size: CollectionSize;
     isLast: boolean;
     isActive?: boolean;
+    listViewActions?: EntityAction[];
+    context?: ReturnType<typeof useCMSContext>;
+    path?: string;
+    selectionController?: SelectionController<M>;
+    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 }) {
     // ── Resolve slots (pure function, no hooks) ──
     const slots = resolveEntitySlots(
@@ -898,6 +935,33 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                     )}
                 </div>
             )}
+
+            {/* LIST VIEW ACTIONS — always visible on each row */}
+            {listViewActions.length > 0 && (
+                <div className="flex items-center gap-0.5 flex-shrink-0 ml-auto" onClick={(e) => e.stopPropagation()}>
+                    {listViewActions.map((action, index) => (
+                        <Tooltip key={action.key ?? index} title={action.name} asChild>
+                            <IconButton
+                                size="small"
+                                onClick={(e: React.MouseEvent) => {
+                                    e.stopPropagation();
+                                    action.onClick({
+                                        view: "collection",
+                                        entity,
+                                        path,
+                                        collection,
+                                        context: context!,
+                                        sideEntityController: context?.sideEntityController,
+                                        selectionController,
+                                        openEntityMode: openEntityMode ?? collection?.openEntityMode ?? "full_screen"
+                                    });
+                                }}>
+                                {action.icon}
+                            </IconButton>
+                        </Tooltip>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }) as <M extends Record<string, unknown>>(props: {
@@ -915,5 +979,10 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     size: CollectionSize;
     isLast: boolean;
     isActive?: boolean;
+    listViewActions?: EntityAction[];
+    context?: ReturnType<typeof useCMSContext>;
+    path?: string;
+    selectionController?: SelectionController<M>;
+    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 }) => React.ReactElement;
 

@@ -5,10 +5,10 @@ import React, { MouseEvent, useCallback } from "react";
 import { CollectionSize, Entity, SelectionController } from "@rebasepro/types";
 import { Badge, Checkbox, cls, IconButton, Menu, MenuItem, Skeleton, Tooltip } from "@rebasepro/ui";
 import { MoreVerticalIcon } from "lucide-react";
-import { useRebaseContext, useLargeLayout, useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/core";
 import { getEntityFromCache } from "@rebasepro/core";
 import { getLocalChangesBackup } from "@rebasepro/common";
-import { useSideEntityController, useCMSContext } from "../../index";
+import { useCMSContext } from "../../index";
 
 /**
  *
@@ -60,7 +60,7 @@ export const EntityCollectionRowActions = function EntityCollectionRowActions({
         selectionController?: SelectionController;
         highlightEntity?: (entity: Entity<any>) => void;
         unhighlightEntity?: (entity: Entity<any>) => void;
-        openEntityMode: "side_panel" | "full_screen" | "split";
+        openEntityMode: "side_panel" | "full_screen" | "split" | "dialog";
         // Sortable props for dnd-kit integration
         sortableNodeRef?: (node: HTMLElement | null) => void;
         sortableStyle?: React.CSSProperties;
@@ -69,7 +69,6 @@ export const EntityCollectionRowActions = function EntityCollectionRowActions({
         isDraggable?: boolean;
     }) {
 
-    const largeLayout = useLargeLayout();
 
     const context = useCMSContext();
     const sideEntityCtrl = context.sideEntityController;

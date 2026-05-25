@@ -5,10 +5,11 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 import { deepEqual as equal } from "fast-equals"
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- used as fallback for many array types
 const EMPTY_ARRAY: any[] = [];
 const DEFAULT_ENTITY_OPEN_MODE = "split";
 
-import { CollectionSize, Entity, EntityReference, EntityTableController, FilterValues, PartialEntityCollection, SaveEntityProps, ViewMode } from "@rebasepro/types";
+import { CollectionSize, Entity, EntityReference, EntityTableController, FilterValues, PartialEntityCollection, ViewMode } from "@rebasepro/types";
 import {
     EntityCollectionRowActions,
     EntityCollectionTable
@@ -22,7 +23,6 @@ import { resolveEntityAction } from "../../util/resolutions";
 import { getPropertyInPath } from "../../util/property_utils";
 import { ReferencePreview } from "../../preview";
 import {
-    saveEntityWithCallbacks,
     useAuthController,
     useCustomizationController,
     useData,
@@ -66,8 +66,8 @@ import { useBreadcrumbsController } from "../../index";
 
 function getOpenEntityMode(
     viewMode: ViewMode,
-    configuredMode?: "side_panel" | "full_screen" | "split"
-): "side_panel" | "full_screen" | "split" {
+    configuredMode?: "side_panel" | "full_screen" | "split" | "dialog"
+): "side_panel" | "full_screen" | "split" | "dialog" {
     if (configuredMode) return configuredMode;
     if (viewMode === "kanban") return "side_panel";
     if (viewMode === "table" || viewMode === "cards") return "full_screen";
@@ -671,10 +671,14 @@ export const EntityCollectionView = React.memo(
             customEntityActions?: EntityAction[]
         }): EntityAction[] => {
             const deleteEnabled = entity ? canDelete(collection, path, entity) : true;
-            const actions: EntityAction[] = [editEntityAction];
-            if (createEnabled)
+            const disableActions = collection.disableDefaultActions ?? [];
+            const actions: EntityAction[] = [];
+            if (!disableActions.includes("edit")) {
+                actions.push(editEntityAction);
+            }
+            if (createEnabled && !disableActions.includes("copy"))
                 actions.push(copyEntityAction);
-            if (deleteEnabled)
+            if (deleteEnabled && !disableActions.includes("delete"))
                 actions.push(deleteEntityAction);
             if (customEntityActions)
                 return mergeEntityActions(actions, customEntityActions);
@@ -953,6 +957,9 @@ export const EntityCollectionView = React.memo(
                 highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
                 size={listSize}
                 emptyComponent={emptyComponent}
+                getActionsForEntity={getActionsForEntity}
+                path={path}
+                openEntityMode={openEntityMode}
             />
         ) : (
             <EntityCollectionTable
@@ -1074,6 +1081,9 @@ export const EntityCollectionView = React.memo(
                                     size={listSize}
                                     emptyComponent={emptyComponent}
                                     selectedEntityId={selectedEntityIdProp}
+                                    getActionsForEntity={getActionsForEntity}
+                                    path={path}
+                                    openEntityMode={openEntityMode}
                                 />
                             </div>
                         ) : (

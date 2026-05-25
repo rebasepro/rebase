@@ -42,7 +42,9 @@ export function configureJwt(config: JwtConfig): void {
         "example-secret",
         "please-change-me",
         "replace-this-with-a-real-secret",
-        "default-secret"
+        "default-secret",
+        "rebase_saas_jwt_secret_must_be_long_long_long_long",
+        "rebase_saas_service_key_must_be_long_long_long_long"
     ]);
 
     if (!config.secret || config.secret.length < 32) {

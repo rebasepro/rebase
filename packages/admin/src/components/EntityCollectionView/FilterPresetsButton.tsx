@@ -154,12 +154,10 @@ export function FilterPresetsButton<M extends Record<string, unknown>>({
     compact
 }: FilterPresetsButtonProps<M>) {
 
-    // ── Guard ───────────────────────────────────────────────────────
-    if (!filterPresets.length || !tableController.setFilterValues) return null;
-
     // ── Derive active state from controller ─────────────────────────
     const activeSet = useMemo(() => {
         const set = new Set<number>();
+        if (!filterPresets.length || !tableController.setFilterValues) return set;
         for (let i = 0; i < filterPresets.length; i++) {
             if (isPresetActive(
                 filterPresets[i] as FilterPreset<string>,
@@ -169,7 +167,7 @@ export function FilterPresetsButton<M extends Record<string, unknown>>({
             }
         }
         return set;
-    }, [filterPresets, tableController.filterValues]);
+    }, [filterPresets, tableController.filterValues, tableController.setFilterValues]);
 
     // ── Toggle handler ──────────────────────────────────────────────
     const handleToggle = useCallback((index: number) => {
@@ -231,6 +229,9 @@ export function FilterPresetsButton<M extends Record<string, unknown>>({
             }
         }
     }, [filterPresets, tableController]);
+
+    // ── Guard (after hooks to preserve Rules of Hooks) ──────────────
+    if (!filterPresets.length || !tableController.setFilterValues) return null;
 
     // ── Split visible vs overflow ───────────────────────────────────
     const maxVisible = compact ? 2 : MAX_VISIBLE_PRESETS;

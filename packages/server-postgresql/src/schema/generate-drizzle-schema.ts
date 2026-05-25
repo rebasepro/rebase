@@ -5,6 +5,7 @@ import { pathToFileURL } from "url";
 import chokidar from "chokidar";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import { EntityCollection } from "@rebasepro/types";
+import { defaultUsersCollection } from "./default-collections";
 
 // --- Helper Functions ---
 
@@ -84,9 +85,15 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
             collections = imported.backendCollections || imported.collections;
         }
 
-        if (!collections || !Array.isArray(collections) || collections.length === 0) {
-            console.error("Error: Could not find collections array or failed to load directory.");
-            return;
+        // If collections directory is empty but exists, or failed to find any, we still want to inject defaults
+        if (!collections || !Array.isArray(collections)) {
+            collections = [];
+        }
+
+        // Inject default collections if not overridden by the developer
+        const hasUsersCollection = collections.some(c => c.slug === "users");
+        if (!hasUsersCollection) {
+            collections.push(defaultUsersCollection);
         }
 
         // Sort collections by slug alphabetically to ensure deterministic schema generation

@@ -8,6 +8,8 @@ import orderItemsCollection from "./order_items";
 import ticketsCollection from "./tickets";
 import productLocalesCollection from "./product_locales";
 import exercisesCollection from "./exercises";
+import usersCollection from "./users";
+import rolesCollection from "./roles";
 
 export const collections = [
     authorsCollection,
@@ -19,5 +21,7 @@ export const collections = [
     orderItemsCollection,
     ticketsCollection,
     productLocalesCollection,
-    exercisesCollection
+    exercisesCollection,
+    usersCollection,
+    rolesCollection
 ];

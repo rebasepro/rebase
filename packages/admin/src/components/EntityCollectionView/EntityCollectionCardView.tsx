@@ -7,7 +7,6 @@ import {
     CircularProgress,
     Typography
 } from "@rebasepro/ui";
-import { useAuthController, useCustomizationController } from "@rebasepro/core";
 
 export type EntityCollectionCardViewProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     collection: EntityCollection<M>;
@@ -77,8 +76,6 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
     initialScroll,
     size = "m"
 }: EntityCollectionCardViewProps<M>) {
-    const authController = useAuthController();
-    const customizationController = useCustomizationController();
 
     const containerRef = useRef<HTMLDivElement>(null);
     const loadMoreRef = useRef<HTMLDivElement>(null);

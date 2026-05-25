@@ -40,7 +40,6 @@ export function VirtualTableSelect(props: {
     }, [focused, ref]);
 
     const onChange = useCallback((updatedValue: string | string[]) => {
-        console.trace("onChange");
         if (valueType === "number") {
             if (multiple) {
                 const newValue = (updatedValue as string[]).map((v) => parseFloat(v));

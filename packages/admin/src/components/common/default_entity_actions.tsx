@@ -1,11 +1,14 @@
-import { CopyIcon, PencilIcon, Trash2Icon } from "lucide-react";
+import { CopyIcon, PencilIcon, Trash2Icon, KeyRoundIcon } from "lucide-react";
 import { iconSize } from "@rebasepro/ui";
-import type { EntityAction } from "@rebasepro/types";
-;
+import type { EntityAction, User, UserCreationResult } from "@rebasepro/types";
+import { ConfirmationDialog, useInternalUserManagementController, useSnackbarController, useTranslation } from "@rebasepro/core";
 import { DeleteEntityDialog } from "../DeleteEntityDialog";
 import { addRecentId } from "../EntityCollectionView/utils";
 import { navigateToEntity } from "../../util/navigation_utils";
 import { resolveDefaultSelectedView } from "@rebasepro/common";
+import { CreationResultDialog } from "../admin/CreationResultDialog";
+import React, { useState } from "react";
+
 
 export const editEntityAction: EntityAction = {
     icon: <PencilIcon size={iconSize.smallest}/>,
@@ -150,7 +153,110 @@ export const deleteEntityAction: EntityAction = {
                     }}
                     onClose={closeDialog}/>;
             }
-        })
+        });
         return Promise.resolve(undefined);
     }
 }
+
+export function ResetPasswordActionDialog({
+    user,
+    open,
+    onClose
+}: {
+    user: User;
+    open: boolean;
+    onClose: () => void;
+}) {
+    const userManagement = useInternalUserManagementController();
+    const snackbarController = useSnackbarController();
+    const { t } = useTranslation();
+    const [loading, setLoading] = useState(false);
+    const [creationResult, setCreationResult] = useState<UserCreationResult | null>(null);
+
+    const handleConfirm = async () => {
+        if (!userManagement?.resetPassword) return;
+        setLoading(true);
+        try {
+            const result = await userManagement.resetPassword(user);
+            setCreationResult(result);
+            snackbarController.open({
+                type: "success",
+                message: t("reset_password_success") || "Password reset successfully"
+            });
+        } catch (error: unknown) {
+            snackbarController.open({
+                type: "error",
+                message: error instanceof Error ? error.message : (t("error_resetting_password") || "Error resetting password")
+            });
+            onClose();
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (creationResult) {
+        return (
+            <CreationResultDialog
+                result={creationResult}
+                onClose={() => {
+                    setCreationResult(null);
+                    onClose();
+                }}
+            />
+        );
+    }
+
+    return (
+        <ConfirmationDialog
+            open={open}
+            loading={loading}
+            onAccept={handleConfirm}
+            onCancel={onClose}
+            title={<>{t("reset_password") || "Reset Password"}</>}
+            body={<>{t("reset_password_confirmation") || "Are you sure you want to reset this user's password?"}</>}
+        />
+    );
+}
+
+export const resetPasswordAction: EntityAction = {
+    icon: <KeyRoundIcon size={iconSize.smallest}/>,
+    name: "Reset Password",
+    key: "reset_password",
+    collapsed: false,
+    showActionsInListView: true,
+    isEnabled: ({ entity }) => Boolean(entity),
+    onClick({
+        entity,
+        context,
+    }): Promise<void> {
+        if (!entity) {
+            throw new Error("INTERNAL: resetPasswordAction: Entity is undefined");
+        }
+        if (!context.dialogsController) {
+            throw new Error("INTERNAL: resetPasswordAction: context.dialogsController is undefined");
+        }
+
+        const user: User = {
+            uid: entity.id as string,
+            email: entity.values?.email as string,
+            displayName: entity.values?.displayName as string || null,
+            photoURL: entity.values?.photoURL as string || null,
+            providerId: entity.values?.providerId as string || "custom",
+            isAnonymous: entity.values?.isAnonymous as boolean || false,
+            roles: entity.values?.roles as string[] || []
+        };
+
+        const { closeDialog } = context.dialogsController.open({
+            key: "reset_password_dialog_" + entity.id,
+            Component: ({ open }) => (
+                <ResetPasswordActionDialog
+                    user={user}
+                    open={open}
+                    onClose={closeDialog}
+                />
+            )
+        });
+        return Promise.resolve(undefined);
+    }
+};
+

@@ -46,7 +46,7 @@ export interface FormContext<M extends Record<string, unknown> = Record<string, 
 
     savingError?: Error;
 
-    openEntityMode: "side_panel" | "full_screen" | "split";
+    openEntityMode: "side_panel" | "full_screen" | "split" | "dialog";
 
     /**
      * The underlying formex controller that powers the form.

@@ -165,17 +165,19 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
 
             const internals = driverResult.internals as PostgresDriverInternals;
             const db = internals.db;
+            const registry = internals.registry;
 
-            await ensureAuthTablesExist(db);
+            await ensureAuthTablesExist(db, registry);
 
             let emailService: EmailService | undefined;
             if (authConfig.email) {
                 emailService = createEmailService(authConfig.email);
             }
 
-            const userService = new UserService(db);
+            const customUsersTable = registry?.getTable("users");
+            const userService = new UserService(db, customUsersTable);
             const roleService = new RoleService(db);
-            const authRepository = new PostgresAuthRepository(db);
+            const authRepository = new PostgresAuthRepository(db, customUsersTable);
 
             return { userService,
 roleService,

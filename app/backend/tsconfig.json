@@ -31,6 +31,9 @@
       ],
       "@rebasepro/server-postgresql": [
         "../../packages/server-postgresql/src/index"
+      ],
+      "@rebasepro/admin": [
+        "../../packages/admin/src/index"
       ]
     }
   },

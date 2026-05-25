@@ -51,15 +51,16 @@ export function EntityEditViewFormActions({
             .filter(Boolean) as EntityAction[];
         const createEnabled = canCreate(collection, path);
         const deleteEnabled = entity ? canDelete(collection, path, entity) : false;
+        const disableActions = collection.disableDefaultActions ?? [];
         const actions: EntityAction[] = [];
-        if (createEnabled)
+        if (createEnabled && !disableActions.includes("copy"))
             actions.push(copyEntityAction);
-        if (deleteEnabled)
+        if (deleteEnabled && !disableActions.includes("delete"))
             actions.push(deleteEntityAction);
         if (customEntityActions)
             return mergeEntityActions(actions, customEntityActions);
         return actions;
-    }, [canCreate, canDelete, collection, path, customizationController.entityActions?.length, entity]);
+    }, [canCreate, canDelete, collection, path, customizationController.entityActions?.length, entity, collection.disableDefaultActions]);
 
     const formActions = showDefaultActions ? entityActions.filter(a => a.includeInForm === undefined || a.includeInForm) : [];
 
@@ -123,7 +124,7 @@ type ActionsViewProps<M extends Record<string, unknown>> = {
     status: "new" | "existing" | "copy",
     sideDialogContext: SideDialogController,
     pluginActions?: any[],
-    openEntityMode: "side_panel" | "full_screen" | "split";
+    openEntityMode: "side_panel" | "full_screen" | "split" | "dialog";
     navigateBack: () => void;
     formContext: FormContext,
     formex: FormexController<any>;
@@ -151,7 +152,7 @@ function buildBottomActions<M extends Record<string, unknown>>({
 }: ActionsViewProps<M>) {
 
     const hasErrors = Object.keys(formex.errors).length > 0 && formex.submitCount > 0;
-    const canClose = openEntityMode === "side_panel";
+    const canClose = openEntityMode === "side_panel" || openEntityMode === "dialog";
     return <DialogActions
         className={className}
         position={"absolute"}>

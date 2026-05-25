@@ -1,6 +1,6 @@
-import { eq, sql } from "drizzle-orm";
+import { eq, getTableName, sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { users, userIdentities, refreshTokens, passwordResetTokens, User, NewUser } from "../schema/auth-schema";
+import { users, userIdentities, refreshTokens, passwordResetTokens } from "../schema/auth-schema";
 import {
     UserRepository,
     RoleRepository,
@@ -18,56 +18,187 @@ import {
     RoleData as Role
 // @ts-ignore
 } from "@rebasepro/server-core";
+import { toSnakeCase, camelCase } from "@rebasepro/utils";
 
 export type { Role };
+
+function getColumnKey(table: any, ...keys: string[]): string | undefined {
+    if (!table) return undefined;
+    for (const key of keys) {
+        if (key in table) return key;
+        const snake = toSnakeCase(key);
+        if (snake in table) return snake;
+        const camel = camelCase(key);
+        if (camel in table) return camel;
+    }
+    return undefined;
+}
+
+function getColumn(table: any, ...keys: string[]): any {
+    const key = getColumnKey(table, ...keys);
+    return key ? table[key] : undefined;
+}
 
 /**
  * PostgreSQL implementation of UserRepository.
  * Handles all user-related database operations using Drizzle ORM.
  */
 export class UserService implements UserRepository {
-    constructor(private db: NodePgDatabase) { }
+    private usersTable: any;
 
-    async createUser(data: NewUser): Promise<User> {
-        const [user] = await this.db.insert(users).values(data).returning();
-        return user;
+    constructor(private db: NodePgDatabase, usersTable?: any) {
+        this.usersTable = usersTable || users;
     }
 
-    async getUserById(id: string): Promise<User | null> {
-        const [user] = await this.db.select().from(users).where(eq(users.id, id));
-        return user || null;
+    private getQualifiedUsersTableName(): string {
+        const name = getTableName(this.usersTable);
+        return `public."${name}"`;
     }
 
-    async getUserByEmail(email: string): Promise<User | null> {
-        const [user] = await this.db.select().from(users).where(eq(users.email, email.toLowerCase()));
-        return user || null;
-    }
+    private mapRowToUser(row: any): UserData {
+        if (!row) return row;
 
-    async getUserByIdentity(provider: string, providerId: string): Promise<User | null> {
-        const result = await this.db.execute(sql`
-            SELECT u.*
-            FROM rebase.users u
-            INNER JOIN rebase.user_identities ui ON u.id = ui.user_id
-            WHERE ui.provider = ${provider} AND ui.provider_id = ${providerId}
-            LIMIT 1
-        `);
+        const id = row.id ?? row.uid;
+        const email = row.email;
+        const passwordHash = row.password_hash ?? row.passwordHash ?? null;
+        const displayName = row.display_name ?? row.displayName ?? null;
+        const photoUrl = row.photo_url ?? row.photoUrl ?? row.photoURL ?? null;
+        const emailVerified = row.email_verified ?? row.emailVerified ?? false;
+        const emailVerificationToken = row.email_verification_token ?? row.emailVerificationToken ?? null;
+        const emailVerificationSentAt = row.email_verification_sent_at ?? row.emailVerificationSentAt ?? null;
+        const createdAt = row.created_at ?? row.createdAt;
+        const updatedAt = row.updated_at ?? row.updatedAt;
 
-        if (result.rows.length === 0) return null;
+        const metadata: Record<string, any> = { ...(row.metadata || {}) };
 
-        const row = result.rows[0] as Record<string, unknown>;
+        const knownKeys = new Set([
+            "id", "uid", "email",
+            "password_hash", "passwordHash",
+            "display_name", "displayName",
+            "photo_url", "photoUrl", "photoURL",
+            "email_verified", "emailVerified",
+            "email_verification_token", "emailVerificationToken",
+            "email_verification_sent_at", "emailVerificationSentAt",
+            "created_at", "createdAt",
+            "updated_at", "updatedAt",
+            "metadata"
+        ]);
+
+        for (const [key, val] of Object.entries(row)) {
+            if (!knownKeys.has(key)) {
+                const camelKey = camelCase(key);
+                metadata[camelKey] = val;
+            }
+        }
+
         return {
-            id: row.id as string,
-            email: row.email as string,
-            passwordHash: (row.password_hash as string | null) ?? null,
-            displayName: (row.display_name as string | null) ?? null,
-            photoUrl: (row.photo_url as string | null) ?? null,
-            emailVerified: (row.email_verified as boolean | undefined) ?? false,
-            emailVerificationToken: (row.email_verification_token as string | null) ?? null,
-            emailVerificationSentAt: (row.email_verification_sent_at as Date | null) ?? null,
-            billingPlan: (row.billing_plan as string | null) ?? "free",
-            createdAt: row.created_at as Date,
-            updatedAt: row.updated_at as Date
-        } as User;
+            id,
+            email,
+            passwordHash,
+            displayName,
+            photoUrl,
+            emailVerified,
+            emailVerificationToken,
+            emailVerificationSentAt: emailVerificationSentAt ? new Date(emailVerificationSentAt) : null,
+            createdAt: createdAt ? new Date(createdAt) : new Date(),
+            updatedAt: updatedAt ? new Date(updatedAt) : new Date(),
+            metadata
+        };
+    }
+
+    private mapPayload(data: any): Record<string, any> {
+        if (!data) return data;
+
+        const payload: Record<string, any> = {};
+
+        const idKey = getColumnKey(this.usersTable, "id") || "id";
+        const emailKey = getColumnKey(this.usersTable, "email") || "email";
+        const passwordHashKey = getColumnKey(this.usersTable, "passwordHash", "password_hash") || "passwordHash";
+        const displayNameKey = getColumnKey(this.usersTable, "displayName", "display_name") || "displayName";
+        const photoUrlKey = getColumnKey(this.usersTable, "photoUrl", "photo_url") || "photoUrl";
+        const emailVerifiedKey = getColumnKey(this.usersTable, "emailVerified", "email_verified") || "emailVerified";
+        const emailVerificationTokenKey = getColumnKey(this.usersTable, "emailVerificationToken", "email_verification_token") || "emailVerificationToken";
+        const emailVerificationSentAtKey = getColumnKey(this.usersTable, "emailVerificationSentAt", "email_verification_sent_at") || "emailVerificationSentAt";
+        const createdAtKey = getColumnKey(this.usersTable, "createdAt", "created_at") || "createdAt";
+        const updatedAtKey = getColumnKey(this.usersTable, "updatedAt", "updated_at") || "updatedAt";
+        const metadataKey = getColumnKey(this.usersTable, "metadata") || "metadata";
+
+        if ("id" in data) payload[idKey] = data.id;
+        if ("email" in data) payload[emailKey] = data.email;
+        if ("passwordHash" in data) payload[passwordHashKey] = data.passwordHash;
+        if ("displayName" in data) payload[displayNameKey] = data.displayName;
+        if ("photoUrl" in data) payload[photoUrlKey] = data.photoUrl;
+        if ("emailVerified" in data) payload[emailVerifiedKey] = data.emailVerified;
+        if ("emailVerificationToken" in data) payload[emailVerificationTokenKey] = data.emailVerificationToken;
+        if ("emailVerificationSentAt" in data) payload[emailVerificationSentAtKey] = data.emailVerificationSentAt;
+        if ("createdAt" in data) payload[createdAtKey] = data.createdAt;
+        if ("updatedAt" in data) payload[updatedAtKey] = data.updatedAt;
+
+        const metadata: Record<string, any> = { ...(data.metadata || {}) };
+        const remainingMetadata: Record<string, any> = {};
+
+        for (const [key, val] of Object.entries(metadata)) {
+            const tableColKey = getColumnKey(this.usersTable, key);
+            if (tableColKey && 
+                tableColKey !== idKey && 
+                tableColKey !== emailKey && 
+                tableColKey !== passwordHashKey && 
+                tableColKey !== displayNameKey && 
+                tableColKey !== photoUrlKey && 
+                tableColKey !== emailVerifiedKey && 
+                tableColKey !== emailVerificationTokenKey && 
+                tableColKey !== emailVerificationSentAtKey && 
+                tableColKey !== createdAtKey && 
+                tableColKey !== updatedAtKey && 
+                tableColKey !== metadataKey) {
+                payload[tableColKey] = val;
+            } else {
+                remainingMetadata[key] = val;
+            }
+        }
+
+        if (metadataKey in this.usersTable) {
+            payload[metadataKey] = remainingMetadata;
+        }
+
+        return payload;
+    }
+
+    async createUser(data: CreateUserData): Promise<UserData> {
+        const payload = this.mapPayload(data);
+        const [row] = (await this.db.insert(this.usersTable).values(payload).returning()) as any[];
+        return this.mapRowToUser(row);
+    }
+
+    async getUserById(id: string): Promise<UserData | null> {
+        const idCol = getColumn(this.usersTable, "id");
+        if (!idCol) return null;
+        const [row] = await this.db.select().from(this.usersTable).where(eq(idCol, id));
+        return row ? this.mapRowToUser(row) : null;
+    }
+
+    async getUserByEmail(email: string): Promise<UserData | null> {
+        const emailCol = getColumn(this.usersTable, "email");
+        if (!emailCol) return null;
+        const [row] = await this.db.select().from(this.usersTable).where(eq(emailCol, email.toLowerCase()));
+        return row ? this.mapRowToUser(row) : null;
+    }
+
+    async getUserByIdentity(provider: string, providerId: string): Promise<UserData | null> {
+        const userIdCol = getColumn(this.usersTable, "id");
+        if (!userIdCol) return null;
+        
+        const result = await this.db
+            .select({ user: this.usersTable })
+            .from(this.usersTable)
+            .innerJoin(userIdentities, eq(userIdCol, userIdentities.userId))
+            .where(
+                sql`${userIdentities.provider} = ${provider} AND ${userIdentities.providerId} = ${providerId}`
+            )
+            .limit(1);
+
+        if (result.length === 0) return null;
+        return this.mapRowToUser(result[0].user);
     }
 
     async getUserIdentities(userId: string): Promise<UserIdentityData[]> {
@@ -97,22 +228,30 @@ export class UserService implements UserRepository {
         }).onConflictDoNothing({ target: [userIdentities.provider, userIdentities.providerId] });
     }
 
-    async updateUser(id: string, data: Partial<Omit<NewUser, "id">>): Promise<User | null> {
-        const [user] = await this.db
-            .update(users)
-            .set({ ...data,
-updatedAt: new Date() })
-            .where(eq(users.id, id))
-            .returning();
-        return user || null;
+    async updateUser(id: string, data: Partial<Omit<CreateUserData, "id">>): Promise<UserData | null> {
+        const idCol = getColumn(this.usersTable, "id");
+        if (!idCol) return null;
+        const payload = this.mapPayload(data);
+        const updatedAtKey = getColumnKey(this.usersTable, "updatedAt", "updated_at") || "updatedAt";
+        payload[updatedAtKey] = new Date();
+
+        const [row] = (await this.db
+            .update(this.usersTable)
+            .set(payload)
+            .where(eq(idCol, id))
+            .returning()) as any[];
+        return row ? this.mapRowToUser(row) : null;
     }
 
     async deleteUser(id: string): Promise<void> {
-        await this.db.delete(users).where(eq(users.id, id));
+        const idCol = getColumn(this.usersTable, "id");
+        if (!idCol) return;
+        await this.db.delete(this.usersTable).where(eq(idCol, id));
     }
 
-    async listUsers(): Promise<User[]> {
-        return this.db.select().from(users);
+    async listUsers(): Promise<UserData[]> {
+        const rows = await this.db.select().from(this.usersTable);
+        return rows.map(row => this.mapRowToUser(row));
     }
 
     async listUsersPaginated(options?: ListUsersOptions): Promise<PaginatedUsersResult> {
@@ -123,116 +262,127 @@ updatedAt: new Date() })
         const orderDir = options?.orderDir || "desc";
         const roleId = options?.roleId;
 
-        // Map camelCase field names to snake_case column names
-        const columnMap: Record<string, string> = {
-            email: "email",
-            displayName: "display_name",
-            createdAt: "created_at",
-            updatedAt: "updated_at",
-            provider: "provider"
-        };
-        const orderColumn = columnMap[orderBy] || "created_at";
+        const orderCol = getColumn(this.usersTable, orderBy);
+        const orderColumn = orderCol ? orderCol.name : "created_at";
         const direction = orderDir === "asc" ? sql`ASC` : sql`DESC`;
+
+        const emailCol = getColumn(this.usersTable, "email");
+        const emailColumn = emailCol ? emailCol.name : "email";
+        const displayNameCol = getColumn(this.usersTable, "displayName", "display_name");
+        const displayNameColumn = displayNameCol ? displayNameCol.name : "display_name";
+        const idCol = getColumn(this.usersTable, "id");
+        const idColumn = idCol ? idCol.name : "id";
+
+        const usersTableName = this.getQualifiedUsersTableName();
 
         const conditions = [];
         if (roleId) {
-            conditions.push(sql`EXISTS (SELECT 1 FROM rebase.user_roles ur WHERE ur.user_id = users.id AND ur.role_id = ${roleId})`);
+            conditions.push(sql`EXISTS (SELECT 1 FROM rebase.user_roles ur WHERE ur.user_id = ${sql.raw(usersTableName)}.${sql.raw(idColumn)} AND ur.role_id = ${roleId})`);
         }
         if (search) {
             const pattern = `%${search}%`;
-            conditions.push(sql`(email ILIKE ${pattern} OR display_name ILIKE ${pattern})`);
+            conditions.push(sql`(${sql.raw(usersTableName)}.${sql.raw(emailColumn)} ILIKE ${pattern} OR ${sql.raw(usersTableName)}.${sql.raw(displayNameColumn)} ILIKE ${pattern})`);
         }
 
         const whereClause = conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
 
         // Sorting: users with roles first if no role filter, then by requested order
         const orderByClause = roleId
-            ? sql`ORDER BY ${sql.raw(orderColumn)} ${direction}`
-            : sql`ORDER BY (SELECT count(*) FROM rebase.user_roles ur WHERE ur.user_id = users.id) DESC, ${sql.raw(orderColumn)} ${direction}`;
+            ? sql`ORDER BY ${sql.raw(usersTableName)}.${sql.raw(orderColumn)} ${direction}`
+            : sql`ORDER BY (SELECT count(*) FROM rebase.user_roles ur WHERE ur.user_id = ${sql.raw(usersTableName)}.${sql.raw(idColumn)}) DESC, ${sql.raw(usersTableName)}.${sql.raw(orderColumn)} ${direction}`;
 
         const countResult = await this.db.execute(sql`
-            SELECT count(*)::int as total FROM rebase.users
+            SELECT count(*)::int as total FROM ${sql.raw(usersTableName)}
             ${whereClause}
         `);
         const total = (countResult.rows[0] as { total: number }).total;
 
         const dataResult = await this.db.execute(sql`
-            SELECT * FROM rebase.users
+            SELECT * FROM ${sql.raw(usersTableName)}
             ${whereClause}
             ${orderByClause}
             LIMIT ${limit} OFFSET ${offset}
         `);
-        const rows = dataResult.rows as User[];
+        const rows = dataResult.rows;
 
-        // Map snake_case rows to camelCase UserData
-        const mappedUsers: User[] = rows.map((row: Record<string, unknown>) => ({
-            id: row.id as string,
-            email: row.email as string,
-            passwordHash: ((row.password_hash ?? row.passwordHash) as string | null) ?? null,
-            displayName: ((row.display_name ?? row.displayName) as string | null) ?? null,
-            photoUrl: ((row.photo_url ?? row.photoUrl) as string | null) ?? null,
-            emailVerified: ((row.email_verified ?? row.emailVerified) as boolean | undefined) ?? false,
-            emailVerificationToken: ((row.email_verification_token ?? row.emailVerificationToken) as string | null) ?? null,
-            emailVerificationSentAt: ((row.email_verification_sent_at ?? row.emailVerificationSentAt) as Date | null) ?? null,
-            billingPlan: ((row.billing_plan ?? row.billingPlan) as string | null) ?? "free",
-            createdAt: (row.created_at ?? row.createdAt) as Date,
-            updatedAt: (row.updated_at ?? row.updatedAt) as Date
-        })) as User[];
+        // Map rows to camelCase UserData
+        const mappedUsers: UserData[] = rows.map((row: any) => this.mapRowToUser(row));
 
         return { users: mappedUsers,
-total,
-limit,
-offset };
+            total,
+            limit,
+            offset };
     }
 
     /**
      * Update user's password hash
      */
     async updatePassword(id: string, passwordHash: string): Promise<void> {
+        const idCol = getColumn(this.usersTable, "id");
+        if (!idCol) return;
+        const passwordHashColKey = getColumnKey(this.usersTable, "passwordHash", "password_hash") || "passwordHash";
+        const updatedAtColKey = getColumnKey(this.usersTable, "updatedAt", "updated_at") || "updatedAt";
+
         await this.db
-            .update(users)
-            .set({ passwordHash,
-updatedAt: new Date() })
-            .where(eq(users.id, id));
+            .update(this.usersTable)
+            .set({
+                [passwordHashColKey]: passwordHash,
+                [updatedAtColKey]: new Date()
+            })
+            .where(eq(idCol, id));
     }
 
     /**
      * Set email verification status
      */
     async setEmailVerified(id: string, verified: boolean): Promise<void> {
+        const idCol = getColumn(this.usersTable, "id");
+        if (!idCol) return;
+        const emailVerifiedColKey = getColumnKey(this.usersTable, "emailVerified", "email_verified") || "emailVerified";
+        const emailVerificationTokenColKey = getColumnKey(this.usersTable, "emailVerificationToken", "email_verification_token") || "emailVerificationToken";
+        const updatedAtColKey = getColumnKey(this.usersTable, "updatedAt", "updated_at") || "updatedAt";
+
         await this.db
-            .update(users)
+            .update(this.usersTable)
             .set({
-                emailVerified: verified,
-                emailVerificationToken: null,
-                updatedAt: new Date()
+                [emailVerifiedColKey]: verified,
+                [emailVerificationTokenColKey]: null,
+                [updatedAtColKey]: new Date()
             })
-            .where(eq(users.id, id));
+            .where(eq(idCol, id));
     }
 
     /**
      * Set email verification token
      */
     async setVerificationToken(id: string, token: string | null): Promise<void> {
+        const idCol = getColumn(this.usersTable, "id");
+        if (!idCol) return;
+        const emailVerificationTokenColKey = getColumnKey(this.usersTable, "emailVerificationToken", "email_verification_token") || "emailVerificationToken";
+        const emailVerificationSentAtColKey = getColumnKey(this.usersTable, "emailVerificationSentAt", "email_verification_sent_at") || "emailVerificationSentAt";
+        const updatedAtColKey = getColumnKey(this.usersTable, "updatedAt", "updated_at") || "updatedAt";
+
         await this.db
-            .update(users)
+            .update(this.usersTable)
             .set({
-                emailVerificationToken: token,
-                emailVerificationSentAt: token ? new Date() : null,
-                updatedAt: new Date()
+                [emailVerificationTokenColKey]: token,
+                [emailVerificationSentAtColKey]: token ? new Date() : null,
+                [updatedAtColKey]: new Date()
             })
-            .where(eq(users.id, id));
+            .where(eq(idCol, id));
     }
 
     /**
      * Find user by email verification token
      */
-    async getUserByVerificationToken(token: string): Promise<User | null> {
-        const [user] = await this.db
+    async getUserByVerificationToken(token: string): Promise<UserData | null> {
+        const tokenCol = getColumn(this.usersTable, "emailVerificationToken", "email_verification_token");
+        if (!tokenCol) return null;
+        const [row] = await this.db
             .select()
-            .from(users)
-            .where(eq(users.emailVerificationToken, token));
-        return user || null;
+            .from(this.usersTable)
+            .where(eq(tokenCol, token));
+        return row ? this.mapRowToUser(row) : null;
     }
 
     /**
@@ -295,13 +445,13 @@ updatedAt: new Date() })
     /**
      * Get user with their roles
      */
-    async getUserWithRoles(userId: string): Promise<{ user: User; roles: Role[] } | null> {
+    async getUserWithRoles(userId: string): Promise<{ user: UserData; roles: Role[] } | null> {
         const user = await this.getUserById(userId);
         if (!user) return null;
 
         const roles = await this.getUserRoles(userId);
         return { user,
-roles };
+            roles };
     }
 }
 
@@ -630,8 +780,8 @@ export class PostgresAuthRepository implements AuthRepository {
     private roleService: RoleService;
     private tokenRepository: PostgresTokenRepository;
 
-    constructor(private db: NodePgDatabase) {
-        this.userService = new UserService(db);
+    constructor(private db: NodePgDatabase, usersTable?: any) {
+        this.userService = new UserService(db, usersTable);
         this.roleService = new RoleService(db);
         this.tokenRepository = new PostgresTokenRepository(db);
     }
@@ -639,19 +789,19 @@ export class PostgresAuthRepository implements AuthRepository {
     // User operations (delegate to UserService)
 
     async createUser(data: CreateUserData): Promise<UserData> {
-        return this.userService.createUser(data as NewUser) as Promise<UserData>;
+        return this.userService.createUser(data);
     }
 
     async getUserById(id: string): Promise<UserData | null> {
-        return this.userService.getUserById(id) as Promise<UserData | null>;
+        return this.userService.getUserById(id);
     }
 
     async getUserByEmail(email: string): Promise<UserData | null> {
-        return this.userService.getUserByEmail(email) as Promise<UserData | null>;
+        return this.userService.getUserByEmail(email);
     }
 
     async getUserByIdentity(provider: string, providerId: string): Promise<UserData | null> {
-        return this.userService.getUserByIdentity(provider, providerId) as Promise<UserData | null>;
+        return this.userService.getUserByIdentity(provider, providerId);
     }
 
     async getUserIdentities(userId: string): Promise<UserIdentityData[]> {
@@ -663,7 +813,7 @@ export class PostgresAuthRepository implements AuthRepository {
     }
 
     async updateUser(id: string, data: Partial<Omit<CreateUserData, "id">>): Promise<UserData | null> {
-        return this.userService.updateUser(id, data) as Promise<UserData | null>;
+        return this.userService.updateUser(id, data);
     }
 
     async deleteUser(id: string): Promise<void> {
@@ -671,7 +821,7 @@ export class PostgresAuthRepository implements AuthRepository {
     }
 
     async listUsers(): Promise<UserData[]> {
-        return this.userService.listUsers() as Promise<UserData[]>;
+        return this.userService.listUsers();
     }
 
     async listUsersPaginated(options?: ListUsersOptions): Promise<PaginatedUsersResult> {
@@ -691,7 +841,7 @@ export class PostgresAuthRepository implements AuthRepository {
     }
 
     async getUserByVerificationToken(token: string): Promise<UserData | null> {
-        return this.userService.getUserByVerificationToken(token) as Promise<UserData | null>;
+        return this.userService.getUserByVerificationToken(token);
     }
 
     async getUserRoles(userId: string): Promise<RoleData[]> {
@@ -711,8 +861,7 @@ export class PostgresAuthRepository implements AuthRepository {
     }
 
     async getUserWithRoles(userId: string): Promise<{ user: UserData; roles: RoleData[] } | null> {
-        const result = await this.userService.getUserWithRoles(userId);
-        return result as { user: UserData; roles: RoleData[] } | null;
+        return this.userService.getUserWithRoles(userId);
     }
 
     // Role operations (delegate to RoleService)

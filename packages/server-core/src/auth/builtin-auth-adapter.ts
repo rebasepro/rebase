@@ -273,6 +273,7 @@ function createUserManagementFromRepo(repo: AuthRepository): UserManagementAdapt
                 passwordHash,
                 displayName: data.displayName,
                 photoUrl: data.photoUrl,
+                metadata: data.metadata,
             });
             return toAuthUserData(user);
         },
@@ -282,6 +283,7 @@ function createUserManagementFromRepo(repo: AuthRepository): UserManagementAdapt
             if (data.email !== undefined) updateData.email = data.email;
             if (data.displayName !== undefined) updateData.displayName = data.displayName;
             if (data.photoUrl !== undefined) updateData.photoUrl = data.photoUrl;
+            if (data.metadata !== undefined) updateData.metadata = data.metadata;
             if (data.password) {
                 const { hashPassword } = await import("./password");
                 updateData.passwordHash = await hashPassword(data.password);
@@ -340,13 +342,14 @@ function createRoleManagementFromRepo(repo: AuthRepository): RoleManagementAdapt
     };
 }
 
-function toAuthUserData(user: { id: string; email: string; displayName?: string | null; photoUrl?: string | null; emailVerified?: boolean; createdAt?: Date; updatedAt?: Date }): AuthUserData {
+function toAuthUserData(user: { id: string; email: string; displayName?: string | null; photoUrl?: string | null; emailVerified?: boolean; metadata?: Record<string, any>; createdAt?: Date; updatedAt?: Date }): AuthUserData {
     return {
         id: user.id,
         email: user.email,
         displayName: user.displayName,
         photoUrl: user.photoUrl,
         emailVerified: user.emailVerified,
+        metadata: user.metadata,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
     };

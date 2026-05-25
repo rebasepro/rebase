@@ -60,8 +60,12 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         {
             "--git": Boolean,
             "--install": Boolean,
+            "--database-url": String,
+            "--introspect": Boolean,
+            "--yes": Boolean,
             "-g": "--git",
-            "-i": "--install"
+            "-i": "--install",
+            "-y": "--yes"
         },
         {
             argv: rawArgs.slice(3), // skip "node", "rebase", "init"
@@ -71,6 +75,26 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
 
     // The first positional arg after "init" is the project name
     const nameArg = args._[0];
+    const isNonInteractive = args["--yes"] || false;
+
+    if (isNonInteractive) {
+        const projectName = nameArg || "my-rebase-app";
+        const targetDirectory = path.resolve(process.cwd(), projectName);
+        const templateDirectory = path.resolve(cliRoot!, "templates", "template");
+        const pmCommands = getPMCommands(pm);
+
+        return {
+            projectName: path.basename(targetDirectory),
+            git: args["--git"] ?? false,
+            installDeps: args["--install"] ?? false,
+            targetDirectory,
+            templateDirectory,
+            databaseUrl: args["--database-url"] || undefined,
+            introspect: args["--introspect"] || false,
+            pm,
+            pmCommands
+        };
+    }
 
     const questions: Record<string, unknown>[] = [];
 
@@ -290,6 +314,10 @@ async function replacePlaceholders(options: InitOptions) {
 
     const getPackageVersion = async (pkgName: string) => {
         if (versionCache.has(pkgName)) return versionCache.get(pkgName)!;
+        if (process.env.REBASE_E2E === "true") {
+            versionCache.set(pkgName, cliVersion);
+            return cliVersion;
+        }
         let versionToUse = cliVersion;
         try {
             // First try to check if the specific cliVersion exists for this package

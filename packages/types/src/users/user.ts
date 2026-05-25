@@ -46,6 +46,12 @@ export type User = {
      */
     createdAt?: Date | string | null;
 
+    /**
+     * Additional metadata/custom claims associated with the user.
+     * Accessible by the frontend, but only writable by the backend.
+     */
+    readonly metadata?: Record<string, any>;
+
     getIdToken?: (forceRefresh?: boolean) => Promise<string>;
 
 };

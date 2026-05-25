@@ -1,4 +1,4 @@
-import { pgSchema, varchar, uuid, timestamp, boolean, jsonb, primaryKey, unique, text } from "drizzle-orm/pg-core";
+import { pgSchema, pgTable, varchar, uuid, timestamp, boolean, jsonb, primaryKey, unique, text } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 /**
@@ -10,7 +10,7 @@ export const rebaseSchema = pgSchema("rebase");
 /**
  * Users table - stores both email/password and OAuth users
  */
-export const users = rebaseSchema.table("users", {
+export const users = pgTable("users", {
     id: uuid("id").defaultRandom().primaryKey(),
     email: varchar("email", { length: 255 }).notNull().unique(),
     passwordHash: varchar("password_hash", { length: 255 }), // NULL for OAuth-only users
@@ -19,7 +19,7 @@ export const users = rebaseSchema.table("users", {
     emailVerified: boolean("email_verified").default(false).notNull(),
     emailVerificationToken: varchar("email_verification_token", { length: 255 }),
     emailVerificationSentAt: timestamp("email_verification_sent_at"),
-    billingPlan: text("billing_plan").default("free").notNull(),
+    metadata: jsonb("metadata").$type<Record<string, any>>().default({}).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull()
 });

@@ -37,6 +37,7 @@ export {
     editEntityAction,
     copyEntityAction,
     deleteEntityAction,
+    resetPasswordAction,
     SideEntityProvider,
     Scaffold,
     AppBar,
@@ -93,3 +94,8 @@ export * from "./data_export";
 
 // Collection editor — moved from @rebasepro/studio (CMS-dependent visual schema editor)
 export * from "./collection_editor";
+
+export { RolesFilterSelect } from "./components/admin/RolesFilterSelect";
+export { UserRolesSelectField } from "./components/admin/UserRolesSelectField";
+export { CreationResultDialog } from "./components/admin/CreationResultDialog";
+

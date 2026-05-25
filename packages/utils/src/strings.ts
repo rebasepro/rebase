@@ -1,6 +1,7 @@
 const tokenizeRegex = /[A-Z]{2,}(?=[A-Z][a-z]|\b)|[A-Z]?[a-z]+|[0-9]+(?:[a-z](?![a-z]))?|[A-Z]/g;
 
-export const toKebabCase = (str: string) => {
+export const toKebabCase = (str?: string) => {
+    if (!str || typeof str !== "string") return "";
     const regExpMatchArray = str.match(tokenizeRegex);
     if (!regExpMatchArray) return "";
     return regExpMatchArray
@@ -10,7 +11,8 @@ export const toKebabCase = (str: string) => {
 
 const snakeCaseRegex = tokenizeRegex;
 
-export const toSnakeCase = (str: string) => {
+export const toSnakeCase = (str?: string) => {
+    if (!str || typeof str !== "string") return "";
     const regExpMatchArray = str.match(snakeCaseRegex);
     if (!regExpMatchArray) return "";
     return regExpMatchArray

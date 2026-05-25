@@ -69,7 +69,7 @@ export interface EntityEditViewProps<M extends Record<string, unknown> = Record<
     onValuesModified?: (modified: boolean, values: M) => void;
     onSaved?: (params: OnUpdateParams) => void;
     onTabChange?: (props: OnTabChangeParams<M>) => void;
-    layout?: "side_panel" | "full_screen" | "split";
+    layout?: "side_panel" | "full_screen" | "split" | "dialog";
     barActions?: (params: BarActionsParams) => any;
     formProps?: Partial<EntityFormProps<M>>,
     /**
@@ -231,7 +231,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
         selectedSecondaryForm
     } = resolvedSelectedEntityView(customViews, customizationController, selectedTab, canEdit);
 
-    const actionsAtTheBottom = layout === "side_panel" || selectedEntityView?.includeActions === "bottom";
+    const actionsAtTheBottom = layout === "side_panel" || layout === "dialog" || selectedEntityView?.includeActions === "bottom";
 
     const mainViewVisible = selectedTab === MAIN_TAB_VALUE || Boolean(selectedSecondaryForm);
 
@@ -476,9 +476,9 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
             </Tab>
         );
 
-    const shouldShowTopBar = Boolean(barActions) || hasAdditionalViews || layout === "side_panel";
+    const shouldShowTopBar = Boolean(barActions) || hasAdditionalViews || layout === "side_panel" || layout === "dialog";
 
-    const fullScreenButton = !barActions && (layout === "side_panel" || layout === "split") && entityId ? (
+    const fullScreenButton = !barActions && (layout === "side_panel" || layout === "split" || layout === "dialog") && entityId ? (
         <Tooltip title={"Open full screen"}>
             <IconButton
                 size="small"

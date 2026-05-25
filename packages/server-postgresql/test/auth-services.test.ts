@@ -1,19 +1,45 @@
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { UserService, RoleService, RefreshTokenService, PasswordResetTokenService, Role } from "../src/auth/services";
-import { users, refreshTokens, passwordResetTokens, User } from "../src/schema/auth-schema";
+import { users, refreshTokens, passwordResetTokens } from "../src/schema/auth-schema";
+import { UserData } from "@rebasepro/server-core";
 
 // Mock the drizzle-orm functions
-jest.mock("drizzle-orm", () => ({
-    eq: jest.fn((field, value) => ({ field,
-value,
-type: "eq" })),
-    sql: jest.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
-        strings,
-        values,
-        type: "sql"
-    })),
-    relations: jest.fn(() => ({}))
-}));
+jest.mock("drizzle-orm", () => {
+    const actual = jest.requireActual("drizzle-orm");
+    return {
+        ...actual,
+        eq: jest.fn((field, value) => ({ field, value, type: "eq" })),
+        sql: Object.assign(
+            jest.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
+                strings,
+                values,
+                type: "sql"
+            })),
+            {
+                raw: jest.fn((val: string) => ({ val, type: "sql-raw" })),
+                join: jest.fn((parts: unknown[], separator: unknown) => ({ parts, separator, type: "sql-join" }))
+            }
+        ),
+        relations: jest.fn(() => ({}))
+    };
+});
+
+function mockUserData(overrides: Partial<UserData>): UserData {
+    return {
+        id: "user-123",
+        email: "test@example.com",
+        passwordHash: null,
+        displayName: null,
+        photoUrl: null,
+        emailVerified: false,
+        emailVerificationToken: null,
+        emailVerificationSentAt: null,
+        createdAt: expect.any(Date),
+        updatedAt: expect.any(Date),
+        metadata: {},
+        ...overrides
+    };
+}
 
 describe("Auth Services", () => {
     let db: jest.Mocked<NodePgDatabase<Record<string, unknown>>>;
@@ -37,9 +63,7 @@ describe("Auth Services", () => {
         });
 
         mockSelectWhere = jest.fn().mockResolvedValue([]);
-        mockSelectFrom = jest.fn().mockReturnValue({
-            where: mockSelectWhere
-        });
+        mockSelectFrom = jest.fn();
 
         mockUpdateReturning = jest.fn().mockResolvedValue([]);
         mockUpdateWhere = jest.fn().mockReturnValue({ returning: mockUpdateReturning });
@@ -49,13 +73,50 @@ describe("Auth Services", () => {
 
         mockExecute = jest.fn().mockResolvedValue({ rows: [] });
 
+        // Set up chainable mock for db.select()
+        const mockChain: any = {};
+        mockChain.from = jest.fn().mockImplementation((...args) => {
+            const result = mockSelectFrom(...args);
+            if (result && typeof result.then === "function") {
+                return result; // If listUsers mocks selectFrom to return a promise, return it directly
+            }
+            return mockChain;
+        });
+        mockChain.innerJoin = jest.fn().mockReturnValue(mockChain);
+        mockChain.where = jest.fn().mockImplementation((...args) => {
+            mockChain.wherePromise = mockSelectWhere(...args);
+            return mockChain;
+        });
+        mockChain.limit = jest.fn().mockReturnValue(mockChain);
+        mockChain.offset = jest.fn().mockReturnValue(mockChain);
+        mockChain.orderBy = jest.fn().mockReturnValue(mockChain);
+        mockChain.then = jest.fn().mockImplementation(async (onFulfilled) => {
+            let val;
+            if (mockChain.wherePromise) {
+                val = await mockChain.wherePromise;
+                mockChain.wherePromise = null;
+            } else if (mockSelectWhere.mock.calls.length > 0) {
+                const result = mockSelectWhere.mock.results[mockSelectWhere.mock.results.length - 1];
+                val = result.type === "return" ? result.value : undefined;
+                if (val && typeof val.then === "function") {
+                    val = await val;
+                }
+            } else {
+                val = [];
+            }
+            return onFulfilled(val || []);
+        });
+
         db = {
             insert: jest.fn().mockReturnValue({ values: mockInsertValues }),
-            select: jest.fn().mockReturnValue({ from: mockSelectFrom }),
+            select: jest.fn().mockReturnValue(mockChain),
             update: jest.fn().mockReturnValue({ set: mockUpdateSet }),
             delete: jest.fn().mockReturnValue({ where: mockDeleteWhere }),
             execute: mockExecute
         } as unknown as jest.Mocked<NodePgDatabase<Record<string, unknown>>>;
+
+        // Set default return value for mockSelectFrom to return mockChain (chainable)
+        mockSelectFrom.mockReturnValue(mockChain);
     });
 
     describe("UserService", () => {
@@ -71,30 +132,34 @@ describe("Auth Services", () => {
                     email: "test@example.com",
                     displayName: "Test User"
                 };
-                const createdUser = { id: "user-123",
-...newUser,
-createdAt: new Date(),
-updatedAt: new Date() };
-                mockInsertReturning.mockResolvedValueOnce([createdUser]);
+                const dbReturnedUser = { 
+                    id: "user-123",
+                    ...newUser,
+                    createdAt: new Date(),
+                    updatedAt: new Date() 
+                };
+                mockInsertReturning.mockResolvedValueOnce([dbReturnedUser]);
 
                 const result = await userService.createUser(newUser);
 
                 expect(db.insert).toHaveBeenCalledWith(users);
-                expect(mockInsertValues).toHaveBeenCalledWith(newUser);
-                expect(result).toEqual(createdUser);
+                expect(mockInsertValues).toHaveBeenCalledWith({
+                    ...newUser,
+                    metadata: {}
+                });
+                expect(result).toEqual(mockUserData({ displayName: "Test User" }));
             });
         });
 
         describe("getUserById", () => {
             it("should return user when found", async () => {
-                const mockUser = { id: "user-123",
-email: "test@example.com" };
+                const mockUser = { id: "user-123", email: "test@example.com" };
                 mockSelectWhere.mockResolvedValueOnce([mockUser]);
 
                 const result = await userService.getUserById("user-123");
 
                 expect(db.select).toHaveBeenCalled();
-                expect(result).toEqual(mockUser);
+                expect(result).toEqual(mockUserData({}));
             });
 
             it("should return null when user not found", async () => {
@@ -108,13 +173,12 @@ email: "test@example.com" };
 
         describe("getUserByEmail", () => {
             it("should return user when found by email", async () => {
-                const mockUser = { id: "user-123",
-email: "test@example.com" };
+                const mockUser = { id: "user-123", email: "test@example.com" };
                 mockSelectWhere.mockResolvedValueOnce([mockUser]);
 
                 const result = await userService.getUserByEmail("test@example.com");
 
-                expect(result).toEqual(mockUser);
+                expect(result).toEqual(mockUserData({}));
             });
 
             it("should lowercase email for lookup", async () => {
@@ -128,14 +192,14 @@ email: "test@example.com" };
         });
 
         describe("getUserByIdentity", () => {
-            it("should execute sql for identity lookup", async () => {
-                const mockUser = { id: "user-123" };
-                // execute mock instead of select
-                mockExecute.mockResolvedValueOnce({ rows: [mockUser] });
+            it("should fetch user by identity", async () => {
+                const mockUser = { id: "user-123", email: "test@example.com" };
+                mockSelectWhere.mockResolvedValueOnce([{ user: mockUser }]);
 
                 const result = await userService.getUserByIdentity("google", "google-abc");
 
-                expect(mockExecute).toHaveBeenCalled();
+                expect(db.select).toHaveBeenCalled();
+                expect(result).toEqual(expect.objectContaining({ id: "user-123", email: "test@example.com" }));
             });
         });
 
@@ -158,9 +222,11 @@ email: "test@example.com" };
 
         describe("updateUser", () => {
             it("should update user and return updated record", async () => {
-                const updatedUser = { id: "user-123",
-email: "test@example.com",
-displayName: "Updated Name" };
+                const updatedUser = { 
+                    id: "user-123",
+                    email: "test@example.com",
+                    displayName: "Updated Name" 
+                };
                 mockUpdateReturning.mockResolvedValueOnce([updatedUser]);
 
                 const result = await userService.updateUser("user-123", { displayName: "Updated Name" });
@@ -170,7 +236,7 @@ displayName: "Updated Name" };
                     displayName: "Updated Name",
                     updatedAt: expect.any(Date)
                 }));
-                expect(result).toEqual(updatedUser);
+                expect(result).toEqual(mockUserData({ displayName: "Updated Name" }));
             });
 
             it("should return null when user not found", async () => {
@@ -194,17 +260,18 @@ displayName: "Updated Name" };
         describe("listUsers", () => {
             it("should return all users", async () => {
                 const mockUsers = [
-                    { id: "user-1",
-email: "user1@example.com" },
-                    { id: "user-2",
-email: "user2@example.com" }
+                    { id: "user-1", email: "user1@example.com" },
+                    { id: "user-2", email: "user2@example.com" }
                 ];
                 mockSelectFrom.mockReturnValueOnce(Promise.resolve(mockUsers));
 
                 const result = await userService.listUsers();
 
                 expect(db.select).toHaveBeenCalled();
-                expect(result).toEqual(mockUsers);
+                expect(result).toEqual([
+                    mockUserData({ id: "user-1", email: "user1@example.com" }),
+                    mockUserData({ id: "user-2", email: "user2@example.com" })
+                ]);
             });
         });
 
@@ -264,13 +331,12 @@ email: "user2@example.com" }
 
         describe("getUserByVerificationToken", () => {
             it("should find user by verification token", async () => {
-                const mockUser = { id: "user-123",
-email: "test@example.com" };
+                const mockUser = { id: "user-123", email: "test@example.com" };
                 mockSelectWhere.mockResolvedValueOnce([mockUser]);
 
                 const result = await userService.getUserByVerificationToken("token-abc");
 
-                expect(result).toEqual(mockUser);
+                expect(result).toEqual(mockUserData({}));
             });
         });
 
@@ -279,17 +345,17 @@ email: "test@example.com" };
                 mockExecute.mockResolvedValueOnce({
                     rows: [
                         { id: "admin",
-name: "Admin",
-is_admin: true,
-default_permissions: null,
-collection_permissions: null,
-config: null },
+                            name: "Admin",
+                            is_admin: true,
+                            default_permissions: null,
+                            collection_permissions: null,
+                            config: null },
                         { id: "editor",
-name: "Editor",
-is_admin: false,
-default_permissions: { edit: true },
-collection_permissions: null,
-config: null }
+                            name: "Editor",
+                            is_admin: false,
+                            default_permissions: { edit: true },
+                            collection_permissions: null,
+                            config: null }
                     ]
                 });
 
@@ -312,11 +378,11 @@ config: null }
                 mockExecute.mockResolvedValueOnce({
                     rows: [
                         { id: "admin",
-name: "Admin",
-is_admin: true,
-default_permissions: null,
-collection_permissions: null,
-config: null }
+                            name: "Admin",
+                            is_admin: true,
+                            default_permissions: null,
+                            collection_permissions: null,
+                            config: null }
                     ]
                 });
 
@@ -353,28 +419,27 @@ config: null }
 
         describe("getUserWithRoles", () => {
             it("should return user with roles", async () => {
-                const mockUser = { id: "user-123",
-email: "test@example.com" };
+                const mockUser = { id: "user-123", email: "test@example.com" };
                 mockSelectWhere.mockResolvedValueOnce([mockUser]);
                 mockExecute.mockResolvedValueOnce({
                     rows: [{ id: "admin",
-name: "Admin",
-is_admin: true,
-default_permissions: null,
-collection_permissions: null,
-config: null }]
+                        name: "Admin",
+                        is_admin: true,
+                        default_permissions: null,
+                        collection_permissions: null,
+                        config: null }]
                 });
 
                 const result = await userService.getUserWithRoles("user-123");
 
                 expect(result).toEqual({
-                    user: mockUser,
+                    user: mockUserData({}),
                     roles: [{ id: "admin",
-name: "Admin",
-isAdmin: true,
-defaultPermissions: null,
-collectionPermissions: null,
-config: null }]
+                        name: "Admin",
+                        isAdmin: true,
+                        defaultPermissions: null,
+                        collectionPermissions: null,
+                        config: null }]
                 });
             });
 
@@ -384,6 +449,30 @@ config: null }]
                 const result = await userService.getUserWithRoles("nonexistent");
 
                 expect(result).toBeNull();
+            });
+        });
+
+        describe("listUsersPaginated", () => {
+            it("should return paginated and filtered users list", async () => {
+                mockExecute
+                    .mockResolvedValueOnce({ rows: [{ total: 1 }] })
+                    .mockResolvedValueOnce({ rows: [{ id: "user-123", email: "test@example.com" }] });
+
+                const result = await userService.listUsersPaginated({
+                    limit: 10,
+                    offset: 0,
+                    search: "test",
+                    orderBy: "email",
+                    orderDir: "asc"
+                });
+
+                expect(mockExecute).toHaveBeenCalledTimes(2);
+                expect(result).toEqual({
+                    users: [mockUserData({ id: "user-123", email: "test@example.com" })],
+                    total: 1,
+                    limit: 10,
+                    offset: 0
+                });
             });
         });
     });

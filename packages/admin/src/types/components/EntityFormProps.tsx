@@ -22,7 +22,7 @@ export type EntityFormProps<M extends Record<string, unknown>> = {
     onStatusChange?: (status: EntityStatus) => void;
     onEntityChange?: (entity: Entity<M>) => void;
     formex?: FormexController<M>;
-    openEntityMode?: "side_panel" | "full_screen" | "split";
+    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
     /**
      * If true, the form will be disabled and no actions will be available
      */

@@ -12,7 +12,8 @@
         "clean": "rm -rf dist"
     },
     "dependencies": {
-        "@rebasepro/types": "workspace:*"
+        "@rebasepro/types": "workspace:*",
+        "@rebasepro/admin": "workspace:*"
     },
     "devDependencies": {
         "typescript": "^5.9.2"

@@ -17,7 +17,9 @@
     "baseUrl": "../../",
     "paths": {
       "@rebasepro/types": ["packages/types/src/index.ts"],
-      "@rebasepro/types/*": ["packages/types/src/*"]
+      "@rebasepro/types/*": ["packages/types/src/*"],
+      "@rebasepro/admin": ["packages/admin/src/index.ts"],
+      "@rebasepro/admin/*": ["packages/admin/src/*"]
     }
   },
   "include": [

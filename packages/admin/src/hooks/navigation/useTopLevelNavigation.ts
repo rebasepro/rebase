@@ -152,7 +152,7 @@ export function useTopLevelNavigation(
                 if (adminView.hideFromNavigation) return acc;
 
                 const pathKey = adminView.slug;
-                let groupName = NAVIGATION_ADMIN_GROUP_NAME;
+                let groupName = adminView.group?.trim() || NAVIGATION_ADMIN_GROUP_NAME;
 
                 if (finalNavigationGroupMappings) {
                     for (const pluginGroupDef of finalNavigationGroupMappings) {

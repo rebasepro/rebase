@@ -1,8 +1,7 @@
 
 import type { EntityCollection } from "@rebasepro/types";
-import type { Property } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Entity, EntityTableController, EnumValueConfig, FilterValues, SaveEntityProps, SelectionController } from "@rebasepro/types";
+import { Entity, EntityTableController, EnumValueConfig, SaveEntityProps, SelectionController } from "@rebasepro/types";
 import { Board } from "./Board";
 import { BoardItem, BoardItemViewProps, ColumnLoadingState } from "./board_types";
 import { EntityBoardCard } from "./EntityBoardCard";
@@ -58,7 +57,6 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
     emptyComponent,
     deletedEntities
 }: EntityCollectionBoardViewProps<M>) {
-    const authController = useAuthController();
     const customizationController = useCustomizationController();
     const context = useRebaseContext();
     const dataClient = useData();
@@ -245,7 +243,6 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
 
     useEffect(() => {
         const currentDataClient = dataClientRef.current;
-        const currentCollection = collectionRef.current;
         const accessor = currentDataClient.collection(fullPath);
 
         if (!orderProperty || !accessor.count) {
@@ -472,7 +469,7 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
         parentCollectionSlugs,
         parentEntityIds
     });
-    const KanbanSetupComponent = kanbanSetupSlots.length > 0 ? () => <>{kanbanSetupSlots[0]}</> : null;
+
 
     // Get AddKanbanColumnComponent from plugin slots
     const addKanbanColumnSlots = useSlot("kanban.add-column", {
@@ -481,7 +478,7 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
         parentCollectionSlugs, parentEntityIds,
         columnProperty
     });
-    const AddKanbanColumnComponent = addKanbanColumnSlots.length > 0 ? () => <>{addKanbanColumnSlots[0]}</> : null;
+
 
     // Check for loading error
     const hasError = Boolean(dataLoadingError);

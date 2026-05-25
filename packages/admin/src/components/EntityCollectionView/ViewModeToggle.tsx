@@ -66,9 +66,7 @@ export function ViewModeToggle({
 
     const { t } = useTranslation();
 
-    if (!onViewModeChange) {
-        return null;
-    }
+
 
     // Get icon for current view mode
     const getViewModeIcon = () => {
@@ -117,9 +115,12 @@ export function ViewModeToggle({
         ];
 
         return allOptions;
-    }, []);
+    }, [t]);
 
-
+    // ── Guard (after hooks to preserve Rules of Hooks) ──────────────
+    if (!onViewModeChange) {
+        return null;
+    }
 
     return (
         <div className="overflow-visible">

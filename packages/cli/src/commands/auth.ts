@@ -77,12 +77,12 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
     }
 
     const scriptContent = `
-import { createPostgresDatabaseConnection } from "@rebasepro/server-core";
-import { hashPassword } from "@rebasepro/server-core/src/auth/password";
+import { createPostgresDatabaseConnection } from "@rebasepro/server-postgresql";
+import { hashPassword } from "@rebasepro/server-core";
 import { eq } from "drizzle-orm";
-import { users } from "@rebasepro/server-core/src/db/auth-schema";
 import * as dotenv from "dotenv";
 import path from "path";
+import fs from "fs";
 
 dotenv.config({ path: "${envFile || path.join(projectRoot, ".env")}" });
 
@@ -93,12 +93,30 @@ async function resetPassword() {
     const { db } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
     const hash = await hashPassword(newPassword);
 
-    const result = await db.update(users)
-        .set({ passwordHash: hash })
-        .where(eq(users.email, email))
+    let usersTable;
+    try {
+        const schemaPath = path.resolve("./src/schema.generated.ts");
+        if (fs.existsSync(schemaPath)) {
+            const schema = await import("file://" + schemaPath);
+            usersTable = schema.users || schema.tables?.users;
+        }
+    } catch (e) {
+        // ignore and fallback
+    }
+
+    if (!usersTable) {
+        const pgServer = await import("@rebasepro/server-postgresql");
+        usersTable = pgServer.users;
+    }
+
+    const passwordHashKey = (usersTable.passwordHash || "passwordHash" in usersTable) ? "passwordHash" : "password_hash";
+
+    const result = await db.update(usersTable)
+        .set({ [passwordHashKey]: hash })
+        .where(eq(usersTable.email, email))
         .returning({
-            id: users.id,
-            email: users.email
+            id: usersTable.id,
+            email: usersTable.email
         });
 
     if (result.length > 0) {

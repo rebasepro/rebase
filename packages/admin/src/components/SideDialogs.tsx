@@ -1,10 +1,11 @@
 import type { SideDialogPanelProps } from "../hooks/useSideDialogsController";
 import React, { useCallback, useContext, useEffect, useState, useMemo } from "react";
 import { useSideDialogsController } from "../hooks";
-;
-import { Sheet } from "@rebasepro/ui";
+import { Sheet, Dialog } from "@rebasepro/ui";
 import { useUnsavedChangesDialog, UnsavedChangesDialog } from "@rebasepro/core";
 import { ErrorBoundary } from "@rebasepro/ui";
+import type { EntitySidePanelProps } from "@rebasepro/types";
+
 
 export type SideDialogController = {
     blocked: boolean,
@@ -145,46 +146,70 @@ function SideDialogView({
         setPendingClose
     }), [blocked, setBlockedNavigationMessage, width, onCloseRequest, pendingClose]);
 
+    const additionalProps = panel?.additional as EntitySidePanelProps | undefined;
+    const isDialogMode = additionalProps?.collection?.openEntityMode === "dialog";
+
     return (
         <SideDialogContext.Provider value={contextValue}>
 
-            <Sheet
-                open={Boolean(panel)}
-                includeBackgroundOverlay={true}
-                overlayStyle={{ zIndex: 40 + panelIndex * 10 }}
-                style={{ zIndex: 45 + panelIndex * 10 }}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        // Check if any suggestion menu is visible in DOM
-                        const suggestionMenu = document.querySelector("[data-suggestion-menu=\"true\"]");
-                        if (suggestionMenu && window.getComputedStyle(suggestionMenu).visibility !== "hidden") {
-                            // Don't close the sheet if a suggestion menu is visible
-                            // Let Tiptap handle closing the menu first
-                            return;
+            {isDialogMode ? (
+                <Dialog
+                    open={Boolean(panel)}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            onCloseRequest();
                         }
-                        onCloseRequest();
-                    }
-                }}
-                onPointerDownOutside={!isTopPanel ? preventDismiss : undefined}
-                onInteractOutside={!isTopPanel ? preventDismiss : undefined}
-                title={"Side dialog " + panel?.key}
-            >
-                {panel &&
-                    <div
-                        className={"transform max-w-[100vw] lg:max-w-[95vw] flex flex-col h-full transition-all duration-250 ease-in-out bg-white dark:bg-surface-800 "}
-                        style={{
-                            width: panel.width,
-                            transform: `translateX(-${offsetPosition * 200}px)`
-                        }}
-                    >
-                        <ErrorBoundary>
-                            {panel.component}
-                        </ErrorBoundary>
-                    </div>}
+                    }}
+                    maxWidth="4xl"
+                    scrollable={false}
+                >
+                    {panel && (
+                        <div className="flex flex-col h-[75vh] min-h-[500px] min-w-[55vw] max-w-full overflow-hidden">
+                            <ErrorBoundary>
+                                {panel.component}
+                            </ErrorBoundary>
+                        </div>
+                    )}
+                </Dialog>
+            ) : (
+                <Sheet
+                    open={Boolean(panel)}
+                    includeBackgroundOverlay={true}
+                    overlayStyle={{ zIndex: 40 + panelIndex * 10 }}
+                    style={{ zIndex: 45 + panelIndex * 10 }}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            // Check if any suggestion menu is visible in DOM
+                            const suggestionMenu = document.querySelector("[data-suggestion-menu=\"true\"]");
+                            if (suggestionMenu && window.getComputedStyle(suggestionMenu).visibility !== "hidden") {
+                                // Don't close the sheet if a suggestion menu is visible
+                                // Let Tiptap handle closing the menu first
+                                return;
+                            }
+                            onCloseRequest();
+                        }
+                    }}
+                    onPointerDownOutside={!isTopPanel ? preventDismiss : undefined}
+                    onInteractOutside={!isTopPanel ? preventDismiss : undefined}
+                    title={"Side dialog " + panel?.key}
+                >
+                    {panel &&
+                        <div
+                            className={"transform max-w-[100vw] lg:max-w-[95vw] flex flex-col h-full transition-all duration-250 ease-in-out bg-white dark:bg-surface-800 "}
+                            style={{
+                                width: panel.width,
+                                transform: `translateX(-${offsetPosition * 200}px)`
+                            }}
+                        >
+                            <ErrorBoundary>
+                                {panel.component}
+                            </ErrorBoundary>
+                        </div>}
 
-                {!panel && <div style={{ width }}/>}
+                    {!panel && <div style={{ width }}/>}
 
-            </Sheet>
+                </Sheet>
+            )}
 
             <UnsavedChangesDialog
                 {...dialogProps}

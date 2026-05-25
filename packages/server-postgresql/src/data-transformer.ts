@@ -127,6 +127,8 @@ export function serializeDataToServer<M extends Record<string, unknown>>(
             continue;
         }
 
+
+
         // Handle relation properties specially
         if (property.type === "relation" && collection) {
             const relation = findRelation(resolvedRelations, key);

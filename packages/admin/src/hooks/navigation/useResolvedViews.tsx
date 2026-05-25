@@ -36,6 +36,7 @@ export type UseResolvedViewsProps<USER extends User> = {
     adminMode?: "content" | "studio" | "settings";
     effectiveRoleController?: EffectiveRoleController;
     userManagement?: UserManagementDelegate<USER>;
+    collections?: EntityCollection[];
 };
 
 export type UseResolvedViewsResult = {
@@ -66,7 +67,8 @@ export function useResolvedViews<USER extends User>(
         plugins,
         adminMode = "content",
         effectiveRoleController,
-        userManagement
+        userManagement,
+        collections
     } = props;
 
     const [loading, setLoading] = useState(true);
@@ -125,23 +127,29 @@ export function useResolvedViews<USER extends User>(
     const injectedAdminViews: AppView[] = useMemo(() => {
         const views: AppView[] = [];
         if (userManagement && usersViewElement) {
-            views.push({
-                slug: "users",
-                name: "Users",
-                icon: "Headset",
-                view: usersViewElement
-            });
-            if (userManagement.roles && rolesViewElement) {
+            const hasUsersCollection = collections?.some(c => c.slug === "users");
+            if (!hasUsersCollection) {
+                views.push({
+                    slug: "users",
+                    name: "Users",
+                    icon: "Headset",
+                    view: usersViewElement,
+                    group: "Settings"
+                });
+            }
+            const hasRolesCollection = collections?.some(c => c.slug === "roles");
+            if (userManagement.roles && rolesViewElement && !hasRolesCollection) {
                 views.push({
                     slug: "roles",
                     name: "Roles",
                     icon: "Shield",
-                    view: rolesViewElement
+                    view: rolesViewElement,
+                    group: "Settings"
                 });
             }
         }
         return views;
-    }, [userManagement, usersViewElement, rolesViewElement]);
+    }, [userManagement, usersViewElement, rolesViewElement, collections]);
 
     // Store injectedAdminViews in a ref for effect access
     const injectedAdminViewsRef = useRef(injectedAdminViews);
@@ -162,9 +170,14 @@ export function useResolvedViews<USER extends User>(
                     resolveAppViews(adminViewsProp, resolvedAuthControllerRef.current, dataRef.current)
                 ]);
 
-                if (cancelled) return;
-
-                const newAdminViews = [...newAdminViewsProp, ...injectedAdminViewsRef.current];
+                const hasCustomUsers = newAdminViewsProp.some(v => v.slug === "users");
+                const hasCustomRoles = newAdminViewsProp.some(v => v.slug === "roles");
+                const finalInjected = injectedAdminViewsRef.current.filter(v => {
+                    if (v.slug === "users" && hasCustomUsers) return false;
+                    if (v.slug === "roles" && hasCustomRoles) return false;
+                    return true;
+                });
+                const newAdminViews = [...newAdminViewsProp, ...finalInjected];
 
                 // Compare views by slug identity rather than deepEqual.
                 // Views contain React elements (JSX) whose internal properties
@@ -201,7 +214,8 @@ export function useResolvedViews<USER extends User>(
         refreshTrigger,
         adminMode,
         initialLoading,
-        user
+        user,
+        collections
     ]);
 
     return useMemo(() => ({
