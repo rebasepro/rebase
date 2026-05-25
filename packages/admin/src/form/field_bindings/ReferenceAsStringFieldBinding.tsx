@@ -23,7 +23,7 @@ import { useCollectionRegistryController } from "../../index";
  * @group Form fields
  */
 export function ReferenceAsStringFieldBinding(props: FieldProps<StringProperty>) {
-    if (typeof (props.property as any).reference?.path !== "string") {
+    if (typeof props.property.reference?.path !== "string") {
         return <ReadOnlyFieldBinding {...props as FieldProps<Property>}/>;
     }
 
@@ -43,7 +43,7 @@ function ReferenceAsStringFieldBindingInternal({
     includeDescription,
     size = "medium"
 }: FieldProps<StringProperty>) {
-    if (!(property as any).reference?.path) {
+    if (!property.reference?.path) {
         throw new Error("Property path is required for ReferenceAsStringFieldBinding");
     }
 
@@ -54,7 +54,7 @@ function ReferenceAsStringFieldBindingInternal({
     });
 
     const collectionRegistryController = useCollectionRegistryController();
-    const path = (property as any).reference.path;
+    const path = property.reference!.path;
     const collection: EntityCollection | undefined = useMemo(() => {
         return path ? collectionRegistryController.getCollection(path) : undefined;
     }, [path]);
@@ -81,7 +81,7 @@ path });
         collection,
         onSingleEntitySelected,
         selectedEntityIds: value ? [value] : undefined,
-        fixedFilter: (property as any).reference.fixedFilter
+        fixedFilter: property.reference?.fixedFilter
     }
     );
 
@@ -106,13 +106,13 @@ path });
 
                 {referenceValue && <ReferencePreview
                     disabled={!path}
-                    previewProperties={(property as any).reference?.previewProperties}
+                    previewProperties={property.reference?.ui?.previewProperties}
                     hover={!disabled}
                     size={size}
                     onClick={disabled || isSubmitting ? undefined : onEntryClick}
                     reference={referenceValue}
-                    includeEntityLink={(property as any).reference?.includeEntityLink}
-                    includeId={(property as any).reference?.includeId}
+                    includeEntityLink={property.reference?.includeEntityLink}
+                    includeId={property.reference?.includeId}
                 />}
 
                 {!value && <div className="justify-center text-left">

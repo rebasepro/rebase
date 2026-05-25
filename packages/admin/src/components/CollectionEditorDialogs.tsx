@@ -47,7 +47,7 @@ export function CollectionEditorDialogs() {
                 <CollectionEditorDialog
                     open={false}
                     isNewCollection={false}
-                    configController={{} as any}
+                    configController={undefined!}
                     handleClose={() => {}}
                     {...collectionDialogProps}
                 />

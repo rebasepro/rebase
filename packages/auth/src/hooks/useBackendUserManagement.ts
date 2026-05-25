@@ -284,6 +284,15 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
             return;
         }
 
+        // Skip admin API calls for non-admin users — they'd get 403 anyway.
+        // This avoids a spurious warning in backend logs on every non-admin login.
+        const userRoles = currentUser.roles ?? [];
+        const isUserAdmin = userRoles.some(r => r === "admin" || r === "schema-admin");
+        if (!isUserAdmin) {
+            setLoading(false);
+            return;
+        }
+
         // Skip refetch if we already loaded data for this same UID
         // (e.g. React StrictMode unmounts and re-mounts with the same user).
         if (lastLoadedUidRef.current === currentUser.uid) {

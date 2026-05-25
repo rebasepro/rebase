@@ -157,10 +157,10 @@ name: "ZIP" } as Property;
 describe("getResolvedPropertyInPath", () => {
     const streetProp: Property = { type: "string",
 name: "Street" } as Property;
-    const addressProp: MapProperty = {
+    const addressProp = {
         type: "map",
         properties: { street: streetProp }
-    } as MapProperty;
+    } as unknown as MapProperty;
 
     const properties: Record<string, Property> = {
         title: { type: "string",

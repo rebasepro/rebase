@@ -32,7 +32,7 @@ export function createPostgresAdapter(pgConfig: PostgresDriverConfig): DatabaseA
         
         async initializeHistory(config, driverResult) {
             if (bootstrapper.initializeHistory) {
-                return bootstrapper.initializeHistory(config, driverResult) as any;
+                return bootstrapper.initializeHistory(config, driverResult);
             }
             return undefined;
         },

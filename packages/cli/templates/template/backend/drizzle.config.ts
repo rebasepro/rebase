@@ -3,7 +3,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { defineConfig } from "drizzle-kit";
 import { tables } from "./src/schema.generated";
-import { getTableName, Table } from "drizzle-orm";
+import { getTableName } from "drizzle-orm";
+import { getTableConfig, PgTable } from "drizzle-orm/pg-core";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,7 +19,13 @@ if (!process.env.DATABASE_URL) {
 // Extract table names from the generated schema.
 // This ensures drizzle-kit ONLY manages tables defined in the schema.
 // Any tables in the database that are NOT part of the Rebase schema are left untouched.
-const tableNames = Object.values(tables).map(table => getTableName(table as Table));
+const tableNames = Object.values(tables).map(table => getTableName(table as PgTable));
+
+// Dynamically extract all schemas defined in the generated tables to ensure Drizzle Kit manages them.
+const schemas = Array.from(new Set(
+    Object.values(tables)
+        .map(table => getTableConfig(table as PgTable).schema || "public")
+));
 
 export default defineConfig({
     schema: "./src/schema.generated.ts",
@@ -30,9 +37,8 @@ export default defineConfig({
     // Only manage tables defined in the generated schema.
     // Unmapped tables in the database are completely ignored.
     tablesFilter: tableNames,
-    // Restrict drizzle-kit to the public schema only — tables in other schemas
-    // (e.g. extensions, custom schemas) are never touched.
-    schemaFilter: ["public"],
+    // Restrict drizzle-kit to the schemas defined in our collections
+    schemaFilter: schemas.length > 0 ? schemas : ["public"],
     // Prevent drizzle-kit from managing roles not defined in the schema
     entities: {
         roles: false

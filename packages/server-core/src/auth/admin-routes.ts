@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import { ApiError, errorHandler } from "../api/errors";
 import type { AuthRepository } from "./interfaces";
 import { requireAuth, requireAdmin, createRequireAuth } from "./middleware";
-import { hashPassword, validatePasswordStrength } from "./password";
+import type { AuthOverrides } from "./auth-overrides";
+import { resolveAuthOverrides } from "./auth-overrides";
 import { AuthModuleConfig } from "./routes";
 import type { BackendHooks, AdminUser, AdminRole, BackendHookContext } from "@rebasepro/types";
 
@@ -17,6 +18,11 @@ interface AdminRouteOptions extends AuthModuleConfig {
      * Backend-level hooks for intercepting admin data.
      */
     hooks?: BackendHooks;
+    /**
+     * Auth overrides for customizing password hashing, credential
+     * verification, lifecycle hooks, etc.
+     */
+    overrides?: AuthOverrides;
 }
 import { HonoEnv } from "../api/types";
 import { randomBytes, createHash } from "crypto";
@@ -68,7 +74,8 @@ function hashToken(token: string): string {
 export function createAdminRoutes(config: AdminRouteOptions): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
     const authRepo = config.authRepo;
-    const { emailService, emailConfig, hooks } = config;
+    const { emailService, emailConfig, hooks, overrides } = config;
+    const ops = resolveAuthOverrides(overrides);
 
     /** Build a BackendHookContext from Hono's context object */
     function buildHookContext(c: { get: (key: string) => unknown }, method: BackendHookContext["method"]): BackendHookContext {
@@ -281,11 +288,11 @@ export function createAdminRoutes(config: AdminRouteOptions): Hono<HonoEnv> {
         // Use provided password or auto-generate one
         const clearPassword = password || generateSecurePassword();
 
-        const validation = validatePasswordStrength(clearPassword);
+        const validation = ops.validatePasswordStrength(clearPassword);
         if (!validation.valid) {
             throw ApiError.badRequest(validation.errors.join(". "), "WEAK_PASSWORD");
         }
-        const passwordHash = await hashPassword(clearPassword);
+        const passwordHash = await ops.hashPassword(clearPassword);
 
         const user = await authRepo.createUser({
             email: email.toLowerCase(),
@@ -401,14 +408,14 @@ displayName: existing.displayName }, appName);
                 console.error("Failed to send reset email:", emailError instanceof Error ? emailError.message : emailError);
                 // Fall back to returning the temporary password
                 const clearPassword = generateSecurePassword();
-                const passwordHash = await hashPassword(clearPassword);
+                const passwordHash = await ops.hashPassword(clearPassword);
                 await authRepo.updatePassword(existing.id, passwordHash);
                 temporaryPassword = clearPassword;
             }
         } else {
             // No email service — generate password, set it, and return one-time
             const clearPassword = generateSecurePassword();
-            const passwordHash = await hashPassword(clearPassword);
+            const passwordHash = await ops.hashPassword(clearPassword);
             await authRepo.updatePassword(existing.id, passwordHash);
             temporaryPassword = clearPassword;
         }
@@ -451,11 +458,11 @@ displayName: existing.displayName }, appName);
         if (displayName !== undefined) updates.displayName = displayName;
 
         if (password) {
-            const validation = validatePasswordStrength(password);
+            const validation = ops.validatePasswordStrength(password);
             if (!validation.valid) {
                 throw ApiError.badRequest(validation.errors.join(". "), "WEAK_PASSWORD");
             }
-            updates.passwordHash = await hashPassword(password);
+            updates.passwordHash = await ops.hashPassword(password);
         }
 
         if (Object.keys(updates).length > 0) {

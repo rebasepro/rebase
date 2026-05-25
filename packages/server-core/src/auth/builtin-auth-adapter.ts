@@ -32,6 +32,8 @@ import type { AccessTokenPayload } from "./jwt";
 import { createAuthRoutes } from "./routes";
 import { createAdminRoutes } from "./admin-routes";
 import type { AuthRepository, OAuthProvider } from "./interfaces";
+import type { AuthOverrides, ResolvedAuthOperations } from "./auth-overrides";
+import { resolveAuthOverrides } from "./auth-overrides";
 import type { EmailService, EmailConfig } from "../email";
 import type { HonoEnv } from "../api/types";
 import { safeCompare } from "./crypto-utils";
@@ -59,6 +61,8 @@ export interface BuiltinAuthAdapterConfig {
     serviceKey?: string;
     /** Backend hooks for intercepting admin data. */
     hooks?: BackendHooks;
+    /** Auth overrides for customizing password, credentials, lifecycle, etc. */
+    overrides?: AuthOverrides;
 }
 
 /**
@@ -78,7 +82,10 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         oauthProviders = [],
         serviceKey,
         hooks,
+        overrides,
     } = config;
+
+    const resolvedOps = resolveAuthOverrides(overrides);
 
     const adapter: AuthAdapter = {
         id: "rebase-builtin",
@@ -184,7 +191,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             };
         },
 
-        userManagement: createUserManagementFromRepo(authRepository),
+        userManagement: createUserManagementFromRepo(authRepository, resolvedOps, overrides),
 
         roleManagement: createRoleManagementFromRepo(authRepository),
 
@@ -196,6 +203,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 allowRegistration,
                 defaultRole,
                 oauthProviders,
+                overrides,
             });
         },
 
@@ -206,6 +214,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 emailConfig,
                 serviceKey,
                 hooks,
+                overrides,
             });
         },
 
@@ -241,7 +250,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
 
 // ─── Internal Helpers ────────────────────────────────────────────────────────
 
-function createUserManagementFromRepo(repo: AuthRepository): UserManagementAdapter {
+function createUserManagementFromRepo(repo: AuthRepository, resolvedOps: ResolvedAuthOperations, overrides?: AuthOverrides): UserManagementAdapter {
     return {
         async listUsers(options?: AuthUserListOptions): Promise<AuthUserListResult> {
             const result = await repo.listUsersPaginated({
@@ -266,15 +275,23 @@ function createUserManagementFromRepo(repo: AuthRepository): UserManagementAdapt
         },
 
         async createUser(data: AuthCreateUserData): Promise<AuthUserData> {
-            const { hashPassword } = await import("./password");
-            const passwordHash = data.password ? await hashPassword(data.password) : undefined;
-            const user = await repo.createUser({
+            const passwordHash = data.password ? await resolvedOps.hashPassword(data.password) : undefined;
+            let createData: import("./interfaces").CreateUserData = {
                 email: data.email,
                 passwordHash,
                 displayName: data.displayName,
                 photoUrl: data.photoUrl,
                 metadata: data.metadata,
-            });
+            };
+            if (overrides?.beforeUserCreate) {
+                createData = await overrides.beforeUserCreate(createData);
+            }
+            const user = await repo.createUser(createData);
+            if (overrides?.afterUserCreate) {
+                overrides.afterUserCreate(user).catch(err => {
+                    console.error("[AuthOverrides] afterUserCreate error:", err instanceof Error ? err.message : err);
+                });
+            }
             return toAuthUserData(user);
         },
 
@@ -285,8 +302,7 @@ function createUserManagementFromRepo(repo: AuthRepository): UserManagementAdapt
             if (data.photoUrl !== undefined) updateData.photoUrl = data.photoUrl;
             if (data.metadata !== undefined) updateData.metadata = data.metadata;
             if (data.password) {
-                const { hashPassword } = await import("./password");
-                updateData.passwordHash = await hashPassword(data.password);
+                updateData.passwordHash = await resolvedOps.hashPassword(data.password);
             }
             const user = await repo.updateUser(id, updateData);
             return user ? toAuthUserData(user) : null;

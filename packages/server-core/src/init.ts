@@ -23,6 +23,7 @@ import { createHistoryRoutes } from "./history";
 import { EmailConfig, createEmailService } from "./email";
 import type { EmailService } from "./email";
 import type { OAuthProvider } from "./auth/interfaces";
+import type { AuthOverrides } from "./auth/auth-overrides";
 import { _initRebase } from "./singleton";
 
 export interface RebaseAuthConfig {
@@ -59,6 +60,24 @@ export interface RebaseAuthConfig {
     spotify?: { clientId: string; clientSecret: string };
     defaultRole?: string;
     providers?: OAuthProvider<any>[];
+    /**
+     * Override specific parts of the built-in auth implementation.
+     *
+     * Each override replaces one piece of the default behavior while
+     * keeping everything else intact. Unset overrides fall through
+     * to the built-in defaults (scrypt passwords, standard validation, etc.).
+     *
+     * @example bcrypt passwords for a legacy database
+     * ```ts
+     * import bcrypt from "bcrypt";
+     *
+     * overrides: {
+     *     hashPassword: (pw) => bcrypt.hash(pw, 12),
+     *     verifyPassword: (pw, hash) => bcrypt.compare(pw, hash),
+     * }
+     * ```
+     */
+    overrides?: AuthOverrides;
     [key: string]: unknown;
 }
 
@@ -391,6 +410,7 @@ collectionRegistry });
                         oauthProviders,
                         serviceKey,
                         hooks: config.hooks,
+                        overrides: safeAuthConfig.overrides,
                     });
                 }
 
@@ -552,6 +572,7 @@ collectionRegistry });
                 oauthProviders,
                 serviceKey,
                 hooks: config.hooks,
+                overrides: safeAuthConfig.overrides,
             });
         }
 
@@ -892,11 +913,12 @@ latencyMs };
             //    timer callbacks don't fire against a closed pool.
             for (const [key, rt] of Object.entries(realtimeServices)) {
                 try {
-                    if (typeof (rt as any).destroy === "function") {
-                        await (rt as any).destroy();
+                    const rtWithLifecycle = rt as RealtimeProvider & { destroy?: () => Promise<void>; stopListening?: () => Promise<void> };
+                    if (typeof rtWithLifecycle.destroy === "function") {
+                        await rtWithLifecycle.destroy();
                         logger.info(`Realtime service "${key}" destroyed`);
-                    } else if (typeof (rt as any).stopListening === "function") {
-                        await (rt as any).stopListening();
+                    } else if (typeof rtWithLifecycle.stopListening === "function") {
+                        await rtWithLifecycle.stopListening();
                         logger.info(`Realtime service "${key}" LISTEN client stopped`);
                     }
                 } catch (err) {

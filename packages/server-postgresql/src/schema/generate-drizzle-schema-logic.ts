@@ -497,7 +497,7 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
     if (hasUuid) pgCoreImports.push("uuid");
 
     const uniqueSchemas = Array.from(new Set(
-        collections.map(c => c.databaseId).filter(Boolean)
+        collections.map(c => isPostgresCollection(c) ? c.schema : undefined).filter(Boolean)
     ));
     if (uniqueSchemas.length > 0) {
         pgCoreImports.push("pgSchema");
@@ -581,7 +581,7 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
         const tableVarName = getTableVarName(tableName);
         if (isJunction && relation && sourceCollection && relation.through) {
             const targetCollection = relation.target();
-            const schema = targetCollection.databaseId || sourceCollection.databaseId;
+            const schema = (isPostgresCollection(targetCollection) ? targetCollection.schema : undefined) || (isPostgresCollection(sourceCollection) ? sourceCollection.schema : undefined);
             const tableCreator = schema ? `${schema}Schema.table` : "pgTable";
             const baseTableName = tableName.includes(".") ? tableName.split(".").pop()! : tableName;
             const {
@@ -604,7 +604,7 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
             schemaContent += `    pk: primaryKey({ columns: [table.${sourceColumn}, table.${targetColumn}] })\n`;
             schemaContent += "}));\n\n";
         } else if (!isJunction) {
-            const schema = collection.databaseId;
+            const schema = isPostgresCollection(collection) ? collection.schema : undefined;
             const tableCreator = schema ? `${schema}Schema.table` : "pgTable";
             const baseTableName = tableName.includes(".") ? tableName.split(".").pop()! : tableName;
             schemaContent += `export const ${tableVarName} = ${tableCreator}(\"${baseTableName}\", {\n`;

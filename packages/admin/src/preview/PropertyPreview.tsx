@@ -111,7 +111,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                 if (typeof stringProperty.reference.path === "string") {
                     content = <ReferencePreview
                         disabled={!stringProperty.reference.path}
-                        previewProperties={(stringProperty as any).reference?.previewProperties}
+                        previewProperties={stringProperty.reference?.ui?.previewProperties}
                         includeId={stringProperty.reference.includeId}
                         includeEntityLink={stringProperty.reference.includeEntityLink}
                         size={props.size}

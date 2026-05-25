@@ -95,28 +95,30 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
     // Track if we're currently loading to prevent multiple simultaneous load requests
     const isLoadingMore = useRef(false);
 
-    // Infinite scroll with Intersection Observer
+    // Keep mutable refs for values used in the IntersectionObserver callback
+    // to avoid re-creating the observer every time pagination state changes.
+    const paginationStateRef = useRef({ paginationEnabled, noMoreToLoad, dataLoading, itemCount, pageSize });
     useEffect(() => {
-        if (!paginationEnabled || noMoreToLoad || dataLoading) {
-            return;
-        }
+        paginationStateRef.current = { paginationEnabled, noMoreToLoad, dataLoading, itemCount, pageSize };
+    }, [paginationEnabled, noMoreToLoad, dataLoading, itemCount, pageSize]);
 
-        // Reset loading flag when dataLoading becomes false
-        if (!dataLoading) {
-            isLoadingMore.current = false;
-        }
+    // Reset loading flag when new data arrives (separate effect, like list view)
+    useEffect(() => {
+        if (!dataLoading) isLoadingMore.current = false;
+    }, [dataLoading]);
 
+    // Infinite scroll with Intersection Observer — stable deps only
+    useEffect(() => {
         const observer = new IntersectionObserver(
             (entries) => {
-                if (entries[0].isIntersecting && !dataLoading && !noMoreToLoad && !isLoadingMore.current) {
-                    // Prevent multiple load requests
+                const { paginationEnabled: pe, noMoreToLoad: nm, dataLoading: dl, itemCount: ic, pageSize: ps } = paginationStateRef.current;
+                if (entries[0].isIntersecting && pe && !dl && !nm && !isLoadingMore.current) {
                     isLoadingMore.current = true;
-                    // Load more items
-                    setItemCount?.((itemCount ?? pageSize) + pageSize);
+                    setItemCount?.((ic ?? ps) + ps);
                 }
             },
             {
-                root: containerRef.current, // Use the scroll container, not viewport
+                root: containerRef.current,
                 rootMargin: "400px",
                 threshold: 0
             }
@@ -127,7 +129,7 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
         }
 
         return () => observer.disconnect();
-    }, [paginationEnabled, noMoreToLoad, dataLoading, itemCount, pageSize, setItemCount]);
+    }, [setItemCount]);
 
     // Scroll restoration — deferred to after layout paint
     useEffect(() => {

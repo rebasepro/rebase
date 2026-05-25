@@ -79,7 +79,7 @@ function renderMap<T extends Record<string, any>>(property: MapProperty, size: P
     if (size === "large") {
         mapPropertyKeys = Object.keys(property.properties);
     } else {
-        mapPropertyKeys = ((property.ui as any)?.previewProperties || Object.keys(property.properties)) as string[];
+        mapPropertyKeys = (property.previewProperties || Object.keys(property.properties)) as string[];
         if (size === "medium")
             mapPropertyKeys = mapPropertyKeys.slice(0, 3);
         else if (size === "small")

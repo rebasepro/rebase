@@ -199,6 +199,7 @@ export const es = {
   "roadmap.next.item1": "Generación de SQL por IA en el editor",
   "roadmap.next.item2": "Infraestructura Cloud de Rebase alojada",
   "roadmap.next.item3": "Cursores multijugador en Studio",
+  "roadmap.next.item4": "Embeddings vectoriales con un clic",
   "roadmap.later.title": "Más adelante",
   "roadmap.later.badge": "Planificación",
   "roadmap.later.item1": "Bot conversacional de análisis y gráficos",

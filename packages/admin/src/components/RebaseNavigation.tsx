@@ -13,10 +13,12 @@ import {
     CustomizationControllerContext
 } from "@rebasepro/core";
 import { CircularProgressCenter } from "@rebasepro/ui";
-import type { AppView, CollectionEditorOptions, EntityCustomView, EntityAction } from "@rebasepro/types";
+import type { AppView, CollectionEditorOptions, EntityCustomView, EntityAction, EntityCollection } from "@rebasepro/types";
+import type { CollectionRegistryController } from "@rebasepro/types";
+import type { UrlController, NavigationStateController } from "@rebasepro/types";
 
-const EMPTY_PLUGINS: any[] = [];
-const EMPTY_COLLECTIONS: any[] = [];
+const EMPTY_PLUGINS: unknown[] = [];
+const EMPTY_COLLECTIONS: EntityCollection[] = [];
 
 import { useBuildNavigationStateController } from "../hooks/navigation/useBuildNavigationStateController";
 import { useBuildUrlController } from "../hooks/navigation/useBuildUrlController";
@@ -146,7 +148,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         collectionRegistryController,
         urlController,
         adminMode: adminModeController?.mode,
-        userManagement: userManagement as any
+        userManagement
     });
 
     // ── Merge CMS-registered entityViews/entityActions into the customization controller ──
@@ -222,9 +224,9 @@ function BridgeAutoRegistrar({
     urlController,
     navigationStateController
 }: {
-    collectionRegistryController: any;
-    urlController: any;
-    navigationStateController: any;
+    collectionRegistryController: CollectionRegistryController;
+    urlController: UrlController;
+    navigationStateController: NavigationStateController;
 }) {
     useBridgeRegistration("collectionRegistry", collectionRegistryController);
     useBridgeRegistration("urlController", urlController);

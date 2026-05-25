@@ -207,7 +207,7 @@ export const tickets = pgTable("tickets", {
     pgPolicy("test_policy", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
 ])).enableRLS();
 
-export const users = pgTable("users", {
+export const users = rebaseSchema.table("users", {
     id: uuid("id").primaryKey().defaultRandom(),
     email: varchar("email").unique().notNull(),
     displayName: varchar("display_name").notNull(),

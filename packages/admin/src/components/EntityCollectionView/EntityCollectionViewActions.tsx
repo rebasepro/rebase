@@ -135,7 +135,7 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
             );
         });
 
-    const pluginActions = useSlot("collection.actions", actionProps as any);
+    const pluginActions = useSlot("collection.actions", actionProps as CollectionActionsProps);
 
     const secondaryActions = (
         <>
@@ -146,17 +146,17 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
             </ErrorBoundary>
             <ErrorBoundary>
                 <Suspense fallback={null}>
-                    <ImportCollectionAction {...(actionProps as any)}/>
+                    <ImportCollectionAction {...(actionProps as CollectionActionsProps)}/>
                 </Suspense>
             </ErrorBoundary>
             <ErrorBoundary>
                 <Suspense fallback={null}>
-                    <ExportCollectionAction {...(actionProps as any)}/>
+                    <ExportCollectionAction {...(actionProps as CollectionActionsProps)}/>
                 </Suspense>
             </ErrorBoundary>
             {hasCollectionEditor && (
                 <ErrorBoundary>
-                    <EditorCollectionAction {...(actionProps as any)}/>
+                    <EditorCollectionAction {...(actionProps as CollectionActionsProps)}/>
                 </ErrorBoundary>
             )}
         </>

@@ -346,7 +346,7 @@ function GoogleLoginButton({
     googleLoginRef.current = authController.googleLogin;
 
     useEffect(() => {
-        const google = (window as any).google;
+        const google = window.google;
         if (!google || codeClientRef.current) return;
 
         codeClientRef.current = google.accounts.oauth2.initCodeClient({

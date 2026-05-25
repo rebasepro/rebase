@@ -7,7 +7,11 @@ import { createPostgresDatabaseConnection } from "@rebasepro/server-postgresql";
 import { env } from "./env.js";
 import {
     authors, posts, tags, products, orders,
-    postsTags, customers, orderItems, tickets, productLocales, exercises
+    postsTags, customers, orderItems, tickets, productLocales, exercises,
+    postsStatus, productsCategory, productsStatus,
+    ordersStatus, ordersPayment_status, ordersCurrency,
+    ticketsStatus, ticketsPriority, ticketsCategory,
+    exercisesDifficulty, exercisesCategory, exercisesStatus
 } from "./schema.generated.js";
 import fs from "fs";
 import path from "path";
@@ -22,7 +26,7 @@ const SEED_ASSETS_DIR = path.resolve(__dirname, "../../seed-assets");
 
 // ── S3 helpers (lazy-loaded only when STORAGE_TYPE=s3) ────────────────
 const isS3 = env.STORAGE_TYPE === "s3";
-let _s3Client: any = null;
+let _s3Client: InstanceType<typeof import("@aws-sdk/client-s3").S3Client> | null = null;
 
 async function getS3Client() {
     if (_s3Client) return _s3Client;
@@ -348,8 +352,9 @@ export async function runSeed() {
         const require = createRequire(import.meta.url);
         const demoProductsRaw = require("./demo-products.json");
 
-        const validCategories = ["electronics", "clothing", "home_garden", "sports", "books", "toys", "health_beauty"];
-        function mapCategory(cat: string | undefined | null) {
+        type ProductCategory = (typeof productsCategory.enumValues)[number];
+        const validCategories: ProductCategory[] = ["electronics", "clothing", "home_garden", "sports", "books", "toys", "health_beauty"];
+        function mapCategory(cat: string | undefined | null): ProductCategory {
             if (!cat) return validCategories[Math.floor(Math.random() * validCategories.length)];
             const c = cat.toLowerCase();
             if (c.includes('clothing') || c.includes('sunglasses')) return 'clothing';
@@ -360,7 +365,33 @@ export async function runSeed() {
             return validCategories[Math.floor(Math.random() * validCategories.length)];
         }
 
-        const firecmsDemoProducts = demoProductsRaw.map((p: any, index: number) => ({
+        interface DemoProductRaw {
+            name?: string;
+            asin?: string;
+            category?: string;
+            price?: number;
+            description?: string;
+            brand?: string;
+            available_locales?: string[];
+            images?: string[];
+            main_image?: string;
+        }
+
+        interface DemoProduct {
+            name: string;
+            sku: string;
+            cat: (typeof productsCategory.enumValues)[number];
+            price: number;
+            cost: number;
+            weight: number;
+            desc: string;
+            brand: string;
+            locales: string[];
+            imageUrls: string[];
+            localImages?: string[] | null;
+        }
+
+        const firecmsDemoProducts: DemoProduct[] = (demoProductsRaw as DemoProductRaw[]).map((p, index) => ({
             name: p.name || `Product ${index}`,
             sku: p.asin || `SKU-${Math.floor(Math.random()*100000)}`,
             cat: mapCategory(p.category),
@@ -426,7 +457,8 @@ name }));
 
         // ── Posts ─────────────────────────────────────────────────────
         console.log(`📰 Generating ${POST_COUNT} blog posts...`);
-        const statuses = ["draft", "needs_review", "published", "published", "published", "archived"] as const;
+        type PostStatus = (typeof postsStatus.enumValues)[number];
+        const statuses: PostStatus[] = ["draft", "needs_review", "published", "published", "published", "archived"];
         const postValues = [];
         const usedSlugs = new Set<string>();
 
@@ -466,8 +498,8 @@ value: sections[s] });
                 slug,
                 hero_image: pick(heroImagePaths),
                 excerpt: pick(excerpts),
-                content: blocks as any,
-                status: status as any,
+                content: blocks,
+                status,
                 publish_date: isPublished ? randomDate(180, 0) : null,
                 created_at: randomDate(180, 10),
                 updated_at: randomDate(30, 0),
@@ -544,19 +576,19 @@ tag_id: tagIds[t - 1] });
                 // Reference the file whether it exists or not — it should be in seed-assets
                 localPaths.push(`product_images/${localName}`);
             }
-            (p as any).localImages = localPaths.length > 0 ? localPaths : null;
+            p.localImages = localPaths.length > 0 ? localPaths : null;
         }
 
         const allProducts = firecmsDemoProducts;
 
-        const productValues = allProducts.map((p: any, i: number) => ({
+        const productValues = allProducts.map((p, i) => ({
             id: productIds[i],
             name: p.name,
             sku: p.sku,
             description: p.desc,
             brand: p.brand,
             available_locales: p.locales,
-            category: p.cat as any,
+            category: p.cat,
             price: p.price.toFixed(2),
             compare_at_price: Math.random() > 0.7 ? (p.price * (1.1 + Math.random() * 0.4)).toFixed(2) : null,
             cost: p.cost.toFixed(2),
@@ -565,17 +597,17 @@ tag_id: tagIds[t - 1] });
             weight_grams: String(p.weight),
             rating: String((3.5 + Math.random() * 1.5).toFixed(1)),
             review_count: String(Math.floor(Math.random() * 500) + 1),
-            status: "active" as any,
+            status: "active" as (typeof productsStatus.enumValues)[number],
             is_featured: Math.random() > 0.8,
-            images: (p as any).localImages,
+            images: p.localImages,
             created_at: randomDate(180, 10),
             updated_at: randomDate(30, 0)
         }));
         await db.insert(products).values(productValues);
 
         console.log("📦 Generating product locales subcollections...");
-        const productLocalesValues: any[] = [];
-        allProducts.forEach((p: any, i: number) => {
+        const productLocalesValues: { id: string; product_id: string; locale: string; name: string; description: string }[] = [];
+        allProducts.forEach((p, i) => {
             const pid = productIds[i];
             const locales = p.locales || ["en"];
             for (const locale of locales) {
@@ -595,9 +627,12 @@ tag_id: tagIds[t - 1] });
         // ── Orders + Order Items ──────────────────────────────────────
         const NUM_ORDERS = 80;
         console.log(`🛒 Generating ${NUM_ORDERS} orders with line items...`);
-        const orderStatuses = ["pending", "confirmed", "processing", "shipped", "delivered", "delivered", "delivered", "cancelled", "refunded"] as const;
-        const paymentStatuses = ["unpaid", "paid", "paid", "paid", "paid", "partially_refunded", "refunded"] as const;
-        const currencies = ["USD", "USD", "USD", "EUR", "GBP", "CAD"] as const;
+        type OrderStatus = (typeof ordersStatus.enumValues)[number];
+        type PaymentStatus = (typeof ordersPayment_status.enumValues)[number];
+        type Currency = (typeof ordersCurrency.enumValues)[number];
+        const orderStatuses: OrderStatus[] = ["pending", "confirmed", "processing", "shipped", "delivered", "delivered", "delivered", "cancelled", "refunded"];
+        const paymentStatuses: PaymentStatus[] = ["unpaid", "paid", "paid", "paid", "paid", "partially_refunded", "refunded"];
+        const currencies: Currency[] = ["USD", "USD", "USD", "EUR", "GBP", "CAD"];
         const carriers = ["UPS", "FedEx", "USPS", "DHL"];
         const orderValues = [];
         const allOrderItems: { id: string; order_id: string; product_id: string; product_name: string; sku: string; quantity: string; unit_price: string; line_total: string }[] = [];
@@ -607,7 +642,7 @@ tag_id: tagIds[t - 1] });
             const isDelivered = status === "delivered";
             const isShipped = status === "shipped" || isDelivered;
             const isCancelled = status === "cancelled" || status === "refunded";
-            const payStatus = isCancelled ? (status === "refunded" ? "refunded" : "paid") : pick([...paymentStatuses]) as string;
+            const payStatus: PaymentStatus = isCancelled ? (status === "refunded" ? "refunded" : "paid") : pick([...paymentStatuses]);
 
             // Pick 1-5 products for this order
             const numItems = 1 + Math.floor(Math.random() * 4);
@@ -649,14 +684,14 @@ tag_id: tagIds[t - 1] });
                 id: orderIds[i - 1],
                 order_number: `ORD-${currentYear()}-${String(i).padStart(4, "0")}`,
                 customer_id: customerIds[custId - 1],
-                status: status as any,
-                payment_status: payStatus as any,
+                status,
+                payment_status: payStatus,
                 subtotal: subtotal.toFixed(2),
                 tax_amount: taxAmount.toFixed(2),
                 shipping_cost: shippingCost.toFixed(2),
                 discount_amount: discountAmount > 0 ? discountAmount.toFixed(2) : "0",
                 total: total.toFixed(2),
-                currency: pick([...currencies]) as any,
+                currency: pick([...currencies]),
                 shipping_address: customerValues[(custId - 1)].shipping_address,
                 tracking_number: isShipped ? `${pick(carriers)}-${String(Math.floor(Math.random() * 9000000000) + 1000000000)}` : null,
                 notes: Math.random() > 0.8 ? pick(["Gift wrap requested", "Leave at front door", "Fragile items", "Rush order", ""]) : null,
@@ -680,7 +715,10 @@ tag_id: tagIds[t - 1] });
         const NUM_TICKETS = 60;
         console.log(`🎫 Generating ${NUM_TICKETS} support tickets...`);
 
-        const ticketSubjects: { subject: string; description: string; category: string; priority: string }[] = [
+        type TicketStatus = (typeof ticketsStatus.enumValues)[number];
+        type TicketPriority = (typeof ticketsPriority.enumValues)[number];
+        type TicketCategory = (typeof ticketsCategory.enumValues)[number];
+        const ticketSubjects: { subject: string; description: string; category: TicketCategory; priority: TicketPriority }[] = [
             // Bug reports
             { subject: "Checkout page freezes on mobile", description: "When I try to complete my purchase on an iPhone 13, the page freezes after entering my credit card details. I've tried Safari and Chrome with the same result. Please help, I really want to buy the camping tent.", category: "bug", priority: "high" },
             { subject: "Promo code SAVE20 not working", description: "I'm trying to use the SAVE20 promo code from your email newsletter, but it says 'Invalid code' when applied to my cart. I only have the Sony headphones in my cart. Is there a restriction?", category: "bug", priority: "medium" },
@@ -750,7 +788,7 @@ tag_id: tagIds[t - 1] });
         ];
 
         const agentNames = ["Alex Rivera", "Sam Chen", "Jordan Park", "Morgan Lee", "Casey Brooks", null, null];
-        const ticketStatuses = ["open", "open", "in_progress", "in_progress", "waiting", "resolved", "resolved", "closed", "closed"] as const;
+        const ticketStatuses: TicketStatus[] = ["open", "open", "in_progress", "in_progress", "waiting", "resolved", "resolved", "closed", "closed"];
 
         const ticketValues = [];
         for (let i = 0; i < NUM_TICKETS; i++) {
@@ -774,9 +812,9 @@ tag_id: tagIds[t - 1] });
                 subject: template.subject,
                 description: template.description,
                 resolution_notes: resolutionNotes,
-                status: status as any,
-                priority: template.priority as any,
-                category: template.category as any,
+                status,
+                priority: template.priority,
+                category: template.category,
                 customer_id: hasCustomer ? customerIds[Math.floor(Math.random() * 40)] : null,
                 assigned_to: status === "open" && Math.random() > 0.5 ? null : pick(agentNames),
                 __order: String(i),
@@ -794,12 +832,15 @@ tag_id: tagIds[t - 1] });
         console.log("\n🏋️ Seeding exercises...");
         const exerciseImagePaths = await seedAssets("exercise_images", "exercise_images/");
 
+        type ExerciseDifficulty = (typeof exercisesDifficulty.enumValues)[number];
+        type ExerciseCategory = (typeof exercisesCategory.enumValues)[number];
+        type ExerciseStatus = (typeof exercisesStatus.enumValues)[number];
         const exerciseData: Array<{
-            name: string; description: string; difficulty: string; category: string;
+            name: string; description: string; difficulty: ExerciseDifficulty; category: ExerciseCategory;
             equipment: string[]; body_parts: string[]; instructions: string;
             default_reps: number | null; default_sets: number; rest_seconds: number;
             calories_per_minute: number; is_compound: boolean; is_featured: boolean;
-            status: string; image_file?: string; video_url?: string;
+            status: ExerciseStatus; image_file?: string; video_url?: string;
         }> = [
             {
                 name: "Barbell Bench Press",
@@ -1122,8 +1163,8 @@ tag_id: tagIds[t - 1] });
                 description: ex.description,
                 images: images.length > 0 ? JSON.stringify(images) : null,
                 video_url: ex.video_url || null,
-                difficulty: ex.difficulty as any,
-                category: ex.category as any,
+                difficulty: ex.difficulty,
+                category: ex.category,
                 equipment: JSON.stringify(ex.equipment),
                 body_parts: JSON.stringify(ex.body_parts),
                 instructions: ex.instructions,
@@ -1133,7 +1174,7 @@ tag_id: tagIds[t - 1] });
                 calories_per_minute: String(ex.calories_per_minute),
                 is_compound: ex.is_compound,
                 is_featured: ex.is_featured,
-                status: ex.status as any,
+                status: ex.status,
                 created_at: randomDate(90, 0),
                 updated_at: randomDate(14, 0)
             };

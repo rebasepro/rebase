@@ -1,4 +1,4 @@
-import type { EntityCollection } from "@rebasepro/types";
+import type { EntityCollection, FieldProps as CoreFieldProps } from "@rebasepro/types";
 import type { FieldProps, PropertyFieldBindingProps } from "../types/fields";
 import type { RebasePlugin, PluginFieldBuilderParams, Property } from "@rebasepro/types";
 import React, { ComponentType, ReactElement, Suspense, useCallback, useRef } from "react";
@@ -118,7 +118,7 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
                 } else if (resolvedProperty.ui?.Field) {
                     const resolved = resolveComponentRef(resolvedProperty.ui.Field);
                     if (resolved) {
-                        Component = resolved as ComponentType<FieldProps<any>>;
+                        Component = resolved as ComponentType<FieldProps<Property, unknown, M>>;
                     }
                 } else {
                     const propertyConfig = getFieldConfig(resolvedProperty, customizationController.propertyConfigs);
@@ -320,14 +320,14 @@ function useWrappedComponent<T, M extends Record<string, any> = any>(
                         fieldConfigId: fieldId,
                         propertyKey,
                         property,
-                        Field: Component as any,
+                        Field: Component as unknown as ComponentType<CoreFieldProps<Property, unknown, Record<string, unknown>>>,
                         plugin,
                         path,
-                        collection: collection as any
+                        collection: collection as EntityCollection | undefined
                     };
                     const enabled = plugin.fieldBuilder.enabled?.(params);
                     if (enabled === undefined || enabled)
-                        Wrapper = plugin.fieldBuilder.wrap(params) as any || Wrapper;
+                        Wrapper = (plugin.fieldBuilder.wrap(params) as unknown as ComponentType<FieldProps<any, any, M>> | null) ?? Wrapper;
                 }
                 if (!fieldId) {
                     console.warn("INTERNAL: Field id not found for property", property);

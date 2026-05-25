@@ -3,7 +3,8 @@ import { ApiError, errorHandler } from "../api/errors";
 import { randomBytes, createHash } from "crypto";
 import type { AuthRepository, OAuthProvider } from "./interfaces";
 import { generateAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry, getAccessTokenExpiry } from "./jwt";
-import { hashPassword, verifyPassword, validatePasswordStrength } from "./password";
+import type { AuthOverrides } from "./auth-overrides";
+import { resolveAuthOverrides } from "./auth-overrides";
 import { requireAuth } from "./middleware";
 import { EmailService, EmailConfig } from "../email";
 import { getPasswordResetTemplate, getEmailVerificationTemplate, getWelcomeEmailTemplate } from "../email/templates";
@@ -26,6 +27,11 @@ export interface AuthModuleConfig {
     oauthProviders?: OAuthProvider[];
     /** When true, blocks all self-registration regardless of `allowRegistration`. */
     disableSelfRegistration?: boolean;
+    /**
+     * Auth overrides for customizing password hashing, credential
+     * verification, lifecycle hooks, etc.
+     */
+    overrides?: AuthOverrides;
     /**
      * Callback that checks if bootstrap has already been completed.
      * Used by GET /auth/config to report `needsSetup` status.
@@ -94,7 +100,8 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     router.onError(errorHandler);
 
     const authRepo = config.authRepo;
-    const { emailService, emailConfig, allowRegistration = false } = config;
+    const { emailService, emailConfig, allowRegistration = false, overrides } = config;
+    const ops = resolveAuthOverrides(overrides);
 
     // ── Zod input schemas ──────────────────────────────────────────────
     const registerSchema = z.object({
@@ -215,7 +222,7 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         }
 
         // Validate password strength
-        const passwordValidation = validatePasswordStrength(password);
+        const passwordValidation = ops.validatePasswordStrength(password);
         if (!passwordValidation.valid) {
             throw ApiError.badRequest(passwordValidation.errors.join(". "), "WEAK_PASSWORD");
         }
@@ -227,12 +234,16 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         }
 
         // Create user
-        const passwordHash = await hashPassword(password);
-        const user = await authRepo.createUser({
+        const passwordHash = await ops.hashPassword(password);
+        let createData: import("./interfaces").CreateUserData = {
             email: email.toLowerCase(),
             passwordHash,
             displayName: displayName || undefined
-        });
+        };
+        if (overrides?.beforeUserCreate) {
+            createData = await overrides.beforeUserCreate(createData);
+        }
+        const user = await authRepo.createUser(createData);
 
         // Auto-bootstrap: if this is the very first user in the system, promote to admin.
         // This avoids the chicken-and-egg problem where the first user has no permissions
@@ -257,6 +268,20 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         sendWelcomeEmail({ email: user.email,
 displayName: user.displayName });
 
+        // Fire afterUserCreate hook (fire-and-forget)
+        if (overrides?.afterUserCreate) {
+            overrides.afterUserCreate(user).catch(err => {
+                console.error("[AuthOverrides] afterUserCreate error:", err instanceof Error ? err.message : err);
+            });
+        }
+
+        // Fire onAuthenticated hook (fire-and-forget)
+        if (overrides?.onAuthenticated) {
+            overrides.onAuthenticated(user, "register").catch(err => {
+                console.error("[AuthOverrides] onAuthenticated error:", err instanceof Error ? err.message : err);
+            });
+        }
+
         return c.json(buildAuthResponse(user, roleIds, accessToken, refreshToken), 201);
     });
 
@@ -267,18 +292,29 @@ displayName: user.displayName });
     router.post("/login", defaultAuthLimiter, async (c) => {
         const { email, password } = parseBody(loginSchema, await c.req.json());
 
-        const user = await authRepo.getUserByEmail(email);
-        if (!user) {
-            throw ApiError.unauthorized("Invalid email or password", "INVALID_CREDENTIALS");
-        }
+        let user;
 
-        if (!user.passwordHash) {
-            throw ApiError.unauthorized("Invalid email or password", "INVALID_CREDENTIALS");
-        }
+        if (overrides?.verifyCredentials) {
+            // Full credential verification override
+            user = await overrides.verifyCredentials(email, password, authRepo);
+            if (!user) {
+                throw ApiError.unauthorized("Invalid email or password", "INVALID_CREDENTIALS");
+            }
+        } else {
+            // Default: email lookup + password hash verification
+            user = await authRepo.getUserByEmail(email);
+            if (!user) {
+                throw ApiError.unauthorized("Invalid email or password", "INVALID_CREDENTIALS");
+            }
 
-        const isValidPassword = await verifyPassword(password, user.passwordHash);
-        if (!isValidPassword) {
-            throw ApiError.unauthorized("Invalid email or password", "INVALID_CREDENTIALS");
+            if (!user.passwordHash) {
+                throw ApiError.unauthorized("Invalid email or password", "INVALID_CREDENTIALS");
+            }
+
+            const isValidPassword = await ops.verifyPassword(password, user.passwordHash);
+            if (!isValidPassword) {
+                throw ApiError.unauthorized("Invalid email or password", "INVALID_CREDENTIALS");
+            }
         }
 
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
@@ -286,6 +322,13 @@ displayName: user.displayName });
             c.req.header("user-agent") || "unknown",
             c.req.header("x-forwarded-for") || "unknown"
         );
+
+        // Fire onAuthenticated hook (fire-and-forget)
+        if (overrides?.onAuthenticated) {
+            overrides.onAuthenticated(user, "login").catch(err => {
+                console.error("[AuthOverrides] onAuthenticated error:", err instanceof Error ? err.message : err);
+            });
+        }
 
         return c.json(buildAuthResponse(user, roleIds, accessToken, refreshToken));
     });
@@ -435,7 +478,7 @@ displayName: user.displayName }, appName);
         const { token, password } = parseBody(resetPasswordSchema, await c.req.json());
 
         // Validate password strength
-        const passwordValidation = validatePasswordStrength(password);
+        const passwordValidation = ops.validatePasswordStrength(password);
         if (!passwordValidation.valid) {
             throw ApiError.badRequest(passwordValidation.errors.join(". "), "WEAK_PASSWORD");
         }
@@ -449,7 +492,7 @@ displayName: user.displayName }, appName);
         }
 
         // Update password
-        const passwordHash = await hashPassword(password);
+        const passwordHash = await ops.hashPassword(password);
         await authRepo.updatePassword(storedToken.userId, passwordHash);
 
         // Mark token as used
@@ -481,19 +524,19 @@ message: "Password has been reset successfully" });
         }
 
         // Verify old password
-        const isValidOldPassword = await verifyPassword(oldPassword, user.passwordHash);
+        const isValidOldPassword = await ops.verifyPassword(oldPassword, user.passwordHash);
         if (!isValidOldPassword) {
             throw ApiError.unauthorized("Current password is incorrect", "INVALID_CREDENTIALS");
         }
 
         // Validate new password strength
-        const passwordValidation = validatePasswordStrength(newPassword);
+        const passwordValidation = ops.validatePasswordStrength(newPassword);
         if (!passwordValidation.valid) {
             throw ApiError.badRequest(passwordValidation.errors.join(". "), "WEAK_PASSWORD");
         }
 
         // Update password
-        const passwordHash = await hashPassword(newPassword);
+        const passwordHash = await ops.hashPassword(newPassword);
         await authRepo.updatePassword(user.id, passwordHash);
 
         // Invalidate all refresh tokens (security: log out all sessions)

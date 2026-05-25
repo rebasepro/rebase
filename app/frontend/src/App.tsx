@@ -53,6 +53,25 @@ export function App() {
     //
     // NOTE: `collection.find()` returns `Entity[]` where each entity
     // wraps data in `.values`. We extract `.values` for aggregation.
+
+    // Inflight dedup for insight data calls — widgets with identical
+    // queries (e.g. three widgets all fetching orders with limit 500)
+    // share a single network request instead of firing separately.
+    const insightFetchCache = React.useMemo(() => new Map<string, Promise<any>>(), []);
+
+    const cachedFind = React.useCallback((collection: string, params: Record<string, unknown> = {}) => {
+        const key = `${collection}:${JSON.stringify(params)}`;
+        if (!insightFetchCache.has(key)) {
+            const promise = rebaseClient.data.collection(collection).find(params)
+                .finally(() => {
+                    // Clear after a short window so co-occurring widgets share the request
+                    setTimeout(() => insightFetchCache.delete(key), 200);
+                });
+            insightFetchCache.set(key, promise);
+        }
+        return insightFetchCache.get(key)!;
+    }, [rebaseClient, insightFetchCache]);
+
     const insightsConfig = React.useMemo<InsightsPluginConfig>(() => ({
         cacheTTL: 120_000,
         insights: {
@@ -61,8 +80,8 @@ export function App() {
                     id: "total-revenue",
                     title: "Total Revenue",
                     data: async () => {
-                        const res = await rebaseClient.data.collection("orders").find({ limit: 500 });
-                        const total = res.data.reduce((sum: number, e) => sum + (Number(e.values?.total) || 0), 0);
+                        const res = await cachedFind("orders", { limit: 500 });
+                        const total = res.data.reduce((sum: number, e: any) => sum + (Number(e.values?.total) || 0), 0);
                         const diff = 0.15; // Mock comparison +15%
                         return { rows: [{ value: total, comp: diff }] };
                     },
@@ -77,7 +96,7 @@ export function App() {
                     id: "total-orders",
                     title: "Orders",
                     data: async () => {
-                        const res = await rebaseClient.data.collection("orders").find({ limit: 1 });
+                        const res = await cachedFind("orders", { limit: 1 });
                         const diff = 0.124; // Mock comparison +12.4%
                         return { rows: [{ value: res.meta.total, comp: diff }] };
                     },
@@ -92,8 +111,8 @@ export function App() {
                     id: "avg-order-value",
                     title: "Avg. Order Value",
                     data: async () => {
-                        const res = await rebaseClient.data.collection("orders").find({ limit: 500 });
-                        const total = res.data.reduce((sum: number, e) => sum + (Number(e.values?.total) || 0), 0);
+                        const res = await cachedFind("orders", { limit: 500 });
+                        const total = res.data.reduce((sum: number, e: any) => sum + (Number(e.values?.total) || 0), 0);
                         const avg = res.data.length > 0 ? total / res.data.length : 0;
                         const diff = -0.052; // Mock comparison -5.2%
                         return { rows: [{ value: avg, comp: diff }] };
@@ -109,7 +128,7 @@ export function App() {
                     id: "refunded-orders",
                     title: "Refunded Orders",
                     data: async () => {
-                        const res = await rebaseClient.data.collection("orders").find({
+                        const res = await cachedFind("orders", {
                             limit: 1,
                             where: { status: "eq.refunded" },
                         });
@@ -137,7 +156,7 @@ export function App() {
                             if (context?.path && context.path !== "orders") {
                                 return { rows: [] }; // Filtering by join table not supported in demo yet
                             }
-                            const res = await rebaseClient.data.collection("orders").find({ limit: 1, where: { status: "eq.confirmed" } });
+                            const res = await cachedFind("orders", { limit: 1, where: { status: "eq.confirmed" } });
                             return { rows: [{ value: res.meta.total, comp: 0.18 }] };
                         },
                         scorecard: {
@@ -154,7 +173,7 @@ export function App() {
                             if (context?.path && context.path !== "orders") {
                                 return { rows: [] };
                             }
-                            const res = await rebaseClient.data.collection("orders").find({ limit: 1, where: { status: "eq.shipped" } });
+                            const res = await cachedFind("orders", { limit: 1, where: { status: "eq.shipped" } });
                             return { rows: [{ value: res.meta.total, comp: 0.074 }] };
                         },
                         scorecard: {
@@ -172,8 +191,8 @@ export function App() {
                             if (context?.path && context.path !== "orders") {
                                 return { rows: [] };
                             }
-                            const res = await rebaseClient.data.collection("orders").find({ limit: 500 });
-                            const total = res.data.reduce((sum: number, e) => sum + (Number(e.values?.total) || 0), 0);
+                            const res = await cachedFind("orders", { limit: 500 });
+                            const total = res.data.reduce((sum: number, e: any) => sum + (Number(e.values?.total) || 0), 0);
                             return { rows: [{ value: total }] };
                         },
                         scorecard: {
@@ -186,7 +205,7 @@ export function App() {
                         id: "products-catalog-count",
                         title: "Catalog",
                         data: async () => {
-                            const res = await rebaseClient.data.collection("products").find({ limit: 1 });
+                            const res = await cachedFind("products", { limit: 1 });
                             return { rows: [{ value: res.meta.total }] };
                         },
                         scorecard: {
@@ -199,7 +218,7 @@ export function App() {
                         id: "tickets-open-count",
                         title: "Open",
                         data: async () => {
-                            const res = await rebaseClient.data.collection("tickets").find({
+                            const res = await cachedFind("tickets", {
                                 limit: 1,
                                 where: { status: "eq.open" },
                             });
@@ -212,7 +231,7 @@ export function App() {
                 ],
             },
         },
-    }), [rebaseClient]);
+    }), [cachedFind]);
 
     const insightsPlugin = useInsightsPlugin(insightsConfig);
 

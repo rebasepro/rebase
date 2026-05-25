@@ -358,7 +358,7 @@ export function getDefaultFieldId(property: Property) {
             return "select";
         } else if (property.userSelect) {
             return "user_select";
-        } else if ((property as any).reference) {
+        } else if ((property as StringProperty).reference) {
             return "reference_as_string";
         } else {
             return "text_field";

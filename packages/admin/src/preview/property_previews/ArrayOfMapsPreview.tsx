@@ -1,4 +1,4 @@
-import type { ArrayProperty, Property } from "@rebasepro/types";
+import type { ArrayProperty, MapProperty, Property } from "@rebasepro/types";
 import React from "react";
 import { ErrorBoundary } from "@rebasepro/ui";
 import type { PropertyPreviewProps } from "../../types/components/PropertyPreviewProps";
@@ -28,7 +28,7 @@ export function ArrayOfMapsPreview({
         throw Error(`You need to specify a 'properties' prop (or specify a custom field) in your map property ${propertyKey}`);
     }
     const values = value;
-    const previewProperties: string[] | undefined = (mapProperty.ui as any)?.previewProperties;
+    const previewProperties: string[] | undefined = (mapProperty as MapProperty).previewProperties;
 
     if (!values) return null;
 

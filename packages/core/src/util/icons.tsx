@@ -23,13 +23,14 @@ function toPascalCase(str: string): string {
  * Resolve a Lucide icon component by string key.
  * Tries direct match, PascalCase conversion, and falls back to CircleAlert.
  */
-function resolveIcon(iconKey: string): React.ComponentType<any> | null {
-    let icon = (lucideIcons as any)[iconKey];
+function resolveIcon(iconKey: string): React.ComponentType<{ size?: number; className?: string }> | null {
+    const iconsMap = lucideIcons as Record<string, React.ComponentType<{ size?: number; className?: string }> | undefined>;
+    let icon = iconsMap[iconKey];
     if (!icon) {
-        icon = (lucideIcons as any)[toPascalCase(iconKey)];
+        icon = iconsMap[toPascalCase(iconKey)];
     }
     if (!icon) {
-        icon = (lucideIcons as any).CircleAlert;
+        icon = iconsMap.CircleAlert;
     }
     return icon ?? null;
 }

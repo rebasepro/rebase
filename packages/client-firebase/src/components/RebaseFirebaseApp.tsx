@@ -27,7 +27,7 @@ import {
     SideEntityProvider,
     RebaseRoute
 } from "@rebasepro/admin";
-import { Entity, PropertyConfig } from "@rebasepro/types";
+import { Entity, PropertyConfig, UserManagementDelegate } from "@rebasepro/types";
 import { CenteredView, CircularProgressCenter } from "@rebasepro/ui";
 import { buildRebaseData } from "@rebasepro/common";
 import { Route, Outlet, Navigate } from "react-router-dom";
@@ -198,7 +198,7 @@ export function RebaseFirebaseApp({
         collectionRegistryController,
         urlController,
         adminMode: adminModeController.mode,
-        userManagement: activeUserManagement as any
+        userManagement: activeUserManagement as unknown as UserManagementDelegate
     });
 
     if (firebaseConfigLoading || !firebaseApp || loading) {

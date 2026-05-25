@@ -66,7 +66,7 @@ export function ImportCollectionAction<M extends Record<string, unknown>, USER e
 
         if (data.length > 0) {
             const originProperties = await buildEntityPropertiesFromData(data, getInferenceType);
-            importConfig.setOriginProperties(originProperties as any);
+            importConfig.setOriginProperties(originProperties as Properties);
 
             const headersMapping = buildHeadersMappingFromData(data, collection?.properties);
             importConfig.setHeadersMapping(headersMapping);

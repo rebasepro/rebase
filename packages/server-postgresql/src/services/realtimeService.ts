@@ -23,6 +23,10 @@ export interface SubscriptionAuthContext {
     roles: string[];
 }
 
+interface DataDriverWithData extends DataDriver {
+    data: unknown;
+}
+
 type RealTimeListenCollectionProps = ListenCollectionProps & {
     subscriptionId: string
 };
@@ -590,7 +594,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                     const contextForCallback = {
                         user: { uid: activeAuth.userId, roles: activeAuth.roles },
                         driver: this.driver,
-                        data: this.driver ? (this.driver as unknown as Record<string, unknown>).data : undefined
+                        data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined
                     } as unknown as RebaseCallContext;
 
                     return await Promise.all(fetchedEntities.map(async (entity) => {
@@ -733,7 +737,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                         const contextForCallback = {
                             user: { uid: activeAuth.userId, roles: activeAuth.roles },
                             driver: this.driver,
-                            data: this.driver ? (this.driver as unknown as Record<string, unknown>).data : undefined
+                            data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined
                         } as unknown as RebaseCallContext;
 
                         if (callbacks?.afterRead) {

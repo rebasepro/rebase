@@ -130,7 +130,7 @@ export function RepeatFieldBinding({
 
             <FieldHelperText includeDescription={includeDescription}
                 showError={showError}
-                error={error as any}
+                error={error}
                 disabled={disabled}
                 property={property}/>
 

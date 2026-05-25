@@ -1,6 +1,7 @@
 import { eq, getTableName, sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { users, userIdentities, refreshTokens, passwordResetTokens } from "../schema/auth-schema";
+import { getTableConfig, PgTable, AnyPgColumn } from "drizzle-orm/pg-core";
+import { users, roles, userRoles, refreshTokens, passwordResetTokens, userIdentities } from "../schema/auth-schema";
 import {
     UserRepository,
     RoleRepository,
@@ -22,7 +23,17 @@ import { toSnakeCase, camelCase } from "@rebasepro/utils";
 
 export type { Role };
 
-function getColumnKey(table: any, ...keys: string[]): string | undefined {
+export interface AuthSchemaTables {
+    users: PgTable & Record<string, AnyPgColumn>;
+    roles: PgTable & Record<string, AnyPgColumn>;
+    userRoles: PgTable & Record<string, AnyPgColumn>;
+    refreshTokens: PgTable & Record<string, AnyPgColumn>;
+    passwordResetTokens: PgTable & Record<string, AnyPgColumn>;
+    appConfig: PgTable & Record<string, AnyPgColumn>;
+    userIdentities: PgTable & Record<string, AnyPgColumn>;
+}
+
+function getColumnKey(table: (PgTable & Record<string, AnyPgColumn>) | undefined, ...keys: string[]): string | undefined {
     if (!table) return undefined;
     for (const key of keys) {
         if (key in table) return key;
@@ -34,7 +45,8 @@ function getColumnKey(table: any, ...keys: string[]): string | undefined {
     return undefined;
 }
 
-function getColumn(table: any, ...keys: string[]): any {
+function getColumn(table: (PgTable & Record<string, AnyPgColumn>) | undefined, ...keys: string[]): AnyPgColumn | undefined {
+    if (!table) return undefined;
     const key = getColumnKey(table, ...keys);
     return key ? table[key] : undefined;
 }
@@ -44,32 +56,51 @@ function getColumn(table: any, ...keys: string[]): any {
  * Handles all user-related database operations using Drizzle ORM.
  */
 export class UserService implements UserRepository {
-    private usersTable: any;
+    private usersTable: PgTable & Record<string, AnyPgColumn>;
+    private userIdentitiesTable: PgTable & Record<string, AnyPgColumn>;
+    private userRolesTable: PgTable & Record<string, AnyPgColumn>;
+    private rolesTable: PgTable & Record<string, AnyPgColumn>;
 
-    constructor(private db: NodePgDatabase, usersTable?: any) {
-        this.usersTable = usersTable || users;
+    constructor(
+        private db: NodePgDatabase,
+        tableOrTables?: (PgTable & Record<string, AnyPgColumn>) | Partial<AuthSchemaTables>
+    ) {
+        if (tableOrTables && ((tableOrTables as Partial<AuthSchemaTables>).users || (tableOrTables as Partial<AuthSchemaTables>).roles)) {
+            const tables = tableOrTables as Partial<AuthSchemaTables>;
+            this.usersTable = (tables.users || users) as unknown as PgTable & Record<string, AnyPgColumn>;
+            this.userIdentitiesTable = (tables.userIdentities || userIdentities) as unknown as PgTable & Record<string, AnyPgColumn>;
+            this.userRolesTable = (tables.userRoles || userRoles) as unknown as PgTable & Record<string, AnyPgColumn>;
+            this.rolesTable = (tables.roles || roles) as unknown as PgTable & Record<string, AnyPgColumn>;
+        } else {
+            const table = tableOrTables as (PgTable & Record<string, AnyPgColumn>) | undefined;
+            this.usersTable = table || (users as unknown as PgTable & Record<string, AnyPgColumn>);
+            this.userIdentitiesTable = userIdentities as unknown as PgTable & Record<string, AnyPgColumn>;
+            this.userRolesTable = userRoles as unknown as PgTable & Record<string, AnyPgColumn>;
+            this.rolesTable = roles as unknown as PgTable & Record<string, AnyPgColumn>;
+        }
     }
 
     private getQualifiedUsersTableName(): string {
         const name = getTableName(this.usersTable);
-        return `public."${name}"`;
+        const schema = getTableConfig(this.usersTable).schema || "public";
+        return `"${schema}"."${name}"`;
     }
 
-    private mapRowToUser(row: any): UserData {
-        if (!row) return row;
+    private mapRowToUser(row: Record<string, unknown>): UserData {
+        if (!row) return row as unknown as UserData;
 
-        const id = row.id ?? row.uid;
-        const email = row.email;
-        const passwordHash = row.password_hash ?? row.passwordHash ?? null;
-        const displayName = row.display_name ?? row.displayName ?? null;
-        const photoUrl = row.photo_url ?? row.photoUrl ?? row.photoURL ?? null;
-        const emailVerified = row.email_verified ?? row.emailVerified ?? false;
-        const emailVerificationToken = row.email_verification_token ?? row.emailVerificationToken ?? null;
-        const emailVerificationSentAt = row.email_verification_sent_at ?? row.emailVerificationSentAt ?? null;
-        const createdAt = row.created_at ?? row.createdAt;
-        const updatedAt = row.updated_at ?? row.updatedAt;
+        const id = (row.id ?? row.uid) as string;
+        const email = row.email as string;
+        const passwordHash = (row.password_hash ?? row.passwordHash ?? null) as string | null | undefined;
+        const displayName = (row.display_name ?? row.displayName ?? null) as string | null | undefined;
+        const photoUrl = (row.photo_url ?? row.photoUrl ?? row.photoURL ?? null) as string | null | undefined;
+        const emailVerified = (row.email_verified ?? row.emailVerified ?? false) as boolean;
+        const emailVerificationToken = (row.email_verification_token ?? row.emailVerificationToken ?? null) as string | null | undefined;
+        const emailVerificationSentAt = (row.email_verification_sent_at ?? row.emailVerificationSentAt ?? null) as string | number | Date | null;
+        const createdAt = (row.created_at ?? row.createdAt) as string | number | Date | undefined;
+        const updatedAt = (row.updated_at ?? row.updatedAt) as string | number | Date | undefined;
 
-        const metadata: Record<string, any> = { ...(row.metadata || {}) };
+        const metadata: Record<string, any> = { ...((row.metadata as Record<string, any> | undefined) || {}) };
 
         const knownKeys = new Set([
             "id", "uid", "email",
@@ -106,10 +137,10 @@ export class UserService implements UserRepository {
         };
     }
 
-    private mapPayload(data: any): Record<string, any> {
-        if (!data) return data;
+    private mapPayload(data: Partial<CreateUserData>): Record<string, unknown> {
+        if (!data) return {};
 
-        const payload: Record<string, any> = {};
+        const payload: Record<string, unknown> = {};
 
         const idKey = getColumnKey(this.usersTable, "id") || "id";
         const emailKey = getColumnKey(this.usersTable, "email") || "email";
@@ -166,7 +197,7 @@ export class UserService implements UserRepository {
 
     async createUser(data: CreateUserData): Promise<UserData> {
         const payload = this.mapPayload(data);
-        const [row] = (await this.db.insert(this.usersTable).values(payload).returning()) as any[];
+        const [row] = (await this.db.insert(this.usersTable).values(payload).returning()) as Record<string, unknown>[];
         return this.mapRowToUser(row);
     }
 
@@ -174,14 +205,14 @@ export class UserService implements UserRepository {
         const idCol = getColumn(this.usersTable, "id");
         if (!idCol) return null;
         const [row] = await this.db.select().from(this.usersTable).where(eq(idCol, id));
-        return row ? this.mapRowToUser(row) : null;
+        return row ? this.mapRowToUser(row as Record<string, unknown>) : null;
     }
 
     async getUserByEmail(email: string): Promise<UserData | null> {
         const emailCol = getColumn(this.usersTable, "email");
         if (!emailCol) return null;
         const [row] = await this.db.select().from(this.usersTable).where(eq(emailCol, email.toLowerCase()));
-        return row ? this.mapRowToUser(row) : null;
+        return row ? this.mapRowToUser(row as Record<string, unknown>) : null;
     }
 
     async getUserByIdentity(provider: string, providerId: string): Promise<UserData | null> {
@@ -191,20 +222,21 @@ export class UserService implements UserRepository {
         const result = await this.db
             .select({ user: this.usersTable })
             .from(this.usersTable)
-            .innerJoin(userIdentities, eq(userIdCol, userIdentities.userId))
+            .innerJoin(this.userIdentitiesTable, eq(userIdCol, this.userIdentitiesTable.userId))
             .where(
-                sql`${userIdentities.provider} = ${provider} AND ${userIdentities.providerId} = ${providerId}`
+                sql`${this.userIdentitiesTable.provider} = ${provider} AND ${this.userIdentitiesTable.providerId} = ${providerId}`
             )
             .limit(1);
 
         if (result.length === 0) return null;
-        return this.mapRowToUser(result[0].user);
+        return this.mapRowToUser(result[0].user as Record<string, unknown>);
     }
 
     async getUserIdentities(userId: string): Promise<UserIdentityData[]> {
+        const schema = getTableConfig(this.userIdentitiesTable).schema || "public";
         const result = await this.db.execute(sql`
             SELECT id, user_id, provider, provider_id, profile_data, created_at, updated_at
-            FROM rebase.user_identities
+            FROM ${sql.raw(`"${schema}"."user_identities"`)}
             WHERE user_id = ${userId}
         `);
 
@@ -220,12 +252,12 @@ export class UserService implements UserRepository {
     }
 
     async linkUserIdentity(userId: string, provider: string, providerId: string, profileData?: Record<string, unknown>): Promise<void> {
-        await this.db.insert(userIdentities).values({
+        await this.db.insert(this.userIdentitiesTable).values({
             userId,
             provider,
             providerId,
             profileData: profileData || null
-        }).onConflictDoNothing({ target: [userIdentities.provider, userIdentities.providerId] });
+        }).onConflictDoNothing({ target: [this.userIdentitiesTable.provider, this.userIdentitiesTable.providerId] });
     }
 
     async updateUser(id: string, data: Partial<Omit<CreateUserData, "id">>): Promise<UserData | null> {
@@ -239,7 +271,7 @@ export class UserService implements UserRepository {
             .update(this.usersTable)
             .set(payload)
             .where(eq(idCol, id))
-            .returning()) as any[];
+            .returning()) as Record<string, unknown>[];
         return row ? this.mapRowToUser(row) : null;
     }
 
@@ -251,7 +283,7 @@ export class UserService implements UserRepository {
 
     async listUsers(): Promise<UserData[]> {
         const rows = await this.db.select().from(this.usersTable);
-        return rows.map(row => this.mapRowToUser(row));
+        return (rows as Record<string, unknown>[]).map(row => this.mapRowToUser(row));
     }
 
     async listUsersPaginated(options?: ListUsersOptions): Promise<PaginatedUsersResult> {
@@ -274,10 +306,11 @@ export class UserService implements UserRepository {
         const idColumn = idCol ? idCol.name : "id";
 
         const usersTableName = this.getQualifiedUsersTableName();
+        const rolesSchema = getTableConfig(this.userRolesTable).schema || "public";
 
         const conditions = [];
         if (roleId) {
-            conditions.push(sql`EXISTS (SELECT 1 FROM rebase.user_roles ur WHERE ur.user_id = ${sql.raw(usersTableName)}.${sql.raw(idColumn)} AND ur.role_id = ${roleId})`);
+            conditions.push(sql`EXISTS (SELECT 1 FROM ${sql.raw(`"${rolesSchema}"."user_roles"`)} ur WHERE ur.user_id = ${sql.raw(usersTableName)}.${sql.raw(idColumn)} AND ur.role_id = ${roleId})`);
         }
         if (search) {
             const pattern = `%${search}%`;
@@ -289,7 +322,7 @@ export class UserService implements UserRepository {
         // Sorting: users with roles first if no role filter, then by requested order
         const orderByClause = roleId
             ? sql`ORDER BY ${sql.raw(usersTableName)}.${sql.raw(orderColumn)} ${direction}`
-            : sql`ORDER BY (SELECT count(*) FROM rebase.user_roles ur WHERE ur.user_id = ${sql.raw(usersTableName)}.${sql.raw(idColumn)}) DESC, ${sql.raw(usersTableName)}.${sql.raw(orderColumn)} ${direction}`;
+            : sql`ORDER BY (SELECT count(*) FROM ${sql.raw(`"${rolesSchema}"."user_roles"`)} ur WHERE ur.user_id = ${sql.raw(usersTableName)}.${sql.raw(idColumn)}) DESC, ${sql.raw(usersTableName)}.${sql.raw(orderColumn)} ${direction}`;
 
         const countResult = await this.db.execute(sql`
             SELECT count(*)::int as total FROM ${sql.raw(usersTableName)}
@@ -306,7 +339,7 @@ export class UserService implements UserRepository {
         const rows = dataResult.rows;
 
         // Map rows to camelCase UserData
-        const mappedUsers: UserData[] = rows.map((row: any) => this.mapRowToUser(row));
+        const mappedUsers: UserData[] = (rows as Record<string, unknown>[]).map((row) => this.mapRowToUser(row));
 
         return { users: mappedUsers,
             total,
@@ -382,17 +415,18 @@ export class UserService implements UserRepository {
             .select()
             .from(this.usersTable)
             .where(eq(tokenCol, token));
-        return row ? this.mapRowToUser(row) : null;
+        return row ? this.mapRowToUser(row as Record<string, unknown>) : null;
     }
 
     /**
      * Get roles for a user from database
      */
     async getUserRoles(userId: string): Promise<Role[]> {
+        const rolesSchema = getTableConfig(this.rolesTable).schema || "public";
         const result = await this.db.execute(sql`
             SELECT r.id, r.name, r.is_admin, r.default_permissions, r.collection_permissions, r.config
-            FROM rebase.roles r
-            INNER JOIN rebase.user_roles ur ON r.id = ur.role_id
+            FROM ${sql.raw(`"${rolesSchema}"."roles"`)} r
+            INNER JOIN ${sql.raw(`"${rolesSchema}"."user_roles"`)} ur ON r.id = ur.role_id
             WHERE ur.user_id = ${userId}
         `);
 
@@ -418,13 +452,14 @@ export class UserService implements UserRepository {
      * Set roles for a user
      */
     async setUserRoles(userId: string, roleIds: string[]): Promise<void> {
+        const rolesSchema = getTableConfig(this.userRolesTable).schema || "public";
         // Delete existing roles
-        await this.db.execute(sql`DELETE FROM rebase.user_roles WHERE user_id = ${userId}`);
+        await this.db.execute(sql`DELETE FROM ${sql.raw(`"${rolesSchema}"."user_roles"`)} WHERE user_id = ${userId}`);
 
         // Insert new roles
         for (const roleId of roleIds) {
             await this.db.execute(sql`
-                INSERT INTO rebase.user_roles (user_id, role_id)
+                INSERT INTO ${sql.raw(`"${rolesSchema}"."user_roles"`)} (user_id, role_id)
                 VALUES (${userId}, ${roleId})
                 ON CONFLICT DO NOTHING
             `);
@@ -435,8 +470,9 @@ export class UserService implements UserRepository {
      * Assign a specific role to new user
      */
     async assignDefaultRole(userId: string, roleId: string): Promise<void> {
+        const rolesSchema = getTableConfig(this.userRolesTable).schema || "public";
         await this.db.execute(sql`
-            INSERT INTO rebase.user_roles (user_id, role_id)
+            INSERT INTO ${sql.raw(`"${rolesSchema}"."user_roles"`)} (user_id, role_id)
             VALUES (${userId}, ${roleId})
             ON CONFLICT DO NOTHING
         `);
@@ -460,12 +496,30 @@ export class UserService implements UserRepository {
  * Handles all role-related database operations using Drizzle ORM.
  */
 export class RoleService implements RoleRepository {
-    constructor(private db: NodePgDatabase) { }
+    private rolesTable: PgTable & Record<string, AnyPgColumn>;
+
+    constructor(
+        private db: NodePgDatabase,
+        tableOrTables?: (PgTable & Record<string, AnyPgColumn>) | Partial<AuthSchemaTables>
+    ) {
+        if (tableOrTables && ((tableOrTables as Partial<AuthSchemaTables>).roles || (tableOrTables as Partial<AuthSchemaTables>).users)) {
+            this.rolesTable = ((tableOrTables as Partial<AuthSchemaTables>).roles || roles) as unknown as PgTable & Record<string, AnyPgColumn>;
+        } else {
+            this.rolesTable = (tableOrTables as unknown as PgTable & Record<string, AnyPgColumn>) || (roles as unknown as PgTable & Record<string, AnyPgColumn>);
+        }
+    }
+
+    private getQualifiedRolesTableName(): string {
+        const name = getTableName(this.rolesTable);
+        const schema = getTableConfig(this.rolesTable).schema || "public";
+        return `"${schema}"."${name}"`;
+    }
 
     async getRoleById(id: string): Promise<Role | null> {
+        const tableName = this.getQualifiedRolesTableName();
         const result = await this.db.execute(sql`
             SELECT id, name, is_admin, default_permissions, collection_permissions, config
-            FROM rebase.roles
+            FROM ${sql.raw(tableName)}
             WHERE id = ${id}
         `);
 
@@ -483,9 +537,10 @@ export class RoleService implements RoleRepository {
     }
 
     async listRoles(): Promise<Role[]> {
+        const tableName = this.getQualifiedRolesTableName();
         const result = await this.db.execute(sql`
             SELECT id, name, is_admin, default_permissions, collection_permissions, config
-            FROM rebase.roles
+            FROM ${sql.raw(tableName)}
             ORDER BY name
         `);
 
@@ -500,8 +555,9 @@ export class RoleService implements RoleRepository {
     }
 
     async createRole(data: Omit<Role, "isAdmin" | "collectionPermissions"> & { isAdmin?: boolean; collectionPermissions?: Role["collectionPermissions"] }): Promise<Role> {
+        const tableName = this.getQualifiedRolesTableName();
         const result = await this.db.execute(sql`
-            INSERT INTO rebase.roles (id, name, is_admin, default_permissions, collection_permissions, config)
+            INSERT INTO ${sql.raw(tableName)} (id, name, is_admin, default_permissions, collection_permissions, config)
             VALUES (
                 ${data.id},
                 ${data.name},
@@ -525,12 +581,12 @@ export class RoleService implements RoleRepository {
     }
 
     async updateRole(id: string, data: Partial<Omit<Role, "id">>): Promise<Role | null> {
-        // For now, use simpler approach
         const existing = await this.getRoleById(id);
         if (!existing) return null;
 
+        const tableName = this.getQualifiedRolesTableName();
         await this.db.execute(sql`
-            UPDATE rebase.roles 
+            UPDATE ${sql.raw(tableName)}
             SET 
                 name = ${data.name ?? existing.name},
                 is_admin = ${data.isAdmin ?? existing.isAdmin},
@@ -544,12 +600,30 @@ export class RoleService implements RoleRepository {
     }
 
     async deleteRole(id: string): Promise<void> {
-        await this.db.execute(sql`DELETE FROM rebase.roles WHERE id = ${id}`);
+        const tableName = this.getQualifiedRolesTableName();
+        await this.db.execute(sql`DELETE FROM ${sql.raw(tableName)} WHERE id = ${id}`);
     }
 }
 
 export class RefreshTokenService {
-    constructor(private db: NodePgDatabase) { }
+    private refreshTokensTable: PgTable & Record<string, AnyPgColumn>;
+
+    constructor(
+        private db: NodePgDatabase,
+        tableOrTables?: (PgTable & Record<string, AnyPgColumn>) | Partial<AuthSchemaTables>
+    ) {
+        if (tableOrTables && ((tableOrTables as Partial<AuthSchemaTables>).refreshTokens || (tableOrTables as Partial<AuthSchemaTables>).users)) {
+            this.refreshTokensTable = ((tableOrTables as Partial<AuthSchemaTables>).refreshTokens || refreshTokens) as unknown as PgTable & Record<string, AnyPgColumn>;
+        } else {
+            this.refreshTokensTable = (tableOrTables as unknown as PgTable & Record<string, AnyPgColumn>) || (refreshTokens as unknown as PgTable & Record<string, AnyPgColumn>);
+        }
+    }
+
+    private getQualifiedRefreshTokensTableName(): string {
+        const name = getTableName(this.refreshTokensTable);
+        const schema = getTableConfig(this.refreshTokensTable).schema || "public";
+        return `"${schema}"."${name}"`;
+    }
 
     async createToken(userId: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void> {
         // Fallback to empty string because UNIQUE constraints treat NULLs as strictly distinct in standard Postgres.
@@ -559,14 +633,15 @@ export class RefreshTokenService {
 
         // Delete any existing session for this user/device combo, then insert.
         // This approach doesn't require the unique_device_session constraint to exist.
+        const tableName = this.getQualifiedRefreshTokensTableName();
         await this.db.execute(sql`
-            DELETE FROM rebase.refresh_tokens 
+            DELETE FROM ${sql.raw(tableName)} 
             WHERE user_id = ${userId} 
             AND user_agent = ${safeUserAgent} 
             AND ip_address = ${safeIpAddress}
         `);
 
-        await this.db.insert(refreshTokens)
+        await this.db.insert(this.refreshTokensTable)
             .values({
                 userId,
                 tokenHash,
@@ -579,49 +654,49 @@ export class RefreshTokenService {
     async findByHash(tokenHash: string): Promise<RefreshTokenInfo | null> {
         const [token] = await this.db
             .select({
-                id: refreshTokens.id,
-                userId: refreshTokens.userId,
-                tokenHash: refreshTokens.tokenHash,
-                expiresAt: refreshTokens.expiresAt,
-                createdAt: refreshTokens.createdAt,
-                userAgent: refreshTokens.userAgent,
-                ipAddress: refreshTokens.ipAddress
+                id: this.refreshTokensTable.id,
+                userId: this.refreshTokensTable.userId,
+                tokenHash: this.refreshTokensTable.tokenHash,
+                expiresAt: this.refreshTokensTable.expiresAt,
+                createdAt: this.refreshTokensTable.createdAt,
+                userAgent: this.refreshTokensTable.userAgent,
+                ipAddress: this.refreshTokensTable.ipAddress
             })
-            .from(refreshTokens)
-            .where(eq(refreshTokens.tokenHash, tokenHash));
+            .from(this.refreshTokensTable)
+            .where(eq(this.refreshTokensTable.tokenHash, tokenHash));
 
-        return token || null;
+        return (token as RefreshTokenInfo) || null;
     }
 
     async deleteByHash(tokenHash: string): Promise<void> {
-        await this.db.delete(refreshTokens).where(eq(refreshTokens.tokenHash, tokenHash));
+        await this.db.delete(this.refreshTokensTable).where(eq(this.refreshTokensTable.tokenHash, tokenHash));
     }
 
     async deleteAllForUser(userId: string): Promise<void> {
-        await this.db.delete(refreshTokens).where(eq(refreshTokens.userId, userId));
+        await this.db.delete(this.refreshTokensTable).where(eq(this.refreshTokensTable.userId, userId));
     }
 
     async listForUser(userId: string): Promise<RefreshTokenInfo[]> {
         const tokens = await this.db
             .select({
-                id: refreshTokens.id,
-                userId: refreshTokens.userId,
-                tokenHash: refreshTokens.tokenHash,
-                expiresAt: refreshTokens.expiresAt,
-                createdAt: refreshTokens.createdAt,
-                userAgent: refreshTokens.userAgent,
-                ipAddress: refreshTokens.ipAddress
+                id: this.refreshTokensTable.id,
+                userId: this.refreshTokensTable.userId,
+                tokenHash: this.refreshTokensTable.tokenHash,
+                expiresAt: this.refreshTokensTable.expiresAt,
+                createdAt: this.refreshTokensTable.createdAt,
+                userAgent: this.refreshTokensTable.userAgent,
+                ipAddress: this.refreshTokensTable.ipAddress
             })
-            .from(refreshTokens)
-            .where(eq(refreshTokens.userId, userId))
-            .orderBy(refreshTokens.createdAt);
+            .from(this.refreshTokensTable)
+            .where(eq(this.refreshTokensTable.userId, userId))
+            .orderBy(this.refreshTokensTable.createdAt);
 
-        return tokens;
+        return tokens as RefreshTokenInfo[];
     }
 
     async deleteById(id: string, userId: string): Promise<void> {
-        await this.db.delete(refreshTokens)
-            .where(sql`${refreshTokens.id} = ${id} AND ${refreshTokens.userId} = ${userId}`);
+        await this.db.delete(this.refreshTokensTable)
+            .where(sql`${this.refreshTokensTable.id} = ${id} AND ${this.refreshTokensTable.userId} = ${userId}`);
     }
 }
 
@@ -629,19 +704,37 @@ export class RefreshTokenService {
  * Password reset token service
  */
 export class PasswordResetTokenService {
-    constructor(private db: NodePgDatabase) { }
+    private passwordResetTokensTable: PgTable & Record<string, AnyPgColumn>;
+
+    constructor(
+        private db: NodePgDatabase,
+        tableOrTables?: (PgTable & Record<string, AnyPgColumn>) | Partial<AuthSchemaTables>
+    ) {
+        if (tableOrTables && ((tableOrTables as Partial<AuthSchemaTables>).passwordResetTokens || (tableOrTables as Partial<AuthSchemaTables>).users)) {
+            this.passwordResetTokensTable = ((tableOrTables as Partial<AuthSchemaTables>).passwordResetTokens || passwordResetTokens) as unknown as PgTable & Record<string, AnyPgColumn>;
+        } else {
+            this.passwordResetTokensTable = (tableOrTables as unknown as PgTable & Record<string, AnyPgColumn>) || (passwordResetTokens as unknown as PgTable & Record<string, AnyPgColumn>);
+        }
+    }
+
+    private getQualifiedPasswordResetTokensTableName(): string {
+        const name = getTableName(this.passwordResetTokensTable);
+        const schema = getTableConfig(this.passwordResetTokensTable).schema || "public";
+        return `"${schema}"."${name}"`;
+    }
 
     /**
      * Create a password reset token
      */
     async createToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
         // Delete any existing unused tokens for this user
+        const tableName = this.getQualifiedPasswordResetTokensTableName();
         await this.db.execute(sql`
-            DELETE FROM rebase.password_reset_tokens 
+            DELETE FROM ${sql.raw(tableName)} 
             WHERE user_id = ${userId} AND used_at IS NULL
         `);
 
-        await this.db.insert(passwordResetTokens).values({
+        await this.db.insert(this.passwordResetTokensTable).values({
             userId,
             tokenHash,
             expiresAt
@@ -654,18 +747,19 @@ export class PasswordResetTokenService {
     async findValidByHash(tokenHash: string): Promise<{ userId: string; expiresAt: Date } | null> {
         const [token] = await this.db
             .select({
-                userId: passwordResetTokens.userId,
-                expiresAt: passwordResetTokens.expiresAt
+                userId: this.passwordResetTokensTable.userId,
+                expiresAt: this.passwordResetTokensTable.expiresAt
             })
-            .from(passwordResetTokens)
-            .where(eq(passwordResetTokens.tokenHash, tokenHash));
+            .from(this.passwordResetTokensTable)
+            .where(eq(this.passwordResetTokensTable.tokenHash, tokenHash)) as unknown as Array<{ userId: string; expiresAt: Date }>;
 
         if (!token) return null;
 
         // Check if expired or used
+        const tableName = this.getQualifiedPasswordResetTokensTableName();
         const result = await this.db.execute(sql`
             SELECT user_id, expires_at 
-            FROM rebase.password_reset_tokens 
+            FROM ${sql.raw(tableName)} 
             WHERE token_hash = ${tokenHash} 
               AND used_at IS NULL 
               AND expires_at > NOW()
@@ -685,24 +779,25 @@ export class PasswordResetTokenService {
      */
     async markAsUsed(tokenHash: string): Promise<void> {
         await this.db
-            .update(passwordResetTokens)
+            .update(this.passwordResetTokensTable)
             .set({ usedAt: new Date() })
-            .where(eq(passwordResetTokens.tokenHash, tokenHash));
+            .where(eq(this.passwordResetTokensTable.tokenHash, tokenHash));
     }
 
     /**
      * Delete all tokens for a user
      */
     async deleteAllForUser(userId: string): Promise<void> {
-        await this.db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, userId));
+        await this.db.delete(this.passwordResetTokensTable).where(eq(this.passwordResetTokensTable.userId, userId));
     }
 
     /**
      * Clean up expired tokens
      */
     async deleteExpired(): Promise<void> {
+        const tableName = this.getQualifiedPasswordResetTokensTableName();
         await this.db.execute(sql`
-            DELETE FROM rebase.password_reset_tokens 
+            DELETE FROM ${sql.raw(tableName)} 
             WHERE expires_at < NOW()
         `);
     }
@@ -716,9 +811,12 @@ export class PostgresTokenRepository implements TokenRepository {
     private refreshTokenService: RefreshTokenService;
     private passwordResetTokenService: PasswordResetTokenService;
 
-    constructor(private db: NodePgDatabase) {
-        this.refreshTokenService = new RefreshTokenService(db);
-        this.passwordResetTokenService = new PasswordResetTokenService(db);
+    constructor(
+        private db: NodePgDatabase,
+        tableOrTables?: (PgTable & Record<string, AnyPgColumn>) | Partial<AuthSchemaTables>
+    ) {
+        this.refreshTokenService = new RefreshTokenService(db, tableOrTables);
+        this.passwordResetTokenService = new PasswordResetTokenService(db, tableOrTables);
     }
 
     // Refresh token operations
@@ -780,10 +878,13 @@ export class PostgresAuthRepository implements AuthRepository {
     private roleService: RoleService;
     private tokenRepository: PostgresTokenRepository;
 
-    constructor(private db: NodePgDatabase, usersTable?: any) {
-        this.userService = new UserService(db, usersTable);
-        this.roleService = new RoleService(db);
-        this.tokenRepository = new PostgresTokenRepository(db);
+    constructor(
+        private db: NodePgDatabase,
+        tableOrTables?: (PgTable & Record<string, AnyPgColumn>) | Partial<AuthSchemaTables>
+    ) {
+        this.userService = new UserService(db, tableOrTables);
+        this.roleService = new RoleService(db, tableOrTables);
+        this.tokenRepository = new PostgresTokenRepository(db, tableOrTables);
     }
 
     // User operations (delegate to UserService)
@@ -947,4 +1048,3 @@ export type PostgresUserRepository = UserService;
 
 /** PostgreSQL role repository implementation */
 export type PostgresRoleRepository = RoleService;
-

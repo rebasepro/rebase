@@ -125,7 +125,7 @@ export function MapFieldBinding({
 
             <FieldHelperText includeDescription={includeDescription}
                 showError={showError ?? false}
-                error={error && !partOfArray ? error as any : undefined}
+                error={error && !partOfArray ? error : undefined}
                 disabled={disabled}
                 property={property}/>
 

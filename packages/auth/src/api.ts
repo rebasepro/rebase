@@ -376,13 +376,25 @@ export interface AuthConfigResponse {
 let authConfigInflight: Promise<AuthConfigResponse> | null = null;
 
 /**
+ * Cached result of the last successful `fetchAuthConfig` call.
+ * Auth config is static for the lifetime of the app session, so
+ * repeat calls (e.g. from effect re-runs) return instantly.
+ */
+let authConfigCached: AuthConfigResponse | null = null;
+
+/**
  * Fetch auth configuration / status from the backend
  * This is an unauthenticated endpoint used to detect bootstrap mode.
  *
+ * Results are cached for the session lifetime.
  * Concurrent calls are deduplicated: only one network request is made
  * and all callers share the same promise.
  */
 export async function fetchAuthConfig(): Promise<AuthConfigResponse> {
+    if (authConfigCached) {
+        return authConfigCached;
+    }
+
     if (authConfigInflight) {
         return authConfigInflight;
     }
@@ -396,11 +408,22 @@ export async function fetchAuthConfig(): Promise<AuthConfigResponse> {
     })();
 
     try {
-        return await authConfigInflight;
+        const result = await authConfigInflight;
+        authConfigCached = result;
+        return result;
     } finally {
         authConfigInflight = null;
     }
 }
 
+/**
+ * Clear the cached auth config (e.g. on logout or for testing).
+ */
+export function clearAuthConfigCache(): void {
+    authConfigCached = null;
+    authConfigInflight = null;
+}
+
 export { AuthApiError };
+
 

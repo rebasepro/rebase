@@ -181,7 +181,7 @@ export function useRelationSelector<M extends Record<string, any> = any>(
                 limit: limit,
                 orderBy: undefined,
                 searchString: currentSearch
-            }, onEntitiesUpdate as any, onErrorUpdate);
+            }, (res) => onEntitiesUpdate({ data: res.data as Entity<M>[], meta: res.meta }), onErrorUpdate);
         } else {
             accessor.find({
                 where: whereParams,
@@ -190,7 +190,7 @@ export function useRelationSelector<M extends Record<string, any> = any>(
                 orderBy: undefined,
                 searchString: currentSearch
             })
-                .then(onEntitiesUpdate as any)
+                .then((res) => onEntitiesUpdate({ data: res.data as Entity<M>[], meta: res.meta }))
                 .catch(onErrorUpdate);
             unsubscribe = () => {};
         }

@@ -5,6 +5,7 @@ import {
 } from "@rebasepro/core";
 import { CircularProgressCenter } from "@rebasepro/ui";
 import { LoginView } from "@rebasepro/core";
+import type { AuthControllerExtended } from "@rebasepro/types";
 
 /**
  * Auth gate component that handles the authentication flow.
@@ -34,7 +35,7 @@ export function RebaseAuthGate({ children }: { children: React.ReactNode }) {
 
     if (!authController?.user) {
         const ActiveLoginView = registry.authConfig?.loginView ?? (
-            <LoginView authController={authController as any}/>
+            <LoginView authController={authController as AuthControllerExtended}/>
         );
         return <>{ActiveLoginView}</>;
     }

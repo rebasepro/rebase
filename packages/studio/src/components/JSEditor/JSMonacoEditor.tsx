@@ -6,6 +6,20 @@ import { cls, defaultBorderMixin } from "@rebasepro/ui";
 import { FileIcon } from "lucide-react";
 import { useModeController } from "@rebasepro/core";
 
+/**
+ * Shape of `monaco.languages.typescript` at runtime.
+ * The bundled type stubs mark this API as deprecated, but it is fully functional.
+ */
+interface MonacoTypeScriptApi {
+    typescriptDefaults: {
+        setCompilerOptions(options: Record<string, unknown>): void;
+        setDiagnosticsOptions(options: Record<string, unknown>): void;
+        addExtraLib(content: string, filePath: string): void;
+    };
+    ScriptTarget: Record<string, number>;
+    ModuleKind: Record<string, number>;
+}
+
 /** Ambient type definitions for the Rebase client SDK injected into Monaco. */
 const REBASE_CLIENT_TYPES = `
 // ─── Rebase Client SDK Type Definitions ─────────────────────────────
@@ -303,7 +317,7 @@ export const JSMonacoEditor = ({
             // Note: cast through `any` because the bundled type stubs mark
             // `monaco.languages.typescript` as deprecated while the runtime
             // API is fully functional.
-            const ts = (monaco.languages as any).typescript;
+            const ts = (monaco.languages as unknown as { typescript: MonacoTypeScriptApi }).typescript;
             ts.typescriptDefaults.setCompilerOptions({
                 target: ts.ScriptTarget.ESNext,
                 module: ts.ModuleKind.ESNext,

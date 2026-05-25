@@ -207,6 +207,7 @@ export const en = {
   "roadmap.next.item1": "AI SQL generation in editor",
   "roadmap.next.item2": "Hosted Rebase Cloud infrastructure",
   "roadmap.next.item3": "Multiplayer cursors in Studio",
+  "roadmap.next.item4": "One-click vector embeddings",
   "roadmap.later.title": "Later",
   "roadmap.later.badge": "Planning",
   "roadmap.later.item1": "Conversational analytics & charts bot",

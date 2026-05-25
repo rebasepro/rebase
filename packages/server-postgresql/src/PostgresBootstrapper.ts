@@ -4,9 +4,9 @@
  * Implements the `BackendBootstrapper` interface for PostgreSQL.
  */
 
-import { getTableName, isTable, Relations, sql } from "drizzle-orm";
+import { getTableName, isTable, Relations, sql, Table } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { PgEnum, PgTable } from "drizzle-orm/pg-core";
+import { PgEnum, PgTable, getTableConfig, AnyPgColumn } from "drizzle-orm/pg-core";
 import {
     BackendBootstrapper,
     InitializedDriver,
@@ -29,7 +29,8 @@ import {
 // @ts-ignore
 } from "@rebasepro/server-core";
 import { ensureAuthTablesExist } from "./auth/ensure-tables";
-import { RoleService, UserService, PostgresAuthRepository } from "./auth/services";
+import { RoleService, UserService, PostgresAuthRepository, AuthSchemaTables } from "./auth/services";
+import { createAuthSchema } from "./schema/auth-schema";
 
 // @ts-ignore
 import { createEmailService, type EmailConfig, type EmailService } from "@rebasepro/server-core";
@@ -95,7 +96,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 });
             }
 
-            if (pgConfig.schema?.enums) registry.registerEnums(pgConfig.schema.enums as Record<string, PgEnum<any>>);
+            if (pgConfig.schema?.enums) registry.registerEnums(pgConfig.schema.enums as Record<string, PgEnum<[string, ...string[]]>>);
             if (pgConfig.schema?.relations) registry.registerRelations(pgConfig.schema.relations as Record<string, Relations>);
 
             // Build schema-aware Drizzle connection
@@ -175,9 +176,29 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             }
 
             const customUsersTable = registry?.getTable("users");
-            const userService = new UserService(db, customUsersTable);
-            const roleService = new RoleService(db);
-            const authRepository = new PostgresAuthRepository(db, customUsersTable);
+            const customRolesTable = registry?.getTable("roles");
+
+            let usersSchemaName = "rebase";
+            let rolesSchemaName = "rebase";
+
+            if (customUsersTable) {
+                usersSchemaName = getTableConfig(customUsersTable).schema || "public";
+            }
+            if (customRolesTable) {
+                rolesSchemaName = getTableConfig(customRolesTable).schema || "public";
+            }
+
+            const authTables = createAuthSchema(rolesSchemaName, usersSchemaName) as unknown as AuthSchemaTables;
+            if (customUsersTable) {
+                authTables.users = customUsersTable as unknown as PgTable & Record<string, AnyPgColumn>;
+            }
+            if (customRolesTable) {
+                authTables.roles = customRolesTable as unknown as PgTable & Record<string, AnyPgColumn>;
+            }
+
+            const userService = new UserService(db, authTables);
+            const roleService = new RoleService(db, authTables);
+            const authRepository = new PostgresAuthRepository(db, authTables);
 
             return { userService,
 roleService,

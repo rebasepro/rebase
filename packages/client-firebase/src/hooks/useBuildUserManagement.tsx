@@ -355,14 +355,15 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<any> = 
 
 const entitiesToUsers = (docs: Entity<Omit<UserWithRoleIds, "id">>[]): (UserWithRoleIds)[] => {
     return docs.map((doc) => {
-        const data = doc.values as any;
+        const data = doc.values;
+        const record = data as Record<string, unknown>;
         const newVar = {
             uid: doc.id,
             ...data,
-            created_on: data?.created_on,
-            updated_on: data?.updated_on
+            created_on: record.created_on as Date | undefined,
+            updated_on: record.updated_on as Date | undefined
         };
-        return newVar as (UserWithRoleIds);
+        return newVar as unknown as UserWithRoleIds;
     });
 }
 

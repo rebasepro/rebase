@@ -29,5 +29,5 @@ export { RebaseAuth } from "./components/RebaseAuth";
 export { createUserManagementAdminViews, UsersView, RolesView } from "./components/AdminViews";
 
 // API utilities
-export { setApiUrl, getApiUrl, fetchAuthConfig, AuthApiError } from "./api";
+export { setApiUrl, getApiUrl, fetchAuthConfig, clearAuthConfigCache, AuthApiError } from "./api";
 export type { AuthConfigResponse } from "./api";

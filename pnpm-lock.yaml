@@ -111,6 +111,9 @@ importers:
 
   app/config:
     dependencies:
+      '@rebasepro/admin':
+        specifier: workspace:*
+        version: link:../../packages/admin
       '@rebasepro/types':
         specifier: workspace:*
         version: link:../../packages/types
@@ -592,6 +595,12 @@ importers:
       '@types/node':
         specifier: ^20.19.41
         version: 20.19.41
+      '@types/pg':
+        specifier: ^8.20.0
+        version: 8.20.0
+      pg:
+        specifier: ^8.21.0
+        version: 8.21.0
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -17297,7 +17306,7 @@ snapshots:
 
   '@types/pg@8.20.0':
     dependencies:
-      '@types/node': 20.19.41
+      '@types/node': 24.12.4
       pg-protocol: 1.14.0
       pg-types: 2.2.0
 

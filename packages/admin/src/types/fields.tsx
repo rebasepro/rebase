@@ -130,7 +130,7 @@ export interface FieldProps<
     /**
      * Additional properties set by the developer
      */
-    customProps: CustomProps
+    customProps?: CustomProps;
 
     /**
      * Additional values related to the state of the form or the entity

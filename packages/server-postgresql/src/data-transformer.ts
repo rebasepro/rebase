@@ -478,9 +478,12 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
             if (Buffer.isBuffer(value)) {
                 isBuffer = true;
                 buf = value;
-            } else if (typeof value === "object" && value !== null && (value as any).type === "Buffer" && Array.isArray((value as any).data)) {
-                isBuffer = true;
-                buf = Buffer.from((value as any).data);
+            } else if (typeof value === "object" && value !== null) {
+                const rawVal = value as Record<string, unknown>;
+                if (rawVal.type === "Buffer" && Array.isArray(rawVal.data)) {
+                    isBuffer = true;
+                    buf = Buffer.from(rawVal.data as number[]);
+                }
             }
             
             if (isBuffer && buf) {
@@ -606,9 +609,12 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
             if (Buffer.isBuffer(value)) {
                 isBuffer = true;
                 buf = value;
-            } else if (typeof value === "object" && value !== null && (value as any).type === "Buffer" && Array.isArray((value as any).data)) {
-                isBuffer = true;
-                buf = Buffer.from((value as any).data);
+            } else if (typeof value === "object" && value !== null) {
+                const rawVal = value as Record<string, unknown>;
+                if (rawVal.type === "Buffer" && Array.isArray(rawVal.data)) {
+                    isBuffer = true;
+                    buf = Buffer.from(rawVal.data as number[]);
+                }
             }
             
             if (isBuffer && buf) {

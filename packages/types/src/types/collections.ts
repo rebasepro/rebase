@@ -412,6 +412,13 @@ export interface PostgresCollection<M extends Record<string, unknown> = Record<s
     table: string;
 
     /**
+     * The PostgreSQL schema name for this table.
+     * E.g. "public", "rebase", "auth".
+     * If not specified, "public" is used (or the default search path).
+     */
+    schema?: string;
+
+    /**
      * For SQL databases, you can define the relations between collections here.
      * Relations describe JOINs, foreign keys, and junction tables.
      */

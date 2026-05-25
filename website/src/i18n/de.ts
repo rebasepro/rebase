@@ -190,6 +190,7 @@ export const de = {
   "roadmap.next.item2": "Gehostete Rebase Cloud-Infrastruktur",
   "roadmap.next.item3": "Multiplayer-Cursor in Studio",
   "roadmap.next.item4": "Nativer Dateispeicher (S3 / R2)",
+  "roadmap.next.item5": "Ein-Klick-Vektor-Embeddings",
   "roadmap.later.title": "Später",
   "roadmap.later.badge": "In Planung",
   "roadmap.later.item1": "Konversationeller Analyse- & Diagramm-Bot",

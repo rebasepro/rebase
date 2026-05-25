@@ -5,7 +5,7 @@ import { RebaseData } from "@rebasepro/types";
 /**
  * @group Hooks and utilities
  */
-export type SaveEntityWithCallbacksProps<M extends Record<string, any>> =
+export type SaveEntityWithCallbacksProps<M extends Record<string, unknown>> =
     SaveEntityProps<M> &
     {
         afterSave?: (updatedEntity: Entity<M>) => void,
@@ -31,7 +31,7 @@ export type SaveEntityWithCallbacksProps<M extends Record<string, any>> =
  * @param afterSaveError
  * @group Hooks and utilities
  */
-export async function saveEntityWithCallbacks<M extends Record<string, any>>({
+export async function saveEntityWithCallbacks<M extends Record<string, unknown>>({
     collection,
     path,
     entityId,
@@ -57,9 +57,9 @@ export async function saveEntityWithCallbacks<M extends Record<string, any>>({
 
     let savePromise: Promise<Entity<M>>;
     if (status === "new" || status === "copy") {
-        savePromise = accessor.create(values, entityId) as any;
+        savePromise = accessor.create(values, entityId) as Promise<Entity<M>>;
     } else {
-        savePromise = accessor.update(entityId!, values) as any;
+        savePromise = accessor.update(entityId!, values) as Promise<Entity<M>>;
     }
 
     return savePromise.then((entity) => {

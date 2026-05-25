@@ -45,7 +45,10 @@ const job: CronJobDefinition = {
         }
 
         // Use the server singleton to access the driver for raw SQL
-        const driver = (rebase as any)._driver ?? (rebase as any).driver;
+        interface RebaseDriver { executeSql(sql: string): Promise<unknown>; }
+        interface RebaseWithDriver { _driver?: RebaseDriver; driver?: RebaseDriver; }
+        const rebaseInternal = rebase as unknown as RebaseWithDriver;
+        const driver = rebaseInternal._driver ?? rebaseInternal.driver;
         if (driver?.executeSql) {
             // Truncate in dependency order
             for (const table of collectionTables) {

@@ -1,5 +1,8 @@
 import { sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { getTableConfig, AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
+import { getColumnMeta } from "../services/entity-helpers";
+import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 
 /**
  * Default roles to seed on first run
@@ -9,34 +12,21 @@ const DEFAULT_ROLES = [
         id: "admin",
         name: "Admin",
         is_admin: true,
-        default_permissions: { read: true,
-create: true,
-edit: true,
-delete: true },
-        config: { createCollections: true,
-editCollections: "all",
-deleteCollections: "all" }
+        default_permissions: { read: true, create: true, edit: true, delete: true },
+        config: { createCollections: true, editCollections: "all", deleteCollections: "all" }
     },
     {
         id: "editor",
         name: "Editor",
         is_admin: false,
-        default_permissions: { read: true,
-create: true,
-edit: true,
-delete: true },
-        config: { createCollections: true,
-editCollections: "own",
-deleteCollections: "own" }
+        default_permissions: { read: true, create: true, edit: true, delete: true },
+        config: { createCollections: true, editCollections: "own", deleteCollections: "own" }
     },
     {
         id: "viewer",
         name: "Viewer",
         is_admin: false,
-        default_permissions: { read: true,
-create: false,
-edit: false,
-delete: false },
+        default_permissions: { read: true, create: false, edit: false, delete: false },
         config: null
     }
 ];
@@ -45,26 +35,26 @@ delete: false },
  * Auto-create auth tables if they don't exist
  * This runs on startup to ensure the database is ready for auth
  */
-export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: any): Promise<void> {
+export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: PostgresCollectionRegistry): Promise<void> {
     console.log("🔍 Checking auth tables...");
 
     try {
-        // ── Create the rebase schema ────────────────────────────────────
-        await db.execute(sql`CREATE SCHEMA IF NOT EXISTS rebase`);
-
         // Resolve dynamic user table name and ID type
         let usersTableName = 'public."users"';
         let userIdType = "TEXT";
+        let usersSchema = "public";
         if (registry) {
-            const usersTable = registry.getTable("users");
+            const usersTable = registry.getTable("users") as (PgTable & Record<string, AnyPgColumn>) | undefined;
             if (usersTable) {
                 const { getTableName } = await import("drizzle-orm");
-                usersTableName = `public."${getTableName(usersTable)}"`;
+                usersSchema = getTableConfig(usersTable).schema || "public";
+                usersTableName = `"${usersSchema}"."${getTableName(usersTable)}"`;
 
                 // Inspect users.id column to match referenced column type
                 if (usersTable.id) {
-                    const rawCol = usersTable.id as unknown as Record<string | symbol, unknown>;
-                    const columnType = rawCol.columnType;
+                    const col = usersTable.id;
+                    const meta = getColumnMeta(col);
+                    const columnType = meta.columnType;
                     if (columnType === "PgUUID") {
                         userIdType = "UUID";
                     } else if (columnType === "PgSerial" || columnType === "PgInteger") {
@@ -76,11 +66,37 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: any):
             }
         }
 
+        // Resolve dynamic roles schema name
+        let rolesSchema = "rebase";
+        if (registry) {
+            const rolesTable = registry.getTable("roles");
+            if (rolesTable) {
+                rolesSchema = getTableConfig(rolesTable).schema || "public";
+            }
+        }
+
+        // ── Create schemas (idempotent) ──────────────────────────────────
+        if (usersSchema !== "public") {
+            await db.execute(sql`CREATE SCHEMA IF NOT EXISTS ${sql.raw(usersSchema)}`);
+        }
+        if (rolesSchema !== "public" && rolesSchema !== usersSchema) {
+            await db.execute(sql`CREATE SCHEMA IF NOT EXISTS ${sql.raw(rolesSchema)}`);
+        }
+        await db.execute(sql`CREATE SCHEMA IF NOT EXISTS rebase`);
+
+        // Dynamic table names
+        const userIdentitiesTable = `"${rolesSchema}"."user_identities"`;
+        const rolesTableName = `"${rolesSchema}"."roles"`;
+        const userRolesTableName = `"${rolesSchema}"."user_roles"`;
+        const refreshTokensTableName = `"${rolesSchema}"."refresh_tokens"`;
+        const passwordResetTokensTableName = `"${rolesSchema}"."password_reset_tokens"`;
+        const appConfigTableName = `"${rolesSchema}"."app_config"`;
+
         // ── Create tables (idempotent) ──────────────────────────────────
 
         // Create user_identities table
         await db.execute(sql`
-            CREATE TABLE IF NOT EXISTS rebase.user_identities (
+            CREATE TABLE IF NOT EXISTS ${sql.raw(userIdentitiesTable)} (
                 id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
                 user_id ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
                 provider TEXT NOT NULL,
@@ -95,13 +111,13 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: any):
         // Create indexes on user_identities
         await db.execute(sql`
             CREATE INDEX IF NOT EXISTS idx_user_identities_user 
-            ON rebase.user_identities(user_id)
+            ON ${sql.raw(userIdentitiesTable)}(user_id)
         `);
 
 
         // Create roles table
         await db.execute(sql`
-            CREATE TABLE IF NOT EXISTS rebase.roles (
+            CREATE TABLE IF NOT EXISTS ${sql.raw(rolesTableName)} (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 is_admin BOOLEAN DEFAULT FALSE,
@@ -114,9 +130,9 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: any):
 
         // Create user_roles junction table
         await db.execute(sql`
-            CREATE TABLE IF NOT EXISTS rebase.user_roles (
+            CREATE TABLE IF NOT EXISTS ${sql.raw(userRolesTableName)} (
                 user_id ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
-                role_id TEXT NOT NULL REFERENCES rebase.roles(id) ON DELETE CASCADE,
+                role_id TEXT NOT NULL REFERENCES ${sql.raw(rolesTableName)}(id) ON DELETE CASCADE,
                 PRIMARY KEY (user_id, role_id)
             )
         `);
@@ -124,12 +140,12 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: any):
         // Create index on user_id for faster lookups
         await db.execute(sql`
             CREATE INDEX IF NOT EXISTS idx_user_roles_user 
-            ON rebase.user_roles(user_id)
+            ON ${sql.raw(userRolesTableName)}(user_id)
         `);
 
         // Create refresh tokens table (includes user_agent, ip_address, and unique constraint)
         await db.execute(sql`
-            CREATE TABLE IF NOT EXISTS rebase.refresh_tokens (
+            CREATE TABLE IF NOT EXISTS ${sql.raw(refreshTokensTableName)} (
                 id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
                 user_id ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
                 token_hash TEXT NOT NULL UNIQUE,
@@ -144,18 +160,18 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: any):
         // Create index on token_hash for faster lookups
         await db.execute(sql`
             CREATE INDEX IF NOT EXISTS idx_refresh_tokens_hash 
-            ON rebase.refresh_tokens(token_hash)
+            ON ${sql.raw(refreshTokensTableName)}(token_hash)
         `);
 
         // Create index on user_id for cleanup operations
         await db.execute(sql`
             CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user 
-            ON rebase.refresh_tokens(user_id)
+            ON ${sql.raw(refreshTokensTableName)}(user_id)
         `);
 
         // Create password reset tokens table
         await db.execute(sql`
-            CREATE TABLE IF NOT EXISTS rebase.password_reset_tokens (
+            CREATE TABLE IF NOT EXISTS ${sql.raw(passwordResetTokensTableName)} (
                 id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
                 user_id ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
                 token_hash TEXT NOT NULL UNIQUE,
@@ -168,18 +184,18 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: any):
         // Create index on token_hash for password reset lookups
         await db.execute(sql`
             CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_hash 
-            ON rebase.password_reset_tokens(token_hash)
+            ON ${sql.raw(passwordResetTokensTableName)}(token_hash)
         `);
 
         // Create index on user_id for password reset cleanup
         await db.execute(sql`
             CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user 
-            ON rebase.password_reset_tokens(user_id)
+            ON ${sql.raw(passwordResetTokensTableName)}(user_id)
         `);
 
         // Create app config table
         await db.execute(sql`
-            CREATE TABLE IF NOT EXISTS rebase.app_config (
+            CREATE TABLE IF NOT EXISTS ${sql.raw(appConfigTableName)} (
                 key TEXT PRIMARY KEY,
                 value JSONB NOT NULL,
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -187,15 +203,9 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: any):
         `);
 
         // Create the `auth` schema with Supabase-style helper functions for RLS.
-        //   auth.uid()   → returns the current user's ID (reads app.user_id)
-        //   auth.jwt()   → returns the full JWT claims as JSONB (reads app.jwt)
-        //   auth.roles() → returns comma-separated role IDs (reads app.user_roles)
-        // These read from session-local config vars set per-transaction by withAuth().
         await db.execute(sql`CREATE SCHEMA IF NOT EXISTS auth`);
 
         // Use an advisory transaction lock to serialize function recreation during HMR
-        // This prevents the "tuple concurrently updated" race condition when multiple Node
-        // workers or rapid restarts attempt to CREATE OR REPLACE FUNCTION simultaneously.
         await db.transaction(async (tx) => {
             await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'))`);
 
@@ -222,7 +232,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: any):
         });
 
         // Seed default roles if none exist
-        await seedDefaultRoles(db);
+        await seedDefaultRoles(db, rolesTableName);
 
         console.log("✅ Auth tables ready");
     } catch (error) {
@@ -234,9 +244,9 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: any):
 /**
  * Seed default roles if the roles table is empty
  */
-async function seedDefaultRoles(db: NodePgDatabase): Promise<void> {
+async function seedDefaultRoles(db: NodePgDatabase, rolesTableName: string): Promise<void> {
     // Check if any roles exist
-    const result = await db.execute(sql`SELECT COUNT(*) as count FROM rebase.roles`);
+    const result = await db.execute(sql`SELECT COUNT(*) as count FROM ${sql.raw(rolesTableName)}`);
     const count = parseInt((result.rows[0] as Record<string, string | number>)?.count as string || "0", 10);
 
     if (count > 0) {
@@ -248,7 +258,7 @@ async function seedDefaultRoles(db: NodePgDatabase): Promise<void> {
 
     for (const role of DEFAULT_ROLES) {
         await db.execute(sql`
-            INSERT INTO rebase.roles (id, name, is_admin, default_permissions, config)
+            INSERT INTO ${sql.raw(rolesTableName)} (id, name, is_admin, default_permissions, config)
             VALUES (
                 ${role.id}, 
                 ${role.name}, 
@@ -262,4 +272,3 @@ async function seedDefaultRoles(db: NodePgDatabase): Promise<void> {
 
     console.log("✅ Default roles created: admin, editor, viewer");
 }
-

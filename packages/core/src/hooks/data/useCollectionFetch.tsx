@@ -125,7 +125,7 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
 
         // Eagerly include relations to avoid N+1 fetches.
         const hasRelations = collection.properties && Object.values(collection.properties).some(
-            (p: any) => p.type === "relation" || p.type === "reference"
+            (p) => p.type === "relation" || p.type === "reference"
         );
         const includeParams = hasRelations ? ["*"] : undefined;
 
@@ -136,7 +136,7 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
                 orderBy: orderByParams,
                 searchString,
                 include: includeParams
-            }, onEntitiesUpdate as any, onError);
+            }, (res) => onEntitiesUpdate({ data: res.data as Entity<M>[], meta: res.meta }), onError);
         } else {
             accessor.find({
                 where: whereParams,
@@ -145,7 +145,7 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
                 searchString,
                 include: includeParams
             })
-                .then(onEntitiesUpdate as any)
+                .then((res) => onEntitiesUpdate({ data: res.data as Entity<M>[], meta: res.meta }))
                 .catch(onError);
             return () => {
             };
