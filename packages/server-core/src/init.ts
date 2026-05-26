@@ -67,7 +67,7 @@ export interface RebaseAuthConfig {
      * keeping everything else intact. Unset overrides fall through
      * to the built-in defaults (scrypt passwords, standard validation, etc.).
      *
-     * @example bcrypt passwords for a legacy database
+     * @example bcrypt passwords with a custom hash
      * ```ts
      * import bcrypt from "bcrypt";
      *

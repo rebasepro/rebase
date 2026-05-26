@@ -69,6 +69,7 @@ export interface EntityEditViewProps<M extends Record<string, unknown> = Record<
     onValuesModified?: (modified: boolean, values: M) => void;
     onSaved?: (params: OnUpdateParams) => void;
     onTabChange?: (props: OnTabChangeParams<M>) => void;
+    navigateBack?: () => void;
     layout?: "side_panel" | "full_screen" | "split" | "dialog";
     barActions?: (params: BarActionsParams) => any;
     formProps?: Partial<EntityFormProps<M>>,
@@ -152,6 +153,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
     onValuesModified,
     onSaved,
     onTabChange,
+    navigateBack,
     entity,
     initialDirtyValues,
     dataLoading,
@@ -209,9 +211,11 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
         }
     ), [collection, status, entityId]);
 
-    const [selectedTab, setSelectedTab] = useState<string>(selectedTabProp ?? defaultSelectedView ?? MAIN_TAB_VALUE);
+    const [selectedTab, setSelectedTab] = useState<string>(
+        selectedTabProp === "edit" ? MAIN_TAB_VALUE : (selectedTabProp ?? defaultSelectedView ?? MAIN_TAB_VALUE)
+    );
     useEffect(() => {
-        const target = selectedTabProp ?? defaultSelectedView ?? MAIN_TAB_VALUE;
+        const target = selectedTabProp === "edit" ? MAIN_TAB_VALUE : (selectedTabProp ?? defaultSelectedView ?? MAIN_TAB_VALUE);
         if (target !== selectedTab) {
             setSelectedTab(target);
         }
@@ -424,6 +428,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
         className={cls((!mainViewVisible || !canEdit) && !selectedSecondaryForm ? "hidden" : "", formProps?.className)}
         EntityFormActionsComponent={EntityEditViewFormActions}
         disabled={!canEdit}
+        navigateBack={navigateBack}
         {...formProps}
         onEntityChange={(entity) => {
             setUsedEntity(entity);
@@ -483,7 +488,8 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
             <IconButton
                 size="small"
                 onClick={() => {
-                    const entityUrl = urlController.buildUrlCollectionPath(`${path}/${entityId}`);
+                    const editSuffix = collection.defaultEntityAction === "view" ? "/edit" : "";
+                    const entityUrl = urlController.buildUrlCollectionPath(`${path}/${entityId}${editSuffix}`);
                     navigate(`${entityUrl}#full`);
                 }}
             >

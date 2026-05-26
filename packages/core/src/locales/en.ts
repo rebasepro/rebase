@@ -25,6 +25,8 @@ export const en: RebaseTranslations = {
     copy: "Copy",
     delete: "Delete",
     delete_not_allowed: "You have selected at least one entity you cannot delete",
+    edit_entity: "Edit",
+    back_to_detail: "Back to details",
 
     // ─── Delete dialog ───────────────────────────────────────────
     delete_confirmation_title: "Delete?",

@@ -73,11 +73,7 @@ export interface LoginViewProps {
      */
     notAllowedError?: string | Error;
 
-    /**
-     * Override: enable Google login button.
-     * If not set, checks `authController.capabilities.googleLogin`.
-     */
-    googleEnabled?: boolean;
+
 
     /**
      * Google client ID for Google OAuth.
@@ -112,7 +108,6 @@ export function LoginView({
     disableSignupScreen = false,
     disabled = false,
     notAllowedError,
-    googleEnabled,
     googleClientId,
     needsSetup,
     registrationEnabled
@@ -140,7 +135,7 @@ export function LoginView({
         ?? ("needsSetup" in authController && !!(authController as { needsSetup?: boolean }).needsSetup)
         ?? false;
     const canRegister = registrationEnabled ?? caps.registration ?? false;
-    const hasGoogleLogin = googleEnabled ?? caps.googleLogin ?? false;
+    const hasGoogleLogin = googleClientId && (caps.enabledProviders?.includes("google") ?? caps.googleLogin ?? false);
     const hasPasswordReset = caps.passwordReset ?? !!authController.forgotPassword;
 
     const showRegistration = !disableSignupScreen && canRegister;

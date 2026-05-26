@@ -2,6 +2,7 @@ import type { EntityCollection } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CollectionSize, Entity, EntityTableController, SelectionController } from "@rebasepro/types";
 import { EntityEditView } from "../EntityEditView";
+import { EntityDetailView } from "../EntityDetailView";
 import {
     cls,
     defaultBorderMixin,
@@ -9,7 +10,7 @@ import {
 } from "@rebasepro/ui";
 import { useLargeLayout } from "@rebasepro/core";
 import { useCollectionRegistryController } from "../../index";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useUrlController } from "../../index";
 import { ErrorBoundary } from "@rebasepro/ui";
 
@@ -107,6 +108,8 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
 }: SplitListViewProps<M>) {
     const largeLayout = useLargeLayout();
     const collectionRegistryController = useCollectionRegistryController();
+    const location = useLocation();
+    const isEditMode = location.pathname.endsWith("/edit") || location.pathname.split("/").pop() === "edit";
     const navigate = useNavigate();
     const urlController = useUrlController();
 
@@ -288,30 +291,78 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
             style={{ transitionDuration: `${TRANSITION_DURATION}ms` }}
         >
             <ErrorBoundary>
-                <EntityEditView
-                    key={String(renderedEntityId)}
-                    path={path}
-                    collection={collection as EntityCollection<Record<string, unknown>>}
-                    entityId={renderedEntityId}
-                    parentCollectionSlugs={usedParentCollectionIds}
-                    parentEntityIds={usedParentEntityIds}
-                    selectedTab={selectedTab}
-                    layout="split"
-                    onTabChange={(params) => {
-                        const newSelectedTab = params.selectedTab;
-                        let entityUrl = urlController.buildUrlCollectionPath(
-                            newSelectedTab
-                                ? `${path}/${renderedEntityId}/${newSelectedTab}`
-                                : `${path}/${renderedEntityId}`
-                        );
-                        // Preserve the __view query param
-                        const currentViewParam = new URLSearchParams(window.location.search).get("__view");
-                        if (currentViewParam) {
-                            entityUrl += `${entityUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
-                        }
-                        navigate(entityUrl);
-                    }}
-                />
+                {collection.defaultEntityAction === "view" && !isEditMode
+                    ? <EntityDetailView
+                        key={String(renderedEntityId)}
+                        path={path}
+                        collection={collection as EntityCollection<Record<string, unknown>>}
+                        entityId={renderedEntityId}
+                        parentCollectionSlugs={usedParentCollectionIds}
+                        parentEntityIds={usedParentEntityIds}
+                        selectedTab={selectedTab}
+                        layout="split"
+                        onEditClick={() => {
+                            let entityUrl = urlController.buildUrlCollectionPath(`${path}/${renderedEntityId}/edit`);
+                            const currentViewParam = new URLSearchParams(window.location.search).get("__view");
+                            if (currentViewParam) {
+                                entityUrl += `${entityUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
+                            }
+                            navigate(entityUrl);
+                        }}
+                        onTabChange={(params) => {
+                            const newSelectedTab = params.selectedTab;
+                            let entityUrl = urlController.buildUrlCollectionPath(
+                                newSelectedTab
+                                    ? `${path}/${renderedEntityId}/${newSelectedTab}`
+                                    : `${path}/${renderedEntityId}`
+                            );
+                            const currentViewParam = new URLSearchParams(window.location.search).get("__view");
+                            if (currentViewParam) {
+                                entityUrl += `${entityUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
+                            }
+                            navigate(entityUrl);
+                        }}
+                    />
+                    : <EntityEditView
+                        key={String(renderedEntityId)}
+                        path={path}
+                        collection={collection as EntityCollection<Record<string, unknown>>}
+                        entityId={renderedEntityId}
+                        parentCollectionSlugs={usedParentCollectionIds}
+                        parentEntityIds={usedParentEntityIds}
+                        selectedTab={selectedTab}
+                        layout="split"
+                        onSaved={(params) => {
+                            let entityUrl = urlController.buildUrlCollectionPath(`${path}/${renderedEntityId}`);
+                            const currentViewParam = new URLSearchParams(window.location.search).get("__view");
+                            if (currentViewParam) {
+                                entityUrl += `${entityUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
+                            }
+                            navigate(entityUrl, { replace: true });
+                        }}
+                        navigateBack={() => {
+                            let entityUrl = urlController.buildUrlCollectionPath(`${path}/${renderedEntityId}`);
+                            const currentViewParam = new URLSearchParams(window.location.search).get("__view");
+                            if (currentViewParam) {
+                                entityUrl += `${entityUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
+                            }
+                            navigate(entityUrl);
+                        }}
+                        onTabChange={(params) => {
+                            const newSelectedTab = params.selectedTab;
+                            let entityUrl = urlController.buildUrlCollectionPath(
+                                newSelectedTab
+                                    ? `${path}/${renderedEntityId}/${newSelectedTab}`
+                                    : `${path}/${renderedEntityId}`
+                            );
+                            const currentViewParam = new URLSearchParams(window.location.search).get("__view");
+                            if (currentViewParam) {
+                                entityUrl += `${entityUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
+                            }
+                            navigate(entityUrl);
+                        }}
+                    />
+                }
             </ErrorBoundary>
         </div>
     ) : <></>;

@@ -9,6 +9,7 @@ const customersCollection: PostgresCollection = {
     icon: "Users",
     group: "E-Commerce",
     history: true,
+    defaultEntityAction: "view",
     properties: {
         id: {
             name: "ID",

@@ -39,6 +39,8 @@ export type EntityFormProps<M extends Record<string, unknown>> = {
 
     EntityFormActionsComponent?: React.FC<EntityFormActionsProps>;
 
+    navigateBack?: () => void;
+
     Builder?: React.ComponentType<EntityCustomViewParams<M>>;
 
     children?: React.ReactNode;

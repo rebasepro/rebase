@@ -6,7 +6,7 @@ import { deepEqual as equal } from "fast-equals";
 import { CollectionsConfigController } from "./types/config_controller";
 import { useCustomizationController, useRebaseContext, useAuthController, useSnackbarController } from "@rebasepro/core";
 import { getTableName } from "@rebasepro/common";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import { CollectionEditorController } from "./types/collection_editor_controller";
 import { CollectionEditorPermissionsBuilder } from "./types/config_permissions";
 import { CollectionInference } from "./types/collection_inference";

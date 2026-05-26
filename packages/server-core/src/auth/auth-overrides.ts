@@ -10,7 +10,7 @@
  * This interface is intentionally open for extension — new overrides
  * can be added as optional methods without breaking existing configurations.
  *
- * @example bcrypt password support for a legacy database
+ * @example bcrypt password support
  * ```ts
  * import bcrypt from "bcrypt";
  *
@@ -30,7 +30,7 @@
  *     verifyCredentials: async (email, password, repo) => {
  *         const user = await repo.getUserByEmail(email);
  *         if (!user || !user.passwordHash) return null;
- *         const valid = await myLegacyVerify(password, user.passwordHash);
+ *         const valid = await myCustomVerify(password, user.passwordHash);
  *         return valid ? user : null;
  *     }
  * };

@@ -6,8 +6,8 @@ import type { AnalyticsEvent } from "@rebasepro/types";
 // Global gtag function injected by the GA4 script in index.html
 declare function gtag(...args: any[]): void;
 
-import { useRebaseAuthController, useBackendUserManagement, RebaseAuth } from "@rebasepro/auth";
-import { Rebase } from "@rebasepro/core";
+import { useRebaseAuthController, useBackendUserManagement } from "@rebasepro/auth";
+import { Rebase, RebaseAuth } from "@rebasepro/core";
 import { RebaseCMS, RebaseShell } from "@rebasepro/admin";
 import type { RebasePlugin } from "@rebasepro/types";
 import { useDataEnhancementPlugin } from "@rebasepro/plugin-data-enhancement";
@@ -261,7 +261,7 @@ export function App() {
             plugins={plugins}
             onAnalyticsEvent={onAnalyticsEvent}
         >
-            <RebaseAuth loginView={<DemoLoginView authController={authController} googleEnabled={true} googleClientId={GOOGLE_CLIENT_ID}/>}/>
+            <RebaseAuth loginView={<DemoLoginView authController={authController} googleClientId={GOOGLE_CLIENT_ID}/>}/>
             <RebaseCMS
                 collections={collections}
                 collectionEditor={collectionEditor}

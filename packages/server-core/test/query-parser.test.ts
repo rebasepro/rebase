@@ -156,36 +156,7 @@ describe("parseQueryOptions — PostgREST filters", () => {
     });
 });
 
-// ─────────────────────────────────────────────────────────────
-// parseQueryOptions — Legacy JSON where
-// ─────────────────────────────────────────────────────────────
-describe("parseQueryOptions — legacy JSON where", () => {
-    it("parses JSON where string", () => {
-        const result = parseQueryOptions({
-            where: JSON.stringify({ status: ["==", "published"] })
-        });
-        expect(result.where?.status).toEqual(["==", "published"]);
-    });
 
-    it("accepts object where directly", () => {
-        const result = parseQueryOptions({
-            where: { status: ["==", "draft"] }
-        });
-        expect(result.where?.status).toEqual(["==", "draft"]);
-    });
-
-    it("throws for malformed JSON where", () => {
-        expect(() => parseQueryOptions({ where: "not valid json{" })).toThrow("Invalid 'where' filter");
-    });
-
-    it("throws for array where", () => {
-        expect(() => parseQueryOptions({ where: JSON.stringify([1, 2]) })).toThrow("Filter must be a JSON object");
-    });
-
-    it("throws for null where", () => {
-        expect(() => parseQueryOptions({ where: JSON.stringify(null) })).toThrow("Filter must be a JSON object");
-    });
-});
 
 // ─────────────────────────────────────────────────────────────
 // parseQueryOptions — Sorting

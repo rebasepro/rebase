@@ -113,23 +113,16 @@ export type GoogleLoginPayload =
 /**
  * Login with Google.
  *
- * Overload 1 (legacy): `googleLogin("token", "idToken" | "accessToken")`
- * Overload 2 (code flow): `googleLogin({ code, redirectUri })`
+ * Accepts one of:
+ * - `{ idToken }` — ID-token flow (One Tap / Sign In button)
+ * - `{ accessToken }` — Access-token flow (popup)
+ * - `{ code, redirectUri }` — Authorization code flow (most secure)
  */
-export async function googleLogin(payload: GoogleLoginPayload): Promise<AuthResponse>;
-export async function googleLogin(token: string, tokenType?: "idToken" | "accessToken"): Promise<AuthResponse>;
-export async function googleLogin(
-    tokenOrPayload: string | GoogleLoginPayload,
-    tokenType: "idToken" | "accessToken" = "idToken"
-): Promise<AuthResponse> {
-    const body = typeof tokenOrPayload === "string"
-        ? { [tokenType]: tokenOrPayload }
-        : tokenOrPayload;
-
+export async function googleLogin(payload: GoogleLoginPayload): Promise<AuthResponse> {
     const response = await fetchWithHandling(`${baseApiUrl}/api/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
+        body: JSON.stringify(payload)
     });
 
     return handleResponse<AuthResponse>(response);
@@ -356,14 +349,10 @@ export interface AuthConfigResponse {
     needsSetup: boolean;
     /** Whether new user registration is enabled */
     registrationEnabled: boolean;
-    /** Whether Google OAuth is configured */
-    googleEnabled: boolean;
-    /** Whether LinkedIn OAuth is configured */
-    linkedinEnabled: boolean;
     /** Whether email service is configured */
     emailServiceEnabled: boolean;
     /** Complete list of enabled OAuth provider IDs (e.g. ["google", "github", "discord"]) */
-    enabledProviders?: string[];
+    enabledProviders: string[];
 }
 
 /**

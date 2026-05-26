@@ -54,6 +54,12 @@ export interface FormContext<M extends Record<string, unknown> = Record<string, 
     formex: FormexController<M>;
 
     disabled: boolean;
+
+    /**
+     * Whether the form context is in read-only detail view mode.
+     * Custom entity views can use this to adjust their rendering.
+     */
+    readOnly?: boolean;
 }
 
 
@@ -73,4 +79,36 @@ export interface EntityCustomViewParams<M extends Record<string, unknown> = Reco
     formContext: FormContext<M>;
     parentCollectionSlugs?: string[];
     parentEntityIds?: string[];
+}
+
+/**
+ * Configuration for customizing the read-only detail view of an entity.
+ * Only used when `defaultEntityAction` is set to `"view"` on the collection.
+ * @group Models
+ */
+export type EntityDetailViewConfig<M extends Record<string, unknown> = Record<string, unknown>> = {
+    /**
+     * Custom component rendered above the property display in the detail view.
+     */
+    Header?: ComponentRef<EntityDetailViewParams<M>>;
+    /**
+     * Custom component rendered below the property display in the detail view.
+     */
+    Footer?: ComponentRef<EntityDetailViewParams<M>>;
+    /**
+     * Completely replace the default detail view with a custom component.
+     * When set, Header and Footer are ignored.
+     */
+    Builder?: ComponentRef<EntityDetailViewParams<M>>;
+};
+
+/**
+ * Props passed to detail view customization components (Header, Footer, Builder).
+ * @group Models
+ */
+export interface EntityDetailViewParams<M extends Record<string, unknown> = Record<string, unknown>> {
+    collection: EntityCollection<M>;
+    entity: Entity<M>;
+    path: string;
+    onEditClick: () => void;
 }

@@ -199,41 +199,20 @@ export function createAdminRoutes(config: AdminRouteOptions): Hono<HonoEnv> {
         const orderDir = c.req.query("orderDir") as "asc" | "desc" | undefined;
         const hookCtx = buildHookContext(c, "GET");
 
-        // If pagination params are provided, use the paginated path
-        if (limitParam !== undefined || search) {
-            const limit = limitParam ? parseInt(limitParam, 10) : 25;
-            const offset = offsetParam ? parseInt(offsetParam, 10) : 0;
+        const limit = limitParam ? parseInt(limitParam, 10) : 25;
+        const offset = offsetParam ? parseInt(offsetParam, 10) : 0;
 
-            const result = await authRepo.listUsersPaginated({
-                limit,
-                offset,
-                search: search || undefined,
-                orderBy: orderBy || undefined,
-                orderDir: orderDir || undefined,
-                roleId: c.req.query("role") || undefined
-            });
+        const result = await authRepo.listUsersPaginated({
+            limit,
+            offset,
+            search: search || undefined,
+            orderBy: orderBy || undefined,
+            orderDir: orderDir || undefined,
+            roleId: c.req.query("role") || undefined
+        });
 
-            let usersWithRoles: AdminUser[] = await Promise.all(
-                result.users.map(async (u) => {
-                    const roles = await authRepo.getUserRoleIds(u.id);
-                    return toAdminUser(u, roles);
-                })
-            );
-
-            usersWithRoles = await applyUserAfterReadBatch(usersWithRoles, hookCtx);
-
-            return c.json({
-                users: usersWithRoles,
-                total: result.total,
-                limit: result.limit,
-                offset: result.offset
-            });
-        }
-
-        // Legacy: return all users (no pagination)
-        const users = await authRepo.listUsers();
         let usersWithRoles: AdminUser[] = await Promise.all(
-            users.map(async (u) => {
+            result.users.map(async (u) => {
                 const roles = await authRepo.getUserRoleIds(u.id);
                 return toAdminUser(u, roles);
             })
@@ -241,7 +220,12 @@ export function createAdminRoutes(config: AdminRouteOptions): Hono<HonoEnv> {
 
         usersWithRoles = await applyUserAfterReadBatch(usersWithRoles, hookCtx);
 
-        return c.json({ users: usersWithRoles });
+        return c.json({
+            users: usersWithRoles,
+            total: result.total,
+            limit: result.limit,
+            offset: result.offset
+        });
     });
 
     router.get("/users/:userId", requireAdmin, async (c) => {

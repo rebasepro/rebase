@@ -359,18 +359,15 @@ export function useRebaseAuthController(
         }
     }, [handleAuthSuccess]);
 
-    // Google login — supports legacy (token, tokenType) and code-flow payload
+    // Google login — accepts payload object with code flow or token
     const googleLogin = useCallback(async (
-        tokenOrPayload: string | { code: string; redirectUri: string },
-        tokenType?: "idToken" | "accessToken"
+        payload: { code: string; redirectUri: string } | { idToken: string } | { accessToken: string }
     ) => {
         setAuthLoading(true);
         setAuthProviderError(null);
 
         try {
-            const response = typeof tokenOrPayload === "string"
-                ? await authApi.googleLogin(tokenOrPayload, tokenType ?? "idToken")
-                : await authApi.googleLogin(tokenOrPayload);
+            const response = await authApi.googleLogin(payload);
             await handleAuthSuccess(response.user, response.tokens);
         } catch (error: unknown) {
             setAuthProviderError(error as Error);

@@ -94,25 +94,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         const key = typeof body["key"] === "string" ? body["key"] : "";
         const bucket = typeof body["bucket"] === "string" ? body["bucket"] : undefined;
 
-        // Backward compatibility support for older clients sending path and fileName
-        const legacyPath = typeof body["path"] === "string" ? body["path"] : "";
-        const legacyFileName = typeof body["fileName"] === "string" ? body["fileName"] : undefined;
-
-        let finalKey = key;
-        if (!finalKey) {
-            if (legacyPath || legacyFileName) {
-                const parts = [];
-                if (legacyPath) parts.push(legacyPath);
-                if (legacyFileName) {
-                    parts.push(legacyFileName);
-                } else {
-                    parts.push(uploadedFile.name || "unnamed");
-                }
-                finalKey = parts.join("/");
-            } else {
-                finalKey = uploadedFile.name || "unnamed";
-            }
-        }
+        const finalKey = key || uploadedFile.name || "unnamed";
 
         // Extract custom metadata from request body
         const metadata: Record<string, unknown> = {};

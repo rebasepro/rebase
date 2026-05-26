@@ -1,6 +1,7 @@
 import type { EntityCollection, ViewMode } from "@rebasepro/types";
-import { Blocker, useBlocker, useLocation } from "react-router";
+import { Blocker, useBlocker, useLocation } from "react-router-dom";
 import { EntityEditView } from "../components/EntityEditView";
+import { EntityDetailView } from "../components/EntityDetailView";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { EntityCollectionView } from "../components";
@@ -268,7 +269,7 @@ function EntityFullScreenRoute({
         if (entityIdIdx >= 0) {
             const afterEntity = pathname.substring(entityIdIdx + 1 + entityIdStr.length);
             const trailingSegment = afterEntity.startsWith("/") ? afterEntity.substring(1) : afterEntity;
-            if (trailingSegment.length > 0) {
+            if (trailingSegment.length > 0 && trailingSegment !== "edit") {
                 urlTab = trailingSegment;
             }
         }
@@ -342,6 +343,38 @@ function EntityFullScreenRoute({
     const collection = collectionRegistry.getCollection(rawCollection.slug) || rawCollection;
     const fullIdPath = isNew ? lastCollectionEntry!.slug : lastEntityEntry!.slug;
     const collectionPath = urlController.resolveDatabasePathsFrom(fullIdPath);
+    const isEditRoute = pathname.endsWith("/edit") || pathname.split("/").pop() === "edit";
+    // Determine if this is a detail-view-first collection showing the view page
+    const isDetailMode = collection.defaultEntityAction === "view" && !isNew && !isCopy && entityId && !isEditRoute;
+
+    if (isDetailMode) {
+        return <>
+            <EntityDetailView
+                key={collection.slug + "_view_" + entityId}
+                entityId={entityId}
+                collection={collection}
+                layout={"full_screen"}
+                path={collectionPath}
+                selectedTab={selectedTab ?? undefined}
+                onEditClick={() => {
+                    const editUrl = urlController.buildUrlCollectionPath(`${collectionPath}/${entityId}`) + "/edit";
+                    navigate(editUrl + hash);
+                }}
+                onTabChange={(params) => {
+                    setSelectedTab(params.selectedTab);
+                    const newSelectedTab = params.selectedTab;
+                    if (newSelectedTab) {
+                        navigate(`${basePath}/${entityId}/${newSelectedTab}${hash}`, { replace: true });
+                    } else {
+                        navigate(`${basePath}/${entityId}${hash}`, { replace: true });
+                    }
+                }}
+                parentCollectionSlugs={parentCollectionSlugs}
+                parentEntityIds={parentEntityIds}
+            />
+        </>;
+    }
+
     return <>
         <EntityEditView
             key={collection.slug + "_" + (isNew ? "new" : (isCopy ? entityId + "_copy" : entityId))}
@@ -353,11 +386,13 @@ function EntityFullScreenRoute({
             selectedTab={selectedTab ?? undefined}
             defaultValues={isNew ? defaultValues : undefined}
             onValuesModified={(modified) => blocked.current = modified}
+            navigateBack={() => {
+                const detailUrl = urlController.buildUrlCollectionPath(`${collectionPath}/${entityId}`);
+                navigate(detailUrl + hash);
+            }}
             onSaved={(params) => {
                 const newSelectedTab = params.selectedTab;
                 const newEntityId = params.entityId;
-                // Clear the hash after saving a new entity — preserving #new
-                // would cause the route to re-parse as "new" and show "not found".
                 const savedHash = isNew ? "" : hash;
                 if (newSelectedTab) {
                     navigate(`${basePath}/${newEntityId}/${newSelectedTab}${savedHash}`, { replace: true });
@@ -385,6 +420,5 @@ function EntityFullScreenRoute({
             handleOk={() => blocker?.proceed?.()}
             handleCancel={() => blocker?.reset?.()}
             body={"You have unsaved changes in this entity."}/>
-
     </>;
 }

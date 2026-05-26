@@ -54,10 +54,7 @@ export interface DemoLoginViewProps {
      */
     notAllowedError?: string | Error;
 
-    /**
-     * Enable Google login button (requires googleClientId in hook)
-     */
-    googleEnabled?: boolean;
+
 
     /**
      * Google client ID for OAuth
@@ -78,9 +75,10 @@ export function DemoLoginView({
     disableSignupScreen = false,
     disabled = false,
     notAllowedError,
-    googleEnabled = false,
     googleClientId
 }: DemoLoginViewProps) {
+
+    const googleEnabled = googleClientId && authController.capabilities?.enabledProviders?.includes("google");
 
     const modeState = useModeController();
     const { mode: colorMode, setMode: setColorMode } = modeState;
@@ -243,7 +241,7 @@ export function DemoLoginView({
                                         icon={<MailIcon/>}
                                         onClick={() => switchMode("login")}
                                     />
-                                    {googleEnabled && googleClientId && authController.capabilities?.enabledProviders?.includes("google") && (
+                                    {googleEnabled && (
                                         <GoogleLoginButton
                                             disabled={disabled || !privacyAccepted}
                                             googleClientId={googleClientId}

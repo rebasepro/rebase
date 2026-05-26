@@ -1,6 +1,8 @@
 export type { EntityViewProps } from "./EntityView";
 export { EntityView } from "./EntityView";
 
+export * from "./EntityDetailView";
+
 export type { EntitySelectionProps } from "./ReferenceTable/EntitySelectionTable";
 export { EntitySelectionTable } from "./ReferenceTable/EntitySelectionTable";
 

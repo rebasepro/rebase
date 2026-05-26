@@ -8,7 +8,7 @@ import type { EntityOverrides } from "./entity_overrides";
 import type { User } from "../users";
 import type { RebaseContext } from "../rebase_context";
 import type { Relation } from "./relations";
-import type { EntityCustomView } from "./entity_views";
+import type { EntityCustomView, EntityDetailViewConfig } from "./entity_views";
 import type { EntityAction } from "./entity_actions";
 import type { ComponentRef } from "./component_ref";
 
@@ -135,6 +135,19 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
      * or in a full screen dialog. Defaults to `full_screen`.
      */
     openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
+
+    /**
+     * Controls what happens when a user clicks on an entity in the collection view.
+     * - `"edit"` (default): Opens the entity in the edit form.
+     * - `"view"`: Opens a read-only detail view with an "Edit" button.
+     */
+    defaultEntityAction?: "view" | "edit";
+
+    /**
+     * Customization options for the read-only detail view.
+     * Only used when `defaultEntityAction` is `"view"`.
+     */
+    detailView?: EntityDetailViewConfig;
 
     /**
      * Prevent default actions from being displayed or executed on this collection.

@@ -916,7 +916,7 @@ withEmail: false });
             const body = await res.json() as any;
             expect(body.needsSetup).toBe(false);
             expect(body.registrationEnabled).toBe(false);
-            expect(body.googleEnabled).toBe(false);
+            expect(body.enabledProviders).toEqual([]);
         });
 
         it("reports Google enabled when configured", async () => {
@@ -925,7 +925,7 @@ withEmail: false });
 
             const res = await app.request("/auth/config");
             const body = await res.json() as any;
-            expect(body.googleEnabled).toBe(true);
+            expect(body.enabledProviders).toContain("google");
         });
     });
 

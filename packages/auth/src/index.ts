@@ -21,13 +21,6 @@ export { useRebaseAuthController } from "./hooks/useRebaseAuthController";
 export { useBackendUserManagement } from "./hooks/useBackendUserManagement";
 export type { BackendUserManagementConfig, UserManagement } from "./hooks/useBackendUserManagement";
 
-// Legacy re-exports for backward compatibility
-// The UI components have moved to @rebasepro/core
-export { RebaseLoginView } from "./components/RebaseLoginView";
-export type { RebaseLoginViewProps } from "./components/RebaseLoginView";
-export { RebaseAuth } from "./components/RebaseAuth";
-export { createUserManagementAdminViews, UsersView, RolesView } from "./components/AdminViews";
-
 // API utilities
 export { setApiUrl, getApiUrl, fetchAuthConfig, clearAuthConfigCache, AuthApiError } from "./api";
 export type { AuthConfigResponse } from "./api";

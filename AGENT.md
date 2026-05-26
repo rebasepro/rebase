@@ -33,3 +33,8 @@ Use `pnpm` exclusively, do not use `npm` or `yarn`.
 - If you need a truly throwaway scratch file, use the agent scratch directory (`<appDataDir>/brain/<conversation-id>/scratch/`), NOT the repo.
 - Log files (`*.log`), diff files (`*.diff`), and temporary text output files should never be committed.
 - The `.gitignore` has aggressive patterns to block these, but don't rely on it — just don't create them in the wrong place.
+
+## Development Discipline & Permissions
+- **NEVER** modify database settings, `.env` configurations, or perform database/role creation/deletion in the local PostgreSQL or Docker environment without presenting a plan and asking for explicit user approval first.
+- **NEVER** make arbitrary decisions or break existing setups. Always respect local configuration constraints and consult the user for confirmation.
+

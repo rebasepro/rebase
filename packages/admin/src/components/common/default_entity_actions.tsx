@@ -47,13 +47,15 @@ export const editEntityAction: EntityAction = {
         }
 
         const newFullIdPath = path ?? collection?.slug ?? entity.path;
-        const defaultSelectedView = resolveDefaultSelectedView(
-            collection ? collection.defaultSelectedView : undefined,
-            {
-                status: "existing",
-                entityId: entity.id
-            }
-        );
+        const defaultSelectedView = collection?.defaultEntityAction === "view"
+            ? "edit"
+            : resolveDefaultSelectedView(
+                collection ? collection.defaultSelectedView : undefined,
+                {
+                    status: "existing",
+                    entityId: entity.id
+                }
+            );
         navigateToEntity({
             openEntityMode,
             collection,

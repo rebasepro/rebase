@@ -201,6 +201,14 @@ function buildBottomActions<M extends Record<string, unknown>>({
             type="reset">
             {status === "existing" ? t("discard") : t("clear")}
         </Button>
+        {collection.defaultEntityAction === "view" && status === "existing" && (
+            <Button variant="text"
+                color="primary"
+                disabled={disabled}
+                onClick={navigateBack}>
+                {t("back_to_detail") ?? "Back to details"}
+            </Button>
+        )}
         <Button variant={canClose ? "text" : "filled"}
             color="primary"
             type="submit"
@@ -266,6 +274,11 @@ function buildSideActions<M extends Record<string, unknown>>({
         <Button fullWidth={true} variant="text" disabled={disabled || formex.isSubmitting} type="reset">
             {status === "existing" ? t("discard") : t("clear")}
         </Button>
+        {collection.defaultEntityAction === "view" && status === "existing" && (
+            <Button fullWidth={true} variant="text" disabled={disabled} onClick={navigateBack}>
+                {t("back_to_detail") ?? "Back to details"}
+            </Button>
+        )}
 
         {pluginActions}
 

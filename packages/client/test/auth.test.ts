@@ -258,7 +258,7 @@ user: mockUser })
             });
 
             const auth = createAuth(transport, { storage: createMemoryStorage() });
-            const sessionInfo = await auth.signInWithGoogle("google-id-token");
+            const sessionInfo = await auth.signInWithGoogle({ idToken: "google-id-token" });
 
             expect(sessionInfo.accessToken).toBe("fake-jwt");
             expect(mockFetch).toHaveBeenCalledWith("http://localhost/api/v1/auth/google", {
@@ -277,7 +277,7 @@ user: mockUser })
             });
 
             const auth = createAuth(transport, { storage: createMemoryStorage() });
-            await expect(auth.signInWithGoogle("bad-token")).rejects.toThrow("Invalid Google token");
+            await expect(auth.signInWithGoogle({ idToken: "bad-token" })).rejects.toThrow("Invalid Google token");
         });
     });
 
@@ -625,14 +625,14 @@ message: "Verified" })
                 json: async () => ({
                     needsSetup: false,
                     registrationEnabled: true,
-                    googleEnabled: true,
-                    emailServiceEnabled: true
+                    emailServiceEnabled: true,
+                    enabledProviders: ["google"]
                 })
             });
 
             const config = await auth.getAuthConfig();
             expect(config.registrationEnabled).toBe(true);
-            expect(config.googleEnabled).toBe(true);
+            expect(config.enabledProviders).toContain("google");
             expect(mockFetch).toHaveBeenCalledWith("http://localhost/api/v1/auth/config", {
                 method: "GET",
                 headers: { "Content-Type": "application/json" }

@@ -37,27 +37,9 @@ export function parseQueryOptions(query: Record<string, unknown>): QueryOptions 
     // Filtering
     options.where = {};
 
-    // Legacy JSON where clause
-    if (query.where) {
-        try {
-            const parsedWhere = typeof query.where === "string"
-                ? JSON.parse(query.where)
-                : query.where;
-            if (typeof parsedWhere !== "object" || parsedWhere === null || Array.isArray(parsedWhere)) {
-                throw new Error("Filter must be a JSON object");
-            }
-            Object.assign(options.where, parsedWhere);
-        } catch (e) {
-            const message = e instanceof Error ? e.message : "malformed JSON";
-            const err = new Error(`Invalid 'where' filter: ${message}`) as Error & { code?: string; statusCode?: number };
-            err.code = "BAD_REQUEST";
-            err.statusCode = 400;
-            throw err;
-        }
-    }
 
-    // PostgREST style filtering
-    const reservedQueryKeys = ["limit", "offset", "page", "orderBy", "where", "include", "fields", "searchString"];
+    // PostgREST-style filtering: ?field=op.value
+    const reservedQueryKeys = ["limit", "offset", "page", "orderBy", "include", "fields", "searchString"];
     for (const [key, rawValue] of Object.entries(query)) {
         if (reservedQueryKeys.includes(key)) continue;
 

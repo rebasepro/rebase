@@ -34,6 +34,8 @@ export interface RebaseTranslations {
     copy: string;
     delete: string;
     delete_not_allowed: string;
+    edit_entity?: string;
+    back_to_detail?: string;
 
     // ─── Delete dialog ───────────────────────────────────────────
     delete_confirmation_title: string;

@@ -164,6 +164,7 @@ export function EntityForm<M extends Record<string, unknown>>({
     EntityFormActionsComponent = EntityFormActions,
     showDefaultActions = true,
     showEntityPath = true,
+    navigateBack: navigateBackProp,
     children
 }: EntityFormProps<M>) {
     const { t } = useTranslation();
@@ -171,13 +172,17 @@ export function EntityForm<M extends Record<string, unknown>>({
     const collectionRegistryController = useCollectionRegistryController();
 
     const navigateBack = useCallback(() => {
+        if (navigateBackProp) {
+            navigateBackProp();
+            return;
+        }
         if (openEntityMode === "side_panel" || openEntityMode === "dialog") {
             // If we are in side panel mode or dialog mode, we close the panel
             sideEntityController.close();
         } else {
             window.history.back();
         }
-    }, [openEntityMode, sideEntityController]);
+    }, [navigateBackProp, openEntityMode, sideEntityController]);
 
     const authController = useAuthController();
     const [status, setStatus] = useState<EntityStatus>(initialStatus);

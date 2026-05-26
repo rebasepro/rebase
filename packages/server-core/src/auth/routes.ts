@@ -834,18 +834,13 @@ message: "Session revoked successfully" });
         // Registration is allowed when explicitly enabled OR during initial setup
         const registrationAllowed = needsSetup || !!allowRegistration;
 
-        // Build a dynamic map of enabled providers for frontend discovery.
-        // Also maintain legacy boolean fields for backward compatibility.
+        // Build the list of enabled OAuth providers for frontend discovery.
         const enabledProviders = (config.oauthProviders || []).map(p => p.id);
 
         return c.json({
             needsSetup,
             registrationEnabled: registrationAllowed,
-            // Legacy fields (kept for backward compat)
-            googleEnabled: enabledProviders.includes("google"),
-            linkedinEnabled: enabledProviders.includes("linkedin"),
             emailServiceEnabled: isEmailConfigured(),
-            // New: complete list of available OAuth providers
             enabledProviders
         });
     });

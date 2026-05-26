@@ -29,8 +29,8 @@ export type AuthChangeEvent = "SIGNED_IN" | "SIGNED_OUT" | "TOKEN_REFRESHED" | "
 export interface AuthConfig {
     needsSetup: boolean;
     registrationEnabled: boolean;
-    googleEnabled: boolean;
     emailServiceEnabled: boolean;
+    enabledProviders: string[];
 }
 
 export interface AuthStorage {
@@ -196,23 +196,19 @@ refreshToken: session.refreshToken };
     /**
      * Sign in with Google.
      *
-     * Supports two invocation styles:
+     * Supports three invocation styles:
      * - `signInWithGoogle({ idToken })` — ID-token flow (One Tap / Sign In button)
      * - `signInWithGoogle({ accessToken })` — Access-token flow (popup)
      * - `signInWithGoogle({ code, redirectUri })` — Authorization code flow (most secure)
-     * - `signInWithGoogle(idToken)` — Legacy shorthand for ID-token flow
      */
     async function signInWithGoogle(
-        tokenOrPayload: string | { idToken?: string; accessToken?: string; code?: string; redirectUri?: string }
+        payload: { idToken: string } | { accessToken: string } | { code: string; redirectUri: string }
     ) {
         const fetchFn = getFetch();
-        const body = typeof tokenOrPayload === "string"
-            ? { idToken: tokenOrPayload }
-            : tokenOrPayload;
         const res = await fetchFn(authUrl("/google"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body)
+            body: JSON.stringify(payload)
         });
         const responseBody = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, responseBody, res.statusText);

@@ -1,11 +1,12 @@
 import type { EntityCollection } from "@rebasepro/types";
 import type { EntitySidePanelProps } from "@rebasepro/types";
-import React, { useCallback, useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { OnUpdateParams } from "../types/components/EntityFormProps";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { Maximize2Icon, XIcon } from "lucide-react";
 import { EntityEditView } from "./EntityEditView";
+import { EntityDetailView } from "./EntityDetailView";
 import { useSideDialogContext } from "./SideDialogs";
 import { IconButton } from "@rebasepro/ui";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -28,6 +29,7 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
         allowFullScreen = true,
         path,
         entityId,
+        selectedTab,
         formProps
     } = props;
 
@@ -59,6 +61,7 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
         if (props.onUpdate) {
             props.onUpdate(params);
         }
+        setShowEditInPanel(false);
         if (params.status !== "existing") {
             sideEntityController.replace({
                 path: params.path,
@@ -86,6 +89,14 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
 
     const collection = collectionRegistryController.getCollection(path) ?? props.collection;
 
+    const [showEditInPanel, setShowEditInPanel] = useState(selectedTab === "edit");
+    const isDetailMode = collection?.defaultEntityAction === "view" && !showEditInPanel && Boolean(entityId);
+
+    // Reset edit mode when switching entities
+    useEffect(() => {
+        setShowEditInPanel(selectedTab === "edit");
+    }, [entityId, selectedTab]);
+
     // Note: beforeunload is handled by useUnsavedChangesDialog in SideDialogView,
     // which listens to the same `blocked` state via SideDialogContext.
 
@@ -103,67 +114,108 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
     return (
         <>
             <ErrorBoundary>
-                <EntityEditView
-                    {...props}
-                    layout={collection?.openEntityMode === "dialog" ? "dialog" : "side_panel"}
-                    collection={collection as EntityCollection}
-                    parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
-                    onValuesModified={onValuesModified}
-                    onSaved={onUpdate}
-                    barActions={({
-                        status,
-                        values
-                    }) => <div className="flex gap-1">
-                            <IconButton
-                                className="self-center"
-                                size={"small"}
-                                onClick={onClose}>
-                                <XIcon/>
-                            </IconButton>
-                            {allowFullScreen && <IconButton
-                                className="self-center"
-                                size={"small"}
-                                onClick={() => {
-                                    const key = (status === "new" || status === "copy") ? path + "#new" : path + "/" + entityId;
-                                    saveEntityToMemoryCache(key, values);
-                                    // Clear blocked so no unsaved-changes dialog fires
-                                    setBlocked(false);
-                                    setBlockedNavigationMessage(undefined);
-                                    // IMPORTANT: useLocation() returns the frozen base_location from RebaseRoutes
-                                    // (the collection URL), not the actual browser URL.
-                                    // Build the full-screen URL directly from props using urlController.
-                                    if (entityId) {
-                                        const fullScreenUrl = urlController.buildUrlCollectionPath(`${path}/${entityId}`);
-                                        navigate(fullScreenUrl, { state: null });
-                                    } else {
-                                        const fullScreenUrl = urlController.buildUrlCollectionPath(path);
-                                        navigate(fullScreenUrl + "#new", { state: null });
-                                    }
-                                }}>
-                                <Maximize2Icon/>
-                            </IconButton>}
-                        </div>}
-                    onTabChange={({
-                        entityId,
-                        selectedTab,
-                        collection: paramCollection
-                    }) => {
-                        if (collection?.openEntityMode === "dialog" || paramCollection?.openEntityMode === "dialog") {
-                            return;
-                        }
-                        // Only update the URL to reflect the new tab — don't call
-                        // sideEntityController.replace() which would recreate the
-                        // entire EntitySidePanel component, causing a full
-                        // unmount/remount and expensive re-render of the form.
-                        if (entityId) {
-                            const collectionPath = removeInitialAndTrailingSlashes(path);
-                            const tabSuffix = selectedTab ? "/" + selectedTab : "";
-                            const fullUrl = urlController.buildUrlCollectionPath(`${collectionPath}/${entityId}${tabSuffix}#side`);
-                            navigate(fullUrl, { replace: true, state: location.state });
-                        }
-                    }}
-                    formProps={formProps}
-                />
+                {isDetailMode
+                    ? <EntityDetailView
+                        path={path}
+                        layout={collection?.openEntityMode === "dialog" ? "dialog" : "side_panel"}
+                        collection={collection as EntityCollection}
+                        entityId={entityId!}
+                        parentCollectionSlugs={parentCollectionSlugs}
+                        parentEntityIds={parentEntityIds}
+                        onEditClick={() => setShowEditInPanel(true)}
+                        barActions={({
+                            status,
+                            values
+                        }) => <div className="flex gap-1">
+                                <IconButton
+                                    className="self-center"
+                                    size={"small"}
+                                    onClick={onClose}>
+                                    <XIcon/>
+                                </IconButton>
+                                {allowFullScreen && <IconButton
+                                    className="self-center"
+                                    size={"small"}
+                                    onClick={() => {
+                                        if (entityId) {
+                                            const fullScreenUrl = urlController.buildUrlCollectionPath(`${path}/${entityId}`);
+                                            navigate(fullScreenUrl, { state: null });
+                                        }
+                                    }}>
+                                    <Maximize2Icon/>
+                                </IconButton>}
+                            </div>}
+                        onTabChange={({
+                            entityId: tabEntityId,
+                            selectedTab,
+                            collection: paramCollection
+                        }) => {
+                            if (collection?.openEntityMode === "dialog" || paramCollection?.openEntityMode === "dialog") {
+                                return;
+                            }
+                            if (tabEntityId) {
+                                const collectionPath = removeInitialAndTrailingSlashes(path);
+                                const tabSuffix = selectedTab ? "/" + selectedTab : "";
+                                const fullUrl = urlController.buildUrlCollectionPath(`${collectionPath}/${tabEntityId}${tabSuffix}#side`);
+                                navigate(fullUrl, { replace: true, state: location.state });
+                            }
+                        }}
+                    />
+                    : <EntityEditView
+                        {...props}
+                        layout={collection?.openEntityMode === "dialog" ? "dialog" : "side_panel"}
+                        collection={collection as EntityCollection}
+                        parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
+                        onValuesModified={onValuesModified}
+                        onSaved={onUpdate}
+                        navigateBack={() => setShowEditInPanel(false)}
+                        barActions={({
+                            status,
+                            values
+                        }) => <div className="flex gap-1">
+                                <IconButton
+                                    className="self-center"
+                                    size={"small"}
+                                    onClick={onClose}>
+                                    <XIcon/>
+                                </IconButton>
+                                {allowFullScreen && <IconButton
+                                    className="self-center"
+                                    size={"small"}
+                                    onClick={() => {
+                                        const key = (status === "new" || status === "copy") ? path + "#new" : path + "/" + entityId;
+                                        saveEntityToMemoryCache(key, values);
+                                        setBlocked(false);
+                                        setBlockedNavigationMessage(undefined);
+                                        if (entityId) {
+                                            const fullScreenUrl = urlController.buildUrlCollectionPath(`${path}/${entityId}`);
+                                            navigate(fullScreenUrl, { state: null });
+                                        } else {
+                                            const fullScreenUrl = urlController.buildUrlCollectionPath(path);
+                                            navigate(fullScreenUrl + "#new", { state: null });
+                                        }
+                                    }}>
+                                    <Maximize2Icon/>
+                                </IconButton>}
+                            </div>}
+                        onTabChange={({
+                            entityId,
+                            selectedTab,
+                            collection: paramCollection
+                        }) => {
+                            if (collection?.openEntityMode === "dialog" || paramCollection?.openEntityMode === "dialog") {
+                                return;
+                            }
+                            if (entityId) {
+                                const collectionPath = removeInitialAndTrailingSlashes(path);
+                                const tabSuffix = selectedTab ? "/" + selectedTab : "";
+                                const fullUrl = urlController.buildUrlCollectionPath(`${collectionPath}/${entityId}${tabSuffix}#side`);
+                                navigate(fullUrl, { replace: true, state: location.state });
+                            }
+                        }}
+                        formProps={formProps}
+                    />
+                }
             </ErrorBoundary>
 
         </>
