@@ -1,13 +1,13 @@
 export const de = {
   "hero.badge": "Open-Source · Schema-gesteuert · In Europa entwickelt",
   "hero.title.part1": "Dein Postgres,",
-  "hero.title.part2": "Voll realisiert.",
+  "hero.title.part2": "Voll ausgeschöpft.",
   "hero.subtitle":
     'Definiere dein Schema einmal in TypeScript. Erhalte sofort ein <b class="text-white font-medium">produktionsbereites Admin-Panel</b>, <b class="text-white font-medium">typisierte APIs</b> und ein <b class="text-white font-medium">vollständiges SDK</b>.',
   "hero.cta.demo": "Demo ausprobieren",
   "hero.cta.github": "Auf GitHub ansehen",
   "demo.badge": "Drei Befehle. Kein Boilerplate.",
-  "demo.title": "Schema rein · Plattform raus",
+  "demo.title": "Du definierst das Schema. Wir stellen die Plattform.",
   "demo.init": "✔ Rebase im aktuellen Verzeichnis initialisiert.",
   "demo.pull": "✔ PostgreSQL-Schema introspektiert. Typen generiert.",
   "demo.dev": "✔ Admin-Panel, API und WebSocket-Server laufen.",
@@ -31,7 +31,7 @@ export const de = {
   "showcase.title.part1": "Teams liefern schneller mit",
   "showcase.title.part2": "REBASE",
   "showcase.subtitle":
-    "Von <b>Marktplätzen</b> über <b>SaaS-Plattformen</b> bis hin zu <b>internen Tools</b> beseitigt Rebase den Klebecode zwischen Datenbank, API und UI.",
+    "Von <b>Marktplätzen</b> über <b>SaaS-Plattformen</b> bis hin zu <b>internen Tools</b> beseitigt Rebase den Integrationscode zwischen Datenbank, API und UI.",
   "showcase.case.badge": "Marktplatz & Jobportal",
   "showcase.case.title": "SustenTalent",
   "showcase.case.desc":
@@ -94,7 +94,7 @@ export const de = {
   "faq.q7": "Kann ich Rebase in meine bestehende React-App einbetten?",
   "faq.a7":
     "Ja. Rebase wird als npm-Pakete verteilt. Du kannst das gesamte Admin-Panel in deiner bestehenden React-Anwendung bereitstellen oder als eigenständige SPA einsetzen. Es ist dafür konzipiert, eingebettet zu werden.",
-  "cta.title": "Hör auf, Klebecode zu schreiben.",
+  "cta.title": "Hör auf, repetitiven Code zu schreiben.",
   "cta.subtitle":
     'Definiere dein Schema. Hol dir deine Plattform.<br class="hidden sm:block"/>Open-Source, selbst gehostet, keine nutzerbasierten Kosten.',
   "cta.button.demo": "Demo ausprobieren",
@@ -131,7 +131,7 @@ export const de = {
     'Eine Collection.<br/><span class="text-primary subtle-shimmer">Alles generiert.</span>',
   "power.subtitle":
     "Definiere dein Datenmodell einmal in TypeScript. Rebase erstellt automatisch deine Admin-UI, Formulare, Datenbankschema, REST &amp; GraphQL APIs und TypeScript-Typen.",
-  "power.badge": "Code als Wahrheit",
+  "power.badge": "Code als einzige Wahrheitsquelle",
   "power.appcode": "App-Code",
   "power.generates": "→ generiert all das Folgende",
   "power.mobile.generates":
@@ -401,7 +401,7 @@ export const de = {
   "about.story.p2": "Was als Nebenprojekt begann, gewann in der Open-Source-Community schnell an Bedeutung. Entwickler auf der ganzen Welt nutzten Rebase, um alles zu erstellen, von Content-Management-Systemen bis hin zu komplexen internen Tools für Unternehmen.",
   "about.story.p3": "Heute ist Rebase eine Plattform, der Teams bei Unternehmen wie <b class=\"text-white font-medium\">Microsoft</b> und <b class=\"text-white font-medium\">IKEA</b> vertrauen, um die kritischen internen Tools zu erstellen, die ihre Geschäfte antreiben. Wir sind stolz darauf, Tausenden von Entwicklern zu helfen, Zeit zu sparen und schneller zu liefern.",
   "about.values.title": "Unsere Werte",
-  "about.values.v1.title": "Entwickler zuerst",
+  "about.values.v1.title": "Entwickler stehen an erster Stelle",
   "about.values.v1.desc": "Jede Entscheidung, die wir treffen, beginnt mit einer Frage: „Macht das das Leben der Entwickler einfacher?“ Wir legen Wert auf großartige DX, umfassende Dokumentation und leistungsstarke APIs.",
   "about.values.v2.title": "Transparenz",
   "about.values.v2.desc": "Wir sind Open Source und stolz darauf. Unser Code, unsere Roadmap und unsere Entscheidungsfindung sind transparent. Wir glauben daran, durch Offenheit Vertrauen aufzubauen.",

@@ -21,7 +21,7 @@ Please complete these setup steps before proceeding, and remember your progress 
 3. **Active Project:**
    Most Rebase tasks require a project context.
    - For Rebase Cloud: Run `rebase login` and select your project via the MCP `list_projects` tool.
-   - For self-hosted: Ensure your `app/.env` file contains a valid `DATABASE_URL`.
+   - For self-hosted: Ensure your `.env` file in the project root contains a valid `DATABASE_URL`.
 
 # Rebase Usage Principles
 
@@ -60,7 +60,7 @@ Please adhere to these principles when working with Rebase, as they ensure relia
    - `packages/plugin-data-enhancement` — AI-powered data autofill
    - `packages/cli` — CLI tool
    - `packages/utils` — Utility functions
-   - `app/` — Developer-facing example application (frontend + backend + config)
+   - `app/` — Local example application (scaffolded via CLI for testing/dev)
 
 7. **Never deploy to production:** Agents should never run `rebase deploy`, `firebase deploy`, `gcloud deploy`, or any command that pushes code to live infrastructure. Provide the exact command and let the user run it themselves.
 
@@ -68,9 +68,28 @@ Please adhere to these principles when working with Rebase, as they ensure relia
 
 # Project Structure
 
+## Scaffolded Project Structure (CLI)
+
+When you initialize a Rebase project via the CLI (`rebase init`), the generated project structure contains:
+
+```
+<project-root>/
+├── frontend/             # React frontend (Vite)
+├── backend/              # Hono backend server
+├── config/               # Application configuration
+│   └── collections/      # TypeScript collection files (one per collection)
+├── .env                  # Environment variables
+├── drizzle.config.ts     # Drizzle database configuration
+└── package.json          # Node dependencies
+```
+
+## Framework Monorepo Structure
+
+For development of the Rebase framework itself, the repository is organized as a modular monorepo:
+
 ```
 rebase/
-├── app/                      # Developer example app
+├── app/                      # Example application (scaffolded structure above)
 │   ├── frontend/             # React frontend (Vite)
 │   ├── backend/              # Hono backend server
 │   └── config/               # Application configuration
@@ -130,6 +149,6 @@ The Rebase MCP server provides these tools for AI agents:
 
 # Common Issues
 
-- **`DATABASE_URL is not set`:** Ensure `app/.env` exists with `DATABASE_URL=postgresql://user:password@localhost:5432/rebase`
+- **`DATABASE_URL is not set`:** Ensure `.env` exists in the project root with `DATABASE_URL=postgresql://user:password@localhost:5432/rebase`
 - **pnpm not found:** Install with `npm install -g pnpm`
 - **Node.js version mismatch:** Rebase requires Node.js v20+. Use `nvm install 20 && nvm use 20`

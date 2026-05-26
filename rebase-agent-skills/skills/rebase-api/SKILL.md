@@ -99,7 +99,7 @@ Authorization: Bearer <jwt-token>
 BASE_URL/api/data/graphql
 ```
 
-GraphQL is optional and must be explicitly enabled in `app/backend/src/index.ts` (see commented-out section in the template).
+GraphQL is optional and must be explicitly enabled in the backend entry point (e.g., `backend/src/index.ts` in the template).
 
 ### Auto-Generated Schema
 

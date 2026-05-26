@@ -28,7 +28,7 @@ It provides **auto-generated REST APIs**, **built-in authentication**, **role-ba
 ## Core Philosophy
 
 ### Schema-as-Code
-Collections are defined as standalone TypeScript files (e.g., `app/config/collections/posts.ts`). This preserves rich configuration — validation, callbacks, enum definitions, relations — while enabling both visual and code-based editing.
+Collections are defined as standalone TypeScript files (e.g., `config/collections/posts.ts`). This preserves rich configuration — validation, callbacks, enum definitions, relations — while enabling both visual and code-based editing.
 
 ### Entity Callbacks
 Collections support lifecycle hooks (`beforeSave`, `afterSave`, `afterRead`, `beforeDelete`, `afterDelete`) for business logic, data synchronization, and side effects. **Use callbacks instead of raw SQL triggers or external scripts.**

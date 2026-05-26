@@ -33,6 +33,8 @@ All configuration is done via environment variables in your `.env` file at the p
 | `NODE_ENV` | Environment: `development`, `production`, or `test` | `development` |
 | `CORS_ORIGINS` | Comma-separated list of allowed origins. **Required in production** if different from backend domain. | — |
 | `FRONTEND_URL` | URL of the frontend app. Used as an alternative to CORS_ORIGINS. | — |
+| `ADMIN_CONNECTION_STRING` | Admin-level database connection string (used for schema introspection and admin operations). | `DATABASE_URL` |
+| `DISABLE_DB_ROLE_SWITCHING` | Disable PostgreSQL role-switching in SQL Editor (useful for custom authentication where DB roles are not mapped). | `false` |
 
 ### Authentication
 
@@ -128,6 +130,27 @@ await initializeRebaseBackend({
     }
 });
 ```
+
+## Troubleshooting
+
+### SQL Editor Permission Denied (`permission denied for table <name>`)
+
+* **Symptoms:** Custom queries executed in the Rebase Studio SQL Editor fail with `cause: error: permission denied for table <name>`, even though the spreadsheet CMS view loads data successfully.
+* **Cause:** By default, Rebase attempts to execute SQL Editor queries by temporarily switching database roles to match the active user's application role (e.g., `SET LOCAL ROLE "admin"`). If you are using custom authentication where roles exist only in database tables rather than actual PostgreSQL roles, the role switch fails or database privileges are missing. The CMS spreadsheet view executes under the default connection owner user and bypasses this.
+* **Solution:** Add `DISABLE_DB_ROLE_SWITCHING=true` to your backend `.env` configuration. This forces Rebase to run SQL Editor queries using the connection owner's privileges (typically a superuser/owner).
+
+### SQL Editor Schema Fetch Failed (`Cross-database execution requires adminConnectionString`)
+
+* **Symptoms:** Studio fails to load the schema tree, or SQL Editor throws `Failed to fetch schema: Cross-database execution requires adminConnectionString to be configured in the backend.`
+* **Cause:** Rebase requires administrative privileges to query database system catalogs and run administrative commands. If `adminConnectionString` is not provided to the bootstrapper, or `getAdmin()` is overridden to return `undefined`, these operations fail.
+* **Solution:** Ensure `adminConnectionString` is configured during backend bootstrapper initialization:
+  ```typescript
+  createPostgresBootstrapper({
+      connection: db,
+      schema: { tables, enums, relations },
+      adminConnectionString: process.env.ADMIN_CONNECTION_STRING || process.env.DATABASE_URL
+  })
+  ```
 
 ## Next Steps
 

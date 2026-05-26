@@ -6,10 +6,10 @@ description: Rebase architecture rules and package entry points
 When working on the Rebase project, adhere to the following architectural guidelines:
 
 ## 1. Entry Points
-- **Primary End-User Entry**: The entry point for the application as an end-user is the `app/` folder at the root of the project. This is how users consume and run the CMS.
-  - `app/frontend/` — React frontend (Vite)
-  - `app/backend/` — Hono backend server
-  - `app/config/collections/` — TypeScript collection definitions (one file per collection)
+- **Primary End-User Entry**: A Rebase project is structured with separate frontend, backend, and config folders in the project root:
+  - `frontend/` — React frontend (Vite)
+  - `backend/` — Hono backend server
+  - `config/collections/` — TypeScript collection definitions (one file per collection)
 
 ## 2. Dev Mode & End-User Preview
 - **Dev Mode Toggle**: The application uses `AdminModeController` with states `developer` and `editor`. This toggle must be preserved.

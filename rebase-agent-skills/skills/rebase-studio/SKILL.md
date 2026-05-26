@@ -158,8 +158,7 @@ const myCustomView = {
 ## Running the Studio
 
 ```bash
-# From the repo root
-cd app
+# From the project root
 pnpm run dev
 ```
 
@@ -173,7 +172,7 @@ Collections are auto-loaded via a Vite plugin using the `virtual:rebase-collecti
 import { collections } from "virtual:rebase-collections";
 ```
 
-This reads all collection files from `app/config/collections/` and makes them available to the frontend without manual barrel exports.
+This reads all collection files from the configured collections directory (e.g., `config/collections/` in the starter template) and makes them available to the frontend without manual barrel exports.
 
 ## References
 

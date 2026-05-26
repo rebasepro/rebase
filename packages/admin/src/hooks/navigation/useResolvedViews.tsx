@@ -126,7 +126,8 @@ export function useResolvedViews<USER extends User>(
 
     const injectedAdminViews: AppView[] = useMemo(() => {
         const views: AppView[] = [];
-        if (userManagement && usersViewElement) {
+        const isUserAdmin = userManagement?.isAdmin !== false;
+        if (userManagement && isUserAdmin && usersViewElement) {
             const hasUsersCollection = collections?.some(c => c.slug === "users");
             if (!hasUsersCollection) {
                 views.push({

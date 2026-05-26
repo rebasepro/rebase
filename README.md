@@ -227,6 +227,26 @@ Explore a live interactive sandbox with all features — data resets periodicall
 
 ---
 
+## 🤖 AI Coding Assistants & Agent Support
+
+Rebase is designed from the ground up to be **AI-agent ready**. When developing a Rebase project using AI coding assistants (like Cursor, Windsurf, or Copilot):
+
+### 1. Built-in Agent Guidelines (`.cursorrules`)
+Every new project scaffolded with `rebase init` automatically includes a pre-configured `.cursorrules` file at the root. This instructs your AI agent on:
+- Using the **Rebase SDK** instead of raw SQL / direct Drizzle queries (which ensures data validation, RLS, and lifecycle callbacks run correctly).
+- The two-step schema migration workflow (`rebase schema generate` -> `rebase db push`).
+- Structuring custom functions and cron jobs.
+
+### 2. Built-in MCP Server
+Rebase runs a Model Context Protocol (MCP) server that connects your AI assistant directly to your live Rebase schemas and databases for automated schema discovery, entity management, and data migrations.
+
+### 3. Troubleshooting Database Permissions in Studio
+If your AI coding agent or database role permissions cause a `permission denied for table <table_name>` error when executing queries in the **Rebase Studio SQL Editor**:
+- Add `DISABLE_DB_ROLE_SWITCHING=true` to your `.env` file.
+- This forces the SQL Editor queries to execute under the default connection owner user (e.g. `rebase`) rather than trying to perform a PostgreSQL role switch to a non-existent database-level role.
+
+---
+
 ## Support & Community
 
 - 📖 [Documentation](https://rebase.pro/docs)

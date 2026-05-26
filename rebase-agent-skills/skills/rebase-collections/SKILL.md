@@ -34,7 +34,7 @@ Properties define the fields of your collection. Rebase supports these built-in 
 
 ### Schema-as-Code
 
-Collections are defined as standalone TypeScript files under `app/config/collections/`. The visual Studio edits these files via AST manipulation — it never runs raw SQL. This preserves custom callbacks and complex configuration.
+Collections are defined as standalone TypeScript files under `config/collections/` relative to the project root. The visual Studio edits these files via AST manipulation — it never runs raw SQL. This preserves custom callbacks and complex configuration.
 
 ## Defining a Collection
 
@@ -489,7 +489,7 @@ const postsCollection: PostgresCollection = {
 After modifying collections, apply changes to the database:
 
 ```bash
-# All commands run from the app/ directory unless noted
+# All commands run from the project root directory unless noted
 
 # 1. Regenerate the Drizzle schema from your collection definitions
 rebase schema generate

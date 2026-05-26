@@ -22,13 +22,13 @@ The backend uses a **two-step process**:
 ## Prerequisites
 
 - PostgreSQL 14+ (local or Docker)
-- `DATABASE_URL` environment variable set in `app/.env`
+- `DATABASE_URL` environment variable set in the project root's `.env` file
 - pnpm installed
 
 ## Quick Start (Development)
 
 ```bash
-# From the app/ directory:
+# From the project root directory:
 
 # 1. Generate Drizzle schema from collections
 rebase schema generate
@@ -211,9 +211,22 @@ The backend handles `SIGTERM` and `SIGINT` signals:
 - **Always backup before production migrations** — `ALTER COLUMN` or `DROP COLUMN` can cause data loss
 - **Tables not in schema are ignored** — custom tables and internal Rebase tables are safe
 - **Review generated SQL** — always inspect the `.sql` files in `./drizzle/` before applying
-- **Collections directory** — Collection files live at `app/config/collections/`, NOT `app/shared/collections/`
+- **Collections directory** — Collection definitions are defined in the `config/collections/` directory.
+
+## Troubleshooting
+
+### 1. SQL Editor Permission Denied (`permission denied for table <name>`)
+- **Symptoms:** You can view data in the collection/CMS spreadsheet view, but running custom SQL queries (like `SELECT * FROM table;`) in the Rebase Studio SQL Editor throws `cause: error: permission denied for table <table_name>`.
+- **Cause:** Rebase tries to switch database roles to match the active user's role (e.g., `SET LOCAL ROLE "admin"`). If you are using custom auth (roles defined only in the database `rebase.roles` table rather than actual PostgreSQL roles), or if the database-level role doesn't have `SELECT` privileges, the query fails. The CMS view does not trigger role-switching and runs under the main connection user (which is typically a superuser/owner and bypasses RLS).
+- **Solution:** Add `DISABLE_DB_ROLE_SWITCHING=true` to your backend `.env` configuration. This skips role switching, executing queries under the connection owner user.
+
+### 2. SQL Editor/Studio Schema Fetch Failed (`Cross-database execution requires adminConnectionString`)
+- **Symptoms:** Running queries in the SQL Editor or attempting to load schemas in Studio throws `Failed to fetch schema: Cross-database execution requires adminConnectionString to be configured in the backend.`
+- **Cause:** The PostgreSQL bootstrapper requires `adminConnectionString` and `getAdmin()` to be configured to execute database administration commands (including schema fetch). If `adminConnectionString` is set to `undefined` or `getAdmin()` returns `undefined` (often done to enforce a zero-schema-change requirement), administrative commands fail.
+- **Solution:** Ensure `adminConnectionString` is passed to `createPostgresBootstrapper` (typically `adminConnectionString: env.ADMIN_CONNECTION_STRING || databaseUrl`) and ensure `getAdmin()` is not overridden to return `undefined`.
 
 ## References
 
 - **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
 - **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)
+

@@ -557,7 +557,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
         saveRole,
         deleteRole,
         isAdmin,
-        allowDefaultRolesCreation: true,
+        allowDefaultRolesCreation: isAdmin,
         includeCollectionConfigPermissions: true,
         defineRolesFor,
         getUser,

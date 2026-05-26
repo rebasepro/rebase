@@ -76,7 +76,7 @@ psql -h localhost -U postgres -d rebase -c "SELECT 1;"
 
 ## 4. Configure Environment Variables
 
-Create an `.env` file in the `app/` directory:
+Create an `.env` file in the project root directory:
 
 ```env
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rebase
@@ -93,7 +93,7 @@ pnpm install
 ## 6. Initialize the Database
 
 ```bash
-cd app
+cd <project-root>
 rebase schema generate
 rebase db push
 ```
@@ -101,7 +101,7 @@ rebase db push
 ## 7. Start the Development Server
 
 ```bash
-cd app
+cd <project-root>
 pnpm run dev
 ```
 

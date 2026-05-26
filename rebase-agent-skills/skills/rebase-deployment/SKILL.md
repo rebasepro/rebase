@@ -91,7 +91,7 @@ Deploy the Studio frontend to Firebase Hosting:
 
 ```bash
 # Build the frontend
-cd app/frontend
+cd frontend
 pnpm run build
 
 # Deploy to Firebase

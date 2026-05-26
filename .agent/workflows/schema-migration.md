@@ -45,7 +45,7 @@ For production deployments, use migrations for version-controlled, reviewable ch
 
 ### 1. Modify Your Collection Definitions
 
-Edit your collection file (e.g., `app/config/collections/posts.ts`):
+Edit your collection file (e.g., `config/collections/posts.ts`):
 
 ```typescript
 import { PostgresCollection } from "@rebasepro/types";
@@ -131,8 +131,8 @@ rebase schema generate && rebase db generate && rebase db migrate
 
 ### Adding a New Collection
 
-1. Create the collection definition as a new file in `app/config/collections/`
-2. Export it from `app/config/collections/index.ts`
+1. Create the collection definition as a new file in `config/collections/`
+2. Export it from `config/collections/index.ts`
 3. Run `rebase schema generate` → `rebase db push` (dev) or `rebase db generate` → `rebase db migrate` (prod)
 
 ### Adding Relations
@@ -191,7 +191,7 @@ This means you can safely have additional tables in your database (from other ap
 To introspect an existing database and create Rebase collections, use:
 `rebase schema introspect`
 
-This will generate TypeScript collection definitions in your `app/config/collections/` directory based on the tables in the database.
+This will generate TypeScript collection definitions in your `config/collections/` directory based on the tables in the database.
 
 ## Troubleshooting
 

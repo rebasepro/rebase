@@ -1,38 +1,38 @@
 export const es = {
   "hero.badge": "Código abierto · Basado en esquemas · Construido en Europa",
   "hero.title.part1": "Tu Postgres,",
-  "hero.title.part2": "Totalmente Realizado.",
+  "hero.title.part2": "Potenciado al Máximo.",
   "hero.subtitle":
     'Define tu esquema una vez en TypeScript. Obtén un <b class="text-white font-medium">panel de administración listo para producción</b>, <b class="text-white font-medium">APIs tipadas</b> y un <b class="text-white font-medium">SDK completo</b> — al instante.',
   "hero.cta.demo": "Probar la Demo",
   "hero.cta.github": "Ver en GitHub",
   "demo.badge": "Tres comandos. Cero boilerplate.",
-  "demo.title": "Esquema Entrada · Plataforma Salida",
+  "demo.title": "Tú defines el esquema. Nosotros ponemos la plataforma.",
   "demo.init": "✔ Rebase inicializado en el directorio actual.",
   "demo.pull": "✔ Esquema de PostgreSQL introspeccionado. Tipos generados.",
   "demo.dev":
     "✔ Panel de administración, API y servidor WebSocket en ejecución.",
   "social.title":
     "Utilizado por desarrolladores y startups construyendo sobre Postgres",
-  "howitworks.badge": "Tiempo recuperado",
+  "howitworks.badge": "Recupera tu tiempo",
   "howitworks.title":
     'Lo que <span class="text-primary">nunca volverás a construir.</span>',
   "howitworks.subtitle":
     "Cada hora que gastabas en fontanería ahora la dedicas a tu producto.",
-  "howitworks.step1.title": "Interfaces admin repetitivas",
+  "howitworks.step1.title": "Paneles de administración desde cero",
   "howitworks.step1.desc":
-    "Deja de cablear vistas de tablas, formularios y lógica de filtrado. Conecta tu Postgres y obtén un panel de administración completo y editable — al instante.",
-  "howitworks.step2.title": "Capas de API hechas a mano",
+    "Deja de programar a mano vistas de tablas, formularios y lógica de filtrado. Conecta tu Postgres y obtén un panel de administración completo y editable — al instante.",
+  "howitworks.step2.title": "Creación manual de APIs",
   "howitworks.step2.desc":
-    "Deja de escribir endpoints CRUD, serializadores y middleware de validación. Rebase expone APIs REST, GraphQL y WebSocket tipadas desde tu esquema — cero código de conexión.",
-  "howitworks.step3.title": "Auth y permisos frágiles",
+    "Deja de escribir endpoints CRUD, serializadores y middleware de validación. Rebase expone APIs REST, GraphQL y WebSocket tipadas desde tu esquema — sin necesidad de escribir código puente.",
+  "howitworks.step3.title": "Autenticación y permisos frágiles",
   "howitworks.step3.desc":
-    "Olvídate del cableado JWT y de los controles de acceso dispersos. Define seguridad a nivel de fila y permisos basados en roles directamente en tu esquema TypeScript — auditable, versionado, a prueba de balas.",
+    "Olvídate de configurar JWT manualmente y de dispersar controles de acceso. Define seguridad a nivel de fila y permisos basados en roles directamente en tu esquema TypeScript — auditable, versionado, a prueba de balas.",
   "showcase.badge": "Construido para Productos Reales",
   "showcase.title.part1": "Los equipos lanzan más rápido con",
   "showcase.title.part2": "REBASE",
   "showcase.subtitle":
-    "Desde <b>marketplaces</b> hasta <b>plataformas SaaS</b> y <b>herramientas internas</b>, Rebase elimina el código de conexión entre base de datos, API y UI.",
+    "Desde <b>marketplaces</b> hasta <b>plataformas SaaS</b> y <b>herramientas internas</b>, Rebase elimina el código intermedio entre base de datos, API y UI.",
   "showcase.case.badge": "Marketplace & Portal de Empleo",
   "showcase.case.title": "SustenTalent",
   "showcase.case.desc":
@@ -95,7 +95,7 @@ export const es = {
   "faq.q7": "¿Puedo incrustar Rebase dentro de mi aplicación React existente?",
   "faq.a7":
     "Sí. Rebase se distribuye como paquetes npm. Puedes montar todo el panel de administración dentro de tu aplicación React existente, o desplegarlo como una SPA independiente. Está diseñado para ser incrustable.",
-  "cta.title": "Deja de escribir código adhesivo.",
+  "cta.title": "Deja de escribir código repetitivo.",
   "cta.subtitle":
     'Define tu esquema. Obtén tu plataforma.<br class="hidden sm:block"/>Código abierto, autoalojado, sin precios por asiento.',
   "cta.button.demo": "Probar la Demo",
@@ -113,7 +113,7 @@ export const es = {
   "opensource.link1": "Para desarrolladores",
   "opensource.link2": "¿Por qué Rebase?",
   "showcase.sync.title":
-    "Construido para la forma<br/>en que realmente trabajas",
+    "Diseñado para tu<br/>forma de trabajar",
   "showcase.sync.subtitle":
     "No es otra herramienta que aprender — Rebase funciona con tu base de datos existente y tu flujo de trabajo actual.",
   "showcase.sync.tab1.title": "Edita como una hoja de cálculo",
@@ -132,7 +132,7 @@ export const es = {
     'Una colección.<br/><span class="text-primary subtle-shimmer">Todo generado.</span>',
   "power.subtitle":
     "Define tu modelo de datos una vez en TypeScript. Rebase crea automáticamente tu interfaz de administración, formularios, esquema de base de datos, APIs REST y GraphQL, y tipos de TypeScript.",
-  "power.badge": "Código como Verdad",
+  "power.badge": "Código como única fuente de verdad",
   "power.appcode": "Código de la App",
   "power.generates": "→ genera todo lo siguiente",
   "power.mobile.generates":
@@ -204,7 +204,7 @@ export const es = {
   "roadmap.later.badge": "Planificación",
   "roadmap.later.item1": "Bot conversacional de análisis y gráficos",
   "roadmap.later.item2": "Generación de esquemas por IA texto-a-esquema",
-  "roadmap.later.item3": "Funciones en el borde / Lógica sin servidor",
+  "roadmap.later.item3": "Edge functions / Lógica serverless",
   "roadmap.later.item4": "Tuberías de migración avanzadas",
   "roadmap.later.item5": "Soporte para MongoDB",
   "footer.product": "Producto",
@@ -405,13 +405,13 @@ export const es = {
   "about.meta.title": "Sobre Rebase - Nuestra Misión de Empoderar a los Desarrolladores",
   "about.meta.description": "Rebase nació de una frustración simple y recurrente: construir herramientas internas y paneles de administración es una tarea lenta, repetitiva y poco agradecida.",
   "about.hero.title": "Nuestra Misión",
-  "about.hero.subtitle": "Rebase nació de una frustración simple y recurrente: construir herramientas internas y paneles de administración es una <b class=\"text-white font-medium\">tarea lenta, repetitiva y poco agradecida</b>. Creemos que los desarrolladores deben centrarse en la innovación del producto principal, no en reinventar la interfaz CRUD por centésima vez.",
+  "about.hero.subtitle": "Rebase nació de una frustración simple y recurrente: construir herramientas internas y paneles de administración es una <b class=\"text-white font-medium\">tarea lenta, repetitiva e ingrata</b>. Creemos que los desarrolladores deben centrarse en la innovación del producto principal, no en reinventar la interfaz CRUD por centésima vez.",
   "about.story.title": "De un kit de herramientas para desarrolladores a una plataforma global.",
   "about.story.p1": "Rebase comenzó como una herramienta interna para lanzar un back-office en minutos, no en semanas. Al igual que muchos desarrolladores, nuestros fundadores estaban cansados de reconstruir las mismas interfaces de administración para cada nuevo proyecto. Querían enfocarse en construir grandes productos, no pasar semanas en operaciones CRUD, autenticación y validación de formularios.",
   "about.story.p2": "Lo que comenzó como un proyecto paralelo ganó terreno rápidamente en la comunidad de código abierto. Desarrolladores de todo el mundo comenzaron a usar Rebase para construir desde sistemas de gestión de contenido hasta complejas herramientas internas para empresas.",
   "about.story.p3": "Hoy, Rebase es una plataforma en la que confían equipos en empresas como <b class=\"text-white font-medium\">Microsoft</b> e <b class=\"text-white font-medium\">IKEA</b> para construir las herramientas internas críticas que impulsan sus negocios. Estamos orgullosos de ayudar a miles de desarrolladores a ahorrar tiempo y lanzar más rápido.",
   "about.values.title": "Nuestros Valores",
-  "about.values.v1.title": "Primero el Desarrollador",
+  "about.values.v1.title": "El desarrollador es lo primero",
   "about.values.v1.desc": "Cada decisión que tomamos comienza con una pregunta: \"¿Esto hace la vida de los desarrolladores más fácil?\" Priorizamos una excelente experiencia de desarrollador, documentación completa y APIs potentes.",
   "about.values.v2.title": "Transparencia",
   "about.values.v2.desc": "Somos de código abierto y estamos orgullosos de ello. Nuestro código, nuestra hoja de ruta y nuestra toma de decisiones son transparentes. Creemos en construir confianza a través de la apertura.",

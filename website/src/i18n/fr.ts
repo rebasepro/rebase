@@ -1,38 +1,38 @@
 export const fr = {
   "hero.badge": "Open-source · Piloté par schéma · Construit en Europe",
   "hero.title.part1": "Votre Postgres,",
-  "hero.title.part2": "Pleinement réalisé.",
+  "hero.title.part2": "Poussé au maximum.",
   "hero.subtitle":
     'Définissez votre schéma une fois en TypeScript. Obtenez instantanément un <b class="text-white font-medium">panneau d\'administration prêt pour la production</b>, des <b class="text-white font-medium">APIs typées</b> et un <b class="text-white font-medium">SDK complet</b>.',
   "hero.cta.demo": "Essayer la Démo",
   "hero.cta.github": "Voir sur GitHub",
   "demo.badge": "Trois commandes. Zéro boilerplate.",
-  "demo.title": "Schéma en entrée · Plateforme en sortie",
+  "demo.title": "Vous définissez le schéma. Nous fournissons la plateforme.",
   "demo.init": "✔ Rebase initialisé dans le répertoire courant.",
   "demo.pull": "✔ Schéma PostgreSQL introspecté. Types générés.",
   "demo.dev":
     "✔ Panneau d'administration, API et serveur WebSocket en cours d'exécution.",
   "social.title":
     "Fait confiance par les développeurs et les startups construisant sur Postgres",
-  "howitworks.badge": "Temps récupéré",
+  "howitworks.badge": "Gagnez du temps",
   "howitworks.title":
     'Ce que vous ne <span class="text-primary">construirez plus jamais.</span>',
   "howitworks.subtitle":
     "Chaque heure que vous passiez sur la plomberie est désormais consacrée à votre produit.",
-  "howitworks.step1.title": "Interfaces admin répétitives",
+  "howitworks.step1.title": "Panneaux d'administration codés à la main",
   "howitworks.step1.desc":
-    "Plus besoin de câbler des vues de tableaux, des formulaires ou la logique de filtrage. Connectez votre Postgres et obtenez un panneau d'administration complet et éditable — instantanément.",
-  "howitworks.step2.title": "Couches d'API faites à la main",
+    "Plus besoin de coder manuellement des vues de tableaux, des formulaires ou la logique de filtrage. Connectez votre Postgres et obtenez un panneau d'administration complet et éditable — instantanément.",
+  "howitworks.step2.title": "Création manuelle d'APIs",
   "howitworks.step2.desc":
-    "Arrêtez d'écrire des endpoints CRUD, des sérialiseurs et des middlewares de validation. Rebase expose des APIs REST, GraphQL et WebSocket typées à partir de votre schéma — zéro code de liaison.",
+    "Arrêtez d'écrire des endpoints CRUD, des sérialiseurs et des middlewares de validation. Rebase expose des APIs REST, GraphQL et WebSocket typées à partir de votre schéma — sans écrire de code répétitif.",
   "howitworks.step3.title": "Auth et permissions fragiles",
   "howitworks.step3.desc":
-    "Oubliez la plomberie JWT et les contrôles d'accès éparpillés. Définissez la sécurité au niveau des lignes et les permissions par rôle directement dans votre schéma TypeScript — auditable, versionné, infaillible.",
+    "Oubliez la configuration manuelle de JWT et les contrôles d'accès éparpillés. Définissez la sécurité au niveau des lignes et les permissions par rôle directement dans votre schéma TypeScript — auditable, versionné, infaillible.",
   "showcase.badge": "Construit pour des Produits Réels",
   "showcase.title.part1": "Les équipes livrent plus vite avec",
   "showcase.title.part2": "REBASE",
   "showcase.subtitle":
-    "Des <b>marketplaces</b> aux <b>plateformes SaaS</b> en passant par les <b>outils internes</b>, Rebase élimine le code de liaison entre la base de données, l'API et l'UI.",
+    "Des <b>marketplaces</b> aux <b>plateformes SaaS</b> en passant par les <b>outils internes</b>, Rebase élimine le code intermédiaire entre la base de données, l'API et l'UI.",
   "showcase.case.badge": "Marketplace & Portail d'emploi",
   "showcase.case.title": "SustenTalent",
   "showcase.case.desc":
@@ -95,7 +95,7 @@ export const fr = {
   "faq.q7": "Puis-je intégrer Rebase dans mon application React existante ?",
   "faq.a7":
     "Oui. Rebase est distribué sous forme de paquets npm. Vous pouvez monter l'ensemble du panneau d'administration dans votre application React existante, ou le déployer comme une SPA autonome. Il est conçu pour être intégrable.",
-  "cta.title": "Arrêtez d'écrire du code de liaison.",
+  "cta.title": "Arrêtez d'écrire du code répétitif.",
   "cta.subtitle":
     'Définissez votre schéma. Obtenez votre plateforme.<br class="hidden sm:block"/>Open-source, auto-hébergé, pas de tarification par utilisateur.',
   "cta.button.demo": "Essayer la Démo",
@@ -132,7 +132,7 @@ export const fr = {
     'Une collection.<br/><span class="text-primary subtle-shimmer">Tout est généré.</span>',
   "power.subtitle":
     "Définissez votre modèle de données une seule fois en TypeScript. Rebase crée automatiquement votre UI d'administration, formulaires, schéma de base de données, APIs REST &amp; GraphQL, et types TypeScript.",
-  "power.badge": "Le Code comme Vérité",
+  "power.badge": "Le code comme source unique de vérité",
   "power.appcode": "Code de l'Application",
   "power.generates": "→ génère tout ce qui suit",
   "power.mobile.generates":
