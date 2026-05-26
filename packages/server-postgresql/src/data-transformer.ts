@@ -1,7 +1,7 @@
 import { eq, SQL } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { CollectionWithRelations, EntityCollection, Properties, Property, Relation, RelationProperty } from "@rebasepro/types";
+import { CollectionWithRelations, EntityCollection, Properties, Property, Relation, RelationProperty, Vector } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, findRelation, createRelationRef, DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { DrizzleConditionBuilder } from "./utils/drizzle-conditions";
@@ -259,6 +259,18 @@ export function serializePropertyToServer(value: unknown, property: Property): u
                 return result;
             }
             return value;
+        case "vector": {
+            if (value instanceof Vector) {
+                return value.value;
+            }
+            if (value && typeof value === "object" && "value" in value && Array.isArray((value as any).value)) {
+                return (value as any).value.map(Number);
+            }
+            if (Array.isArray(value)) {
+                return value.map(Number);
+            }
+            return value;
+        }
 
         case "string":
             if (typeof value === "string") {
@@ -581,6 +593,26 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
                 return isNaN(parsed) ? null : parsed;
             }
             return value;
+
+        case "vector": {
+            let nums: number[] = [];
+            if (typeof value === "string") {
+                nums = value.slice(1, -1).split(",").map(Number);
+            } else if (Array.isArray(value)) {
+                nums = value.map(Number);
+            } else if (value instanceof Vector) {
+                nums = value.value;
+            } else if (typeof value === "object" && value !== null && "value" in value) {
+                const valObj = value as { value: unknown };
+                if (Array.isArray(valObj.value)) {
+                    nums = valObj.value.map(Number);
+                }
+            }
+            return {
+                __type: "Vector",
+                value: nums
+            };
+        }
 
         case "date": {
             let date: Date | undefined;

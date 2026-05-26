@@ -22,6 +22,7 @@ import { NumberPropertyField } from "./properties/NumberPropertyField";
 import { ReferencePropertyField } from "./properties/ReferencePropertyField";
 import { DateTimePropertyField } from "./properties/DateTimePropertyField";
 import { AdvancedPropertyValidation } from "./properties/advanced/AdvancedPropertyValidation";
+import { VectorPropertyField } from "./properties/VectorPropertyField";
 
 import { KeyValuePropertyField } from "./properties/KeyValuePropertyField";
 import { RelationPropertyField } from "./properties/RelationPropertyField";
@@ -168,6 +169,9 @@ export const PropertyForm = React.memo(
                 }
                 if (values.type === "reference" && !values.path) {
                     errors.slug = "You must specify a target collection for the field";
+                }
+                if (values.type === "vector" && (!values.dimensions || isNaN(Number(values.dimensions)) || Number(values.dimensions) <= 0)) {
+                    errors.dimensions = "Vector dimensions must be a positive number";
                 }
                 if (values.propertyConfig === "repeat") {
                     if (!("of" in values) || !values.of) {
@@ -463,6 +467,10 @@ function PropertyEditFormFields({
             <RelationPropertyField
                 showErrors={showErrors}
                 disabled={disabled}/>;
+    } else if (selectedFieldConfigId === "vector_input") {
+        childComponent =
+            <VectorPropertyField
+                disabled={disabled}/>;
     } else {
         childComponent = null;
     }
@@ -596,7 +604,8 @@ const WIDGET_TYPE_MAP: Record<PropertyConfigId, string> = {
     key_value: "Group",
     repeat: "Array",
     custom_array: "Array",
-    block: "Group"
+    block: "Group",
+    vector_input: "Number"
 };
 
 function WidgetSelectView({

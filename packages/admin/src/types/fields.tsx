@@ -28,7 +28,8 @@ export type DefaultFieldConfig =
     | "key_value"
     | "repeat"
     | "custom_array"
-    | "block";
+    | "block"
+    | "vector_input";
 
 /**
  * When building a custom field you need to create a React component that takes

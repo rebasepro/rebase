@@ -99,9 +99,20 @@ async function main() {
 
         // 2. Get Columns
         const { rows: columns } = await client.query<TableColumn>(`
-            SELECT table_name, column_name, data_type, udt_name, is_nullable, column_default
-            FROM information_schema.columns
-            WHERE table_schema = $1
+            SELECT 
+                c.table_name, 
+                c.column_name, 
+                c.data_type, 
+                c.udt_name, 
+                c.is_nullable, 
+                c.column_default,
+                (SELECT a.atttypmod FROM pg_attribute a 
+                 JOIN pg_class pc ON a.attrelid = pc.oid 
+                 WHERE pc.relname = c.table_name 
+                   AND a.attname = c.column_name 
+                   AND pc.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = c.table_schema)) as atttypmod
+            FROM information_schema.columns c
+            WHERE c.table_schema = $1
         `, [pgSchema]);
 
         // 2b. Get Enum Types and their values

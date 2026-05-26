@@ -172,4 +172,26 @@ path: "authors" }
             expect(serializePropertyToServer(false, boolProp)).toBe(false);
         });
     });
+
+    // ── Vector property ──
+    describe("vector property", () => {
+        const vectorProp: Property = { type: "vector", dimensions: 3 } as Property;
+
+        it("should serialize a Vector instance to a flat array", () => {
+            const vectorVal = { __type: "Vector", value: [1.5, -2.0, 3.14] };
+            expect(serializePropertyToServer(vectorVal, vectorProp)).toEqual([1.5, -2.0, 3.14]);
+        });
+
+        it("should serialize a raw number array to a flat array", () => {
+            expect(serializePropertyToServer([0.5, 0.6, 0.7], vectorProp)).toEqual([0.5, 0.6, 0.7]);
+        });
+
+        it("should return null for null values", () => {
+            expect(serializePropertyToServer(null, vectorProp)).toBeNull();
+        });
+
+        it("should return undefined for undefined values", () => {
+            expect(serializePropertyToServer(undefined, vectorProp)).toBeUndefined();
+        });
+    });
 });

@@ -51,6 +51,8 @@ function propertyToTypeScriptType(prop: Property): string {
             }
             return "Array<any>";
         }
+        case "vector":
+            return "number[]";
         default:
             return "any";
     }

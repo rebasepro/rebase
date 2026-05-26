@@ -9,7 +9,7 @@ import { buildStringProperty } from "./builders/string_property_builder";
 import { buildValidation } from "./builders/validation_builder";
 import { buildReferenceProperty } from "./builders/reference_property_builder";
 import { extractEnumFromValues, mergeDeep, prettifyIdentifier, resolveEnumValues } from "./util";
-import { DataType, EnumValues, Properties, Property, StringProperty } from "@rebasepro/types";
+import { DataType, EnumValues, Properties, Property, StringProperty, Vector } from "@rebasepro/types";
 
 export type InferenceTypeBuilder = (value: any) => DataType;
 
@@ -395,6 +395,7 @@ function checkTypesCountHighVariability(typesCount: TypesCount) {
 
 export function inferTypeFromValue(value: any): DataType {
     if (value === null || value === undefined) return "string";
+    if (value instanceof Vector || (value && typeof value === "object" && value.__type === "Vector")) return "vector";
     if (typeof value === "string") return "string";
     if (typeof value === "number") return "number";
     if (typeof value === "boolean") return "boolean";

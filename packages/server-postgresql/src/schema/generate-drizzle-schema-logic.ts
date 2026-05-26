@@ -1,4 +1,4 @@
-import { EntityCollection, NumberProperty, Property, Relation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollection, DateProperty, ArrayProperty, MapProperty, ReferenceProperty } from "@rebasepro/types";
+import { EntityCollection, NumberProperty, Property, Relation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollection, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty } from "@rebasepro/types";
 import { getPrimaryKeys } from "../services/entity-helpers";
 import { getEnumVarName, getTableName, getTableVarName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
@@ -153,6 +153,11 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
             } else {
                 columnDefinition = `jsonb("${colName}")`;
             }
+            break;
+        }
+        case "vector": {
+            const vp = prop as VectorProperty;
+            columnDefinition = `vector("${colName}", { dimensions: ${vp.dimensions} })`;
             break;
         }
         case "relation": {
@@ -489,15 +494,16 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
         )
     );
 
-    const hasJson = collections.some(c =>
+    const hasVector = collections.some(c =>
         c.properties && Object.values(c.properties).some(
-            (p: Property) => (p.type === "map" || p.type === "array") && (p as unknown as Record<string, unknown>).columnType === "json"
+            (p: Property) => p.type === "vector"
         )
     );
 
     // Always import pgPolicy and sql — RLS is enabled on every table (secure by default)
     const pgCoreImports = ["primaryKey", "pgTable", "integer", "varchar", "text", "char", "boolean", "timestamp", "date", "time", "jsonb", "json", "pgEnum", "numeric", "real", "doublePrecision", "bigint", "serial", "bigserial", "pgPolicy"];
     if (hasUuid) pgCoreImports.push("uuid");
+    if (hasVector) pgCoreImports.push("vector");
 
     const uniqueSchemas = Array.from(new Set(
         collections.map(c => isPostgresCollection(c) ? c.schema : undefined).filter(Boolean)

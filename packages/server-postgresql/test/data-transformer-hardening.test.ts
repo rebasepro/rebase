@@ -415,3 +415,34 @@ describe("structural dunder guard", () => {
         expect(dunderKeys).toEqual([]);
     });
 });
+
+// ─────────────────────────────────────────────────────────────
+// parsePropertyFromServer — vector parsing
+// ─────────────────────────────────────────────────────────────
+describe("parsePropertyFromServer vector parsing", () => {
+    const targetCollection = makeCollection("items", {
+        embedding: {
+            type: "vector",
+            dimensions: 3,
+            name: "Embedding"
+        } as unknown as Property
+    });
+
+    it("parses string representation '[0.1,-0.2,3.14]' from postgres into wrapped vector", () => {
+        const property = targetCollection.properties.embedding as Property;
+        const result = parsePropertyFromServer("[0.1,-0.2,3.14]", property, targetCollection, "embedding");
+        expect(result).toEqual({
+            __type: "Vector",
+            value: [0.1, -0.2, 3.14]
+        });
+    });
+
+    it("parses numeric array [0.1,-0.2,3.14] into wrapped vector", () => {
+        const property = targetCollection.properties.embedding as Property;
+        const result = parsePropertyFromServer([0.1, -0.2, 3.14], property, targetCollection, "embedding");
+        expect(result).toEqual({
+            __type: "Vector",
+            value: [0.1, -0.2, 3.14]
+        });
+    });
+});

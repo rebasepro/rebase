@@ -1,4 +1,4 @@
-import { EntityCollection, Property, StringProperty, NumberProperty, ArrayProperty, MapProperty, Relation } from "@rebasepro/types";
+import { EntityCollection, Property, StringProperty, NumberProperty, ArrayProperty, MapProperty, Relation, VectorProperty } from "@rebasepro/types";
 
 /**
  * OpenAPI 3.0.3 specification generator.
@@ -624,6 +624,13 @@ enum: [variantKey] },
             return base;
         }
 
+        case "vector": {
+            const vp = property as VectorProperty;
+            base.type = "array";
+            base.items = { type: "number" };
+            base.description = (base.description || "") + ` (Vector(${vp.dimensions}))`;
+            return base;
+        }
         default:
             base.type = "string";
             return base;

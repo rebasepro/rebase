@@ -2,7 +2,7 @@ import React from "react";
 
 import type { ComponentRef } from "./component_ref";
 
-import type { EntityReference, EntityRelation, EntityValues, GeoPoint, Entity } from "./entities";
+import type { EntityReference, EntityRelation, EntityValues, GeoPoint, Entity, Vector } from "./entities";
 import type { Relation, JoinStep, OnAction } from "./relations";
 import type { EntityCollection, FilterValues } from "./collections";
 import type { ColorKey, ColorScheme } from "./chips";
@@ -48,7 +48,8 @@ export type DataType =
     | "reference"
     | "relation"
     | "array"
-    | "map";
+    | "map"
+    | "vector";
 
 export type Property =
     | StringProperty
@@ -59,7 +60,8 @@ export type Property =
     | ReferenceProperty
     | RelationProperty
     | ArrayProperty
-    | MapProperty;
+    | MapProperty
+    | VectorProperty;
 
 export type Properties = {
     [key: string]: Property;
@@ -89,6 +91,7 @@ export type InferPropertyType<P extends Property> =
     P extends RelationProperty ? EntityRelation | EntityRelation[] :
     P extends ArrayProperty ? (P["of"] extends Property ? InferPropertyType<P["of"]>[] : unknown[]) :
     P extends MapProperty ? (P["properties"] extends Properties ? InferEntityType<P["properties"]> : Record<string, unknown>) :
+    P extends VectorProperty ? Vector :
     never;
 
 /**
@@ -377,6 +380,20 @@ export interface BooleanProperty extends BaseProperty {
     /**
      * Rules for validating this property
      */
+    validation?: PropertyValidationSchema;
+}
+
+/**
+ * @group Entity properties
+ */
+export interface VectorUIConfig extends BaseUIConfig {
+    clearable?: boolean;
+}
+
+export interface VectorProperty extends BaseProperty {
+    ui?: VectorUIConfig;
+    type: "vector";
+    dimensions: number;
     validation?: PropertyValidationSchema;
 }
 

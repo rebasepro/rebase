@@ -104,6 +104,9 @@ export class GraphQLSchemaGenerator {
             case "array":
                 type = new GraphQLList(GraphQLString);
                 break;
+            case "vector":
+                type = new GraphQLList(GraphQLFloat);
+                break;
             default:
                 type = GraphQLString;
         }
@@ -153,6 +156,8 @@ export class GraphQLSchemaGenerator {
                 return GraphQLString;
             case "array":
                 return new GraphQLList(GraphQLString);
+            case "vector":
+                return new GraphQLList(GraphQLFloat);
             default:
                 return GraphQLString;
         }

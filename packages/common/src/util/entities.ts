@@ -71,6 +71,8 @@ export function getDefaultValueFortype(type: DataType) {
         return [];
     } else if (type === "map") {
         return {};
+    } else if (type === "vector") {
+        return null;
     } else {
         return null;
     }

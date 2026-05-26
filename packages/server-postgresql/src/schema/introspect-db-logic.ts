@@ -21,6 +21,7 @@ export interface TableColumn {
     udt_name: string;
     is_nullable: string;
     column_default: string | null;
+    atttypmod: number | null;
 }
 
 export interface EnumValue {
@@ -548,8 +549,9 @@ export function generateCollectionFile(
         // Check if this column uses a PostgreSQL enum type
         const colEnumValues = enumMap.get(col.udt_name);
         const isEnumColumn = col.data_type === "USER-DEFINED" && colEnumValues !== undefined;
+        const isVectorColumn = col.udt_name === "vector";
 
-        const propType = isEnumColumn ? "string" : mapPgType(col.data_type);
+        const propType = isEnumColumn ? "string" : (isVectorColumn ? "vector" : mapPgType(col.data_type));
         let extra = "";
 
         const colNameLower = col.column_name.toLowerCase();
@@ -631,6 +633,11 @@ export function generateCollectionFile(
             } else if (!inferenceExtra.includes("isId:")) {
                 extra += `\n            isId: "uuid", // Verify if this is a UUID or CUID`;
             }
+        }
+
+        if (finalPropType === "vector") {
+            const dims = col.atttypmod && col.atttypmod > 0 ? col.atttypmod : 1536;
+            extra += `\n            dimensions: ${dims},`;
         }
 
         if (col.is_nullable === "NO" && !meta.pks.includes(col.column_name) && !col.column_default) {

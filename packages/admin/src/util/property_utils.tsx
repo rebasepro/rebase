@@ -86,6 +86,8 @@ function getDefaultIconForProperty(property: Property): LucideIcon {
             return LinkIcon;
         case "relation":
             return LinkIcon;
+        case "vector":
+            return HashIcon;
         default:
             return CircleIcon;
     }

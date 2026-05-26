@@ -1,6 +1,6 @@
 
 import type { DefaultFieldConfig } from "../types/fields";
-import type { ArrayProperty, NumberProperty, Property, PropertyConfig, StringProperty } from "@rebasepro/types";
+import type { ArrayProperty, NumberProperty, Property, PropertyConfig, StringProperty, VectorProperty } from "@rebasepro/types";
 import { ArrayCustomShapedFieldBinding } from "../form/field_bindings/ArrayCustomShapedFieldBinding";
 import { ArrayOfReferencesFieldBinding } from "../form/field_bindings/ArrayOfReferencesFieldBinding";
 import { BlockFieldBinding } from "../form/field_bindings/BlockFieldBinding";
@@ -16,6 +16,7 @@ import { SelectFieldBinding } from "../form/field_bindings/SelectFieldBinding";
 import { StorageUploadFieldBinding } from "../form/field_bindings/StorageUploadFieldBinding";
 import { SwitchFieldBinding } from "../form/field_bindings/SwitchFieldBinding";
 import { TextFieldBinding } from "../form/field_bindings/TextFieldBinding";
+import { VectorFieldBinding } from "../form/field_bindings/VectorFieldBinding";
 import { isPropertyBuilder } from "@rebasepro/common";
 
 import { FolderUpIcon, FlagIcon, GlobeIcon, ListIcon, TextIcon, UserCheckIcon, Rows3Icon, LinkIcon, VoteIcon, ListOrderedIcon, QuoteIcon, MailIcon, HashIcon, UserIcon, RepeatIcon, CalendarIcon, AlignLeftIcon, UploadIcon } from "lucide-react";
@@ -318,6 +319,18 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
             },
             ui: { Field: BlockFieldBinding }
         }
+    },
+    vector_input: {
+        key: "vector_input",
+        name: "Vector input",
+        description: "Vector array for embeddings",
+        Icon: HashIcon,
+        color: "#bec920",
+        property: {
+            type: "vector",
+            dimensions: 1536,
+            ui: { Field: VectorFieldBinding }
+        }
     }
 };
 
@@ -407,6 +420,8 @@ export function getDefaultFieldId(property: Property) {
         return "relation";
     } else if (property.type === "reference") {
         return "reference";
+    } else if (property.type === "vector") {
+        return "vector_input";
     }
 
     console.error("Unsupported field config mapping", property);

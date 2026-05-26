@@ -20,6 +20,7 @@ export { BlockFieldBinding } from "./field_bindings/BlockFieldBinding";
 export { ReadOnlyFieldBinding } from "./field_bindings/ReadOnlyFieldBinding";
 export { MarkdownEditorFieldBinding } from "./field_bindings/MarkdownEditorFieldBinding";
 export { ArrayCustomShapedFieldBinding } from "./field_bindings/ArrayCustomShapedFieldBinding";
+export { VectorFieldBinding } from "./field_bindings/VectorFieldBinding";
 
 export * from "./components";
 

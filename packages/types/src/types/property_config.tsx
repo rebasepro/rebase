@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrayProperty, MapProperty, Property, StringProperty, NumberProperty, BooleanProperty, DateProperty, GeopointProperty, ReferenceProperty, RelationProperty } from "./properties";import { BaseProperty } from "./properties";
+import { ArrayProperty, MapProperty, Property, StringProperty, NumberProperty, BooleanProperty, DateProperty, GeopointProperty, ReferenceProperty, RelationProperty, VectorProperty } from "./properties";import { BaseProperty } from "./properties";
 
 type CMSBasePropertyNoName = Omit<BaseProperty, "name">;
 
@@ -19,7 +19,8 @@ export type ConfigProperty =
     | (Omit<MapProperty, "name" | "properties"> & {
         name?: string;
         properties?: Record<string, ConfigProperty>
-    } & CMSBasePropertyNoName);
+    } & CMSBasePropertyNoName)
+    | (Omit<VectorProperty, "name"> & { name?: string } & CMSBasePropertyNoName);
 
 /**
  * This is the configuration object for a property.
@@ -90,4 +91,5 @@ export type PropertyConfigId =
     "date_time" |
     "repeat" |
     "custom_array" |
-    "block";
+    "block" |
+    "vector_input";

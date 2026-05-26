@@ -10,6 +10,7 @@ export type TypesCount = {
     geopoint?: number,
     reference?: number,
     relation?: number,
+    vector?: number,
 };
 
 export type TypesCountRecord<K extends keyof DataType = any> = {

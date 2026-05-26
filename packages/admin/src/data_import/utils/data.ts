@@ -1,5 +1,5 @@
 import { getPropertyInPath } from "../../util";
-import { AuthController, Entity, EntityCollection, EntityReference, CollectionRegistryController, Properties, Property } from "@rebasepro/types";
+import { AuthController, Entity, EntityCollection, EntityReference, CollectionRegistryController, Properties, Property, Vector } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";
 import { unflattenObject } from "./file_to_json";
 import { getIn } from "@rebasepro/formex";
@@ -76,6 +76,25 @@ export function processValueMapping(authController: AuthController, value: any, 
     if (usedProperty === null) return value;
     const from = inferTypeFromValue(value);
     const to = usedProperty.type;
+
+    if (to === "vector") {
+        if (value && typeof value === "object" && "value" in value && Array.isArray(value.value)) {
+            return new Vector(value.value);
+        } else if (Array.isArray(value)) {
+            return new Vector(value.map(Number));
+        } else if (typeof value === "string") {
+            let cleaned = value.trim();
+            if (cleaned.startsWith("[") && cleaned.endsWith("]")) {
+                cleaned = cleaned.slice(1, -1);
+            }
+            if (cleaned === "") return null;
+            return new Vector(cleaned.split(",").map(v => {
+                const num = Number(v.trim());
+                return isNaN(num) ? 0 : num;
+            }));
+        }
+        return value;
+    }
 
     if (from === "array" && to === "array" && Array.isArray(value) && usedProperty.of && !Array.isArray(usedProperty.of) && !isPropertyBuilder(usedProperty.of)) {
         return value.map(v => processValueMapping(authController, v, navigation, usedProperty.of as Property));

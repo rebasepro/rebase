@@ -1,5 +1,5 @@
 import type { Properties } from "@rebasepro/types";
-import type { ArrayProperty, MapProperty, NumberProperty, Property, BooleanProperty, DateProperty, GeopointProperty, ReferenceProperty, RelationProperty, StringProperty } from "@rebasepro/types";
+import type { ArrayProperty, MapProperty, NumberProperty, Property, BooleanProperty, DateProperty, GeopointProperty, ReferenceProperty, RelationProperty, StringProperty, VectorProperty } from "@rebasepro/types";
 ;
 import { z, ZodTypeAny } from "zod";
 import { enumToObjectEntries, isPropertyBuilder } from "@rebasepro/common";
@@ -74,6 +74,8 @@ export function mapPropertyToZod(propertyContext: PropertyContext<Property>): Zo
         return getZodReferenceSchema(propertyContext as PropertyContext<ReferenceProperty>);
     } else if (property.type === "relation") {
         return getZodRelationSchema(propertyContext as PropertyContext<RelationProperty>);
+    } else if (property.type === "vector") {
+        return getZodVectorSchema(propertyContext as PropertyContext<VectorProperty>);
     }
 
     // Log the error but don't crash the form
@@ -516,4 +518,37 @@ function getZodArraySchema({
         }
     }
     return arraySchema;
+}
+
+function getZodVectorSchema({
+    property
+}: PropertyContext<VectorProperty>): ZodTypeAny {
+    let schema: ZodTypeAny = z.preprocess(
+        (val: any) => {
+            if (val && typeof val === "object" && "__type" in val && val.__type === "Vector") {
+                return val.value;
+            }
+            if (val && typeof val === "object" && "value" in val && Array.isArray(val.value)) {
+                return val.value;
+            }
+            return val;
+        },
+        z.array(z.number()).nullable().optional()
+    );
+    
+    if (property.dimensions) {
+        schema = schema.refine(
+            (val: any) => val === null || val === undefined || val.length === property.dimensions,
+            { message: `${property.name ?? "Vector"} must have exactly ${property.dimensions} dimensions` }
+        );
+    }
+    
+    if (property.validation?.required) {
+        schema = schema.refine(
+            (val: any) => val !== null && val !== undefined && val.length > 0,
+            { message: property.validation?.requiredMessage ?? "Required" }
+        );
+    }
+    
+    return schema;
 }

@@ -94,6 +94,8 @@ export function getExpectedColumnType(prop: Property): string | null {
             return null; // FK columns are derived from the relation, not from the property
         case "reference":
             return "character varying"; // References default to varchar FK
+        case "vector":
+            return "USER-DEFINED";
         default:
             return null;
     }
@@ -438,15 +440,19 @@ export async function checkCollectionsVsDatabase(
                 const expectedType = getExpectedColumnType(prop);
                 if (expectedType) {
                     const actualType = dbCol.data_type;
-                    if (actualType !== expectedType) {
+                    let isMismatch = actualType !== expectedType;
+                    if (prop.type === "vector" && dbCol.udt_name !== "vector") {
+                        isMismatch = true;
+                    }
+                    if (isMismatch) {
                         issues.push({
                             severity: "warning",
                             category: "type_mismatch",
                             table: tableName,
                             column: colName,
-                            expected: expectedType,
-                            actual: actualType,
-                            message: `Column "${colName}" in table "${tableName}": expected type "${expectedType}" but found "${actualType}".`,
+                            expected: prop.type === "vector" ? "vector" : expectedType,
+                            actual: dbCol.udt_name === "vector" ? "vector" : actualType,
+                            message: `Column "${colName}" in table "${tableName}": expected type "${prop.type === "vector" ? "vector" : expectedType}" but found "${dbCol.udt_name === "vector" ? "vector" : actualType}".`,
                             fix: "Review collection property type or run a migration"
                         });
                     }
