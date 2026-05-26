@@ -56,7 +56,7 @@ describe("findProjectRoot", () => {
         expect(findProjectRoot(emptyDir)).toBeNull();
     });
 
-    it("finds root by backend/ + shared/ sibling directories", () => {
+    it("finds root by backend/ + config/ sibling directories", () => {
         const projectDir = createDir("my-app");
         createDir("my-app", "backend");
         createDir("my-app", "config");
@@ -95,7 +95,7 @@ describe("findProjectRoot", () => {
         expect(findProjectRoot(projectDir)).toBe(projectDir);
     });
 
-    it("does NOT match a directory with only backend/ (no shared/)", () => {
+    it("does NOT match a directory with only backend/ (no config/)", () => {
         const projectDir = createDir("partial-app");
         createDir("partial-app", "backend");
         writeJSON(path.join(projectDir, "package.json"), { name: "partial" });

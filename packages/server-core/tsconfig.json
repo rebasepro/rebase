@@ -35,6 +35,9 @@
       ],
       "@rebasepro/common": [
         "../common/src"
+      ],
+      "hono": [
+        "node_modules/hono"
       ]
     }
   },

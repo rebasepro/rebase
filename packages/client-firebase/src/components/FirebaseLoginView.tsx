@@ -87,7 +87,7 @@ export interface FirebaseLoginViewProps {
      */
     additionalComponent?: ReactNode;
 
-    notAllowedError?: any;
+    notAllowedError?: string | Error;
 
     className?: string;
 
@@ -172,7 +172,7 @@ export function FirebaseLoginView({
     }, [authController.authProviderError]);
 
     function buildErrorView() {
-        let errorView: any;
+        let errorView: React.ReactNode;
         if (authController.user != null) return errorView; // if the user is logged in via MFA
         const ignoredCodes = ["auth/popup-closed-by-user", "auth/cancelled-popup-request"];
         if (authController.authProviderError) {
@@ -388,7 +388,7 @@ function PhoneLoginForm({
     const [code, setCode] = useState<string>();
     const [isInvalidCode, setIsInvalidCode] = useState(false);
 
-    const handleSubmit = async (event: any) => {
+    const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
 
         if (code && authController.confirmationResult) {
@@ -428,7 +428,7 @@ function PhoneLoginForm({
                     value={phone ?? ""}
                     disabled={Boolean(phone && (authController.authLoading || authController.confirmationResult))}
                     type="phone"
-                    onChange={(event: any) => setPhone(event.target.value)}/>
+                    onChange={(event) => setPhone(event.target.value)}/>
                 {Boolean(phone && authController.confirmationResult) &&
                     <>
                         <div className="mt-2 p-1 flex">
@@ -438,7 +438,7 @@ function PhoneLoginForm({
                         <TextField placeholder=""
                             value={code ?? ""}
                             type="text"
-                            onChange={(event: any) => setCode(event.target.value)}/>
+                            onChange={(event) => setCode(event.target.value)}/>
                     </>
                 }
 
@@ -494,8 +494,8 @@ function LoginForm({
 
     useEffect(() => {
         if (!document) return;
-        const escFunction = (event: any) => {
-            if (event.keyCode === 27) {
+        const escFunction = (event: KeyboardEvent) => {
+            if (event.key === "Escape") {
                 onClose();
             }
         };
@@ -536,7 +536,7 @@ function LoginForm({
         }
     }
 
-    const handleSubmit = (event: any) => {
+    const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault();
         if (loginState === "email") {
             handleEnterEmail();
@@ -574,7 +574,7 @@ function LoginForm({
                     value={email ?? ""}
                     disabled={authController.authLoading}
                     type="email"
-                    onChange={(event: any) => setEmail(event.target.value)}/>}
+                    onChange={(event) => setEmail(event.target.value)}/>}
 
                 <div
                     className={`${loginState === "password" || (loginState === "registration" && !disableSignupScreen) ? "block" : "hidden"}`}>
@@ -583,7 +583,7 @@ function LoginForm({
                         disabled={authController.authLoading}
                         inputRef={passwordRef}
                         type="password"
-                        onChange={(event: any) => setPassword(event.target.value)}/>
+                        onChange={(event) => setPassword(event.target.value)}/>
                 </div>
 
                 <div
@@ -605,9 +605,9 @@ function LoginForm({
                                             message: "Password reset email sent",
                                             type: "success"
                                         });
-                                    } catch (e: any) {
+                                    } catch (e: unknown) {
                                         snackbarController.open({
-                                            message: e.message,
+                                            message: e instanceof Error ? e.message : String(e),
                                             type: "error"
                                         });
                                     }

@@ -491,6 +491,48 @@ describe("Layer 6 – circular dependency resilience", () => {
         expect(storedTags.relations).toBeDefined();
         expect(storedTags.relations!.find((r) => r.relationName === "posts")).toBeDefined();
     });
+
+    it("resolves string target slugs correctly when registering collections", () => {
+        const posts: PostgresCollection = {
+            name: "Posts",
+            slug: "posts",
+            table: "posts",
+            properties: {
+                id: { type: "number", isId: "increment" },
+                author: {
+                    name: "Author",
+                    type: "relation",
+                    target: "authors", // String slug instead of function returning reference
+                    cardinality: "one",
+                    direction: "owning",
+                } as RelationProperty,
+            },
+        };
+
+        const authors: PostgresCollection = {
+            name: "Authors",
+            slug: "authors",
+            table: "authors",
+            properties: {
+                id: { type: "number", isId: "increment" },
+                name: { type: "string" },
+            },
+        };
+
+        const registry = new CollectionRegistry([posts, authors]);
+
+        const storedPosts = registry.get("posts") as PostgresCollection;
+        expect(storedPosts).toBeDefined();
+
+        const authorProp = storedPosts.properties.author as RelationProperty;
+        expect(authorProp.relation).toBeDefined();
+        expect(authorProp.relation!.cardinality).toBe("one");
+
+        const resolvedTarget = authorProp.relation!.target();
+        expect(resolvedTarget).toBeDefined();
+        expect(resolvedTarget.slug).toBe("authors");
+        expect(resolvedTarget.name).toBe("Authors");
+    });
 });
 
 // ══════════════════════════════════════════════════════════════════════

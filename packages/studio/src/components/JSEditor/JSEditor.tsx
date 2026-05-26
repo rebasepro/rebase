@@ -364,7 +364,7 @@ isScoped: true };
 
         const consoleEntries: ConsoleEntry[] = [];
         const startTime = performance.now();
-        let scopedClientToCleanUp: any = null;
+        let scopedClientToCleanUp: { ws?: { disconnect(): void } } | null = null;
 
         // Capture console methods
         const originalConsole = {
@@ -427,13 +427,13 @@ timestamp: Date.now() });
             } else {
                 setResultView("json");
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             const duration = performance.now() - startTime;
             setResult({
                 value: undefined,
                 console: consoleEntries,
                 duration,
-                error: err?.message || String(err),
+                error: err instanceof Error ? err.message : String(err),
                 timestamp: Date.now()
             });
             setResultView("json");

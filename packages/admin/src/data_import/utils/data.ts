@@ -54,14 +54,13 @@ export function convertDataToEntity(authController: AuthController,
     };
 }
 
-export function flattenEntry(obj: any, parent = ""): any {
-    return Object.keys(obj).reduce((acc, key) => {
+export function flattenEntry(obj: Record<string, unknown>, parent = ""): Record<string, unknown> {
+    return Object.keys(obj).reduce<Record<string, unknown>>((acc, key) => {
         const prefixedKey = parent ? `${parent}.${key}` : key;
 
         if (typeof obj[key] === "object" && !(obj[key] instanceof Date) && obj[key] !== null && !Array.isArray(obj[key])) {
-            Object.assign(acc, flattenEntry(obj[key], prefixedKey));
+            Object.assign(acc, flattenEntry(obj[key] as Record<string, unknown>, prefixedKey));
         } else {
-            // @ts-ignore
             acc[prefixedKey] = obj[key];
         }
 

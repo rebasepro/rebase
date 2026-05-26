@@ -167,15 +167,12 @@ export async function oauthLogin(providerId: string, payload: Record<string, unk
  * Refresh access token using refresh token
  */
 export async function refreshAccessToken(refreshToken: string): Promise<RefreshResponse> {
-    console.log("[AUTH-API] Calling refresh endpoint...");
-
     const response = await fetchWithHandling(`${baseApiUrl}/api/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken })
     });
 
-    console.log("[AUTH-API] Refresh response status:", response.status);
     return handleResponse<RefreshResponse>(response);
 }
 

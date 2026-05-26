@@ -186,7 +186,7 @@ export function requireProjectRoot(): string {
     if (!root) {
         console.error(chalk.red("✗ Could not find a Rebase project root."));
         console.error(chalk.gray("  Make sure you are inside a Rebase project directory"));
-        console.error(chalk.gray("  (one with backend/, frontend/, and shared/ directories)."));
+        console.error(chalk.gray("  (one with backend/, frontend/, and config/ directories)."));
         process.exit(1);
     }
     return root;

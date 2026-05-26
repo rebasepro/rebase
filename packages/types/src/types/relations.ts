@@ -20,7 +20,7 @@ export interface Relation {
     /**
      * The final collection you want to retrieve records from.
      */
-    target: () => EntityCollection;
+    target: (() => EntityCollection) | any;
 
     /**
      * The nature of the relationship, determining if one or many records are returned.

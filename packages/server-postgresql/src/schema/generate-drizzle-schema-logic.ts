@@ -246,8 +246,8 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
  * The result is wrapped in a Drizzle sql`` template literal.
  */
 const resolveRawSql = (expression: string): string => {
-    // Replace {column_name} with ${table.column_name}
-    const resolved = expression.replace(/\{(\w+)\}/g, (_, col) => `\${table.${col}}`);
+    // Replace {column_name} with column_name directly (so Drizzle-kit can parse it as a static string)
+    const resolved = expression.replace(/\{(\w+)\}/g, (_, col) => col);
     return `sql\`${resolved}\``;
 };
 
@@ -272,7 +272,7 @@ const unwrapSql = (sqlExpr: string): string => {
 /**
  * Builds the USING clause for a policy based on shortcuts or raw SQL.
  */
-const buildUsingClause = (rule: SecurityRule): string | null => {
+const buildUsingClause = (rule: SecurityRule, collection: EntityCollection): string | null => {
     if (rule.using) {
         return resolveRawSql(rule.using);
     }
@@ -280,7 +280,9 @@ const buildUsingClause = (rule: SecurityRule): string | null => {
         return "sql`true`";
     }
     if (rule.ownerField) {
-        return `sql\`\${table.${rule.ownerField}} = auth.uid()\``;
+        const prop = collection.properties?.[rule.ownerField];
+        const colName = resolveColumnName(rule.ownerField, prop);
+        return `sql\`${colName} = auth.uid()\``;
     }
     return null;
 };
@@ -289,12 +291,12 @@ const buildUsingClause = (rule: SecurityRule): string | null => {
  * Builds the WITH CHECK clause for a policy based on shortcuts or raw SQL.
  * Falls back to the USING clause if not explicitly provided.
  */
-const buildWithCheckClause = (rule: SecurityRule): string | null => {
+const buildWithCheckClause = (rule: SecurityRule, collection: EntityCollection): string | null => {
     if (rule.withCheck) {
         return resolveRawSql(rule.withCheck);
     }
     // For insert/update/all, fall back to using clause if withCheck not specified
-    return buildUsingClause(rule);
+    return buildUsingClause(rule, collection);
 };
 
 /**
@@ -325,7 +327,8 @@ const getPolicyNameHash = (rule: SecurityRule): string => {
  * - operations[] array: generates one policy per operation
  * - Combinations: roles + ownerField, roles + raw SQL, etc.
  */
-const generatePolicyCode = (tableName: string, rule: SecurityRule, index: number): string => {
+const generatePolicyCode = (collection: EntityCollection, rule: SecurityRule, index: number): string => {
+    const tableName = getTableName(collection);
     // Resolve operations: operations[] takes precedence over operation (singular)
     const ops: SecurityOperation[] = rule.operations && rule.operations.length > 0
         ? rule.operations
@@ -339,14 +342,14 @@ const generatePolicyCode = (tableName: string, rule: SecurityRule, index: number
             ? (ops.length > 1 ? `${rule.name}_${op}` : rule.name)
             : `${tableName}_${op}_${ruleHash}${ops.length > 1 ? `_${opIdx}` : ""}`;
 
-        return generateSinglePolicyCode(tableName, rule, op, policyName);
+        return generateSinglePolicyCode(collection, rule, op, policyName);
     }).join("");
 };
 
 /**
  * Generates a single pgPolicy() call for one specific operation.
  */
-const generateSinglePolicyCode = (tableName: string, rule: SecurityRule, operation: SecurityOperation, policyName: string): string => {
+const generateSinglePolicyCode = (collection: EntityCollection, rule: SecurityRule, operation: SecurityOperation, policyName: string): string => {
     const mode = rule.mode ?? "permissive";
     const roles = rule.roles ? [...rule.roles].sort() : undefined;
 
@@ -357,8 +360,8 @@ const generateSinglePolicyCode = (tableName: string, rule: SecurityRule, operati
     const needsUsing = operation !== "insert";
     const needsWithCheck = operation !== "select" && operation !== "delete";
 
-    let usingClause = needsUsing ? buildUsingClause(rule) : null;
-    let withCheckClause = needsWithCheck ? buildWithCheckClause(rule) : null;
+    let usingClause = needsUsing ? buildUsingClause(rule, collection) : null;
+    let withCheckClause = needsWithCheck ? buildWithCheckClause(rule, collection) : null;
 
     // If roles are specified, wrap existing clauses with role check,
     // or generate a roles-only clause.
@@ -628,7 +631,7 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
             if (!stripPolicies && securityRules && securityRules.length > 0) {
                 schemaContent += "\n}, (table) => ([\n";
                 securityRules.forEach((rule: SecurityRule, idx: number) => {
-                    schemaContent += generatePolicyCode(tableName, rule, idx);
+                    schemaContent += generatePolicyCode(collection, rule, idx);
                 });
                 schemaContent += "])).enableRLS();\n\n";
             } else {

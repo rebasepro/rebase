@@ -213,7 +213,7 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
     // on ESC key press
     useEffect(() => {
         const escFunction = (event: KeyboardEvent) => {
-            if (event.keyCode === 27) {
+            if (event.key === "Escape") {
                 unselect();
             }
         };

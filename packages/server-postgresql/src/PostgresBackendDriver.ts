@@ -538,23 +538,33 @@ propertyCallbacks: undefined };
         } as unknown as RebaseCallContext;
 
         if (callbacks?.beforeDelete || propertyCallbacks?.beforeDelete) {
+            let preventDefault = false;
             if (callbacks?.beforeDelete) {
-                await callbacks.beforeDelete({
+                const result = await callbacks.beforeDelete({
                     collection: resolvedCollection as EntityCollection<M>,
                     path: entity.path,
                     entityId: entity.id,
                     entity,
                     context: contextForCallback
                 });
+                if (result === false) {
+                    preventDefault = true;
+                }
             }
             if (propertyCallbacks?.beforeDelete) {
-                await propertyCallbacks.beforeDelete({
+                const result = await propertyCallbacks.beforeDelete({
                     collection: resolvedCollection as EntityCollection<M>,
                     path: entity.path,
                     entityId: entity.id,
                     entity,
                     context: contextForCallback
                 });
+                if (result === false) {
+                    preventDefault = true;
+                }
+            }
+            if (preventDefault) {
+                return;
             }
         }
 

@@ -9,8 +9,6 @@ import {
     Relation,
     RelationProperty,
     StringProperty,
-    OnAction,
-    JoinStep,
     getDataSourceCapabilities
 } from "@rebasepro/types";
 import { deepEqual } from "fast-equals";
@@ -71,8 +69,14 @@ export class CollectionRegistry {
             return false;
         }
 
-        // Raw input has changed — normalize and register
         this.reset();
+        // Phase 0: Populate maps with raw collections first for string target resolution
+        collections.forEach((c) => {
+            if (c.slug) {
+                this.collectionsBySlug.set(c.slug, c);
+            }
+            this.collectionsByTableName.set(getTableName(c), c);
+        });
 
         const normalizedCollections = collections.map(c => this.normalizeCollection({ ...c }));
 
@@ -182,7 +186,7 @@ export class CollectionRegistry {
         if (getDataSourceCapabilities(result.driver).supportsRelations) {
             mergedRelations = mergedRelationsRaw.map(r => {
                 try {
-                    return sanitizeRelation(r, result);
+                    return sanitizeRelation(r, result, (slug) => this.get(slug));
                 } catch {
                     // sanitizeRelation may throw for incomplete configs
                     // (e.g. missing target). Keep the raw relation as-is.
@@ -463,26 +467,3 @@ export class CollectionRegistry {
 
 }
 
-function areCollectionListsEqual(a: EntityCollection[], b: EntityCollection[]) {
-    // console.log("Comparing collection lists", a, b);
-    // return true;
-    if (a.length !== b.length) {
-        return false;
-    }
-    const aCopy = [...a];
-    const bCopy = [...b];
-    const aSorted = aCopy.sort((x, y) => x.slug.localeCompare(y.slug));
-    const bSorted = bCopy.sort((x, y) => x.slug.localeCompare(y.slug));
-    return aSorted.every((value, index) => areCollectionsEqual(value, bSorted[index]));
-}
-
-function areCollectionsEqual(a: EntityCollection, b: EntityCollection) {
-    const subcollectionsA = getSubcollections(a);
-    const subcollectionsB = getSubcollections(b);
-    const { driver: _dA, subcollections: _sA, relations: _rA, ...restA } = a as EntityCollection & Record<string, unknown> & { subcollections?: unknown; relations?: unknown };
-    const { driver: _dB, subcollections: _sB, relations: _rB, ...restB } = b as EntityCollection & Record<string, unknown> & { subcollections?: unknown; relations?: unknown };
-    if (!areCollectionListsEqual(subcollectionsA, subcollectionsB)) {
-        return false;
-    }
-    return deepEqual(removeFunctions(restA), removeFunctions(restB));
-}

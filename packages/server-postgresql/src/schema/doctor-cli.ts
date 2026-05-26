@@ -5,6 +5,7 @@
  */
 import path from "path";
 import chalk from "chalk";
+import fs from "fs";
 import { runDoctor } from "./doctor";
 
 async function main() {
@@ -12,7 +13,7 @@ async function main() {
     const schemaArg = process.argv.find((a) => a.startsWith("--schema="));
     const sdkArg = process.argv.find((a) => a.startsWith("--sdk="));
 
-    const collectionsPath = collectionsArg?.split("=")[1] ?? path.join("..", "shared", "collections");
+    const collectionsPath = collectionsArg?.split("=")[1] ?? path.join("..", "config", "collections");
     const schemaPath = schemaArg?.split("=")[1] ?? path.join("src", "schema.generated.ts");
     const sdkPath = sdkArg?.split("=")[1] ?? path.join("..", "generated", "sdk", "database.types.ts");
 

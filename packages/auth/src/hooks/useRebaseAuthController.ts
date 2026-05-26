@@ -42,11 +42,8 @@ interface StoredAuthData {
  */
 function saveAuthToStorage(tokens: AuthTokens, user: UserInfo): void {
     try {
-        const data: StoredAuthData = { tokens,
-user };
+        const data: StoredAuthData = { tokens, user };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        const expiryDate = new Date(tokens.accessTokenExpiresAt);
-        const expiryStr = Number.isFinite(tokens.accessTokenExpiresAt) ? expiryDate.toISOString() : "invalid";
     } catch (e) { /* ignore */ }
 }
 
@@ -181,7 +178,6 @@ export function useRebaseAuthController(
                     saveAuthToStorage(newTokens, latestStoredData.user);
                 }
 
-                const newExpiryStr = Number.isFinite(newTokens.accessTokenExpiresAt) ? new Date(newTokens.accessTokenExpiresAt).toISOString() : "invalid";
                 return newTokens;
             } catch (error: unknown) {
 
@@ -310,7 +306,6 @@ export function useRebaseAuthController(
 
     // Handle successful authentication
     const handleAuthSuccess = useCallback(async (userInfo: UserInfo, tokens: AuthTokens) => {
-        console.log("[Auth] handleAuthSuccess called, user:", userInfo.email, "uid:", userInfo.uid);
         tokensRef.current = tokens;
         let convertedUser = convertToUser(userInfo);
 
@@ -318,21 +313,18 @@ export function useRebaseAuthController(
         if (defineRolesFor) {
             const customRoles = await defineRolesFor(convertedUser);
             if (customRoles) {
-                convertedUser = { ...convertedUser,
-roles: customRoles.map(r => r.id) };
+                convertedUser = { ...convertedUser, roles: customRoles.map(r => r.id) };
             }
         }
 
         // Save to localStorage for persistence
         saveAuthToStorage(tokens, userInfo);
 
-        console.log("[Auth] Calling setUser, roles:", convertedUser.roles);
         setUser(convertedUser);
         setAuthError(null);
         setAuthProviderError(null);
         setLoginSkipped(false);
         scheduleTokenRefresh(tokens);
-        console.log("[Auth] handleAuthSuccess completed");
     }, [scheduleTokenRefresh, defineRolesFor]);
 
     // Email/password login

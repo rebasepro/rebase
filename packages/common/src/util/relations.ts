@@ -2,13 +2,57 @@ import { CollectionWithRelations, EntityCollection, getDataSourceCapabilities, P
 import { toSnakeCase } from "@rebasepro/utils";
 import { generateForeignKeyName } from "@rebasepro/utils";
 
-export function sanitizeRelation(relation: Partial<Relation>, sourceCollection: EntityCollection): Relation {
+export function sanitizeRelation(
+    relation: Partial<Relation>,
+    sourceCollection: EntityCollection,
+    resolveCollection?: (slugOrTable: string) => EntityCollection | undefined
+): Relation {
     if (!relation.target) {
         throw new Error("Relation is missing a `target` collection.");
     }
-    const targetCollection = relation.target();
+
+    const rawTarget = relation.target;
+    let targetCollection: EntityCollection | undefined;
+
+    if (typeof rawTarget === "string") {
+        if (resolveCollection) {
+            targetCollection = resolveCollection(rawTarget);
+        }
+        if (!targetCollection) {
+            targetCollection = { slug: rawTarget, name: rawTarget } as EntityCollection;
+        }
+    } else if (typeof rawTarget === "function") {
+        const evaluated = rawTarget();
+        if (typeof evaluated === "string") {
+            if (resolveCollection) {
+                targetCollection = resolveCollection(evaluated);
+            }
+            if (!targetCollection) {
+                targetCollection = { slug: evaluated, name: evaluated } as EntityCollection;
+            }
+        } else {
+            targetCollection = evaluated;
+        }
+    }
+
+    if (!targetCollection) {
+        throw new Error("Relation is missing a valid `target` collection.");
+    }
 
     const newRelation: Partial<Relation> = { ...relation };
+
+    newRelation.target = () => {
+        if (typeof rawTarget === "string") {
+            return (resolveCollection && resolveCollection(rawTarget)) || targetCollection!;
+        } else if (typeof rawTarget === "function") {
+            const evaluated = rawTarget();
+            if (typeof evaluated === "string") {
+                return (resolveCollection && resolveCollection(evaluated)) || targetCollection!;
+            }
+            return evaluated;
+        }
+        return targetCollection!;
+    };
 
     // 1. Default relationName from target collection slug
     if (!newRelation.relationName) {

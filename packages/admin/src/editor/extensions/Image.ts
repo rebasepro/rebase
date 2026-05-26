@@ -99,7 +99,7 @@ export const createDropImagePlugin = (upload: UploadFn): Plugin => {
                     const images = files.filter(file => /image/i.test(file.type));
 
                     if (images.length === 0) {
-                        console.log("No images found in dropped files");
+                        console.debug("No images found in dropped files");
                         return false;
                     }
 

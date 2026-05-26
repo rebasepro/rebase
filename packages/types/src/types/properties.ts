@@ -505,7 +505,7 @@ export interface RelationProperty extends BaseProperty {
      * When set, the framework treats this property as a self-contained relation
      * definition and no separate `relations[]` entry is needed.
      */
-    target?: () => EntityCollection;
+    target?: string | (() => EntityCollection | string);
 
     /**
      * Whether this property references one or many records.

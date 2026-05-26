@@ -418,7 +418,7 @@ function LoginForm({
     useEffect(() => {
         if (!document) return;
         const escFunction = (event: KeyboardEvent) => {
-            if (event.keyCode === 27) {
+            if (event.key === "Escape") {
                 onClose();
             }
         };
@@ -615,7 +615,7 @@ function ForgotPasswordForm({
     useEffect(() => {
         if (!document) return;
         const escFunction = (event: KeyboardEvent) => {
-            if (event.keyCode === 27) {
+            if (event.key === "Escape") {
                 onClose();
             }
         };

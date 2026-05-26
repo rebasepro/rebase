@@ -507,8 +507,8 @@ roles });
 
 function findCollectionsDir(): string | null {
     const candidates = [
-        resolve(PROJECT_DIR, "app", "shared", "collections"),
-        resolve(PROJECT_DIR, "shared", "collections"),
+        resolve(PROJECT_DIR, "app", "config", "collections"),
+        resolve(PROJECT_DIR, "config", "collections"),
         resolve(PROJECT_DIR, "collections")
     ];
     for (const dir of candidates) {

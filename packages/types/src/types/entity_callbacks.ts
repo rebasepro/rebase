@@ -50,7 +50,7 @@ export type EntityCallbacks<M extends Record<string, unknown> = Record<string, u
      *
      * @param props
      */
-    beforeDelete?(props: EntityBeforeDeleteProps<M, USER>): void;
+    beforeDelete?(props: EntityBeforeDeleteProps<M, USER>): Promise<boolean | void> | boolean | void;
 
     /**
      * Callback used after the entity is deleted.

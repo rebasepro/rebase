@@ -1,17 +1,20 @@
-import { pgSchema, varchar, uuid, timestamp, boolean, jsonb, primaryKey, unique } from "drizzle-orm/pg-core";
+import { pgSchema, pgTable, varchar, uuid, timestamp, boolean, jsonb, primaryKey, unique } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 /**
  * Factory function to dynamically create the auth tables bound to the specified schema names.
  */
 export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchemaName: string = "rebase") {
-    const rolesSchema = pgSchema(rolesSchemaName);
-    const usersSchema = pgSchema(usersSchemaName);
+    const rolesSchema = rolesSchemaName === "public" ? null : pgSchema(rolesSchemaName);
+    const usersSchema = usersSchemaName === "public" ? null : pgSchema(usersSchemaName);
+
+    const rolesTableCreator: any = rolesSchema ? rolesSchema.table.bind(rolesSchema) : pgTable;
+    const usersTableCreator: any = usersSchema ? usersSchema.table.bind(usersSchema) : pgTable;
 
     /**
      * Users table - stores both email/password and OAuth users
      */
-    const users = usersSchema.table("users", {
+    const users = usersTableCreator("users", {
         id: uuid("id").defaultRandom().primaryKey(),
         email: varchar("email", { length: 255 }).notNull().unique(),
         passwordHash: varchar("password_hash", { length: 255 }), // NULL for OAuth-only users
@@ -28,7 +31,7 @@ export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchema
     /**
      * Roles table - defines permission sets
      */
-    const roles = rolesSchema.table("roles", {
+    const roles = rolesTableCreator("roles", {
         id: varchar("id", { length: 50 }).primaryKey(), // 'admin', 'editor', 'viewer'
         name: varchar("name", { length: 100 }).notNull(),
         isAdmin: boolean("is_admin").default(false).notNull(),
@@ -56,17 +59,17 @@ export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchema
     /**
      * User-Role junction table
      */
-    const userRoles = rolesSchema.table("user_roles", {
+    const userRoles = rolesTableCreator("user_roles", {
         userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
         roleId: varchar("role_id", { length: 50 }).notNull().references(() => roles.id, { onDelete: "cascade" })
-    }, (table) => ({
+    }, (table: any) => ({
         pk: primaryKey({ columns: [table.userId, table.roleId] })
     }));
 
     /**
      * Refresh tokens for long-lived sessions
      */
-    const refreshTokens = rolesSchema.table("refresh_tokens", {
+    const refreshTokens = rolesTableCreator("refresh_tokens", {
         id: uuid("id").defaultRandom().primaryKey(),
         userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
         tokenHash: varchar("token_hash", { length: 255 }).notNull().unique(),
@@ -74,14 +77,14 @@ export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchema
         userAgent: varchar("user_agent", { length: 500 }),
         ipAddress: varchar("ip_address", { length: 45 }),
         createdAt: timestamp("created_at").defaultNow().notNull()
-    }, (table) => ({
+    }, (table: any) => ({
         uniqueDeviceSession: unique("unique_device_session").on(table.userId, table.userAgent, table.ipAddress)
     }));
 
     /**
      * Password reset tokens for forgot password flow
      */
-    const passwordResetTokens = rolesSchema.table("password_reset_tokens", {
+    const passwordResetTokens = rolesTableCreator("password_reset_tokens", {
         id: uuid("id").defaultRandom().primaryKey(),
         userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
         tokenHash: varchar("token_hash", { length: 255 }).notNull().unique(),
@@ -93,7 +96,7 @@ export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchema
     /**
      * App config - key/value store for custom settings
      */
-    const appConfig = rolesSchema.table("app_config", {
+    const appConfig = rolesTableCreator("app_config", {
         key: varchar("key", { length: 100 }).primaryKey(),
         value: jsonb("value").notNull(),
         updatedAt: timestamp("updated_at").defaultNow().notNull()
@@ -102,7 +105,7 @@ export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchema
     /**
      * User identities - maps external OAuth profiles back to local users
      */
-    const userIdentities = rolesSchema.table("user_identities", {
+    const userIdentities = rolesTableCreator("user_identities", {
         id: uuid("id").defaultRandom().primaryKey(),
         userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
         provider: varchar("provider", { length: 50 }).notNull(), // e.g. 'google', 'linkedin'
@@ -110,7 +113,7 @@ export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchema
         profileData: jsonb("profile_data"),
         createdAt: timestamp("created_at").defaultNow().notNull(),
         updatedAt: timestamp("updated_at").defaultNow().notNull()
-    }, (table) => ({
+    }, (table: any) => ({
         uniqueProviderId: unique("unique_provider_id").on(table.provider, table.providerId)
     }));
 

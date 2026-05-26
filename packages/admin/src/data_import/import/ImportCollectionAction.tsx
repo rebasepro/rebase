@@ -406,12 +406,11 @@ function buildHeadersMappingFromData(objArr: object[], properties?: Properties) 
     const headersMapping: Record<string, string> = {};
     objArr.filter(Boolean).forEach((obj) => {
         Object.keys(obj).forEach((key) => {
-            // @ts-ignore
-            const child = obj[key];
-            if (typeof child === "object" && !Array.isArray(child)) {
+            const child = (obj as Record<string, unknown>)[key];
+            if (child != null && typeof child === "object" && !Array.isArray(child)) {
                 const childProperty = properties?.[key];
                 const childProperties = childProperty && "properties" in childProperty ? childProperty.properties : undefined;
-                const childHeadersMapping = buildHeadersMappingFromData([child], childProperties);
+                const childHeadersMapping = buildHeadersMappingFromData([child as object], childProperties);
                 Object.entries(childHeadersMapping).forEach(([subKey, mapping]) => {
                     headersMapping[`${key}.${subKey}`] = `${key}.${mapping}`;
                 });

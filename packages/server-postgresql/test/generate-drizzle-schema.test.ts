@@ -393,7 +393,7 @@ ownerField: "user_id" }
             expect(result).toContain("pgPolicy");
             expect(result).toContain('as: "permissive"');
             expect(result).toContain('for: "all"');
-            expect(result).toContain("${table.user_id} = auth.uid()");
+            expect(result).toContain("user_id = auth.uid()");
             // 'all' needs both using and withCheck
             expect(result).toContain("using:");
             expect(result).toContain("withCheck:");
@@ -567,7 +567,7 @@ using: "{is_locked} = false" }
 
             const result = await generateSchema(collections);
             expect(result).toContain('as: "restrictive"');
-            expect(result).toContain("${table.is_locked} = false");
+            expect(result).toContain("is_locked = false");
         });
 
         it("should generate raw SQL using clause with column references", async () => {
@@ -586,7 +586,7 @@ using: "{published_at} > now() - interval '30 days'" }
             }];
 
             const result = await generateSchema(collections);
-            expect(result).toContain("${table.published_at} > now() - interval '30 days'");
+            expect(result).toContain("published_at > now() - interval '30 days'");
         });
 
         it("should generate raw SQL withCheck clause", async () => {
@@ -611,8 +611,8 @@ using: "{published_at} > now() - interval '30 days'" }
             const result = await generateSchema(collections);
             expect(result).toContain("using:");
             expect(result).toContain("withCheck:");
-            expect(result).toContain("${table.user_id} = auth.uid()");
-            expect(result).toContain("${table.status} != 'archived'");
+            expect(result).toContain("user_id = auth.uid()");
+            expect(result).toContain("status != 'archived'");
         });
 
         it("should use custom policy names when provided", async () => {

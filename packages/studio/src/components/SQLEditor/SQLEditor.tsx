@@ -5,14 +5,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { createPortal } from "react-dom";
 import { Button, Paper, Typography, CircularProgress, cls, IconButton, InputLabel, Dialog, DialogContent, DialogActions, DialogTitle, TextField, Tooltip, Alert, Tabs, Tab, defaultBorderMixin, Select, SelectItem, Menu, MenuItem, ResizablePanels, Chip, VirtualTable, VirtualTableColumn , iconSize, Checkbox, TextareaAutosize } from "@rebasepro/ui";
 import { DatabaseIcon, TerminalIcon, XIcon, PlusIcon, PencilIcon, MoreVerticalIcon, MenuIcon, PlayIcon } from "lucide-react";
-// VirtualTableInput is conditionally loaded from CMS when available
-let VirtualTableInput: React.ComponentType<any> | null = null;
-try {
-    // @ts-ignore — optional peer dependency
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const cms = require("@rebasepro/admin");
-    VirtualTableInput = cms.VirtualTableInput;
-} catch { /* CMS not available */ }
+
 import { useRebaseContext, useSnackbarController, ConfirmationDialog, ErrorView, useTranslation } from "@rebasepro/core";
 import { MonacoEditor } from "./MonacoEditor";
 import { SQLEditorSidebar, Snippet } from "./SQLEditorSidebar";
@@ -264,7 +257,7 @@ export const SQLEditor = () => {
                     const loadedRole = localStorage.getItem("rebase_sql_selected_role") || undefined;
 
                     const initialActiveTabId = localStorage.getItem(STORAGE_KEY_ACTIVE_TAB) || "1";
-                    let initialTabs: any[] = [];
+                    let initialTabs: Array<{ id?: string; database?: string; role?: string }> = [];
                     try {
                         const savedTabs = localStorage.getItem(STORAGE_KEY_TABS);
                         if (savedTabs) initialTabs = JSON.parse(savedTabs);

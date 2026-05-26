@@ -481,19 +481,32 @@ message: error instanceof Error ? error.message : "Error deleting role" });
         }
     };
 
-    const createDefaultRoles = () => {
+    const createDefaultRoles = async () => {
         const defaultRoles: Role[] = [
             { id: "admin",
-name: "Admin",
-isAdmin: true },
+              name: "Admin",
+              isAdmin: true },
             { id: "editor",
-name: "Editor",
-isAdmin: false },
+              name: "Editor",
+              isAdmin: false },
             { id: "viewer",
-name: "Viewer",
-isAdmin: false }
+              name: "Viewer",
+              isAdmin: false }
         ];
-        defaultRoles.forEach(role => saveRole(role));
+        try {
+            for (const role of defaultRoles) {
+                await saveRole(role);
+            }
+            snackbarController.open({
+                type: "success",
+                message: "Default roles created successfully"
+            });
+        } catch (error: unknown) {
+            snackbarController.open({
+                type: "error",
+                message: error instanceof Error ? error.message : "Failed to create default roles"
+            });
+        }
     };
 
     if (loading) {

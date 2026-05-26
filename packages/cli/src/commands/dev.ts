@@ -24,7 +24,9 @@ import {
     findBackendDir,
     findFrontendDir,
     findEnvFile,
-    resolveTsx
+    resolveTsx,
+    getActiveBackendPlugin,
+    resolvePluginCliScript
 } from "../utils/project";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 
@@ -77,10 +79,12 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             "--backend-only": Boolean,
             "--frontend-only": Boolean,
             "--port": Number,
+            "--generate": Boolean,
             "--help": Boolean,
             "-b": "--backend-only",
             "-f": "--frontend-only",
             "-p": "--port",
+            "-g": "--generate",
             "-h": "--help"
         },
         {
@@ -99,6 +103,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     const frontendDir = findFrontendDir(projectRoot);
     const backendOnly = args["--backend-only"] || false;
     const frontendOnly = args["--frontend-only"] || false;
+    const shouldGenerate = args["--generate"] || process.env.REBASE_AUTO_GENERATE === "true" || process.env.REBASE_GENERATE === "true";
 
     // Resolve the port ONCE, before starting anything
     const startPort = resolveStartPort(projectRoot, args["--port"]);
@@ -258,9 +263,73 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         /** Whether the frontend has been launched (we only launch it once). */
         let frontendLaunched = false;
 
+        // Initial schema and SDK generation (disabled by default, enabled via --generate or env var)
+        if (shouldGenerate) {
+            console.log(chalk.gray("  → Ensuring schema and SDK are generated on start..."));
+            try {
+                const activePlugin = getActiveBackendPlugin(backendDir);
+                const pluginCli = activePlugin ? resolvePluginCliScript(backendDir, activePlugin) : null;
+                if (pluginCli) {
+                    await execa(tsxBin, [pluginCli, "schema", "generate"], {
+                        cwd: backendDir,
+                        stdio: "inherit",
+                        env
+                    });
+                }
+                await execa("npx", ["rebase", "generate-sdk"], {
+                    cwd: projectRoot,
+                    stdio: "inherit",
+                    env
+                });
+                console.log(chalk.green("  ✓ Initial schema and SDK generated successfully.\n"));
+            } catch (err: any) {
+                console.error(chalk.red(`  ✗ Initial schema/SDK generation failed: ${err.message || err}\n`));
+            }
+
+            // Watch collections folder for changes
+            const collectionsDir = path.join(projectRoot, "config", "collections");
+            if (fs.existsSync(collectionsDir)) {
+                let watchDebounce: NodeJS.Timeout | null = null;
+                fs.watch(collectionsDir, { recursive: true }, (eventType, filename) => {
+                    if (!filename || filename.startsWith(".") || filename.endsWith(".tmp")) return;
+
+                    if (watchDebounce) clearTimeout(watchDebounce);
+                    watchDebounce = setTimeout(async () => {
+                        console.log(chalk.yellow(`\n  🔄 Collection change detected (${filename}). Regenerating schema & SDK...`));
+                        try {
+                            const activePlugin = getActiveBackendPlugin(backendDir);
+                            const pluginCli = activePlugin ? resolvePluginCliScript(backendDir, activePlugin) : null;
+                            if (pluginCli) {
+                                await execa(tsxBin, [pluginCli, "schema", "generate"], {
+                                    cwd: backendDir,
+                                    stdio: "inherit",
+                                    env
+                                });
+                            }
+                            await execa("npx", ["rebase", "generate-sdk"], {
+                                cwd: projectRoot,
+                                stdio: "inherit",
+                                env
+                            });
+                            console.log(chalk.green("  ✓ Schema & SDK regenerated successfully. Hono will reload."));
+                        } catch (err: any) {
+                            console.error(chalk.red(`  ✗ Failed to regenerate schema/SDK: ${err.message || err}`));
+                        }
+                    }, 300);
+                });
+            }
+        }
+
+        const watchArgs = ["watch", "--conditions", "development", "src/index.ts"];
+        if (!shouldGenerate) {
+            // When auto-generation is disabled, watch the config/collections dir directly so the dev server
+            // still reloads automatically when files there are edited/updated manually.
+            watchArgs.splice(1, 0, `--watch="${path.join("..", "config", "**", "*")}"`);
+        }
+
         const backendChild = execa(
             tsxBin,
-            ["watch", `--watch="${path.join("..", "config", "**", "*")}"`, "--conditions", "development", "src/index.ts"],
+            watchArgs,
             {
                 cwd: backendDir,
                 stdio: ["inherit", "pipe", "pipe"],
@@ -349,6 +418,7 @@ ${chalk.green.bold("Options")}
   ${chalk.blue("--backend-only, -b")}   Only start the backend server
   ${chalk.blue("--frontend-only, -f")}  Only start the frontend server
   ${chalk.blue("--port, -p")}           Backend port (default: auto-detected per project)
+  ${chalk.blue("--generate, -g")}        Enable automatic schema and SDK generation on startup and file changes
 
 ${chalk.green.bold("Description")}
   Starts both the backend (tsx watch + Hono) and frontend (Vite)
@@ -361,5 +431,9 @@ ${chalk.green.bold("Description")}
   If the assigned port is already in use, the server will automatically
   try the next available port. The frontend is started only after the
   backend is ready, and VITE_API_URL is injected automatically.
+
+  By default, automatic schema and SDK generation is disabled on startup
+  and file changes. Pass --generate (-g) or set REBASE_AUTO_GENERATE=true
+  in your environment to enable it.
 `);
 }

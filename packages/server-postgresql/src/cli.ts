@@ -92,6 +92,13 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             await runDrizzleKit("push", rawArgs);
         } else if (subcommand === "migrate") {
             await runDrizzleKit("migrate", rawArgs);
+        } else if (subcommand === "studio") {
+            const schemaPath = path.join(process.cwd(), "src", "schema.generated.ts");
+            if (!fs.existsSync(schemaPath)) {
+                console.log(chalk.yellow("  ⚠ schema.generated.ts not found. Generating schema first..."));
+                await schemaCommand("generate", rawArgs);
+            }
+            await runDrizzleKit("studio", rawArgs);
         } else {
             await runDrizzleKit(subcommand, rawArgs);
         }
@@ -518,7 +525,7 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
             process.exit(1);
         }
 
-        const collectionsPath = argsList["--collections"] || path.join("..", "shared", "collections");
+        const collectionsPath = argsList["--collections"] || path.join("..", "config", "collections");
         const outputPath = argsList["--output"] || path.join("src", "schema.generated.ts");
         const watch = argsList["--watch"] || false;
 
@@ -633,7 +640,7 @@ async function doctorPluginCommand(rawArgs: string[]): Promise<void> {
         process.exit(1);
     }
 
-    const collectionsPath = parsedArgs["--collections"] || path.join("..", "shared", "collections");
+    const collectionsPath = parsedArgs["--collections"] || path.join("..", "config", "collections");
     const schemaPath = parsedArgs["--schema"] || path.join("src", "schema.generated.ts");
     const sdkPath = parsedArgs["--sdk"] || path.join("..", "generated", "sdk", "database.types.ts");
 

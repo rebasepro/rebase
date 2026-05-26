@@ -134,6 +134,12 @@ export interface RebaseBackendConfig {
     functionsDir?: string;
     cronsDir?: string;
     /**
+     * Enable/disable database persistence for cron job execution logs.
+     * When set to false, cron jobs will run but logs will not be persisted to the database.
+     * Default: true.
+     */
+    cronPersistence?: boolean;
+    /**
      * Maximum request body size in bytes for API routes (default: 10MB).
      * Set to 0 to disable the global limit entirely.
      *
@@ -829,8 +835,9 @@ path: `${basePath}/functions` });
 
             cronScheduler.registerJobs(loadedCronJobs);
 
-            // Attach database persistence if the driver supports SQL
-            const store = createCronStore(defaultDriver);
+            // Attach database persistence if the driver supports SQL and persistence is enabled
+            const admin = defaultBootstrapper.getAdmin?.(defaultDriverResult);
+            const store = (admin && config.cronPersistence !== false) ? createCronStore(defaultDriver) : undefined;
             if (store) {
                 await store.ensureTable();
                 cronScheduler.setStore(store);

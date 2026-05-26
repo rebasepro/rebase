@@ -2,7 +2,6 @@
 import React, { useMemo } from "react";
 import { deepEqual as equal } from "fast-equals"
 
-// @ts-ignore
 import MarkdownIt from "markdown-it";
 import { cls } from "../util";
 

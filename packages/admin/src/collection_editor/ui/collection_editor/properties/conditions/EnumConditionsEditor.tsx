@@ -269,7 +269,7 @@ function parseEnumFilterRule(rule: Record<string, unknown>): EnumConditionConfig
         const selectedEnumIds = objectToArray(selectedEnumIdsRaw);
         if (selectedEnumIds.length === 0 && selectedEnumIdsRaw) {
             // If it was truthy but we got no values, parsing failed
-            console.log("[EnumConditionsEditor] Warning: Could not parse selectedEnumIds:", selectedEnumIdsRaw);
+            console.warn("[EnumConditionsEditor] Could not parse selectedEnumIds:", selectedEnumIdsRaw);
         }
 
         // Parse the condition
