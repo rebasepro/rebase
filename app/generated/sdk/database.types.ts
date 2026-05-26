@@ -392,6 +392,32 @@ export interface Database {
       updatedAt?: string;
     };
   };
+  roles: {
+    Row: {
+      id: string;
+      name: string;
+      isadmin?: boolean;
+      defaultpermissions?: { read: boolean; create: boolean; edit: boolean; delete: boolean; };
+      collectionpermissions?: Record<string, any>;
+      config?: { createcollections: boolean; editcollections: string; deletecollections: string; };
+    };
+    Insert: {
+      id: string;
+      name: string;
+      isadmin?: boolean;
+      defaultpermissions?: { read: boolean; create: boolean; edit: boolean; delete: boolean; };
+      collectionpermissions?: Record<string, any>;
+      config?: { createcollections: boolean; editcollections: string; deletecollections: string; };
+    };
+    Update: {
+      id?: string;
+      name?: string;
+      isadmin?: boolean;
+      defaultpermissions?: { read: boolean; create: boolean; edit: boolean; delete: boolean; };
+      collectionpermissions?: Record<string, any>;
+      config?: { createcollections: boolean; editcollections: string; deletecollections: string; };
+    };
+  };
   tags: {
     Row: {
       id: string;
@@ -454,6 +480,48 @@ export interface Database {
       customerId?: string | number;
     };
   };
+  users: {
+    Row: {
+      id?: string;
+      email: string;
+      displayname: string;
+      photourl?: string;
+      passwordhash?: string;
+      emailverified?: boolean;
+      emailverificationtoken?: string;
+      emailverificationsentat?: string;
+      metadata?: Record<string, any>;
+      createdat?: string;
+      updatedat?: string;
+      roles?: Array<{ id: string | number; path: string; __type: "relation"; data?: any }>;
+    };
+    Insert: {
+      id?: string;
+      email: string;
+      displayname: string;
+      photourl?: string;
+      passwordhash?: string;
+      emailverified?: boolean;
+      emailverificationtoken?: string;
+      emailverificationsentat?: string;
+      metadata?: Record<string, any>;
+      createdat?: string;
+      updatedat?: string;
+    };
+    Update: {
+      id?: string;
+      email?: string;
+      displayname?: string;
+      photourl?: string;
+      passwordhash?: string;
+      emailverified?: boolean;
+      emailverificationtoken?: string;
+      emailverificationsentat?: string;
+      metadata?: Record<string, any>;
+      createdat?: string;
+      updatedat?: string;
+    };
+  };
 }
 
 export type CollectionName = keyof Database;
@@ -468,6 +536,8 @@ export const collectionsDictionary = {
   posts: "posts",
   productLocales: "product_locales",
   products: "products",
+  roles: "roles",
   tags: "tags",
   tickets: "tickets",
+  users: "users",
 } as const;

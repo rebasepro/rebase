@@ -51,7 +51,7 @@ productLocalesCollection.securityRules = [
         name: "product_locales_public_access",
         mode: "permissive",
         operation: "all",
-        pgRoles: ["public"],
+        pgRoles: ["authenticated"],
         using: "true"
     }
 ];

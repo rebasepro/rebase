@@ -44,7 +44,7 @@ tagsCollection.securityRules = [
         name: "tags_public_access",
         mode: "permissive",
         operation: "all",
-        pgRoles: ["public"],
+        pgRoles: ["authenticated"],
         using: "true"
     }
 ];

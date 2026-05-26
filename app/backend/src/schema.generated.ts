@@ -29,7 +29,7 @@ export const authors = pgTable("authors", {
     website: varchar("website"),
     userId: varchar("user_id")
 }, (table) => ([
-    pgPolicy("authors_public_access", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
+    pgPolicy("authors_public_access", { as: "permissive", for: "all", to: ["authenticated"], using: sql`true`, withCheck: sql`true` }),
 ])).enableRLS();
 
 export const customers = pgTable("customers", {
@@ -49,7 +49,7 @@ export const customers = pgTable("customers", {
     created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
     updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`)
 }, (table) => ([
-    pgPolicy("test_policy", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
+    pgPolicy("test_policy", { as: "permissive", for: "all", to: ["authenticated"], using: sql`true`, withCheck: sql`true` }),
 ])).enableRLS();
 
 export const exercises = pgTable("exercises", {
@@ -73,7 +73,7 @@ export const exercises = pgTable("exercises", {
     created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
     updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`)
 }, (table) => ([
-    pgPolicy("test_policy", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
+    pgPolicy("test_policy", { as: "permissive", for: "all", to: ["authenticated"], using: sql`true`, withCheck: sql`true` }),
 ])).enableRLS();
 
 export const orderItems = pgTable("order_items", {
@@ -86,7 +86,7 @@ export const orderItems = pgTable("order_items", {
     unit_price: numeric("unit_price").notNull(),
     line_total: numeric("line_total")
 }, (table) => ([
-    pgPolicy("test_policy", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
+    pgPolicy("test_policy", { as: "permissive", for: "all", to: ["authenticated"], using: sql`true`, withCheck: sql`true` }),
 ])).enableRLS();
 
 export const orders = pgTable("orders", {
@@ -110,7 +110,7 @@ export const orders = pgTable("orders", {
     created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
     updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`)
 }, (table) => ([
-    pgPolicy("test_policy", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
+    pgPolicy("test_policy", { as: "permissive", for: "all", to: ["authenticated"], using: sql`true`, withCheck: sql`true` }),
 ])).enableRLS();
 
 export const posts = pgTable("posts", {
@@ -126,7 +126,7 @@ export const posts = pgTable("posts", {
     updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
     author_id: uuid("author_id").references(() => authors.id, { onDelete: "set null" })
 }, (table) => ([
-    pgPolicy("test_policy", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
+    pgPolicy("test_policy", { as: "permissive", for: "all", to: ["authenticated"], using: sql`true`, withCheck: sql`true` }),
 ])).enableRLS();
 
 export const postsTags = pgTable("posts_tags", {
@@ -143,7 +143,7 @@ export const productLocales = pgTable("product_locales", {
     name: varchar("name"),
     description: varchar("description")
 }, (table) => ([
-    pgPolicy("product_locales_public_access", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
+    pgPolicy("product_locales_public_access", { as: "permissive", for: "all", to: ["authenticated"], using: sql`true`, withCheck: sql`true` }),
 ])).enableRLS();
 
 export const products = pgTable("products", {
@@ -168,7 +168,7 @@ export const products = pgTable("products", {
     created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
     updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`)
 }, (table) => ([
-    pgPolicy("test_policy", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
+    pgPolicy("test_policy", { as: "permissive", for: "all", to: ["authenticated"], using: sql`true`, withCheck: sql`true` }),
 ])).enableRLS();
 
 export const roles = rebaseSchema.table("roles", {
@@ -179,14 +179,14 @@ export const roles = rebaseSchema.table("roles", {
     collectionPermissions: jsonb("collection_permissions"),
     config: jsonb("config")
 }, (table) => ([
-    pgPolicy("roles_public_access", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
+    pgPolicy("roles_public_access", { as: "permissive", for: "all", to: ["authenticated"], using: sql`true`, withCheck: sql`true` }),
 ])).enableRLS();
 
 export const tags = pgTable("tags", {
     id: uuid("id").primaryKey().defaultRandom().notNull(),
     name: varchar("name").notNull()
 }, (table) => ([
-    pgPolicy("tags_public_access", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
+    pgPolicy("tags_public_access", { as: "permissive", for: "all", to: ["authenticated"], using: sql`true`, withCheck: sql`true` }),
 ])).enableRLS();
 
 export const tickets = pgTable("tickets", {
@@ -204,7 +204,7 @@ export const tickets = pgTable("tickets", {
     updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
     __order: varchar("order")
 }, (table) => ([
-    pgPolicy("test_policy", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
+    pgPolicy("test_policy", { as: "permissive", for: "all", to: ["authenticated"], using: sql`true`, withCheck: sql`true` }),
 ])).enableRLS();
 
 export const users = rebaseSchema.table("users", {

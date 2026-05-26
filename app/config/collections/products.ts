@@ -275,7 +275,7 @@ productsCollection.securityRules = [
         name: "test_policy",
         mode: "permissive",
         operation: "all",
-        pgRoles: ["public"],
+        pgRoles: ["authenticated"],
         using: "true"
     }
 ];

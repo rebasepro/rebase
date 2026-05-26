@@ -260,7 +260,7 @@ const ordersCollection: PostgresCollection = {
             mode: "permissive",
             operation: "all",
             pgRoles: [
-                "public"
+                "authenticated"
             ],
             using: "true"
         }
@@ -300,7 +300,7 @@ ordersCollection.securityRules = [
         name: "test_policy",
         mode: "permissive",
         operation: "all",
-        pgRoles: ["public"],
+        pgRoles: ["authenticated"],
         using: "true"
     }
 ];
