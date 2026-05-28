@@ -58,7 +58,6 @@ export function PluginLifecycleManager({
             }
         };
         // Only run on mount/unmount — plugins array identity should be stable
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // ── Auth state change lifecycle ──────────────────────────────────

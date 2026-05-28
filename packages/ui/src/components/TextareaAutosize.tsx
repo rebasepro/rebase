@@ -260,7 +260,7 @@ export const TextareaAutosize = React.forwardRef(function TextareaAutosize(
                 value={value}
                 onChange={handleChange}
                 className={props.className}
-                ref={handleRef}
+                ref={handleRef as any}
                 onFocus={onFocus}
                 onBlur={onBlur}
                 // Apply the rows prop to get a "correct" first SSR paint
@@ -279,7 +279,7 @@ export const TextareaAutosize = React.forwardRef(function TextareaAutosize(
                 aria-hidden
                 className={cls(props.className, props.shadowClassName)}
                 readOnly
-                ref={shadowRef}
+                ref={shadowRef as any}
                 tabIndex={-1}
                 style={{
                     padding: 0,

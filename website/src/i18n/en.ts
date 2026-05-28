@@ -596,4 +596,10 @@ export const en = {
   "testimonials.6.handle": "@davem_codes",
   "testimonials.6.role": "CTO & Solopreneur",
   "testimonials.6.quote": "The open-source self-hosting model makes it a no-brainer. I get a top-tier admin portal and custom SDK for free.",
+
+  // AI & Agents Section
+  "ai.badge": "Decoupled AI Architecture",
+  "ai.title": "Build AI apps, <span class=\"text-primary subtle-shimmer\">keep your core clean.</span>",
+  "ai.subtitle": "Decouple your AI features from your core codebase. Rebase provides the blueprints and event pipelines to install, customize, and trigger LLM logic effortlessly on Postgres.",
 };
+

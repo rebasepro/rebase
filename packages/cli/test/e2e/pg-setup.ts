@@ -43,7 +43,7 @@ export async function startPgContainer(): Promise<PgContainer> {
         throw new Error(`Failed to parse host port from docker port output: ${portOutput}`);
     }
     const port = parseInt(portMatch[1], 10);
-    const connectionString = `postgresql://rebase:rebase@localhost:${port}/rebase`;
+    const connectionString = `postgresql://rebase:rebase@localhost:${port}/rebase?options=-c%20search_path=public`;
 
     console.log(`Container started on port ${port}. Waiting for database readiness...`);
 

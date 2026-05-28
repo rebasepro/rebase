@@ -16,7 +16,7 @@ const iconKeysMap: Record<string, string> = iconKeys.reduce((acc: Record<string,
 }, {});
 
 function toPascalCase(str: string): string {
-    return str.split(/[-_]/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('');
+    return str.split(/[-_]/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join("");
 }
 
 /**
@@ -53,7 +53,7 @@ export function getIcon(iconKey?: string | React.ReactNode,
         const lowerKey = iconKey.toLowerCase();
         const slugifiedKey = slugify(iconKey).replace(/-/g, "_");
 
-        let mappedKey = iconKeysMap[iconKey] || iconKeysMap[lowerKey] || iconKeysMap[slugifiedKey];
+        const mappedKey = iconKeysMap[iconKey] || iconKeysMap[lowerKey] || iconKeysMap[slugifiedKey];
 
         if (!mappedKey) {
             return undefined;

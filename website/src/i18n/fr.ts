@@ -473,4 +473,10 @@ export const fr = {
   "testimonials.6.handle": "@davem_codes",
   "testimonials.6.role": "CTO & Solopreneur",
   "testimonials.6.quote": "Le modèle d'auto-hébergement open-source est une évidence. J'obtiens gratuitement un portail d'administration haut de gamme et un SDK personnalisé.",
+
+  // AI & Agents Section
+  "ai.badge": "Architecture d'IA Découplée",
+  "ai.title": "Développez des apps d'IA, <span class=\"text-primary subtle-shimmer\">gardez votre code propre.</span>",
+  "ai.subtitle": "Découplez vos fonctionnalités d'IA de votre base de code principale. Rebase fournit des modèles et des pipelines d'événements pour installer, personnaliser et déclencher de la logique LLM sans effort sur Postgres.",
 };
+

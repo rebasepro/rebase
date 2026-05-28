@@ -2,7 +2,7 @@ import type { AppView } from "@rebasepro/types";
 import React, { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 ;
-import { useUrlController } from "../hooks";
+import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { useAdminModeController } from "@rebasepro/core";
 export interface AdminModeSyncerProps {
     /**

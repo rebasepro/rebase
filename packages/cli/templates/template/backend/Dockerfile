@@ -33,7 +33,7 @@ RUN pnpm --filter "*-config" run build
 RUN pnpm --filter "*-backend" run build
 
 # Prune dev dependencies for a smaller runtime
-RUN pnpm install --frozen-lockfile --prod
+RUN CI=true pnpm install --frozen-lockfile --prod
 
 # ── Stage 2: Production Runtime ──────────────────────────────────────
 FROM node:22-alpine AS runtime

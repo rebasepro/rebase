@@ -200,9 +200,12 @@ describe("mapPgType", () => {
         expect(mapPgType("_text")).toBe("array");
     });
     it("maps string-like types to string", () => {
-        for (const t of ["text", "varchar", "character varying", "char", "character", "uuid", "bytea", "inet", "cidr", "macaddr", "macaddr8", "interval"]) {
+        for (const t of ["text", "varchar", "character varying", "char", "character", "uuid", "inet", "cidr", "macaddr", "macaddr8", "interval"]) {
             expect(mapPgType(t)).toBe("string");
         }
+    });
+    it("maps bytea to binary", () => {
+        expect(mapPgType("bytea")).toBe("binary");
     });
     it("defaults unknown types to string", () => {
         expect(mapPgType("tsvector")).toBe("string");

@@ -3,7 +3,7 @@
 import React, { PropsWithChildren } from "react";
 import { SnackbarProvider as NotistackSnackbarProvider } from "notistack";
 
-export const SnackbarProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
+export const SnackbarProvider: React.FC<PropsWithChildren> = ({ children }) => {
 
     return (
         <NotistackSnackbarProvider maxSnack={3}

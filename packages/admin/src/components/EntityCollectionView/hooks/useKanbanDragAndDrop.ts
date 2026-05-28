@@ -70,7 +70,7 @@ export function useKanbanDragAndDrop<M extends Record<string, unknown>>({
                 : null;
 
             try {
-                let a = prevKey;
+                const a = prevKey;
                 let b = nextKey;
                 if (a !== null && b !== null && a >= b) {
                     // Handle duplicate or out-of-order keys to prevent fractional-indexing crash

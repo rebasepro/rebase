@@ -105,7 +105,16 @@ export const RelationSelector = React.forwardRef<
         const scrollContainerRef = useRef<HTMLDivElement>(null);
         const sentinelRef = useRef<HTMLDivElement>(null);
         const observerRef = useRef<IntersectionObserver | null>(null);
-        const triggerRef = (ref as React.RefObject<HTMLButtonElement>) || useRef<HTMLButtonElement>(null);
+        const localTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+        const handleButtonRef = useCallback((node: HTMLButtonElement | null) => {
+            localTriggerRef.current = node;
+            if (typeof ref === "function") {
+                ref(node);
+            } else if (ref) {
+                ref.current = node;
+            }
+        }, [ref]);
         const contentRef = useRef<HTMLDivElement | null>(null);
         const searchInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -367,7 +376,7 @@ relation } as RelationItem;
 
             function handlePointerDown(ev: MouseEvent) {
                 const target = ev.target as Node;
-                const triggerEl = triggerRef.current;
+                const triggerEl = localTriggerRef.current;
                 const contentEl = contentRef.current;
                 if (triggerEl?.contains(target)) return;
                 if (contentEl?.contains(target)) return;
@@ -411,7 +420,7 @@ relation } as RelationItem;
                 <PopoverPrimitive.Root open={isPopoverOpen} onOpenChange={handleRootOpenChange} modal={false}>
                     <PopoverPrimitive.Trigger asChild>
                         <button
-                            ref={triggerRef as React.Ref<HTMLButtonElement>}
+                            ref={handleButtonRef}
                             type="button"
                             aria-haspopup="listbox"
                             aria-expanded={isPopoverOpen}

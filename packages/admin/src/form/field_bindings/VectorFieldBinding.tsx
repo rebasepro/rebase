@@ -28,9 +28,13 @@ export function VectorFieldBinding({
     includeDescription,
     size = "large"
 }: FieldProps<VectorProperty>) {
+    const isVectorObject = (val: unknown): val is { value: number[] } => {
+        return typeof val === "object" && val !== null && "value" in val;
+    };
+
     // Extract array value from the custom { __type: "Vector", value: number[] } wrapper
-    const arrayValue = (value && typeof value === "object" && "value" in value) 
-        ? (value as any).value 
+    const arrayValue = isVectorObject(value) 
+        ? value.value 
         : (Array.isArray(value) ? value : []);
 
     const [textValue, setTextValue] = useState(() => arrayValue.join(", "));

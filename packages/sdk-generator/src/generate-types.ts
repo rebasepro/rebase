@@ -53,6 +53,8 @@ function propertyToTypeScriptType(prop: Property): string {
         }
         case "vector":
             return "number[]";
+        case "binary":
+            return "string";
         default:
             return "any";
     }

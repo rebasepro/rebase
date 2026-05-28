@@ -170,6 +170,9 @@ describe("Rebase CLI E2E Integration Suite", () => {
 
         const generatedSchemaPath = path.join(scaffoldedDir, "backend", "src", "schema.generated.ts");
         expect(fs.existsSync(generatedSchemaPath)).toBe(true);
+        console.log("=== GENERATED SCHEMA CONTENT ===");
+        console.log(fs.readFileSync(generatedSchemaPath, "utf-8"));
+        console.log("=================================");
 
         console.log("5. Verifying that the generated schema builds...");
         await execa("pnpm", ["exec", "tsc", "--noEmit"], {
@@ -243,7 +246,7 @@ describe("Rebase CLI E2E Integration Suite", () => {
         const tables = tablesRes.rows.map(r => `${r.table_schema}.${r.table_name}`);
 
         console.log("Detected tables:", tables);
-        expect(tables).toContain("public.users");
+        expect(tables).toContain("rebase.users");
         expect(tables).toContain("rebase.roles");
         expect(tables).toContain("rebase.user_roles");
         expect(tables).toContain("rebase.refresh_tokens");
@@ -281,11 +284,11 @@ describe("Rebase CLI E2E Integration Suite", () => {
         const initialPasswordHash = "initial_unhashed_placeholder";
 
         await dbClient.query(`
-            INSERT INTO public.users (id, email, password_hash, display_name, email_verified, metadata)
+            INSERT INTO rebase.users (id, email, password_hash, display_name, email_verified, metadata)
             VALUES ($1, $2, $3, $4, $5, $6::jsonb)
         `, [mockUserId, mockEmail, initialPasswordHash, "E2E Test User", true, "{}"]);
 
-        const insertCheck = await dbClient.query("SELECT password_hash FROM public.users WHERE id = $1", [mockUserId]);
+        const insertCheck = await dbClient.query("SELECT password_hash FROM rebase.users WHERE id = $1", [mockUserId]);
         expect(insertCheck.rows[0].password_hash).toBe(initialPasswordHash);
 
         console.log("9. Resetting user password via CLI...");
@@ -303,7 +306,7 @@ describe("Rebase CLI E2E Integration Suite", () => {
         });
 
         console.log("10. Verifying that the password hash was updated in the database...");
-        const selectRes = await dbClient.query("SELECT password_hash FROM public.users WHERE id = $1", [mockUserId]);
+        const selectRes = await dbClient.query("SELECT password_hash FROM rebase.users WHERE id = $1", [mockUserId]);
         const updatedHash = selectRes.rows[0].password_hash;
         
         expect(updatedHash).toBeDefined();

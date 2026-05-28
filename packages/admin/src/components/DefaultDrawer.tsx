@@ -2,7 +2,8 @@ import type { NavigationEntry, NavigationResult } from "@rebasepro/types";
 import React, { useMemo } from "react";
 
 import { useCollapsedGroups, buildCollapsedDefaults, useLargeLayout, useAdminModeController, useTranslation, useSlot, useRebaseContext, useAnalyticsController, useRebaseRegistry } from "@rebasepro/core";
-import { useNavigationStateController, useUrlController } from "../hooks";
+import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
+import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
 
 
 import { Link, useNavigate } from "react-router-dom";

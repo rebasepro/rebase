@@ -104,6 +104,7 @@ describe("resolveComponentRef", () => {
 
     it("returns a React.forwardRef component as-is", () => {
         const FwdComp = React.forwardRef((_props, _ref) => null);
+        FwdComp.displayName = "FwdComp";
         const result = resolveComponentRef(FwdComp as any);
         expect(result).toBe(FwdComp);
     });

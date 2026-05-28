@@ -83,7 +83,7 @@ const ButtonInner = React.memo(React.forwardRef<
     if (Component) {
         return (
             <Component
-                ref={ref}
+                ref={ref as any}
                 onClick={props.onClick}
                 className={cls(startIcon ? "pl-3" : "", baseClasses, buttonClasses, sizeClasses, iconColorClass, className)}
                 {...props}>
@@ -94,7 +94,7 @@ const ButtonInner = React.memo(React.forwardRef<
     }
 
     return (
-        <button ref={ref as React.Ref<HTMLButtonElement>}
+        <button ref={ref as any}
                 type={props.type ?? "button"}
                 onClick={props.onClick}
                 className={cls(startIcon ? "pl-3" : "", baseClasses, buttonClasses, sizeClasses, iconColorClass, className)}

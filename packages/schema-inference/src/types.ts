@@ -11,6 +11,7 @@ export type TypesCount = {
     reference?: number,
     relation?: number,
     vector?: number,
+    binary?: number,
 };
 
 export type TypesCountRecord<K extends keyof DataType = any> = {

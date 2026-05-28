@@ -73,6 +73,8 @@ export function getDefaultValueFortype(type: DataType) {
         return {};
     } else if (type === "vector") {
         return null;
+    } else if (type === "binary") {
+        return null;
     } else {
         return null;
     }

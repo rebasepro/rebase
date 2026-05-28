@@ -40,7 +40,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: Postg
 
     try {
         // Resolve dynamic user table name and ID type
-        let usersTableName = 'public."users"';
+        let usersTableName = '"users"';
         let userIdType = "TEXT";
         let usersSchema = "public";
         if (registry) {
@@ -48,7 +48,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: Postg
             if (usersTable) {
                 const { getTableName } = await import("drizzle-orm");
                 usersSchema = getTableConfig(usersTable).schema || "public";
-                usersTableName = `"${usersSchema}"."${getTableName(usersTable)}"`;
+                usersTableName = usersSchema === "public" ? `"${getTableName(usersTable)}"` : `"${usersSchema}"."${getTableName(usersTable)}"`;
 
                 // Inspect users.id column to match referenced column type
                 if (usersTable.id) {

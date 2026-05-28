@@ -631,6 +631,11 @@ enum: [variantKey] },
             base.description = (base.description || "") + ` (Vector(${vp.dimensions}))`;
             return base;
         }
+        case "binary": {
+            base.type = "string";
+            base.description = (base.description || "") + " (Binary/Base64)";
+            return base;
+        }
         default:
             base.type = "string";
             return base;

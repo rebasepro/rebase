@@ -1,5 +1,5 @@
 import type { Properties } from "@rebasepro/types";
-import type { ArrayProperty, MapProperty, NumberProperty, Property, BooleanProperty, DateProperty, GeopointProperty, ReferenceProperty, RelationProperty, StringProperty, VectorProperty } from "@rebasepro/types";
+import type { ArrayProperty, MapProperty, NumberProperty, Property, BooleanProperty, DateProperty, GeopointProperty, ReferenceProperty, RelationProperty, StringProperty, VectorProperty, BinaryProperty } from "@rebasepro/types";
 ;
 import { z, ZodTypeAny } from "zod";
 import { enumToObjectEntries, isPropertyBuilder } from "@rebasepro/common";
@@ -76,6 +76,8 @@ export function mapPropertyToZod(propertyContext: PropertyContext<Property>): Zo
         return getZodRelationSchema(propertyContext as PropertyContext<RelationProperty>);
     } else if (property.type === "vector") {
         return getZodVectorSchema(propertyContext as PropertyContext<VectorProperty>);
+    } else if (property.type === "binary") {
+        return getZodBinarySchema(propertyContext as PropertyContext<BinaryProperty>);
     }
 
     // Log the error but don't crash the form
@@ -550,5 +552,20 @@ function getZodVectorSchema({
         );
     }
     
+    return schema;
+}
+
+function getZodBinarySchema({
+    property
+}: PropertyContext<BinaryProperty>): ZodTypeAny {
+    let schema: ZodTypeAny = z.string().nullable().optional();
+    const validation = property.validation;
+
+    if (validation?.required) {
+        schema = schema.nullable().optional().refine(
+            (value: any) => value !== undefined && value !== null && value !== "",
+            { message: validation.requiredMessage ? validation.requiredMessage : "Required" }
+        );
+    }
     return schema;
 }

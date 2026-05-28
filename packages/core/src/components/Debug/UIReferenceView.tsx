@@ -147,7 +147,7 @@ block: "start" });
                                 <div className="mt-3 flex-grow overflow-hidden">
                                     <div className="my-2 mx-2 flex flex-col">
                                         <div className="overflow-hidden rounded-lg bg-surface-50 dark:bg-surface-950/30">
-                                            {[<FolderIcon size={iconSize.small}/>, <UserIcon size={iconSize.small}/>, <TagIcon size={iconSize.small}/>].map((icon, i) => (
+                                            {[<FolderIcon key="folder" size={iconSize.small}/>, <UserIcon key="user" size={iconSize.small}/>, <TagIcon key="tag" size={iconSize.small}/>].map((icon, i) => (
                                                 <div key={i} className="rounded-lg truncate hover:bg-surface-accent-300/75 dark:hover:bg-surface-accent-800/75 flex flex-row items-center h-10">
                                                     <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px] text-text-secondary dark:text-text-secondary-dark">
                                                         {icon}

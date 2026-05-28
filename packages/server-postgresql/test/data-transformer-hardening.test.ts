@@ -446,3 +446,29 @@ describe("parsePropertyFromServer vector parsing", () => {
         });
     });
 });
+
+// ─────────────────────────────────────────────────────────────
+// parsePropertyFromServer — binary parsing
+// ─────────────────────────────────────────────────────────────
+describe("parsePropertyFromServer binary parsing", () => {
+    const targetCollection = makeCollection("items", {
+        data: {
+            type: "binary",
+            name: "Data"
+        } as unknown as Property
+    });
+
+    it("parses database Buffer into a base64 data URL string", () => {
+        const property = targetCollection.properties.data as Property;
+        const buffer = Buffer.from("hello");
+        const result = parsePropertyFromServer(buffer, property, targetCollection, "data");
+        expect(result).toBe("data:application/octet-stream;base64,aGVsbG8=");
+    });
+
+    it("parses Buffer object (JSON serialization) into a base64 data URL string", () => {
+        const property = targetCollection.properties.data as Property;
+        const bufferObj = { type: "Buffer", data: Array.from(Buffer.from("hello")) };
+        const result = parsePropertyFromServer(bufferObj, property, targetCollection, "data");
+        expect(result).toBe("data:application/octet-stream;base64,aGVsbG8=");
+    });
+});

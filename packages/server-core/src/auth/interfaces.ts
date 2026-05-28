@@ -20,7 +20,7 @@ export interface UserData {
     emailVerified: boolean;
     emailVerificationToken?: string | null;
     emailVerificationSentAt?: Date | null;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -34,7 +34,7 @@ export interface CreateUserData {
     displayName?: string;
     photoUrl?: string;
     emailVerified?: boolean;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
 }
 
 /**

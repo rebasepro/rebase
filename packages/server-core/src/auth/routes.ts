@@ -24,7 +24,8 @@ export interface AuthModuleConfig {
     /** Default role ID to assign to new users (default: none). Must NOT be "admin". */
     defaultRole?: string;
     /** Optional array of OAuth providers */
-    oauthProviders?: OAuthProvider[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    oauthProviders?: OAuthProvider<any>[];
     /** When true, blocks all self-registration regardless of `allowRegistration`. */
     disableSelfRegistration?: boolean;
     /**
@@ -44,7 +45,7 @@ export interface AuthModuleConfig {
  * Helper to build standard auth response output
  */
 function buildAuthResponse(
-    user: { id: string; email: string; displayName?: string | null; photoUrl?: string | null; metadata?: Record<string, any> | null },
+    user: { id: string; email: string; displayName?: string | null; photoUrl?: string | null; metadata?: Record<string, unknown> | null },
     roleIds: string[],
     accessToken: string,
     refreshToken: string

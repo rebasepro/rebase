@@ -49,7 +49,8 @@ export type DataType =
     | "relation"
     | "array"
     | "map"
-    | "vector";
+    | "vector"
+    | "binary";
 
 export type Property =
     | StringProperty
@@ -61,7 +62,8 @@ export type Property =
     | RelationProperty
     | ArrayProperty
     | MapProperty
-    | VectorProperty;
+    | VectorProperty
+    | BinaryProperty;
 
 export type Properties = {
     [key: string]: Property;
@@ -92,6 +94,7 @@ export type InferPropertyType<P extends Property> =
     P extends ArrayProperty ? (P["of"] extends Property ? InferPropertyType<P["of"]>[] : unknown[]) :
     P extends MapProperty ? (P["properties"] extends Properties ? InferEntityType<P["properties"]> : Record<string, unknown>) :
     P extends VectorProperty ? Vector :
+    P extends BinaryProperty ? string :
     never;
 
 /**
@@ -394,6 +397,14 @@ export interface VectorProperty extends BaseProperty {
     ui?: VectorUIConfig;
     type: "vector";
     dimensions: number;
+    validation?: PropertyValidationSchema;
+}
+
+/**
+ * @group Entity properties
+ */
+export interface BinaryProperty extends BaseProperty {
+    type: "binary";
     validation?: PropertyValidationSchema;
 }
 

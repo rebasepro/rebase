@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrayProperty, MapProperty, Property, StringProperty, NumberProperty, BooleanProperty, DateProperty, GeopointProperty, ReferenceProperty, RelationProperty, VectorProperty } from "./properties";import { BaseProperty } from "./properties";
+import { ArrayProperty, MapProperty, Property, StringProperty, NumberProperty, BooleanProperty, DateProperty, GeopointProperty, ReferenceProperty, RelationProperty, VectorProperty, BinaryProperty } from "./properties";import { BaseProperty } from "./properties";
 
 type CMSBasePropertyNoName = Omit<BaseProperty, "name">;
 
@@ -20,7 +20,8 @@ export type ConfigProperty =
         name?: string;
         properties?: Record<string, ConfigProperty>
     } & CMSBasePropertyNoName)
-    | (Omit<VectorProperty, "name"> & { name?: string } & CMSBasePropertyNoName);
+    | (Omit<VectorProperty, "name"> & { name?: string } & CMSBasePropertyNoName)
+    | (Omit<BinaryProperty, "name"> & { name?: string } & CMSBasePropertyNoName);
 
 /**
  * This is the configuration object for a property.

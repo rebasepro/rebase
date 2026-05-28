@@ -9,8 +9,7 @@
  */
 import React from "react";
 import { initializeApp } from "@firebase/app";
-import { Rebase } from "@rebasepro/core";
-import { RebaseAuth } from "@rebasepro/auth";
+import { Rebase, RebaseAuth } from "@rebasepro/core";
 import { RebaseCMS, RebaseShell } from "@rebasepro/admin";
 import {
     useFirebaseAuthController,

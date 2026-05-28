@@ -249,7 +249,8 @@ export function createAdminRoutes(config: AdminRouteOptions): Hono<HonoEnv> {
 
     router.post("/users", requireAdmin, async (c) => {
         const body = await c.req.json();
-        let { email, displayName, password, roles } = body;
+        const { password } = body;
+        let { email, displayName, roles } = body;
 
         if (!email) {
             throw ApiError.badRequest("Email is required", "INVALID_INPUT");
@@ -421,7 +422,8 @@ displayName: existing.displayName }, appName);
     router.put("/users/:userId", requireAdmin, async (c) => {
         const userId = c.req.param("userId");
         const body = await c.req.json();
-        let { email, displayName, password, roles } = body;
+        const { password } = body;
+        let { email, displayName, roles } = body;
 
         const existing = await authRepo.getUserById(userId);
         if (!existing) {

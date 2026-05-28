@@ -56,7 +56,8 @@ export interface BuiltinAuthAdapterConfig {
     /** Default role to assign to new users. */
     defaultRole?: string;
     /** OAuth providers to register. */
-    oauthProviders?: OAuthProvider<unknown>[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    oauthProviders?: OAuthProvider<any>[];
     /** Static service key for server-to-server auth. */
     serviceKey?: string;
     /** Backend hooks for intercepting admin data. */
@@ -358,7 +359,7 @@ function createRoleManagementFromRepo(repo: AuthRepository): RoleManagementAdapt
     };
 }
 
-function toAuthUserData(user: { id: string; email: string; displayName?: string | null; photoUrl?: string | null; emailVerified?: boolean; metadata?: Record<string, any>; createdAt?: Date; updatedAt?: Date }): AuthUserData {
+function toAuthUserData(user: { id: string; email: string; displayName?: string | null; photoUrl?: string | null; emailVerified?: boolean; metadata?: Record<string, unknown>; createdAt?: Date; updatedAt?: Date }): AuthUserData {
     return {
         id: user.id,
         email: user.email,

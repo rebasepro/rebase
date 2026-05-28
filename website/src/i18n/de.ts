@@ -461,4 +461,10 @@ export const de = {
   "testimonials.6.handle": "@davem_codes",
   "testimonials.6.role": "CTO & Solopreneur",
   "testimonials.6.quote": "Das Open-Source-Self-Hosting-Modell macht es zu einer klaren Sache. Ich bekomme kostenlos ein erstklassiges Admin-Portal und ein maßgeschneidertes SDK.",
+
+  // AI & Agents Section
+  "ai.badge": "Entkoppelte KI-Architektur",
+  "ai.title": "KI-Apps entwickeln, <span class=\"text-primary subtle-shimmer\">den Core sauber halten.</span>",
+  "ai.subtitle": "Entkopple deine KI-Funktionen von deiner Haupt-Codebasis. Rebase bietet die Vorlagen und Event-Pipelines, um LLM-Logik mühelos auf Postgres zu installieren, anzupassen und auszulösen.",
 };
+

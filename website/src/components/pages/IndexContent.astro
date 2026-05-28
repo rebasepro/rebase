@@ -9,10 +9,12 @@ import { BodyPartsDemo } from '../../components/demos/BodyPartsDemo';
 import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
 import { SdkMiniDemo } from '../../components/demos/SdkMiniDemo';
 import { RealtimeMiniDemo } from '../../components/demos/RealtimeMiniDemo';
+import AiAppDevelopmentDemo from '../../components/demos/AiAppDevelopmentDemo';
 import RoadmapSection from '../../components/RoadmapSection.astro';
 import ABVariant from '../../components/ABVariant.astro';
 
 import ClientLogos from '../../components/ClientLogos.astro';
+
 import { languages, defaultLang, useTranslations, useTranslatedPath } from '../../i18n/ui';
 
 const translatePath = useTranslatedPath(lang);
@@ -727,8 +729,32 @@ const translatePath = useTranslatedPath(lang);
             <CollectionPowerSection/>
         </div>
 
+        <!-- AI & Agents Section -->
+        <section id="s-ai-apps" class="relative isolate bg-black py-28 sm:py-36 overflow-hidden border-t border-surface-900">
+            <SectionBackgroundAccents blob={{ position: "top", size: "lg" }}/>
+            <div class="pointer-events-none absolute inset-0 -z-10">
+                <div class="absolute -bottom-40 left-1/3 w-[700px] h-[700px] rounded-full bg-violet-500/5 blur-3xl opacity-50"></div>
+                <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:40px_40px] opacity-10"></div>
+            </div>
+            
+            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+                <div class="mx-auto max-w-3xl text-center mb-16 animate-on-scroll fade-in-up">
+                    <p class="text-xs font-semibold tracking-[0.25em] text-violet-400 uppercase">{t('ai.badge')}</p>
+                    <h2 class="mt-4 text-3xl font-bold tracking-tight text-white sm:text-5xl" set:html={t('ai.title')}></h2>
+                    <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed">
+                        {t('ai.subtitle')}
+                    </p>
+                </div>
+
+                <div class="max-w-7xl mx-auto animate-on-scroll fade-in-up delay-100">
+                    <AiAppDevelopmentDemo client:load />
+                </div>
+            </div>
+        </section>
+
         <!-- Visual Mosaic Showcase -->
-        <section id="s-mosaic-showcase" class="relative isolate bg-black py-28 sm:py-36 overflow-hidden border-t border-surface-900">
+        <section id="s-mosaic-showcase"
+ class="relative isolate bg-black py-28 sm:py-36 overflow-hidden border-t border-surface-900">
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
                 <div class="mx-auto max-w-3xl text-center mb-16 animate-on-scroll fade-in-up">
                     <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">{t('mosaic.badge')}</p>

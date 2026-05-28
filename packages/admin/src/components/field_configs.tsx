@@ -422,6 +422,8 @@ export function getDefaultFieldId(property: Property) {
         return "reference";
     } else if (property.type === "vector") {
         return "vector_input";
+    } else if (property.type === "binary") {
+        return "text_field";
     }
 
     console.error("Unsupported field config mapping", property);

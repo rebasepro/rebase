@@ -18,6 +18,7 @@
         "react-dom": "^19.0.0",
         "react-router": "^7.0.0",
         "react-router-dom": "^7.0.0",
+        "react-compiler-runtime": "^1.0.0",
         "@fontsource/rubik": "^5.2.5"
     },
     "scripts": {

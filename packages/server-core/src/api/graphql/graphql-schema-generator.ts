@@ -89,6 +89,7 @@ export class GraphQLSchemaGenerator {
         let type;
 
         switch (property.type) {
+            case "binary":
             case "string":
                 type = GraphQLString;
                 break;
@@ -146,6 +147,7 @@ export class GraphQLSchemaGenerator {
 
     private convertPropertyToInputType(property: Property) {
         switch (property.type) {
+            case "binary":
             case "string":
                 return GraphQLString;
             case "number":

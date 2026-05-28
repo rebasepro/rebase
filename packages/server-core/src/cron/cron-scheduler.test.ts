@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals";
 import { CronScheduler, validateCronExpression } from "./cron-scheduler";
-import type { CronJobDefinition } from "@rebasepro/types";
+import type { CronJobDefinition, CronJobLogEntry } from "@rebasepro/types";
 import type { LoadedCronJob } from "./cron-loader";
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -475,12 +475,12 @@ describe("CronScheduler", () => {
         beforeEach(() => { jest.useRealTimers(); });
 
         it("persists logs to store after execution", async () => {
-            const insertLog = jest.fn<(entry: any) => Promise<void>>().mockResolvedValue(undefined);
+            const insertLog = jest.fn<(entry: CronJobLogEntry) => Promise<void>>().mockResolvedValue(undefined);
             const mockStore = {
                 ensureTable: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
                 insertLog,
-                fetchLogs: jest.fn<() => Promise<any[]>>().mockResolvedValue([]),
-                fetchJobStats: jest.fn<() => Promise<Map<string, any>>>().mockResolvedValue(new Map()),
+                fetchLogs: jest.fn<() => Promise<CronJobLogEntry[]>>().mockResolvedValue([]),
+                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string | Date | null }>>>().mockResolvedValue(new Map()),
             };
             scheduler.setStore(mockStore);
             scheduler.registerJobs([makeJob("persisted")]);
@@ -493,8 +493,8 @@ describe("CronScheduler", () => {
             const mockStore = {
                 ensureTable: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
                 insertLog: jest.fn<() => Promise<void>>().mockRejectedValue(new Error("DB down")),
-                fetchLogs: jest.fn<() => Promise<any[]>>().mockResolvedValue([]),
-                fetchJobStats: jest.fn<() => Promise<Map<string, any>>>().mockResolvedValue(new Map()),
+                fetchLogs: jest.fn<() => Promise<CronJobLogEntry[]>>().mockResolvedValue([]),
+                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string | Date | null }>>>().mockResolvedValue(new Map()),
             };
             scheduler.setStore(mockStore);
             scheduler.registerJobs([makeJob("resilient")]);
@@ -504,13 +504,13 @@ describe("CronScheduler", () => {
         });
 
         it("seeds counters from store on start", async () => {
-            const stats = new Map<string, any>();
+            const stats = new Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string | Date | null }>();
             stats.set("seeded", { totalRuns: 42, totalFailures: 3, lastRunAt: "2026-01-01T00:00:00Z" });
             const mockStore = {
                 ensureTable: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
                 insertLog: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-                fetchLogs: jest.fn<() => Promise<any[]>>().mockResolvedValue([]),
-                fetchJobStats: jest.fn<() => Promise<Map<string, any>>>().mockResolvedValue(stats),
+                fetchLogs: jest.fn<() => Promise<CronJobLogEntry[]>>().mockResolvedValue([]),
+                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string | Date | null }>>>().mockResolvedValue(stats),
             };
             scheduler.setStore(mockStore);
             scheduler.registerJobs([makeJob("seeded")]);

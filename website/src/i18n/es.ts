@@ -471,4 +471,10 @@ export const es = {
   "testimonials.6.handle": "@davem_codes",
   "testimonials.6.role": "CTO y Solopreneur",
   "testimonials.6.quote": "El modelo de autoalojamiento de código abierto lo hace evidente. Obtengo un portal de administración de primer nivel y un SDK personalizado de forma gratuita.",
+
+  // AI & Agents Section
+  "ai.badge": "Arquitectura de IA Desacoplada",
+  "ai.title": "Construye apps de IA, <span class=\"text-primary subtle-shimmer\">mantén tu núcleo limpio.</span>",
+  "ai.subtitle": "Desacopla tus funcionalidades de IA de tu base de código principal. Rebase proporciona las plantillas y los flujos de eventos para instalar, personalizar y disparar lógica LLM sin esfuerzo sobre Postgres.",
 };
+

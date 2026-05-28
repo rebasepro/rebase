@@ -1,5 +1,5 @@
 import { and, eq, or, sql, SQL, ilike, inArray } from "drizzle-orm";
-import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
+import { AnyPgColumn, PgTable, PgVarchar, PgText, PgChar } from "drizzle-orm/pg-core";
 import { FilterValues, WhereFilterOp, Relation, JoinStep } from "@rebasepro/types";
 import { getColumnName, resolveCollectionRelations } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
@@ -653,7 +653,15 @@ export class DrizzleConditionBuilder {
             if (p.type === "string" && !p.enum && p.isId !== "uuid") {
                 const fieldColumn = table[key as keyof typeof table] as AnyPgColumn;
                 if (fieldColumn) {
-                    searchConditions.push(ilike(fieldColumn, `%${searchString}%`));
+                    // Verify that the underlying database column supports string pattern-matching
+                    const supportsILike = 
+                        fieldColumn instanceof PgVarchar || 
+                        fieldColumn instanceof PgText || 
+                        fieldColumn instanceof PgChar ||
+                        (fieldColumn && typeof fieldColumn === "object" && !("columnType" in fieldColumn));
+                    if (supportsILike) {
+                        searchConditions.push(ilike(fieldColumn, `%${searchString}%`));
+                    }
                 }
             }
         }

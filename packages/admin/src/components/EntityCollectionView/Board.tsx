@@ -148,7 +148,6 @@ export function Board<M extends Record<string, unknown>, COLUMN extends string>(
             }
             return updated;
         });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [data, columnsProp, assignColumn]);
 
     const findColumnByItemId = (id: string): string | undefined => {
@@ -328,7 +327,7 @@ export function Board<M extends Record<string, unknown>, COLUMN extends string>(
             const overColumn = findColumnByItemId(overId) || currentColumn;
 
 
-            let finalItemMapState = { ...itemMapState };
+            const finalItemMapState = { ...itemMapState };
 
             if (currentColumn && currentColumn === overColumn) {
                 // Use dnd-kit's sortable indexes if available to avoid race conditions with mutating handleDragOver

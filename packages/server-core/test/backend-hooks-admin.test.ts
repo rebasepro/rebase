@@ -159,11 +159,16 @@ describe("BackendHooks — Admin Routes", () => {
                 }
             };
             const app = createApp(hooks);
-            mockAuthRepo.listUsers.mockResolvedValueOnce([
-                mockUser({ id: "u1", email: "alice@test.com" }),
-                mockUser({ id: "u2", email: "bot@system.internal" }),
-                mockUser({ id: "u3", email: "bob@test.com" })
-            ]);
+            mockAuthRepo.listUsersPaginated.mockResolvedValueOnce({
+                users: [
+                    mockUser({ id: "u1", email: "alice@test.com" }),
+                    mockUser({ id: "u2", email: "bot@system.internal" }),
+                    mockUser({ id: "u3", email: "bob@test.com" })
+                ],
+                total: 3,
+                limit: 25,
+                offset: 0
+            });
             mockAuthRepo.getUserRoleIds
                 .mockResolvedValueOnce(["editor"])
                 .mockResolvedValueOnce(["editor"])
@@ -186,9 +191,14 @@ describe("BackendHooks — Admin Routes", () => {
                 }
             };
             const app = createApp(hooks);
-            mockAuthRepo.listUsers.mockResolvedValueOnce([
-                mockUser({ id: "u1", email: "alice@secret.com" })
-            ]);
+            mockAuthRepo.listUsersPaginated.mockResolvedValueOnce({
+                users: [
+                    mockUser({ id: "u1", email: "alice@secret.com" })
+                ],
+                total: 1,
+                limit: 25,
+                offset: 0
+            });
             mockAuthRepo.getUserRoleIds.mockResolvedValueOnce(["editor"]);
 
             const res = await app.request("/admin/users", { headers: { ...adminAuth() } });
@@ -219,7 +229,12 @@ describe("BackendHooks — Admin Routes", () => {
             const afterReadSpy = jest.fn((user, ctx) => user);
             const hooks: BackendHooks = { users: { afterRead: afterReadSpy } };
             const app = createApp(hooks);
-            mockAuthRepo.listUsers.mockResolvedValueOnce([mockUser({ id: "u1" })]);
+            mockAuthRepo.listUsersPaginated.mockResolvedValueOnce({
+                users: [mockUser({ id: "u1" })],
+                total: 1,
+                limit: 25,
+                offset: 0
+            });
             mockAuthRepo.getUserRoleIds.mockResolvedValueOnce(["editor"]);
 
             await app.request("/admin/users", { headers: { ...adminAuth("admin-42") } });
@@ -379,9 +394,14 @@ describe("BackendHooks — Admin Routes", () => {
     describe("no hooks configured", () => {
         it("returns data unchanged when no hooks are provided", async () => {
             const app = createApp(); // no hooks
-            mockAuthRepo.listUsers.mockResolvedValueOnce([
-                mockUser({ id: "u1", email: "alice@test.com" })
-            ]);
+            mockAuthRepo.listUsersPaginated.mockResolvedValueOnce({
+                users: [
+                    mockUser({ id: "u1", email: "alice@test.com" })
+                ],
+                total: 1,
+                limit: 25,
+                offset: 0
+            });
             mockAuthRepo.getUserRoleIds.mockResolvedValueOnce(["editor"]);
 
             const res = await app.request("/admin/users", { headers: { ...adminAuth() } });

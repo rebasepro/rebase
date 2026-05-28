@@ -1,7 +1,7 @@
 import { eq, SQL } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { CollectionWithRelations, EntityCollection, Properties, Property, Relation, RelationProperty, Vector } from "@rebasepro/types";
+import { CollectionWithRelations, EntityCollection, Properties, Property, Relation, RelationProperty, Vector, BinaryProperty } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, findRelation, createRelationRef, DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { DrizzleConditionBuilder } from "./utils/drizzle-conditions";
@@ -272,6 +272,20 @@ export function serializePropertyToServer(value: unknown, property: Property): u
             return value;
         }
 
+        case "binary":
+            if (typeof value === "string") {
+                if (value.startsWith("data:application/octet-stream;base64,")) {
+                    const base64Data = value.split(",")[1];
+                    if (base64Data) {
+                        return Buffer.from(base64Data, "base64");
+                    }
+                }
+            }
+            if (Buffer.isBuffer(value)) {
+                return value;
+            }
+            return value;
+
         case "string":
             if (typeof value === "string") {
                 if (value.startsWith("data:application/octet-stream;base64,")) {
@@ -480,6 +494,22 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
     }
 
     switch (property.type) {
+        case "binary": {
+            let buf: Buffer | null = null;
+            if (Buffer.isBuffer(value)) {
+                buf = value;
+            } else if (typeof value === "object" && value !== null) {
+                const rawVal = value as Record<string, unknown>;
+                if (rawVal.type === "Buffer" && Array.isArray(rawVal.data)) {
+                    buf = Buffer.from(rawVal.data as number[]);
+                }
+            }
+            if (buf) {
+                return `data:application/octet-stream;base64,${buf.toString("base64")}`;
+            }
+            return value;
+        }
+
         case "string": {
             if (typeof value === "string") return value;
             

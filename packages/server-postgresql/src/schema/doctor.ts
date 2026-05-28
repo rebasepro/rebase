@@ -96,6 +96,8 @@ export function getExpectedColumnType(prop: Property): string | null {
             return "character varying"; // References default to varchar FK
         case "vector":
             return "USER-DEFINED";
+        case "binary":
+            return "bytea";
         default:
             return null;
     }

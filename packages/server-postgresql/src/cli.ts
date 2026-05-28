@@ -322,7 +322,12 @@ async function fixMigrationStatementOrder(): Promise<void> {
     if (sqlFiles.length === 0) return;
 
     const latestFile = path.join(drizzleDir, sqlFiles[0].name);
-    const content = fs.readFileSync(latestFile, "utf-8");
+    let content = fs.readFileSync(latestFile, "utf-8");
+    const originalContent = content;
+
+    // Replace CREATE SCHEMA with CREATE SCHEMA IF NOT EXISTS to prevent failures
+    content = content.replace(/CREATE SCHEMA "([^"]+)";/g, 'CREATE SCHEMA IF NOT EXISTS "$1";');
+
     const DELIMITER = "--> statement-breakpoint";
     const parts = content.split(DELIMITER);
 
@@ -364,7 +369,12 @@ async function fixMigrationStatementOrder(): Promise<void> {
         if (needsReorder) break;
     }
 
-    if (!needsReorder) return;
+    if (!needsReorder) {
+        if (content !== originalContent) {
+            fs.writeFileSync(latestFile, content, "utf-8");
+        }
+        return;
+    }
 
     // Reorder: move DROP POLICY statements for affected tables before their ALTER TABLE
     // Strategy: stable sort — DROP POLICY on table X gets priority over ALTER on table X
@@ -388,7 +398,7 @@ idx }));
     const reordered = stmtEntries.map(e => e.stmt).join(DELIMITER);
     fs.writeFileSync(latestFile, reordered, "utf-8");
 
-    console.log(chalk.yellow(`  ⚠ Reordered migration statements in ${sqlFiles[0].name} (DROP POLICY before ALTER COLUMN)`));
+    console.log(chalk.yellow(`  \u26A0 Reordered migration statements in ${sqlFiles[0].name} (DROP POLICY before ALTER COLUMN)`));
 }
 
 async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> {
@@ -413,7 +423,11 @@ async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> 
             if (fs.existsSync(p)) {
                 const parsed = dotenv.config({ path: p });
                 if (parsed.parsed) {
-                    Object.assign(env, parsed.parsed);
+                    for (const [key, val] of Object.entries(parsed.parsed)) {
+                        if (env[key] === undefined) {
+                            env[key] = val;
+                        }
+                    }
                     break;
                 }
             }

@@ -1,6 +1,6 @@
 import { EntityCollection } from "@rebasepro/types";
 import { resetPasswordAction, deleteEntityAction, RolesFilterSelect, UserRolesSelectField } from "@rebasepro/admin";
-import rolesCollection from "./roles";
+import rolesCollection from "./roles.js";
 
 const usersCollection: EntityCollection = {
     name: "Users",

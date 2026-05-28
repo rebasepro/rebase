@@ -15,7 +15,7 @@ import type { CronStore } from "./cron-store";
 
 /**
  * Expand a single cron field into an ordered array of allowed values.
- * Supports: `*`, `N`, `N-M`, `N/S`, `N-M/S`, `*​/S`, and comma-separated combinations.
+ * Supports: `*`, `N`, `N-M`, `N/S`, `N-M/S`, `*\/S`, and comma-separated combinations.
  */
 function expandCronField(field: string, min: number, max: number): number[] {
     const results = new Set<number>();

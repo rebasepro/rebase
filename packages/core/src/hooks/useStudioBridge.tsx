@@ -205,7 +205,6 @@ unregister }), [register, unregister]);
     const bridgeValue = useMemo<StudioBridge>(() => ({
         ...NOOP_BRIDGE,
         ...slicesRef.current
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }), [version]);
 
     return (

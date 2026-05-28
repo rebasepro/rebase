@@ -95,7 +95,7 @@ export function SearchBar({
             </div>
             <input
                 value={searchText ?? ""}
-                ref={inputRef}
+                ref={inputRef as any}
                 onClick={onClick}
                 placeholder={placeholder}
                 aria-label={placeholder}

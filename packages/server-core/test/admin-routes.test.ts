@@ -63,6 +63,7 @@ displayName: data.displayName,
 passwordHash: data.passwordHash }))
         ),
         listUsers: jest.fn().mockResolvedValue([]),
+        listUsersPaginated: jest.fn().mockResolvedValue({ users: [], total: 0, limit: 25, offset: 0 }),
         getUserRoles: jest.fn().mockResolvedValue([mockRole("editor")]),
         getUserRoleIds: jest.fn().mockResolvedValue(["editor"]),
         assignDefaultRole: jest.fn().mockResolvedValue(undefined),
@@ -226,12 +227,17 @@ accessExpiresIn: "1h" });
         describe("GET /admin/users", () => {
             it("returns list of users with roles", async () => {
                 const app = createApp();
-                mockAuthRepo.listUsers.mockResolvedValueOnce([
-                    mockUser({ id: "u1",
+                mockAuthRepo.listUsersPaginated.mockResolvedValueOnce({
+                    users: [
+                        mockUser({ id: "u1",
 email: "a@test.com" }),
-                    mockUser({ id: "u2",
+                        mockUser({ id: "u2",
 email: "b@test.com" })
-                ]);
+                    ],
+                    total: 2,
+                    limit: 25,
+                    offset: 0
+                });
                 mockAuthRepo.getUserRoleIds
                     .mockResolvedValueOnce(["admin"])
                     .mockResolvedValueOnce(["editor"]);

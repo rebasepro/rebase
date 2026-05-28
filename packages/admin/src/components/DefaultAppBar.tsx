@@ -7,7 +7,7 @@ import { ErrorBoundary , iconSize } from "@rebasepro/ui";
 import { MoonIcon, SunIcon, SettingsIcon, SunMoonIcon, LogOutIcon } from "lucide-react";
 import { Avatar, cls, IconButton, Menu, MenuItem, Skeleton, Typography } from "@rebasepro/ui";
 import { useAuthController, useLargeLayout, useModeController, useAdminModeController, useTranslation } from "@rebasepro/core";
-import { useUrlController } from "../hooks";
+import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { User } from "@rebasepro/types";
 import { useApp } from "./app/useApp";
 import { useBreadcrumbsController } from "../hooks/useBreadcrumbsController";

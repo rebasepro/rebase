@@ -446,7 +446,6 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
     // Uses refs for ALL dynamic values so the component type never changes.
     // When ItemComponent identity changes, React.memo'd SortableItem remounts
     // the card → DOM is destroyed/recreated → CSS :hover state is lost → flicker.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     const ItemComponent = useMemo(() => {
         const Comp = (props: BoardItemViewProps<M>) => (
             <EntityBoardCard

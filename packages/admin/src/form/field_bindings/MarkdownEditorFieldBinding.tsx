@@ -93,7 +93,7 @@ export function MarkdownEditorFieldBinding({
             // Update canonical ref with the proper round-tripped value now that ProseMirror is loaded
             canonicalRef.current = canonicalizeMarkdown(value);
         });
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, []);
 
     // Compute the canonical (round-tripped) form of the initial value ONCE.
     // This is what ProseMirror will produce after parse → serialize, so any

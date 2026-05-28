@@ -29,7 +29,7 @@ export const BooleanSwitch = React.forwardRef(function BooleanSwitch({
             role="switch"
             aria-checked={allowIndeterminate && (value === null || value === undefined) ? "mixed" : !!value}
             aria-disabled={disabled || undefined}
-            ref={ref}
+            ref={ref as any}
             tabIndex={disabled ? -1 : undefined}
             onClick={disabled
                 ? (e) => e.preventDefault()

@@ -194,4 +194,25 @@ path: "authors" }
             expect(serializePropertyToServer(undefined, vectorProp)).toBeUndefined();
         });
     });
+
+    // ── Binary property ──
+    describe("binary property", () => {
+        const binaryProp: Property = { type: "binary" } as Property;
+
+        it("should serialize a base64 data URL to a Buffer", () => {
+            const base64Data = "data:application/octet-stream;base64,aGVsbG8=";
+            const result = serializePropertyToServer(base64Data, binaryProp);
+            expect(Buffer.isBuffer(result)).toBe(true);
+            expect((result as Buffer).toString("utf8")).toBe("hello");
+        });
+
+        it("should pass through a Buffer as-is", () => {
+            const buffer = Buffer.from("world");
+            expect(serializePropertyToServer(buffer, binaryProp)).toBe(buffer);
+        });
+
+        it("should return null for null values", () => {
+            expect(serializePropertyToServer(null, binaryProp)).toBeNull();
+        });
+    });
 });

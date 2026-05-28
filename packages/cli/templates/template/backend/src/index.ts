@@ -14,8 +14,8 @@ import {
     logger
 } from "@rebasepro/server-core";
 import { createPostgresDatabaseConnection, createPostgresAdapter } from "@rebasepro/server-postgresql";
-import { enums, relations, tables } from "./schema.generated";
-import { env } from "./env";
+import { enums, relations, tables } from "./schema.generated.js";
+import { env } from "./env.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

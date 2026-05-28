@@ -182,7 +182,7 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<any>>(
                     </div>}
 
                     {column.resizable && <div
-                        ref={resizeHandleRef}
+                        ref={resizeHandleRef as any}
                         data-no-dnd="true"
                         className={cls(
                             "absolute h-full w-[6px] top-0 right-0 cursor-col-resize",

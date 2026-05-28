@@ -59,6 +59,7 @@ export interface RebaseAuthConfig {
     slack?: { clientId: string; clientSecret: string };
     spotify?: { clientId: string; clientSecret: string };
     defaultRole?: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     providers?: OAuthProvider<any>[];
     /**
      * Override specific parts of the built-in auth implementation.
@@ -504,8 +505,8 @@ collectionRegistry });
         });
 
         if (!isAuthAdapter(config.auth)) {
-            // ── Register OAuth providers and mount built-in routes ──
             const safeAuthConfig = config.auth as RebaseAuthConfig;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const oauthProviders: OAuthProvider<any>[] = [...(safeAuthConfig.providers || [])];
 
             if (safeAuthConfig.google?.clientId) {
@@ -906,46 +907,48 @@ latencyMs };
 
     // ── Graceful Shutdown ─────────────────────────────────────────────────
     const shutdown = (timeoutMs = 15_000): Promise<void> => {
-        return new Promise<void>(async (resolve) => {
-            logger.info("Shutting down Rebase Backend...");
+        return new Promise<void>((resolve) => {
+            (async () => {
+                logger.info("Shutting down Rebase Backend...");
 
-            // 1. Stop cron scheduler
-            if (cronScheduler) {
-                cronScheduler.stop();
-                logger.info("Cron scheduler stopped");
-            }
-
-            // 2. Tear down realtime services (LISTEN clients, debounce timers,
-            //    subscriptions). Must happen BEFORE pool.end() so that pending
-            //    timer callbacks don't fire against a closed pool.
-            for (const [key, rt] of Object.entries(realtimeServices)) {
-                try {
-                    const rtWithLifecycle = rt as RealtimeProvider & { destroy?: () => Promise<void>; stopListening?: () => Promise<void> };
-                    if (typeof rtWithLifecycle.destroy === "function") {
-                        await rtWithLifecycle.destroy();
-                        logger.info(`Realtime service "${key}" destroyed`);
-                    } else if (typeof rtWithLifecycle.stopListening === "function") {
-                        await rtWithLifecycle.stopListening();
-                        logger.info(`Realtime service "${key}" LISTEN client stopped`);
-                    }
-                } catch (err) {
-                    logger.warn(`Error destroying realtime service "${key}":`, { error: err });
+                // 1. Stop cron scheduler
+                if (cronScheduler) {
+                    cronScheduler.stop();
+                    logger.info("Cron scheduler stopped");
                 }
-            }
 
-            // 3. Close the HTTP server (stop accepting, drain in-flight)
-            config.server.close(() => {
-                logger.info("HTTP server closed");
-                resolve();
-            });
+                // 2. Tear down realtime services (LISTEN clients, debounce timers,
+                //    subscriptions). Must happen BEFORE pool.end() so that pending
+                //    timer callbacks don't fire against a closed pool.
+                for (const [key, rt] of Object.entries(realtimeServices)) {
+                    try {
+                        const rtWithLifecycle = rt as RealtimeProvider & { destroy?: () => Promise<void>; stopListening?: () => Promise<void> };
+                        if (typeof rtWithLifecycle.destroy === "function") {
+                            await rtWithLifecycle.destroy();
+                            logger.info(`Realtime service "${key}" destroyed`);
+                        } else if (typeof rtWithLifecycle.stopListening === "function") {
+                            await rtWithLifecycle.stopListening();
+                            logger.info(`Realtime service "${key}" LISTEN client stopped`);
+                        }
+                    } catch (err) {
+                        logger.warn(`Error destroying realtime service "${key}":`, { error: err });
+                    }
+                }
 
-            // 4. Force-resolve after timeout (unless disabled with 0)
-            if (timeoutMs > 0) {
-                setTimeout(() => {
-                    logger.warn(`Forced shutdown after ${timeoutMs / 1000}s timeout`);
+                // 3. Close the HTTP server (stop accepting, drain in-flight)
+                config.server.close(() => {
+                    logger.info("HTTP server closed");
                     resolve();
-                }, timeoutMs).unref();
-            }
+                });
+
+                // 4. Force-resolve after timeout (unless disabled with 0)
+                if (timeoutMs > 0) {
+                    setTimeout(() => {
+                        logger.warn(`Forced shutdown after ${timeoutMs / 1000}s timeout`);
+                        resolve();
+                    }, timeoutMs).unref();
+                }
+            })();
         });
     };
 

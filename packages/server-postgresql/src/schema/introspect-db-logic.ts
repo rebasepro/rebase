@@ -188,7 +188,7 @@ export function mapPgType(dataType: string): string {
     if (dt === "json" || dt === "jsonb") return "map";
 
     // Binary
-    if (dt === "bytea") return "string";
+    if (dt === "bytea") return "binary";
 
     // Network types
     if (dt === "inet" || dt === "cidr" || dt === "macaddr" || dt === "macaddr8") return "string";
