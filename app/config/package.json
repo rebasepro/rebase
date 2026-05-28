@@ -1,6 +1,6 @@
 {
     "name": "rebase-app-config",
-    "version": "0.1.1",
+    "version": "0.2.0",
     "description": "Shared collections and config for Rebase app",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
@@ -12,8 +12,8 @@
         "clean": "rm -rf dist"
     },
     "dependencies": {
-        "@rebasepro/types": "workspace:*",
-        "@rebasepro/admin": "workspace:*"
+        "@rebasepro/admin": "workspace:*",
+        "@rebasepro/types": "workspace:*"
     },
     "devDependencies": {
         "typescript": "^5.9.3"

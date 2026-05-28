@@ -1,6 +1,6 @@
 {
     "name": "@rebasepro/app-example",
-    "version": "0.1.1",
+    "version": "0.2.0",
     "description": "Complete Rebase application example with PostgreSQL backend",
     "private": true,
     "type": "module",
