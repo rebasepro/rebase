@@ -11,7 +11,14 @@ packages:
   - saas/backend
   - saas/frontend
   - saas
-
-
-
+allowBuilds:
+  '@firebase/util': true
+  cpu-features: true
+  esbuild: true
+  mongodb-memory-server: true
+  nx: true
+  protobufjs: true
+  puppeteer: true
+  sharp: true
+  ssh2: true
 

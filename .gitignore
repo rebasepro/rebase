@@ -77,3 +77,9 @@ app/uploads/
 .rebase-dev-url
 
 *.d.ts
+
+# Temporary test, linting, and scratch outputs
+/e2e-screenshots/
+/eslint_report.json
+/scratch/
+/test-cli-init-project/
