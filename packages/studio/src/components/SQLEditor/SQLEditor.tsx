@@ -272,17 +272,18 @@ export const SQLEditor = () => {
     useEffect(() => {
         let mounted = true;
         const fetchConnectionConfig = async () => {
-            if (!databaseAdmin?.fetchAvailableDatabases || !databaseAdmin?.fetchAvailableRoles) {
+            if (!databaseAdmin?.fetchAvailableDatabases || !databaseAdmin?.fetchAvailableRoles || !databaseAdmin?.executeSql) {
                 setConnectionConfigError(t("studio_sql_sql_not_supported"));
                 setIsLoadingConfig(false);
                 return;
             }
 
             try {
-                const [dbs, roles, currentDbFromApi] = await Promise.all([
+                const [dbs, roles, currentDbFromApi, currentUserResult] = await Promise.all([
                     databaseAdmin.fetchAvailableDatabases(),
                     databaseAdmin.fetchAvailableRoles(),
-                    typeof databaseAdmin?.fetchCurrentDatabase === "function" ? databaseAdmin.fetchCurrentDatabase() : Promise.resolve(undefined)
+                    typeof databaseAdmin?.fetchCurrentDatabase === "function" ? databaseAdmin.fetchCurrentDatabase() : Promise.resolve(undefined),
+                    databaseAdmin.executeSql("SELECT current_user AS role").catch(() => [])
                 ]);
 
                 if (mounted) {
@@ -309,20 +310,25 @@ export const SQLEditor = () => {
                     if (actualDb) {
                         setSelectedDatabase(actualDb);
                         localStorage.setItem("rebase_sql_selected_db", actualDb);
-                        setTabs(prev => prev.map(t => t.id === initialActiveTabId && !t.database ? { ...t,
+                        setTabs(prev => prev.map(t => t.id === initialActiveTabId && (!t.database || !dbs.includes(t.database)) ? { ...t,
 database: actualDb } : t));
                     }
 
+                    const currentUser = (currentUserResult?.[0] as Record<string, unknown> | undefined)?.role as string | undefined;
                     let actualRole = currentActiveTab?.role || loadedRole;
                     if (actualRole && !roles.includes(actualRole)) actualRole = undefined;
                     if (!actualRole && roles.length > 0) {
-                        actualRole = roles.includes("postgres") ? "postgres" : roles[0];
+                        if (currentUser && roles.includes(currentUser)) {
+                            actualRole = currentUser;
+                        } else {
+                            actualRole = roles.includes("postgres") ? "postgres" : roles[0];
+                        }
                     }
 
                     if (actualRole) {
                         setSelectedRole(actualRole);
                         localStorage.setItem("rebase_sql_selected_role", actualRole);
-                        setTabs(prev => prev.map(t => t.id === initialActiveTabId && !t.role ? { ...t,
+                        setTabs(prev => prev.map(t => t.id === initialActiveTabId && (!t.role || !roles.includes(t.role)) ? { ...t,
 role: actualRole } : t));
                     }
                 }

@@ -44,7 +44,7 @@ export function getDefaultValuesFor<M extends Record<string, unknown>>(propertie
 ...b }), {}) as EntityValues<M>;
 }
 
-export function getDefaultValueFor(property?: Property) {
+export function getDefaultValueFor(property?: Property): unknown {
     if (!property) return undefined;
     if (isPropertyBuilder(property)) return undefined;
     if (property.defaultValue || property.defaultValue === null) {
@@ -58,7 +58,7 @@ export function getDefaultValueFor(property?: Property) {
     }
 }
 
-export function getDefaultValueFortype(type: DataType) {
+export function getDefaultValueFortype(type: DataType): unknown {
     if (type === "string") {
         return null;
     } else if (type === "number") {

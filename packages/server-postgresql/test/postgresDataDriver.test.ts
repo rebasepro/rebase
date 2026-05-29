@@ -644,5 +644,22 @@ status: "new" });
             expect(mockRealtimeService.notifyEntityUpdate).toHaveBeenNthCalledWith(2, "call-2", "2", {}, undefined);
         });
     });
+
+    describe("PostgresBackendDriver Admin operations", () => {
+        it("fetchAvailableRoles should query roles filtered by current user membership", async () => {
+            const executeSqlSpy = jest.spyOn(delegate, "executeSql").mockResolvedValueOnce([
+                { rolname: "demo" },
+                { rolname: "cloudsqlsuperuser" }
+            ]);
+
+            const result = await delegate.fetchAvailableRoles();
+
+            expect(executeSqlSpy).toHaveBeenCalledWith(
+                "SELECT rolname FROM pg_roles WHERE pg_has_role(current_user, rolname, 'member') ORDER BY rolname;"
+            );
+            expect(result).toEqual(["demo", "cloudsqlsuperuser"]);
+            executeSqlSpy.mockRestore();
+        });
+    });
 });
 

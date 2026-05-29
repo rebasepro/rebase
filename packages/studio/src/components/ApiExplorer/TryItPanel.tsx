@@ -33,19 +33,19 @@ export function TryItPanel({ endpoint, apiUrl, getAuthToken, user, basePath = ""
     const storageKey = `rebase_apiexplorer_${endpoint.method}_${endpoint.path}`;
 
     const [pathParams, setPathParams] = useState<Record<string, string>>(() => {
-        try { const v = localStorage.getItem(`${storageKey}_path`); if (v) return JSON.parse(v); } catch {}
+        try { const v = localStorage.getItem(`${storageKey}_path`); if (v) return JSON.parse(v); } catch { /* ignore */ }
         return {};
     });
     const [queryParams, setQueryParams] = useState<Record<string, string>>(() => {
-        try { const v = localStorage.getItem(`${storageKey}_query`); if (v) return JSON.parse(v); } catch {}
+        try { const v = localStorage.getItem(`${storageKey}_query`); if (v) return JSON.parse(v); } catch { /* ignore */ }
         return {};
     });
     const [customHeaders, setCustomHeaders] = useState<Array<{ key: string; value: string }>>(() => {
-        try { const v = localStorage.getItem(`${storageKey}_headers`); if (v) return JSON.parse(v); } catch {}
+        try { const v = localStorage.getItem(`${storageKey}_headers`); if (v) return JSON.parse(v); } catch { /* ignore */ }
         return [{ key: "rebase-branch", value: "" }];
     });
     const [body, setBody] = useState(() => {
-        try { const v = localStorage.getItem(`${storageKey}_body`); if (v) return JSON.parse(v); } catch {}
+        try { const v = localStorage.getItem(`${storageKey}_body`); if (v) return JSON.parse(v); } catch { /* ignore */ }
         return buildBodyTemplate(endpoint);
     });
     const [response, setResponse] = useState<{ status: number; statusText: string; body: string; time: number } | null>(

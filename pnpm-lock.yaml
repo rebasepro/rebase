@@ -35,6 +35,9 @@ importers:
       eslint-plugin-react:
         specifier: ^7.37.5
         version: 7.37.5(eslint@9.39.4(jiti@2.7.0))
+      eslint-plugin-react-hooks:
+        specifier: ^7.1.1
+        version: 7.1.1(eslint@9.39.4(jiti@2.7.0))
       globals:
         specifier: ^16.5.0
         version: 16.5.0
@@ -1184,6 +1187,9 @@ importers:
         specifier: workspace:*
         version: link:../client
     devDependencies:
+      '@jest/globals':
+        specifier: ^29.7.0
+        version: 29.7.0
       '@rebasepro/common':
         specifier: workspace:*
         version: link:../common
@@ -1818,12 +1824,18 @@ importers:
       '@types/node':
         specifier: ^20.19.41
         version: 20.19.41
+      '@types/pg':
+        specifier: ^8.20.0
+        version: 8.20.0
       '@types/ssh2':
         specifier: ^1.15.4
         version: 1.15.5
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
+      pg:
+        specifier: ^8.21.0
+        version: 8.21.0
       tsx:
         specifier: ^4.22.3
         version: 4.22.3
@@ -13488,7 +13500,7 @@ snapshots:
 
   '@babel/parser@7.24.1':
     dependencies:
-      '@babel/types': 7.24.0
+      '@babel/types': 7.29.7
 
   '@babel/parser@7.29.7':
     dependencies:

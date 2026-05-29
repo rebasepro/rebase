@@ -84,6 +84,11 @@ export function EntityPreviewData({
 
     const collection = collectionProp ?? collectionRegistryController.getCollection(entity.path);
 
+    const listProperties = useMemo(() => {
+        if (!collection) return [];
+        return previewKeys ?? getEntityPreviewKeys(authController, collection, customizationController.propertyConfigs, previewKeys, size === "medium" || size === "large" ? 3 : 2);
+    }, [previewKeys, collection, size, authController, customizationController.propertyConfigs]);
+
     if (!collection) {
         return (
             <>
@@ -91,9 +96,6 @@ export function EntityPreviewData({
             </>
         );
     }
-
-    const listProperties = useMemo(() => previewKeys ?? getEntityPreviewKeys(authController, collection, customizationController.propertyConfigs, previewKeys, size === "medium" || size === "large" ? 3 : 2),
-        [previewKeys, collection, size]);
 
     const titleProperty = includeTitle ? getEntityTitlePropertyKey(collection, customizationController.propertyConfigs) : undefined;
     const imagePropertyKey = includeImage ? getEntityImagePreviewPropertyKey(collection) : undefined;

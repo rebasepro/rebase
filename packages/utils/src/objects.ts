@@ -6,7 +6,7 @@ export const isEmptyArray = (value?: unknown) =>
     Array.isArray(value) && value.length === 0;
 
 /** @private is the given object a Function? */
-export const isFunction = (obj: unknown): obj is Function =>
+export const isFunction = (obj: unknown): obj is (...args: unknown[]) => unknown =>
     typeof obj === "function";
 
 /** @private is the given object an integer? */

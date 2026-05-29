@@ -1,6 +1,7 @@
 import pluginJs from "@eslint/js";
 import pluginReact from "eslint-plugin-react";
 import tseslint from "typescript-eslint";
+import pluginReactHooks from "eslint-plugin-react-hooks";
 
 /** @type {import("eslint").Linter.Config[]} */
 export default [
@@ -13,6 +14,10 @@ export default [
     {
 
         files: ["**/*.{js,jsx,mjs,cjs,ts,tsx}"],
+
+        plugins: {
+            "react-hooks": pluginReactHooks
+        },
 
         languageOptions: {
             parserOptions: {
@@ -78,8 +83,8 @@ export default [
                 avoidEscape: true
             }],
 
-            // "react-hooks/rules-of-hooks": "error",
-            // "react-hooks/exhaustive-deps": "warn",
+            "react-hooks/rules-of-hooks": "error",
+            "react-hooks/exhaustive-deps": "warn",
             "@typescript-eslint/no-unused-vars": ["warn", {
                 "argsIgnorePattern": "^_",
                 "varsIgnorePattern": "^_",
@@ -93,13 +98,22 @@ export default [
     },
     {
         files: [
-            "packages/types/**/*.{ts,tsx}",
-            "packages/utils/**/*.{ts,tsx}",
-            "packages/common/**/*.{ts,tsx}",
-            "packages/server-core/**/*.{ts,tsx}"
+            "packages/utils/src/**/*.{ts,tsx}",
+            "packages/common/src/**/*.{ts,tsx}",
+            "packages/server-core/src/**/*.{ts,tsx}"
         ],
         rules: {
             "@typescript-eslint/no-explicit-any": "error"
+        }
+    },
+    {
+        files: ["**/__tests__/**/*.ts", "**/__tests__/**/*.tsx", "**/*.test.ts", "**/*.test.tsx"],
+        rules: {
+            "prefer-const": "off",
+            "no-unused-vars": "off",
+            "@typescript-eslint/no-unused-vars": "off",
+            "@typescript-eslint/no-unsafe-function-type": "off",
+            "@typescript-eslint/no-require-imports": "off"
         }
     },
     {

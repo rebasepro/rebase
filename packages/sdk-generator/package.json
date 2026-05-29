@@ -28,6 +28,7 @@
     "@rebasepro/types": "workspace:*"
   },
   "devDependencies": {
+    "@jest/globals": "^29.7.0",
     "@rebasepro/common": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@types/jest": "^29.5.14",

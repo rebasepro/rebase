@@ -738,7 +738,9 @@ searchString }
     }
 
     async fetchAvailableRoles(): Promise<string[]> {
-        const result = await this.executeSql("SELECT rolname FROM pg_roles;");
+        const result = await this.executeSql(
+            "SELECT rolname FROM pg_roles WHERE pg_has_role(current_user, rolname, 'member') ORDER BY rolname;"
+        );
         return result.map((r: Record<string, unknown>) => r.rolname as string);
     }
 

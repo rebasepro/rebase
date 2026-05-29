@@ -42,7 +42,7 @@ export const localSearchControllerBuilder: FirestoreTextSearchControllerBuilder 
 
         currentPath = path;
 
-        return new Promise(async (resolve, reject) => {
+        return new Promise((resolve, reject) => {
             if (collectionProp) {
                 console.debug("Init local search controller", path);
                 const firestore = databaseId ? getFirestore(firebaseApp, databaseId) : getFirestore(firebaseApp);

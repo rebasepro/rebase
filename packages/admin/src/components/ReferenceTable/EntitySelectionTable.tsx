@@ -91,6 +91,16 @@ export interface EntitySelectionProps<M extends Record<string, unknown>> {
  * @group Components
  */
 export function EntitySelectionTable<M extends Record<string, unknown>>(
+    props: EntitySelectionProps<M>
+) {
+    if (!props.collection) {
+        return <ErrorView
+            error={"Could not find collection"}/>
+    }
+    return <EntitySelectionTableInternal {...props} collection={props.collection} />;
+}
+
+function EntitySelectionTableInternal<M extends Record<string, unknown>>(
     {
         onSingleEntitySelected,
         onMultipleEntitiesSelected,
@@ -101,7 +111,7 @@ export function EntitySelectionTable<M extends Record<string, unknown>>(
         description,
         fixedFilter,
         maxSelection
-    }: EntitySelectionProps<M>) {
+    }: EntitySelectionProps<M> & { collection: EntityCollection<M> }) {
 
     const sideDialogContext = useSideDialogContext();
     const sideEntityController = useSideEntityController();
@@ -246,11 +256,6 @@ export function EntitySelectionTable<M extends Record<string, unknown>>(
         event.stopPropagation();
         sideDialogContext.close(false);
     }, [sideDialogContext]);
-
-    if (!collection) {
-        return <ErrorView
-            error={"Could not find collection with id " + collection}/>
-    }
 
     const displayedColumnIds = useColumnIds(collection, false);
 

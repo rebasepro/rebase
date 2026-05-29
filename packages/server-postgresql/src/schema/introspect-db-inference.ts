@@ -17,8 +17,8 @@ export function inferPropertyFromData(
     sampleValues: unknown[],
     isPk: boolean
 ): InferenceResult {
-    let result: InferenceResult = {};
-    let extraLines: string[] = [];
+    const result: InferenceResult = {};
+    const extraLines: string[] = [];
 
     // Filter out null/undefined for analysis
     const validValues = sampleValues.filter(v => v !== null && v !== undefined && v !== "");
@@ -84,7 +84,7 @@ export function inferPropertyFromData(
             let allNumbers = true;
             let allStrings = true;
             for (const v of validValues) {
-                let parsed = typeof v === "string" ? JSON.parse(v) : v;
+                const parsed = typeof v === "string" ? JSON.parse(v) : v;
                 for (const item of parsed) {
                     if (typeof item !== "number") allNumbers = false;
                     if (typeof item !== "string") allStrings = false;
@@ -99,7 +99,7 @@ export function inferPropertyFromData(
             if (allObjects && validValues.length > 0) {
                 const schema: Record<string, string> = {};
                 for (const v of validValues) {
-                    let parsed = typeof v === "string" ? JSON.parse(v) : v;
+                    const parsed = typeof v === "string" ? JSON.parse(v) : v;
                     for (const [k, val] of Object.entries(parsed)) {
                         if (val === null || val === undefined) continue;
                         const type = typeof val;
@@ -221,7 +221,7 @@ export function inferPropertyFromData(
             if (hasFileExtension) {
                 const firstVal = validValues[0] as string;
                 const lastSlash = firstVal.lastIndexOf('/');
-                let inferredStoragePath = lastSlash > 0 ? firstVal.substring(0, lastSlash) : "files";
+                const inferredStoragePath = lastSlash > 0 ? firstVal.substring(0, lastSlash) : "files";
                 extraLines.push(`            storage: {\n                storagePath: "${inferredStoragePath}"\n            }`);
             } else if (isUrl) {
                 if (isMedia) {

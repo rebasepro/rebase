@@ -48,6 +48,23 @@ const ADMIN_ONLY_TYPES = new Set([
 ]);
 
 /**
+ * Recursively extract the deepest error message from an error's cause chain (e.g., Drizzle wrapping a PG error).
+ */
+function extractErrorMessage(error: unknown): string {
+    if (!error) return "Unknown error";
+    if (typeof error === "object") {
+        const err = error as Record<string, unknown> & { cause?: unknown; message?: string };
+        if (err.cause) {
+            return extractErrorMessage(err.cause);
+        }
+        if (typeof err.message === "string") {
+            return err.message;
+        }
+    }
+    return String(error);
+}
+
+/**
  * Check if the current session belongs to an admin user.
  */
 function isAdminSession(session: ClientSession | undefined): boolean {
@@ -359,22 +376,29 @@ colors: true }));
 
                     case "EXECUTE_SQL": {
                         const { sql, options } = payload;
-                        const delegate = await getScopedDelegate();
-                        const admin = delegate.admin;
-                        if (!isSQLAdmin(admin)) {
-                            sendError("ERROR", "NOT_SUPPORTED", "SQL execution is not available for this driver.");
-                            break;
+                        try {
+                            const delegate = await getScopedDelegate();
+                            const admin = delegate.admin;
+                            if (!isSQLAdmin(admin)) {
+                                sendError("ERROR", "NOT_SUPPORTED", "SQL execution is not available for this driver.");
+                                break;
+                            }
+                            const result = await admin.executeSql(sql, options);
+                            if (process.env.NODE_ENV !== "production") {
+                                wsDebug(`⚡ [WebSocket Server] SQL executed. Returned ${Array.isArray(result) ? result.length : "non-array"} rows.`);
+                            }
+                            const response = {
+                                type: "EXECUTE_SQL_SUCCESS",
+                                payload: { result },
+                                requestId
+                            };
+                            ws.send(JSON.stringify(response));
+                        } catch (sqlError: unknown) {
+                            // This is a query execution error (e.g., syntax error, permission denied).
+                            // We return it cleanly to the client without logging a server stack trace.
+                            const errMsg = extractErrorMessage(sqlError);
+                            sendError("ERROR", "SQL_ERROR", errMsg);
                         }
-                        const result = await admin.executeSql(sql, options);
-                        if (process.env.NODE_ENV !== "production") {
-                            wsDebug(`⚡ [WebSocket Server] SQL executed. Returned ${Array.isArray(result) ? result.length : "non-array"} rows.`);
-                        }
-                        const response = {
-                            type: "EXECUTE_SQL_SUCCESS",
-                            payload: { result },
-                            requestId
-                        };
-                        ws.send(JSON.stringify(response));
                     }
                         break;
 

@@ -291,35 +291,30 @@ function EntityFullScreenRoute({
 
     const entityPath = basePath + `/${entityId}`;
 
-    let blocker: Blocker | undefined = undefined;
-    try {
-        blocker = useBlocker(({
-            currentLocation,
-            nextLocation
-        }) => {
-            if (nextLocation.pathname.startsWith(entityPath))
-                return false;
+    const blocker = useBlocker(({
+        currentLocation,
+        nextLocation
+    }) => {
+        if (nextLocation.pathname.startsWith(entityPath))
+            return false;
 
-            // Side panel overlay navigations preserve the underlying form via
-            // base_location in router state — no data is lost in either direction.
+        // Side panel overlay navigations preserve the underlying form via
+        // base_location in router state — no data is lost in either direction.
 
-            // Opening a side panel (e.g. clicking a relation arrow)
-            const nextHash = nextLocation.hash;
-            if (nextHash === "#side" || nextHash === "#new_side")
-                return false;
+        // Opening a side panel (e.g. clicking a relation arrow)
+        const nextHash = nextLocation.hash;
+        if (nextHash === "#side" || nextHash === "#new_side")
+            return false;
 
-            // Closing a side panel (navigate(-1) back to the form's own path)
-            const currentHash = currentLocation.hash;
-            if ((currentHash === "#side" || currentHash === "#new_side") &&
-                (nextLocation.pathname === basePath ||
-                 nextLocation.pathname.startsWith(entityPath)))
-                return false;
+        // Closing a side panel (navigate(-1) back to the form's own path)
+        const currentHash = currentLocation.hash;
+        if ((currentHash === "#side" || currentHash === "#new_side") &&
+            (nextLocation.pathname === basePath ||
+             nextLocation.pathname.startsWith(entityPath)))
+            return false;
 
-            return blocked.current;
-        });
-    } catch (e) {
-        // console.warn("Blocker not available, navigation will not be blocked");
-    }
+        return blocked.current;
+    });
 
     const lastCollectionEntry = [...navigationEntries].reverse().find((entry) => entry.type === "collection");
 

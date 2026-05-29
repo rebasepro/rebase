@@ -11,13 +11,12 @@ export function NewCollectionCard({
     context
 }: PluginHomePageAdditionalCardsProps) {
 
-    if (!context.navigationStateController?.topLevelNavigation)
-        return null;
-
     const authController = useAuthController();
-
     const collectionEditorController = useCollectionEditorController();
     const { t } = useTranslation();
+
+    if (!context.navigationStateController?.topLevelNavigation)
+        return null;
     const canCreateCollections = collectionEditorController.configPermissions
         ? collectionEditorController.configPermissions({
             user: authController.user

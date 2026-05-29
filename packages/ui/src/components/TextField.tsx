@@ -82,7 +82,8 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
         ref: ForwardedRef<HTMLDivElement>
     ) => {
 
-        const inputRef = inputRefProp ?? useRef(null);
+        const fallbackRef = useRef(null);
+        const inputRef = inputRefProp ?? fallbackRef;
         const autoId = useId();
         const inputId = inputProps.id ?? autoId;
         const labelId = `${inputId}-label`;

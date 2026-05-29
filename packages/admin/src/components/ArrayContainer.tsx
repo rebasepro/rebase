@@ -109,24 +109,14 @@ function SortableItem({
         transform,
         transition,
         isDragging
-    } = sortable
-            ? useSortable({ id })
-            : {
-                attributes: {},
-                listeners: {},
-                setNodeRef: (node: HTMLElement | null) => {
-                },
-                transform: null,
-                transition: undefined,
-                isDragging: false
-            };
+    } = useSortable({ id });
 
     const style = transform ? {
         transform: CSS.Transform.toString(transform),
         transition
     } : {};
-    const dragHandleProps = sortable ? { ...listeners,
-...attributes } : {};
+    const dragHandleProps = { ...listeners,
+...attributes };
 
     return (
         <ArrayContainerItem
