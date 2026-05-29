@@ -1,8 +1,7 @@
 import type { HomePageSection, PluginGenericProps } from "@rebasepro/types";
 import React, { useEffect } from "react";
 import { Card, cls, Container, Typography } from "@rebasepro/ui";
-import { ArrowRightIcon } from "lucide-react";
-import { iconSize } from "@rebasepro/ui";
+import { ArrowRightIcon, iconSize } from "@rebasepro/ui";
 import { IconForView, useRebaseContext, useRestoreScroll, useSlot } from "@rebasepro/core";
 import { useNavigate } from "react-router-dom";
 import { useStudioBreadcrumbs, BootstrapAdminBanner } from "@rebasepro/core";

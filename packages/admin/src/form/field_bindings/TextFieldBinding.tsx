@@ -2,8 +2,16 @@ import type { FieldProps } from "../../types/fields";
 import type { NumberProperty, StringProperty } from "@rebasepro/types";
 import React, { useCallback } from "react";
 
-import { Collapse, IconButton, TextField, TextareaAutosize, fieldBackgroundHoverMixin, fieldBackgroundMixin, cls } from "@rebasepro/ui";
-import { XIcon } from "lucide-react";
+import {
+    cls,
+    Collapse,
+    fieldBackgroundHoverMixin,
+    fieldBackgroundMixin,
+    IconButton,
+    TextareaAutosize,
+    TextField,
+    XIcon
+} from "@rebasepro/ui";
 import { PreviewType } from "@rebasepro/types";
 import { FieldHelperText, LabelWithIcon } from "../components";
 import { PropertyPreview } from "../../preview";

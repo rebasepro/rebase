@@ -2,8 +2,39 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Highlight, themes } from "prism-react-renderer";
 import { toSnakeCase } from "@rebasepro/utils";
-import { Button, Typography, CircularProgress, cls, IconButton, Dialog, DialogContent, DialogActions, DialogTitle, TextField, Tooltip, defaultBorderMixin, ResizablePanels, Chip, Menu, MenuItem, Tabs, Tab, VirtualTable, VirtualTableColumn, CellRendererParams , iconSize } from "@rebasepro/ui";
-import { TerminalIcon, XIcon, PlusIcon, SaveIcon, DownloadIcon, PlayIcon, MoreVerticalIcon, PencilIcon, MenuIcon } from "lucide-react";
+import {
+    Button,
+    CellRendererParams,
+    Chip,
+    CircularProgress,
+    cls,
+    defaultBorderMixin,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    DownloadIcon,
+    IconButton,
+    iconSize,
+    Menu,
+    MenuIcon,
+    MenuItem,
+    MoreVerticalIcon,
+    PencilIcon,
+    PlayIcon,
+    PlusIcon,
+    ResizablePanels,
+    SaveIcon,
+    Tab,
+    Tabs,
+    TerminalIcon,
+    TextField,
+    Tooltip,
+    Typography,
+    VirtualTable,
+    VirtualTableColumn,
+    XIcon
+} from "@rebasepro/ui";
 import { useStudioUrlController, useStudioCollectionRegistry, useStudioSideEntityController } from "@rebasepro/core";
 import { useRebaseContext, useRebaseClient, useSnackbarController, useApiConfig, useTranslation, useModeController, ErrorView, SelectableUser, IconForView } from "@rebasepro/core";
 import { EntityCollection } from "@rebasepro/types";

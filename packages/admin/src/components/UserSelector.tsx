@@ -1,10 +1,25 @@
 
-import * as PopoverPrimitive from "@radix-ui/react-popover";
+import {
+    ChevronDownIcon,
+    CircularProgress,
+    cls,
+    defaultBorderMixin,
+    fieldBackgroundDisabledMixin,
+    fieldBackgroundHoverMixin,
+    fieldBackgroundInvisibleMixin,
+    fieldBackgroundMixin,
+    focusedDisabled,
+    IconButton,
+    iconSize,
+    PopoverPrimitive,
+    SearchIcon,
+    Separator,
+    useInjectStyles,
+    XIcon
+} from "@rebasepro/ui";
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Command as CommandPrimitive } from "cmdk";
-import { CircularProgress, cls, defaultBorderMixin, fieldBackgroundDisabledMixin, fieldBackgroundHoverMixin, fieldBackgroundInvisibleMixin, fieldBackgroundMixin, focusedDisabled, IconButton, Separator, useInjectStyles , iconSize } from "@rebasepro/ui";
-import { XIcon, ChevronDownIcon, SearchIcon } from "lucide-react";
 import { User } from "@rebasepro/types";
 import { useUserSelector, UserSelectorItem } from "@rebasepro/core";
 import { UserDisplay } from "@rebasepro/core";

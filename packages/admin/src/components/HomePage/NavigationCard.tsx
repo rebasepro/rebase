@@ -1,5 +1,4 @@
-import { Card, cls, Markdown, Typography } from "@rebasepro/ui";
-import { ArrowRightIcon } from "lucide-react";
+import { ArrowRightIcon, Card, cls, Markdown, Typography } from "@rebasepro/ui";
 import React from "react";
 
 export type NavigationCardProps = {

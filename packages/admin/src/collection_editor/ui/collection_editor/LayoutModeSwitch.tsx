@@ -1,5 +1,12 @@
-import { cls, ToggleButtonGroup, Typography } from "@rebasepro/ui";
-import { ColumnsIcon, PanelLeftIcon, SquareIcon, AppWindow } from "lucide-react";
+import {
+    AppWindow,
+    cls,
+    ColumnsIcon,
+    PanelLeftIcon,
+    SquareIcon,
+    ToggleButtonGroup,
+    Typography
+} from "@rebasepro/ui";
 
 export function LayoutModeSwitch({
     value,

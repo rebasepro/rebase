@@ -1,6 +1,5 @@
 import React from "react";
-import { Typography, cls, iconSize, Button } from "@rebasepro/ui";
-import { KeyRoundIcon } from "lucide-react";
+import { Button, cls, iconSize, KeyRoundIcon, Typography } from "@rebasepro/ui";
 import { UserSelectPopover, SelectableUser } from "@rebasepro/core";
 
 export interface AuthSimulationSelectorProps {

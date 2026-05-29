@@ -2,11 +2,10 @@
 import type { EntityCustomViewParams } from "@rebasepro/types";
 import { useRef, useEffect } from "react";
 import { cls, IconButton, Label, Tooltip, Typography } from "@rebasepro/ui";
-import { HistoryIcon } from "lucide-react";
+import { ErrorBoundary, HistoryIcon } from "@rebasepro/ui";
 import { EntityHistoryEntry } from "./EntityHistoryEntry";
 import { useSnackbarController, useAuthController } from "@rebasepro/core";
 import { ConfirmationDialog } from "@rebasepro/core";
-import { ErrorBoundary } from "@rebasepro/ui";
 import { useState } from "react";
 import { useEntityHistory } from "../../index";
 

@@ -1,7 +1,18 @@
 
 import React, { useCallback, useMemo, useRef, useState } from "react";
-import { cls, defaultBorderMixin, Popover, Typography, CircularProgress, IconButton , iconSize, SearchBar } from "@rebasepro/ui";
-import { CircleUserIcon, SearchIcon, XIcon } from "lucide-react";
+import {
+    CircleUserIcon,
+    CircularProgress,
+    cls,
+    defaultBorderMixin,
+    IconButton,
+    iconSize,
+    Popover,
+    SearchBar,
+    SearchIcon,
+    Typography,
+    XIcon
+} from "@rebasepro/ui";
 import { User } from "@rebasepro/types";
 
 /**

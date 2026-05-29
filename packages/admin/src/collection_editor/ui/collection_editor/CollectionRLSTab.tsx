@@ -13,8 +13,30 @@ function sanitizeSqlIdentifier(name: string): string {
     }
     return `"${name}"`;
 }
-import { Button, IconButton, Typography, cls, defaultBorderMixin, Chip, Paper, Container, Tooltip, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, SelectItem, MultiSelect, MultiSelectItem , iconSize } from "@rebasepro/ui";
-import { KeyIcon, Trash2Icon } from "lucide-react";
+import {
+    Button,
+    Chip,
+    CircularProgress,
+    cls,
+    Container,
+    defaultBorderMixin,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    IconButton,
+    iconSize,
+    KeyIcon,
+    MultiSelect,
+    MultiSelectItem,
+    Paper,
+    Select,
+    SelectItem,
+    TextField,
+    Tooltip,
+    Trash2Icon,
+    Typography
+} from "@rebasepro/ui";
 import { useFormex } from "@rebasepro/formex";
 import { useRebaseContext } from "@rebasepro/core";
 

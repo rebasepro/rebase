@@ -3,8 +3,7 @@ import {
     useTranslation
 } from "@rebasepro/core";
 import { PluginHomePageAdditionalCardsProps } from "@rebasepro/types";
-import { Card, cls, Typography } from "@rebasepro/ui";
-import { PlusIcon } from "lucide-react";
+import { Card, cls, PlusIcon, Typography } from "@rebasepro/ui";
 import { useCollectionEditorController } from "../useCollectionEditorController";
 
 export function NewCollectionCard({

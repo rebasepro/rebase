@@ -4,8 +4,23 @@ import { Fragment, DOMParser } from "prosemirror-model";
 import { useProseMirrorContext } from "../hooks/useProseMirrorContext";
 import { autoUpdate, computePosition, flip, offset, shift, type VirtualElement } from "@floating-ui/dom";
 import { SlashCommandPluginKey } from "../plugins/slashCommandPlugin";
-import { cls, defaultBorderMixin , iconSize } from "@rebasepro/ui";
-import { CheckSquareIcon, Heading1Icon, Heading2Icon, Heading3Icon, Wand2Icon, TableIcon, TypeIcon, ListIcon, ListOrderedIcon, QuoteIcon, CodeIcon, ImageIcon } from "lucide-react";
+import {
+    CheckSquareIcon,
+    cls,
+    CodeIcon,
+    defaultBorderMixin,
+    Heading1Icon,
+    Heading2Icon,
+    Heading3Icon,
+    iconSize,
+    ImageIcon,
+    ListIcon,
+    ListOrderedIcon,
+    QuoteIcon,
+    TableIcon,
+    TypeIcon,
+    Wand2Icon
+} from "@rebasepro/ui";
 import { setBlockType, wrapIn } from "prosemirror-commands";
 import { wrapInList } from "prosemirror-schema-list";
 import { schema } from "../schema";

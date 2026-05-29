@@ -4,8 +4,15 @@ import { CSS } from "@dnd-kit/utilities";
 import { BoardSortableList } from "./BoardSortableList";
 import { BoardColumnTitle } from "./BoardColumnTitle";
 import { BoardItem, BoardItemViewProps } from "./board_types";
-import { ChipColorKey, ChipColorScheme, cls, defaultBorderMixin, IconButton , iconSize } from "@rebasepro/ui";
-import { PlusIcon } from "lucide-react";
+import {
+    ChipColorKey,
+    ChipColorScheme,
+    cls,
+    defaultBorderMixin,
+    IconButton,
+    iconSize,
+    PlusIcon
+} from "@rebasepro/ui";
 
 export interface BoardColumnProps<M extends Record<string, unknown>> {
     id: string;

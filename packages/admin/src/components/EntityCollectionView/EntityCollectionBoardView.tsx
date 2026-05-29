@@ -5,8 +5,21 @@ import { Entity, EntityTableController, EnumValueConfig, SaveEntityProps, Select
 import { Board } from "./Board";
 import { BoardItem, BoardItemViewProps, ColumnLoadingState } from "./board_types";
 import { EntityBoardCard } from "./EntityBoardCard";
-import { Button, ChipColorKey, ChipColorScheme, CircularProgress, Dialog, DialogActions, DialogContent, getColorSchemeForSeed, IconButton, Tooltip, Typography , iconSize } from "@rebasepro/ui";
-import { RefreshCwIcon } from "lucide-react";
+import {
+    Button,
+    ChipColorKey,
+    ChipColorScheme,
+    CircularProgress,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    getColorSchemeForSeed,
+    IconButton,
+    iconSize,
+    RefreshCwIcon,
+    Tooltip,
+    Typography
+} from "@rebasepro/ui";
 import { resolveEnumValues } from "@rebasepro/common";
 import { getPropertyInPath } from "../../util/property_utils";
 import {

@@ -1,5 +1,4 @@
-import { cls, defaultBorderMixin } from "@rebasepro/ui";
-import { CircleUserIcon } from "lucide-react";
+import { CircleUserIcon, cls, defaultBorderMixin } from "@rebasepro/ui";
 import { User } from "@rebasepro/types";
 
 /**

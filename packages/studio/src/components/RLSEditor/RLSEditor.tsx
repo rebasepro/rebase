@@ -1,8 +1,28 @@
 
 import { useStudioCollectionRegistry } from "@rebasepro/core";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Paper, Typography, CircularProgress, cls, Alert, defaultBorderMixin, Card, Chip, Button, Tooltip, ResizablePanels, IconButton, Tabs, Tab , iconSize } from "@rebasepro/ui";
-import { ShieldIcon, RefreshCwIcon, AlertTriangleIcon, KeyIcon, Trash2Icon } from "lucide-react";
+import {
+    Alert,
+    AlertTriangleIcon,
+    Button,
+    Card,
+    Chip,
+    CircularProgress,
+    cls,
+    defaultBorderMixin,
+    IconButton,
+    iconSize,
+    KeyIcon,
+    Paper,
+    RefreshCwIcon,
+    ResizablePanels,
+    ShieldIcon,
+    Tab,
+    Tabs,
+    Tooltip,
+    Trash2Icon,
+    Typography
+} from "@rebasepro/ui";
 import { useRebaseContext, useSnackbarController, ErrorView, useTranslation } from "@rebasepro/core";
 import { isPostgresCollection } from "@rebasepro/types";
 import { PolicyEditor } from "./PolicyEditor";

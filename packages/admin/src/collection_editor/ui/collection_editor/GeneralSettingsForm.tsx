@@ -5,8 +5,24 @@ import React, { useState } from "react";
 import { useAuthController, useCustomizationController } from "@rebasepro/core";
 import { SearchIconsView } from "../../_cms_internals";
 import type { EntityCollection, PostgresCollection } from "@rebasepro/types";
-import { BooleanSwitchWithLabel, Chip, cls, Container, DebouncedTextField, Dialog, ExpandablePanel, IconButton, Select, SelectItem, TextField, Tooltip, Typography , iconSize } from "@rebasepro/ui";
-import { HistoryIcon, SearchIcon } from "lucide-react";
+import {
+    BooleanSwitchWithLabel,
+    Chip,
+    cls,
+    Container,
+    DebouncedTextField,
+    Dialog,
+    ExpandablePanel,
+    HistoryIcon,
+    IconButton,
+    iconSize,
+    SearchIcon,
+    Select,
+    SelectItem,
+    TextField,
+    Tooltip,
+    Typography
+} from "@rebasepro/ui";
 import { Field, getIn, useFormex } from "@rebasepro/formex";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
 import { singular, toSnakeCase } from "@rebasepro/utils";

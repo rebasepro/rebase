@@ -11,7 +11,7 @@ import {
     SearchBar,
     iconSize
 } from "@rebasepro/ui";
-import { BookOpenIcon, PlayIcon } from "lucide-react";
+import { BookOpenIcon, PlayIcon } from "@rebasepro/ui";
 import { EndpointDetail } from "./EndpointDetail";
 import { TryItPanel } from "./TryItPanel";
 import type { OpenApiSpec, ParsedEndpoint } from "./types";

@@ -7,8 +7,7 @@ import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
 import { EnumValuesChip } from "../../preview";
 import { getIconForProperty } from "../../util/property_utils";
 import { enumToObjectEntries, getLabelOrConfigFrom } from "@rebasepro/common";
-import { MultiSelect, MultiSelectItem , iconSize } from "@rebasepro/ui";
-import { XIcon } from "lucide-react";
+import { iconSize, MultiSelect, MultiSelectItem, XIcon } from "@rebasepro/ui";
 import { useClearRestoreValue } from "../useClearRestoreValue";
 
 /**

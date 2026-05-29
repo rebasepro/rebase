@@ -1,8 +1,23 @@
 
 import type { Properties } from "@rebasepro/types";
 import React, { useState } from "react";
-import { Button, defaultBorderMixin, Dialog, DialogActions, DialogContent, DialogTitle, Menu, MenuItem, Typography , iconSize } from "@rebasepro/ui";
-import { XCircleIcon, CheckIcon, ChevronDownIcon, EyeIcon, AlertTriangleIcon } from "lucide-react";
+import {
+    AlertTriangleIcon,
+    Button,
+    CheckIcon,
+    ChevronDownIcon,
+    defaultBorderMixin,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    EyeIcon,
+    iconSize,
+    Menu,
+    MenuItem,
+    Typography,
+    XCircleIcon
+} from "@rebasepro/ui";
 import { FormexController } from "@rebasepro/formex";
 import { useSnackbarController, useTranslation } from "@rebasepro/core";
 import { flattenKeys, removeEntityFromCache } from "@rebasepro/core";

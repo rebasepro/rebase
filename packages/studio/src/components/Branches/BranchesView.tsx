@@ -1,7 +1,29 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Typography, cls, defaultBorderMixin, Button, Chip, CircularProgress, IconButton, Paper, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, SelectItem, Alert , iconSize } from "@rebasepro/ui";
-import { GitBranchIcon, Trash2Icon, RefreshCwIcon, PlusIcon, CopyIcon } from "lucide-react";
+import {
+    Alert,
+    Button,
+    Chip,
+    CircularProgress,
+    cls,
+    CopyIcon,
+    defaultBorderMixin,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    GitBranchIcon,
+    IconButton,
+    iconSize,
+    Paper,
+    PlusIcon,
+    RefreshCwIcon,
+    Select,
+    SelectItem,
+    TextField,
+    Trash2Icon,
+    Typography
+} from "@rebasepro/ui";
 import { useRebaseContext, useSnackbarController, ConfirmationDialog } from "@rebasepro/core";
 import { isBranchAdmin } from "@rebasepro/types";
 import type { BranchInfo } from "@rebasepro/types";

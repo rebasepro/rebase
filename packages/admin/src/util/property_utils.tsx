@@ -4,10 +4,24 @@ import type { EntityCollection, MapProperty, Property, PropertyConfig, StringPro
 import React from "react";
 
 import { isPropertyBuilder } from "@rebasepro/common";
-import { iconSize } from "@rebasepro/ui";
-import type { IconSize } from "@rebasepro/ui";
-import { CircleIcon, FlagIcon, FunctionSquareIcon, GlobeIcon, TextIcon, Rows3Icon, LinkIcon, VoteIcon, MailIcon, HashIcon, RepeatIcon, CalendarIcon, AlignLeftIcon, UploadIcon } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import {
+    AlignLeftIcon,
+    CalendarIcon,
+    CircleIcon,
+    FlagIcon,
+    FunctionSquareIcon,
+    GlobeIcon,
+    HashIcon,
+    iconSize,
+    LinkIcon,
+    MailIcon,
+    RepeatIcon,
+    Rows3Icon,
+    TextIcon,
+    UploadIcon,
+    VoteIcon
+} from "@rebasepro/ui";
+import type { IconSize, LucideIcon } from "@rebasepro/ui";
 
 /**
  * Resolve a size value (string token or number) to a numeric pixel value

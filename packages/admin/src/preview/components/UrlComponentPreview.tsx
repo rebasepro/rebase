@@ -3,8 +3,7 @@ import React, { useMemo } from "react";
 import { ImagePreview } from "./ImagePreview";
 import { PreviewType } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
-import { cls, Tooltip, Typography } from "@rebasepro/ui";
-import { ExternalLinkIcon, FileTextIcon } from "lucide-react";
+import { cls, ExternalLinkIcon, FileTextIcon, Tooltip, Typography } from "@rebasepro/ui";
 import { EmptyValue } from "./EmptyValue";
 import { getThumbnailMeasure } from "../util";
 

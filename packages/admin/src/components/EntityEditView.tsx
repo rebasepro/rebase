@@ -7,7 +7,21 @@ import { PluginProviderStack, resolveComponentRef } from "@rebasepro/core";
 
 import { EntityCollectionView, EntityView } from "../components";
 import { CircularProgressCenter, iconSize } from "@rebasepro/ui";
-import { CodeIcon, HistoryIcon, Maximize2Icon } from "lucide-react";
+import {
+    CenteredView,
+    CircularProgress,
+    cls,
+    CodeIcon,
+    defaultBorderMixin,
+    HistoryIcon,
+    IconButton,
+    Maximize2Icon,
+    Skeleton,
+    Tab,
+    Tabs,
+    Tooltip,
+    Typography
+} from "@rebasepro/ui";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { ErrorView } from "@rebasepro/core";
 import {
@@ -16,7 +30,6 @@ import {
     resolveDefaultSelectedView
 } from "@rebasepro/common";
 import { resolvedSelectedEntityView } from "../util/resolutions";
-import { CenteredView, CircularProgress, cls, defaultBorderMixin, IconButton, Tab, Tabs, Tooltip, Typography, Skeleton } from "@rebasepro/ui";
 import {
     useCustomizationController,
     useEntityFetch,

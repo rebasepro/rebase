@@ -18,8 +18,22 @@ declare global {
     }
 }
 
-import { Button, cls, IconButton, LoadingButton, Menu, MenuItem, TextField, Typography, iconSize } from "@rebasepro/ui";
-import { ArrowLeftIcon, MailIcon, MoonIcon, SunIcon, SunMoonIcon } from "lucide-react";
+import {
+    ArrowLeftIcon,
+    Button,
+    cls,
+    IconButton,
+    iconSize,
+    LoadingButton,
+    MailIcon,
+    Menu,
+    MenuItem,
+    MoonIcon,
+    SunIcon,
+    SunMoonIcon,
+    TextField,
+    Typography
+} from "@rebasepro/ui";
 import { AuthControllerExtended, User } from "@rebasepro/types";
 import { ErrorView } from "../ErrorView";
 import { RebaseLogo } from "../RebaseLogo";

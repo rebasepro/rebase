@@ -5,8 +5,18 @@ import { useAuthController, useCustomizationController } from "@rebasepro/core";
 import { getFieldConfig } from "../../../components/field_configs";
 import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
 import { EntityCollection, Property } from "@rebasepro/types";
-import { BooleanSwitchWithLabel, Container, IconButton, Select, SelectItem, TextField, Typography, Button , iconSize } from "@rebasepro/ui";
-import { XIcon } from "lucide-react";
+import {
+    BooleanSwitchWithLabel,
+    Button,
+    Container,
+    IconButton,
+    iconSize,
+    Select,
+    SelectItem,
+    TextField,
+    Typography,
+    XIcon
+} from "@rebasepro/ui";
 
 import { useFormex } from "@rebasepro/formex";
 import { LayoutModeSwitch } from "./LayoutModeSwitch";

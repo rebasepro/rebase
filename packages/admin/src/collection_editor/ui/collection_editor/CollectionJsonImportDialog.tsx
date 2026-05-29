@@ -1,7 +1,17 @@
 
 import React, { useCallback, useState } from "react";
-import { Alert, Button, cls, Dialog, DialogActions, DialogContent, DialogTitle, Typography , iconSize } from "@rebasepro/ui";
-import { CodeIcon } from "lucide-react";
+import {
+    Alert,
+    Button,
+    cls,
+    CodeIcon,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    iconSize,
+    Typography
+} from "@rebasepro/ui";
 import { EntityCollection } from "@rebasepro/types";
 import { validateCollectionJson, CollectionValidationError } from "../../validateCollectionJson";
 

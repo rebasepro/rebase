@@ -3,8 +3,42 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { User } from "@rebasepro/types";
 import { useSnackbarController, useAuthController, useTranslation } from "@rebasepro/core";
 import { useBreadcrumbsController } from "../../index";
-import { Alert, Button, Container, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Table, TableBody, TableCell, TableHeader, TableRow, TextField, Typography, CircularProgress, CenteredView, Tooltip, MultiSelect, MultiSelectItem, LoadingButton, SearchBar, Select, SelectItem, Skeleton , iconSize } from "@rebasepro/ui";
-import { MailIcon, KeyRoundIcon, PlusIcon, Trash2Icon, CopyIcon, CheckCircleIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import {
+    Alert,
+    Button,
+    CenteredView,
+    CheckCircleIcon,
+    ChevronLeftIcon,
+    ChevronRightIcon,
+    CircularProgress,
+    Container,
+    CopyIcon,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    IconButton,
+    iconSize,
+    KeyRoundIcon,
+    LoadingButton,
+    MailIcon,
+    MultiSelect,
+    MultiSelectItem,
+    PlusIcon,
+    SearchBar,
+    Select,
+    SelectItem,
+    Skeleton,
+    Table,
+    TableBody,
+    TableCell,
+    TableHeader,
+    TableRow,
+    TextField,
+    Tooltip,
+    Trash2Icon,
+    Typography
+} from "@rebasepro/ui";
 import { RoleChip } from "./RoleChip";
 import { UserManagementDelegate, Role, UserCreationResult } from "@rebasepro/types";
 import { ConfirmationDialog, BootstrapAdminBanner } from "@rebasepro/core";

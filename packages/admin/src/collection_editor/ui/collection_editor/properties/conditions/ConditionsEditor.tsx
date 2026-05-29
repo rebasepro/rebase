@@ -1,8 +1,21 @@
 
 import React from "react";
 import { useFormex } from "@rebasepro/formex";
-import { IconButton, Select, SelectItem, DebouncedTextField, Typography, Chip, TextField, cls, defaultBorderMixin, Button, BooleanSwitchWithLabel , iconSize } from "@rebasepro/ui";
-import { Trash2Icon } from "lucide-react";
+import {
+    BooleanSwitchWithLabel,
+    Button,
+    Chip,
+    cls,
+    DebouncedTextField,
+    defaultBorderMixin,
+    IconButton,
+    iconSize,
+    Select,
+    SelectItem,
+    TextField,
+    Trash2Icon,
+    Typography
+} from "@rebasepro/ui";
 import { getFieldConfig, DEFAULT_FIELD_CONFIGS } from "../../../../_cms_internals";
 import { Properties, Property, EnumValueConfig } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";

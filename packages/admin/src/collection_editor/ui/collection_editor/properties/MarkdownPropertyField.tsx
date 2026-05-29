@@ -5,8 +5,15 @@ import { ValidationPanel } from "./validation/ValidationPanel";
 import { Field, getIn, useFormex } from "@rebasepro/formex";
 import { useTranslation } from "@rebasepro/core";
 
-import { BooleanSwitchWithLabel, DebouncedTextField, ExpandablePanel, TextField, Typography } from "@rebasepro/ui";
-import { UploadCloudIcon, SettingsIcon } from "lucide-react";
+import {
+    BooleanSwitchWithLabel,
+    DebouncedTextField,
+    ExpandablePanel,
+    SettingsIcon,
+    TextField,
+    Typography,
+    UploadCloudIcon
+} from "@rebasepro/ui";
 
 export function MarkdownPropertyField({
     disabled,

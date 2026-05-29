@@ -1,7 +1,6 @@
 
 import React from "react";
-import { Typography, Button, IconButton, Paper, Container, Separator, cls } from "@rebasepro/ui";
-import { Trash2Icon } from "lucide-react";
+import { Button, cls, Container, IconButton, Paper, Separator, Trash2Icon, Typography } from "@rebasepro/ui";
 
 export const UIStyleGuide = () => {
     const typographyVariants = [

@@ -1,6 +1,13 @@
 import React from "react";
-import { coolIconKeys, iconKeys, iconSize, IconColor, colorClassesMapping, cls } from "@rebasepro/ui";
-import { icons as lucideIcons } from "lucide-react";
+import {
+    cls,
+    colorClassesMapping,
+    coolIconKeys,
+    IconColor,
+    iconKeys,
+    iconSize,
+    lucideIcons
+} from "@rebasepro/ui";
 import { deepEqual as equal } from "fast-equals"
 import { hashString, slugify } from "@rebasepro/utils";
 

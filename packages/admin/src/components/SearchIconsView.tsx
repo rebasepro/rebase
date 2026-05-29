@@ -1,7 +1,15 @@
 import React from "react";
 
-import { coolIconKeys, debounce, IconButton, iconKeys, SearchBar, Tooltip, iconSize } from "@rebasepro/ui";
-import { icons as lucideIcons } from "lucide-react";
+import {
+    coolIconKeys,
+    debounce,
+    IconButton,
+    iconKeys,
+    iconSize,
+    lucideIcons,
+    SearchBar,
+    Tooltip
+} from "@rebasepro/ui";
 import { iconsSearch, iconSynonyms } from "@rebasepro/core";
 import { useTranslation } from "@rebasepro/core";
 

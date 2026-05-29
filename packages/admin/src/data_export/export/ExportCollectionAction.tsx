@@ -9,8 +9,23 @@ import {
 import { useCMSContext } from "../../hooks";
 import { CollectionActionsProps, Entity, EntityCollection, ExportConfig, RebaseContext, User } from "@rebasepro/types";
 import { getDefaultValuesFor } from "@rebasepro/common";
-import { Alert, BooleanSwitchWithLabel, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Label, RadioGroup, RadioGroupItem, Tooltip, iconSize } from "@rebasepro/ui";
-import { DownloadIcon } from "lucide-react";
+import {
+    Alert,
+    BooleanSwitchWithLabel,
+    Button,
+    CircularProgress,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    DownloadIcon,
+    IconButton,
+    iconSize,
+    Label,
+    RadioGroup,
+    RadioGroupItem,
+    Tooltip
+} from "@rebasepro/ui";
 import { downloadEntitiesExport } from "./export";
 
 const DOCS_LIMIT = 500;

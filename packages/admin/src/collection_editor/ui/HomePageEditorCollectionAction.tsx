@@ -5,8 +5,7 @@ import {
     useTranslation
 } from "@rebasepro/core";
 import { PluginHomePageActionsProps } from "@rebasepro/types";
-import { IconButton, Menu, MenuItem } from "@rebasepro/ui";
-import { CopyIcon, MoreVerticalIcon, SettingsIcon, Trash2Icon } from "lucide-react";
+import { CopyIcon, IconButton, Menu, MenuItem, MoreVerticalIcon, SettingsIcon, Trash2Icon } from "@rebasepro/ui";
 import { useCollectionEditorController } from "../useCollectionEditorController";
 import { useState } from "react";
 import { useCollectionsConfigController } from "../useCollectionsConfigController";

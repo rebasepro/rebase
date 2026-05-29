@@ -2,8 +2,7 @@
 import { EditorState, Transaction } from "prosemirror-state";
 import { EditorBubbleItem } from "../components";
 import type { SelectorItem } from "./node-selector";
-import { Button, cls } from "@rebasepro/ui";
-import { BoldIcon, ItalicIcon, StrikethroughIcon, UnderlineIcon, CodeIcon } from "lucide-react";
+import { BoldIcon, Button, cls, CodeIcon, ItalicIcon, StrikethroughIcon, UnderlineIcon } from "@rebasepro/ui";
 import { useProseMirrorContext } from "../hooks/useProseMirrorContext";
 import { isMarkActive } from "../utils/prosemirror-utils";
 import { schema } from "../schema";

@@ -17,8 +17,7 @@
   },
   "dependencies": {
     "@rebasepro/core": "workspace:*",
-    "@rebasepro/types": "workspace:*",
-    "lucide-react": "1.14.0"
+    "@rebasepro/types": "workspace:*"
   },
   "peerDependencies": {
     "react": ">=19.0.0",
@@ -44,6 +43,7 @@
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
     "@types/jest": "^29.5.14",
+    "@types/node": "^20.19.41",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.7.0",

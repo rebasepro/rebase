@@ -9,8 +9,7 @@ import { copyEntityAction, deleteEntityAction } from "../components";
 import { mergeEntityActions } from "../util/entity_actions";
 import { resolveEntityAction } from "../util/resolutions";
 import { Button, CircularProgress, cls, defaultBorderMixin, DialogActions, IconButton, LoadingButton, Tooltip, Typography } from "@rebasepro/ui";
-import { AlertCircleIcon } from "lucide-react";
-import { iconSize } from "@rebasepro/ui";
+import { AlertCircleIcon, iconSize } from "@rebasepro/ui";
 import {
     useCustomizationController,
     useSnackbarController,

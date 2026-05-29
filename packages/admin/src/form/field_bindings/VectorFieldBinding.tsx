@@ -1,8 +1,16 @@
 import type { FieldProps } from "../../types/fields";
 import type { VectorProperty } from "@rebasepro/types";
 import React, { useState, useEffect, useCallback } from "react";
-import { TextField, IconButton, Button } from "@rebasepro/ui";
-import { EyeIcon, EyeOffIcon, PencilIcon, Trash2Icon, CheckIcon } from "lucide-react";
+import {
+    Button,
+    CheckIcon,
+    EyeIcon,
+    EyeOffIcon,
+    IconButton,
+    PencilIcon,
+    TextField,
+    Trash2Icon
+} from "@rebasepro/ui";
 import { FieldHelperText, LabelWithIcon } from "../components";
 import { useClearRestoreValue } from "../useClearRestoreValue";
 import { PropertyIdCopyTooltip } from "../../components/PropertyIdCopyTooltip";

@@ -3,8 +3,7 @@ import type { EntityCollection } from "@rebasepro/types";
 import React, { useCallback } from "react";
 import { deepEqual as equal } from "fast-equals";
 
-import { cls } from "@rebasepro/ui";
-import { PencilIcon } from "lucide-react";
+import { cls, PencilIcon } from "@rebasepro/ui";
 import { getRelationFrom, normalizeToEntityRelation } from "@rebasepro/common";
 
 import { RelationPreview } from "../../../preview";

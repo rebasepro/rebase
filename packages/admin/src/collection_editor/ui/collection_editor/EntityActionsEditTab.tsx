@@ -7,8 +7,22 @@ import {
 import { resolveEntityAction } from "../../_cms_internals";
 import { type EntityCollection } from "@rebasepro/types";
 import { EntityAction } from "@rebasepro/types";
-import { Alert, Button, Container, IconButton, Paper, Table, TableBody, TableCell, TableRow, Tooltip, Typography , iconSize } from "@rebasepro/ui";
-import { PlusIcon, Trash2Icon } from "lucide-react";
+import {
+    Alert,
+    Button,
+    Container,
+    IconButton,
+    iconSize,
+    Paper,
+    PlusIcon,
+    Table,
+    TableBody,
+    TableCell,
+    TableRow,
+    Tooltip,
+    Trash2Icon,
+    Typography
+} from "@rebasepro/ui";
 import { useFormex } from "@rebasepro/formex";
 import { EntityActionsSelectDialog } from "./EntityActionsSelectDialog";
 

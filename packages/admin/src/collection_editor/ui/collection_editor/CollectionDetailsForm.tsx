@@ -5,8 +5,24 @@ import React, { useMemo, useState } from "react";
 import { useAuthController, useCustomizationController } from "@rebasepro/core";
 import { getFieldConfig, PropertyConfigBadge, SearchIconsView } from "../../_cms_internals";
 import { EntityCollection, Property } from "@rebasepro/types";
-import { BooleanSwitchWithLabel, Chip, cls, Container, DebouncedTextField, Dialog, IconButton, Select, SelectItem, TextField, Tooltip, Typography, Button, iconSize } from "@rebasepro/ui";
-import { XIcon, HistoryIcon } from "lucide-react";
+import {
+    BooleanSwitchWithLabel,
+    Button,
+    Chip,
+    cls,
+    Container,
+    DebouncedTextField,
+    Dialog,
+    HistoryIcon,
+    IconButton,
+    iconSize,
+    Select,
+    SelectItem,
+    TextField,
+    Tooltip,
+    Typography,
+    XIcon
+} from "@rebasepro/ui";
 
 import { Field, getIn, useFormex } from "@rebasepro/formex";
 import { useCollectionEditorController } from "../../useCollectionEditorController";

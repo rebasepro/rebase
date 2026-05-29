@@ -1,7 +1,16 @@
 
 import React, { useEffect, useState } from "react";
-import { Avatar, Button, CircularProgress, Tabs, Tab, TextField, Typography, IconButton } from "@rebasepro/ui";
-import { Trash2Icon } from "lucide-react";
+import {
+    Avatar,
+    Button,
+    CircularProgress,
+    IconButton,
+    Tab,
+    Tabs,
+    TextField,
+    Trash2Icon,
+    Typography
+} from "@rebasepro/ui";
 import { useAuthController, useTranslation } from "../hooks";
 
 interface SessionInfo {

@@ -5,8 +5,7 @@ import { ErrorBoundary } from "@rebasepro/ui";
 import { Property } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";
 import { cls, Paper, Typography } from "@rebasepro/ui";
-import { MinusCircleIcon, FunctionSquareIcon } from "lucide-react";
-import { iconSize } from "@rebasepro/ui";
+import { FunctionSquareIcon, iconSize, MinusCircleIcon } from "@rebasepro/ui";
 
 
 export function PropertyFieldPreview({

@@ -28,7 +28,7 @@ export default defineConfig({
             output: {
                 manualChunks(id) {
                     // Heavy vendor libraries — split into individually cached chunks
-                    if (id.includes("xlsx")) return "vendor-xlsx";
+                    if (id.includes("exceljs")) return "vendor-exceljs";
                     if (id.includes("prosemirror")) return "vendor-prosemirror";
                     if (id.includes("monaco-editor") || id.includes("@monaco-editor")) return "vendor-monaco";
                     if (id.includes("@xyflow") || id.includes("dagre")) return "vendor-xyflow";

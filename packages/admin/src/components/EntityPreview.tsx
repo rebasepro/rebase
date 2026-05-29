@@ -6,8 +6,15 @@ import { useEffect, useMemo } from "react";
 import { Entity } from "@rebasepro/types";
 import type { PreviewSize } from "../types/components/PropertyPreviewProps";
 import { getEntityImagePreviewPropertyKey } from "@rebasepro/common";
-import { cls, defaultBorderMixin, IconButton, Skeleton, Tooltip, Typography } from "@rebasepro/ui";
-import { ArrowRightToLineIcon } from "lucide-react";
+import {
+    ArrowRightToLineIcon,
+    cls,
+    defaultBorderMixin,
+    IconButton,
+    Skeleton,
+    Tooltip,
+    Typography
+} from "@rebasepro/ui";
 import { PropertyPreview, SkeletonPropertyComponent } from "../preview";
 import {
     useAuthController,

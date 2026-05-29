@@ -4,8 +4,16 @@ import { useCollectionRegistryController } from "../../_cms_internals";
 import React, { useState } from "react";
 import { useSnackbarController } from "@rebasepro/core";
 import { EntityCollection } from "@rebasepro/types";
-import { Button, CircularProgress, IconButton, Menu, TextField, Tooltip, Typography } from "@rebasepro/ui";
-import { SendIcon } from "lucide-react";
+import {
+    Button,
+    CircularProgress,
+    IconButton,
+    Menu,
+    SendIcon,
+    TextField,
+    Tooltip,
+    Typography
+} from "@rebasepro/ui";
 import {
     CollectionGenerationCallback,
     CollectionGenerationApiError,

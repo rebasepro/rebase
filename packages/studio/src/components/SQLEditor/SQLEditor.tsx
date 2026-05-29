@@ -3,8 +3,44 @@ import { IconForView } from "@rebasepro/core";
 import { useStudioCollectionRegistry, useStudioSideEntityController } from "@rebasepro/core";
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Button, Paper, Typography, CircularProgress, cls, IconButton, InputLabel, Dialog, DialogContent, DialogActions, DialogTitle, TextField, Tooltip, Alert, Tabs, Tab, defaultBorderMixin, Select, SelectItem, Menu, MenuItem, ResizablePanels, Chip, VirtualTable, VirtualTableColumn , iconSize, Checkbox, TextareaAutosize } from "@rebasepro/ui";
-import { DatabaseIcon, TerminalIcon, XIcon, PlusIcon, PencilIcon, MoreVerticalIcon, MenuIcon, PlayIcon } from "lucide-react";
+import {
+    Alert,
+    Button,
+    Checkbox,
+    Chip,
+    CircularProgress,
+    cls,
+    DatabaseIcon,
+    defaultBorderMixin,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    IconButton,
+    iconSize,
+    InputLabel,
+    Menu,
+    MenuIcon,
+    MenuItem,
+    MoreVerticalIcon,
+    Paper,
+    PencilIcon,
+    PlayIcon,
+    PlusIcon,
+    ResizablePanels,
+    Select,
+    SelectItem,
+    Tab,
+    Tabs,
+    TerminalIcon,
+    TextareaAutosize,
+    TextField,
+    Tooltip,
+    Typography,
+    VirtualTable,
+    VirtualTableColumn,
+    XIcon
+} from "@rebasepro/ui";
 
 import { useRebaseContext, useSnackbarController, ConfirmationDialog, ErrorView, useTranslation } from "@rebasepro/core";
 import { MonacoEditor } from "./MonacoEditor";

@@ -3,8 +3,22 @@ import { EditorState, Transaction } from "prosemirror-state";
 import { EditorBubbleItem } from "../components";
 import { useTranslation } from "@rebasepro/core";
 
-import { Button, Popover , iconSize } from "@rebasepro/ui";
-import { CheckSquareIcon, Heading3Icon, Heading1Icon, Heading2Icon, CheckIcon, CodeIcon, ListIcon, ListOrderedIcon, QuoteIcon, ChevronDownIcon, TypeIcon } from "lucide-react";
+import {
+    Button,
+    CheckIcon,
+    CheckSquareIcon,
+    ChevronDownIcon,
+    CodeIcon,
+    Heading1Icon,
+    Heading2Icon,
+    Heading3Icon,
+    iconSize,
+    ListIcon,
+    ListOrderedIcon,
+    Popover,
+    QuoteIcon,
+    TypeIcon
+} from "@rebasepro/ui";
 import { useProseMirrorContext } from "../hooks/useProseMirrorContext";
 import { isNodeActive } from "../utils/prosemirror-utils";
 import { schema } from "../schema";

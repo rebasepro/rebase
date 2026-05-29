@@ -1,8 +1,21 @@
 
 import { getPropertyInPath } from "../../util";
 import { Properties, Property } from "@rebasepro/types";
-import { BooleanSwitchWithLabel, DateTimeField, ExpandablePanel, Select, SelectItem, Table, TableBody, TableCell, TableHeader, TableRow, TextField, Typography } from "@rebasepro/ui";
-import { ChevronRightIcon } from "lucide-react";
+import {
+    BooleanSwitchWithLabel,
+    ChevronRightIcon,
+    DateTimeField,
+    ExpandablePanel,
+    Select,
+    SelectItem,
+    Table,
+    TableBody,
+    TableCell,
+    TableHeader,
+    TableRow,
+    TextField,
+    Typography
+} from "@rebasepro/ui";
 import { getIn, setIn } from "@rebasepro/formex";
 import { ImportConfig } from "../types";
 

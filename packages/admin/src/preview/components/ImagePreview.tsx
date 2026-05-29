@@ -1,4 +1,4 @@
-import { CopyIcon, ExternalLinkIcon, ImageOffIcon } from "lucide-react";
+import { CopyIcon, ExternalLinkIcon, ImageOffIcon } from "@rebasepro/ui";
 import React, { CSSProperties, useMemo, useState, useEffect } from "react";import { IconButton, Tooltip } from "@rebasepro/ui";
 import { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { getThumbnailMeasure } from "../util";

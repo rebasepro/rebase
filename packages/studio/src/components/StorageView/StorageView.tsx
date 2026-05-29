@@ -1,7 +1,44 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Typography, cls, defaultBorderMixin, Button, IconButton, Tooltip, CircularProgress, ResizablePanels, Chip, Dialog, DialogTitle, DialogContent, DialogActions, FileUpload, iconSize, Checkbox, LoadingButton, TextField } from "@rebasepro/ui";
-import { VideoIcon, Music2Icon, RefreshCwIcon, Trash2Icon, XIcon, PlusIcon, DownloadIcon, UploadCloudIcon, FolderIcon, FolderPlusIcon, FileTextIcon, ImageIcon, ArrowLeftIcon, FileIcon, HomeIcon, LayoutGridIcon, ListIcon, CopyIcon, CheckIcon } from "lucide-react";
+import {
+    ArrowLeftIcon,
+    Button,
+    Checkbox,
+    CheckIcon,
+    Chip,
+    CircularProgress,
+    cls,
+    CopyIcon,
+    defaultBorderMixin,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    DownloadIcon,
+    FileIcon,
+    FileTextIcon,
+    FileUpload,
+    FolderIcon,
+    FolderPlusIcon,
+    HomeIcon,
+    IconButton,
+    iconSize,
+    ImageIcon,
+    LayoutGridIcon,
+    ListIcon,
+    LoadingButton,
+    Music2Icon,
+    PlusIcon,
+    RefreshCwIcon,
+    ResizablePanels,
+    TextField,
+    Tooltip,
+    Trash2Icon,
+    Typography,
+    UploadCloudIcon,
+    VideoIcon,
+    XIcon
+} from "@rebasepro/ui";
 import { useStorageSource, useSnackbarController, ErrorView, useApiConfig } from "@rebasepro/core";
 import type { StorageListResult } from "@rebasepro/types";
 import { useSearchParams } from "react-router-dom";

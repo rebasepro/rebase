@@ -4,11 +4,10 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { OnUpdateParams } from "../types/components/EntityFormProps";
 import { ErrorBoundary } from "@rebasepro/ui";
-import { Maximize2Icon, XIcon } from "lucide-react";
+import { IconButton, Maximize2Icon, XIcon } from "@rebasepro/ui";
 import { EntityEditView } from "./EntityEditView";
 import { EntityDetailView } from "./EntityDetailView";
 import { useSideDialogContext } from "./SideDialogs";
-import { IconButton } from "@rebasepro/ui";
 import { useLocation, useNavigate } from "react-router-dom";
 import { removeInitialAndTrailingSlashes } from "@rebasepro/common";
 import { saveEntityToMemoryCache } from "@rebasepro/core";

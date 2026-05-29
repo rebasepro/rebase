@@ -2,8 +2,7 @@
 import React, { useState } from "react";
 import { EnumValuesChip } from "../../../preview";
 import { VirtualTableWhereFilterOp } from "@rebasepro/ui";
-import { XIcon } from "lucide-react";
-import { IconButton, MultiSelect, MultiSelectItem, Select, SelectItem, TextField } from "@rebasepro/ui";
+import { IconButton, MultiSelect, MultiSelectItem, Select, SelectItem, TextField, XIcon } from "@rebasepro/ui";
 import { EnumValueConfig } from "@rebasepro/types";
 import { useTranslation } from "@rebasepro/core";
 

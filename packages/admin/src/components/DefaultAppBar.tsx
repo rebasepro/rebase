@@ -4,8 +4,20 @@ import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { RebaseLogo, LanguageToggle } from "@rebasepro/core";
 import { ErrorBoundary , iconSize } from "@rebasepro/ui";
-import { MoonIcon, SunIcon, SettingsIcon, SunMoonIcon, LogOutIcon } from "lucide-react";
-import { Avatar, cls, IconButton, Menu, MenuItem, Skeleton, Typography } from "@rebasepro/ui";
+import {
+    Avatar,
+    cls,
+    IconButton,
+    LogOutIcon,
+    Menu,
+    MenuItem,
+    MoonIcon,
+    SettingsIcon,
+    Skeleton,
+    SunIcon,
+    SunMoonIcon,
+    Typography
+} from "@rebasepro/ui";
 import { useAuthController, useLargeLayout, useModeController, useAdminModeController, useTranslation } from "@rebasepro/core";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { User } from "@rebasepro/types";

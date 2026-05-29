@@ -1,7 +1,6 @@
 import { useTranslation } from "@rebasepro/core";
 import { EntityCollection, EntityTableController, Property } from "@rebasepro/types";
-import { IconButton, Tooltip } from "@rebasepro/ui";
-import { SettingsIcon } from "lucide-react";
+import { IconButton, SettingsIcon, Tooltip } from "@rebasepro/ui";
 import React from "react";
 import { useCollectionEditorController } from "../useCollectionEditorController";
 

@@ -8,8 +8,18 @@ import {
 import { getPropertyInPath } from "../_cms_internals";
 import { EntityCollection, EnumValueConfig, StringProperty } from "@rebasepro/types";
 import { resolveEnumValues } from "@rebasepro/common";
-import { Button, cls, defaultBorderMixin, Dialog, DialogActions, DialogContent, IconButton, TextField, Typography } from "@rebasepro/ui";
-import { PlusIcon } from "lucide-react";
+import {
+    Button,
+    cls,
+    defaultBorderMixin,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    IconButton,
+    PlusIcon,
+    TextField,
+    Typography
+} from "@rebasepro/ui";
 import { useCollectionsConfigController } from "../useCollectionsConfigController";
 import { toSnakeCase } from "@rebasepro/utils";
 

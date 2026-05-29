@@ -1,5 +1,4 @@
-import { Button, Tooltip , iconSize } from "@rebasepro/ui";
-import { FilterXIcon } from "lucide-react";
+import { Button, FilterXIcon, iconSize, Tooltip } from "@rebasepro/ui";
 import { EntityTableController } from "@rebasepro/types";
 import { useTranslation } from "@rebasepro/core";
 

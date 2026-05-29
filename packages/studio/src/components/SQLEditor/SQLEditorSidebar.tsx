@@ -1,7 +1,6 @@
 
 import React, { useState } from "react";
-import { Typography, cls, defaultBorderMixin, Tabs, Tab, IconButton , iconSize } from "@rebasepro/ui";
-import { Trash2Icon } from "lucide-react";
+import { cls, defaultBorderMixin, IconButton, iconSize, Tab, Tabs, Trash2Icon, Typography } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/core";
 import { SchemaBrowser } from "./SchemaBrowser";
 import { TableInfo } from "./SQLEditor";

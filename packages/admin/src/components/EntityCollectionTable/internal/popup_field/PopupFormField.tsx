@@ -4,7 +4,7 @@ import type { FormContext, PropertyFieldBindingProps } from "../../../../types/f
 import type { Property } from "@rebasepro/types";
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 
-import * as Portal from "@radix-ui/react-portal";
+import { Button, DialogActions, IconButton, Portal, Typography, XIcon } from "@rebasepro/ui";
 
 import { Entity, EntityValues } from "@rebasepro/types";
 import { PluginProviderStack } from "@rebasepro/core";
@@ -13,8 +13,6 @@ import { useDraggable } from "./useDraggable";
 import { CustomFieldValidator, getEntitySchema } from "../../../../form/validation";
 import { useWindowSize } from "./useWindowSize";
 import { getPropertyInPath } from "../../../../util/property_utils";
-import { Button, DialogActions, IconButton, Typography } from "@rebasepro/ui";
-import { XIcon } from "lucide-react";
 import { PropertyFieldBinding, zodToFormErrors } from "../../../../form";
 import { useAuthController, useCustomizationController, useData, useRebaseContext } from "@rebasepro/core";
 import type { OnCellValueChangeParams } from "@rebasepro/core";

@@ -5,8 +5,7 @@ import { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { PropertyPreview } from "../../preview";
 
 import { cls, IconButton, paperMixin, Tooltip } from "@rebasepro/ui";
-import { FileTextIcon, MinusIcon } from "lucide-react";
-import { ErrorBoundary } from "@rebasepro/ui";
+import { ErrorBoundary, FileTextIcon, MinusIcon } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/core";
 
 interface StorageItemPreviewProps {

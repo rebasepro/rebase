@@ -1,6 +1,5 @@
 import React, { PropsWithChildren, useState } from "react";
-import { cls, IconButton, Typography, ExpandablePanel , iconSize } from "@rebasepro/ui";
-import { PencilIcon } from "lucide-react";
+import { cls, ExpandablePanel, IconButton, iconSize, PencilIcon, Typography } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/core";
 
 export function NavigationGroup({

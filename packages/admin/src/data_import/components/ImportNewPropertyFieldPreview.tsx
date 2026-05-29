@@ -5,8 +5,7 @@ import {
     getFieldConfig,
     PropertyConfigBadge
 } from "../../components";
-import { ErrorBoundary, IconButton, TextField } from "@rebasepro/ui";
-import { PencilIcon } from "lucide-react";
+import { ErrorBoundary, IconButton, PencilIcon, TextField } from "@rebasepro/ui";
 
 export function ImportNewPropertyFieldPreview({
     propertyKey,

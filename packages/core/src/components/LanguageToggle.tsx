@@ -1,6 +1,5 @@
 import React from "react";
-import { IconButton, Menu, MenuItem, Typography, iconSize } from "@rebasepro/ui";
-import { CheckIcon, LanguagesIcon } from "lucide-react";
+import { CheckIcon, IconButton, iconSize, LanguagesIcon, Menu, MenuItem, Typography } from "@rebasepro/ui";
 import { useTranslation } from "../hooks";
 
 export function LanguageToggle() {

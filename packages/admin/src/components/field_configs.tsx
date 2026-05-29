@@ -19,7 +19,26 @@ import { TextFieldBinding } from "../form/field_bindings/TextFieldBinding";
 import { VectorFieldBinding } from "../form/field_bindings/VectorFieldBinding";
 import { isPropertyBuilder } from "@rebasepro/common";
 
-import { FolderUpIcon, FlagIcon, GlobeIcon, ListIcon, TextIcon, UserCheckIcon, Rows3Icon, LinkIcon, VoteIcon, ListOrderedIcon, QuoteIcon, MailIcon, HashIcon, UserIcon, RepeatIcon, CalendarIcon, AlignLeftIcon, UploadIcon } from "lucide-react";
+import {
+    AlignLeftIcon,
+    CalendarIcon,
+    FlagIcon,
+    FolderUpIcon,
+    GlobeIcon,
+    HashIcon,
+    LinkIcon,
+    ListIcon,
+    ListOrderedIcon,
+    MailIcon,
+    QuoteIcon,
+    RepeatIcon,
+    Rows3Icon,
+    TextIcon,
+    UploadIcon,
+    UserCheckIcon,
+    UserIcon,
+    VoteIcon
+} from "@rebasepro/ui";
 import { RelationFieldBinding } from "../form/field_bindings/RelationFieldBinding";
 import { UserSelectFieldBinding } from "../form/field_bindings/UserSelectFieldBinding";
 import { mergeDeep } from "@rebasepro/utils";

@@ -6,8 +6,23 @@ import { deepEqual as equal } from "fast-equals"
 ;
 import { EnumValueConfig, EnumValues } from "@rebasepro/types";
 import { ArrayContainer, ArrayEntryParams } from "../../_cms_internals";
-import { Badge, Button, CircularProgress, DebouncedTextField, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Paper, Typography , iconSize } from "@rebasepro/ui";
-import { RefreshCcwIcon, ListIcon, SettingsIcon } from "lucide-react";
+import {
+    Badge,
+    Button,
+    CircularProgress,
+    DebouncedTextField,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    IconButton,
+    iconSize,
+    ListIcon,
+    Paper,
+    RefreshCcwIcon,
+    SettingsIcon,
+    Typography
+} from "@rebasepro/ui";
 import { extractEnumFromValues } from "@rebasepro/schema-inference";
 import { Field, Formex, getIn, useCreateFormex, useFormex } from "@rebasepro/formex";
 

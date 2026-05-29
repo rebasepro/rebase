@@ -1,7 +1,6 @@
 import React from "react";
 import { ErrorTooltip } from "./ErrorTooltip";
-import { Typography, Button } from "@rebasepro/ui";
-import { AlertTriangleIcon } from "lucide-react";
+import { AlertTriangleIcon, Button, Typography } from "@rebasepro/ui";
 
 /**
  * @group Components

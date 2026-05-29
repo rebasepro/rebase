@@ -52,3 +52,10 @@ export * from "./DebouncedTextField";
 export * from "./Skeleton";
 export * from "./ToggleButtonGroup";
 export * from "./VirtualTable";
+
+// Re-exported Radix primitives — consume these from @rebasepro/ui instead of
+// adding direct @radix-ui/* deps to every sub-package.
+import * as Portal from "@radix-ui/react-portal";
+import * as PopoverPrimitive from "@radix-ui/react-popover";
+export { Portal, PopoverPrimitive };
+export { Slot } from "@radix-ui/react-slot";

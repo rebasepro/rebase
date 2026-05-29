@@ -1,8 +1,7 @@
 import type { NavigationEntry, EntityCollection } from "@rebasepro/types";
 import { useNavigate } from "react-router-dom";
 ;
-import { IconButton, Tooltip } from "@rebasepro/ui";
-import { StarIcon } from "lucide-react";
+import { IconButton, StarIcon, Tooltip } from "@rebasepro/ui";
 import { NavigationCard } from "./NavigationCard";
 import { SmallNavigationCard } from "./SmallNavigationCard";
 import React from "react";

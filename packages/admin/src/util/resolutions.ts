@@ -1,4 +1,4 @@
-import { HistoryIcon } from "lucide-react";
+import { HistoryIcon } from "@rebasepro/ui";
 import React, { lazy } from "react";
 import type { EntityCustomView, EntityCollection } from "@rebasepro/types";
 import type { CustomizationController, EntityAction } from "@rebasepro/types";

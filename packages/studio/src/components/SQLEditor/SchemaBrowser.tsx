@@ -1,7 +1,19 @@
 
 import React, { useState } from "react";
-import { Typography, CircularProgress, cls, IconButton, defaultBorderMixin, Menu, MenuItem, Button , iconSize } from "@rebasepro/ui";
-import { CopyIcon, MoreVerticalIcon, RefreshCwIcon } from "lucide-react";
+import {
+    Button,
+    CircularProgress,
+    cls,
+    CopyIcon,
+    defaultBorderMixin,
+    IconButton,
+    iconSize,
+    Menu,
+    MenuItem,
+    MoreVerticalIcon,
+    RefreshCwIcon,
+    Typography
+} from "@rebasepro/ui";
 import { TableInfo } from "./SQLEditor";
 import { ErrorView, useTranslation } from "@rebasepro/core";
 

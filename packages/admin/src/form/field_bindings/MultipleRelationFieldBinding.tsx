@@ -9,8 +9,7 @@ import { getIconForProperty } from "../../util/property_utils";
 import { getRelationFrom, resolveRelationProperty } from "@rebasepro/common";
 
 import { useTranslation, ErrorView } from "@rebasepro/core";
-import { Button, cls, ExpandablePanel, fieldBackgroundMixin, Typography } from "@rebasepro/ui";
-import { PencilIcon } from "lucide-react";
+import { Button, cls, ExpandablePanel, fieldBackgroundMixin, PencilIcon, Typography } from "@rebasepro/ui";
 import { RelationPreview } from "../../preview";
 
 /**

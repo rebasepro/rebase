@@ -1,4 +1,4 @@
-import { Wand2Icon } from "lucide-react";
+import { Wand2Icon } from "@rebasepro/ui";
 import React from "react";
 
 export interface AIIconProps {

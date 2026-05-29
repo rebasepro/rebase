@@ -9,8 +9,7 @@ import { CollectionSize, Entity, EntityReference, FilterValues } from "@rebasepr
 import { getPreviewSizeFrom } from "../../../preview/util";
 import { useCustomizationController } from "@rebasepro/core";
 import { ErrorView } from "@rebasepro/core";
-import { cls } from "@rebasepro/ui";
-import { PencilIcon } from "lucide-react";
+import { cls, PencilIcon } from "@rebasepro/ui";
 import { EntityPreviewContainer } from "../../EntityPreview";
 import { getReferenceFrom } from "@rebasepro/common";
 import { useCollectionRegistryController } from "../../../index";

@@ -4,8 +4,17 @@ import { IconForView } from "@rebasepro/core";
 import { useUrlController } from "../../_cms_internals";
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { cls, defaultBorderMixin, ResizablePanels, Typography, IconButton, Button , iconSize, Tooltip } from "@rebasepro/ui";
-import { PlusIcon } from "lucide-react";
+import {
+    Button,
+    cls,
+    defaultBorderMixin,
+    IconButton,
+    iconSize,
+    PlusIcon,
+    ResizablePanels,
+    Tooltip,
+    Typography
+} from "@rebasepro/ui";
 ;
 import { CollectionsConfigController } from "../../types/config_controller";
 import { CollectionStudioView } from "./CollectionStudioView";

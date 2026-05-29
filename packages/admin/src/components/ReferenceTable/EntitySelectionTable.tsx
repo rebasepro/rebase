@@ -15,8 +15,7 @@ import {
     usePermissions
 } from "@rebasepro/core";
 import { ErrorView } from "@rebasepro/core";
-import { Button, DialogActions, Typography } from "@rebasepro/ui";
-import { PlusIcon } from "lucide-react";
+import { Button, DialogActions, PlusIcon, Typography } from "@rebasepro/ui";
 import { IconForView } from "@rebasepro/core";
 import { useSelectionController } from "../EntityCollectionView/useSelectionController";
 

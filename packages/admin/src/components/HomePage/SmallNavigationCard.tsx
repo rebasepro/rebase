@@ -1,5 +1,4 @@
-import { cardClickableMixin, cardMixin, cls, Typography } from "@rebasepro/ui";
-import { ArrowRightIcon } from "lucide-react";
+import { ArrowRightIcon, cardClickableMixin, cardMixin, cls, Typography } from "@rebasepro/ui";
 
 import { Link } from "react-router-dom";
 

@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo } from "react";
-import { cls, FilterChip, Menu, MenuItem, Tooltip } from "@rebasepro/ui";
-import { CheckIcon, ChevronsUpDownIcon } from "lucide-react";
+import { CheckIcon, ChevronsUpDownIcon, cls, FilterChip, Menu, MenuItem, Tooltip } from "@rebasepro/ui";
 import type { EntityTableController, FilterValues, FilterPreset } from "@rebasepro/types";
 
 export interface FilterPresetsButtonProps<M extends Record<string, unknown>> {

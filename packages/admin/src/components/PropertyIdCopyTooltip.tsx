@@ -1,5 +1,4 @@
-import { IconButton, Tooltip, Typography } from "@rebasepro/ui";
-import { CopyIcon } from "lucide-react";
+import { CopyIcon, IconButton, Tooltip, Typography } from "@rebasepro/ui";
 import { useCallback, useState } from "react";
 
 export function PropertyIdCopyTooltip({

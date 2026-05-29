@@ -1,7 +1,26 @@
 
 import React, { useState } from "react";
-import { Button, IconButton, Typography, Table, TableHeader, TableCell, TableBody, TableRow, TextField, Select, SelectItem, Container, Dialog, DialogTitle, DialogContent, DialogActions, cls, defaultBorderMixin } from "@rebasepro/ui";
-import { Trash2Icon } from "lucide-react";
+import {
+    Button,
+    cls,
+    Container,
+    defaultBorderMixin,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    IconButton,
+    Select,
+    SelectItem,
+    Table,
+    TableBody,
+    TableCell,
+    TableHeader,
+    TableRow,
+    TextField,
+    Trash2Icon,
+    Typography
+} from "@rebasepro/ui";
 import { useFormex } from "@rebasepro/formex";
 import { PostgresCollection, Relation } from "@rebasepro/types";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";

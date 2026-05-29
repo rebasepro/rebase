@@ -1,7 +1,24 @@
 
 import React, { useState, useEffect } from "react";
-import { Button, Paper, Typography, TextField, Select, SelectItem, MultiSelect, MultiSelectItem, cls, defaultBorderMixin, IconButton, Dialog, DialogTitle, DialogContent, DialogActions , iconSize } from "@rebasepro/ui";
-import { HelpCircleIcon } from "lucide-react";
+import {
+    Button,
+    cls,
+    defaultBorderMixin,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    HelpCircleIcon,
+    IconButton,
+    iconSize,
+    MultiSelect,
+    MultiSelectItem,
+    Paper,
+    Select,
+    SelectItem,
+    TextField,
+    Typography
+} from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/core";
 import { MonacoEditor } from "../SQLEditor/MonacoEditor";
 import { PostgresPolicy } from "./RLSEditor";

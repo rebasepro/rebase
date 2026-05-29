@@ -11,8 +11,57 @@
  *   DrawerNavigationGroup.tsx, UsersView.tsx, RolesView.tsx
  */
 import React, { useState } from "react";
-import { Alert, Avatar, BooleanSwitch, Button, Checkbox, Chip, CircularProgress, cls, defaultBorderMixin, IconButton, LoadingButton, Menu, MenuItem, MultiSelect, MultiSelectItem, SearchBar, Select, SelectItem, Separator, Skeleton, Tab, Table, TableBody, TableCell, TableHeader, TableRow, Tabs, TextField, Tooltip, Typography , iconSize } from "@rebasepro/ui";
-import { SunMoonIcon, ChevronsLeftIcon, ChevronsRightIcon, LogOutIcon, TagIcon, PlusIcon, MoonIcon, Trash2Icon, PencilIcon, ChevronDownIcon, FilterIcon, SunIcon, SettingsIcon, KanbanIcon, LayoutGridIcon, ListIcon, FolderIcon, UserIcon } from "lucide-react";
+import {
+    Alert,
+    Avatar,
+    BooleanSwitch,
+    Button,
+    Checkbox,
+    ChevronDownIcon,
+    ChevronsLeftIcon,
+    ChevronsRightIcon,
+    Chip,
+    CircularProgress,
+    cls,
+    defaultBorderMixin,
+    FilterIcon,
+    FolderIcon,
+    IconButton,
+    iconSize,
+    KanbanIcon,
+    LayoutGridIcon,
+    ListIcon,
+    LoadingButton,
+    LogOutIcon,
+    Menu,
+    MenuItem,
+    MoonIcon,
+    MultiSelect,
+    MultiSelectItem,
+    PencilIcon,
+    PlusIcon,
+    SearchBar,
+    Select,
+    SelectItem,
+    Separator,
+    SettingsIcon,
+    Skeleton,
+    SunIcon,
+    SunMoonIcon,
+    Tab,
+    Table,
+    TableBody,
+    TableCell,
+    TableHeader,
+    TableRow,
+    Tabs,
+    TagIcon,
+    TextField,
+    Tooltip,
+    Trash2Icon,
+    Typography,
+    UserIcon
+} from "@rebasepro/ui";
 import { RebaseLogo } from "../RebaseLogo";
 
 const SECTIONS = [

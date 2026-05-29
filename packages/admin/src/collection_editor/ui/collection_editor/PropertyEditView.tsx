@@ -8,8 +8,25 @@ import { DEFAULT_FIELD_CONFIGS, getFieldConfig, getFieldId } from "../../../comp
 import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
 import { Property, PropertyConfig, PropertyConfigId } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";
-import { Button, Card, cls, Dialog, DialogActions, DialogContent, DialogTitle, fieldBackgroundDisabledMixin, fieldBackgroundHoverMixin, fieldBackgroundMixin, IconButton, InfoLabel, Tooltip, Typography , iconSize } from "@rebasepro/ui";
-import { Trash2Icon, AlertTriangleIcon } from "lucide-react";
+import {
+    AlertTriangleIcon,
+    Button,
+    Card,
+    cls,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    fieldBackgroundDisabledMixin,
+    fieldBackgroundHoverMixin,
+    fieldBackgroundMixin,
+    IconButton,
+    iconSize,
+    InfoLabel,
+    Tooltip,
+    Trash2Icon,
+    Typography
+} from "@rebasepro/ui";
 import { EnumPropertyField } from "./properties/EnumPropertyField";
 import { StoragePropertyField } from "./properties/StoragePropertyField";
 import { MapPropertyField } from "./properties/MapPropertyField";

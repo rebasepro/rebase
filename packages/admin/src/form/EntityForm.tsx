@@ -7,7 +7,7 @@ import type { EntityFormProps, OnUpdateParams } from "../types/components/Entity
 import { deepEqual as equal } from "fast-equals";
 
 import { ErrorBoundary } from "@rebasepro/ui";
-import { AlignLeftIcon, CheckIcon, PencilIcon } from "lucide-react";
+import { AlignLeftIcon, CheckIcon, PencilIcon, useDebouncedCallback } from "@rebasepro/ui";
 import { getDefaultValuesFor, getLocalChangesBackup, isHidden, isReadOnly } from "@rebasepro/common";
 
 import { saveEntityWithCallbacks, useAuthController, useCustomizationController, useData, useSnackbarController, useTranslation, useSlot } from "@rebasepro/core";
@@ -31,7 +31,6 @@ import { EntityFormActions } from "./EntityFormActions";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
 import { LocalChangesMenu } from "./components/LocalChangesMenu";
 
-import { useDebouncedCallback } from "@rebasepro/ui";
 import { getEntityTitlePropertyKey } from "../util/previews";
 import { getValueInPath, isObject, mergeDeep } from "@rebasepro/utils";
 import { useCollectionRegistryController, useSideEntityController, useCMSContext } from "../index";

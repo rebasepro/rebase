@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import { Button, Paper, Typography } from "@rebasepro/ui";
-import { PlusIcon } from "lucide-react";
+import { Button, Paper, PlusIcon, Typography } from "@rebasepro/ui";
 import { getIn, useFormex } from "@rebasepro/formex";
 import { OnPropertyChangedParams, PropertyFormDialog } from "../PropertyEditView";
 import {

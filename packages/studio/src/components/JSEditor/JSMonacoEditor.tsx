@@ -2,8 +2,7 @@
 import React, { useRef, useEffect } from "react";
 import Editor, { Monaco, OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
-import { cls, defaultBorderMixin } from "@rebasepro/ui";
-import { FileIcon } from "lucide-react";
+import { cls, defaultBorderMixin, FileIcon } from "@rebasepro/ui";
 import { useModeController } from "@rebasepro/core";
 
 /**

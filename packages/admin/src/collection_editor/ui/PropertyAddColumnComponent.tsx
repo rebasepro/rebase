@@ -4,8 +4,7 @@ import {
 } from "@rebasepro/core";
 import { getDefaultPropertiesOrder } from "../_cms_internals";
 import { EntityCollection, EntityTableController } from "@rebasepro/types";
-import { Tooltip } from "@rebasepro/ui";
-import { PlusIcon } from "lucide-react";
+import { PlusIcon, Tooltip } from "@rebasepro/ui";
 import { useCollectionEditorController } from "../useCollectionEditorController";
 
 export function PropertyAddColumnComponent({

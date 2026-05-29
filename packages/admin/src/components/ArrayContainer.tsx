@@ -13,8 +13,22 @@ import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Button, cls, HandleIcon, IconButton, Menu, MenuItem, Tooltip, useOutsideAlerter , iconSize } from "@rebasepro/ui";
-import { PlusIcon, CopyIcon, ChevronDownIcon, ChevronUpIcon, MinusIcon } from "lucide-react";
+import {
+    Button,
+    ChevronDownIcon,
+    ChevronUpIcon,
+    cls,
+    CopyIcon,
+    HandleIcon,
+    IconButton,
+    iconSize,
+    Menu,
+    MenuItem,
+    MinusIcon,
+    PlusIcon,
+    Tooltip,
+    useOutsideAlerter
+} from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/core";
 import { getHashValue } from "@rebasepro/utils";
 

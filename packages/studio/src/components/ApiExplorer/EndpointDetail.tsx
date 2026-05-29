@@ -1,6 +1,14 @@
 import React from "react";
-import { Typography, Chip, cls, defaultBorderMixin, iconSize } from "@rebasepro/ui";
-import { SlidersHorizontalIcon, UploadIcon, ArrowRightFromLineIcon } from "lucide-react";
+import {
+    ArrowRightFromLineIcon,
+    Chip,
+    cls,
+    defaultBorderMixin,
+    iconSize,
+    SlidersHorizontalIcon,
+    Typography,
+    UploadIcon
+} from "@rebasepro/ui";
 import type { ParsedEndpoint, OpenApiSpec, OpenApiSchema } from "./types";
 import { resolveRef, resolveRefName } from "./parseSpec";
 

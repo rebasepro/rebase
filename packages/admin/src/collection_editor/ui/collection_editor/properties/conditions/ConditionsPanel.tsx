@@ -1,7 +1,6 @@
 import { PropsWithChildren } from "react";
 
-import { ExpandablePanel, Typography } from "@rebasepro/ui";
-import { SettingsIcon } from "lucide-react";
+import { ExpandablePanel, SettingsIcon, Typography } from "@rebasepro/ui";
 
 export function ConditionsPanel({
     children

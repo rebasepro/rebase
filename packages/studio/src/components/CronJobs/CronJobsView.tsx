@@ -1,7 +1,24 @@
 
 import React, { useState, useEffect, useRef } from "react";
-import { Typography, cls, defaultBorderMixin, Button, Chip, CircularProgress, IconButton, Card, Paper , iconSize } from "@rebasepro/ui";
-import { PauseIcon, CalendarIcon, RefreshCwIcon, PlayIcon, CheckCircleIcon, AlertCircleIcon, HistoryIcon } from "lucide-react";
+import {
+    AlertCircleIcon,
+    Button,
+    CalendarIcon,
+    Card,
+    CheckCircleIcon,
+    Chip,
+    CircularProgress,
+    cls,
+    defaultBorderMixin,
+    HistoryIcon,
+    IconButton,
+    iconSize,
+    Paper,
+    PauseIcon,
+    PlayIcon,
+    RefreshCwIcon,
+    Typography
+} from "@rebasepro/ui";
 import { useRebaseClient, useSnackbarController } from "@rebasepro/core";
 import type { CronJobStatus, CronJobLogEntry } from "@rebasepro/types";
 import type { RebaseClient } from "@rebasepro/client";

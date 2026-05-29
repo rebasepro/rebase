@@ -11,6 +11,7 @@
         "start:dev": "tsx src/index.ts"
     },
     "dependencies": {
+        "@aws-sdk/client-s3": "^3.1050.0",
         "@hono/node-server": "^1.19.14",
         "@rebasepro/server-core": "workspace:*",
         "@rebasepro/server-postgresql": "workspace:*",

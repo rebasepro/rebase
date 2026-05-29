@@ -1,5 +1,4 @@
-import { CopyIcon, PencilIcon, Trash2Icon, KeyRoundIcon } from "lucide-react";
-import { iconSize } from "@rebasepro/ui";
+import { CopyIcon, iconSize, KeyRoundIcon, PencilIcon, Trash2Icon } from "@rebasepro/ui";
 import type { EntityAction, User, UserCreationResult } from "@rebasepro/types";
 import { ConfirmationDialog, useInternalUserManagementController, useSnackbarController, useTranslation } from "@rebasepro/core";
 import { DeleteEntityDialog } from "../DeleteEntityDialog";

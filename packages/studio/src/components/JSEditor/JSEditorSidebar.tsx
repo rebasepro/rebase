@@ -1,7 +1,17 @@
 
 import React, { useState } from "react";
-import { Typography, cls, defaultBorderMixin, Tabs, Tab, Tooltip, IconButton , iconSize } from "@rebasepro/ui";
-import { PlusIcon, Trash2Icon } from "lucide-react";
+import {
+    cls,
+    defaultBorderMixin,
+    IconButton,
+    iconSize,
+    PlusIcon,
+    Tab,
+    Tabs,
+    Tooltip,
+    Trash2Icon,
+    Typography
+} from "@rebasepro/ui";
 
 export interface JSSnippet {
     id: string;

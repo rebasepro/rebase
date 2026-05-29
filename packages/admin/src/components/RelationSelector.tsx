@@ -1,10 +1,29 @@
 
-import * as PopoverPrimitive from "@radix-ui/react-popover";
+import {
+    ArrowRightToLineIcon,
+    CheckIcon,
+    ChevronDownIcon,
+    Chip,
+    CircularProgress,
+    cls,
+    defaultBorderMixin,
+    fieldBackgroundDisabledMixin,
+    fieldBackgroundHoverMixin,
+    fieldBackgroundInvisibleMixin,
+    fieldBackgroundMixin,
+    focusedDisabled,
+    IconButton,
+    iconSize,
+    PopoverPrimitive,
+    SearchIcon,
+    Separator,
+    Tooltip,
+    useInjectStyles,
+    XIcon
+} from "@rebasepro/ui";
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Command as CommandPrimitive } from "cmdk";
-import { Chip, CircularProgress, cls, defaultBorderMixin, fieldBackgroundDisabledMixin, fieldBackgroundHoverMixin, fieldBackgroundInvisibleMixin, fieldBackgroundMixin, focusedDisabled, IconButton, Separator, Tooltip, useInjectStyles , iconSize } from "@rebasepro/ui";
-import { CheckIcon, XIcon, ChevronDownIcon, ArrowRightToLineIcon, SearchIcon } from "lucide-react";
 import { Entity, EntityRelation, FilterValues, Relation } from "@rebasepro/types";
 import { EntityPreviewData } from "./EntityPreview";
 import { useData, useRelationSelector } from "@rebasepro/core";

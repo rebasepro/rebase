@@ -1,7 +1,16 @@
 
 import React from "react";
-import { Button, DebouncedTextField, ExpandablePanel, MultiSelect, MultiSelectItem, Select, SelectItem, Typography } from "@rebasepro/ui";
-import { UploadCloudIcon } from "lucide-react";
+import {
+    Button,
+    DebouncedTextField,
+    ExpandablePanel,
+    MultiSelect,
+    MultiSelectItem,
+    Select,
+    SelectItem,
+    Typography,
+    UploadCloudIcon
+} from "@rebasepro/ui";
 
 import { Field, FormexFieldProps, getIn, useFormex } from "@rebasepro/formex";
 import { useTranslation } from "@rebasepro/core";

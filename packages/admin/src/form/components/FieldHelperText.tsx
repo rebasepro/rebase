@@ -1,6 +1,5 @@
 import type { Property } from "@rebasepro/types";
-import { IconButton, Tooltip, Typography } from "@rebasepro/ui";
-import { InfoIcon } from "lucide-react";
+import { IconButton, InfoIcon, Tooltip, Typography } from "@rebasepro/ui";
 
 /**
  * Normalize an error value to a displayable string.

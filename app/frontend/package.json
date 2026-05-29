@@ -16,6 +16,7 @@
         "@rebasepro/types": "workspace:*",
         "@rebasepro/ui": "workspace:*",
         "@tailwindcss/typography": "^0.5.19",
+        "lucide-react": "1.14.0",
         "react": "^19.2.6",
         "react-dom": "^19.2.6",
         "react-router-dom": "^7.15.1"
@@ -43,6 +44,7 @@
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.3.0",
+        "@types/jest": "^29.5.14",
         "@types/react": "^19.2.15",
         "@types/react-dom": "^19.2.3",
         "@vitejs/plugin-react": "^4.7.0",

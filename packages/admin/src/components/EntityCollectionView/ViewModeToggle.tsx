@@ -1,8 +1,20 @@
 
 import React, { useMemo } from "react";
 import { CollectionSize, ViewMode } from "@rebasepro/types";
-import { Button, Popover, Select, SelectItem, ToggleButtonGroup, ToggleButtonOption , iconSize } from "@rebasepro/ui";
-import { LayoutGridIcon, ListIcon, TableIcon, ColumnsIcon, KanbanIcon } from "lucide-react";
+import {
+    Button,
+    ColumnsIcon,
+    iconSize,
+    KanbanIcon,
+    LayoutGridIcon,
+    ListIcon,
+    Popover,
+    Select,
+    SelectItem,
+    TableIcon,
+    ToggleButtonGroup,
+    ToggleButtonOption
+} from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/core";
 
 export type KanbanPropertyOption = {

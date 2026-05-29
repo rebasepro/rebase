@@ -1,7 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import { EditorBubbleItem } from "../components";
-import { Button, Popover } from "@rebasepro/ui";
-import { CheckIcon, ChevronDownIcon } from "lucide-react";
+import { Button, CheckIcon, ChevronDownIcon, Popover } from "@rebasepro/ui";
 import { useProseMirrorContext } from "../hooks/useProseMirrorContext";
 import { isMarkActive, getMarkAttributes, setMark, unsetMark } from "../utils/prosemirror-utils";
 import { schema } from "../schema";

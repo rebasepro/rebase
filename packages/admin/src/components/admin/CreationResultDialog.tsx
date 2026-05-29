@@ -1,8 +1,20 @@
 import React, { useState } from "react";
-import { MailIcon, CopyIcon, CheckCircleIcon } from "lucide-react";
+import {
+    Alert,
+    Button,
+    CheckCircleIcon,
+    CopyIcon,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    IconButton,
+    MailIcon,
+    Tooltip,
+    Typography
+} from "@rebasepro/ui";
 import { useSnackbarController, useTranslation } from "@rebasepro/core";
 import { UserCreationResult } from "@rebasepro/types";
-import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Tooltip, Typography } from "@rebasepro/ui";
 
 export function CreationResultDialog({
     result,

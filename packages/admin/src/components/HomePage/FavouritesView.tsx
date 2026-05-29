@@ -1,8 +1,7 @@
 import type { NavigationEntry } from "@rebasepro/types";
 import { useNavigate } from "react-router-dom";
 ;
-import { Chip, Collapse } from "@rebasepro/ui";
-import { StarIcon } from "lucide-react";
+import { Chip, Collapse, StarIcon } from "@rebasepro/ui";
 import { useUserConfigurationPersistence } from "@rebasepro/core";
 import { useNavigationStateController } from "../../index";
 

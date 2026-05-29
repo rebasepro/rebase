@@ -1,7 +1,6 @@
 import type { NavigationEntry } from "@rebasepro/types";
 import React from "react";
-import { cls, iconSize, Typography } from "@rebasepro/ui";
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, cls, iconSize, Typography } from "@rebasepro/ui";
 ;
 import { IconForView } from "@rebasepro/core";
 import { DrawerNavigationItem } from "./DrawerNavigationItem";

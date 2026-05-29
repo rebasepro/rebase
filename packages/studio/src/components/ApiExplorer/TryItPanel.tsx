@@ -1,6 +1,17 @@
 import React, { useState, useCallback, useMemo, useEffect } from "react";
-import { Typography, Button, TextField, IconButton, cls, defaultBorderMixin, iconSize } from "@rebasepro/ui";
-import { LoaderIcon, SendIcon, PlusIcon, XIcon } from "lucide-react";
+import {
+    Button,
+    cls,
+    defaultBorderMixin,
+    IconButton,
+    iconSize,
+    LoaderIcon,
+    PlusIcon,
+    SendIcon,
+    TextField,
+    Typography,
+    XIcon
+} from "@rebasepro/ui";
 import { useRebaseContext, UserSelectPopover, SelectableUser } from "@rebasepro/core";
 import { AuthSimulationSelector } from "../AuthSimulationSelector";
 import type { ParsedEndpoint } from "./types";

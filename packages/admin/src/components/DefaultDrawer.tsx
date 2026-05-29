@@ -8,8 +8,7 @@ import { useNavigationStateController } from "../hooks/navigation/contexts/Navig
 
 import { Link, useNavigate } from "react-router-dom";
 import { AnalyticsEvent } from "@rebasepro/types";
-import { cls, Tooltip, Typography , iconSize } from "@rebasepro/ui";
-import { ChevronsLeftIcon, ChevronsRightIcon } from "lucide-react";
+import { ChevronsLeftIcon, ChevronsRightIcon, cls, iconSize, Tooltip, Typography } from "@rebasepro/ui";
 import { DrawerNavigationGroup } from "./DrawerNavigationGroup";
 import { RebaseLogo } from "@rebasepro/core";
 import { useApp } from "./app/useApp";

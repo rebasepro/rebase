@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Button, cls, focusedDisabled, Popover , iconSize } from "@rebasepro/ui";
-import { CheckIcon, Trash2Icon } from "lucide-react";
+import { Button, CheckIcon, cls, focusedDisabled, iconSize, Popover, Trash2Icon } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/core";
 import { useProseMirrorContext } from "../hooks/useProseMirrorContext";
 import { getMarkAttributes, isMarkActive, setMark, unsetMark } from "../utils/prosemirror-utils";

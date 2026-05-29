@@ -1,7 +1,6 @@
 import { PropsWithChildren } from "react";
 
-import { ExpandablePanel, Typography } from "@rebasepro/ui";
-import { CheckSquareIcon } from "lucide-react";
+import { CheckSquareIcon, ExpandablePanel, Typography } from "@rebasepro/ui";
 
 export function ValidationPanel({
     children

@@ -3,8 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import useMeasure from "react-use-measure";
 
 import { cls, Tooltip , iconSize } from "@rebasepro/ui";
-import { MinusCircleIcon } from "lucide-react";
-import { ErrorBoundary } from "@rebasepro/ui";
+import { ErrorBoundary, MinusCircleIcon } from "@rebasepro/ui";
 import { getRowHeight, TableSize } from "@rebasepro/core";
 import { ErrorTooltip } from "@rebasepro/core";
 

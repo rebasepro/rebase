@@ -1,5 +1,4 @@
-import { Button } from "@rebasepro/ui";
-import { PlusIcon } from "lucide-react";
+import { Button, PlusIcon } from "@rebasepro/ui";
 import { useCollectionEditorController } from "../useCollectionEditorController";
 import { useAdminModeController, useTranslation } from "@rebasepro/core";
 

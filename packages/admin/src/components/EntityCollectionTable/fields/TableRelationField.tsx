@@ -9,8 +9,7 @@ import { CollectionSize, Entity, EntityRelation, FilterValues, Relation } from "
 import { getPreviewSizeFrom } from "../../../preview/util";
 import { } from "@rebasepro/core";
 import { ErrorView } from "@rebasepro/core";
-import { cls } from "@rebasepro/ui";
-import { PencilIcon } from "lucide-react";
+import { cls, PencilIcon } from "@rebasepro/ui";
 import { EntityPreviewContainer } from "../../EntityPreview";
 import { getRelationFrom, normalizeToEntityRelation } from "@rebasepro/common";
 import { TableMultipleRelationField } from "./TableMultipleRelationField";

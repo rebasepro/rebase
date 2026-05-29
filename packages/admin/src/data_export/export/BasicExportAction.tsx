@@ -2,8 +2,21 @@
 import React, { useCallback } from "react";
 
 import { Entity, Properties } from "@rebasepro/types";
-import { BooleanSwitchWithLabel, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Label, RadioGroup, RadioGroupItem, Tooltip, Typography } from "@rebasepro/ui";
-import { DownloadIcon } from "lucide-react";
+import {
+    BooleanSwitchWithLabel,
+    Button,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    DownloadIcon,
+    IconButton,
+    Label,
+    RadioGroup,
+    RadioGroupItem,
+    Tooltip,
+    Typography
+} from "@rebasepro/ui";
 import { downloadEntitiesExport } from "./export";
 
 export type BasicExportActionProps = {

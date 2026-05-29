@@ -3,8 +3,22 @@ import { AIIcon } from "@rebasepro/core";
 import React, { useState } from "react";
 ;
 import { EntityCollection } from "@rebasepro/types";
-import { Button, Card, Chip, cls, Container, Tooltip, Typography , iconSize } from "@rebasepro/ui";
-import { CodeIcon, TableIcon, ShoppingCartIcon, UserIcon, FileTextIcon, FileIcon } from "lucide-react";
+import {
+    Button,
+    Card,
+    Chip,
+    cls,
+    CodeIcon,
+    Container,
+    FileIcon,
+    FileTextIcon,
+    iconSize,
+    ShoppingCartIcon,
+    TableIcon,
+    Tooltip,
+    Typography,
+    UserIcon
+} from "@rebasepro/ui";
 import { CollectionJsonImportDialog } from "./CollectionJsonImportDialog";
 
 import { productsCollectionTemplate } from "./templates/products_template";

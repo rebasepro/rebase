@@ -2,8 +2,7 @@ import type { EntityCollection } from "@rebasepro/types";
 import type { Property } from "@rebasepro/types";
 import * as React from "react";
 
-import { Chip, cls, defaultBorderMixin, Tooltip, Typography , iconSize } from "@rebasepro/ui";
-import { ArrowLeftIcon } from "lucide-react";
+import { ArrowLeftIcon, Chip, cls, defaultBorderMixin, iconSize, Tooltip, Typography } from "@rebasepro/ui";
 import { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { getPropertyInPath } from "../../util/property_utils";
 import { PropertyPreview } from "../../preview/PropertyPreview";

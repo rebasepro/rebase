@@ -1,5 +1,5 @@
 import { describe, expect, test } from "@jest/globals";
-import { unflattenObject } from "../../src/data_import/utils/file_to_json";
+import { unflattenObject } from "../../src/data_import/utils/transforms";
 
 describe("UnflattenObject function", () => {
 

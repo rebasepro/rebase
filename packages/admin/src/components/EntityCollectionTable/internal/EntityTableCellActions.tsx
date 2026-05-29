@@ -1,5 +1,4 @@
-import { IconButton } from "@rebasepro/ui";
-import { AlertCircleIcon } from "lucide-react";
+import { AlertCircleIcon, IconButton } from "@rebasepro/ui";
 import { ErrorTooltip } from "@rebasepro/core";
 import { useCallback, useEffect, useRef } from "react";
 

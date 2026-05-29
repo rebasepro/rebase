@@ -41,7 +41,7 @@ import { SplitListView } from "./SplitListView";
 import { EntityCollectionBoardView } from "./EntityCollectionBoardView";
 import { ViewModeToggle, KanbanPropertyOption } from "./ViewModeToggle";
 import { Button, cls, focusedDisabled, IconButton, Markdown, Popover, Skeleton, Tooltip, Typography, VirtualTableColumn , iconSize } from "@rebasepro/ui";
-import { PlusIcon, ArrowRightToLineIcon, SearchIcon } from "lucide-react";
+import { ArrowRightToLineIcon, ErrorBoundary, PlusIcon, SearchIcon } from "@rebasepro/ui";
 import { setIn } from "@rebasepro/formex";
 import { getSubcollectionColumnId } from "../EntityCollectionTable/internal/common";
 import {
@@ -59,7 +59,6 @@ import { useSelectionController } from "./useSelectionController";
 import { EntityCollectionViewStartActions } from "./EntityCollectionViewStartActions";
 import { addRecentId, getRecentIds } from "./utils";
 import { useScrollRestoration } from "@rebasepro/core";
-import { ErrorBoundary } from "@rebasepro/ui";
 import { mergeDeep } from "@rebasepro/utils";
 import { useCollectionRegistryController, useUrlController, useSideEntityController, useCMSContext } from "../../index";
 import { useBreadcrumbsController } from "../../index";

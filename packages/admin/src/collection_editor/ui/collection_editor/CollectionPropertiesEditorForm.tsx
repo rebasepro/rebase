@@ -7,10 +7,21 @@ import {
     useSnackbarController
 } from "@rebasepro/core";
 import { ErrorBoundary } from "@rebasepro/ui";
-import { PlusIcon, CodeIcon, FileSearchIcon } from "lucide-react";
+import {
+    Button,
+    CircularProgress,
+    cls,
+    CodeIcon,
+    DebouncedTextField,
+    defaultBorderMixin,
+    FileSearchIcon,
+    IconButton,
+    PlusIcon,
+    Tooltip,
+    Typography
+} from "@rebasepro/ui";
 import { EntityCollection, MapProperty, Properties, Property, PropertyConfig, User } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";
-import { Button, CircularProgress, cls, DebouncedTextField, defaultBorderMixin, IconButton, Tooltip, Typography } from "@rebasepro/ui";
 
 import { getFullId, idToPropertiesPath, namespaceToPropertiesOrderPath } from "./util";
 import { OnPropertyChangedParams, PropertyForm, PropertyFormDialog } from "./PropertyEditView";

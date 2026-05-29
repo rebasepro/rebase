@@ -5,8 +5,20 @@ import { deepEqual as equal } from "fast-equals"
 import { AIModifiedIndicator } from "@rebasepro/core";
 import { AdditionalFieldDelegate, Properties, Property } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";
-import { defaultBorderMixin, cls, IconButton, Menu, MenuItem, Tooltip , iconSize } from "@rebasepro/ui";
-import { FileSearchIcon, ArrowDownToLineIcon, ArrowUpToLineIcon, Trash2Icon, MoreVerticalIcon } from "lucide-react";
+import {
+    ArrowDownToLineIcon,
+    ArrowUpToLineIcon,
+    cls,
+    defaultBorderMixin,
+    FileSearchIcon,
+    IconButton,
+    iconSize,
+    Menu,
+    MenuItem,
+    MoreVerticalIcon,
+    Tooltip,
+    Trash2Icon
+} from "@rebasepro/ui";
 import { NonEditablePropertyPreview, PropertyFieldPreview } from "./PropertyFieldPreview";
 import {
     closestCenter,

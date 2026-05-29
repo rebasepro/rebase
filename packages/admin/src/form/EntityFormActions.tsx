@@ -5,8 +5,16 @@ import type { EntityAction, SideEntityController } from "@rebasepro/types";
 import React from "react";
 import { Entity, RebaseContext } from "@rebasepro/types";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
-import { Button, cls, defaultBorderMixin, DialogActions, IconButton, LoadingButton, Typography } from "@rebasepro/ui";
-import { AlertCircleIcon } from "lucide-react";
+import {
+    AlertCircleIcon,
+    Button,
+    cls,
+    defaultBorderMixin,
+    DialogActions,
+    IconButton,
+    LoadingButton,
+    Typography
+} from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/core";
 import { FormexController } from "@rebasepro/formex";
 import { useCMSContext } from "../index";

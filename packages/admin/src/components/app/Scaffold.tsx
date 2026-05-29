@@ -1,10 +1,9 @@
 import React, { PropsWithChildren, useCallback, useMemo } from "react";
 import { cls, defaultBorderMixin, IconButton, Sheet, Tooltip } from "@rebasepro/ui";
-import { ChevronLeftIcon, MenuIcon } from "lucide-react";
+import { ChevronLeftIcon, ErrorBoundary, MenuIcon } from "@rebasepro/ui";
 import { deepEqual as equal } from "fast-equals"
 
 import { useLargeLayout, useAdminModeController, useTranslation } from "@rebasepro/core";
-import { ErrorBoundary } from "@rebasepro/ui";
 import { AppContext } from "./useApp";
 
 export const DRAWER_WIDTH = 280;

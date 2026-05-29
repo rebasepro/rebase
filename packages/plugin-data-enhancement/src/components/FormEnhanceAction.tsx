@@ -1,8 +1,20 @@
 
 import React, { useCallback, useDeferredValue, useEffect, useRef } from "react";
 
-import { Button, CircularProgress, cls, focusedDisabled, IconButton, Menu, MenuItem, Separator, TextareaAutosize , iconSize } from "@rebasepro/ui";
-import { XIcon, SendIcon } from "lucide-react";
+import {
+    Button,
+    CircularProgress,
+    cls,
+    focusedDisabled,
+    IconButton,
+    iconSize,
+    Menu,
+    MenuItem,
+    SendIcon,
+    Separator,
+    TextareaAutosize,
+    XIcon
+} from "@rebasepro/ui";
 import {
     AIIcon,
     useLargeLayout

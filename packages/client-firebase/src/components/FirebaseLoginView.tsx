@@ -3,8 +3,20 @@ import React, { ReactNode, useCallback, useEffect, useRef, useState } from "reac
 
 import { FirebaseApp, FirebaseError } from "@firebase/app";
 import { ErrorView, RebaseLogo, useModeController, useSnackbarController } from "@rebasepro/core";
-import { Button, CircularProgress, cls, IconButton, LoadingButton, TextField, Typography , iconSize } from "@rebasepro/ui";
-import { ArrowLeftIcon, MailIcon, PhoneIcon, UserIcon } from "lucide-react";
+import {
+    ArrowLeftIcon,
+    Button,
+    CircularProgress,
+    cls,
+    IconButton,
+    iconSize,
+    LoadingButton,
+    MailIcon,
+    PhoneIcon,
+    TextField,
+    Typography,
+    UserIcon
+} from "@rebasepro/ui";
 import { appleIcon, facebookIcon, githubIcon, googleIcon, microsoftIcon, twitterIcon } from "./social_icons";
 import {
     getAuth,

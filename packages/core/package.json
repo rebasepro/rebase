@@ -84,6 +84,7 @@
     "@vitejs/plugin-react": "^4.7.0",
     "babel-plugin-react-compiler": "beta",
     "cross-env": "^7.0.3",
+    "esbuild": "^0.25.12",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^30.4.1",
     "react-router-dom": "^7.15.1",

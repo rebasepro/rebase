@@ -5,11 +5,10 @@ import React, { lazy, Suspense } from "react";
 import { useLargeLayout, useTranslation, useSlot, resolveComponentRef } from "@rebasepro/core";
 import { CollectionActionsProps, EntityTableController, SelectionController } from "@rebasepro/types";
 import { Button, IconButton, Tooltip, Popover, iconSize } from "@rebasepro/ui";
-import { PlusIcon, Trash2Icon, MoreVerticalIcon } from "lucide-react";
-import { ErrorBoundary } from "@rebasepro/ui";
+import { ErrorBoundary, MoreVerticalIcon, PlusIcon, Trash2Icon } from "@rebasepro/ui";
 import { usePermissions } from "@rebasepro/core";
 import { toArray } from "@rebasepro/utils";
-// Lazy-load import/export — pulls in xlsx (~800KB) only on demand
+// Lazy-load import/export — pulls in exceljs only on demand
 const ImportCollectionAction = lazy(() => import("../../data_import/import").then(m => ({ default: m.ImportCollectionAction })));
 const ExportCollectionAction = lazy(() => import("../../data_export/export").then(m => ({ default: m.ExportCollectionAction })));
 import { EditorCollectionAction } from "../../collection_editor/ui/EditorCollectionAction";

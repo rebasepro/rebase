@@ -6,8 +6,23 @@ import { DataType, GeoPoint } from "@rebasepro/types";
 
 import { ArrayContainer } from "../../components/ArrayContainer";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
-import { BooleanSwitchWithLabel, Button, cls, DateTimeField, defaultBorderMixin, ExpandablePanel, IconButton, Menu, MenuItem, TextField, Typography , iconSize } from "@rebasepro/ui";
-import { PlusIcon, ChevronDownIcon, MinusIcon } from "lucide-react";
+import {
+    BooleanSwitchWithLabel,
+    Button,
+    ChevronDownIcon,
+    cls,
+    DateTimeField,
+    defaultBorderMixin,
+    ExpandablePanel,
+    IconButton,
+    iconSize,
+    Menu,
+    MenuItem,
+    MinusIcon,
+    PlusIcon,
+    TextField,
+    Typography
+} from "@rebasepro/ui";
 import { getIconForProperty } from "../../util/property_utils";
 import { useCustomizationController, useTranslation } from "@rebasepro/core";
 import { getIn } from "@rebasepro/formex";

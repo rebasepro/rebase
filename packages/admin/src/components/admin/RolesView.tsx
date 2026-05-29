@@ -4,8 +4,34 @@ import { useCollectionRegistryController } from "../../index";
 import { useSnackbarController, useTranslation } from "@rebasepro/core";
 import { getDataSourceCapabilities, Role, SecurityRule, UserManagementDelegate } from "@rebasepro/types";
 import { useBreadcrumbsController } from "../../index";
-import { Button, Chip, Container, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Label, Paper, Table, TableBody, TableCell, TableHeader, TableRow, TextField, Typography, CircularProgress, CenteredView, Tooltip, Checkbox, LoadingButton, defaultBorderMixin , iconSize } from "@rebasepro/ui";
-import { PlusIcon, Trash2Icon } from "lucide-react";
+import {
+    Button,
+    CenteredView,
+    Checkbox,
+    Chip,
+    CircularProgress,
+    Container,
+    defaultBorderMixin,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    IconButton,
+    iconSize,
+    Label,
+    LoadingButton,
+    Paper,
+    PlusIcon,
+    Table,
+    TableBody,
+    TableCell,
+    TableHeader,
+    TableRow,
+    TextField,
+    Tooltip,
+    Trash2Icon,
+    Typography
+} from "@rebasepro/ui";
 import { RoleChip } from "./RoleChip";
 import { ConfirmationDialog } from "@rebasepro/core";
 
