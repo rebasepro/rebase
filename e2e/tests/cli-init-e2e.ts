@@ -556,25 +556,29 @@ async function run() {
             const timeout = setTimeout(() => {
                 devProcess.kill("SIGKILL");
                 reject(new Error("Timeout waiting for dev server to start"));
-            }, 60000);
+            }, 90000);
 
             devProcess.stdout?.on("data", (data) => {
                 const output = data.toString();
                 process.stdout.write(output);
                 accumulatedOutput += output;
 
-                if (accumulatedOutput.includes("[admin]") && accumulatedOutput.includes("Local:")) {
-                    const match = accumulatedOutput.match(/http:\/\/localhost:\d+/);
-                    if (match && !frontendUrl) {
-                        frontendUrl = match[0];
+                const cleanOutput = accumulatedOutput.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, "");
+
+                if (cleanOutput.includes("[admin]") && (cleanOutput.includes("Local:") || cleanOutput.includes("Frontend URL:"))) {
+                    const matches = cleanOutput.match(/http:\/\/localhost:\d+/g) || [];
+                    const fUrl = matches.find(url => !url.includes("3099"));
+                    if (fUrl && !frontendUrl) {
+                        frontendUrl = fUrl;
                         console.log(`\nDetected Frontend URL: ${frontendUrl}`);
                     }
                 }
 
-                if (accumulatedOutput.includes("[backend]") && accumulatedOutput.includes("Server running at")) {
-                    const match = accumulatedOutput.match(/http:\/\/localhost:\d+/);
-                    if (match && !backendUrl) {
-                        backendUrl = match[0];
+                if (cleanOutput.includes("[backend]") && cleanOutput.includes("Server running at")) {
+                    const matches = cleanOutput.match(/http:\/\/localhost:\d+/g) || [];
+                    const bUrl = matches.find(url => url.includes("3099"));
+                    if (bUrl && !backendUrl) {
+                        backendUrl = bUrl;
                         console.log(`Detected Backend URL: ${backendUrl}`);
                     }
                 }
