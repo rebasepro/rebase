@@ -2,6 +2,7 @@ import { chromium } from "@playwright/test";
 import * as fs from "fs";
 import * as path from "path";
 import { execSync } from "child_process";
+import { execa } from "execa";
 
 process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY = "1";
 
@@ -318,7 +319,6 @@ interface PgContainer {
 }
 
 async function startPgContainer(): Promise<PgContainer> {
-    const execa = (await import("execa")).default;
     const containerName = `rebase-test-postgres-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
     console.log(`Starting PostgreSQL container: ${containerName}...`);
@@ -394,7 +394,6 @@ async function startPgContainer(): Promise<PgContainer> {
 
 async function stopPgContainer(containerName: string): Promise<void> {
     console.log(`Stopping and removing PostgreSQL container: ${containerName}...`);
-    const execa = (await import("execa")).default;
     try {
         await execa("docker", ["rm", "-f", containerName]);
         console.log("Container removed successfully.");
@@ -404,7 +403,6 @@ async function stopPgContainer(containerName: string): Promise<void> {
 }
 
 async function run() {
-    const execa = (await import("execa")).default;
     fs.mkdirSync(screenshotDir, { recursive: true });
     console.log("🚀 Starting E2E CLI Init and Deployment Flow Verification");
 
