@@ -86,7 +86,12 @@ function packLocalPackages(projectPath: string): Record<string, string> {
         "server-core",
         "server-postgresql",
         "plugin-data-enhancement",
-        "cli"
+        "cli",
+        "schema-inference",
+        "client-firebase",
+        "plugin-insights",
+        "mcp-server",
+        "server-mongodb"
     ];
 
     const tempVersion = `0.1.2-e2e-${Date.now()}`;
