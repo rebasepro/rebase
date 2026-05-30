@@ -549,6 +549,7 @@ async function run() {
 
         let frontendUrl = "";
         let backendUrl = "";
+        let accumulatedOutput = "";
 
         // Listen for frontend and backend readiness
         await new Promise<void>((resolve, reject) => {
@@ -560,17 +561,18 @@ async function run() {
             devProcess.stdout?.on("data", (data) => {
                 const output = data.toString();
                 process.stdout.write(output);
+                accumulatedOutput += output;
 
-                if (output.includes("[admin]") && output.includes("Local:")) {
-                    const match = output.match(/http:\/\/localhost:\d+/);
+                if (accumulatedOutput.includes("[admin]") && accumulatedOutput.includes("Local:")) {
+                    const match = accumulatedOutput.match(/http:\/\/localhost:\d+/);
                     if (match && !frontendUrl) {
                         frontendUrl = match[0];
                         console.log(`\nDetected Frontend URL: ${frontendUrl}`);
                     }
                 }
 
-                if (output.includes("[backend]") && output.includes("Server running at")) {
-                    const match = output.match(/http:\/\/localhost:\d+/);
+                if (accumulatedOutput.includes("[backend]") && accumulatedOutput.includes("Server running at")) {
+                    const match = accumulatedOutput.match(/http:\/\/localhost:\d+/);
                     if (match && !backendUrl) {
                         backendUrl = match[0];
                         console.log(`Detected Backend URL: ${backendUrl}`);
