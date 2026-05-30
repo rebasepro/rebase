@@ -1,8 +1,47 @@
 import { chromium } from "@playwright/test";
 import * as fs from "fs";
 import * as path from "path";
-import { execSync } from "child_process";
-import { execa } from "execa";
+import { execSync, spawn } from "child_process";
+
+function execa(command: string, args: string[], options: any = {}) {
+    const cp = spawn(command, args, {
+        cwd: options.cwd,
+        env: options.env,
+        stdio: options.stdio || "pipe"
+    }) as any;
+
+    let stdoutData = "";
+    let stderrData = "";
+
+    if (cp.stdout) {
+        cp.stdout.on("data", (chunk: any) => {
+            stdoutData += chunk.toString();
+        });
+    }
+    if (cp.stderr) {
+        cp.stderr.on("data", (chunk: any) => {
+            stderrData += chunk.toString();
+        });
+    }
+
+    const promise = new Promise<{ stdout: string; stderr: string; exitCode: number }>((resolve, reject) => {
+        cp.on("close", (code: number | null) => {
+            if (code === 0 || code === null) {
+                resolve({ stdout: stdoutData, stderr: stderrData, exitCode: code || 0 });
+            } else {
+                reject(new Error(`Command failed with exit code ${code}: ${command} ${args.join(" ")}\n${stderrData}`));
+            }
+        });
+        cp.on("error", (err: any) => {
+            reject(err);
+        });
+    });
+
+    const result = cp;
+    result.then = promise.then.bind(promise);
+    result.catch = promise.catch.bind(promise);
+    return result;
+}
 
 process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY = "1";
 
