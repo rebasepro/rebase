@@ -94,7 +94,8 @@ function packLocalPackages(projectPath: string): Record<string, string> {
         "server-mongodb"
     ];
 
-    const tempVersion = `0.1.2-e2e-${Date.now()}`;
+    const currentVersion = JSON.parse(fs.readFileSync(path.join(rootDir, "lerna.json"), "utf-8")).version;
+    const tempVersion = `${currentVersion}-e2e-${Date.now()}`;
     console.log(`📦 Packing local workspace packages with version ${tempVersion}...`);
     const packageTarballs: Record<string, string> = {};
 
