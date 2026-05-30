@@ -181,13 +181,20 @@ const FixedEditorOverlay = ({
     );
 };
 
+const getStoragePrefix = (baseUrl?: string) => {
+    if (!baseUrl) return "default";
+    return baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_");
+};
+
 export const SQLEditor = () => {
-    const { databaseAdmin } = useRebaseContext();
+    const { databaseAdmin, client } = useRebaseContext();
     const sideEntityController = useStudioSideEntityController();
     const snackbarController = useSnackbarController();
     const collectionRegistry = useStudioCollectionRegistry();
 
     const { t } = useTranslation();
+
+    const projectPrefix = useMemo(() => getStoragePrefix(client?.baseUrl), [client?.baseUrl]);
 
     // Schema state
     const [schemas, setSchemas] = useState<Record<string, TableInfo[]>>({});
@@ -197,10 +204,12 @@ export const SQLEditor = () => {
 
     // Connection state
     const [selectedDatabase, setSelectedDatabase] = useState<string | undefined>(() => {
-        return localStorage.getItem("rebase_sql_selected_db") || undefined;
+        const projectPrefixSync = client?.baseUrl ? client.baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_") : "default";
+        return localStorage.getItem(`rebase_sql_selected_db_${projectPrefixSync}`) || undefined;
     });
     const [selectedRole, setSelectedRole] = useState<string | undefined>(() => {
-        return localStorage.getItem("rebase_sql_selected_role") || undefined;
+        const projectPrefixSync = client?.baseUrl ? client.baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_") : "default";
+        return localStorage.getItem(`rebase_sql_selected_role_${projectPrefixSync}`) || undefined;
     });
 
     const [availableDatabases, setAvailableDatabases] = useState<string[]>([]);
@@ -221,7 +230,8 @@ export const SQLEditor = () => {
         execTime: number | null,
         lastExecutedSql: string | null
     }>>(() => {
-        const saved = localStorage.getItem(STORAGE_KEY_TABS);
+        const projectPrefixSync = client?.baseUrl ? client.baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_") : "default";
+        const saved = localStorage.getItem(`rebase_sql_tabs_${projectPrefixSync}`);
         if (saved) {
             const parsed = JSON.parse(saved);
             return parsed.map((t: Record<string, unknown>) => ({
@@ -237,8 +247,8 @@ export const SQLEditor = () => {
             id: "1",
             name: "Query 1",
             sql: "SELECT * FROM ",
-            database: localStorage.getItem("rebase_sql_selected_db") || undefined,
-            role: localStorage.getItem("rebase_sql_selected_role") || undefined,
+            database: localStorage.getItem(`rebase_sql_selected_db_${projectPrefixSync}`) || undefined,
+            role: localStorage.getItem(`rebase_sql_selected_role_${projectPrefixSync}`) || undefined,
             results: null,
             loading: false,
             error: null,
@@ -247,7 +257,8 @@ export const SQLEditor = () => {
         }];
     });
     const [activeTabId, setActiveTabId] = useState<string>(() => {
-        return localStorage.getItem(STORAGE_KEY_ACTIVE_TAB) || "1";
+        const projectPrefixSync = client?.baseUrl ? client.baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_") : "default";
+        return localStorage.getItem(`rebase_sql_active_tab_${projectPrefixSync}`) || "1";
     });
 
     const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
@@ -290,13 +301,13 @@ export const SQLEditor = () => {
                     setAvailableDatabases(dbs);
                     setAvailableRoles(roles);
 
-                    const loadedDb = localStorage.getItem("rebase_sql_selected_db") || undefined;
-                    const loadedRole = localStorage.getItem("rebase_sql_selected_role") || undefined;
+                    const loadedDb = localStorage.getItem(`rebase_sql_selected_db_${projectPrefix}`) || undefined;
+                    const loadedRole = localStorage.getItem(`rebase_sql_selected_role_${projectPrefix}`) || undefined;
 
-                    const initialActiveTabId = localStorage.getItem(STORAGE_KEY_ACTIVE_TAB) || "1";
+                    const initialActiveTabId = localStorage.getItem(`rebase_sql_active_tab_${projectPrefix}`) || "1";
                     let initialTabs: Array<{ id?: string; database?: string; role?: string }> = [];
                     try {
-                        const savedTabs = localStorage.getItem(STORAGE_KEY_TABS);
+                        const savedTabs = localStorage.getItem(`rebase_sql_tabs_${projectPrefix}`);
                         if (savedTabs) initialTabs = JSON.parse(savedTabs);
                     } catch (e) { /* ignore */ }
                     const currentActiveTab = initialTabs.find(t => t.id === initialActiveTabId);
@@ -309,13 +320,13 @@ export const SQLEditor = () => {
 
                     if (actualDb) {
                         setSelectedDatabase(actualDb);
-                        localStorage.setItem("rebase_sql_selected_db", actualDb);
-                        setTabs(prev => prev.map(t => t.id === initialActiveTabId && (!t.database || !dbs.includes(t.database)) ? { ...t,
-database: actualDb } : t));
+                        localStorage.setItem(`rebase_sql_selected_db_${projectPrefix}`, actualDb);
+                        setTabs(prev => prev.map(t => t.id === initialActiveTabId && (!t.database || !dbs.includes(t.database)) ? { ...t, database: actualDb } : t));
                     }
 
                     const currentUser = (currentUserResult?.[0] as Record<string, unknown> | undefined)?.role as string | undefined;
                     let actualRole = currentActiveTab?.role || loadedRole;
+
                     if (actualRole && !roles.includes(actualRole)) actualRole = undefined;
                     if (!actualRole && roles.length > 0) {
                         if (currentUser && roles.includes(currentUser)) {
@@ -327,9 +338,8 @@ database: actualDb } : t));
 
                     if (actualRole) {
                         setSelectedRole(actualRole);
-                        localStorage.setItem("rebase_sql_selected_role", actualRole);
-                        setTabs(prev => prev.map(t => t.id === initialActiveTabId && (!t.role || !roles.includes(t.role)) ? { ...t,
-role: actualRole } : t));
+                        localStorage.setItem(`rebase_sql_selected_role_${projectPrefix}`, actualRole);
+                        setTabs(prev => prev.map(t => t.id === initialActiveTabId && (!t.role || !roles.includes(t.role)) ? { ...t, role: actualRole } : t));
                     }
                 }
             } catch (err: unknown) {
@@ -348,22 +358,20 @@ role: actualRole } : t));
         fetchConnectionConfig();
 
         return () => { mounted = false; };
-    }, [databaseAdmin]);
+    }, [databaseAdmin, projectPrefix]);
 
     const handleDatabaseChange = (db: string, tabId?: string) => {
         setSelectedDatabase(db);
-        localStorage.setItem("rebase_sql_selected_db", db);
-        setTabs(prev => prev.map(t => t.id === (tabId || activeTabId) ? { ...t,
-database: db } : t));
+        localStorage.setItem(`rebase_sql_selected_db_${projectPrefix}`, db);
+        setTabs(prev => prev.map(t => t.id === (tabId || activeTabId) ? { ...t, database: db } : t));
         // Reset so the schema will be re-fetched for the new database
         schemaFetchedRef.current = false;
     };
 
     const handleRoleChange = (role: string, tabId?: string) => {
         setSelectedRole(role);
-        localStorage.setItem("rebase_sql_selected_role", role);
-        setTabs(prev => prev.map(t => t.id === (tabId || activeTabId) ? { ...t,
-role } : t));
+        localStorage.setItem(`rebase_sql_selected_role_${projectPrefix}`, role);
+        setTabs(prev => prev.map(t => t.id === (tabId || activeTabId) ? { ...t, role } : t));
     };
 
     const handleTabChange = useCallback((newTabId: string) => {
@@ -372,22 +380,20 @@ role } : t));
         if (newTab) {
             if (newTab.database && newTab.database !== selectedDatabase) {
                 setSelectedDatabase(newTab.database);
-                localStorage.setItem("rebase_sql_selected_db", newTab.database);
+                localStorage.setItem(`rebase_sql_selected_db_${projectPrefix}`, newTab.database);
                 schemaFetchedRef.current = false;
             } else if (!newTab.database && selectedDatabase) {
-                setTabs(prev => prev.map(t => t.id === newTabId ? { ...t,
-database: selectedDatabase } : t));
+                setTabs(prev => prev.map(t => t.id === newTabId ? { ...t, database: selectedDatabase } : t));
             }
 
             if (newTab.role && newTab.role !== selectedRole) {
                 setSelectedRole(newTab.role);
-                localStorage.setItem("rebase_sql_selected_role", newTab.role);
+                localStorage.setItem(`rebase_sql_selected_role_${projectPrefix}`, newTab.role);
             } else if (!newTab.role && selectedRole) {
-                setTabs(prev => prev.map(t => t.id === newTabId ? { ...t,
-role: selectedRole } : t));
+                setTabs(prev => prev.map(t => t.id === newTabId ? { ...t, role: selectedRole } : t));
             }
         }
-    }, [tabs, selectedDatabase, selectedRole]);
+    }, [tabs, selectedDatabase, selectedRole, projectPrefix]);
 
     const fetchSchema = useCallback(async () => {
         if (!databaseAdmin?.executeSql) {
@@ -601,7 +607,8 @@ role: selectedRole });
     }, [editingCell, schemas, activeTab.lastExecutedSql, activeTab.results, databaseAdmin, updateActiveTab, snackbarController, selectedDatabase, selectedRole]);
 
     const [columnWidths, setColumnWidths] = useState<Record<string, Record<string, number>>>(() => {
-        const saved = localStorage.getItem("rebase_sql_column_widths");
+        const projectPrefixSync = client?.baseUrl ? client.baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_") : "default";
+        const saved = localStorage.getItem(`rebase_sql_column_widths_${projectPrefixSync}`);
         return saved ? JSON.parse(saved) : {};
     });
     const [snippets, setSnippets] = useState<Snippet[]>([]);
@@ -611,12 +618,20 @@ role: selectedRole });
 
     // Load from local storage
     useEffect(() => {
-        const savedSnippets = localStorage.getItem("rebase_sql_snippets");
-        if (savedSnippets) setSnippets(JSON.parse(savedSnippets));
+        const savedSnippets = localStorage.getItem(`rebase_sql_snippets_${projectPrefix}`);
+        if (savedSnippets) {
+            setSnippets(JSON.parse(savedSnippets));
+        } else {
+            setSnippets([]);
+        }
 
-        const savedHistory = localStorage.getItem("rebase_sql_history");
-        if (savedHistory) setHistory(JSON.parse(savedHistory));
-    }, []);
+        const savedHistory = localStorage.getItem(`rebase_sql_history_${projectPrefix}`);
+        if (savedHistory) {
+            setHistory(JSON.parse(savedHistory));
+        } else {
+            setHistory([]);
+        }
+    }, [projectPrefix]);
 
     // Save tabs and active tab to local storage
     useEffect(() => {
@@ -627,21 +642,21 @@ role: selectedRole });
             database: t.database,
             role: t.role
         }));
-        localStorage.setItem(STORAGE_KEY_TABS, JSON.stringify(sanitizedTabs));
-    }, [tabs]);
+        localStorage.setItem(`rebase_sql_tabs_${projectPrefix}`, JSON.stringify(sanitizedTabs));
+    }, [tabs, projectPrefix]);
 
     useEffect(() => {
-        localStorage.setItem(STORAGE_KEY_ACTIVE_TAB, activeTabId);
-    }, [activeTabId]);
+        localStorage.setItem(`rebase_sql_active_tab_${projectPrefix}`, activeTabId);
+    }, [activeTabId, projectPrefix]);
 
     const saveSnippets = (newSnippets: Snippet[]) => {
         setSnippets(newSnippets);
-        localStorage.setItem("rebase_sql_snippets", JSON.stringify(newSnippets));
+        localStorage.setItem(`rebase_sql_snippets_${projectPrefix}`, JSON.stringify(newSnippets));
     };
 
     const saveHistory = (newHistory: string[]) => {
         setHistory(newHistory);
-        localStorage.setItem("rebase_sql_history", JSON.stringify(newHistory.slice(-50)));
+        localStorage.setItem(`rebase_sql_history_${projectPrefix}`, JSON.stringify(newHistory.slice(-50)));
     };
 
     const handleDeleteSnippet = (id: string) => {
@@ -702,10 +717,10 @@ role: selectedRole });
                     [key]: width
                 }
             };
-            localStorage.setItem("rebase_sql_column_widths", JSON.stringify(newWidths));
+            localStorage.setItem(`rebase_sql_column_widths_${projectPrefix}`, JSON.stringify(newWidths));
             return newWidths;
         });
-    }, [activeTab.sql]);
+    }, [activeTab.sql, projectPrefix]);
 
     const handlePrettify = () => {
         // Simple formatting for now
@@ -1177,7 +1192,8 @@ id: String(ra.entityId) })}
 
     const [sidebarSize, setSidebarSize] = useState(() => {
         try {
-            const saved = localStorage.getItem("rebase_sql_editor_sidebar_size");
+            const projectPrefixSync = client?.baseUrl ? client.baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_") : "default";
+            const saved = localStorage.getItem(`rebase_sql_editor_sidebar_size_${projectPrefixSync}`);
             return saved !== null ? parseFloat(saved) : 20;
         } catch (e) {
             return 20;
@@ -1185,7 +1201,8 @@ id: String(ra.entityId) })}
     });
     const [editorHeight, setEditorHeight] = useState(() => {
         try {
-            const saved = localStorage.getItem("rebase_sql_editor_height");
+            const projectPrefixSync = client?.baseUrl ? client.baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_") : "default";
+            const saved = localStorage.getItem(`rebase_sql_editor_height_${projectPrefixSync}`);
             return saved !== null ? parseFloat(saved) : 50;
         } catch (e) {
             return 50;
@@ -1194,15 +1211,15 @@ id: String(ra.entityId) })}
 
     useEffect(() => {
         try {
-            localStorage.setItem("rebase_sql_editor_sidebar_size", sidebarSize.toString());
+            localStorage.setItem(`rebase_sql_editor_sidebar_size_${projectPrefix}`, sidebarSize.toString());
         } catch (e) { /* ignore */ }
-    }, [sidebarSize]);
+    }, [sidebarSize, projectPrefix]);
 
     useEffect(() => {
         try {
-            localStorage.setItem("rebase_sql_editor_height", editorHeight.toString());
+            localStorage.setItem(`rebase_sql_editor_height_${projectPrefix}`, editorHeight.toString());
         } catch (e) { /* ignore */ }
-    }, [editorHeight]);
+    }, [editorHeight, projectPrefix]);
 
     const activeSnippet = snippets.find(s => s.sql === activeTab.sql);
     const isFavorite = activeSnippet?.isFavorite || false;
@@ -1331,7 +1348,11 @@ isFavorite: !s.isFavorite } : s));
                                             className="text-text-secondary dark:text-text-secondary-dark font-medium mr-2"
                                         >
                                             <DatabaseIcon size={iconSize.small} className="mr-1.5 text-text-disabled dark:text-text-disabled-dark"/>
-                                            <span className="max-w-[80px] truncate">{isLoadingConfig ? "..." : (selectedDatabase || t("studio_sql_select_db"))}</span>
+                                            <span className="max-w-[160px] truncate">
+                                                {isLoadingConfig 
+                                                    ? "..." 
+                                                    : `${selectedDatabase || t("studio_sql_select_db")}${selectedRole ? ` (${selectedRole})` : ""}`}
+                                            </span>
                                         </Button>
                                     }
                                 >
