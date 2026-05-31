@@ -1,7 +1,7 @@
 {
   "name": "@rebasepro/admin",
   "type": "module",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Rebase CMS — content management views, forms, and routing",
   "funding": {
     "url": "https://github.com/sponsors/rebaseco"
@@ -70,9 +70,9 @@
     "@rebasepro/types": "workspace:*",
     "@rebasepro/ui": "workspace:*",
     "@rebasepro/utils": "workspace:*",
-    "react-compiler-runtime": "1.0.0",
     "cmdk": "^1.1.1",
     "date-fns": "^3.6.0",
+    "exceljs": "^4.4.0",
     "fast-equals": "6.0.0",
     "fractional-indexing": "3.2.0",
     "fuse.js": "^7.3.0",
@@ -95,9 +95,9 @@
     "prosemirror-tables": "^1.8.5",
     "prosemirror-transform": "^1.12.0",
     "prosemirror-view": "^1.41.8",
+    "react-compiler-runtime": "1.0.0",
     "react-dropzone": "^14.4.1",
     "react-use-measure": "^2.1.7",
-    "exceljs": "^4.4.0",
     "zod": "^3.25.76"
   },
   "peerDependencies": {

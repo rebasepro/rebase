@@ -1,6 +1,6 @@
 {
     "name": "rebase-app-backend",
-    "version": "0.2.0",
+    "version": "0.2.2",
     "description": "Custom PostgreSQL backend for Rebase with real-time sync",
     "main": "src/index.ts",
     "type": "module",
