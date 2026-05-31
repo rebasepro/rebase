@@ -24,7 +24,7 @@ That's it. Your app is running:
 
 - [Node.js](https://nodejs.org) >= 18
 - [pnpm](https://pnpm.io) or [npm](https://www.npmjs.com) (v7+)
-- A PostgreSQL database
+- A PostgreSQL database (you can start the included database container via `docker compose up -d db`)
 
 #### Setup
 

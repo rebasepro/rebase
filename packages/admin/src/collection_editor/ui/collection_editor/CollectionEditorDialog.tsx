@@ -29,7 +29,6 @@ import { CollectionEditorSchema } from "./CollectionYupValidation";
 import { GeneralSettingsForm } from "./GeneralSettingsForm";
 import { DisplaySettingsForm } from "./DisplaySettingsForm";
 import { CollectionPropertiesEditorForm } from "./CollectionPropertiesEditorForm";
-import { CollectionRelationsTab } from "./CollectionRelationsTab";
 import { CollectionsConfigController } from "../../types/config_controller";
 import { CollectionEditorWelcomeView } from "./CollectionEditorWelcomeView";
 import { CollectionInference } from "../../types/collection_inference";
@@ -163,7 +162,6 @@ type EditorView = "welcome"
     | "properties"
     | "loading"
     | "extra_view"
-    | "relations"
     | "rls";
 
 export function CollectionEditor(props: CollectionEditorDialogProps & {
@@ -490,7 +488,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     const validation = (col: EntityCollection<M>) => {
 
         let errors: Record<string, string> = {};
-        const schema = (currentView === "properties" || currentView === "relations" || currentView === "general") && CollectionEditorSchema;
+        const schema = (currentView === "properties" || currentView === "general") && CollectionEditorSchema;
         if (schema) {
             const result = schema.safeParse(col);
             if (!result.success) {
@@ -644,9 +642,6 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                             {getDataSourceCapabilities(values.driver).supportsRLS && <Tab value={"rls"}>
                                 RLS
                             </Tab>}
-                            {getDataSourceCapabilities(values.driver).supportsRelations && <Tab value={"relations"}>
-                                Relations
-                            </Tab>}
                         </Tabs>
                     </div>
                     <div className="flex items-center gap-4">
@@ -750,10 +745,6 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
 
                         {currentView === "display" &&
                             <DisplaySettingsForm expandKanban={expandKanban}/>
-                        }
-
-                        {currentView === "relations" && getDataSourceCapabilities(values.driver).supportsRelations &&
-                            <CollectionRelationsTab/>
                         }
 
                         {currentView === "rls" && getDataSourceCapabilities(values.driver).supportsRLS &&

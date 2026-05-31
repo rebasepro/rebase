@@ -117,7 +117,7 @@ export class PostgresBackendDriver implements DataDriver {
         if (!collection && !path) return { collection: undefined,
 callbacks: undefined,
 propertyCallbacks: undefined };
-        const registryCollection = this.registry.getCollectionByPath(path);
+        const registryCollection = this.registry?.getCollectionByPath(path);
         const resolvedCollection = registryCollection
             ? { ...collection,
 ...registryCollection } as EntityCollection<M>
@@ -166,7 +166,8 @@ propertyCallbacks: undefined };
                 user: this.user,
                 driver: this,
                 data: this.data,
-                client: this.client
+                client: this.client,
+                storageSource: this.client?.storage
             } as unknown as RebaseCallContext; // Backend context
             return Promise.all(entities.map(async (entity) => {
                 let fetched = entity;
@@ -276,7 +277,8 @@ propertyCallbacks: undefined };
                 user: this.user,
                 driver: this,
                 data: this.data,
-                client: this.client
+                client: this.client,
+                storageSource: this.client?.storage
             } as unknown as RebaseCallContext; // Backend context
             if (callbacks?.afterRead) {
                 entity = await callbacks.afterRead({
@@ -359,7 +361,8 @@ propertyCallbacks: undefined };
             user: this.user,
             driver: this,
             data: this.data,
-            client: this.client
+            client: this.client,
+            storageSource: this.client?.storage
         } as unknown as RebaseCallContext;
 
         // Fetch previous values for callbacks AND history recording
@@ -534,7 +537,8 @@ propertyCallbacks: undefined };
             user: this.user,
             driver: this,
             data: this.data,
-            client: this.client
+            client: this.client,
+            storageSource: this.client?.storage
         } as unknown as RebaseCallContext;
 
         if (callbacks?.beforeDelete || propertyCallbacks?.beforeDelete) {

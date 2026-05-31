@@ -35,7 +35,12 @@ describe("PostgresBackendDriver", () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
-        delegate = new PostgresBackendDriver(mockDb, mockRealtimeService);
+        const mockRegistry = {
+            getCollectionByPath: jest.fn().mockReturnValue({ slug: "test_coll", properties: {} }),
+            getCollections: jest.fn().mockReturnValue([]),
+            getTable: jest.fn().mockReturnValue({})
+        } as any;
+        delegate = new PostgresBackendDriver(mockDb, mockRealtimeService, mockRegistry);
     });
 
     it("should initialize correctly", () => {
@@ -659,6 +664,130 @@ status: "new" });
             );
             expect(result).toEqual(["demo", "cloudsqlsuperuser"]);
             executeSqlSpy.mockRestore();
+        });
+    });
+
+    describe("storageSource in Callbacks", () => {
+        it("should inject storageSource: client.storage into contextForCallback in fetchCollection", async () => {
+            const mockStorage = { key: "mockStorage" };
+            delegate.client = {
+                storage: mockStorage
+            } as any;
+
+            const afterReadSpy = jest.fn().mockImplementation(async ({ entity }) => entity);
+            const mockCollectionWithCallback = {
+                slug: "test_coll",
+                callbacks: {
+                    afterRead: afterReadSpy
+                }
+            } as any;
+
+            jest.spyOn(delegate.entityService, "fetchCollection").mockResolvedValueOnce([
+                { id: "e1", path: "test_coll", values: {} } as any
+            ]);
+
+            await delegate.fetchCollection({
+                path: "test_coll",
+                collection: mockCollectionWithCallback
+            });
+
+            expect(afterReadSpy).toHaveBeenCalled();
+            const callArgs = afterReadSpy.mock.calls[0][0];
+            expect(callArgs.context).toBeDefined();
+            expect(callArgs.context.storageSource).toBe(mockStorage);
+        });
+
+        it("should inject storageSource in fetchEntity", async () => {
+            const mockStorage = { key: "mockStorage" };
+            delegate.client = {
+                storage: mockStorage
+            } as any;
+
+            const afterReadSpy = jest.fn().mockImplementation(async ({ entity }) => entity);
+            const mockCollectionWithCallback = {
+                slug: "test_coll",
+                callbacks: {
+                    afterRead: afterReadSpy
+                }
+            } as any;
+
+            jest.spyOn(delegate.entityService, "fetchEntity").mockResolvedValueOnce(
+                { id: "e1", path: "test_coll", values: {} } as any
+            );
+
+            await delegate.fetchEntity({
+                path: "test_coll",
+                entityId: "e1",
+                collection: mockCollectionWithCallback
+            });
+
+            expect(afterReadSpy).toHaveBeenCalled();
+            const callArgs = afterReadSpy.mock.calls[0][0];
+            expect(callArgs.context.storageSource).toBe(mockStorage);
+        });
+
+        it("should inject storageSource in saveEntity beforeSave and afterSave", async () => {
+            const mockStorage = { key: "mockStorage" };
+            delegate.client = {
+                storage: mockStorage
+            } as any;
+
+            const beforeSaveSpy = jest.fn().mockImplementation(async ({ values }) => values);
+            const afterSaveSpy = jest.fn();
+            const mockCollectionWithCallback = {
+                slug: "test_coll",
+                callbacks: {
+                    beforeSave: beforeSaveSpy,
+                    afterSave: afterSaveSpy
+                }
+            } as any;
+
+            jest.spyOn(delegate.entityService, "fetchEntity").mockResolvedValue(undefined);
+            jest.spyOn(delegate.entityService, "saveEntity").mockResolvedValueOnce(
+                { id: "e1", path: "test_coll", values: { name: "test" } } as any
+            );
+
+            await delegate.saveEntity({
+                path: "test_coll",
+                entityId: "e1",
+                values: { name: "test" },
+                collection: mockCollectionWithCallback,
+                status: "existing"
+            });
+
+            expect(beforeSaveSpy).toHaveBeenCalled();
+            expect(beforeSaveSpy.mock.calls[0][0].context.storageSource).toBe(mockStorage);
+            expect(afterSaveSpy).toHaveBeenCalled();
+            expect(afterSaveSpy.mock.calls[0][0].context.storageSource).toBe(mockStorage);
+        });
+
+        it("should inject storageSource in deleteEntity beforeDelete and afterDelete", async () => {
+            const mockStorage = { key: "mockStorage" };
+            delegate.client = {
+                storage: mockStorage
+            } as any;
+
+            const beforeDeleteSpy = jest.fn().mockImplementation(async () => true);
+            const afterDeleteSpy = jest.fn();
+            const mockCollectionWithCallback = {
+                slug: "test_coll",
+                callbacks: {
+                    beforeDelete: beforeDeleteSpy,
+                    afterDelete: afterDeleteSpy
+                }
+            } as any;
+
+            jest.spyOn(delegate.entityService, "deleteEntity").mockResolvedValueOnce();
+
+            await delegate.deleteEntity({
+                entity: { id: "e1", path: "test_coll", values: {} } as any,
+                collection: mockCollectionWithCallback
+            });
+
+            expect(beforeDeleteSpy).toHaveBeenCalled();
+            expect(beforeDeleteSpy.mock.calls[0][0].context.storageSource).toBe(mockStorage);
+            expect(afterDeleteSpy).toHaveBeenCalled();
+            expect(afterDeleteSpy.mock.calls[0][0].context.storageSource).toBe(mockStorage);
         });
     });
 });

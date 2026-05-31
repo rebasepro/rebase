@@ -10,8 +10,11 @@ const VALID_DATA_TYPES = [
     "date",
     "geopoint",
     "reference",
+    "relation",
     "array",
-    "map"
+    "map",
+    "vector",
+    "binary"
 ] as const;
 
 type DataType = typeof VALID_DATA_TYPES[number];
@@ -105,6 +108,90 @@ function validateProperty(
             errors.push({
                 path: `${path}.path`,
                 message: "Must be a string"
+            });
+        }
+    }
+
+    // Validate relation property
+    if (property.dataType === "relation") {
+        if (property.target !== undefined && typeof property.target !== "string" && typeof property.target !== "function") {
+            errors.push({
+                path: `${path}.target`,
+                message: "Must be a string (collection slug) or a function"
+            });
+        }
+        if (property.cardinality !== undefined && property.cardinality !== "one" && property.cardinality !== "many") {
+            errors.push({
+                path: `${path}.cardinality`,
+                message: "Must be either 'one' or 'many'"
+            });
+        }
+        if (property.direction !== undefined && property.direction !== "owning" && property.direction !== "inverse") {
+            errors.push({
+                path: `${path}.direction`,
+                message: "Must be either 'owning' or 'inverse'"
+            });
+        }
+        if (property.localKey !== undefined && typeof property.localKey !== "string") {
+            errors.push({
+                path: `${path}.localKey`,
+                message: "Must be a string"
+            });
+        }
+        if (property.foreignKeyOnTarget !== undefined && typeof property.foreignKeyOnTarget !== "string") {
+            errors.push({
+                path: `${path}.foreignKeyOnTarget`,
+                message: "Must be a string"
+            });
+        }
+        if (property.through !== undefined) {
+            if (typeof property.through !== "object" || property.through === null) {
+                errors.push({
+                    path: `${path}.through`,
+                    message: "Must be an object"
+                });
+            } else {
+                const throughObj = property.through as Record<string, unknown>;
+                if (throughObj.table !== undefined && typeof throughObj.table !== "string") {
+                    errors.push({
+                        path: `${path}.through.table`,
+                        message: "Must be a string"
+                    });
+                }
+                if (throughObj.sourceColumn !== undefined && typeof throughObj.sourceColumn !== "string") {
+                    errors.push({
+                        path: `${path}.through.sourceColumn`,
+                        message: "Must be a string"
+                    });
+                }
+                if (throughObj.targetColumn !== undefined && typeof throughObj.targetColumn !== "string") {
+                    errors.push({
+                        path: `${path}.through.targetColumn`,
+                        message: "Must be a string"
+                    });
+                }
+            }
+        }
+        if (property.onUpdate !== undefined && typeof property.onUpdate !== "string") {
+            errors.push({
+                path: `${path}.onUpdate`,
+                message: "Must be a string"
+            });
+        }
+        if (property.onDelete !== undefined && typeof property.onDelete !== "string") {
+            errors.push({
+                path: `${path}.onDelete`,
+                message: "Must be a string"
+            });
+        }
+    }
+
+    // Validate vector property
+    if (property.dataType === "vector") {
+        if (property.dimensions !== undefined && (typeof property.dimensions !== "number" || isNaN(property.dimensions) || property.dimensions <= 0)) {
+            errors.push({
+                path: `${path}.dimensions`,
+                message: "Must be a positive number"
             });
         }
     }

@@ -11,6 +11,7 @@ import {
     WhereFieldValue
 } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
+import { QueryBuilder } from "./query_builder";
 
 /**
  * Convert where-clause filter object to the internal DataDriver FilterValues format.
@@ -129,14 +130,11 @@ function parseOrderBy(orderBy?: string): [string, "asc" | "desc"] | undefined {
     return [field, direction];
 }
 
-/**
- * Create a CollectionAccessor that delegates to a DataDriver for a given collection slug.
- */
 function createDriverAccessor<M extends Record<string, unknown> = Record<string, unknown>>(
     driver: DataDriver,
     slug: string
 ): CollectionAccessor<M> {
-    return {
+    const accessor: CollectionAccessor<M> = {
         async find(params?: FindParams): Promise<FindResponse<M>> {
             const orderParsed = parseOrderBy(params?.orderBy);
             const entities = await driver.fetchCollection<M>({
@@ -237,8 +235,30 @@ values: {} as Record<string, unknown> }
                     onUpdate: (entity) => onUpdate(entity ?? undefined),
                     onError
                 });
-            } : undefined
+            } : undefined,
+
+        // Fluent Query Builder
+        where(column: keyof M & string, operator: any, value: unknown) {
+            return new QueryBuilder<M>(accessor).where(column, operator, value);
+        },
+        orderBy(column: keyof M & string, ascending?: "asc" | "desc") {
+            return new QueryBuilder<M>(accessor).orderBy(column, ascending);
+        },
+        limit(count: number) {
+            return new QueryBuilder<M>(accessor).limit(count);
+        },
+        offset(count: number) {
+            return new QueryBuilder<M>(accessor).offset(count);
+        },
+        search(searchString: string) {
+            return new QueryBuilder<M>(accessor).search(searchString);
+        },
+        include(...relations: string[]) {
+            return new QueryBuilder<M>(accessor).include(...relations);
+        }
     };
+
+    return accessor;
 }
 
 /**

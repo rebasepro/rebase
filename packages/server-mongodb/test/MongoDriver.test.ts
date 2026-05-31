@@ -343,4 +343,82 @@ email: "test@example.com" },
             });
         });
     });
+
+    describe("MongoDriver Hooks and storageSource", () => {
+        it("should execute read, save, and delete hooks and pass storageSource", async () => {
+            const mockStorage = { key: "mongoStorage" };
+            delegate.client = {
+                storage: mockStorage
+            } as any;
+
+            const afterReadSpy = jest.fn().mockImplementation(async ({ entity }) => {
+                entity.values.hooked = true;
+                return entity;
+            });
+            const beforeSaveSpy = jest.fn().mockImplementation(async ({ values }) => {
+                return { beforeSaved: true };
+            });
+            const afterSaveSpy = jest.fn();
+            const beforeDeleteSpy = jest.fn();
+            const afterDeleteSpy = jest.fn();
+
+            const collectionWithHooks: EntityCollection = {
+                name: "hooked_users",
+                properties: {
+                    name: { dataType: "string" }
+                },
+                callbacks: {
+                    afterRead: afterReadSpy,
+                    beforeSave: beforeSaveSpy,
+                    afterSave: afterSaveSpy,
+                    beforeDelete: beforeDeleteSpy,
+                    afterDelete: afterDeleteSpy
+                }
+            } as any;
+
+            // 1. Test saveEntity
+            const saved = await delegate.saveEntity({
+                path: "hooked_users",
+                values: { name: "John" },
+                collection: collectionWithHooks,
+                status: "new"
+            });
+
+            expect(beforeSaveSpy).toHaveBeenCalled();
+            const saveArgs = beforeSaveSpy.mock.calls[0][0];
+            expect(saveArgs.context.storageSource).toBe(mockStorage);
+            expect(saveArgs.values.name).toBe("John");
+            
+            // Verifies updatedValues includes returned value from beforeSave callback
+            expect(saved.values.beforeSaved).toBe(true);
+
+            expect(afterSaveSpy).toHaveBeenCalled();
+            const afterSaveArgs = afterSaveSpy.mock.calls[0][0];
+            expect(afterSaveArgs.context.storageSource).toBe(mockStorage);
+
+            // 2. Test fetchEntity
+            const fetched = await delegate.fetchEntity({
+                path: "hooked_users",
+                entityId: saved.id,
+                collection: collectionWithHooks
+            });
+
+            expect(fetched).toBeDefined();
+            expect(fetched?.values.hooked).toBe(true);
+            expect(afterReadSpy).toHaveBeenCalled();
+            const readArgs = afterReadSpy.mock.calls[0][0];
+            expect(readArgs.context.storageSource).toBe(mockStorage);
+
+            // 3. Test deleteEntity
+            await delegate.deleteEntity({
+                entity: fetched!,
+                collection: collectionWithHooks
+            });
+
+            expect(beforeDeleteSpy).toHaveBeenCalled();
+            expect(beforeDeleteSpy.mock.calls[0][0].context.storageSource).toBe(mockStorage);
+            expect(afterDeleteSpy).toHaveBeenCalled();
+            expect(afterDeleteSpy.mock.calls[0][0].context.storageSource).toBe(mockStorage);
+        });
+    });
 });

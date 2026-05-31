@@ -172,8 +172,19 @@ export class CollectionRegistry {
         const mergedRelationsRaw = [...extractedRelations];
         for (const manual of manualRelations) {
             const name = manual.relationName;
-            if (!name || !mergedRelationsRaw.find(r => r.relationName === name)) {
+            if (!name) {
                 mergedRelationsRaw.push(manual);
+            } else {
+                const existingIndex = mergedRelationsRaw.findIndex(r => r.relationName === name);
+                if (existingIndex === -1) {
+                    mergedRelationsRaw.push(manual);
+                } else {
+                    // Merge manual into existing, preserving custom fields like 'collection'
+                    mergedRelationsRaw[existingIndex] = {
+                        ...manual,
+                        ...mergedRelationsRaw[existingIndex]
+                    };
+                }
             }
         }
 

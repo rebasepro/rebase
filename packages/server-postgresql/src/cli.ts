@@ -478,10 +478,15 @@ async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> 
                 const errorOutput = stderr || stdout;
                 if (errorOutput) {
                     const lines = errorOutput.split("\n").filter((l: string) => l.trim());
+                    let printedCount = 0;
                     for (const line of lines) {
                         if (line.toLowerCase().includes("error") || line.includes("cannot") || line.includes("already exists") || line.includes("does not exist") || line.includes("violates") || line.includes("permission denied")) {
                             console.error(chalk.red(`  ${line.trim()}`));
+                            printedCount++;
                         }
+                    }
+                    if (printedCount === 0) {
+                        lines.slice(0, 10).forEach(line => console.error(chalk.red(`  ${line.trim()}`)));
                     }
                 }
                 console.error("");

@@ -7,4 +7,5 @@ blockExoticSubdeps: false
 minimumReleaseAge: 0
 allowBuilds:
   esbuild: true
+  "{{PROJECT_NAME}}-config": true
 

@@ -81,6 +81,7 @@ export interface UserInfo {
     photoURL?: string | null;
     emailVerified?: boolean;
     roles?: string[];
+    metadata?: Record<string, unknown>;
 }
 
 /**

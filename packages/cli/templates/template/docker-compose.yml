@@ -56,8 +56,8 @@ services:
     env_file: .env
     environment:
       # Override DATABASE_URL to point to the Docker network service
-      DATABASE_URL: postgresql://rebase:${DATABASE_PASSWORD:-changeme}@db:5432/rebase
-      ADMIN_CONNECTION_STRING: postgresql://rebase:${DATABASE_PASSWORD:-changeme}@db:5432/rebase
+      DATABASE_URL: postgresql://rebase:${DATABASE_PASSWORD:-changeme}@db:5432/rebase?options=-c%20search_path=public
+      ADMIN_CONNECTION_STRING: postgresql://rebase:${DATABASE_PASSWORD:-changeme}@db:5432/rebase?options=-c%20search_path=public
       NODE_ENV: production
       PORT: "3001"
     depends_on:

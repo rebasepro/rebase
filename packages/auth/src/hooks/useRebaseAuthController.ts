@@ -25,7 +25,8 @@ function convertToUser(userInfo: UserInfo): User {
         photoURL: userInfo.photoURL || null,
         providerId: "custom",
         isAnonymous: false,
-        roles: userInfo.roles || []
+        roles: userInfo.roles || [],
+        metadata: userInfo.metadata
     };
 }
 

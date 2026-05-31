@@ -11,6 +11,7 @@ export * from "./auth";
 export * from "./admin";
 export * from "./cron";
 export * from "./collection";
+export * from "./query_builder";
 export * from "./websocket";
 export * from "./storage";
 export * from "./reviver";

@@ -514,15 +514,61 @@ async function run() {
 
         // 5. Generate database schema & migration files
         console.log("\n⚡ Step 5: Generating database schema & migration files...");
-        await execa("node", [
+        const genResult = await execa("node", [
             cliBin,
             "db",
             "generate"
         ], {
             cwd: projectPath,
-            stdio: "inherit",
             env: cleanEnv
         });
+
+        console.log("--- db generate stdout ---");
+        console.log(genResult.stdout);
+        if (genResult.stderr) {
+            console.error("--- db generate stderr ---");
+            console.error(genResult.stderr);
+        }
+
+        const genOutput = (genResult.stdout + "\n" + genResult.stderr).toLowerCase();
+        const forbiddenPatterns = [
+            "unrecognized relation",
+            "could not generate column",
+            "missing relation target",
+            "unrecognized or missing relation target"
+        ];
+
+        for (const pattern of forbiddenPatterns) {
+            if (genOutput.includes(pattern)) {
+                throw new Error(`E2E Failure: Schema generator printed warning matching pattern "${pattern}"!\nOutput:\n${genResult.stdout}\n${genResult.stderr}`);
+            }
+        }
+
+        // Verify that the schema file contains the expected generated relation objects
+        const schemaFilePath = path.join(projectPath, "backend", "src", "schema.generated.ts");
+        if (!fs.existsSync(schemaFilePath)) {
+            throw new Error(`E2E Failure: Generated schema file not found at ${schemaFilePath}`);
+        }
+
+        const schemaContent = fs.readFileSync(schemaFilePath, "utf-8");
+        
+        // Assert that postsRelations is generated
+        if (!schemaContent.includes("postsRelations")) {
+            throw new Error("E2E Failure: Generated schema does not contain 'postsRelations'!");
+        }
+
+        // Assert that tags relation junction table is generated
+        if (!schemaContent.includes("posts_tags") && !schemaContent.includes("postsTags")) {
+            throw new Error("E2E Failure: Generated schema does not contain junction table/relation mapping for tags ('posts_tags' or 'postsTags')!");
+        }
+
+        // Assert that author_id exists in posts table columns
+        if (!schemaContent.includes("authorId") && !schemaContent.includes("author_id")) {
+            throw new Error("E2E Failure: Generated schema does not contain foreign key column for 'author' ('authorId' or 'author_id') on posts table!");
+        }
+
+        console.log("✅ Verified: Database schema contains all expected relations and columns.");
+
 
         // 6. Run database migrations to apply schema changes
         console.log("\n🗄️ Step 6: Running database migrations...");
@@ -750,7 +796,7 @@ async function run() {
                 stdio: "inherit",
                 env: {
                     ...cleanEnv,
-                    DATABASE_URL: "postgresql://rebase:changeme@localhost:5433/rebase"
+                    DATABASE_URL: "postgresql://rebase:changeme@localhost:5433/rebase?options=-c%20search_path=public"
                 }
             });
             console.log("Migrations applied inside Docker.");

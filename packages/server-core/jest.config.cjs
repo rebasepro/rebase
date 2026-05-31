@@ -10,7 +10,10 @@ module.exports = {
     ],
     // This helps Jest resolve monorepo packages
     moduleNameMapper: {
-        "^@rebase/(.*)$": "<rootDir>/../$1/src",
+        "^@rebasepro/client$": "<rootDir>/../client/src/index.ts",
+        "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
+        "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
+        "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts",
         "^(\\.{1,2}/.*)\\.js$": "$1"
     }
 };

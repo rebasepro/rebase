@@ -221,7 +221,7 @@ describe("template collections", () => {
     it("posts collection demonstrates a relation to authors", () => {
         const postsPath = path.join(TEMPLATE_DIR, "config", "collections", "posts.ts");
         const content = fs.readFileSync(postsPath, "utf-8");
-        expect(content).toContain("relation:");
+        expect(content).toContain('type: "relation"');
         expect(content).toContain("authorsCollection");
     });
 
@@ -442,7 +442,7 @@ describe(".env.example", () => {
     it("configureEnvFile successfully generates a valid .env", async () => {
         const targetDir = await simulateInit("env-test-app");
         // simulateInit does not call configureEnvFile, so we call it manually
-        configureEnvFile(targetDir);
+        await configureEnvFile(targetDir);
 
         const envPath = path.join(targetDir, ".env");
         expect(fs.existsSync(envPath)).toBe(true);
@@ -462,12 +462,17 @@ describe(".env.example", () => {
         const dbMatch = envContent.match(/^DATABASE_URL=(.*)$/m);
         expect(dbMatch).toBeTruthy();
         expect(dbMatch![1]).toContain("postgresql://rebase:");
+
+        // Verify DATABASE_PASSWORD matches the one in DATABASE_URL
+        const dbPasswordMatch = envContent.match(/^DATABASE_PASSWORD=(.*)$/m);
+        expect(dbPasswordMatch).toBeTruthy();
+        expect(dbMatch![1]).toContain(`postgresql://rebase:${dbPasswordMatch![1]}@`);
     });
 
     it("configureEnvFile correctly uses provided databaseUrl", async () => {
         const targetDir = await simulateInit("env-custom-db-app");
         const customDbUrl = "postgresql://user:pass@remote:5432/db";
-        configureEnvFile(targetDir, customDbUrl);
+        await configureEnvFile(targetDir, customDbUrl);
 
         const envContent = fs.readFileSync(path.join(targetDir, ".env"), "utf-8");
         const dbMatch = envContent.match(/^DATABASE_URL=(.*)$/m);

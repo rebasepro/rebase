@@ -8,7 +8,10 @@ module.exports = {
         "**/test/**/*.test.ts"
     ],
     moduleNameMapper: {
-        "^@rebase/(.*)$": "<rootDir>/../$1/src"
+        "^@rebasepro/client$": "<rootDir>/../client/src/index.ts",
+        "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
+        "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
+        "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts"
     },
     // mongodb-memory-server needs more time to start
     testTimeout: 30000

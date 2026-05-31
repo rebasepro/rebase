@@ -41,7 +41,7 @@
         "../ui/src"
       ],
       "@rebasepro/admin": [
-        "../cms/src"
+        "../admin/src"
       ],
       "@rebasepro/common": [
         "../common/src"

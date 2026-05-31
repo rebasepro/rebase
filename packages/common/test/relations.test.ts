@@ -66,7 +66,7 @@ slug: "mySlug" }))).toBe("my_slug");
 // ─────────────────────────────────────────────────────────────
 describe("sanitizeRelation", () => {
     it("throws when target is missing", () => {
-        expect(() => sanitizeRelation({} as any, makeCollection())).toThrow("missing a `target`");
+        expect(() => sanitizeRelation({} as Partial<Relation>, makeCollection())).toThrow("missing a `target`");
     });
 
     it("defaults relationName from target slug", () => {
@@ -207,3 +207,75 @@ foreignKeyOnTarget: "custom_fk" } as Partial<Relation>,
         expect(result.foreignKeyOnTarget).toBe("custom_fk");
     });
 });
+
+// ─────────────────────────────────────────────────────────────
+// resolvePropertyRelation
+// ─────────────────────────────────────────────────────────────
+import { resolvePropertyRelation } from "../src/util/relations";
+import { Property, RelationProperty, Relation } from "@rebasepro/types";
+
+describe("resolvePropertyRelation", () => {
+    it("successfully resolves flat inline relation configuration", () => {
+        const target = makeTargetCollection();
+        const property: RelationProperty = {
+            name: "Author",
+            type: "relation",
+            target: () => target,
+            cardinality: "one",
+            direction: "owning"
+        };
+        const result = resolvePropertyRelation({
+            propertyKey: "author",
+            property,
+            sourceCollection: makeCollection()
+        });
+        expect(result).toBeDefined();
+        expect(result?.relationName).toBe("author");
+        expect(result?.cardinality).toBe("one");
+    });
+
+    it("rejects legacy nested relation configurations and returns undefined", () => {
+        const target = makeTargetCollection();
+        const property = {
+            name: "Author",
+            type: "relation",
+            relation: {
+                target: () => target,
+                cardinality: "one",
+                direction: "owning"
+            }
+        };
+        const result = resolvePropertyRelation({
+            propertyKey: "author",
+            property: property as unknown as Property,
+            sourceCollection: makeCollection()
+        });
+        expect(result).toBeUndefined();
+    });
+
+    it("rejects legacy fallback lookup in collection.relations and returns undefined", () => {
+        const target = makeTargetCollection();
+        const property: RelationProperty = {
+            name: "Author",
+            type: "relation",
+            relationName: "author"
+        };
+        const sourceCollection = makeCollection({
+            relations: [
+                {
+                    relationName: "author",
+                    target: () => target,
+                    cardinality: "one",
+                    direction: "owning"
+                } as Relation
+            ]
+        });
+        const result = resolvePropertyRelation({
+            propertyKey: "author",
+            property,
+            sourceCollection
+        });
+        expect(result).toBeUndefined();
+    });
+});
+

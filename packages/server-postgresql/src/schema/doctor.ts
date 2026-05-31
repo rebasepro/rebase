@@ -265,6 +265,8 @@ export async function checkCollectionsVsSdk(
 // ── Phase 2: Collections ↔ Database ──────────────────────────────────────
 
 interface DbColumn {
+    table_schema: string;
+    table_name: string;
     column_name: string;
     data_type: string;
     is_nullable: string;
@@ -288,27 +290,45 @@ export async function checkCollectionsVsDatabase(
     const { Pool } = pgModule.default ?? pgModule;
     const pool = new Pool({ connectionString: databaseUrl });
 
-    try {
-        // Fetch all tables in the public schema
-        const tablesResult = await pool.query<{ table_name: string }>(
-            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
-        );
-        const existingTables = new Set(tablesResult.rows.map((r) => r.table_name));
+    // Determine all schemas defined by the collections, plus public and rebase
+    const schemas = Array.from(new Set([
+        "public",
+        "rebase",
+        ...collections
+            .filter(isPostgresCollection)
+            .map(c => c.schema)
+            .filter((s): s is string => !!s)
+    ]));
 
-        // Fetch all columns
+    try {
+        // Fetch all tables in the defined schemas
+        const tablesResult = await pool.query<{ table_schema: string; table_name: string }>(
+            `SELECT table_schema, table_name 
+             FROM information_schema.tables 
+             WHERE table_schema = ANY($1) AND table_type = 'BASE TABLE'`,
+            [schemas]
+        );
+        const existingTables = new Set(tablesResult.rows.map((r) => 
+            r.table_schema === "public" ? r.table_name : `${r.table_schema}.${r.table_name}`
+        ));
+
+        // Fetch all columns in the defined schemas
         const columnsResult = await pool.query<DbColumn>(
-            `SELECT table_name, column_name, data_type, is_nullable, udt_name
+            `SELECT table_schema, table_name, column_name, data_type, is_nullable, udt_name
              FROM information_schema.columns
-             WHERE table_schema = 'public'
-             ORDER BY table_name, ordinal_position`
+             WHERE table_schema = ANY($1)
+             ORDER BY table_schema, table_name, ordinal_position`,
+            [schemas]
         );
         const columnsByTable = new Map<string, DbColumn[]>();
         for (const row of columnsResult.rows) {
-            const tableName = (row as unknown as Record<string, string>).table_name;
-            if (!columnsByTable.has(tableName)) {
-                columnsByTable.set(tableName, []);
+            const tableSchema = row.table_schema;
+            const tableName = row.table_name;
+            const key = tableSchema === "public" ? tableName : `${tableSchema}.${tableName}`;
+            if (!columnsByTable.has(key)) {
+                columnsByTable.set(key, []);
             }
-            columnsByTable.get(tableName)!.push(row);
+            columnsByTable.get(key)!.push(row);
         }
 
         // Fetch enums
@@ -326,18 +346,22 @@ export async function checkCollectionsVsDatabase(
             enumsByName.get(row.enum_name)!.push(row.enum_value);
         }
 
-        // Fetch foreign key constraints
+        // Fetch foreign key constraints in the defined schemas
         const fksResult = await pool.query<{
             constraint_name: string;
+            table_schema: string;
             table_name: string;
             column_name: string;
+            foreign_table_schema: string;
             foreign_table_name: string;
             foreign_column_name: string;
         }>(
             `SELECT
                 tc.constraint_name,
+                tc.table_schema,
                 tc.table_name,
                 kcu.column_name,
+                ccu.table_schema AS foreign_table_schema,
                 ccu.table_name AS foreign_table_name,
                 ccu.column_name AS foreign_column_name
              FROM information_schema.table_constraints AS tc
@@ -345,14 +369,18 @@ export async function checkCollectionsVsDatabase(
                  ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
              JOIN information_schema.constraint_column_usage AS ccu
                  ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema
-             WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public'`
+             WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = ANY($1)`,
+            [schemas]
         );
         const fksByTable = new Map<string, typeof fksResult.rows>();
         for (const row of fksResult.rows) {
-            if (!fksByTable.has(row.table_name)) {
-                fksByTable.set(row.table_name, []);
+            const tableSchema = row.table_schema;
+            const tableName = row.table_name;
+            const key = tableSchema === "public" ? tableName : `${tableSchema}.${tableName}`;
+            if (!fksByTable.has(key)) {
+                fksByTable.set(key, []);
             }
-            fksByTable.get(row.table_name)!.push(row);
+            fksByTable.get(key)!.push(row);
         }
 
         // ── Compare each collection against the database ─────────────────
@@ -361,20 +389,22 @@ export async function checkCollectionsVsDatabase(
 
         for (const collection of postgresCollections) {
             const tableName = getTableName(collection);
+            const schemaName = collection.schema || "public";
+            const fullTableName = schemaName === "public" ? tableName : `${schemaName}.${tableName}`;
 
             // Check table existence
-            if (!existingTables.has(tableName)) {
+            if (!existingTables.has(fullTableName)) {
                 issues.push({
                     severity: "error",
                     category: "missing_table",
-                    table: tableName,
-                    message: `Table "${tableName}" does not exist in the database.`,
+                    table: fullTableName,
+                    message: `Table "${fullTableName}" does not exist in the database.`,
                     fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`"
                 });
                 continue; // Skip column checks for missing tables
             }
 
-            const dbColumns = columnsByTable.get(tableName) ?? [];
+            const dbColumns = columnsByTable.get(fullTableName) ?? [];
             const dbColumnMap = new Map(dbColumns.map((c) => [c.column_name, c]));
 
             // System columns that Rebase always creates
@@ -392,27 +422,36 @@ export async function checkCollectionsVsDatabase(
                             issues.push({
                                 severity: "error",
                                 category: "missing_column",
-                                table: tableName,
+                                table: fullTableName,
                                 column: fkColName,
-                                message: `Foreign key column "${fkColName}" for relation "${propName}" is missing from table "${tableName}".`,
+                                message: `Foreign key column "${fkColName}" for relation "${propName}" is missing from table "${fullTableName}".`,
                                 fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`"
                             });
                         }
 
                         // Check FK constraint exists
-                        const tableFks = fksByTable.get(tableName) ?? [];
-                        const hasFk = tableFks.some((fk) => fk.column_name === fkColName);
+                        const tableFks = fksByTable.get(fullTableName) ?? [];
+                        let targetTableName = "unknown";
+                        let targetSchemaName = "public";
+                        try {
+                            const targetColl = relation.target();
+                            targetTableName = getTableName(targetColl);
+                            targetSchemaName = targetColl.schema || "public";
+                        } catch { /* ignore */ }
+
+                        const hasFk = tableFks.some((fk) => 
+                            fk.column_name === fkColName && 
+                            fk.foreign_table_name === targetTableName &&
+                            fk.foreign_table_schema === targetSchemaName
+                        );
+
                         if (dbColumnMap.has(fkColName) && !hasFk) {
-                            let targetTableName = "unknown";
-                            try {
-                                targetTableName = getTableName(relation.target());
-                            } catch { /* ignore */ }
                             issues.push({
                                 severity: "warning",
                                 category: "missing_foreign_key",
-                                table: tableName,
+                                table: fullTableName,
                                 column: fkColName,
-                                message: `Column "${fkColName}" exists but has no FOREIGN KEY constraint referencing "${targetTableName}".`,
+                                message: `Column "${fkColName}" exists but has no FOREIGN KEY constraint referencing "${targetSchemaName === "public" ? targetTableName : `${targetSchemaName}.${targetTableName}`}".`,
                                 fix: "Run `rebase db push` or add the constraint manually"
                             });
                         }
@@ -430,9 +469,9 @@ export async function checkCollectionsVsDatabase(
                     issues.push({
                         severity: "error",
                         category: "missing_column",
-                        table: tableName,
+                        table: fullTableName,
                         column: colName,
-                        message: `Column "${colName}" is defined in collection "${collection.slug}" but missing from table "${tableName}".`,
+                        message: `Column "${colName}" is defined in collection "${collection.slug}" but missing from table "${fullTableName}".`,
                         fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`"
                     });
                     continue;
@@ -450,11 +489,11 @@ export async function checkCollectionsVsDatabase(
                         issues.push({
                             severity: "warning",
                             category: "type_mismatch",
-                            table: tableName,
+                            table: fullTableName,
                             column: colName,
                             expected: prop.type === "vector" ? "vector" : expectedType,
                             actual: dbCol.udt_name === "vector" ? "vector" : actualType,
-                            message: `Column "${colName}" in table "${tableName}": expected type "${prop.type === "vector" ? "vector" : expectedType}" but found "${dbCol.udt_name === "vector" ? "vector" : actualType}".`,
+                            message: `Column "${colName}" in table "${fullTableName}": expected type "${prop.type === "vector" ? "vector" : expectedType}" but found "${dbCol.udt_name === "vector" ? "vector" : actualType}".`,
                             fix: "Review collection property type or run a migration"
                         });
                     }
@@ -470,7 +509,7 @@ export async function checkCollectionsVsDatabase(
                             issues.push({
                                 severity: "warning",
                                 category: "missing_enum",
-                                table: tableName,
+                                table: fullTableName,
                                 column: colName,
                                 expected: enumName,
                                 message: `Enum type "${enumName}" is defined in collection but not found in the database.`,
@@ -492,11 +531,11 @@ export async function checkCollectionsVsDatabase(
                                 issues.push({
                                     severity: "warning",
                                     category: "enum_value_mismatch",
-                                    table: tableName,
+                                    table: fullTableName,
                                     column: colName,
                                     expected: expectedValues.join(", "),
                                     actual: dbEnumValues.join(", "),
-                                    message: `Enum values for "${colName}" in table "${tableName}" are out of sync (${parts.join("; ")}).`,
+                                    message: `Enum values for "${colName}" in table "${fullTableName}" are out of sync (${parts.join("; ")}).`,
                                     fix: "Run `rebase db push` to update the enum"
                                 });
                             }
@@ -510,12 +549,14 @@ export async function checkCollectionsVsDatabase(
             for (const relation of Object.values(resolvedRelations)) {
                 if (relation.cardinality === "many" && relation.direction === "owning" && relation.through) {
                     const junctionTable = relation.through.table;
-                    if (!existingTables.has(junctionTable)) {
+                    const junctionSchema = collection.schema || "public";
+                    const fullJunctionTable = junctionSchema === "public" ? junctionTable : `${junctionSchema}.${junctionTable}`;
+                    if (!existingTables.has(fullJunctionTable)) {
                         issues.push({
                             severity: "error",
                             category: "missing_table",
-                            table: junctionTable,
-                            message: `Junction table "${junctionTable}" for many-to-many relation "${relation.relationName}" is missing.`,
+                            table: fullJunctionTable,
+                            message: `Junction table "${fullJunctionTable}" for many-to-many relation "${relation.relationName}" is missing.`,
                             fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`"
                         });
                     }

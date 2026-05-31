@@ -122,7 +122,7 @@ app.post("/protected", async (c) => {
     if (!user) {
         return c.json({ error: "Unauthorized" }, 401);
     }
-    return c.json({ message: `Hello, ${user.uid}` });
+    return c.json({ message: `Hello, ${user.userId}` });
 });
 
 // Admin-only endpoint
@@ -139,16 +139,64 @@ export default app;
 ```
 
 :::important
-Rebase's JWT middleware is scoped to the built-in API routes (`/api/data`, `/api/auth`, etc.). Custom function routes get the **parsed user context**, but you must enforce access control yourself.
+Rebase's JWT middleware is scoped to the built-in API routes (`/api/data`, `/api/auth`, etc.). Custom function routes get the **parsed user context** (e.g. `c.get("user")`), but you must enforce access control yourself.
 :::
 
-## Accessing the Database
+### Service Key Authentication
 
-Custom functions run alongside Rebase, so you can access the database through two approaches:
+Rebase supports a static `REBASE_SERVICE_KEY` defined in your `.env` for script or server-to-server calls. 
 
-### 1. Via the Rebase Singleton (Recommended)
+When an external request passes the service key via the Authorization header (`Authorization: Bearer <service_key>`), the auth middleware automatically:
+1. Validates the key using constant-time comparison to prevent timing attacks.
+2. Grants admin-level access, setting `c.get("user")` with:
+   ```json
+   {
+     "userId": "service",
+     "roles": ["admin"]
+   }
+   ```
+3. Injects an admin-privileged `DataDriver` into `c.get("driver")` that bypasses Row-Level Security.
 
-The `@rebasepro/server-core` package provides a `rebase` singleton that gives you admin-level access to all app-scoped services (data, auth, storage, email) from anywhere in your backend.
+## Accessing the Database & Services
+
+Custom functions run alongside Rebase, providing multiple ways to interact with your data depending on your security requirements:
+
+### 1. Via the User-Scoped Data Driver (Recommended for User Requests)
+
+Rebase automatically injects the `driver` into the Hono request context (`c.get("driver")`). This driver is **scoped to the authenticated user** and automatically respects all PostgreSQL Row-Level Security (RLS) policies.
+
+Using the driver ensures that users can only query or update records they are authorized to access under your database security policies:
+
+```typescript
+// backend/functions/my-products.ts
+import { Hono } from "hono";
+import { HonoEnv } from "@rebasepro/server-core"; // Import types for typing Hono context
+
+const app = new Hono<HonoEnv>();
+
+app.get("/", async (c) => {
+    const driver = c.get("driver")!; // Injected scoped driver
+    const user = c.get("user");       // Authenticated user context
+
+    if (!user) {
+        return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    // Queries respect Row-Level Security
+    const { data: myProducts } = await driver.fetchCollection({
+        path: "products",
+        limit: 10
+    });
+
+    return c.json(myProducts);
+});
+
+export default app;
+```
+
+### 2. Via the Rebase Singleton (Bypasses RLS - Admin Access)
+
+The `@rebasepro/server-core` package provides a `rebase` singleton that has **full administrative privileges** (no RLS). Use this for background processing, system updates, integrations, or cases where a request needs to read or write to tables that the end-user has no direct permissions for:
 
 ```typescript
 // backend/functions/approve-job.ts
@@ -160,9 +208,8 @@ const app = new Hono();
 app.post("/:id/approve", async (c) => {
     const id = c.req.param("id");
 
-    // Use the admin-level data API (bypasses RLS)
-    await rebase.data.saveEntity("jobs", {
-        id,
+    // Use the admin-level data API (bypasses RLS completely)
+    await rebase.data.jobs.update(id, {
         status: "published",
         approved_at: new Date().toISOString(),
     });
@@ -173,7 +220,17 @@ app.post("/:id/approve", async (c) => {
 export default app;
 ```
 
-### 2. Via Direct Drizzle Access
+### RLS-Scoped Driver vs. Rebase Singleton
+
+| Feature | `c.get("driver")` | `rebase` Singleton |
+|---------|--------------------|-------------------|
+| **RLS Enforcement** | ✅ Yes (evaluated against user/roles) | ❌ No (bypasses all security rules) |
+| **Ideal for...** | General user CRUD, search, and queries | Background jobs, system triggers, webhooks |
+| **API style** | Driver-level methods (`fetchCollection`, `saveEntity`) | Fluent collection accessors (`rebase.data.jobs.find`) |
+
+### 3. Via Direct Drizzle Access
+
+If you need raw SQL or complex custom queries, you can access your Drizzle database instance directly:
 
 ```typescript
 // backend/functions/reports.ts

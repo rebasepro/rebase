@@ -52,7 +52,7 @@ export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): Backend
             }
 
             const realtimeService = new MongoRealtimeService(db);
-            const driver = new MongoDriver(db, realtimeService);
+            const driver = new MongoDriver(db, realtimeService, undefined, registry);
 
             const internals: MongoDriverInternals = {
                 db,

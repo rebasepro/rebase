@@ -122,7 +122,7 @@ interface CronJobDefinition {
 
 ## Handler Context
 
-Each handler receives a `CronJobContext`:
+Each handler receives a `CronJobContext` containing utility methods and the Rebase Client instance:
 
 ```typescript
 interface CronJobContext {
@@ -134,10 +134,59 @@ interface CronJobContext {
 
     // Logger — captured lines appear in Studio and the logs API
     log: (...args: unknown[]) => void;
+
+    // Backing RebaseClient instance running with full admin privileges
+    client: RebaseClient;
 }
 ```
 
 Use `ctx.log()` to emit structured output. These lines are captured in the execution log and visible in Studio and via the REST API.
+
+### Interacting with Database & Services via `ctx.client`
+
+The `ctx.client` parameter provides direct, server-side access to all Rebase services under administrative privileges. This means database operations run with bypass of Row-Level Security (RLS) policies:
+
+```typescript
+// backend/crons/expire-users.ts
+import type { CronJobDefinition } from "@rebasepro/types";
+
+const job: CronJobDefinition = {
+    schedule: "0 0 * * *", // Daily at midnight
+    name: "Expire Inactive Accounts",
+    
+    async handler(ctx) {
+        ctx.log("Checking for expired trial users...");
+
+        // Fetch using the pre-initialized data driver
+        const { data: trials } = await ctx.client.data.users.find({
+            where: {
+                trial_status: "active",
+                trial_ends_at: ["<", new Date().toISOString()]
+            }
+        });
+
+        ctx.log(`Found ${trials.length} users with expired trials.`);
+
+        for (const user of trials) {
+            await ctx.client.data.users.update(user.id, {
+                trial_status: "expired",
+                status: "disabled"
+            });
+            
+            // Send email notification using Rebase email service
+            if (ctx.client.email) {
+                await ctx.client.email.send({
+                    to: user.values.email,
+                    subject: "Your trial has expired",
+                    html: "<p>Please upgrade your subscription to continue.</p>"
+                });
+            }
+        }
+    }
+};
+
+export default job;
+```
 
 :::tip
 The handler can return any JSON-serializable value. It will be stored in the log entry as `result` and displayed in Studio's execution history.
@@ -240,12 +289,26 @@ The table is auto-created on first startup — no migrations needed.
 Persistence is non-blocking. If a database write fails, the scheduler continues running and the in-memory log buffer is still available as a fallback.
 :::
 
-## Error Handling & Timeouts
+## Schedule Validation
 
-- If a handler **throws**, the error is captured in the log entry and the job state is set to `"error"`. The scheduler continues running — the next scheduled tick will still fire.
-- If a handler exceeds `timeoutSeconds` (default: 300), it is terminated with a timeout error.
-- All execution metrics (success count, failure count, last error) are tracked per job and accessible via the API.
-- Failed persistence writes are logged but never crash the scheduler.
+At server initialization, Rebase parses and validates all registered cron schedules. 
+- Validation verifies that the expression contains exactly 5 whitespace-separated fields.
+- It checks that all ranges, steps, and lists produce values within the standard bounds (e.g., minutes 0–59, hours 0–23).
+- If any cron expression is invalid, Rebase logs a clear error to the terminal at startup and rejects the job so the server doesn't execute malformed schedules.
+
+## Concurrency Guarding
+
+To ensure stability under heavy workloads, Rebase implements a strict **concurrency guard** per cron job:
+- **No overlapping executions**: If a job's scheduled tick fires (or is manually triggered) while the previous run of the same job is still active, Rebase will skip the execution.
+- **Manual trigger fallback**: When a job is triggered via the API/Studio while already running, the execution is skipped and the API returns a skipped indicator: `result: { skipped: true, reason: "already_executing" }`.
+- **Timer unref**: Timers use `unref()` internally to prevent scheduled jobs from blocking the Node.js event loop during graceful process shutdown.
+
+## Timeouts & Error Handling
+
+- **Automatic Timeout**: If a job execution exceeds its configured `timeoutSeconds` (defaults to `300` seconds / 5 minutes), the run is forcibly aborted and logged as a failure with a timeout error.
+- **Fail-safe isolation**: If a handler throws an error, the scheduler captures the exception stack, updates the job state to `"error"`, and schedules the next run normally. A crash in a single job will never crash the scheduler thread or the main HTTP server.
+- **In-Memory Ring Buffer**: Rebase holds the last `50` execution logs per job in an in-memory ring buffer for instant retrieval, while writing all logs asynchronously to the PostgreSQL database if persistence is enabled.
+- **Robust Persistence**: Database log writes are fully asynchronous and fail-safe; if the database connection drops temporarily, the scheduler continues executing normally and uses the in-memory buffer as a fallback.
 
 ## Example: Daily Cleanup Job
 

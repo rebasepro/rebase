@@ -29,7 +29,7 @@ function MyComponent() {
 
 ## `useAuthController`
 
-Access authentication state:
+Access authentication state and capabilities:
 
 ```typescript
 import { useAuthController } from "@rebasepro/core";
@@ -38,12 +38,182 @@ function UserMenu() {
     const auth = useAuthController();
 
     auth.user            // Current user (or null)
-    auth.initialLoading  // Loading initial session
-    auth.signOut()       // Log out
-    auth.getAuthToken()  // Get JWT for API calls
+    auth.authLoading     // True when auth operation is in progress
+    auth.initialLoading  // Loading initial session on app startup
+    auth.signOut()       // Log out (returns Promise<void>)
+    auth.getAuthToken()  // Get JWT for API calls (returns Promise<string>)
     auth.extra           // Additional user data (roles, etc.)
+    auth.capabilities    // Capabilities advertised by auth provider (e.g. registration, reset)
 }
 ```
+
+## `useCollectionFetch`
+
+Fetch and subscribe to a list of entities in a collection. It automatically establishes a real-time WebSocket subscription if supported by the driver, falling back to REST fetches.
+
+```typescript
+import { useCollectionFetch } from "@rebasepro/core";
+import { productsCollection } from "../config/collections";
+
+function ProductList() {
+    const { data, dataLoading, dataLoadingError, noMoreToLoad } = useCollectionFetch({
+        path: "products",
+        collection: productsCollection,
+        itemCount: 20,
+        filterValues: {
+            active: ["==", true],
+            price: [">=", 100]
+        },
+        sortBy: ["created_at", "desc"],
+        searchString: "laptop"
+    });
+
+    if (dataLoading) return <p>Loading products...</p>;
+    if (dataLoadingError) return <p>Error: {dataLoadingError.message}</p>;
+
+    return (
+        <ul>
+            {data.map(product => (
+                <li key={product.id}>{product.values.name} (${product.values.price})</li>
+            ))}
+        </ul>
+    );
+}
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `path` | `string` | Absolute collection path (e.g., `"products"`). |
+| `collection` | `EntityCollection` | The collection definition object. |
+| `itemCount` | `number` | Optional. Number of entities to fetch. |
+| `filterValues` | `FilterValues` | Optional. Query filters. Supports shorthand equality, tuples `[op, val]`, and PostgREST operator strings. |
+| `sortBy` | `[string, "asc" \| "desc"]` | Optional. Sort field and order direction tuple. |
+| `searchString` | `string` | Optional. Query for full-text search. |
+
+### Return Value
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `data` | `Entity[]` | Array of fetched entities. |
+| `dataLoading` | `boolean` | True if the initial load is in progress. |
+| `dataLoadingError` | `Error` | Error object if the fetch fails. |
+| `noMoreToLoad` | `boolean` | True if there are no more records beyond the current page/limit. |
+
+## `useEntityFetch`
+
+Fetch and subscribe to a single entity by ID. It renders instantly using cached data if already loaded via a collection fetch, then updates in the background.
+
+```typescript
+import { useEntityFetch } from "@rebasepro/core";
+import { productsCollection } from "../config/collections";
+
+function ProductDetail({ productId }) {
+    const { entity, dataLoading, dataLoadingError } = useEntityFetch({
+        path: "products",
+        entityId: productId,
+        collection: productsCollection
+    });
+
+    if (dataLoading) return <p>Loading product...</p>;
+    if (dataLoadingError) return <p>Error: {dataLoadingError.message}</p>;
+    if (!entity) return <p>Product not found</p>;
+
+    return (
+        <div>
+            <h1>{entity.values.name}</h1>
+            <p>{entity.values.description}</p>
+        </div>
+    );
+}
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `path` | `string` | Absolute collection path. |
+| `entityId` | `string \| number` | The ID of the entity to fetch. |
+| `collection` | `EntityCollection` | The collection definition object. |
+| `useCache` | `boolean` | Optional. If `true` and entity is in cache, skips background refresh. (Default: `false`). |
+
+### Caching Utilities
+
+Rebase maintains a global memory cache to prevent UI flashing. You can manipulate this cache directly:
+
+- `populateEntityFetchCache(path, entities)`: Pre-populates the cache with a list of entities (e.g. after a bulk action or custom API call).
+- `clearEntityFetchCache()`: Clears the cache. Recommended to call this upon user logout to prevent data leakage.
+
+## `usePermissions`
+
+Hook to evaluate roles and permissions for the current user. It abstracts away the need to manually pass the `authController` to permission checking functions.
+
+```typescript
+import { usePermissions } from "@rebasepro/core";
+import { productsCollection } from "../config/collections";
+
+function CreateProductButton() {
+    const { canCreate } = usePermissions();
+
+    const allowedToCreate = canCreate(productsCollection, "products");
+
+    return (
+        <button disabled={!allowedToCreate}>
+            Create Product
+        </button>
+    );
+}
+```
+
+### Return Value
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `canCreate` | `(collection, path) => boolean` | Checks if the user is allowed to create entities in the collection. |
+| `canEdit` | `(collection, path, entity) => boolean` | Checks if the user is allowed to edit the given entity. |
+| `canDelete` | `(collection, path, entity) => boolean` | Checks if the user is allowed to delete the given entity. |
+| `canRead` | `(collection) => boolean` | Checks if the user is allowed to read the collection. |
+
+## `useClipboard`
+
+Utility hook to copy or cut text to the clipboard, with automatic support for fallback mechanisms on older browsers.
+
+> [!NOTE]
+> Note the exact spelling of `isCoppied` (with two `p`s) in the return payload.
+
+```typescript
+import { useClipboard } from "@rebasepro/core";
+
+function CopyButton({ text }) {
+    const { copy, isCoppied } = useClipboard({ copiedDuration: 2000 });
+
+    return (
+        <button onClick={() => copy(text)}>
+            {isCoppied ? "Copied!" : "Copy Text"}
+        </button>
+    );
+}
+```
+
+### Parameters
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `copiedDuration` | `number` | Optional. Time in milliseconds before resetting `isCoppied` back to `false`. |
+| `onSuccess` | `(text) => void` | Optional. Callback triggered on successful copy. |
+| `onError` | `(err) => void` | Optional. Callback triggered on error. |
+
+### Return Value
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `ref` | `MutableRefObject` | React ref to attach to input/textarea elements to copy from. |
+| `copy` | `(text?: string) => void` | Triggers copy of the given text, or the ref element's content. |
+| `cut` | `() => void` | Triggers cut of the ref element's content. |
+| `isCoppied` | `boolean` | True if text was recently copied. |
+| `clipboard` | `string` | The current copied text value. |
+| `clearClipboard` | `() => void` | Clears the clipboard. |
 
 ## `useSideEntityController`
 
@@ -172,6 +342,224 @@ function MyComponent() {
     navigation.views           // Custom views
     navigation.adminViews      // Admin-mode views
     navigation.getCollection(path) // Get collection for a path
+}
+```
+
+## `useRelationSelector`
+
+Manage complex relation selections with built-in search, debouncing, and pagination.
+
+```typescript
+import { useRelationSelector } from "@rebasepro/core";
+import { categoriesCollection } from "../config/collections";
+
+function CategorySelector({ onSelect }) {
+    const { items, isLoading, search, loadMore, hasMore } = useRelationSelector({
+        path: "categories",
+        collection: categoriesCollection,
+        pageSize: 10
+    });
+
+    return (
+        <div>
+            <input type="text" onChange={(e) => search(e.target.value)} placeholder="Search..." />
+            <ul>
+                {items.map(item => (
+                    <li key={item.id} onClick={() => onSelect(item.relation)}>
+                        {item.label}
+                    </li>
+                ))}
+            </ul>
+            {hasMore && <button onClick={loadMore} disabled={isLoading}>Load More</button>}
+        </div>
+    );
+}
+```
+
+### Parameters
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `path` | `string` | Absolute collection path. |
+| `collection` | `EntityCollection` | Target collection definition. |
+| `fixedFilter` | `FilterValues` | Optional. Static filters to restrict search results. |
+| `pageSize` | `number` | Optional. Number of items per page. (Default: `10`). |
+| `getLabelFromEntity` | `(entity) => string` | Optional. Customize the display label text. |
+| `getDescriptionFromEntity` | `(entity) => string` | Optional. Customize the description text. |
+
+## `useUserSelector`
+
+Manage user account selection with server-side search and pagination, automatically falling back to client-side filtering if the backend delegate doesn't support server-side search.
+
+```typescript
+import { useUserSelector } from "@rebasepro/core";
+
+function AssigneeSelector({ onSelect }) {
+    const { items, isLoading, search, loadMore, hasMore } = useUserSelector({
+        pageSize: 10
+    });
+
+    return (
+        <div>
+            <input type="text" onChange={(e) => search(e.target.value)} placeholder="Search users..." />
+            <ul>
+                {items.map(item => (
+                    <li key={item.uid} onClick={() => onSelect(item.user)}>
+                        {item.label} ({item.description})
+                    </li>
+                ))}
+            </ul>
+            {hasMore && <button onClick={loadMore} disabled={isLoading}>Load More</button>}
+        </div>
+    );
+}
+```
+
+### Parameters
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `pageSize` | `number` | Optional. Number of users to return per page. (Default: `10`). |
+
+### Return Value
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `items` | `UserSelectorItem[]` | List of items wrapping `uid`, `label`, `description`, and raw `user`. |
+| `isLoading` | `boolean` | True if fetching is active. |
+| `error` | `Error` | Contains error if fetch fails. |
+| `search` | `(str) => void` | Updates search string with a debounced delay of 300ms. |
+| `loadMore` | `() => void` | Loads next page of users. |
+| `hasMore` | `boolean` | True if more users exist on the server. |
+| `getUser` | `(uid) => User` | Helper to fetch a single user object. |
+
+## `useRebaseClient`
+
+Retrieve the backing client SDK instance (`RebaseClient`) from the React context. This is useful for invoking raw SDK operations (like calling custom endpoints or manual uploads) within your components.
+
+```typescript
+import { useRebaseClient } from "@rebasepro/core";
+
+function CustomAction() {
+    const client = useRebaseClient();
+
+    const handleAction = async () => {
+        const result = await client.call("send-invoice", { invoiceId: "123" });
+        console.log(result);
+    };
+
+    return <button onClick={handleAction}>Process Invoice</button>;
+}
+```
+
+## `useUnsavedChangesDialog`
+
+Prevent navigation or page unload when form data has unsaved changes. It automatically intercepts internal React Router navigation via `useBlocker` as well as browser-level reloads via `beforeunload`.
+
+```typescript
+import { useUnsavedChangesDialog } from "@rebasepro/core";
+import { useState } from "react";
+
+function EditForm() {
+    const [isDirty, setIsDirty] = useState(false);
+
+    const { dialogProps, triggerDialog } = useUnsavedChangesDialog(
+        isDirty,
+        () => console.log("Navigation allowed (discarded or saved changes)")
+    );
+
+    // dialogProps contains { open, handleOk, handleCancel, body }
+}
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `when` | `boolean` | Flag to activate page/router navigation blocking. |
+| `onOk` | `() => void` | Callback triggered when the user confirms discarding changes. |
+
+### Return Value
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `dialogProps` | `UnsavedChangesDialogProps` | Modal props to pass directly to an `UnsavedChangesDialog` UI component. |
+| `triggerDialog` | `() => void` | Triggers manual dialog display programmatically. |
+
+## `useEffectiveRoleController`
+
+Switch roles at runtime to preview permissions and test Row-Level Security (RLS) policies locally without signing out.
+
+```typescript
+import { useEffectiveRoleController } from "@rebasepro/core";
+
+function RoleSwitcher() {
+    const { effectiveRole, setEffectiveRole } = useEffectiveRoleController();
+
+    return (
+        <select value={effectiveRole || ""} onChange={(e) => setEffectiveRole(e.target.value || null)}>
+            <option value="">Default (No Simulation)</option>
+            <option value="admin">Admin</option>
+            <option value="editor">Editor</option>
+            <option value="user">Standard User</option>
+        </select>
+    );
+}
+```
+
+## `useAdminModeController`
+
+Switch the admin layout view modes within the admin panel.
+
+```typescript
+import { useAdminModeController } from "@rebasepro/core";
+
+function ModeToggle() {
+    const { mode, setMode } = useAdminModeController(); // mode is "content" | "studio" | "settings"
+
+    return <button onClick={() => setMode("studio")}>Switch to Studio View</button>;
+}
+```
+
+## `useDialogsController`
+
+Open dialog screens imperatively from anywhere in the component tree.
+
+```typescript
+import { useDialogsController } from "@rebasepro/core";
+import { MyCustomDialog } from "./MyCustomDialog";
+
+function OpenModalButton() {
+    const dialogs = useDialogsController();
+
+    return (
+        <button onClick={() => dialogs.open({
+            key: "my-custom-modal",
+            Component: MyCustomDialog,
+            props: { title: "Custom Title" }
+        })}>
+            Open Custom Dialog
+        </button>
+    );
+}
+```
+
+## `useAnalyticsController`
+
+Capture CMS UI actions and user events globally.
+
+```typescript
+import { useAnalyticsController } from "@rebasepro/core";
+import { useEffect } from "react";
+
+function AnalyticsLogger() {
+    const analytics = useAnalyticsController();
+
+    useEffect(() => {
+        analytics.onAnalyticsEvent = (event, data) => {
+            console.log(`CMS Event: ${event}`, data);
+        };
+    }, [analytics]);
 }
 ```
 

@@ -3,6 +3,7 @@ import inquirer from "inquirer";
 import chalk from "chalk";
 import path from "path";
 import fs from "fs";
+import net from "net";
 import { promisify } from "util";
 import { execa } from "execa";
 import { cp } from "fs/promises";
@@ -206,7 +207,7 @@ async function createProject(options: InitOptions) {
     await replacePlaceholders(options);
 
     // Rename .env.example to .env if it exists and randomize secrets
-    configureEnvFile(options.targetDirectory, options.databaseUrl);
+    await configureEnvFile(options.targetDirectory, options.databaseUrl);
 
     // Initialize git
     if (options.git) {
@@ -274,8 +275,8 @@ async function createProject(options: InitOptions) {
         console.log(chalk.gray("  # Your database is configured! Start the dev server:"));
     } else {
         console.log(chalk.gray("  # A local database configuration has been generated in .env."));
-        console.log(chalk.gray("  # If using the included docker-compose.yml, start it with:"));
-        console.log(`  ${chalk.cyan("docker compose up -d")}`);
+        console.log(chalk.gray("  # If using the included docker-compose.yml, start the database with:"));
+        console.log(`  ${chalk.cyan("docker compose up -d db")}`);
         console.log("");
         console.log(chalk.gray("  # Then start the dev server:"));
     }
@@ -297,6 +298,7 @@ async function replacePlaceholders(options: InitOptions) {
         "backend/package.json",
         "config/package.json",
         "frontend/index.html",
+        "pnpm-workspace.yaml",
         "README.md"
     ];
 
@@ -383,7 +385,28 @@ async function replacePlaceholders(options: InitOptions) {
 }
 
 
-export function configureEnvFile(targetDirectory: string, databaseUrl?: string) {
+async function isPortAvailable(port: number): Promise<boolean> {
+    return new Promise((resolve) => {
+        const server = net.createServer();
+        server.once("error", () => {
+            resolve(false);
+        });
+        server.once("listening", () => {
+            server.close(() => resolve(true));
+        });
+        server.listen(port);
+    });
+}
+
+async function findAvailablePort(startPort: number): Promise<number> {
+    let port = startPort;
+    while (!(await isPortAvailable(port))) {
+        port++;
+    }
+    return port;
+}
+
+export async function configureEnvFile(targetDirectory: string, databaseUrl?: string) {
     const envExamplePath = path.join(targetDirectory, ".env.example");
     const envPath = path.join(targetDirectory, ".env");
     if (fs.existsSync(envExamplePath) && !fs.existsSync(envPath)) {
@@ -407,10 +430,22 @@ export function configureEnvFile(targetDirectory: string, databaseUrl?: string) 
                 `DATABASE_URL=${databaseUrl}`
             );
         } else {
+            const dbPort = await findAvailablePort(5432);
             envContent = envContent.replace(
                 /^DATABASE_URL=.*$/m,
-                `DATABASE_URL=postgresql://rebase:${dbPassword}@localhost:5432/rebase`
+                `DATABASE_URL=postgresql://rebase:${dbPassword}@localhost:${dbPort}/rebase?options=-c%20search_path=public\nDATABASE_PASSWORD=${dbPassword}`
             );
+
+            // Also update docker-compose.yml with the dynamic host port if it has the default 5432 port mapping
+            const dockerComposePath = path.join(targetDirectory, "docker-compose.yml");
+            if (fs.existsSync(dockerComposePath)) {
+                let dockerComposeContent = fs.readFileSync(dockerComposePath, "utf-8");
+                dockerComposeContent = dockerComposeContent.replace(
+                    /-\s*"5432:5432"/g,
+                    `- "${dbPort}:5432"`
+                );
+                fs.writeFileSync(dockerComposePath, dockerComposeContent, "utf-8");
+            }
         }
 
         fs.writeFileSync(envPath, envContent, "utf-8");

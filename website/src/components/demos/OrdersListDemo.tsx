@@ -99,11 +99,17 @@ function OrderRow({ order, isHovered, isSelected, onHover, onLeave }: {
       <div className="flex-shrink-0 w-8 flex items-center justify-center text-surface-400 dark:text-surface-500">
         <ShoppingCart size={16} />
       </div>
-      <div className="flex-1 min-w-0 ml-3">
+      <div className="flex-grow min-w-0 ml-3">
         <div className="text-sm font-semibold text-surface-900 dark:text-white">{order.id}</div>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-xs text-surface-500">{order.paymentStatus}</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded font-medium text-white" style={{ backgroundColor: order.customerColor }}>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wider ${
+            order.paymentStatus === "paid" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20" :
+            order.paymentStatus === "pending" ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/20" :
+            "bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/20"
+          }`}>
+            {order.paymentStatus}
+          </span>
+          <span className="text-xs text-surface-500 dark:text-surface-400 font-medium">
             {order.customer}
           </span>
         </div>
@@ -164,8 +170,8 @@ function OrderDetailPanel({ order, onClose, highlightedField }: {
             <div className={fieldClass("customer")}>
               <span className="absolute top-1.5 left-3 text-[10px] font-medium text-primary">Customer <span className="text-red-400">*</span></span>
               <div className="px-3 pt-6 pb-2 flex items-center gap-2">
-                <span className="text-[10px] px-1.5 py-0.5 rounded font-medium text-white" style={{ backgroundColor: order.customerColor }}>{order.customer}</span>
-                <span className="text-xs text-surface-400">{order.email}</span>
+                <span className="text-sm font-semibold text-surface-900 dark:text-white">{order.customer}</span>
+                <span className="text-xs text-surface-500 dark:text-surface-400">({order.email})</span>
               </div>
             </div>
 
@@ -184,7 +190,15 @@ function OrderDetailPanel({ order, onClose, highlightedField }: {
             {/* Payment */}
             <div className={fieldClass("payment")}>
               <span className="absolute top-1.5 left-3 text-[10px] font-medium text-surface-400">Payment</span>
-              <div className="px-3 pt-6 pb-2 text-sm text-surface-900 dark:text-surface-200 capitalize">{order.paymentStatus}</div>
+              <div className="px-3 pt-6 pb-2">
+                <span className={`text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider inline-block ${
+                  order.paymentStatus === "paid" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20" :
+                  order.paymentStatus === "pending" ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/20" :
+                  "bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/20"
+                }`}>
+                  {order.paymentStatus}
+                </span>
+              </div>
             </div>
 
             {/* Total */}

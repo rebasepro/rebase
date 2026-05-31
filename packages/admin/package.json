@@ -70,6 +70,7 @@
     "@rebasepro/types": "workspace:*",
     "@rebasepro/ui": "workspace:*",
     "@rebasepro/utils": "workspace:*",
+    "react-compiler-runtime": "1.0.0",
     "cmdk": "^1.1.1",
     "date-fns": "^3.6.0",
     "fast-equals": "6.0.0",

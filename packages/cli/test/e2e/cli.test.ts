@@ -6,7 +6,10 @@ import crypto from "crypto";
 import { fileURLToPath } from "url";
 import { execa } from "execa";
 import pg from "pg";
+import { createRequire } from "module";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
+
+const require = createRequire(import.meta.url);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,6 +31,22 @@ function getCleanEnv(): Record<string, string> {
     return cleanEnv;
 }
 
+function getPackageDir(name: string, paths: string[]): string {
+    const entryPath = require.resolve(name, { paths });
+    let current = path.dirname(entryPath);
+    while (current && current !== path.parse(current).root) {
+        const pkgJsonPath = path.join(current, "package.json");
+        if (fs.existsSync(pkgJsonPath)) {
+            const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
+            if (pkg.name === name) {
+                return current;
+            }
+        }
+        current = path.dirname(current);
+    }
+    throw new Error(`Could not find package root for ${name}`);
+}
+
 function linkLocalPackages(projectPath: string) {
     const pkgPaths = [
         path.join(projectPath, "package.json"),
@@ -37,6 +56,11 @@ function linkLocalPackages(projectPath: string) {
     ];
 
     const rootDir = path.resolve(cliRoot, "../.."); // `/Users/francesco/rebase`
+
+    // Dynamically resolve the real installation paths of hono and drizzle-orm inside the monorepo
+    const resolvePaths = [path.join(rootDir, "packages", "server-core")];
+    const honoPath = getPackageDir("hono", resolvePaths);
+    const drizzlePath = getPackageDir("drizzle-orm", resolvePaths);
 
     for (const pkgPath of pkgPaths) {
         if (!fs.existsSync(pkgPath)) continue;
@@ -57,24 +81,26 @@ function linkLocalPackages(projectPath: string) {
         updateDeps(pkg.peerDependencies);
 
         // For the root package.json of the scaffolded project, add hono and drizzle-orm to devDependencies
-        // and add pnpm overrides to ensure workspace consistency
         if (pkgPath === path.join(projectPath, "package.json")) {
             if (!pkg.devDependencies) {
                 pkg.devDependencies = {};
             }
-            pkg.devDependencies["hono"] = `link:${path.join(rootDir, "node_modules", "hono")}`;
-            pkg.devDependencies["drizzle-orm"] = `link:${path.join(rootDir, "node_modules", "drizzle-orm")}`;
-
-            if (!pkg.pnpm) {
-                pkg.pnpm = {};
-            }
-            pkg.pnpm.overrides = {
-                "hono": `link:${path.join(rootDir, "node_modules", "hono")}`,
-                "drizzle-orm": `link:${path.join(rootDir, "node_modules", "drizzle-orm")}`
-            };
+            pkg.devDependencies["hono"] = `link:${honoPath}`;
+            pkg.devDependencies["drizzle-orm"] = `link:${drizzlePath}`;
         }
 
         fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 4), "utf-8");
+    }
+
+    const workspaceYamlPath = path.join(projectPath, "pnpm-workspace.yaml");
+    if (fs.existsSync(workspaceYamlPath)) {
+        let content = fs.readFileSync(workspaceYamlPath, "utf-8");
+        content += `
+overrides:
+  hono: "link:${honoPath}"
+  drizzle-orm: "link:${drizzlePath}"
+`;
+        fs.writeFileSync(workspaceYamlPath, content, "utf-8");
     }
 }
 
@@ -92,11 +118,21 @@ describe("Rebase CLI E2E Integration Suite", () => {
         tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-cli-e2e-"));
         scaffoldedDir = path.join(tempDir, "my-app");
 
-        // Set up database client connection
-        dbClient = new pg.Client({
-            connectionString: pgContainer.connectionString
-        });
-        await dbClient.connect();
+        let connectAttempts = 0;
+        const maxConnectAttempts = 5;
+        while (connectAttempts < maxConnectAttempts) {
+            try {
+                dbClient = new pg.Client({
+                    connectionString: pgContainer.connectionString
+                });
+                await dbClient.connect();
+                break;
+            } catch (e) {
+                connectAttempts++;
+                if (connectAttempts === maxConnectAttempts) throw e;
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
+        }
     }, 180_000); // 3-minute setup allowance
 
     afterAll(async () => {
@@ -312,5 +348,117 @@ describe("Rebase CLI E2E Integration Suite", () => {
         expect(updatedHash).toBeDefined();
         expect(updatedHash).not.toBe(initialPasswordHash);
         expect(updatedHash.length).toBeGreaterThan(20); // Password hashes are typically much longer
-    }, 180_000); // 3 minutes total execution allowance
+
+        console.log("11. Testing CLI help and version commands...");
+        const helpRes = await execa("node", [cliBin, "--help"], { cwd: scaffoldedDir, stdio: "inherit", env: cleanEnv });
+        const versionRes = await execa("node", [cliBin, "--version"], { cwd: scaffoldedDir, stdio: "inherit", env: cleanEnv });
+
+        console.log("12. Testing generate-sdk command...");
+        await execa("node", [
+            cliBin,
+            "generate-sdk"
+        ], {
+            cwd: scaffoldedDir,
+            stdio: "inherit",
+            env: cleanEnv
+        });
+        expect(fs.existsSync(path.join(scaffoldedDir, "generated", "sdk", "database.types.ts"))).toBe(true);
+        expect(fs.existsSync(path.join(scaffoldedDir, "generated", "sdk", "README.md"))).toBe(true);
+
+        console.log("13. Testing doctor command...");
+        await execa("node", [
+            cliBin,
+            "doctor"
+        ], {
+            cwd: scaffoldedDir,
+            stdio: "inherit",
+            env: cleanEnv
+        });
+
+        console.log("14. Testing db generate migrations...");
+        await execa("node", [
+            cliBin,
+            "db",
+            "generate",
+            "--collections",
+            "../config/collections"
+        ], {
+            cwd: scaffoldedDir,
+            stdio: "inherit",
+            env: cleanEnv
+        });
+        // Verify that migration files are created under backend/drizzle
+        const drizzleDir = path.join(scaffoldedDir, "backend", "drizzle");
+        expect(fs.existsSync(drizzleDir)).toBe(true);
+        const files = fs.readdirSync(drizzleDir);
+        expect(files.some(f => f.endsWith(".sql"))).toBe(true);
+
+        console.log("15. Dropping tables to test db migrate from scratch...");
+        await dbClient.query("DROP TABLE IF EXISTS posts_tags CASCADE");
+        await dbClient.query("DROP TABLE IF EXISTS posts CASCADE");
+        await dbClient.query("DROP TABLE IF EXISTS authors CASCADE");
+        await dbClient.query("DROP TABLE IF EXISTS tags CASCADE");
+        await dbClient.query("DROP TABLE IF EXISTS rebase.users CASCADE");
+        await dbClient.query("DROP TABLE IF EXISTS rebase.roles CASCADE");
+        await dbClient.query("DROP TABLE IF EXISTS rebase.branches CASCADE");
+        await dbClient.query("DROP TABLE IF EXISTS rebase.user_identities CASCADE");
+        await dbClient.query("DROP TABLE IF EXISTS rebase.user_roles CASCADE");
+        await dbClient.query("DROP TABLE IF EXISTS rebase.refresh_tokens CASCADE");
+        await dbClient.query("DROP TABLE IF EXISTS rebase.password_reset_tokens CASCADE");
+        await dbClient.query("DROP TABLE IF EXISTS rebase.app_config CASCADE");
+        await dbClient.query("DROP TABLE IF EXISTS rebase.entity_history CASCADE");
+        await dbClient.query("DROP SCHEMA IF EXISTS rebase CASCADE");
+        await dbClient.query("DROP TABLE IF EXISTS __drizzle_migrations CASCADE");
+        await dbClient.query("DROP TYPE IF EXISTS posts_status CASCADE");
+
+        console.log("15b. Testing db migrate...");
+        await execa("node", [
+            cliBin,
+            "db",
+            "migrate"
+        ], {
+            cwd: scaffoldedDir,
+            stdio: "inherit",
+            env: cleanEnv
+        });
+
+        console.log("16. Disconnecting dbClient to enable database branching templates...");
+        await dbClient.end();
+
+        console.log("17. Testing db branch create, list, and delete...");
+        await execa("node", [
+            cliBin,
+            "db",
+            "branch",
+            "create",
+            "e2e-test-branch"
+        ], {
+            cwd: scaffoldedDir,
+            stdio: "inherit",
+            env: cleanEnv
+        });
+
+        const listRes = await execa("node", [
+            cliBin,
+            "db",
+            "branch",
+            "list"
+        ], {
+            cwd: scaffoldedDir,
+            stdio: "inherit",
+            env: cleanEnv
+        });
+
+        await execa("node", [
+            cliBin,
+            "db",
+            "branch",
+            "delete",
+            "e2e-test-branch"
+        ], {
+            cwd: scaffoldedDir,
+            stdio: "inherit",
+            env: cleanEnv
+        });
+    }, 240_000); // 4 minutes total execution allowance
 });

@@ -38,3 +38,12 @@ Use `pnpm` exclusively, do not use `npm` or `yarn`.
 - **NEVER** modify database settings, `.env` configurations, or perform database/role creation/deletion in the local PostgreSQL or Docker environment without presenting a plan and asking for explicit user approval first.
 - **NEVER** make arbitrary decisions or break existing setups. Always respect local configuration constraints and consult the user for confirmation.
 
+## Agent Quality Verification (ZERO REGRESSION POLICY)
+- **Before submitting any task or declaring work complete, the agent MUST run**:
+  ```bash
+  ./scripts/verify-quality.sh
+  ```
+- This script compiles the monorepo, runs ESLint (including React rules of hooks), executes all unit tests, and verifies the application state with Playwright E2E integration tests.
+- **ZERO TOLERANCE FOR FAILURES**: The agent must ensure that all checks pass cleanly before presenting changes as complete. If any check fails, the agent must investigate the root cause, resolve it, and re-run verification. Human developers can run this script voluntarily to check project health.
+
+

@@ -499,6 +499,9 @@ importers:
       react:
         specifier: '>=19.0.0'
         version: 19.2.6
+      react-compiler-runtime:
+        specifier: 1.0.0
+        version: 1.0.0(react@19.2.6)
       react-dom:
         specifier: '>=19.0.0'
         version: 19.2.6(react@19.2.6)
@@ -646,6 +649,9 @@ importers:
 
   packages/client:
     dependencies:
+      '@rebasepro/common':
+        specifier: workspace:*
+        version: link:../common
       '@rebasepro/types':
         specifier: workspace:*
         version: link:../types
@@ -911,6 +917,9 @@ importers:
       react:
         specifier: '>=19.0.0'
         version: 19.2.6
+      react-compiler-runtime:
+        specifier: 1.0.0
+        version: 1.0.0(react@19.2.6)
       react-dom:
         specifier: '>=19.0.0'
         version: 19.2.6(react@19.2.6)
@@ -987,6 +996,9 @@ importers:
       react:
         specifier: '>=19.0.0'
         version: 19.2.6
+      react-compiler-runtime:
+        specifier: 1.0.0
+        version: 1.0.0(react@19.2.6)
       react-dom:
         specifier: '>=19.0.0'
         version: 19.2.6(react@19.2.6)
@@ -1314,12 +1326,18 @@ importers:
 
   packages/server-mongodb:
     dependencies:
+      '@rebasepro/common':
+        specifier: workspace:*
+        version: link:../common
       '@rebasepro/server-core':
         specifier: workspace:*
         version: link:../server-core
       '@rebasepro/types':
         specifier: workspace:*
         version: link:../types
+      '@rebasepro/utils':
+        specifier: workspace:*
+        version: link:../utils
       mongodb:
         specifier: ^6.21.0
         version: 6.21.0(socks@2.8.9)
@@ -1641,6 +1659,9 @@ importers:
       react:
         specifier: '>=19.0.0'
         version: 19.2.6
+      react-compiler-runtime:
+        specifier: 1.0.0
+        version: 1.0.0(react@19.2.6)
       react-dom:
         specifier: '>=19.0.0'
         version: 19.2.6(react@19.2.6)
@@ -1860,12 +1881,18 @@ importers:
       '@rebasepro/admin':
         specifier: workspace:*
         version: link:../../packages/admin
+      '@rebasepro/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@rebasepro/client':
         specifier: workspace:*
         version: link:../../packages/client
       '@rebasepro/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@rebasepro/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@rebasepro/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -1985,6 +2012,9 @@ importers:
       astro:
         specifier: ^5.18.1
         version: 5.18.2(@types/node@24.12.4)(jiti@2.7.0)(lightningcss@1.32.0)(rollup@4.60.4)(terser@5.48.0)(tsx@4.22.3)(typescript@5.9.3)(yaml@2.9.0)
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
       firebase:
         specifier: ^10.14.1
         version: 10.14.1
@@ -2012,6 +2042,9 @@ importers:
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
+      tailwind-merge:
+        specifier: ^2.6.1
+        version: 2.6.1
     devDependencies:
       '@types/react-syntax-highlighter':
         specifier: ^15.5.13

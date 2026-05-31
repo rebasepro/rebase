@@ -128,7 +128,7 @@ export function createMongoBackend(config: MongoBackendConfig): MongoBackendInst
     const entityService = new MongoEntityService(db);
     const realtimeService = new MongoRealtimeService(db);
     const historyService = new MongoHistoryService(db, config.historyRetention);
-    const driver = new MongoDriver(db, realtimeService, historyService);
+    const driver = new MongoDriver(db, realtimeService, historyService, collectionRegistry);
     const mongoConnection = new MongoDBConnection(db, client);
 
     // Build admin capabilities for MongoDB
@@ -227,11 +227,12 @@ latencyMs: Date.now() - start };
 export function createMongoDelegate(
     db: Db,
     realtimeService?: MongoRealtimeService,
-    historyService?: MongoHistoryService
+    historyService?: MongoHistoryService,
+    registry?: CollectionRegistryInterface
 ): MongoDriver {
     const realtime = realtimeService ?? new MongoRealtimeService(db);
     const history = historyService ?? new MongoHistoryService(db);
-    return new MongoDriver(db, realtime, history);
+    return new MongoDriver(db, realtime, history, registry);
 }
 
 /**

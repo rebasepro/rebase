@@ -285,4 +285,34 @@ path: "products" })
             expect(data.products.count).toBeUndefined();
         });
     });
+
+    // ── Fluent Query Builder ────────────────────────────────
+    describe("CollectionAccessor Fluent Queries", () => {
+        it("supports fluent query building and translates to find calls", async () => {
+            const driver = createMockDriver();
+            const data = buildRebaseData(driver);
+
+            await data.products
+                .where("price", ">", 100)
+                .orderBy("createdAt", "desc")
+                .limit(5)
+                .offset(10)
+                .search("camera")
+                .find();
+
+            expect(driver.fetchCollection).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    path: "products",
+                    filter: {
+                        price: [">", 100]
+                    },
+                    orderBy: "createdAt",
+                    order: "desc",
+                    limit: 5,
+                    offset: 10,
+                    searchString: "camera"
+                })
+            );
+        });
+    });
 });

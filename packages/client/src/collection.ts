@@ -1,8 +1,8 @@
 import { Transport, FindParams, buildQueryString } from "./transport";
 import { RebaseWebSocketClient } from "./websocket";
-import { Entity, FilterValues, WhereFilterOp, CollectionAccessor, WhereFieldValue, FindResponse } from "@rebasepro/types";
+import { Entity, FilterValues, WhereFilterOp, CollectionAccessor, WhereFieldValue, FindResponse, FilterOperator } from "@rebasepro/types";
 
-import { FilterOperator, QueryBuilder } from "./query_builder";
+import { QueryBuilder } from "./query_builder";
 
 function parseWhereFilter(where?: Record<string, WhereFieldValue>): FilterValues<string> | undefined {
     if (!where) return undefined;

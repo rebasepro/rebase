@@ -14,16 +14,25 @@ import { CollectionsSelect } from "./ReferencePropertyField";
 
 const ON_ACTION_OPTIONS: OnAction[] = ["cascade", "restrict", "no action", "set null", "set default"];
 
+function getTargetSlug(target?: string | (() => string | { slug: string } | Record<string, unknown>)): string {
+    if (!target) return "";
+    if (typeof target === "string") return target;
+    try {
+        const resolved = target();
+        if (typeof resolved === "string") return resolved;
+        if (resolved && typeof resolved === "object" && "slug" in resolved && typeof resolved.slug === "string") {
+            return resolved.slug;
+        }
+        return "";
+    } catch {
+        return "";
+    }
+}
+
 /**
  * Property editor form for `type: "relation"` properties.
  *
- * This component edits both:
- *  1. The `RelationProperty` fields on the property itself (relationName, etc.)
- *  2. The matching `Relation` entry in `collection.relations[]`
- *
- * When a user configures a relation property, we sync the relation config
- * back to the parent collection's `relations` array so saving the collection
- * persists everything in one go.
+ * This component edits the `RelationProperty` fields on the property itself (target, relationName, etc.)
  */
 export function RelationPropertyField({
     disabled,
@@ -36,37 +45,22 @@ export function RelationPropertyField({
         values,
         errors,
         setFieldValue
-    } = useFormex<RelationProperty & { id?: string; _relationConfig?: Record<string, unknown> }>();
+    } = useFormex<RelationProperty & { id?: string }>();
 
     const collectionRegistry = useCollectionRegistryController();
 
-    // ─── Read the parent collection form to sync `relations[]` ───
-    // The PropertyForm is nested inside a parent Formex for the whole collection.
-    // We reach it via a second useFormex keyed to the parent context.
-    // However, the PropertyForm uses its own isolated Formex, so we can't
-    // directly access the parent. Instead, we store the relation config
-    // on the property itself and let the save logic merge it.
-    //
-    // We store the full relation config on a transient `_relationConfig` key
-    // so the consumer (CollectionPropertiesEditorForm / save logic) can
-    // extract it and place it in `collection.relations[]`.
-
     const relationName = values.relationName ?? "";
-    // Transient config object stored on the property for editor use.
-    // Contains standard Relation fields plus `_targetSlug` for the UI dropdown.
-    const relationConfig: Record<string, unknown> = (values._relationConfig as Record<string, unknown>) ?? {};
-
-    const targetSlug = (relationConfig._targetSlug as string) ?? "";
-    const cardinality = (relationConfig.cardinality as string) ?? "one";
-    const direction = (relationConfig.direction as string) ?? "owning";
-    const localKey = (relationConfig.localKey as string) ?? "";
-    const foreignKeyOnTarget = (relationConfig.foreignKeyOnTarget as string) ?? "";
-    const through = relationConfig.through as Record<string, string> | undefined;
+    const targetSlug = getTargetSlug(values.target);
+    const cardinality = values.cardinality ?? "one";
+    const direction = values.direction ?? "owning";
+    const localKey = values.localKey ?? "";
+    const foreignKeyOnTarget = values.foreignKeyOnTarget ?? "";
+    const through = values.through;
     const throughTable = through?.table ?? "";
     const throughSourceColumn = through?.sourceColumn ?? "";
     const throughTargetColumn = through?.targetColumn ?? "";
-    const onUpdate = (relationConfig.onUpdate as string) ?? "no action";
-    const onDelete = (relationConfig.onDelete as string) ?? "no action";
+    const onUpdate = values.onUpdate ?? "no action";
+    const onDelete = values.onDelete ?? "no action";
 
     // Whether to show the junction table section
     const showThrough = cardinality === "many" && direction === "owning";
@@ -75,26 +69,12 @@ export function RelationPropertyField({
     // Whether to show the foreign key on target field
     const showForeignKey = direction === "inverse";
 
-    const updateRelationConfig = useCallback(
-        (patch: Record<string, unknown>) => {
-            const current = (values._relationConfig as Record<string, unknown>) ?? {};
-            setFieldValue("_relationConfig" as keyof (RelationProperty & { _relationConfig?: unknown }), { ...current,
-...patch });
-        },
-        [values, setFieldValue]
-    );
-
     const updateThrough = useCallback(
         (patch: Record<string, unknown>) => {
-            const current = (values._relationConfig as Record<string, unknown>) ?? {};
-            const currentThrough = (current.through as Record<string, unknown>) ?? {};
-            setFieldValue("_relationConfig" as keyof (RelationProperty & { _relationConfig?: unknown }), {
-                ...current,
-                through: { ...currentThrough,
-...patch }
-            });
+            const currentThrough = values.through ?? { table: "", sourceColumn: "", targetColumn: "" };
+            setFieldValue("through", { ...currentThrough, ...patch });
         },
-        [values, setFieldValue]
+        [values.through, setFieldValue]
     );
 
     // Auto-generate relationName from target collection slug
@@ -102,7 +82,7 @@ export function RelationPropertyField({
         if (targetSlug && !relationName) {
             setFieldValue("relationName", targetSlug);
         }
-    }, [targetSlug]);
+    }, [targetSlug, relationName, setFieldValue]);
 
     const collections: EntityCollection[] = collectionRegistry?.collections ?? [];
 
@@ -112,10 +92,10 @@ export function RelationPropertyField({
             <div className={"col-span-12"}>
                 <CollectionsSelect
                     disabled={disabled}
-                    pathPath={"_relationConfig._targetSlug"}
+                    pathPath={"target"}
                     value={targetSlug}
                     setFieldValue={(_, value) => {
-                        updateRelationConfig({ _targetSlug: value });
+                        setFieldValue("target", value);
                         // Auto-generate relation name from target
                         if (!relationName || relationName === targetSlug) {
                             setFieldValue("relationName", value);
@@ -152,7 +132,7 @@ export function RelationPropertyField({
             <div className={"col-span-12 sm:col-span-6"}>
                 <Select
                     value={cardinality}
-                    onValueChange={(v) => updateRelationConfig({ cardinality: v })}
+                    onValueChange={(v) => setFieldValue("cardinality", v as "one" | "many")}
                     label={"Cardinality"}
                     disabled={disabled}
                     fullWidth
@@ -184,7 +164,7 @@ export function RelationPropertyField({
             <div className={"col-span-12 sm:col-span-6"}>
                 <Select
                     value={direction}
-                    onValueChange={(v) => updateRelationConfig({ direction: v })}
+                    onValueChange={(v) => setFieldValue("direction", v as "owning" | "inverse")}
                     label={"Direction"}
                     disabled={disabled}
                     fullWidth
@@ -218,7 +198,7 @@ export function RelationPropertyField({
                     <TextField
                         value={localKey}
                         onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-                            updateRelationConfig({ localKey: e.target.value })
+                            setFieldValue("localKey", e.target.value)
                         }
                         label={"Local key (foreign key column on this table)"}
                         disabled={disabled}
@@ -236,7 +216,7 @@ export function RelationPropertyField({
                     <TextField
                         value={foreignKeyOnTarget}
                         onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-                            updateRelationConfig({ foreignKeyOnTarget: e.target.value })
+                            setFieldValue("foreignKeyOnTarget", e.target.value)
                         }
                         label={"Foreign key on target table"}
                         disabled={disabled}
@@ -305,7 +285,7 @@ export function RelationPropertyField({
             <div className={"col-span-12 sm:col-span-6"}>
                 <Select
                     value={onUpdate}
-                    onValueChange={(v) => updateRelationConfig({ onUpdate: v })}
+                    onValueChange={(v) => setFieldValue("onUpdate", v as OnAction)}
                     label={"On update"}
                     disabled={disabled}
                     fullWidth
@@ -325,7 +305,7 @@ export function RelationPropertyField({
             <div className={"col-span-12 sm:col-span-6"}>
                 <Select
                     value={onDelete}
-                    onValueChange={(v) => updateRelationConfig({ onDelete: v })}
+                    onValueChange={(v) => setFieldValue("onDelete", v as OnAction)}
                     label={"On delete"}
                     disabled={disabled}
                     fullWidth

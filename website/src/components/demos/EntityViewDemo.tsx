@@ -15,7 +15,7 @@ const MOCK_ENTITIES: Entity[] = [
   {
     "id": "PROD-1",
     "title": "Baseball Cap",
-    "image": "https://picsum.photos/seed/baseball-cap/400/400",
+    "image": "https://firebasestorage.googleapis.com/v0/b/firecms-demo-27150.appspot.com/o/dadaki%2FB000P0MDMS-576916726.jpg?alt=media",
     "status": "Available",
     "brand": "Authentic Pigment",
     "category": "clothing_man"
@@ -23,7 +23,7 @@ const MOCK_ENTITIES: Entity[] = [
   {
     "id": "PROD-2",
     "title": "Conceal invisible shelf",
-    "image": "https://picsum.photos/seed/shelf-wood/400/400",
+    "image": "https://firebasestorage.googleapis.com/v0/b/firecms-demo-27150.appspot.com/o/dadaki%2FB000UO4KXY-825906283.jpg?alt=media",
     "status": "Available",
     "brand": "Umbra",
     "category": "home_storage"
@@ -31,7 +31,7 @@ const MOCK_ENTITIES: Entity[] = [
   {
     "id": "PROD-3",
     "title": "Aviator RB 3025",
-    "image": "https://picsum.photos/seed/aviator-sun/400/400",
+    "image": "https://firebasestorage.googleapis.com/v0/b/firecms-demo-27150.appspot.com/o/dadaki%2FB000ZHY0JK-2047853797.jpg?alt=media",
     "status": "Available",
     "brand": "Ray-Ban",
     "category": "sunglasses"
@@ -39,7 +39,7 @@ const MOCK_ENTITIES: Entity[] = [
   {
     "id": "PROD-4",
     "title": "Wine decanter",
-    "image": "https://picsum.photos/seed/wine-decant/400/400",
+    "image": "https://firebasestorage.googleapis.com/v0/b/firecms-demo-27150.appspot.com/o/dadaki%2FB0017TNJWY-528977189.jpg?alt=media",
     "status": "Out of Stock",
     "brand": "Sagaform",
     "category": "serveware"
@@ -47,7 +47,7 @@ const MOCK_ENTITIES: Entity[] = [
   {
     "id": "PROD-5",
     "title": "Wobble Chess Set Walnut",
-    "image": "https://picsum.photos/seed/chess-walnut/400/400",
+    "image": "https://firebasestorage.googleapis.com/v0/b/firecms-demo-27150.appspot.com/o/dadaki%2FB001A793IW-400375460.jpg?alt=media",
     "status": "Available",
     "brand": "Umbra",
     "category": "toys_and_games"
@@ -55,7 +55,7 @@ const MOCK_ENTITIES: Entity[] = [
   {
     "id": "PROD-6",
     "title": "Pimentero",
-    "image": "https://picsum.photos/seed/pepper-mill/400/400",
+    "image": "https://firebasestorage.googleapis.com/v0/b/firecms-demo-27150.appspot.com/o/dadaki%2FB001DE7P7S-994938178.jpg?alt=media",
     "status": "Available",
     "brand": "Seletti",
     "category": "serveware"
@@ -63,7 +63,7 @@ const MOCK_ENTITIES: Entity[] = [
   {
     "id": "PROD-7",
     "title": "AAM32 1 Corkscrew",
-    "image": "https://picsum.photos/seed/corkscrew-a/400/400",
+    "image": "https://firebasestorage.googleapis.com/v0/b/firecms-demo-27150.appspot.com/o/dadaki%2FB001M8APXG-1784151073.jpg?alt=media",
     "status": "Available",
     "brand": "Alessi",
     "category": "kitchen"
@@ -71,7 +71,7 @@ const MOCK_ENTITIES: Entity[] = [
   {
     "id": "PROD-8",
     "title": " PREDATOR 2 ",
-    "image": "https://picsum.photos/seed/predator-2/400/400",
+    "image": "https://firebasestorage.googleapis.com/v0/b/firecms-demo-27150.appspot.com/o/dadaki%2FB001UQ71F0-122304841.jpg?alt=media",
     "status": "Available",
     "brand": "Ray-Ban",
     "category": "sunglasses"
@@ -79,7 +79,7 @@ const MOCK_ENTITIES: Entity[] = [
   {
     "id": "PROD-9",
     "title": "Casio Collection",
-    "image": "https://picsum.photos/seed/casio-watch/400/400",
+    "image": "https://firebasestorage.googleapis.com/v0/b/firecms-demo-27150.appspot.com/o/images%2F6vhbn_61gb0NS5lIL._AC_SY879_.JPEG?alt=media",
     "status": "Available",
     "brand": "Casio",
     "category": "watches"

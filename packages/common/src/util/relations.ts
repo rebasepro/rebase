@@ -33,6 +33,8 @@ export function sanitizeRelation(
         } else {
             targetCollection = evaluated;
         }
+    } else if (rawTarget && typeof rawTarget === "object") {
+        targetCollection = rawTarget as EntityCollection;
     }
 
     if (!targetCollection) {
@@ -215,11 +217,15 @@ export function resolveCollectionRelations(
     //    Each relation is stored once under its canonical relationName key.
     if (relCollection.relations) {
         relCollection.relations.forEach((relation: Relation) => {
-            const normalizedRelation = sanitizeRelation(relation, collection);
-            const relationKey = normalizedRelation.relationName;
-            if (relationKey) {
-                relations[relationKey] = normalizedRelation;
-                registeredRelationNames.add(relationKey);
+            try {
+                const normalizedRelation = sanitizeRelation(relation, collection);
+                const relationKey = normalizedRelation.relationName;
+                if (relationKey) {
+                    relations[relationKey] = normalizedRelation;
+                    registeredRelationNames.add(relationKey);
+                }
+            } catch (e) {
+                // Ignore incomplete or invalid relations (e.g. missing target during registry setup)
             }
         });
     }
@@ -274,7 +280,8 @@ export function resolvePropertyRelation({
 
     const relProp = property as RelationProperty;
 
-    // 1. If the property has inline config (target set), build a Relation from it
+    // If the property has inline config (target set), build a Relation from it.
+    // We only support the flat format where properties are directly on the RelationProperty.
     if (relProp.target) {
         return {
             relationName: relProp.relationName || propertyKey,
@@ -292,15 +299,8 @@ export function resolvePropertyRelation({
         } as Relation;
     }
 
-    // 2. Fall back to lookup from collection.relations[] (backward compat)
-    const relation = (((sourceCollection as CollectionWithRelations).relations) ?? []).find((rel: Relation) => rel.relationName === relProp.relationName)
-    if (!relation) {
-        console.warn(`Unrecognized relation format for property '${propertyKey}' in collection '${sourceCollection.slug}'`);
-        return undefined;
-    }
-
-    return relation as Relation;
-
+    console.warn(`Unrecognized or missing relation target for property '${propertyKey}' in collection '${sourceCollection.slug}'`);
+    return undefined;
 }
 
 export function getTableName(collection: EntityCollection): string {

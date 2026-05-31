@@ -37,6 +37,7 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
+    "@rebasepro/common": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@rebasepro/utils": "workspace:*"
   },

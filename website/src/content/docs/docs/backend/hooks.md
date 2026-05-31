@@ -1,0 +1,155 @@
+---
+title: Global Backend Hooks
+sidebar_label: Global Hooks
+description: Intercept database operations, user management, and roles globally at the server API boundary.
+---
+
+## Overview
+
+While **[Entity Callbacks](/docs/collections/callbacks)** run on the database adapter layer scoped to individual collections, **Global Backend Hooks** run at the HTTP API boundary. They allow you to define cross-cutting logic that applies globally across all collections or admin endpoints.
+
+Use global backend hooks for:
+- **Global PII masking**: Filtering out or redacting sensitive user information for specific roles.
+- **Unified audit logging**: Writing log entries for all creations, updates, or deletions across all collections.
+- **Global validation rules**: Restricting certain HTTP methods or operations under custom context rules.
+- **User lifecycle side-effects**: Sending custom welcome emails or syncing external identity providers when users are saved or deleted.
+
+## Configuration
+
+Configure hooks in `initializeRebaseBackend` by providing the `hooks` property of type `BackendHooks`:
+
+```typescript
+import { initializeRebaseBackend } from "@rebasepro/server-core";
+
+const instance = await initializeRebaseBackend({
+    app,
+    server,
+    // ... basic config
+    hooks: {
+        users: {
+            afterRead: (user, context) => {
+                // Return user or null to filter it out
+                return user;
+            }
+        },
+        data: {
+            afterRead: (slug, entity, context) => {
+                // Apply global data transformations
+                return entity;
+            }
+        }
+    }
+});
+```
+
+---
+
+## Hook Context
+
+Every boundary hook receives a `BackendHookContext` detailing the request environment:
+
+```typescript
+interface BackendHookContext {
+    /** The authenticated user payload, or undefined if public */
+    requestUser?: {
+        userId: string;
+        roles: string[];
+    };
+    
+    /** The HTTP method triggering the hook */
+    method: "GET" | "POST" | "PUT" | "DELETE";
+}
+```
+
+---
+
+## User Hooks (`users`)
+
+Intercept user account operations at the `/api/admin` boundary.
+
+| Hook | Signature | Description |
+|------|-----------|-------------|
+| `afterRead` | `(user, context) => user \| null` | Transform user record before returning. Returning `null` hides it. |
+| `beforeSave` | `(data, context) => data` | Modify user fields (email, roles, name) before database insert/update. Throw to reject. |
+| `afterSave` | `(user, context) => void` | Post-save hook for side effects. |
+| `beforeDelete` | `(userId, context) => void` | Intercept delete operations. Throw to prevent. |
+| `afterDelete` | `(userId, context) => void` | Post-delete side effects hook. |
+
+### Example: Sync User to CRM on signup
+
+```typescript
+const hooks: BackendHooks = {
+    users: {
+        afterSave: async (user, context) => {
+            if (context.method === "POST") {
+                // New user signed up - sync to HubSpot/Salesforce
+                await syncToCRM(user.email, user.displayName);
+            }
+        },
+        beforeDelete: async (userId, context) => {
+            // Prevent deleting protected system accounts
+            if (userId === "system-admin-uuid") {
+                throw new Error("Cannot delete system admin account!");
+            }
+        }
+    }
+};
+```
+
+---
+
+## Role Hooks (`roles`)
+
+Intercept role definitions fetched by the admin panel.
+
+| Hook | Signature | Description |
+|------|-----------|-------------|
+| `afterRead` | `(role, context) => role \| null` | Modify or hide role properties dynamically. |
+
+---
+
+## Data Boundary Hooks (`data`)
+
+Intersects **ALL** collection entities flowing through the REST API routes. These run **after** the per-collection `EntityCallbacks`.
+
+| Hook | Signature | Description |
+|------|-----------|-------------|
+| `afterRead` | `(slug, entity, context) => entity \| null` | Modify or redact fields before sending to client. Return `null` to exclude the record. |
+| `beforeSave` | `(slug, values, entityId, context) => values` | Perform global checks or inject values before saving. Throw to abort. |
+| `afterSave` | `(slug, entity, context) => void` | Run post-save tasks (e.g. syncing search indexes). |
+| `beforeDelete` | `(slug, entityId, context) => void` | Run validation before deletion. Throw to block. |
+| `afterDelete` | `(slug, entityId, context) => void` | Post-deletion cleanup. |
+
+### Example: Global PII Masking and Global Audit Logging
+
+```typescript
+import { BackendHooks } from "@rebasepro/types";
+
+const hooks: BackendHooks = {
+    data: {
+        // Redact email addresses for non-admin requests
+        afterRead: (slug, entity, context) => {
+            const isAdmin = context.requestUser?.roles.includes("admin");
+            
+            if (!isAdmin && entity.email) {
+                return {
+                    ...entity,
+                    email: "********" // Mask email
+                };
+            }
+            return entity;
+        },
+        
+        // Log all deletion actions globally
+        afterDelete: async (slug, entityId, context) => {
+            console.log(`[AUDIT] User ${context.requestUser?.userId} deleted ${slug}/${entityId}`);
+            await writeToAuditLogs({
+                action: "delete",
+                collection: slug,
+                entityId,
+                userId: context.requestUser?.userId
+            });
+        }
+    }
+};
+```

@@ -21,6 +21,7 @@ import { enumToObjectEntries } from "./enums";
 import { DEFAULT_ONE_OF_TYPE } from "./common";
 import { isDefaultFieldConfigId } from "@rebasepro/utils";
 import { getIn, mergeDeep } from "@rebasepro/utils";
+import { resolveCollectionRelations } from "./relations";
 
 /**
  * Resolve property builders, enums and arrays.
@@ -350,8 +351,10 @@ export function getSubcollections<M extends Record<string, unknown> = Record<str
         return (collection as CollectionWithSubcollections).subcollections!() ?? [];
     }
 
-    if (getDataSourceCapabilities(collection.driver).supportsRelations && ((collection as CollectionWithRelations).relations)) {
-        const manyRelations = ((collection as CollectionWithRelations).relations)!.filter((r: Relation) => r.cardinality === "many");
+    if (getDataSourceCapabilities(collection.driver).supportsRelations) {
+        const resolvedRelations = resolveCollectionRelations(collection);
+        const manyRelations = Object.values(resolvedRelations).filter((r: Relation) => r.cardinality === "many");
+        
         return manyRelations.map((r: Relation) => {
             const target = r.target();
             if (!target) return undefined;

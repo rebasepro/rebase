@@ -144,6 +144,18 @@ slug: "docs/deployment/flyio" }
                         {
                             label: "Cron Jobs",
                             slug: "docs/backend/cron-jobs"
+                        },
+                        {
+                            label: "Custom Functions",
+                            slug: "docs/backend/custom-functions"
+                        },
+                        {
+                            label: "Custom Server",
+                            slug: "docs/backend/custom-server"
+                        },
+                        {
+                            label: "Global Hooks",
+                            slug: "docs/backend/hooks"
                         }
                     ]
                 },

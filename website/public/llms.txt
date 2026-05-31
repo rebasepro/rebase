@@ -3162,7 +3162,7 @@ interface CronJobDefinition {
 
 ### Handler Context
 
-Each handler receives a `CronJobContext`:
+Each handler receives a `CronJobContext` containing utility methods and the Rebase Client instance:
 
 ```typescript
 interface CronJobContext {
@@ -3174,10 +3174,58 @@ interface CronJobContext {
 
     // Logger — captured lines appear in Studio and the logs API
     log: (...args: unknown[]) => void;
+
+    // Backing RebaseClient instance running with full admin privileges
+    client: RebaseClient;
 }
 ```
 
 Use `ctx.log()` to emit structured output. These lines are captured in the execution log and visible in Studio and via the REST API.
+
+#### Interacting with Database & Services via `ctx.client`
+
+The `ctx.client` parameter provides direct, server-side access to all Rebase services under administrative privileges. This means database operations run with bypass of Row-Level Security (RLS) policies:
+
+```typescript
+// backend/crons/expire-users.ts
+
+const job: CronJobDefinition = {
+    schedule: "0 0 * * *", // Daily at midnight
+    name: "Expire Inactive Accounts",
+    
+    async handler(ctx) {
+        ctx.log("Checking for expired trial users...");
+
+        // Fetch using the pre-initialized data driver
+        const { data: trials } = await ctx.client.data.users.find({
+            where: {
+                trial_status: "active",
+                trial_ends_at: ["<", new Date().toISOString()]
+            }
+        });
+
+        ctx.log(`Found ${trials.length} users with expired trials.`);
+
+        for (const user of trials) {
+            await ctx.client.data.users.update(user.id, {
+                trial_status: "expired",
+                status: "disabled"
+            });
+            
+            // Send email notification using Rebase email service
+            if (ctx.client.email) {
+                await ctx.client.email.send({
+                    to: user.values.email,
+                    subject: "Your trial has expired",
+                    html: "<p>Please upgrade your subscription to continue.</p>"
+                });
+            }
+        }
+    }
+};
+
+export default job;
+```
 
 :::tip
 The handler can return any JSON-serializable value. It will be stored in the log entry as `result` and displayed in Studio's execution history.
@@ -3279,12 +3327,26 @@ The table is auto-created on first startup — no migrations needed.
 Persistence is non-blocking. If a database write fails, the scheduler continues running and the in-memory log buffer is still available as a fallback.
 :::
 
-### Error Handling & Timeouts
+### Schedule Validation
 
-- If a handler **throws**, the error is captured in the log entry and the job state is set to `"error"`. The scheduler continues running — the next scheduled tick will still fire.
-- If a handler exceeds `timeoutSeconds` (default: 300), it is terminated with a timeout error.
-- All execution metrics (success count, failure count, last error) are tracked per job and accessible via the API.
-- Failed persistence writes are logged but never crash the scheduler.
+At server initialization, Rebase parses and validates all registered cron schedules. 
+- Validation verifies that the expression contains exactly 5 whitespace-separated fields.
+- It checks that all ranges, steps, and lists produce values within the standard bounds (e.g., minutes 0–59, hours 0–23).
+- If any cron expression is invalid, Rebase logs a clear error to the terminal at startup and rejects the job so the server doesn't execute malformed schedules.
+
+### Concurrency Guarding
+
+To ensure stability under heavy workloads, Rebase implements a strict **concurrency guard** per cron job:
+- **No overlapping executions**: If a job's scheduled tick fires (or is manually triggered) while the previous run of the same job is still active, Rebase will skip the execution.
+- **Manual trigger fallback**: When a job is triggered via the API/Studio while already running, the execution is skipped and the API returns a skipped indicator: `result: { skipped: true, reason: "already_executing" }`.
+- **Timer unref**: Timers use `unref()` internally to prevent scheduled jobs from blocking the Node.js event loop during graceful process shutdown.
+
+### Timeouts & Error Handling
+
+- **Automatic Timeout**: If a job execution exceeds its configured `timeoutSeconds` (defaults to `300` seconds / 5 minutes), the run is forcibly aborted and logged as a failure with a timeout error.
+- **Fail-safe isolation**: If a handler throws an error, the scheduler captures the exception stack, updates the job state to `"error"`, and schedules the next run normally. A crash in a single job will never crash the scheduler thread or the main HTTP server.
+- **In-Memory Ring Buffer**: Rebase holds the last `50` execution logs per job in an in-memory ring buffer for instant retrieval, while writing all logs asynchronously to the PostgreSQL database if persistence is enabled.
+- **Robust Persistence**: Database log writes are fully asynchronous and fail-safe; if the database connection drops temporarily, the scheduler continues executing normally and uses the in-memory buffer as a fallback.
 
 ### Example: Daily Cleanup Job
 
@@ -3317,6 +3379,569 @@ export default job;
 - **[Backend Overview](/docs/backend)** — Full backend configuration reference
 - **[Entity Callbacks](/docs/collections/callbacks)** — Run logic on data changes
 - **[Webhook Integration](/docs/recipes/webhooks)** — Send notifications on events
+
+## Custom Functions
+
+### Overview
+
+Custom functions let you add **arbitrary Hono API routes** alongside Rebase's auto-generated CRUD endpoints. They follow the same **file-based discovery** pattern as collections and cron jobs: drop a TypeScript file in your `functions/` directory, and Rebase mounts it automatically.
+
+Use custom functions for:
+
+- **Business logic endpoints** — approvals, promotions, custom workflows
+- **Third-party integrations** — Stripe webhooks, Slack commands, external API proxies
+- **Public endpoints** — contact forms, lead capture, health checks
+- **Aggregate queries** — dashboard stats, reports, analytics
+
+### Defining a Custom Function
+
+Create a file in your `backend/functions/` directory that default-exports a Hono app:
+
+```typescript
+// backend/functions/hello.ts
+
+const app = new Hono();
+
+app.get("/", (c) => {
+    return c.json({ message: "Hello from custom function!" });
+});
+
+export default app;
+```
+
+This mounts at **`/api/functions/hello`**. The filename (without extension) becomes the route prefix.
+
+### Configuration
+
+Enable custom functions by adding `functionsDir` to your backend config:
+
+```typescript
+
+const instance = await initializeRebaseBackend({
+    // ... other config
+    functionsDir: path.resolve(__dirname, "../functions"),
+});
+```
+
+Rebase will:
+
+1. Scan the directory for `.ts` / `.js` files
+2. Validate each default export is a Hono app (duck-typed via `.fetch()` + `.routes`)
+3. Mount each app at `/api/functions/<filename>`
+4. Apply the auth middleware (see [Authentication](#authentication) below)
+
+### File Naming and Route Mapping
+
+| File | Mount Path |
+|------|-----------|
+| `functions/hello.ts` | `/api/functions/hello/*` |
+| `functions/send-invoice.ts` | `/api/functions/send-invoice/*` |
+| `functions/webhooks.ts` | `/api/functions/webhooks/*` |
+
+Files that are **skipped**:
+
+- `index.ts` / `index.js` — reserved
+- `*.test.ts` / `*.test.js` — test files
+- `*.d.ts` — type declarations
+
+### Export Formats
+
+The loader accepts two export formats:
+
+#### Hono App (recommended)
+
+```typescript
+
+const app = new Hono();
+app.get("/status", (c) => c.json({ ok: true }));
+export default app;
+```
+
+#### Factory Function
+
+```typescript
+
+export default function () {
+    const app = new Hono();
+    app.get("/status", (c) => c.json({ ok: true }));
+    return app;
+}
+```
+
+Both are detected via duck-typing — the loader checks for `.fetch()` and `.routes` properties, so any Hono-compatible instance will work regardless of the installed Hono version.
+
+### Authentication
+
+Custom functions are mounted with the **same auth middleware** as the data routes, but with `requireAuth: false`. This means:
+
+- The user's JWT is **parsed and injected** into the context if present
+- But requests are **not rejected** if no JWT is provided
+- You must **explicitly protect** routes that need authentication
+
+#### Protecting Routes
+
+Use Rebase's built-in auth helpers:
+
+```typescript
+
+const app = new Hono();
+
+// Public endpoint — no auth required
+app.get("/public", (c) => {
+    return c.json({ message: "Anyone can access this" });
+});
+
+// Protected endpoint — requires a valid JWT
+app.post("/protected", async (c) => {
+    const user = c.get("user"); // Injected by Rebase middleware
+    if (!user) {
+        return c.json({ error: "Unauthorized" }, 401);
+    }
+    return c.json({ message: `Hello, ${user.userId}` });
+});
+
+// Admin-only endpoint
+app.post("/admin-only", async (c) => {
+    const user = c.get("user");
+    const roles: string[] = user?.roles ?? [];
+    if (!roles.includes("admin")) {
+        return c.json({ error: "Admin access required" }, 403);
+    }
+    return c.json({ message: "Admin operation succeeded" });
+});
+
+export default app;
+```
+
+:::important
+Rebase's JWT middleware is scoped to the built-in API routes (`/api/data`, `/api/auth`, etc.). Custom function routes get the **parsed user context** (e.g. `c.get("user")`), but you must enforce access control yourself.
+:::
+
+#### Service Key Authentication
+
+Rebase supports a static `REBASE_SERVICE_KEY` defined in your `.env` for script or server-to-server calls. 
+
+When an external request passes the service key via the Authorization header (`Authorization: Bearer <service_key>`), the auth middleware automatically:
+1. Validates the key using constant-time comparison to prevent timing attacks.
+2. Grants admin-level access, setting `c.get("user")` with:
+   ```json
+   {
+     "userId": "service",
+     "roles": ["admin"]
+   }
+   ```
+3. Injects an admin-privileged `DataDriver` into `c.get("driver")` that bypasses Row-Level Security.
+
+### Accessing the Database & Services
+
+Custom functions run alongside Rebase, providing multiple ways to interact with your data depending on your security requirements:
+
+#### 1. Via the User-Scoped Data Driver (Recommended for User Requests)
+
+Rebase automatically injects the `driver` into the Hono request context (`c.get("driver")`). This driver is **scoped to the authenticated user** and automatically respects all PostgreSQL Row-Level Security (RLS) policies.
+
+Using the driver ensures that users can only query or update records they are authorized to access under your database security policies:
+
+```typescript
+// backend/functions/my-products.ts
+
+const app = new Hono();
+
+app.post("/:id/approve", async (c) => {
+    const id = c.req.param("id");
+
+    // Use the admin-level data API (bypasses RLS completely)
+    await rebase.data.jobs.update(id, {
+        status: "published",
+        approved_at: new Date().toISOString(),
+    });
+
+    return c.json({ success: true });
+});
+
+export default app;
+```
+
+#### RLS-Scoped Driver vs. Rebase Singleton
+
+| Feature | `c.get("driver")` | `rebase` Singleton |
+|---------|--------------------|-------------------|
+| **RLS Enforcement** | ✅ Yes (evaluated against user/roles) | ❌ No (bypasses all security rules) |
+| **Ideal for...** | General user CRUD, search, and queries | Background jobs, system triggers, webhooks |
+| **API style** | Driver-level methods (`fetchCollection`, `saveEntity`) | Fluent collection accessors (`rebase.data.jobs.find`) |
+
+#### 3. Via Direct Drizzle Access
+
+If you need raw SQL or complex custom queries, you can access your Drizzle database instance directly:
+
+```typescript
+// backend/functions/reports.ts
+
+const app = new Hono();
+
+app.get("/stats", async (c) => {
+    const result = await db.execute(sql`
+        SELECT COUNT(*) as total FROM jobs WHERE status = 'published'
+    `);
+    return c.json({ totalJobs: result.rows[0]?.total });
+});
+
+export default app;
+```
+
+:::tip
+The Drizzle `db` instance used by Rebase is the same one you pass to `createPostgresBootstrapper`. You can share it freely between custom functions and Rebase.
+:::
+
+### Route Registration Order
+
+Custom functions are loaded and mounted **after** `initializeRebaseBackend()` completes the core setup. The initialization order is:
+
+1. **Bootstrappers** — Database connections, auth tables, realtime services
+2. **Auth routes** — `/api/auth/*`, `/api/admin/*`
+3. **Storage routes** — `/api/storage/*`
+4. **Data routes** — `/api/data/*` (CRUD for collections)
+5. **Custom functions** ← `/api/functions/*`
+6. **Cron jobs** — `/api/cron/*`
+7. **WebSocket** — Realtime subscriptions
+
+This means your custom functions have access to all initialized services. Register any routes that need to run **before** Rebase on the Hono app directly, prior to calling `initializeRebaseBackend()`:
+
+```typescript
+const app = new Hono();
+
+// This runs BEFORE Rebase routes
+app.get("/health", (c) => c.json({ status: "ok" }));
+
+// Rebase initialization — registers all /api/* routes
+const instance = await initializeRebaseBackend({ app, /* ... */ });
+```
+
+### Example: Webhook Handler
+
+```typescript
+// backend/functions/stripe-webhook.ts
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+const app = new Hono();
+
+app.post("/", async (c) => {
+    const sig = c.req.header("stripe-signature")!;
+    const body = await c.req.text();
+
+    const event = stripe.webhooks.constructEvent(
+        body,
+        sig,
+        process.env.STRIPE_WEBHOOK_SECRET!
+    );
+
+    if (event.type === "checkout.session.completed") {
+        const session = event.data.object;
+        await instance.driver.data.subscriptions.create({
+            user_id: session.client_reference_id,
+            stripe_id: session.subscription,
+            status: "active",
+        });
+    }
+
+    return c.json({ received: true });
+});
+
+export default app;
+```
+
+### Debugging
+
+When a function is loaded successfully, you'll see:
+
+```
+⚡ Loaded function route: hello
+```
+
+If loading fails, the loader provides diagnostic output:
+
+```
+[functions] broken-function.ts: default export is not a Hono app or factory. Skipping.
+  export type: object (SomeClass)
+  prototype methods: constructor, someMethod
+  Hint: ensure the function exports a Hono app created with the same hono version as the server.
+```
+
+### Next Steps
+
+- **[Backend Overview](/docs/backend)** — Full backend configuration reference
+- **[Entity Callbacks](/docs/collections/callbacks)** — Run logic on data changes
+- **[Cron Jobs](/docs/backend/cron-jobs)** — Scheduled background tasks
+
+## Custom Server Integration
+
+## Custom Server Integration
+
+Rebase was built to be completely modular. While the `initializeRebaseBackend` coordinator provides a full batteries-included backend using Hono, you can completely bypass it and embed the core **Database Adapter** and **Realtime WebSockets** directly into your own custom Node.js application (like Express, Fastify, or plain Node.js HTTP).
+
+The `@rebasepro/server-postgresql` package is completely framework-agnostic. It depends only on Drizzle ORM and standard Node.js `http.Server`.
+
+### Environment Configuration
+
+Rebase provides a centralized `loadEnv()` utility in `@rebasepro/server-core` that validates your environment variables against a strict Zod schema. Call it **after** loading your `.env` file:
+
+```typescript
+
+dotenv.config({ path: "../../.env" });
+
+// Basic — just Rebase env vars:
+export const env = loadEnv();
+
+// Extended — add your own typed vars:
+
+export const env = loadEnv({
+    extend: z.object({
+        SMTP_HOST: z.string().optional(),
+        SMTP_PORT: z.string().default("587").transform(Number),
+        STRIPE_SECRET_KEY: z.string(),
+    })
+});
+// env.SMTP_HOST  → string | undefined  (fully typed)
+// env.STRIPE_SECRET_KEY → string        (validated, required)
+```
+
+**Key behaviors:**
+- Auto-generates ephemeral `JWT_SECRET` and `REBASE_SERVICE_KEY` in development so you can start without manual setup.
+- Blocks auto-generated secrets in production — you must set them explicitly.
+- Validates that `CORS_ORIGINS` or `FRONTEND_URL` is set in production.
+
+See `.env.example` in the scaffolded app for the full list of supported variables.
+
+### Using Rebase with Express
+
+Here is a complete example of how to initialize the Rebase PostgreSQL adapter and Realtime WebSockets inside a standard Express application.
+
+#### 1. Install Dependencies
+
+You'll need the Postgres server package along with Express:
+
+```bash
+npm install @rebasepro/server-postgresql @rebasepro/types express
+```
+
+#### 2. Initialization Example
+
+```typescript
+
+async function startServer() {
+    const app = express();
+    
+    // 1. You MUST create the raw Node HTTP server so the WebSocket server can bind to it
+    const server = createServer(app);
+
+    // 2. Initialize the Postgres Bootstrapper directly
+    const bootstrapper = createPostgresBootstrapper({
+        connectionString: process.env.DATABASE_URL,
+        // Optional: define any Drizzle schema here if you want typed relations/queries
+        // schema: { tables: { ... } } 
+    });
+
+    // 3. Initialize the driver (connects to DB, starts logical replication listeners)
+    const { driver, realtimeProvider } = await bootstrapper.initializeDriver({
+        collections: [] // Pass your Rebase collections here if you're using them
+    });
+
+    // 4. Attach the Rebase WebSockets to your HTTP Server
+    await bootstrapper.initializeWebsockets(
+        server, 
+        realtimeProvider, 
+        driver
+    );
+
+    // --- Express Routes ---
+    app.use(express.json());
+
+    app.get('/', (req, res) => {
+        res.send('Express server running with embedded Rebase!');
+    });
+
+    // You can interact directly with the Rebase driver anywhere in your Express routes
+    app.post('/custom-data', async (req, res) => {
+        try {
+            // Use the raw Rebase Database Driver
+            const result = await driver.saveEntity({
+                collection: 'products',
+                entity: req.body
+            });
+            res.json({ success: true, data: result });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    // 5. Start listening using the raw server instance (NOT app.listen)
+    server.listen(3000, () => {
+        console.log('Express and Rebase Realtime running on port 3000');
+    });
+}
+
+startServer();
+```
+
+### Key Concepts
+
+#### Native HTTP Server
+Because WebSockets require an HTTP `Upgrade` request, you **must** bind Rebase to the native Node.js `http.Server` instance. If you just call `app.listen(3000)` in Express, you won't have access to the underlying server object needed by `initializeWebsockets()`.
+
+#### Bypassing Hono
+By directly invoking `createPostgresBootstrapper()` and manually calling `initializeDriver()` and `initializeWebsockets()`, you are bypassing the Rebase coordinator (`initializeRebaseBackend`) entirely. This means no Hono dependencies are loaded, and the auto-generated REST APIs, Admin UI routes, and Auth endpoints are not mounted. 
+
+This gives you total control over your API surface while still leveraging Rebase's powerful logical-replication WebSocket engine and Drizzle-powered driver.
+
+## Global Backend Hooks
+
+### Overview
+
+While **[Entity Callbacks](/docs/collections/callbacks)** run on the database adapter layer scoped to individual collections, **Global Backend Hooks** run at the HTTP API boundary. They allow you to define cross-cutting logic that applies globally across all collections or admin endpoints.
+
+Use global backend hooks for:
+- **Global PII masking**: Filtering out or redacting sensitive user information for specific roles.
+- **Unified audit logging**: Writing log entries for all creations, updates, or deletions across all collections.
+- **Global validation rules**: Restricting certain HTTP methods or operations under custom context rules.
+- **User lifecycle side-effects**: Sending custom welcome emails or syncing external identity providers when users are saved or deleted.
+
+### Configuration
+
+Configure hooks in `initializeRebaseBackend` by providing the `hooks` property of type `BackendHooks`:
+
+```typescript
+
+const instance = await initializeRebaseBackend({
+    app,
+    server,
+    // ... basic config
+    hooks: {
+        users: {
+            afterRead: (user, context) => {
+                // Return user or null to filter it out
+                return user;
+            }
+        },
+        data: {
+            afterRead: (slug, entity, context) => {
+                // Apply global data transformations
+                return entity;
+            }
+        }
+    }
+});
+```
+
+---
+
+### Hook Context
+
+Every boundary hook receives a `BackendHookContext` detailing the request environment:
+
+```typescript
+interface BackendHookContext {
+    /** The authenticated user payload, or undefined if public */
+    requestUser?: {
+        userId: string;
+        roles: string[];
+    };
+    
+    /** The HTTP method triggering the hook */
+    method: "GET" | "POST" | "PUT" | "DELETE";
+}
+```
+
+---
+
+### User Hooks (`users`)
+
+Intercept user account operations at the `/api/admin` boundary.
+
+| Hook | Signature | Description |
+|------|-----------|-------------|
+| `afterRead` | `(user, context) => user \| null` | Transform user record before returning. Returning `null` hides it. |
+| `beforeSave` | `(data, context) => data` | Modify user fields (email, roles, name) before database insert/update. Throw to reject. |
+| `afterSave` | `(user, context) => void` | Post-save hook for side effects. |
+| `beforeDelete` | `(userId, context) => void` | Intercept delete operations. Throw to prevent. |
+| `afterDelete` | `(userId, context) => void` | Post-delete side effects hook. |
+
+#### Example: Sync User to CRM on signup
+
+```typescript
+const hooks: BackendHooks = {
+    users: {
+        afterSave: async (user, context) => {
+            if (context.method === "POST") {
+                // New user signed up - sync to HubSpot/Salesforce
+                await syncToCRM(user.email, user.displayName);
+            }
+        },
+        beforeDelete: async (userId, context) => {
+            // Prevent deleting protected system accounts
+            if (userId === "system-admin-uuid") {
+                throw new Error("Cannot delete system admin account!");
+            }
+        }
+    }
+};
+```
+
+---
+
+### Role Hooks (`roles`)
+
+Intercept role definitions fetched by the admin panel.
+
+| Hook | Signature | Description |
+|------|-----------|-------------|
+| `afterRead` | `(role, context) => role \| null` | Modify or hide role properties dynamically. |
+
+---
+
+### Data Boundary Hooks (`data`)
+
+Intersects **ALL** collection entities flowing through the REST API routes. These run **after** the per-collection `EntityCallbacks`.
+
+| Hook | Signature | Description |
+|------|-----------|-------------|
+| `afterRead` | `(slug, entity, context) => entity \| null` | Modify or redact fields before sending to client. Return `null` to exclude the record. |
+| `beforeSave` | `(slug, values, entityId, context) => values` | Perform global checks or inject values before saving. Throw to abort. |
+| `afterSave` | `(slug, entity, context) => void` | Run post-save tasks (e.g. syncing search indexes). |
+| `beforeDelete` | `(slug, entityId, context) => void` | Run validation before deletion. Throw to block. |
+| `afterDelete` | `(slug, entityId, context) => void` | Post-deletion cleanup. |
+
+#### Example: Global PII Masking and Global Audit Logging
+
+```typescript
+
+const hooks: BackendHooks = {
+    data: {
+        // Redact email addresses for non-admin requests
+        afterRead: (slug, entity, context) => {
+            const isAdmin = context.requestUser?.roles.includes("admin");
+            
+            if (!isAdmin && entity.email) {
+                return {
+                    ...entity,
+                    email: "********" // Mask email
+                };
+            }
+            return entity;
+        },
+        
+        // Log all deletion actions globally
+        afterDelete: async (slug, entityId, context) => {
+            console.log(`[AUDIT] User ${context.requestUser?.userId} deleted ${slug}/${entityId}`);
+            await writeToAuditLogs({
+                action: "delete",
+                collection: slug,
+                entityId,
+                userId: context.requestUser?.userId
+            });
+        }
+    }
+};
+```
 
 ## Authentication
 
@@ -4664,7 +5289,7 @@ function MyComponent() {
 
 ### `useAuthController`
 
-Access authentication state:
+Access authentication state and capabilities:
 
 ```typescript
 
@@ -4672,12 +5297,175 @@ function UserMenu() {
     const auth = useAuthController();
 
     auth.user            // Current user (or null)
-    auth.initialLoading  // Loading initial session
-    auth.signOut()       // Log out
-    auth.getAuthToken()  // Get JWT for API calls
+    auth.authLoading     // True when auth operation is in progress
+    auth.initialLoading  // Loading initial session on app startup
+    auth.signOut()       // Log out (returns Promise<void>)
+    auth.getAuthToken()  // Get JWT for API calls (returns Promise<string>)
     auth.extra           // Additional user data (roles, etc.)
+    auth.capabilities    // Capabilities advertised by auth provider (e.g. registration, reset)
 }
 ```
+
+### `useCollectionFetch`
+
+Fetch and subscribe to a list of entities in a collection. It automatically establishes a real-time WebSocket subscription if supported by the driver, falling back to REST fetches.
+
+```typescript
+
+function ProductList() {
+    const { data, dataLoading, dataLoadingError, noMoreToLoad } = useCollectionFetch({
+        path: "products",
+        collection: productsCollection,
+        itemCount: 20,
+        filterValues: {
+            active: ["==", true],
+            price: [">=", 100]
+        },
+        sortBy: ["created_at", "desc"],
+        searchString: "laptop"
+    });
+
+    if (dataLoading) return <p>Loading products...</p>;
+    if (dataLoadingError) return <p>Error: {dataLoadingError.message}</p>;
+
+    return (
+        <ul>
+            {data.map(product => (
+                <li key={product.id}>{product.values.name} (${product.values.price})</li>
+            ))}
+        </ul>
+    );
+}
+```
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `path` | `string` | Absolute collection path (e.g., `"products"`). |
+| `collection` | `EntityCollection` | The collection definition object. |
+| `itemCount` | `number` | Optional. Number of entities to fetch. |
+| `filterValues` | `FilterValues` | Optional. Query filters. Supports shorthand equality, tuples `[op, val]`, and PostgREST operator strings. |
+| `sortBy` | `[string, "asc" \| "desc"]` | Optional. Sort field and order direction tuple. |
+| `searchString` | `string` | Optional. Query for full-text search. |
+
+#### Return Value
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `data` | `Entity[]` | Array of fetched entities. |
+| `dataLoading` | `boolean` | True if the initial load is in progress. |
+| `dataLoadingError` | `Error` | Error object if the fetch fails. |
+| `noMoreToLoad` | `boolean` | True if there are no more records beyond the current page/limit. |
+
+### `useEntityFetch`
+
+Fetch and subscribe to a single entity by ID. It renders instantly using cached data if already loaded via a collection fetch, then updates in the background.
+
+```typescript
+
+function ProductDetail({ productId }) {
+    const { entity, dataLoading, dataLoadingError } = useEntityFetch({
+        path: "products",
+        entityId: productId,
+        collection: productsCollection
+    });
+
+    if (dataLoading) return <p>Loading product...</p>;
+    if (dataLoadingError) return <p>Error: {dataLoadingError.message}</p>;
+    if (!entity) return <p>Product not found</p>;
+
+    return (
+        <div>
+            <h1>{entity.values.name}</h1>
+            <p>{entity.values.description}</p>
+        </div>
+    );
+}
+```
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `path` | `string` | Absolute collection path. |
+| `entityId` | `string \| number` | The ID of the entity to fetch. |
+| `collection` | `EntityCollection` | The collection definition object. |
+| `useCache` | `boolean` | Optional. If `true` and entity is in cache, skips background refresh. (Default: `false`). |
+
+#### Caching Utilities
+
+Rebase maintains a global memory cache to prevent UI flashing. You can manipulate this cache directly:
+
+- `populateEntityFetchCache(path, entities)`: Pre-populates the cache with a list of entities (e.g. after a bulk action or custom API call).
+- `clearEntityFetchCache()`: Clears the cache. Recommended to call this upon user logout to prevent data leakage.
+
+### `usePermissions`
+
+Hook to evaluate roles and permissions for the current user. It abstracts away the need to manually pass the `authController` to permission checking functions.
+
+```typescript
+
+function CreateProductButton() {
+    const { canCreate } = usePermissions();
+
+    const allowedToCreate = canCreate(productsCollection, "products");
+
+    return (
+        <button disabled={!allowedToCreate}>
+            Create Product
+        </button>
+    );
+}
+```
+
+#### Return Value
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `canCreate` | `(collection, path) => boolean` | Checks if the user is allowed to create entities in the collection. |
+| `canEdit` | `(collection, path, entity) => boolean` | Checks if the user is allowed to edit the given entity. |
+| `canDelete` | `(collection, path, entity) => boolean` | Checks if the user is allowed to delete the given entity. |
+| `canRead` | `(collection) => boolean` | Checks if the user is allowed to read the collection. |
+
+### `useClipboard`
+
+Utility hook to copy or cut text to the clipboard, with automatic support for fallback mechanisms on older browsers.
+
+> [!NOTE]
+> Note the exact spelling of `isCoppied` (with two `p`s) in the return payload.
+
+```typescript
+
+function CopyButton({ text }) {
+    const { copy, isCoppied } = useClipboard({ copiedDuration: 2000 });
+
+    return (
+        <button onClick={() => copy(text)}>
+            {isCoppied ? "Copied!" : "Copy Text"}
+        </button>
+    );
+}
+```
+
+#### Parameters
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `copiedDuration` | `number` | Optional. Time in milliseconds before resetting `isCoppied` back to `false`. |
+| `onSuccess` | `(text) => void` | Optional. Callback triggered on successful copy. |
+| `onError` | `(err) => void` | Optional. Callback triggered on error. |
+
+#### Return Value
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `ref` | `MutableRefObject` | React ref to attach to input/textarea elements to copy from. |
+| `copy` | `(text?: string) => void` | Triggers copy of the given text, or the ref element's content. |
+| `cut` | `() => void` | Triggers cut of the ref element's content. |
+| `isCoppied` | `boolean` | True if text was recently copied. |
+| `clipboard` | `string` | The current copied text value. |
+| `clearClipboard` | `() => void` | Clears the clipboard. |
 
 ### `useSideEntityController`
 
@@ -4800,6 +5588,212 @@ function MyComponent() {
     navigation.views           // Custom views
     navigation.adminViews      // Admin-mode views
     navigation.getCollection(path) // Get collection for a path
+}
+```
+
+### `useRelationSelector`
+
+Manage complex relation selections with built-in search, debouncing, and pagination.
+
+```typescript
+
+function CategorySelector({ onSelect }) {
+    const { items, isLoading, search, loadMore, hasMore } = useRelationSelector({
+        path: "categories",
+        collection: categoriesCollection,
+        pageSize: 10
+    });
+
+    return (
+        <div>
+            <input type="text" onChange={(e) => search(e.target.value)} placeholder="Search..." />
+            <ul>
+                {items.map(item => (
+                    <li key={item.id} onClick={() => onSelect(item.relation)}>
+                        {item.label}
+                    </li>
+                ))}
+            </ul>
+            {hasMore && <button onClick={loadMore} disabled={isLoading}>Load More</button>}
+        </div>
+    );
+}
+```
+
+#### Parameters
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `path` | `string` | Absolute collection path. |
+| `collection` | `EntityCollection` | Target collection definition. |
+| `fixedFilter` | `FilterValues` | Optional. Static filters to restrict search results. |
+| `pageSize` | `number` | Optional. Number of items per page. (Default: `10`). |
+| `getLabelFromEntity` | `(entity) => string` | Optional. Customize the display label text. |
+| `getDescriptionFromEntity` | `(entity) => string` | Optional. Customize the description text. |
+
+### `useUserSelector`
+
+Manage user account selection with server-side search and pagination, automatically falling back to client-side filtering if the backend delegate doesn't support server-side search.
+
+```typescript
+
+function AssigneeSelector({ onSelect }) {
+    const { items, isLoading, search, loadMore, hasMore } = useUserSelector({
+        pageSize: 10
+    });
+
+    return (
+        <div>
+            <input type="text" onChange={(e) => search(e.target.value)} placeholder="Search users..." />
+            <ul>
+                {items.map(item => (
+                    <li key={item.uid} onClick={() => onSelect(item.user)}>
+                        {item.label} ({item.description})
+                    </li>
+                ))}
+            </ul>
+            {hasMore && <button onClick={loadMore} disabled={isLoading}>Load More</button>}
+        </div>
+    );
+}
+```
+
+#### Parameters
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `pageSize` | `number` | Optional. Number of users to return per page. (Default: `10`). |
+
+#### Return Value
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `items` | `UserSelectorItem[]` | List of items wrapping `uid`, `label`, `description`, and raw `user`. |
+| `isLoading` | `boolean` | True if fetching is active. |
+| `error` | `Error` | Contains error if fetch fails. |
+| `search` | `(str) => void` | Updates search string with a debounced delay of 300ms. |
+| `loadMore` | `() => void` | Loads next page of users. |
+| `hasMore` | `boolean` | True if more users exist on the server. |
+| `getUser` | `(uid) => User` | Helper to fetch a single user object. |
+
+### `useRebaseClient`
+
+Retrieve the backing client SDK instance (`RebaseClient`) from the React context. This is useful for invoking raw SDK operations (like calling custom endpoints or manual uploads) within your components.
+
+```typescript
+
+function CustomAction() {
+    const client = useRebaseClient();
+
+    const handleAction = async () => {
+        const result = await client.call("send-invoice", { invoiceId: "123" });
+        console.log(result);
+    };
+
+    return <button onClick={handleAction}>Process Invoice</button>;
+}
+```
+
+### `useUnsavedChangesDialog`
+
+Prevent navigation or page unload when form data has unsaved changes. It automatically intercepts internal React Router navigation via `useBlocker` as well as browser-level reloads via `beforeunload`.
+
+```typescript
+
+function EditForm() {
+    const [isDirty, setIsDirty] = useState(false);
+
+    const { dialogProps, triggerDialog } = useUnsavedChangesDialog(
+        isDirty,
+        () => console.log("Navigation allowed (discarded or saved changes)")
+    );
+
+    // dialogProps contains { open, handleOk, handleCancel, body }
+}
+```
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `when` | `boolean` | Flag to activate page/router navigation blocking. |
+| `onOk` | `() => void` | Callback triggered when the user confirms discarding changes. |
+
+#### Return Value
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `dialogProps` | `UnsavedChangesDialogProps` | Modal props to pass directly to an `UnsavedChangesDialog` UI component. |
+| `triggerDialog` | `() => void` | Triggers manual dialog display programmatically. |
+
+### `useEffectiveRoleController`
+
+Switch roles at runtime to preview permissions and test Row-Level Security (RLS) policies locally without signing out.
+
+```typescript
+
+function RoleSwitcher() {
+    const { effectiveRole, setEffectiveRole } = useEffectiveRoleController();
+
+    return (
+        <select value={effectiveRole || ""} onChange={(e) => setEffectiveRole(e.target.value || null)}>
+            <option value="">Default (No Simulation)</option>
+            <option value="admin">Admin</option>
+            <option value="editor">Editor</option>
+            <option value="user">Standard User</option>
+        </select>
+    );
+}
+```
+
+### `useAdminModeController`
+
+Switch the admin layout view modes within the admin panel.
+
+```typescript
+
+function ModeToggle() {
+    const { mode, setMode } = useAdminModeController(); // mode is "content" | "studio" | "settings"
+
+    return <button onClick={() => setMode("studio")}>Switch to Studio View</button>;
+}
+```
+
+### `useDialogsController`
+
+Open dialog screens imperatively from anywhere in the component tree.
+
+```typescript
+
+function OpenModalButton() {
+    const dialogs = useDialogsController();
+
+    return (
+        <button onClick={() => dialogs.open({
+            key: "my-custom-modal",
+            Component: MyCustomDialog,
+            props: { title: "Custom Title" }
+        })}>
+            Open Custom Dialog
+        </button>
+    );
+}
+```
+
+### `useAnalyticsController`
+
+Capture CMS UI actions and user events globally.
+
+```typescript
+
+function AnalyticsLogger() {
+    const analytics = useAnalyticsController();
+
+    useEffect(() => {
+        analytics.onAnalyticsEvent = (event, data) => {
+            console.log(`CMS Event: ${event}`, data);
+        };
+    }, [analytics]);
 }
 ```
 

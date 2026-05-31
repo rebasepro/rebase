@@ -70,48 +70,65 @@ const breadcrumbSchema = breadcrumbs && breadcrumbs.length > 0 ? {
     (function(){
         var E;try{E=JSON.parse(abExperiments)}catch(e){return}
         if(!E||!E.length)return;
-        var D=document,H=D.documentElement,now=Date.now();
-        // Read existing assignments from cookie
-        var m=D.cookie.match(/(^|;)\s*rb_ab\s*=\s*([^;]+)/);
-        var a={};if(m)try{a=JSON.parse(decodeURIComponent(m[2]))}catch(e){}
-        // Process each experiment
-        var ids={},ch=false;
-        for(var i=0;i<E.length;i++){
-            var x=E[i];
-            if(x.expires&&new Date(x.expires).getTime()<now)continue;
-            ids[x.id]=1;
-            if(!a[x.id]||x.variants.indexOf(a[x.id])===-1){
-                var w=x.weights||[];
-                if(!w.length)for(var j=0;j<x.variants.length;j++)w.push(100/x.variants.length);
-                var r=Math.random()*100,c=0;
-                for(var k=0;k<w.length;k++){c+=w[k];if(r<c){a[x.id]=x.variants[k];ch=true;break}}
+        
+        function initAB() {
+            var D=document,H=D.documentElement,now=Date.now();
+            // Read existing assignments from cookie
+            var m=D.cookie.match(/(^|;)\s*rb_ab\s*=\s*([^;]+)/);
+            var a={};if(m)try{a=JSON.parse(decodeURIComponent(m[2]))}catch(e){}
+            // Process each experiment
+            var ids={},ch=false;
+            for(var i=0;i<E.length;i++){
+                var x=E[i];
+                if(x.expires&&new Date(x.expires).getTime()<now)continue;
+                ids[x.id]=1;
+                if(!a[x.id]||x.variants.indexOf(a[x.id])===-1){
+                    var w=x.weights||[];
+                    if(!w.length)for(var j=0;j<x.variants.length;j++)w.push(100/x.variants.length);
+                    var r=Math.random()*100,c=0;
+                    for(var k=0;k<w.length;k++){c+=w[k];if(r<c){a[x.id]=x.variants[k];ch=true;break}}
+                }
+            }
+            // Remove stale experiment assignments
+            for(var key in a)if(!ids[key]){delete a[key];ch=true}
+            // Set data attributes on <html>
+            for(var id in a)H.setAttribute("data-ab-"+id,a[id]);
+            // Inject CSS: for non-control variants, hide control and show assigned
+            var css="";
+            for(var id in a){
+                if(a[id]!=="control"){
+                    css+='[data-ab-show="'+id+':control"]{display:none!important}';
+                    css+='[data-ab-show="'+id+':'+a[id]+'"]{display:block!important}';
+                }
+            }
+            // Section reorder: inject CSS order rules
+            for(var i=0;i<E.length;i++){
+                var x=E[i];
+                if(a[x.id]&&a[x.id]!=="control"&&x.sectionOrders&&x.sectionOrders[a[x.id]]){
+                    var so=x.sectionOrders[a[x.id]];
+                    for(var sid in so)css+="#"+sid+"{order:"+so[sid]+"}";
+                }
+            }
+            
+            // Remove existing style tag to avoid duplicates on swap
+            var oldS=D.getElementById("ab-styles");
+            if(oldS)oldS.remove();
+            
+            if(css){var s=D.createElement("style");s.id="ab-styles";s.textContent=css;D.head.appendChild(s)}
+            // Persist cookie (90 days, functional — no consent needed)
+            if(ch){
+                var dm=location.hostname.indexOf("rebase.pro")>-1?";domain=.rebase.pro":"";
+                D.cookie="rb_ab="+encodeURIComponent(JSON.stringify(a))+";path=/;max-age=7776000;samesite=lax;secure"+dm;
             }
         }
-        // Remove stale experiment assignments
-        for(var key in a)if(!ids[key]){delete a[key];ch=true}
-        // Set data attributes on <html>
-        for(var id in a)H.setAttribute("data-ab-"+id,a[id]);
-        // Inject CSS: for non-control variants, hide control and show assigned
-        var css="";
-        for(var id in a){
-            if(a[id]!=="control"){
-                css+='[data-ab-show="'+id+':control"]{display:none!important}';
-                css+='[data-ab-show="'+id+':'+a[id]+'"]{display:block!important}';
-            }
-        }
-        // Section reorder: inject CSS order rules
-        for(var i=0;i<E.length;i++){
-            var x=E[i];
-            if(a[x.id]&&a[x.id]!=="control"&&x.sectionOrders&&x.sectionOrders[a[x.id]]){
-                var so=x.sectionOrders[a[x.id]];
-                for(var sid in so)css+="#"+sid+"{order:"+so[sid]+"}";
-            }
-        }
-        if(css){var s=D.createElement("style");s.id="ab-styles";s.textContent=css;D.head.appendChild(s)}
-        // Persist cookie (90 days, functional — no consent needed)
-        if(ch){
-            var dm=location.hostname.indexOf("rebase.pro")>-1?";domain=.rebase.pro":"";
-            D.cookie="rb_ab="+encodeURIComponent(JSON.stringify(a))+";path=/;max-age=7776000;samesite=lax;secure"+dm;
+        
+        // Initial run
+        initAB();
+        
+        // Run on Astro ViewTransitions swap to keep the A/B test variant styling
+        if (!window.__rb_ab_initialized) {
+            window.__rb_ab_initialized = true;
+            document.addEventListener("astro:after-swap", initAB);
         }
     })();
     </script>

@@ -53,23 +53,17 @@ const postsCollection: EntityCollection = {
             name: "Author",
             type: "relation",
             relationName: "author",
-            relation: {
-                relationName: "author",
-                cardinality: "one",
-                direction: "owning",
-                target: () => authorsCollection
-            }
+            target: () => authorsCollection,
+            cardinality: "one",
+            direction: "owning"
         },
         tags: {
             name: "Tags",
             type: "relation",
             relationName: "tags",
-            relation: {
-                relationName: "tags",
-                cardinality: "many",
-                direction: "owning",
-                target: () => tagsCollection
-            }
+            target: () => tagsCollection,
+            cardinality: "many",
+            direction: "owning"
         }
     }
 };

@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# ============================================================
+# verify-quality.sh — Systematic code quality & testing verifier
+# Run from monorepo root:  ./scripts/verify-quality.sh
+# ============================================================
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+ERROR_LOG=$(mktemp)
+
+err()  { echo -e "${RED}✗ $1${NC}"; echo "1" >> "$ERROR_LOG"; }
+ok()   { echo -e "${GREEN}✓ $1${NC}"; }
+warn() { echo -e "${YELLOW}⚠ $1${NC}"; }
+section() { echo -e "\n${YELLOW}━━━ $1 ━━━${NC}"; }
+error_count() { wc -l < "$ERROR_LOG" | tr -d ' '; }
+
+echo -e "${YELLOW}====================================================${NC}"
+echo -e "${YELLOW}       Rebase Code Quality Verification Suite       ${NC}"
+echo -e "${YELLOW}====================================================${NC}"
+
+# 1. Monorepo Build Check
+section "1. Monorepo Build Check"
+echo "Running pnpm build..."
+if pnpm run build; then
+    ok "Monorepo compiled successfully."
+else
+    err "Monorepo build failed."
+fi
+
+# 2. ESLint Check
+section "2. Code Style & Linting Check (ESLint)"
+echo "Running ESLint..."
+if npx eslint . --max-warnings=0; then
+    ok "No ESLint warnings or errors found."
+else
+    err "ESLint checks failed. Please fix style or React rules violations."
+fi
+
+# 3. Unit Tests Check
+section "3. Unit Tests Suite"
+echo "Running unit tests (pnpm test)..."
+if pnpm test; then
+    ok "All unit tests passed successfully."
+else
+    err "Some unit tests failed."
+fi
+
+# 4. E2E Tests Check
+section "4. Playwright E2E Integration Suite"
+echo "Running Playwright E2E tests (including SQL Console and Collection Editor)..."
+if pnpm run e2e; then
+    ok "All E2E integration tests passed successfully."
+else
+    err "Playwright E2E tests failed."
+fi
+
+# 5. Build Health Check (Vite & Bundles)
+section "5. Bundle ESM/CJS Health Check"
+if [ -f "./scripts/check-packages.sh" ]; then
+    echo "Running build-health package check..."
+    if ./scripts/check-packages.sh; then
+        ok "ESM / Package dependency configurations verified."
+    else
+        warn "Build health package checks found warning conditions (dependency or bundle issues)."
+    fi
+else
+    warn "check-packages.sh not found, skipping."
+fi
+
+# Summary
+section "Verification Summary"
+TOTAL=$(error_count)
+if [ "$TOTAL" = "0" ]; then
+    echo -e "${GREEN}====================================================${NC}"
+    echo -e "${GREEN}      ✓ SUCCESS: All quality checks passed!          ${NC}"
+    echo -e "${GREEN}====================================================${NC}"
+    rm -f "$ERROR_LOG"
+    exit 0
+else
+    echo -e "${RED}====================================================${NC}"
+    echo -e "${RED}      ✗ FAILURE: $TOTAL check group(s) failed.      ${NC}"
+    echo -e "${RED}====================================================${NC}"
+    rm -f "$ERROR_LOG"
+    exit 1
+fi

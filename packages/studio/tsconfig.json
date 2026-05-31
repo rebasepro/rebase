@@ -41,7 +41,7 @@
         "../types/src"
       ],
       "@rebasepro/admin": [
-        "../cms/src"
+        "../admin/src"
       ],
       "@rebasepro/schema-inference": [
         "../schema-inference/src"

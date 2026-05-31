@@ -45,7 +45,7 @@
         "../formex/src"
       ],
       "@rebasepro/admin": [
-        "../cms/src"
+        "../admin/src"
       ],
 
       "@rebasepro/plugin-data-enhancement": [

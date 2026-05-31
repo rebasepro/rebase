@@ -46,7 +46,9 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
+    "@rebasepro/common": "workspace:*",
     "@rebasepro/types": "workspace:*",
+    "@rebasepro/utils": "workspace:*",
     "mongodb": "^6.21.0",
     "ws": "^8.20.1"
   },

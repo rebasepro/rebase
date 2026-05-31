@@ -90,6 +90,23 @@ export interface FindResponse<M extends Record<string, unknown> = Record<string,
     };
 }
 
+export type FilterOperator = WhereFilterOpShort;
+
+/**
+ * Fluent Query Builder Interface supported on both client and server accessors.
+ * @group Data
+ */
+export interface QueryBuilderInterface<M extends Record<string, unknown> = Record<string, unknown>> {
+    where(column: keyof M & string, operator: FilterOperator, value: unknown): this;
+    orderBy(column: keyof M & string, ascending?: "asc" | "desc"): this;
+    limit(count: number): this;
+    offset(count: number): this;
+    search(searchString: string): this;
+    include(...relations: string[]): this;
+    find(): Promise<FindResponse<M>>;
+    listen(onUpdate: (data: FindResponse<M>) => void, onError?: (error: Error) => void): () => void;
+}
+
 /**
  * A single collection's CRUD accessor.
  *
@@ -145,6 +162,14 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
      * Count the number of records matching the given filter.
      */
     count?(params?: FindParams): Promise<number>;
+
+    // Fluent Query Builder
+    where(column: keyof M & string, operator: FilterOperator, value: unknown): QueryBuilderInterface<M>;
+    orderBy(column: keyof M & string, ascending?: "asc" | "desc"): QueryBuilderInterface<M>;
+    limit(count: number): QueryBuilderInterface<M>;
+    offset(count: number): QueryBuilderInterface<M>;
+    search(searchString: string): QueryBuilderInterface<M>;
+    include(...relations: string[]): QueryBuilderInterface<M>;
 }
 
 /**
