@@ -28,5 +28,10 @@
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rebasepro/rebase.git",
+    "directory": "packages/mcp-server"
   }
 }
