@@ -13,6 +13,9 @@ concurrency:
 jobs:
   publish-canary:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -53,15 +56,8 @@ jobs:
           git add -A
           git commit -m "chore: canary version $CANARY_VERSION" --no-verify
 
-      - name: Configure npm auth
-        run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
       - name: Publish to npm
         run: pnpm --filter './packages/*' -r publish --tag canary --no-git-checks --access public --report-summary
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Summary
         run: |

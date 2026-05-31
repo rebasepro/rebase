@@ -144,17 +144,9 @@ jobs:
           git tag -a "v$VERSION" -m "Release v$VERSION"
 
       # ── Publish ─────────────────────────────────────────────
-      - name: Configure npm auth
-        if: ${{ !inputs.dry_run }}
-        run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
       - name: Publish to npm
         if: ${{ !inputs.dry_run }}
         run: pnpm --filter './packages/*' -r publish --no-git-checks --access public --report-summary
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Push tags
         if: ${{ !inputs.dry_run }}
