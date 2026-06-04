@@ -7,8 +7,8 @@ export type { JwtConfig, AccessTokenPayload } from "./jwt";
 export { hashPassword, verifyPassword, validatePasswordStrength } from "./password";
 export type { PasswordValidationResult } from "./password";
 
-export type { AuthOverrides, AuthMethod, ResolvedAuthOperations } from "./auth-overrides";
-export { resolveAuthOverrides } from "./auth-overrides";
+export type { AuthHooks, AuthMethod, ResolvedAuthOperations } from "./auth-hooks";
+export { resolveAuthHooks } from "./auth-hooks";
 
 // OAuth Providers
 export { createGoogleProvider } from "./google-oauth";

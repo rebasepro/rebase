@@ -6,6 +6,7 @@ import "@fontsource/rubik";
 import { useRebaseAuthController, useBackendUserManagement } from "@rebasepro/auth";
 import { Rebase, RebaseAuth } from "@rebasepro/core";
 import { RebaseCMS, RebaseShell } from "@rebasepro/admin";
+import { ErrorBoundary } from "@rebasepro/ui";
 import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
 import { collections } from "virtual:rebase-collections";
@@ -30,17 +31,19 @@ export function App() {
     });
 
     return (
-        <Rebase
-            client={rebaseClient}
-            authController={authController}
-            userManagement={userManagement}
-        >
-            <RebaseAuth />
-            <RebaseCMS
-                collections={collections}
-            />
-            <RebaseStudio/>
-            <RebaseShell title="Rebase"/>
-        </Rebase>
+        <ErrorBoundary fullPage>
+            <Rebase
+                client={rebaseClient}
+                authController={authController}
+                userManagement={userManagement}
+            >
+                <RebaseAuth />
+                <RebaseCMS
+                    collections={collections}
+                />
+                <RebaseStudio/>
+                <RebaseShell title="Rebase"/>
+            </Rebase>
+        </ErrorBoundary>
     );
 }

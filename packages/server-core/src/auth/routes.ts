@@ -3,8 +3,8 @@ import { ApiError, errorHandler } from "../api/errors";
 import { randomBytes, createHash } from "crypto";
 import type { AuthRepository, OAuthProvider } from "./interfaces";
 import { generateAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry, getAccessTokenExpiry } from "./jwt";
-import type { AuthOverrides } from "./auth-overrides";
-import { resolveAuthOverrides } from "./auth-overrides";
+import type { AuthHooks } from "./auth-hooks";
+import { resolveAuthHooks } from "./auth-hooks";
 import { requireAuth } from "./middleware";
 import { EmailService, EmailConfig } from "../email";
 import { getPasswordResetTemplate, getEmailVerificationTemplate, getWelcomeEmailTemplate } from "../email/templates";
@@ -29,10 +29,10 @@ export interface AuthModuleConfig {
     /** When true, blocks all self-registration regardless of `allowRegistration`. */
     disableSelfRegistration?: boolean;
     /**
-     * Auth overrides for customizing password hashing, credential
+     * Auth hooks for customizing password hashing, credential
      * verification, lifecycle hooks, etc.
      */
-    overrides?: AuthOverrides;
+    authHooks?: AuthHooks;
     /**
      * Callback that checks if bootstrap has already been completed.
      * Used by GET /auth/config to report `needsSetup` status.
@@ -101,8 +101,8 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     router.onError(errorHandler);
 
     const authRepo = config.authRepo;
-    const { emailService, emailConfig, allowRegistration = false, overrides } = config;
-    const ops = resolveAuthOverrides(overrides);
+    const { emailService, emailConfig, allowRegistration = false, authHooks } = config;
+    const ops = resolveAuthHooks(authHooks);
 
     // ── Zod input schemas ──────────────────────────────────────────────
     const registerSchema = z.object({
@@ -241,8 +241,8 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
             passwordHash,
             displayName: displayName || undefined
         };
-        if (overrides?.beforeUserCreate) {
-            createData = await overrides.beforeUserCreate(createData);
+        if (authHooks?.beforeUserCreate) {
+            createData = await authHooks.beforeUserCreate(createData);
         }
         const user = await authRepo.createUser(createData);
 
@@ -270,18 +270,18 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
 displayName: user.displayName });
 
         // Fire afterUserCreate hook
-        if (overrides?.afterUserCreate) {
+        if (authHooks?.afterUserCreate) {
             try {
-                await overrides.afterUserCreate(user);
+                await authHooks.afterUserCreate(user);
             } catch (err) {
-                console.error("[AuthOverrides] afterUserCreate error:", err instanceof Error ? err.message : err);
+                console.error("[AuthHooks] afterUserCreate error:", err instanceof Error ? err.message : err);
             }
         }
 
         // Fire onAuthenticated hook (fire-and-forget)
-        if (overrides?.onAuthenticated) {
-            overrides.onAuthenticated(user, "register").catch(err => {
-                console.error("[AuthOverrides] onAuthenticated error:", err instanceof Error ? err.message : err);
+        if (authHooks?.onAuthenticated) {
+            authHooks.onAuthenticated(user, "register").catch(err => {
+                console.error("[AuthHooks] onAuthenticated error:", err instanceof Error ? err.message : err);
             });
         }
 
@@ -297,9 +297,9 @@ displayName: user.displayName });
 
         let user;
 
-        if (overrides?.verifyCredentials) {
+        if (authHooks?.verifyCredentials) {
             // Full credential verification override
-            user = await overrides.verifyCredentials(email, password, authRepo);
+            user = await authHooks.verifyCredentials(email, password, authRepo);
             if (!user) {
                 throw ApiError.unauthorized("Invalid email or password", "INVALID_CREDENTIALS");
             }
@@ -327,9 +327,9 @@ displayName: user.displayName });
         );
 
         // Fire onAuthenticated hook (fire-and-forget)
-        if (overrides?.onAuthenticated) {
-            overrides.onAuthenticated(user, "login").catch(err => {
-                console.error("[AuthOverrides] onAuthenticated error:", err instanceof Error ? err.message : err);
+        if (authHooks?.onAuthenticated) {
+            authHooks.onAuthenticated(user, "login").catch(err => {
+                console.error("[AuthHooks] onAuthenticated error:", err instanceof Error ? err.message : err);
             });
         }
 
@@ -382,11 +382,11 @@ displayName: user.displayName });
                         await authRepo.linkUserIdentity(user.id, provider.id, externalUser.providerId, { email: externalUser.email });
 
                         // Fire afterUserCreate hook
-                        if (overrides?.afterUserCreate) {
+                        if (authHooks?.afterUserCreate) {
                             try {
-                                await overrides.afterUserCreate(user);
+                                await authHooks.afterUserCreate(user);
                             } catch (err) {
-                                console.error("[AuthOverrides] afterUserCreate error:", err instanceof Error ? err.message : err);
+                                console.error("[AuthHooks] afterUserCreate error:", err instanceof Error ? err.message : err);
                             }
                         }
 

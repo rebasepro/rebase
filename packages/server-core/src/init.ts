@@ -23,7 +23,7 @@ import { createHistoryRoutes } from "./history";
 import { EmailConfig, createEmailService } from "./email";
 import type { EmailService } from "./email";
 import type { OAuthProvider } from "./auth/interfaces";
-import type { AuthOverrides } from "./auth/auth-overrides";
+import type { AuthHooks } from "./auth/auth-hooks";
 import { _initRebase } from "./singleton";
 
 export interface RebaseAuthConfig {
@@ -72,13 +72,13 @@ export interface RebaseAuthConfig {
      * ```ts
      * import bcrypt from "bcrypt";
      *
-     * overrides: {
+     * hooks: {
      *     hashPassword: (pw) => bcrypt.hash(pw, 12),
      *     verifyPassword: (pw, hash) => bcrypt.compare(pw, hash),
      * }
      * ```
      */
-    overrides?: AuthOverrides;
+    hooks?: AuthHooks;
     [key: string]: unknown;
 }
 
@@ -417,7 +417,7 @@ collectionRegistry });
                         oauthProviders,
                         serviceKey,
                         hooks: config.hooks,
-                        overrides: safeAuthConfig.overrides,
+                        authHooks: safeAuthConfig.hooks,
                     });
                 }
 
@@ -579,7 +579,7 @@ collectionRegistry });
                 oauthProviders,
                 serviceKey,
                 hooks: config.hooks,
-                overrides: safeAuthConfig.overrides,
+                authHooks: safeAuthConfig.hooks,
             });
         }
 

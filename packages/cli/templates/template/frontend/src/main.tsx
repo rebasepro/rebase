@@ -4,6 +4,10 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { App } from "./App";
 import "./index.css";
 
+window.addEventListener("unhandledrejection", (event: PromiseRejectionEvent) => {
+    console.error("[Rebase] Unhandled promise rejection:", event.reason);
+});
+
 const router = createBrowserRouter([
     {
         path: "/*",

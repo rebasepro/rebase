@@ -2,8 +2,8 @@ import { Hono } from "hono";
 import { ApiError, errorHandler } from "../api/errors";
 import type { AuthRepository } from "./interfaces";
 import { requireAuth, requireAdmin, createRequireAuth } from "./middleware";
-import type { AuthOverrides } from "./auth-overrides";
-import { resolveAuthOverrides } from "./auth-overrides";
+import type { AuthHooks } from "./auth-hooks";
+import { resolveAuthHooks } from "./auth-hooks";
 import { AuthModuleConfig } from "./routes";
 import type { BackendHooks, AdminUser, AdminRole, BackendHookContext } from "@rebasepro/types";
 
@@ -19,10 +19,10 @@ interface AdminRouteOptions extends AuthModuleConfig {
      */
     hooks?: BackendHooks;
     /**
-     * Auth overrides for customizing password hashing, credential
+     * Auth hooks for customizing password hashing, credential
      * verification, lifecycle hooks, etc.
      */
-    overrides?: AuthOverrides;
+    authHooks?: AuthHooks;
 }
 import { HonoEnv } from "../api/types";
 import { randomBytes, createHash } from "crypto";
@@ -74,8 +74,8 @@ function hashToken(token: string): string {
 export function createAdminRoutes(config: AdminRouteOptions): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
     const authRepo = config.authRepo;
-    const { emailService, emailConfig, hooks, overrides } = config;
-    const ops = resolveAuthOverrides(overrides);
+    const { emailService, emailConfig, hooks, authHooks } = config;
+    const ops = resolveAuthHooks(authHooks);
 
     /** Build a BackendHookContext from Hono's context object */
     function buildHookContext(c: { get: (key: string) => unknown }, method: BackendHookContext["method"]): BackendHookContext {

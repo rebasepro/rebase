@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import {
     useRebaseRegistry
 } from "@rebasepro/core";
+import { ErrorBoundary } from "@rebasepro/ui";
 
 import { RebaseAuthGate } from "./RebaseAuthGate";
 import { RebaseNavigation } from "./RebaseNavigation";
@@ -51,19 +52,21 @@ export function RebaseShell(props: RebaseShellProps) {
     return (
         <RebaseAuthGate>
             <RebaseNavigation>
-                <RebaseRouteDefs
-                    layout={
-                        <RebaseLayout
-                            title={title}
-                            appBar={appBar}
-                            drawer={drawer}
-                            autoOpenDrawer={autoOpenDrawer}
-                            devViews={devViews}
-                        />
-                    }
-                >
-                    {children}
-                </RebaseRouteDefs>
+                <ErrorBoundary fullPage>
+                    <RebaseRouteDefs
+                        layout={
+                            <RebaseLayout
+                                title={title}
+                                appBar={appBar}
+                                drawer={drawer}
+                                autoOpenDrawer={autoOpenDrawer}
+                                devViews={devViews}
+                            />
+                        }
+                    >
+                        {children}
+                    </RebaseRouteDefs>
+                </ErrorBoundary>
             </RebaseNavigation>
         </RebaseAuthGate>
     );

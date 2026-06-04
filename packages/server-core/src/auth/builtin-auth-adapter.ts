@@ -32,8 +32,8 @@ import type { AccessTokenPayload } from "./jwt";
 import { createAuthRoutes } from "./routes";
 import { createAdminRoutes } from "./admin-routes";
 import type { AuthRepository, OAuthProvider } from "./interfaces";
-import type { AuthOverrides, ResolvedAuthOperations } from "./auth-overrides";
-import { resolveAuthOverrides } from "./auth-overrides";
+import type { AuthHooks, ResolvedAuthOperations } from "./auth-hooks";
+import { resolveAuthHooks } from "./auth-hooks";
 import type { EmailService, EmailConfig } from "../email";
 import type { HonoEnv } from "../api/types";
 import { safeCompare } from "./crypto-utils";
@@ -62,8 +62,8 @@ export interface BuiltinAuthAdapterConfig {
     serviceKey?: string;
     /** Backend hooks for intercepting admin data. */
     hooks?: BackendHooks;
-    /** Auth overrides for customizing password, credentials, lifecycle, etc. */
-    overrides?: AuthOverrides;
+    /** Auth hooks for customizing password, credentials, lifecycle, etc. */
+    authHooks?: AuthHooks;
 }
 
 /**
@@ -83,10 +83,10 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         oauthProviders = [],
         serviceKey,
         hooks,
-        overrides,
+        authHooks,
     } = config;
 
-    const resolvedOps = resolveAuthOverrides(overrides);
+    const resolvedOps = resolveAuthHooks(authHooks);
 
     const adapter: AuthAdapter = {
         id: "rebase-builtin",
@@ -192,7 +192,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             };
         },
 
-        userManagement: createUserManagementFromRepo(authRepository, resolvedOps, overrides),
+        userManagement: createUserManagementFromRepo(authRepository, resolvedOps, authHooks),
 
         roleManagement: createRoleManagementFromRepo(authRepository),
 
@@ -204,7 +204,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 allowRegistration,
                 defaultRole,
                 oauthProviders,
-                overrides,
+                authHooks,
             });
         },
 
@@ -215,7 +215,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 emailConfig,
                 serviceKey,
                 hooks,
-                overrides,
+                authHooks,
             });
         },
 
@@ -251,7 +251,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
 
 // ─── Internal Helpers ────────────────────────────────────────────────────────
 
-function createUserManagementFromRepo(repo: AuthRepository, resolvedOps: ResolvedAuthOperations, overrides?: AuthOverrides): UserManagementAdapter {
+function createUserManagementFromRepo(repo: AuthRepository, resolvedOps: ResolvedAuthOperations, authHooks?: AuthHooks): UserManagementAdapter {
     return {
         async listUsers(options?: AuthUserListOptions): Promise<AuthUserListResult> {
             const result = await repo.listUsersPaginated({
@@ -284,15 +284,15 @@ function createUserManagementFromRepo(repo: AuthRepository, resolvedOps: Resolve
                 photoUrl: data.photoUrl,
                 metadata: data.metadata,
             };
-            if (overrides?.beforeUserCreate) {
-                createData = await overrides.beforeUserCreate(createData);
+            if (authHooks?.beforeUserCreate) {
+                createData = await authHooks.beforeUserCreate(createData);
             }
             const user = await repo.createUser(createData);
-            if (overrides?.afterUserCreate) {
+            if (authHooks?.afterUserCreate) {
                 try {
-                    await overrides.afterUserCreate(user);
+                    await authHooks.afterUserCreate(user);
                 } catch (err) {
-                    console.error("[AuthOverrides] afterUserCreate error:", err instanceof Error ? err.message : err);
+                    console.error("[AuthHooks] afterUserCreate error:", err instanceof Error ? err.message : err);
                 }
             }
             return toAuthUserData(user);
