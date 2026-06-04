@@ -1,6 +1,7 @@
 import React from "react";
 
-import { Authenticator, AnalyticsEvent, AppView, AppViewsBuilder, EntityCollection, EntityCollectionsBuilder, RebasePlugin, Locale, PropertyConfig } from "@rebasepro/types";
+import { AnalyticsEvent, AppView, AppViewsBuilder, EntityCollection, EntityCollectionsBuilder, RebasePlugin, Locale, PropertyConfig } from "@rebasepro/types";
+import { FirebaseAccessGate } from "../hooks/useFirebaseAccessGate";
 import { UserManagementDelegate } from "@rebasepro/types";
 import { FirebaseApp } from "@firebase/app";
 import { FirebaseLoginViewProps } from "./FirebaseLoginView";
@@ -64,12 +65,12 @@ export type RebaseFirebaseAppProps = {
 
     /**
      * Do the users need to log in to access the CMS.
-     * You can specify an Authenticator function to discriminate which users can
-     * access the CMS or not.
+     * You can specify a {@link FirebaseAccessGate} function to discriminate
+     * which users can access the CMS or not.
      * If not specified, authentication is enabled but no user restrictions
      * apply
      */
-    authenticator?: boolean | Authenticator<FirebaseUserWrapper>;
+    accessGate?: boolean | FirebaseAccessGate<FirebaseUserWrapper>;
 
     /**
      * List of sign in options that will be displayed in the login

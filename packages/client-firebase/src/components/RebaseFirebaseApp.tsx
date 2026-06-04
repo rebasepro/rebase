@@ -10,7 +10,6 @@ import {
     useBuildModeController,
     useBuildAdminModeController,
     AdminModeControllerProvider,
-    useValidateAuthenticator,
     RebaseRoutes
 } from "@rebasepro/core";
 import {
@@ -40,7 +39,8 @@ import {
     useFirebaseStorageSource,
     useFirestoreDriver,
     useInitialiseFirebase,
-    useBuildUserManagement
+    useBuildUserManagement,
+    useFirebaseAccessGate
 } from "../hooks";
 
 import { FirebaseAuthController } from "../types";
@@ -70,7 +70,7 @@ export function RebaseFirebaseApp({
     name,
     logo,
     logoDark,
-    authenticator,
+    accessGate,
     collections,
     views,
     adminViews,
@@ -158,15 +158,15 @@ export function RebaseFirebaseApp({
     });
 
     /**
-     * Validate authenticator
+     * Validate access gate
      */
     const {
         authLoading,
         canAccessMainView,
         notAllowedError
-    } = useValidateAuthenticator({
+    } = useFirebaseAccessGate({
         authController,
-        authenticator,
+        accessGate,
         data: buildRebaseData(firestoreDelegate),
         storageSource
     });

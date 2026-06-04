@@ -21,6 +21,10 @@ import {
 
 export type Role = RoleData;
 
+function escapeRegExp(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function toUser(doc: any): UserData {
     return {
         id: doc._id || doc.id,
@@ -154,9 +158,10 @@ export class MongoUserService implements UserRepository {
         const query: Record<string, unknown> = {};
         
         if (search) {
+            const escapedSearch = escapeRegExp(search);
             query.$or = [
-                { email: { $regex: search, $options: "i" } },
-                { displayName: { $regex: search, $options: "i" } }
+                { email: { $regex: escapedSearch, $options: "i" } },
+                { displayName: { $regex: escapedSearch, $options: "i" } }
             ];
         }
 
@@ -217,8 +222,7 @@ export class MongoUserService implements UserRepository {
             name: r.name,
             isAdmin: r.isAdmin ?? false,
             defaultPermissions: r.defaultPermissions ?? null,
-            collectionPermissions: r.collectionPermissions ?? null,
-            config: r.config ?? null
+            collectionPermissions: r.collectionPermissions ?? null
         }));
     }
 
@@ -270,8 +274,7 @@ export class MongoRoleService implements RoleRepository {
             name: doc.name,
             isAdmin: doc.isAdmin ?? false,
             defaultPermissions: doc.defaultPermissions ?? null,
-            collectionPermissions: doc.collectionPermissions ?? null,
-            config: doc.config ?? null
+            collectionPermissions: doc.collectionPermissions ?? null
         };
     }
 
@@ -282,8 +285,7 @@ export class MongoRoleService implements RoleRepository {
             name: doc.name,
             isAdmin: doc.isAdmin ?? false,
             defaultPermissions: doc.defaultPermissions ?? null,
-            collectionPermissions: doc.collectionPermissions ?? null,
-            config: doc.config ?? null
+            collectionPermissions: doc.collectionPermissions ?? null
         }));
     }
 
@@ -294,8 +296,7 @@ export class MongoRoleService implements RoleRepository {
             name: data.name,
             isAdmin: data.isAdmin ?? false,
             defaultPermissions: data.defaultPermissions ?? null,
-            collectionPermissions: data.collectionPermissions ?? null,
-            config: data.config ?? null
+            collectionPermissions: data.collectionPermissions ?? null
         };
         await this.collection.insertOne(doc);
         return { ...doc } as RoleData;

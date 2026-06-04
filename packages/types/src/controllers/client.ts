@@ -75,7 +75,6 @@ export interface AdminRole {
     name: string;
     isAdmin: boolean;
     defaultPermissions: Record<string, unknown> | null;
-    config: Record<string, unknown> | null;
 }
 
 /**
@@ -98,8 +97,8 @@ export interface AdminAPI {
     deleteUser(userId: string): Promise<{ success: boolean }>;
     listRoles(): Promise<{ roles: AdminRole[] }>;
     getRole(roleId: string): Promise<{ role: AdminRole }>;
-    createRole(data: { id: string; name: string; isAdmin?: boolean; defaultPermissions?: Record<string, unknown>; config?: Record<string, unknown> }): Promise<{ role: AdminRole }>;
-    updateRole(roleId: string, data: { name?: string; isAdmin?: boolean; defaultPermissions?: Record<string, unknown>; config?: Record<string, unknown> }): Promise<{ role: AdminRole }>;
+    createRole(data: { id: string; name: string; isAdmin?: boolean; defaultPermissions?: Record<string, unknown> }): Promise<{ role: AdminRole }>;
+    updateRole(roleId: string, data: { name?: string; isAdmin?: boolean; defaultPermissions?: Record<string, unknown> }): Promise<{ role: AdminRole }>;
     deleteRole(roleId: string): Promise<{ success: boolean }>;
     bootstrap(): Promise<{ success: boolean; message: string; user: { uid: string; roles: string[] } }>;
 }

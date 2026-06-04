@@ -25,12 +25,7 @@ export function EditorCollectionActionStart({
     const snackbarController = useSnackbarController();
     const { t } = useTranslation();
 
-    const canEditCollection = collectionEditorController.configPermissions
-        ? collectionEditorController.configPermissions({
-            user: authController.user,
-            collection
-        }).editCollections
-        : true;
+    const canEditCollection = !configController.readOnly;
 
     let saveDefaultFilterButton = null;
     if (!equal(getObjectOrNull(tableController.filterValues), getObjectOrNull(collection.defaultFilter)) ||

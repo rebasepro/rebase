@@ -64,7 +64,8 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         apiKey,
         userManagement: _userManagement,
         effectiveRoleController,
-        apiUrl
+        apiUrl,
+        translations
     } = props;
 
     const plugins = pluginsProp;
@@ -182,7 +183,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
     }
 
     const content = (
-        <RebaseI18nProvider locale={locale}>
+        <RebaseI18nProvider locale={locale} translations={translations as any}>
         <SnackbarProvider>
         <ModeControllerProvider value={modeController}>
         <AdminModeControllerProvider value={adminModeController}>

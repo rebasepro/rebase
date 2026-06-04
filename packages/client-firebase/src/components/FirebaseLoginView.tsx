@@ -261,7 +261,7 @@ export function FirebaseLoginView({
         } else if (notAllowedError instanceof Error) {
             notAllowedMessage = notAllowedError.message;
         } else {
-            notAllowedMessage = "It looks like you don't have access to the CMS, based on the specified Authenticator configuration";
+            notAllowedMessage = "It looks like you don't have access to the CMS, based on the specified access gate configuration";
         }
     }
 

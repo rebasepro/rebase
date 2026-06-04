@@ -479,6 +479,12 @@ describe(".env.example", () => {
         expect(dbMatch).toBeTruthy();
         expect(dbMatch![1]).toBe(customDbUrl);
     });
+
+    it("configureEnvFile throws an error if a multiline databaseUrl is provided", async () => {
+        const targetDir = await simulateInit("env-malicious-db-app");
+        const maliciousDbUrl = "postgresql://user:pass@remote:5432/db\nINJECTED_VAR=dangerous";
+        await expect(configureEnvFile(targetDir, maliciousDbUrl)).rejects.toThrow("Invalid DATABASE_URL");
+    });
 });
 
 // =============================================================================

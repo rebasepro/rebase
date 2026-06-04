@@ -269,11 +269,13 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         sendWelcomeEmail({ email: user.email,
 displayName: user.displayName });
 
-        // Fire afterUserCreate hook (fire-and-forget)
+        // Fire afterUserCreate hook
         if (overrides?.afterUserCreate) {
-            overrides.afterUserCreate(user).catch(err => {
+            try {
+                await overrides.afterUserCreate(user);
+            } catch (err) {
                 console.error("[AuthOverrides] afterUserCreate error:", err instanceof Error ? err.message : err);
-            });
+            }
         }
 
         // Fire onAuthenticated hook (fire-and-forget)
@@ -378,6 +380,15 @@ displayName: user.displayName });
                         });
 
                         await authRepo.linkUserIdentity(user.id, provider.id, externalUser.providerId, { email: externalUser.email });
+
+                        // Fire afterUserCreate hook
+                        if (overrides?.afterUserCreate) {
+                            try {
+                                await overrides.afterUserCreate(user);
+                            } catch (err) {
+                                console.error("[AuthOverrides] afterUserCreate error:", err instanceof Error ? err.message : err);
+                            }
+                        }
 
                         // Auto-bootstrap: first user in the system gets admin
                         const allUsers = await authRepo.listUsers();

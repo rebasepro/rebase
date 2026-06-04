@@ -271,6 +271,16 @@ export function DrawerToggle({
                     aria-expanded={isExpanded}
                     aria-label={isExpanded ? t("collapse") : t("expand")}
                     onClick={() => isExpanded ? closeDrawer() : openDrawer()}
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            if (isExpanded) {
+                                closeDrawer();
+                            } else {
+                                openDrawer();
+                            }
+                        }
+                    }}
                 >
                     <div className="shrink-0 flex items-center justify-center w-[56px] h-[24px] text-surface-500 dark:text-surface-400">
                         {isExpanded

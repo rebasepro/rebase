@@ -8,28 +8,25 @@ const DEFAULT_ROLES = [
         _id: "admin",
         id: "admin",
         name: "Admin",
-        is_admin: true,
-        default_permissions: { read: true, create: true, edit: true, delete: true },
-        config: { createCollections: true, editCollections: "all", deleteCollections: "all" },
-        created_at: new Date()
+        isAdmin: true,
+        defaultPermissions: { read: true, create: true, edit: true, delete: true },
+        createdAt: new Date()
     },
     {
         _id: "editor",
         id: "editor",
         name: "Editor",
-        is_admin: false,
-        default_permissions: { read: true, create: true, edit: true, delete: true },
-        config: { createCollections: true, editCollections: "own", deleteCollections: "own" },
-        created_at: new Date()
+        isAdmin: false,
+        defaultPermissions: { read: true, create: true, edit: true, delete: true },
+        createdAt: new Date()
     },
     {
         _id: "viewer",
         id: "viewer",
         name: "Viewer",
-        is_admin: false,
-        default_permissions: { read: true, create: false, edit: false, delete: false },
-        config: null,
-        created_at: new Date()
+        isAdmin: false,
+        defaultPermissions: { read: true, create: false, edit: false, delete: false },
+        createdAt: new Date()
     }
 ];
 
@@ -38,27 +35,27 @@ export async function ensureAuthCollectionsExist(db: Db): Promise<void> {
 
     try {
         // Users
-        const users = db.collection("__rebase_users");
+        const users = db.collection("rebase_users");
         await users.createIndex({ email: 1 }, { unique: true });
 
         // User Identities
-        const identities = db.collection("__rebase_user_identities");
+        const identities = db.collection("rebase_user_identities");
         await identities.createIndex({ provider: 1, provider_id: 1 }, { unique: true });
         await identities.createIndex({ user_id: 1 });
 
         // User Roles (junction collection)
-        const userRoles = db.collection("__rebase_user_roles");
+        const userRoles = db.collection("rebase_user_roles");
         await userRoles.createIndex({ user_id: 1, role_id: 1 }, { unique: true });
         await userRoles.createIndex({ user_id: 1 });
 
         // Refresh Tokens
-        const refreshTokens = db.collection("__rebase_refresh_tokens");
+        const refreshTokens = db.collection("rebase_refresh_tokens");
         await refreshTokens.createIndex({ token_hash: 1 }, { unique: true });
         await refreshTokens.createIndex({ user_id: 1, user_agent: 1, ip_address: 1 }, { unique: true });
         await refreshTokens.createIndex({ user_id: 1 });
 
         // Password Reset Tokens
-        const resetTokens = db.collection("__rebase_password_reset_tokens");
+        const resetTokens = db.collection("rebase_password_reset_tokens");
         await resetTokens.createIndex({ token_hash: 1 }, { unique: true });
         await resetTokens.createIndex({ user_id: 1 });
 
@@ -72,7 +69,7 @@ export async function ensureAuthCollectionsExist(db: Db): Promise<void> {
 }
 
 async function seedDefaultRoles(db: Db): Promise<void> {
-    const roles = db.collection("__rebase_roles");
+    const roles = db.collection("rebase_roles");
     const count = await roles.countDocuments();
 
     if (count > 0) {

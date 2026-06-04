@@ -83,6 +83,7 @@ export function useInsightsData(
                 }
             })
             .catch((err) => {
+                cache.invalidate(cacheKey);
                 if (!cancelled) {
                     setError(err instanceof Error ? err : new Error(String(err)));
                 }

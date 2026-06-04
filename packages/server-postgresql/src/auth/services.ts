@@ -424,19 +424,18 @@ export class UserService implements UserRepository {
     async getUserRoles(userId: string): Promise<Role[]> {
         const rolesSchema = getTableConfig(this.rolesTable).schema || "public";
         const result = await this.db.execute(sql`
-            SELECT r.id, r.name, r.is_admin, r.default_permissions, r.collection_permissions, r.config
+            SELECT r.id, r.name, r.is_admin, r.default_permissions, r.collection_permissions
             FROM ${sql.raw(`"${rolesSchema}"."roles"`)} r
             INNER JOIN ${sql.raw(`"${rolesSchema}"."user_roles"`)} ur ON r.id = ur.role_id
             WHERE ur.user_id = ${userId}
         `);
 
-        return (result.rows as Array<{ id: string; name: string; is_admin: boolean; default_permissions: Record<string, boolean> | null; collection_permissions: Record<string, Record<string, boolean>> | null; config: Record<string, unknown> | null }>).map(row => ({
+        return (result.rows as Array<{ id: string; name: string; is_admin: boolean; default_permissions: Record<string, boolean> | null; collection_permissions: Record<string, Record<string, boolean>> | null }>).map(row => ({
             id: row.id,
             name: row.name,
             isAdmin: row.is_admin,
             defaultPermissions: row.default_permissions,
-            collectionPermissions: row.collection_permissions,
-            config: row.config
+            collectionPermissions: row.collection_permissions
         }));
     }
 
@@ -518,65 +517,61 @@ export class RoleService implements RoleRepository {
     async getRoleById(id: string): Promise<Role | null> {
         const tableName = this.getQualifiedRolesTableName();
         const result = await this.db.execute(sql`
-            SELECT id, name, is_admin, default_permissions, collection_permissions, config
+            SELECT id, name, is_admin, default_permissions, collection_permissions
             FROM ${sql.raw(tableName)}
             WHERE id = ${id}
         `);
 
         if (result.rows.length === 0) return null;
 
-        const row = result.rows[0] as { id: string; name: string; is_admin: boolean; default_permissions: Record<string, boolean> | null; collection_permissions: Record<string, Record<string, boolean>> | null; config: Record<string, unknown> | null };
+        const row = result.rows[0] as { id: string; name: string; is_admin: boolean; default_permissions: Record<string, boolean> | null; collection_permissions: Record<string, Record<string, boolean>> | null };
         return {
             id: row.id,
             name: row.name,
             isAdmin: row.is_admin,
             defaultPermissions: row.default_permissions,
-            collectionPermissions: row.collection_permissions,
-            config: row.config
+            collectionPermissions: row.collection_permissions
         };
     }
 
     async listRoles(): Promise<Role[]> {
         const tableName = this.getQualifiedRolesTableName();
         const result = await this.db.execute(sql`
-            SELECT id, name, is_admin, default_permissions, collection_permissions, config
+            SELECT id, name, is_admin, default_permissions, collection_permissions
             FROM ${sql.raw(tableName)}
             ORDER BY name
         `);
 
-        return (result.rows as Array<{ id: string; name: string; is_admin: boolean; default_permissions: Record<string, boolean> | null; collection_permissions: Record<string, Record<string, boolean>> | null; config: Record<string, unknown> | null }>).map(row => ({
+        return (result.rows as Array<{ id: string; name: string; is_admin: boolean; default_permissions: Record<string, boolean> | null; collection_permissions: Record<string, Record<string, boolean>> | null }>).map(row => ({
             id: row.id,
             name: row.name,
             isAdmin: row.is_admin,
             defaultPermissions: row.default_permissions,
-            collectionPermissions: row.collection_permissions,
-            config: row.config
+            collectionPermissions: row.collection_permissions
         }));
     }
 
     async createRole(data: Omit<Role, "isAdmin" | "collectionPermissions"> & { isAdmin?: boolean; collectionPermissions?: Role["collectionPermissions"] }): Promise<Role> {
         const tableName = this.getQualifiedRolesTableName();
         const result = await this.db.execute(sql`
-            INSERT INTO ${sql.raw(tableName)} (id, name, is_admin, default_permissions, collection_permissions, config)
+            INSERT INTO ${sql.raw(tableName)} (id, name, is_admin, default_permissions, collection_permissions)
             VALUES (
                 ${data.id},
                 ${data.name},
                 ${data.isAdmin ?? false},
                 ${data.defaultPermissions ? JSON.stringify(data.defaultPermissions) : null}::jsonb,
-                ${data.collectionPermissions ? JSON.stringify(data.collectionPermissions) : null}::jsonb,
-                ${data.config ? JSON.stringify(data.config) : null}::jsonb
+                ${data.collectionPermissions ? JSON.stringify(data.collectionPermissions) : null}::jsonb
             )
-            RETURNING id, name, is_admin, default_permissions, collection_permissions, config
+            RETURNING id, name, is_admin, default_permissions, collection_permissions
         `);
 
-        const row = result.rows[0] as { id: string; name: string; is_admin: boolean; default_permissions: Record<string, boolean> | null; collection_permissions: Record<string, Record<string, boolean>> | null; config: Record<string, unknown> | null };
+        const row = result.rows[0] as { id: string; name: string; is_admin: boolean; default_permissions: Record<string, boolean> | null; collection_permissions: Record<string, Record<string, boolean>> | null };
         return {
             id: row.id,
             name: row.name,
             isAdmin: row.is_admin,
             defaultPermissions: row.default_permissions,
-            collectionPermissions: row.collection_permissions,
-            config: row.config
+            collectionPermissions: row.collection_permissions
         };
     }
 
@@ -591,8 +586,7 @@ export class RoleService implements RoleRepository {
                 name = ${data.name ?? existing.name},
                 is_admin = ${data.isAdmin ?? existing.isAdmin},
                 default_permissions = ${data.defaultPermissions ? JSON.stringify(data.defaultPermissions) : JSON.stringify(existing.defaultPermissions)}::jsonb,
-                collection_permissions = ${data.collectionPermissions !== undefined ? (data.collectionPermissions ? JSON.stringify(data.collectionPermissions) : null) : (existing.collectionPermissions ? JSON.stringify(existing.collectionPermissions) : null)}::jsonb,
-                config = ${data.config ? JSON.stringify(data.config) : (existing.config ? JSON.stringify(existing.config) : null)}::jsonb
+                collection_permissions = ${data.collectionPermissions !== undefined ? (data.collectionPermissions ? JSON.stringify(data.collectionPermissions) : null) : (existing.collectionPermissions ? JSON.stringify(existing.collectionPermissions) : null)}::jsonb
             WHERE id = ${id}
         `);
 
@@ -979,8 +973,7 @@ export class PostgresAuthRepository implements AuthRepository {
         return this.roleService.createRole({
             ...data,
             defaultPermissions: data.defaultPermissions ?? null,
-            collectionPermissions: data.collectionPermissions ?? null,
-            config: data.config ?? null
+            collectionPermissions: data.collectionPermissions ?? null
         });
     }
 

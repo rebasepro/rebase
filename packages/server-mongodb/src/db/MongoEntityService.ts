@@ -183,12 +183,13 @@ export class MongoEntityService implements EntityRepository {
             searchString?: string;
             databaseId?: string;
             collection?: EntityCollection;
+            rawQuery?: Filter<Document>;
         } = {}
     ): Promise<Entity<M>[]> {
         const collection = this.getCollection(collectionPath);
 
         // Build query
-        const query = MongoConditionBuilder.buildQuery<M>({
+        const query = options.rawQuery ?? MongoConditionBuilder.buildQuery<M>({
             filter: options.filter,
             searchString: options.searchString,
             properties: options.collection?.properties ?? {}
@@ -231,6 +232,7 @@ export class MongoEntityService implements EntityRepository {
             limit?: number;
             databaseId?: string;
             collection?: EntityCollection;
+            rawQuery?: Filter<Document>;
         } = {}
     ): Promise<Entity<M>[]> {
         return this.fetchCollection<M>(collectionPath, {
@@ -247,13 +249,14 @@ export class MongoEntityService implements EntityRepository {
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
             databaseId?: string;
+            rawQuery?: Filter<Document>;
         } = {}
     ): Promise<number> {
         const collection = this.getCollection(collectionPath);
 
-        const query = options.filter
+        const query = options.rawQuery ?? (options.filter
             ? MongoConditionBuilder.buildQuery<M>({ filter: options.filter })
-            : {};
+            : {});
 
         return collection.countDocuments(query);
     }

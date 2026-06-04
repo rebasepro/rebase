@@ -12,22 +12,19 @@ const DEFAULT_ROLES = [
         id: "admin",
         name: "Admin",
         is_admin: true,
-        default_permissions: { read: true, create: true, edit: true, delete: true },
-        config: { createCollections: true, editCollections: "all", deleteCollections: "all" }
+        default_permissions: { read: true, create: true, edit: true, delete: true }
     },
     {
         id: "editor",
         name: "Editor",
         is_admin: false,
-        default_permissions: { read: true, create: true, edit: true, delete: true },
-        config: { createCollections: true, editCollections: "own", deleteCollections: "own" }
+        default_permissions: { read: true, create: true, edit: true, delete: true }
     },
     {
         id: "viewer",
         name: "Viewer",
         is_admin: false,
-        default_permissions: { read: true, create: false, edit: false, delete: false },
-        config: null
+        default_permissions: { read: true, create: false, edit: false, delete: false }
     }
 ];
 
@@ -123,7 +120,6 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: Postg
                 is_admin BOOLEAN DEFAULT FALSE,
                 default_permissions JSONB,
                 collection_permissions JSONB,
-                config JSONB,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
             )
         `);
@@ -258,13 +254,12 @@ async function seedDefaultRoles(db: NodePgDatabase, rolesTableName: string): Pro
 
     for (const role of DEFAULT_ROLES) {
         await db.execute(sql`
-            INSERT INTO ${sql.raw(rolesTableName)} (id, name, is_admin, default_permissions, config)
+            INSERT INTO ${sql.raw(rolesTableName)} (id, name, is_admin, default_permissions)
             VALUES (
                 ${role.id}, 
                 ${role.name}, 
                 ${role.is_admin}, 
-                ${JSON.stringify(role.default_permissions)}::jsonb, 
-                ${role.config ? JSON.stringify(role.config) : null}::jsonb
+                ${JSON.stringify(role.default_permissions)}::jsonb
             )
             ON CONFLICT (id) DO NOTHING
         `);

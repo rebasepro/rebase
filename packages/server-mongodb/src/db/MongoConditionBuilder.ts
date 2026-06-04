@@ -23,6 +23,10 @@ const REBASE_TO_MONGO_OP: Record<WhereFilterOp, string> = {
     "not-in": "$nin"
 };
 
+function escapeRegExp(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
  * MongoDB Condition Builder
  *
@@ -84,7 +88,8 @@ export class MongoConditionBuilder {
 
         // Build regex conditions for each searchable string property
         const orConditions: Filter<Document>[] = [];
-        const searchRegex = new RegExp(searchString, "i");
+        const escapedSearch = escapeRegExp(searchString);
+        const searchRegex = new RegExp(escapedSearch, "i");
 
         for (const [key, prop] of Object.entries(properties)) {
             // Only search in string-type properties

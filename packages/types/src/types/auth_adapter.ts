@@ -186,7 +186,6 @@ export interface AuthRoleData {
         edit?: boolean;
         delete?: boolean;
     }> | null;
-    config?: Record<string, unknown> | null;
 }
 
 /**
@@ -199,7 +198,6 @@ export interface AuthCreateRoleData {
     isAdmin?: boolean;
     defaultPermissions?: AuthRoleData["defaultPermissions"];
     collectionPermissions?: AuthRoleData["collectionPermissions"];
-    config?: AuthRoleData["config"];
 }
 
 /**

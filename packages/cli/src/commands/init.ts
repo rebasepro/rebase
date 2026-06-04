@@ -137,7 +137,13 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         type: "input",
         name: "databaseUrl",
         message: "Enter your PostgreSQL database connection string (leave blank to use a local default):",
-        default: ""
+        default: "",
+        validate: (input: string) => {
+            if (input.trim() && /[\r\n]/.test(input)) {
+                return "Database URL cannot contain newline characters.";
+            }
+            return true;
+        }
     });
 
     questions.push({
@@ -266,22 +272,38 @@ async function createProject(options: InitOptions) {
     console.log(chalk.bold("Next steps:"));
     console.log("");
     const runDev = pmCommands.run("dev");
+    const runDbPush = pmCommands.run("db:push");
     console.log(`  ${chalk.cyan("cd")} ${options.projectName}`);
     if (!options.installDeps) {
         console.log(`  ${chalk.cyan(installCmd.join(" "))}`);
     }
     console.log("");
+
     if (options.databaseUrl) {
-        console.log(chalk.gray("  # Your database is configured! Start the dev server:"));
+        if (options.introspect) {
+            console.log(chalk.gray("  # Database has been introspected & collections generated!"));
+            console.log(chalk.gray("  # Start the development server (frontend + backend):"));
+            console.log(`  ${chalk.cyan(runDev.join(" "))}`);
+        } else {
+            console.log(chalk.gray("  # Your custom database is configured in .env."));
+            console.log(chalk.gray("  # If the database is empty, push the Rebase schema to initialize it:"));
+            console.log(`  ${chalk.cyan(runDbPush.join(" "))}`);
+            console.log("");
+            console.log(chalk.gray("  # Then start the development server:"));
+            console.log(`  ${chalk.cyan(runDev.join(" "))}`);
+        }
     } else {
         console.log(chalk.gray("  # A local database configuration has been generated in .env."));
-        console.log(chalk.gray("  # If using the included docker-compose.yml, start the database with:"));
+        console.log(chalk.gray("  # 1. Start the PostgreSQL database container:"));
         console.log(`  ${chalk.cyan("docker compose up -d db")}`);
         console.log("");
-        console.log(chalk.gray("  # Then start the dev server:"));
+        console.log(chalk.gray("  # 2. Push the Rebase schema to initialize database tables:"));
+        console.log(`  ${chalk.cyan(runDbPush.join(" "))}`);
+        console.log("");
+        console.log(chalk.gray("  # 3. Start the development server (frontend + backend):"));
+        console.log(`  ${chalk.cyan(runDev.join(" "))}`);
     }
-    console.log("");
-    console.log(`  ${chalk.cyan(runDev.join(" "))}`);
+
     console.log("");
     console.log(chalk.gray("This starts both the backend (Hono + PostgreSQL)")
         + chalk.gray(" and the frontend (Vite + React) concurrently."));
@@ -425,6 +447,9 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
         );
 
         if (databaseUrl) {
+            if (/[\r\n]/.test(databaseUrl)) {
+                throw new Error("Invalid DATABASE_URL: multiline values are not allowed.");
+            }
             envContent = envContent.replace(
                 /^DATABASE_URL=.*$/m,
                 `DATABASE_URL=${databaseUrl}`

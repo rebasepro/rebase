@@ -9,7 +9,7 @@ import {
     UserInfo
 } from "../types";
 
-const STORAGE_KEY = "rebase_auth";
+const STORAGE_KEY = "rebase_react_auth";
 
 // Buffer time before expiry to trigger refresh (2 minutes)
 const TOKEN_REFRESH_BUFFER_MS = 2 * 60 * 1000;

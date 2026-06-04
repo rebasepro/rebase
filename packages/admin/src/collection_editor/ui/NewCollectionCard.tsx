@@ -17,11 +17,7 @@ export function NewCollectionCard({
 
     if (!context.navigationStateController?.topLevelNavigation)
         return null;
-    const canCreateCollections = collectionEditorController.configPermissions
-        ? collectionEditorController.configPermissions({
-            user: authController.user
-        }).createCollections
-        : true;
+    const canCreateCollections = !collectionEditorController?.configController?.readOnly;
 
     return (
         <Card className={cls("h-full p-4 min-h-[124px]")}

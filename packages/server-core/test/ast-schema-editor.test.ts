@@ -60,4 +60,30 @@ description: "Product name" },
         expect(newContent).toContain("target: () => categoriesCollection");
         expect(newContent).toContain('description: "Product name"');
     });
+
+    it("should safely escape string values containing quotes and prevent code injection", async () => {
+        // Setup initial file
+        const fileContent = `import { EntityCollection } from "@rebasepro/types";
+const productsCollection: EntityCollection = {
+    name: "Products",
+    slug: "products",
+    properties: {}
+};
+export default productsCollection;
+`;
+        fs.writeFileSync(path.join(testDir, "products.ts"), fileContent);
+
+        // Payload attempting breakout
+        const maliciousData = {
+            name: 'Products", description: "Injected description", breakout: "true',
+            slug: "products",
+            properties: {}
+        };
+
+        await editor.saveCollection("products", maliciousData);
+
+        const newContent = fs.readFileSync(path.join(testDir, "products.ts"), "utf-8");
+        // Verify that the quote was safely escaped and did not break out to create a new property
+        expect(newContent).toContain('name: "Products\\", description: \\"Injected description\\", breakout: \\"true"');
+    });
 });

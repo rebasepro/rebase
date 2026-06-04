@@ -6,3 +6,4 @@ export * from "./useFirestoreDriver";
 export * from "./useFirebaseRealTimeDBDelegate";
 export * from "./useRecaptcha";
 export * from "./useBuildUserManagement";
+export * from "./useFirebaseAccessGate";

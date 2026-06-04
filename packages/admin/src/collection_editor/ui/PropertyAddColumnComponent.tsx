@@ -22,12 +22,7 @@ export function PropertyAddColumnComponent({
     const authController = useAuthController();
     const collectionEditorController = useCollectionEditorController();
     const { t } = useTranslation();
-    const canEditCollection = collectionEditorController.configPermissions
-        ? collectionEditorController.configPermissions({
-            user: authController.user,
-            collection
-        }).editCollections
-        : true;
+    const canEditCollection = !collectionEditorController.configController?.readOnly;
 
     return (
         <Tooltip
@@ -36,7 +31,7 @@ export function PropertyAddColumnComponent({
             <div
                 className={"p-0.5 w-20 h-full flex items-center justify-center cursor-pointer bg-surface-100/40 bg-surface-100/40 hover:bg-surface-100 dark:bg-surface-900 dark:bg-opacity-40 dark:bg-surface-900/40 dark:hover:bg-surface-800"}
                 // className={onHover ? "bg-white dark:bg-surface-900" : undefined}
-                onClick={() => {
+                onClick={canEditCollection ? () => {
                     collectionEditorController.editProperty({
                         editedCollectionId: collection.slug,
                         parentCollectionSlugs, parentEntityIds,
@@ -44,7 +39,7 @@ export function PropertyAddColumnComponent({
                         collection,
                         existingEntities: tableController.data
                     });
-                }}>
+                } : undefined}>
                 <PlusIcon/>
             </div>
         </Tooltip>

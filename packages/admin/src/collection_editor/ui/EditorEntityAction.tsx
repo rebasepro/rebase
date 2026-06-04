@@ -19,12 +19,7 @@ export function EditorEntityAction({
 
     const parentCollection = parentCollectionSlugs.length > 0 ? collectionRegistry.getCollection(parentCollectionSlugs[parentCollectionSlugs.length - 1]) : undefined;
 
-    const canEditCollection = collectionEditorController.configPermissions
-        ? collectionEditorController.configPermissions({
-            user: authController.user,
-            collection
-        }).editCollections
-        : true;
+    const canEditCollection = !collectionEditorController.configController?.readOnly;
 
     const isDirty = formContext?.formex.dirty ?? false;
 

@@ -7,6 +7,15 @@ import { cls, ExternalLinkIcon, FileTextIcon, Tooltip, Typography } from "@rebas
 import { EmptyValue } from "./EmptyValue";
 import { getThumbnailMeasure } from "../util";
 
+export function sanitizeUrl(url: string | undefined): string {
+    if (!url) return "about:blank";
+    const trimmed = url.trim();
+    if (/^(?:javascript|data|vbscript):/i.test(trimmed)) {
+        return "about:blank";
+    }
+    return trimmed;
+}
+
 /**
  * @group Preview components
  */
@@ -31,7 +40,7 @@ export function UrlComponentPreview({
         if (!url || !url.trim()) return <EmptyValue/>;
         return (
             <a className="flex gap-4 break-words items-center font-medium text-primary visited:text-primary dark:visited:text-primary dark:text-primary"
-                href={url}
+                href={sanitizeUrl(url)}
                 rel="noopener noreferrer"
                 onMouseDown={(e: React.MouseEvent) => {
                     e.preventDefault();
@@ -60,7 +69,7 @@ export function UrlComponentPreview({
         return (
             <Tooltip title={hint}>
                 <a
-                    href={url}
+                    href={sanitizeUrl(url)}
                     rel="noopener noreferrer"
                     target="_blank"
                     onClick={(e) => e.stopPropagation()}

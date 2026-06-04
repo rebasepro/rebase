@@ -29,7 +29,7 @@ export const authors = pgTable("authors", {
     website: varchar("website"),
     userId: varchar("user_id")
 }, (table) => ([
-    pgPolicy("authors_public_access", { as: "permissive", for: "all", to: ["authenticated"], using: sql`true`, withCheck: sql`true` }),
+    pgPolicy("authors_public_access", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
 ])).enableRLS();
 
 export const customers = pgTable("customers", {
@@ -126,7 +126,7 @@ export const posts = pgTable("posts", {
     updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
     author_id: uuid("author_id").references(() => authors.id, { onDelete: "set null" })
 }, (table) => ([
-    pgPolicy("test_policy", { as: "permissive", for: "all", to: ["authenticated"], using: sql`true`, withCheck: sql`true` }),
+    pgPolicy("test_policy", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
 ])).enableRLS();
 
 export const postsTags = pgTable("posts_tags", {
@@ -176,8 +176,7 @@ export const roles = rebaseSchema.table("roles", {
     name: varchar("name").notNull(),
     isAdmin: boolean("is_admin"),
     defaultPermissions: jsonb("default_permissions"),
-    collectionPermissions: jsonb("collection_permissions"),
-    config: jsonb("config")
+    collectionPermissions: jsonb("collection_permissions")
 }, (table) => ([
     pgPolicy("roles_public_access", { as: "permissive", for: "all", to: ["authenticated"], using: sql`true`, withCheck: sql`true` }),
 ])).enableRLS();

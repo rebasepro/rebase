@@ -3,8 +3,7 @@ import React, { useCallback, useMemo } from "react";
 import "@fontsource/rubik";
 import "@fontsource/jetbrains-mono";
 
-import { Authenticator } from "@rebasepro/types";
-import { FirebaseUserWrapper, RebaseFirebaseApp } from "@rebasepro/client-firebase";
+import { FirebaseAccessGate, FirebaseUserWrapper, RebaseFirebaseApp } from "@rebasepro/client-firebase";
 import { demoCollection } from "./collections/demo";
 import { productsCollection } from "./collections/products";
 import { blogCollection } from "./collections/blog";
@@ -24,7 +23,7 @@ export const firebaseConfig = {
 function App() {
 
     // Use your own authentication logic here
-    const myAuthenticator: Authenticator<FirebaseUserWrapper> = useCallback(async ({
+    const myAccessGate: FirebaseAccessGate<FirebaseUserWrapper> = useCallback(async ({
                                                                                        user,
                                                                                        authController
                                                                                    }) => {
@@ -54,7 +53,7 @@ function App() {
         name={"My demo app"}
         collections={collections}
         firebaseConfig={firebaseConfig}
-        authenticator={myAuthenticator}
+        accessGate={myAccessGate}
         signInOptions={["google.com", "password"]}
     />;
 }

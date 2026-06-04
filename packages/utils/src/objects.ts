@@ -166,6 +166,9 @@ export function mergeDeep<T extends object, U extends object>(
 
     // Iterate over keys in the source object.
     for (const key in source) {
+        if (key === "__proto__" || key === "constructor" || key === "prototype") {
+            continue;
+        }
         if (Object.prototype.hasOwnProperty.call(source, key)) {
             const sourceValue = source[key];
             const outputValue = (output as Record<string, unknown>)[key]; // Current value in our merged object (originating from target)
@@ -258,15 +261,22 @@ export function getValueInPath(o: object | undefined, path: string): unknown {
 }
 
 export function removeInPath(o: object, path: string): object | undefined {
-    let currentObject = { ...o };
+    const res = clone(o) as Record<string, unknown>;
+    let current = res;
     const parts = path.split(".");
     const last = parts.pop();
     for (const part of parts) {
-        currentObject = (currentObject as Record<string, unknown>)[part] as Record<string, unknown>;
+        if (part in current && current[part] !== null && typeof current[part] === "object") {
+            current[part] = clone(current[part]) as Record<string, unknown>;
+            current = current[part] as Record<string, unknown>;
+        } else {
+            return res;
+        }
     }
-    if (last)
-        delete (currentObject as Record<string, unknown>)[last];
-    return currentObject;
+    if (last && current && typeof current === "object") {
+        delete current[last];
+    }
+    return res;
 }
 
 export function removeFunctions(o: unknown): unknown {

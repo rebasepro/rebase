@@ -18,15 +18,5 @@ export type Role = {
     isAdmin?: boolean;
 
 
-    /**
-     * Permissions related to editing the collections
-     */
-    config?: {
 
-        createCollections?: boolean;
-
-        editCollections?: boolean | "own";
-
-        deleteCollections?: boolean | "own";
-    }
 }

@@ -30,9 +30,7 @@ export type {
 export type {
     CollectionEditorController
 } from "./types/collection_editor_controller";
-export type {
-    CollectionEditorPermissions, CollectionEditorPermissionsBuilder
-} from "./types/config_permissions";
+
 export type {
     CollectionInference
 } from "./types/collection_inference";

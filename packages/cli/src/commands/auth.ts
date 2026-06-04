@@ -75,6 +75,9 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
     if (envFile) {
         env.DOTENV_CONFIG_PATH = envFile;
     }
+    env.REBASE_RESET_EMAIL = email;
+    env.REBASE_RESET_PASSWORD = newPassword || "NewPassword123!";
+    env.REBASE_ENV_FILE_PATH = envFile || path.join(projectRoot, ".env");
 
     const scriptContent = `
 import { createPostgresDatabaseConnection } from "@rebasepro/server-postgresql";
@@ -84,10 +87,10 @@ import * as dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
 
-dotenv.config({ path: "${envFile || path.join(projectRoot, ".env")}" });
+dotenv.config({ path: process.env.REBASE_ENV_FILE_PATH });
 
-const email = "${email}";
-const newPassword = "${newPassword || "NewPassword123!"}";
+const email = process.env.REBASE_RESET_EMAIL!;
+const newPassword = process.env.REBASE_RESET_PASSWORD!;
 
 async function resetPassword() {
     const { db } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);

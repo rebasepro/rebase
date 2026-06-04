@@ -12,16 +12,20 @@ import {
     RealtimeProvider,
     CollectionSubscriptionConfig,
     EntitySubscriptionConfig,
-    WebSocketMessage
+    WebSocketMessage,
+    User
 } from "@rebasepro/types";
 import { WebSocket } from "ws";
 import { MongoEntityService } from "../db/MongoEntityService";
+
+import { MongoDriver } from "./MongoDriver";
 
 interface Subscription {
     type: "collection" | "entity";
     config: CollectionSubscriptionConfig | EntitySubscriptionConfig;
     changeStream?: ChangeStream;
     callback?: (data: any) => void;
+    authContext?: { userId: string; roles: string[] };
 }
 
 /**
@@ -34,9 +38,14 @@ export class MongoRealtimeService implements RealtimeProvider {
     private subscriptions = new Map<string, Subscription>();
     private clients = new Map<string, WebSocket>();
     private entityService: MongoEntityService;
+    private driver?: MongoDriver;
 
     constructor(private db: Db) {
         this.entityService = new MongoEntityService(db);
+    }
+
+    setDataDriver(driver: MongoDriver) {
+        this.driver = driver;
     }
 
     /**
@@ -51,7 +60,7 @@ export class MongoRealtimeService implements RealtimeProvider {
      */
     subscribeToCollection(
         subscriptionId: string,
-        config: CollectionSubscriptionConfig,
+        config: CollectionSubscriptionConfig & { authContext?: { userId: string; roles: string[] } },
         callback?: (entities: Entity[]) => void
     ): void {
         // Clean up existing subscription if any
@@ -80,7 +89,8 @@ export class MongoRealtimeService implements RealtimeProvider {
                 type: "collection",
                 config,
                 changeStream,
-                callback
+                callback,
+                authContext: config.authContext
             };
 
             this.subscriptions.set(subscriptionId, subscription);
@@ -107,7 +117,8 @@ export class MongoRealtimeService implements RealtimeProvider {
             const subscription: Subscription = {
                 type: "collection",
                 config,
-                callback
+                callback,
+                authContext: config.authContext
             };
 
             this.subscriptions.set(subscriptionId, subscription);
@@ -122,18 +133,37 @@ export class MongoRealtimeService implements RealtimeProvider {
      */
     private async fetchAndNotifyCollection(
         subscriptionId: string,
-        config: CollectionSubscriptionConfig,
+        config: CollectionSubscriptionConfig & { authContext?: { userId: string; roles: string[] } },
         callback?: (entities: Entity[]) => void
     ): Promise<void> {
         try {
-            const entities = await this.entityService.fetchCollection(config.path, {
-                filter: config.filter as FilterValues<string> | undefined,
-                orderBy: config.orderBy,
-                order: config.order,
-                limit: config.limit,
-                startAfter: config.startAfter,
-                searchString: config.searchString
-            });
+            let entities;
+            const registryCollection = this.driver?.registry?.getCollectionByPath(config.path);
+
+            if (config.authContext && this.driver) {
+                const mockUser = { uid: config.authContext.userId, roles: config.authContext.roles } as User;
+                const authenticatedDriver = await this.driver.withAuth(mockUser);
+                entities = await authenticatedDriver.fetchCollection({
+                    path: config.path,
+                    collection: registryCollection,
+                    filter: config.filter as any,
+                    orderBy: config.orderBy,
+                    order: config.order,
+                    limit: config.limit,
+                    startAfter: config.startAfter,
+                    searchString: config.searchString
+                });
+            } else {
+                entities = await this.entityService.fetchCollection(config.path, {
+                    filter: config.filter as FilterValues<string> | undefined,
+                    orderBy: config.orderBy,
+                    order: config.order,
+                    limit: config.limit,
+                    startAfter: config.startAfter,
+                    searchString: config.searchString,
+                    collection: registryCollection
+                });
+            }
 
             if (callback) {
                 callback(entities);
@@ -148,7 +178,7 @@ export class MongoRealtimeService implements RealtimeProvider {
      */
     subscribeToEntity(
         subscriptionId: string,
-        config: EntitySubscriptionConfig,
+        config: EntitySubscriptionConfig & { authContext?: { userId: string; roles: string[] } },
         callback?: (entity: Entity | null) => void
     ): void {
         // Clean up existing subscription if any
@@ -180,7 +210,8 @@ export class MongoRealtimeService implements RealtimeProvider {
                 type: "entity",
                 config,
                 changeStream,
-                callback
+                callback,
+                authContext: config.authContext
             };
 
             this.subscriptions.set(subscriptionId, subscription);
@@ -209,7 +240,8 @@ export class MongoRealtimeService implements RealtimeProvider {
             const subscription: Subscription = {
                 type: "entity",
                 config,
-                callback
+                callback,
+                authContext: config.authContext
             };
 
             this.subscriptions.set(subscriptionId, subscription);
@@ -224,11 +256,24 @@ export class MongoRealtimeService implements RealtimeProvider {
      */
     private async fetchAndNotifyEntity(
         subscriptionId: string,
-        config: EntitySubscriptionConfig,
+        config: EntitySubscriptionConfig & { authContext?: { userId: string; roles: string[] } },
         callback?: (entity: Entity | null) => void
     ): Promise<void> {
         try {
-            const entity = await this.entityService.fetchEntity(config.path, config.entityId);
+            let entity;
+            const registryCollection = this.driver?.registry?.getCollectionByPath(config.path);
+
+            if (config.authContext && this.driver) {
+                const mockUser = { uid: config.authContext.userId, roles: config.authContext.roles } as User;
+                const authenticatedDriver = await this.driver.withAuth(mockUser);
+                entity = await authenticatedDriver.fetchEntity({
+                    path: config.path,
+                    entityId: config.entityId,
+                    collection: registryCollection
+                });
+            } else {
+                entity = await this.entityService.fetchEntity(config.path, config.entityId);
+            }
 
             if (callback) {
                 callback(entity || null);
@@ -334,6 +379,8 @@ export class MongoRealtimeService implements RealtimeProvider {
         const ws = this.clients.get(clientId);
         if (!ws) return;
 
+        const authContext = _authContext ? { userId: _authContext.userId, roles: (_authContext.roles ?? []).map(String) } : undefined;
+
         switch (message.type) {
             case "subscribe_collection": {
                 const subscriptionId = message.payload?.subscriptionId ?? message.subscriptionId;
@@ -349,8 +396,9 @@ export class MongoRealtimeService implements RealtimeProvider {
                         order: message.payload?.order,
                         limit: message.payload?.limit,
                         startAfter: message.payload?.startAfter,
-                        searchString: message.payload?.searchString
-                    },
+                        searchString: message.payload?.searchString,
+                        authContext
+                    } as any,
                     (entities) => {
                         ws.send(JSON.stringify({
                             type: "collection_update",
@@ -370,8 +418,9 @@ export class MongoRealtimeService implements RealtimeProvider {
                     {
                         clientId,
                         path: message.payload?.path,
-                        entityId: message.payload?.entityId
-                    },
+                        entityId: message.payload?.entityId,
+                        authContext
+                    } as any,
                     (entity) => {
                         ws.send(JSON.stringify({
                             type: "entity_update",

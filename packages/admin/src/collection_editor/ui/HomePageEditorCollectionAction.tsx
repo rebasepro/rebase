@@ -21,16 +21,9 @@ export function HomePageEditorCollectionAction({
     const collectionEditorController = useCollectionEditorController();
     const { t } = useTranslation();
 
-    const permissions = collectionEditorController?.configPermissions
-        ? collectionEditorController.configPermissions({
-            user: authController.user,
-            collection
-        })
-        : {
-            createCollections: false,
-            editCollections: false,
-            deleteCollections: false
-        };
+    const canCreateCollections = !configController.readOnly;
+    const canEditCollections = !configController.readOnly;
+    const canDeleteCollections = !configController.readOnly;
 
     const onEditCollectionClicked = () => {
         collectionEditorController?.editCollection({
@@ -67,13 +60,13 @@ export function HomePageEditorCollectionAction({
     return <>
 
         <div>
-            {permissions.deleteCollections &&
+            {canDeleteCollections &&
                 <Menu
                     trigger={<IconButton size={"small"}>
                         <MoreVerticalIcon/>
                     </IconButton>}
                 >
-                    {permissions.createCollections &&
+                    {canCreateCollections &&
                         <MenuItem
                             dense={true}
                             onClick={(event: React.MouseEvent) => {
@@ -100,11 +93,11 @@ export function HomePageEditorCollectionAction({
 
             }
 
-            {permissions.editCollections &&
+            {canEditCollections &&
                 <IconButton
                     size={"small"}
                     onClick={(event: React.MouseEvent) => {
-                        onEditCollectionClicked();
+                         onEditCollectionClicked();
                     }}>
                     <SettingsIcon/>
                 </IconButton>}

@@ -606,6 +606,9 @@ importers:
       '@rebasepro/server-core':
         specifier: workspace:*
         version: link:../server-core
+      '@rebasepro/server-postgresql':
+        specifier: workspace:*
+        version: link:../server-postgresql
       '@rebasepro/types':
         specifier: workspace:*
         version: link:../types
@@ -1134,6 +1137,9 @@ importers:
       '@rebasepro/types':
         specifier: workspace:*
         version: link:../types
+      '@rebasepro/ui':
+        specifier: workspace:*
+        version: link:../ui
       react:
         specifier: '>=19.0.0'
         version: 19.2.6
@@ -1847,6 +1853,9 @@ importers:
       ssh2:
         specifier: ^1.15.0
         version: 1.17.0
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
     devDependencies:
       '@types/node':
         specifier: ^20.19.41
@@ -1875,6 +1884,10 @@ importers:
       '@rebasepro/types':
         specifier: workspace:*
         version: link:../../packages/types
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   saas/frontend:
     dependencies:

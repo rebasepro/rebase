@@ -45,16 +45,6 @@ const rolesCollection: PostgresCollection = {
             name: "Collection Permissions",
             type: "map",
             columnName: "collection_permissions"
-        },
-        config: {
-            name: "Config",
-            type: "map",
-            columnName: "config",
-            properties: {
-                createCollections: { name: "Create Collections", type: "boolean" },
-                editCollections: { name: "Edit Collections", type: "string" },
-                deleteCollections: { name: "Delete Collections", type: "string" }
-            }
         }
     }
 };

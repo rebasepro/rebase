@@ -49,8 +49,7 @@ function mockRole(id: string, isAdmin = false) {
         name: id.charAt(0).toUpperCase() + id.slice(1),
         isAdmin,
         defaultPermissions: null,
-        collectionPermissions: null,
-        config: null
+        collectionPermissions: null
     };
 }
 
@@ -98,11 +97,11 @@ function createApp(hooks?: BackendHooks) {
         getRoleById: jest.fn().mockResolvedValue(null),
         createRole: jest.fn().mockImplementation(r => Promise.resolve({
             id: r.id, name: r.name, isAdmin: r.isAdmin || false,
-            defaultPermissions: null, collectionPermissions: null, config: null
+            defaultPermissions: null, collectionPermissions: null
         })),
         updateRole: jest.fn().mockImplementation((id, r) => Promise.resolve({
             id, name: r.name, isAdmin: r.isAdmin || false,
-            defaultPermissions: null, collectionPermissions: null, config: null
+            defaultPermissions: null, collectionPermissions: null
         })),
         deleteRole: jest.fn().mockResolvedValue(undefined)
     };

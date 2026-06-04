@@ -352,10 +352,8 @@ export const EntityPreviewContainer = React.forwardRef<HTMLDivElement, EntityPre
 }, ref) => {
     return <div
         ref={ref}
-        style={{
-            ...style,
-            tabIndex: 0
-        } as React.CSSProperties}
+        tabIndex={0}
+        style={style}
         className={cls(
             "bg-white dark:bg-surface-900",
             size === "small" ? "min-h-[32px]" : "min-h-[44px]",
@@ -367,8 +365,15 @@ export const EntityPreviewContainer = React.forwardRef<HTMLDivElement, EntityPre
             onClick ? "cursor-pointer" : "",
             defaultBorderMixin,
             className)}
+        role={onClick ? "button" : undefined}
         onClick={(event) => {
             if (onClick) {
+                event.preventDefault();
+                onClick(event);
+            }
+        }}
+        onKeyDown={(event) => {
+            if (onClick && (event.key === "Enter" || event.key === " ")) {
                 event.preventDefault();
                 onClick(event);
             }

@@ -348,14 +348,12 @@ describe("Auth Services", () => {
                             name: "Admin",
                             is_admin: true,
                             default_permissions: null,
-                            collection_permissions: null,
-                            config: null },
+                            collection_permissions: null },
                         { id: "editor",
                             name: "Editor",
                             is_admin: false,
                             default_permissions: { edit: true },
-                            collection_permissions: null,
-                            config: null }
+                            collection_permissions: null }
                     ]
                 });
 
@@ -367,8 +365,7 @@ describe("Auth Services", () => {
                     name: "Admin",
                     isAdmin: true,
                     defaultPermissions: null,
-                    collectionPermissions: null,
-                    config: null
+                    collectionPermissions: null
                 });
             });
         });
@@ -381,8 +378,7 @@ describe("Auth Services", () => {
                             name: "Admin",
                             is_admin: true,
                             default_permissions: null,
-                            collection_permissions: null,
-                            config: null }
+                            collection_permissions: null }
                     ]
                 });
 
@@ -426,8 +422,7 @@ describe("Auth Services", () => {
                         name: "Admin",
                         is_admin: true,
                         default_permissions: null,
-                        collection_permissions: null,
-                        config: null }]
+                        collection_permissions: null }]
                 });
 
                 const result = await userService.getUserWithRoles("user-123");
@@ -438,8 +433,7 @@ describe("Auth Services", () => {
                         name: "Admin",
                         isAdmin: true,
                         defaultPermissions: null,
-                        collectionPermissions: null,
-                        config: null }]
+                        collectionPermissions: null }]
                 });
             });
 
@@ -491,8 +485,7 @@ describe("Auth Services", () => {
 name: "Admin",
 is_admin: true,
 default_permissions: null,
-collection_permissions: null,
-config: null }]
+collection_permissions: null }]
                 });
 
                 const result = await roleService.getRoleById("admin");
@@ -502,8 +495,7 @@ config: null }]
                     name: "Admin",
                     isAdmin: true,
                     defaultPermissions: null,
-                    collectionPermissions: null,
-                    config: null
+                    collectionPermissions: null
                 });
             });
 
@@ -524,14 +516,12 @@ config: null }]
 name: "Admin",
 is_admin: true,
 default_permissions: null,
-collection_permissions: null,
-config: null },
+collection_permissions: null },
                         { id: "editor",
 name: "Editor",
 is_admin: false,
 default_permissions: null,
-collection_permissions: null,
-config: null }
+collection_permissions: null }
                     ]
                 });
 
@@ -548,15 +538,13 @@ config: null }
 name: "Custom Role",
 is_admin: false,
 default_permissions: null,
-collection_permissions: null,
-config: null }]
+collection_permissions: null }]
                 });
 
                 const role = await roleService.createRole({
                     id: "custom",
                     name: "Custom Role",
-                    defaultPermissions: null,
-                    config: null
+                    defaultPermissions: null
                 });
 
                 expect(role.id).toBe("custom");
@@ -571,15 +559,13 @@ config: null }]
 name: "Admin",
 is_admin: true,
 default_permissions: null,
-collection_permissions: null,
-config: null }] })
+collection_permissions: null }] })
                     .mockResolvedValueOnce({ rows: [] })
                     .mockResolvedValueOnce({ rows: [{ id: "admin",
 name: "Super Admin",
 is_admin: true,
 default_permissions: null,
-collection_permissions: null,
-config: null }] });
+collection_permissions: null }] });
 
                 const result = await roleService.updateRole("admin", { name: "Super Admin" });
 

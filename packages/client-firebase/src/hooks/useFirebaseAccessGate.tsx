@@ -2,28 +2,57 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { deepEqual as equal } from "fast-equals";
 
-import { AuthController, Authenticator, RebaseData, StorageSource, User } from "@rebasepro/types";
+import { AuthController, RebaseData, StorageSource, User } from "@rebasepro/types";
 
 /**
- * This hook is used internally for validating an authenticator.
+ * Client-side gate that decides whether a Firebase-authenticated user
+ * is allowed to access the CMS UI.
  *
- * @param authController
- * @param authentication
- * @param storageSource
- * @param data
+ * Return `true` to allow access or `false` / throw to deny.
+ * @group Firebase
  */
-export function useValidateAuthenticator<USER extends User = any>
+export type FirebaseAccessGate<USER extends User = User> = (props: {
+
+    /**
+     * Logged-in user or null
+     */
+    user: USER | null;
+
+    /**
+     * AuthController
+     */
+    authController: AuthController<USER>;
+
+    /**
+     * Unified data access API
+     */
+    data: RebaseData;
+
+    /**
+     * Used storage implementation
+     */
+    storageSource: StorageSource;
+
+}) => boolean | Promise<boolean>;
+
+/**
+ * Hook that evaluates a {@link FirebaseAccessGate} callback after
+ * the user logs in and gates access to the main CMS view.
+ *
+ * @group Firebase
+ */
+export function useFirebaseAccessGate<USER extends User = any>
 ({
      disabled,
      authController,
-     authenticator,
+     accessGate,
      storageSource,
      data
  }:
  {
      disabled?: boolean,
      authController: AuthController<USER>,
-     authenticator?: boolean | Authenticator<USER>,
+     accessGate?: boolean | FirebaseAccessGate<USER>,
      data: RebaseData;
      storageSource: StorageSource;
  }): {
@@ -33,14 +62,14 @@ export function useValidateAuthenticator<USER extends User = any>
     authVerified: boolean,
 } {
 
-    const authenticationEnabled = Boolean(authenticator);
+    const gateEnabled = Boolean(accessGate);
 
-    const [authLoading, setAuthLoading] = useState<boolean>(authenticationEnabled);
+    const [authLoading, setAuthLoading] = useState<boolean>(gateEnabled);
     const [notAllowedError, setNotAllowedError] = useState<any>(false);
-    const [authVerified, setAuthVerified] = useState<boolean>(!authenticationEnabled || Boolean(authController.loginSkipped));
+    const [authVerified, setAuthVerified] = useState<boolean>(!gateEnabled || Boolean(authController.loginSkipped));
 
     const canAccessMainView = (authVerified) &&
-        (!authenticationEnabled || Boolean(authController.user) || Boolean(authController.loginSkipped)) &&
+        (!gateEnabled || Boolean(authController.user) || Boolean(authController.loginSkipped)) &&
         !notAllowedError;
 
     useEffect(() => {
@@ -54,7 +83,7 @@ export function useValidateAuthenticator<USER extends User = any>
      */
     const checkedUserRef = useRef<User | undefined>(undefined);
 
-    const checkAuthentication = useCallback(async () => {
+    const checkAccess = useCallback(async () => {
 
         if (disabled) {
             return;
@@ -73,10 +102,10 @@ export function useValidateAuthenticator<USER extends User = any>
 
         const delegateUser = authController.user;
 
-        if (authenticator instanceof Function && delegateUser && !equal(checkedUserRef.current?.uid, delegateUser.uid)) {
+        if (accessGate instanceof Function && delegateUser && !equal(checkedUserRef.current?.uid, delegateUser.uid)) {
             setAuthLoading(true);
             try {
-                const allowed = await authenticator({
+                const allowed = await accessGate({
                     user: delegateUser,
                     authController,
                     data,
@@ -101,16 +130,16 @@ export function useValidateAuthenticator<USER extends User = any>
             setAuthVerified(true);
         }
 
-    }, [disabled, authController, authenticator, data, storageSource]);
+    }, [disabled, authController, accessGate, data, storageSource]);
 
     useEffect(() => {
-        checkAuthentication();
-    }, [checkAuthentication]);
+        checkAccess();
+    }, [checkAccess]);
 
     return useMemo(() => ({
         canAccessMainView,
-        authLoading: authenticationEnabled && authLoading,
+        authLoading: gateEnabled && authLoading,
         notAllowedError,
         authVerified
-    }), [canAccessMainView, authenticationEnabled, authLoading, notAllowedError, authVerified]);
+    }), [canAccessMainView, gateEnabled, authLoading, notAllowedError, authVerified]);
 }

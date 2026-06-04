@@ -65,6 +65,7 @@ export * from "./utils/dev-port";
 // Environment validation
 export { loadEnv } from "./env";
 export type { RebaseEnv } from "./env";
+export { z } from "zod";
 
 // Backend bootstrappers (pluggable driver initialization)
 

@@ -54,8 +54,7 @@ function mockRole(id: string, isAdmin = false) {
 name: id.charAt(0).toUpperCase() + id.slice(1),
 isAdmin,
 defaultPermissions: null,
-collectionPermissions: null,
-config: null };
+collectionPermissions: null };
 }
 
 let mockAuthRepo: jest.Mocked<AuthRepository>;

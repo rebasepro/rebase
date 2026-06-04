@@ -120,10 +120,7 @@ export interface UserManagementDelegate<USER extends User = User> {
      */
     allowDefaultRolesCreation?: boolean;
 
-    /**
-     * Should collection config permissions be included?
-     */
-    includeCollectionConfigPermissions?: boolean;
+
 
 
     /**

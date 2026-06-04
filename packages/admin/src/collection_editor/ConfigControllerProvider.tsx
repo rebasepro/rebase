@@ -8,7 +8,6 @@ import { useCustomizationController, useRebaseContext, useAuthController, useSna
 import { getTableName } from "@rebasepro/common";
 import { useNavigate } from "react-router-dom";
 import { CollectionEditorController } from "./types/collection_editor_controller";
-import { CollectionEditorPermissionsBuilder } from "./types/config_permissions";
 import { CollectionInference } from "./types/collection_inference";
 import { CollectionGenerationCallback } from "./api/generateCollectionApi";
 import { CollectionEditorDialogsContext, CollectionEditorDialogsState } from "./CollectionEditorDialogsContext";
@@ -27,10 +26,7 @@ export interface ConfigControllerProviderProps {
      */
     collectionInference?: CollectionInference;
 
-    /**
-     * Use this builder to define the permissions for the configuration per user.
-     */
-    configPermissions?: CollectionEditorPermissionsBuilder;
+
 
     extraView?: {
         View: React.ComponentType<{
@@ -59,7 +55,6 @@ export const ConfigControllerProvider = React.memo(
     function ConfigControllerProvider({
         children,
         collectionConfigController,
-        configPermissions,
         collectionInference,
         extraView,
         getUser,
@@ -123,11 +118,7 @@ export const ConfigControllerProvider = React.memo(
             collection?: EntityCollection;
         }>();
 
-        const defaultConfigPermissions: CollectionEditorPermissionsBuilder = useCallback(() => ({
-            createCollections: true,
-            editCollections: true,
-            deleteCollections: true
-        }), []);
+
 
         const editCollection = useCallback(({
             id,
@@ -381,10 +372,9 @@ export const ConfigControllerProvider = React.memo(
             editCollection,
             createCollection,
             editProperty,
-            configPermissions: configPermissions ?? defaultConfigPermissions,
             pathSuggestions,
             configController: collectionConfigController
-        }), [editCollection, createCollection, editProperty, configPermissions, defaultConfigPermissions, pathSuggestions, collectionConfigController]);
+        }), [editCollection, createCollection, editProperty, pathSuggestions, collectionConfigController]);
 
         return (
             <ConfigControllerContext.Provider value={collectionConfigController}>

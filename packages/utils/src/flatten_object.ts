@@ -6,7 +6,11 @@ export function flattenObject(obj: Record<string, unknown>, parentKey = "") {
         if (typeof obj[key] === "object" && obj[key] !== null) {
             if (Array.isArray(obj[key])) {
                 obj[key].forEach((item: unknown, index: number) => {
-                    Object.assign(flatObj, flattenObject(item as Record<string, unknown>, `${newKey}[${index}]`));
+                    if (typeof item === "object" && item !== null) {
+                        Object.assign(flatObj, flattenObject(item as Record<string, unknown>, `${newKey}[${index}]`));
+                    } else {
+                        flatObj[`${newKey}[${index}]`] = item;
+                    }
                 });
             } else {
                 Object.assign(flatObj, flattenObject(obj[key] as Record<string, unknown>, newKey));

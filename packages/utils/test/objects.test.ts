@@ -138,6 +138,13 @@ c: 3 };
 b: 2,
 c: 3 });
         });
+
+        it("should defend against prototype pollution", () => {
+            const target = {};
+            const source = JSON.parse('{"__proto__": {"polluted": "yes"}}');
+            mergeDeep(target, source);
+            expect(({} as any).polluted).toBeUndefined();
+        });
     });
 
     describe("getValueInPath", () => {
@@ -149,11 +156,11 @@ c: 3 });
 
     describe("removeInPath", () => {
         it("should delete a nested property without mutating original", () => {
-            const obj = { a: { b: 1,
-c: 2 } };
-            const result = removeInPath(obj, "a.b");
-            // The method logic makes shallow copies but mutates `currentObject`
-            expect(result).not.toHaveProperty("b");
+            const obj = { a: { b: 1, c: 2 } };
+            const result = removeInPath(obj, "a.b") as any;
+            expect(result.a.b).toBeUndefined();
+            expect(result.a.c).toBe(2);
+            expect(obj.a.b).toBe(1); // original remains intact
         });
     });
 

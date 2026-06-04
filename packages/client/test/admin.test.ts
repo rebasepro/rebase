@@ -158,8 +158,7 @@ displayName: "New Name" };
                 { id: "admin",
 name: "Admin",
 isAdmin: true,
-defaultPermissions: null,
-config: null }
+defaultPermissions: null }
             ];
             mockRequest.mockResolvedValueOnce({ roles });
 
@@ -187,8 +186,7 @@ name: "Admin" } });
                 id: "editor",
                 name: "Editor",
                 isAdmin: false,
-                defaultPermissions: { canEdit: true },
-                config: { theme: "dark" }
+                defaultPermissions: { canEdit: true }
             };
             await admin.createRole(data);
 

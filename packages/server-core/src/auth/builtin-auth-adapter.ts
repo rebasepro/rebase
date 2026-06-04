@@ -289,9 +289,11 @@ function createUserManagementFromRepo(repo: AuthRepository, resolvedOps: Resolve
             }
             const user = await repo.createUser(createData);
             if (overrides?.afterUserCreate) {
-                overrides.afterUserCreate(user).catch(err => {
+                try {
+                    await overrides.afterUserCreate(user);
+                } catch (err) {
                     console.error("[AuthOverrides] afterUserCreate error:", err instanceof Error ? err.message : err);
-                });
+                }
             }
             return toAuthUserData(user);
         },
@@ -343,7 +345,6 @@ function createRoleManagementFromRepo(repo: AuthRepository): RoleManagementAdapt
                 isAdmin: data.isAdmin,
                 defaultPermissions: data.defaultPermissions,
                 collectionPermissions: data.collectionPermissions,
-                config: data.config,
             });
             return toAuthRoleData(role);
         },
@@ -372,13 +373,12 @@ function toAuthUserData(user: { id: string; email: string; displayName?: string 
     };
 }
 
-function toAuthRoleData(role: { id: string; name: string; isAdmin: boolean; defaultPermissions?: unknown; collectionPermissions?: unknown; config?: unknown }): AuthRoleData {
+function toAuthRoleData(role: { id: string; name: string; isAdmin: boolean; defaultPermissions?: unknown; collectionPermissions?: unknown }): AuthRoleData {
     return {
         id: role.id,
         name: role.name,
         isAdmin: role.isAdmin,
         defaultPermissions: role.defaultPermissions as AuthRoleData["defaultPermissions"],
         collectionPermissions: role.collectionPermissions as AuthRoleData["collectionPermissions"],
-        config: role.config as AuthRoleData["config"],
     };
 }

@@ -8,3 +8,17 @@
 **/test-output.txt
 **/eslint-errors*.json
 **/lerna-debug.log
+
+# Exclude large development/test folders not needed for SaaS build
+/test-cli-init-project/
+/scratch/
+/.yarn/
+/app/
+/website/
+/e2e/
+/videos/
+/playwright-report/
+/test-results/
+/.idea/
+/.vscode/
+/.astro/

@@ -148,11 +148,14 @@ export function createMongoWebSocket(
                     const session = clientSessions.get(clientId);
                     if (session?.user && isDriverWithAuth(driver)) {
                         try {
-                            const userForAuth: Record<string, unknown> = {
-                                uid: session.user.userId,
-                                roles: session.user.roles ?? []
+                            const userForAuth = {
+                                uid: (session.user as any).userId,
+                                email: (session.user as any).email ?? "",
+                                displayName: (session.user as any).displayName ?? "",
+                                photoURL: (session.user as any).photoURL ?? "",
+                                roles: (session.user as any).roles ?? []
                             };
-                            return await driver.withAuth(userForAuth);
+                            return await driver.withAuth(userForAuth as any);
                         } catch (e) {
                             console.error("Failed to create authenticated delegate for WS request", e);
                             return driver;

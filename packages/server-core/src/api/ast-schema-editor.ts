@@ -89,7 +89,7 @@ export class AstSchemaEditor {
             return "undefined";
         }
         if (typeof obj === "string") {
-            return `"${obj.replace(/"/g, '\\"')}"`;
+            return JSON.stringify(obj);
         }
         if (typeof obj === "number" || typeof obj === "boolean") {
             return String(obj);
@@ -127,7 +127,7 @@ export class AstSchemaEditor {
 
                                 if (isCode || name === "target" || name === "callbacks" || name === "permissions" || name === "securityRules") {
                                     // Preserve this property exactly as it was
-                                    const keyStr = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name) ? name : `"${name}"`;
+                                    const keyStr = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name) ? name : JSON.stringify(name);
                                     preservedProps.push(`${keyStr}: ${init.getText()}`);
                                 }
                             }
@@ -139,7 +139,7 @@ export class AstSchemaEditor {
             if (keys.length === 0 && preservedProps.length === 0) return "{}";
 
             const props = keys.map(key => {
-                const keyStr = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? key : `"${key}"`;
+                const keyStr = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? key : JSON.stringify(key);
 
                 // If the value is an object, pass the old AST node to recurse
                 let childAstNode: ObjectLiteralExpression | undefined;
@@ -192,7 +192,7 @@ export class AstSchemaEditor {
                 }
             } else {
                 propsObj.addPropertyAssignment({
-                    name: /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(propertyKey) ? propertyKey : `"${propertyKey}"`,
+                    name: /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(propertyKey) ? propertyKey : JSON.stringify(propertyKey),
                     initializer: newInitializer
                 });
             }

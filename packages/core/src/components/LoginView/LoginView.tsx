@@ -96,6 +96,26 @@ export interface LoginViewProps {
     googleClientId?: string;
 
     /**
+     * GitHub client ID for GitHub OAuth.
+     */
+    githubClientId?: string;
+
+    /**
+     * LinkedIn client ID for LinkedIn OAuth.
+     */
+    linkedinClientId?: string;
+
+    /**
+     * Optional custom title shown above options
+     */
+    title?: string;
+
+    /**
+     * Optional custom subtitle shown above options
+     */
+    subtitle?: string;
+
+    /**
      * When true, shows bootstrap/setup UI (first-user creation).
      * If not set, derived from `authController` if it exposes `needsSetup`.
      */
@@ -123,8 +143,13 @@ export function LoginView({
     disabled = false,
     notAllowedError,
     googleClientId,
+    githubClientId,
+    linkedinClientId,
+    title,
+    subtitle,
     needsSetup,
-    registrationEnabled
+    registrationEnabled,
+    additionalComponent
 }: LoginViewProps) {
 
     const modeState = useModeController();
@@ -150,6 +175,8 @@ export function LoginView({
         ?? false;
     const canRegister = registrationEnabled ?? caps.registration ?? false;
     const hasGoogleLogin = googleClientId && (caps.enabledProviders?.includes("google") ?? caps.googleLogin ?? false);
+    const hasGitHubLogin = githubClientId && (caps.enabledProviders?.includes("github") ?? false);
+    const hasLinkedinLogin = linkedinClientId && (caps.enabledProviders?.includes("linkedin") ?? false);
     const hasPasswordReset = caps.passwordReset ?? !!authController.forgotPassword;
 
     const showRegistration = !disableSignupScreen && canRegister;
@@ -158,6 +185,28 @@ export function LoginView({
         const timer = setTimeout(() => setFadeIn(true), 50);
         return () => clearTimeout(timer);
     }, []);
+
+    // Effect to handle incoming redirect OAuth codes (GitHub, LinkedIn, etc.)
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get("code");
+        const provider = localStorage.getItem("rebase_oauth_provider");
+        if (code && provider) {
+            localStorage.removeItem("rebase_oauth_provider");
+            // Clear URL search params without page reload
+            const cleanUrl = window.location.origin + window.location.pathname;
+            window.history.replaceState({}, document.title, cleanUrl);
+            
+            if (authController.oauthLogin) {
+                authController.oauthLogin(provider, {
+                    code,
+                    redirectUri: cleanUrl
+                }).catch((err) => {
+                    console.error(`${provider} login failed:`, err);
+                });
+            }
+        }
+    }, [authController]);
 
     function buildErrorView() {
         if (!authController.authProviderError) return null;
@@ -192,16 +241,20 @@ export function LoginView({
         } else if (notAllowedError instanceof Error) {
             notAllowedMessage = notAllowedError.message;
         } else {
-            notAllowedMessage = "It looks like you don't have access, based on the specified Authenticator configuration";
+            notAllowedMessage = "It looks like you don't have access, based on the specified access configuration";
         }
     }
 
     return (
         <div
             className={cls(
-                "relative flex items-center justify-center h-screen w-screen p-4 transition-opacity duration-500 bg-surface-50 dark:bg-surface-800",
+                "relative flex items-center justify-center h-screen w-screen p-4 transition-opacity duration-500 bg-surface-50 dark:bg-surface-950 overflow-hidden",
                 fadeIn ? "opacity-100" : "opacity-0"
             )}>
+
+            {/* Glowing background blobs */}
+            <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary-500/10 blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-500/10 blur-[120px] pointer-events-none" />
 
             {/* Top-right controls */}
             <div className="absolute top-4 right-4 flex items-center gap-1 z-10">
@@ -220,9 +273,9 @@ export function LoginView({
                 </Menu>
             </div>
 
-            <div className="flex flex-col items-center w-[480px] max-w-full p-8 sm:p-10">
+            <div className="relative flex flex-col items-center w-[440px] max-w-full p-8 sm:p-10 bg-white/70 dark:bg-surface-900/60 backdrop-blur-xl border border-surface-200/50 dark:border-surface-800/50 rounded-2xl shadow-2xl z-10 transition-all duration-300 hover:shadow-primary-500/5">
                 {/* Logo */}
-                <div className="w-32 h-32 m-2 mb-6">
+                <div className="w-24 h-24 m-2 mb-4 drop-shadow-md">
                     {logoComponent}
                 </div>
 
@@ -257,6 +310,20 @@ export function LoginView({
                             {/* Provider buttons screen */}
                             {mode === "buttons" && (
                                 <div className="w-full flex flex-col gap-3 mt-2">
+                                    {(title || subtitle) && (
+                                        <div className="text-center mb-2">
+                                            {title && (
+                                                <Typography variant="h6" className="mb-0.5 font-bold">
+                                                    {title}
+                                                </Typography>
+                                            )}
+                                            {subtitle && (
+                                                <Typography variant="body2" color="secondary" className="mb-4">
+                                                    {subtitle}
+                                                </Typography>
+                                            )}
+                                        </div>
+                                    )}
                                     <LoginButton
                                         disabled={disabled}
                                         text={"Sign in with email"}
@@ -268,6 +335,18 @@ export function LoginView({
                                             disabled={disabled}
                                             googleClientId={googleClientId}
                                             authController={authController}
+                                        />
+                                    )}
+                                    {hasGitHubLogin && githubClientId && (
+                                        <GitHubLoginButton
+                                            disabled={disabled}
+                                            githubClientId={githubClientId}
+                                        />
+                                    )}
+                                    {hasLinkedinLogin && linkedinClientId && (
+                                        <LinkedInLoginButton
+                                            disabled={disabled}
+                                            linkedinClientId={linkedinClientId}
                                         />
                                     )}
                                     {showRegistration && (
@@ -323,6 +402,12 @@ export function LoginView({
                         </>
                     )}
                 </div>
+
+                {additionalComponent && (
+                    <div className="w-full">
+                        {additionalComponent}
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -337,7 +422,7 @@ function LoginButton({
     return (
         <Button
             disabled={disabled}
-            className="w-full"
+            className="w-full transition-transform duration-200 active:scale-[0.98]"
             variant="outlined"
             size="large"
             onClick={onClick}>
@@ -417,6 +502,66 @@ function GoogleLoginButton({
             disabled={disabled}
             text="Sign in with Google"
             icon={<GoogleIcon/>}
+            onClick={handleClick}
+        />
+    );
+}
+
+const GitHubIcon = () => (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+        <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.464-1.11-1.464-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.579.688.481C19.137 20.162 22 16.418 22 12c0-5.523-4.477-10-10-10z"/>
+    </svg>
+);
+
+function GitHubLoginButton({
+    disabled,
+    githubClientId
+}: {
+    disabled?: boolean,
+    githubClientId: string
+}) {
+    const handleClick = () => {
+        localStorage.setItem("rebase_oauth_provider", "github");
+        const redirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
+        const scope = "read:user,user:email";
+        window.location.href = `https://github.com/login/oauth/authorize?client_id=${githubClientId}&redirect_uri=${redirectUri}&scope=${scope}`;
+    };
+
+    return (
+        <LoginButton
+            disabled={disabled}
+            text="Sign in with GitHub"
+            icon={<GitHubIcon/>}
+            onClick={handleClick}
+        />
+    );
+}
+
+const LinkedInIcon = () => (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+        <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+    </svg>
+);
+
+function LinkedInLoginButton({
+    disabled,
+    linkedinClientId
+}: {
+    disabled?: boolean,
+    linkedinClientId: string
+}) {
+    const handleClick = () => {
+        localStorage.setItem("rebase_oauth_provider", "linkedin");
+        const redirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
+        const scope = "openid profile email";
+        window.location.href = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${linkedinClientId}&redirect_uri=${redirectUri}&scope=${scope}`;
+    };
+
+    return (
+        <LoginButton
+            disabled={disabled}
+            text="Sign in with LinkedIn"
+            icon={<LinkedInIcon/>}
             onClick={handleClick}
         />
     );

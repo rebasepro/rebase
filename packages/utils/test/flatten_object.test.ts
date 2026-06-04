@@ -54,6 +54,20 @@ name: "bar" }
                 "user.profile.tags[0].meta": "new"
             });
         });
+
+        it("should flatten arrays of primitives without data loss", () => {
+            const obj = {
+                a: [1, 2],
+                b: { c: ["foo", "bar"] }
+            };
+            const result = flattenObject(obj);
+            expect(result).toEqual({
+                "a[0]": 1,
+                "a[1]": 2,
+                "b.c[0]": "foo",
+                "b.c[1]": "bar"
+            });
+        });
     });
 
     describe("getArrayValuesCount", () => {

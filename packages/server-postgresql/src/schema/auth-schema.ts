@@ -48,12 +48,7 @@ export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchema
                 edit?: boolean;
                 delete?: boolean;
             }>
-        >(),
-        config: jsonb("config").$type<{
-            createCollections?: boolean;
-            editCollections?: "own" | "all" | boolean;
-            deleteCollections?: "own" | "all" | boolean;
-        }>()
+        >()
     });
 
     /**

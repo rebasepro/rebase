@@ -3,6 +3,7 @@ import React, { CSSProperties, useMemo, useState, useEffect } from "react";impor
 import { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { getThumbnailMeasure } from "../util";
 import { useTranslation } from "@rebasepro/core";
+import { sanitizeUrl } from "./UrlComponentPreview";
 
 /**
  * @group Preview components
@@ -127,7 +128,7 @@ maxHeight: "100%" }}>
                         className="invisible group-hover:visible"
                         variant={"filled"}
                         component={"a" as React.ElementType}
-                        href={url}
+                        href={sanitizeUrl(url)}
                         rel="noopener noreferrer"
                         target="_blank"
                         size={"smallest"}

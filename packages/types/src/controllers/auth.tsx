@@ -1,6 +1,4 @@
-import { StorageSource } from "./storage";
 import { Role, User } from "../users";
-import { RebaseData } from "./data";
 
 /**
  * Capabilities advertised by an auth provider.
@@ -100,6 +98,8 @@ export interface AuthControllerExtended<USER extends User = User, ExtraData = un
     emailPasswordLogin?(email: string, password: string): Promise<void>;
     /** Login with Google — accepts an ID token, access token, or authorization code payload */
     googleLogin?: (payload: { idToken: string } | { accessToken: string } | { code: string; redirectUri: string }) => Promise<void>;
+    /** Generic OAuth login — works with any provider. Posts payload to /auth/{providerId}. */
+    oauthLogin?: (providerId: string, payload: Record<string, unknown>) => Promise<void>;
     /** Register a new user */
     register?(email: string, password: string, displayName?: string): Promise<void>;
     /** Skip login (for anonymous access if enabled) */
@@ -113,31 +113,3 @@ export interface AuthControllerExtended<USER extends User = User, ExtraData = un
     /** Update user profile */
     updateProfile?(displayName?: string, photoURL?: string): Promise<USER>;
 }
-
-/**
- * Implement this function to allow access to specific users.
- * @group Hooks and utilities
- */
-export type Authenticator<USER extends User = User> = (props: {
-
-    /**
-     * Logged-in user or null
-     */
-    user: USER | null;
-
-    /**
-     * AuthController
-     */
-    authController: AuthController<USER>;
-
-    /**
-     * Unified data access API
-     */
-    data: RebaseData;
-
-    /**
-     * Used storage implementation
-     */
-    storageSource: StorageSource;
-
-}) => boolean | Promise<boolean>;

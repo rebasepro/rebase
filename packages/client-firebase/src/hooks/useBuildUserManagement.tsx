@@ -4,13 +4,13 @@ import { deepEqual as equal } from "fast-equals";
 import { removeUndefined } from "@rebasepro/utils";
 import {
     AuthController,
-    Authenticator,
     DataDriver,
     Entity,
     Role,
     User,
     UserManagementDelegate
 } from "@rebasepro/types";
+import { FirebaseAccessGate } from "./useFirebaseAccessGate";
 
 type UserWithRoleIds<USER extends User = any> = Omit<USER, "roles"> & { roles: string[] };
 
@@ -49,11 +49,6 @@ export interface UserManagementDelegateParams<CONTROLLER extends AuthController<
      */
     allowDefaultRolesCreation?: boolean;
 
-    /**
-     * Include the collection config permissions in the user management system.
-     */
-    includeCollectionConfigPermissions?: boolean;
-
 }
 
 /**
@@ -65,7 +60,6 @@ export interface UserManagementDelegateParams<CONTROLLER extends AuthController<
  * @param rolesPath
  * @param roles
  * @param allowDefaultRolesCreation
- * @param includeCollectionConfigPermissions
  */
 export function useBuildUserManagement<CONTROLLER extends AuthController<any> = AuthController<any>,
     USER extends User = CONTROLLER extends AuthController<infer U> ? U : any>
@@ -75,8 +69,7 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<any> = 
      roles: rolesProp,
      usersPath = "__FIRECMS/config/users",
      rolesPath = "__FIRECMS/config/roles",
-     allowDefaultRolesCreation,
-     includeCollectionConfigPermissions
+     allowDefaultRolesCreation
  }: UserManagementDelegateParams<CONTROLLER>): UserManagementDelegate<USER> & CONTROLLER {
 
     if (!authController) {
@@ -268,7 +261,7 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<any> = 
         return roles.filter(r => mgmtUser.roles.includes(r.id));
     }, [roles, usersWithRoleIds]);
 
-    const authenticator: Authenticator<USER> = useCallback(({ user }) => {
+    const accessGate: FirebaseAccessGate<USER> = useCallback(({ user }) => {
 
         if (loading) {
             return false;
@@ -339,9 +332,8 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<any> = 
         usersError,
         isAdmin,
         allowDefaultRolesCreation: allowDefaultRolesCreation === undefined ? true : allowDefaultRolesCreation,
-        includeCollectionConfigPermissions: Boolean(includeCollectionConfigPermissions),
         defineRolesFor,
-        authenticator,
+        accessGate,
         ...authController,
         initialLoading: authController.initialLoading || loading,
         userRoles: userRoles,

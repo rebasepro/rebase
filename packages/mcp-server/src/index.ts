@@ -572,7 +572,11 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
         const collectionsDir = findCollectionsDir();
         if (!collectionsDir) throw new Error("Collections directory not found.");
 
-        const filePath = join(collectionsDir, `${name}.ts`);
+        const absoluteCollectionsDir = resolve(collectionsDir);
+        const filePath = resolve(absoluteCollectionsDir, `${name}.ts`);
+        if (!filePath.startsWith(absoluteCollectionsDir)) {
+            throw new Error("Access denied: path traversal detected");
+        }
         if (!existsSync(filePath)) throw new Error(`Collection "${name}" not found.`);
 
         return {

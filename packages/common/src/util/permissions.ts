@@ -135,7 +135,7 @@ function evaluateRule<USER extends User, M extends Record<string, unknown>>(rule
     return true;
 }
 
-function checkOperation<M extends Record<string, unknown>, USER extends User>(
+export function checkOperation<M extends Record<string, unknown>, USER extends User>(
     collection: EntityCollection<M>,
     authController: AuthController<USER>,
     entity: Entity<M> | null,

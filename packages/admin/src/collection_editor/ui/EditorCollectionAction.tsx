@@ -19,12 +19,7 @@ export function EditorCollectionAction({
 
     const parentCollection = parentCollectionSlugs.length > 0 ? collectionRegistry.getCollection(parentCollectionSlugs[parentCollectionSlugs.length - 1]) : undefined;
 
-    const canEditCollection = !collectionEditorController.configController?.readOnly && (collectionEditorController.configPermissions
-        ? collectionEditorController.configPermissions({
-            user: authController.user,
-            collection
-        }).editCollections
-        : true);
+    const canEditCollection = !collectionEditorController.configController?.readOnly;
 
     const tooltipTitle = collectionEditorController.configController?.readOnly
         ? (collectionEditorController.configController.readOnlyReason || t("studio_editor_collection_disabled"))

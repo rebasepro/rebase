@@ -161,4 +161,12 @@ export type RebaseProps<USER extends User> = {
      */
     effectiveRoleController?: EffectiveRoleController;
 
+    /**
+     * Override or extend any Rebase UI string, keyed by locale.
+     */
+    translations?: {
+        [locale: string]: Record<string, any>;
+    };
+
 };
+

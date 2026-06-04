@@ -28,7 +28,6 @@ export interface UserManagement<USER extends User = User> {
 
     isAdmin?: boolean;
     allowDefaultRolesCreation?: boolean;
-    includeCollectionConfigPermissions?: boolean;
     defineRolesFor: (user: User) => Promise<Role[] | undefined> | Role[] | undefined;
     getUser: (uid: string) => User | null;
 
@@ -87,13 +86,11 @@ interface ApiRole {
     id: string;
     name: string;
     isAdmin?: boolean;
-    config?: Record<string, any>;
 }
 
 /**
  * Convert API user to Rebase User
  * @param apiUser - The API user object
- * @param availableRoles - Optional array of available roles to look up names
  */
 function convertUser(apiUser: ApiUser): User {
     return {
@@ -115,8 +112,7 @@ function convertRole(apiRole: ApiRole): Role {
     return {
         id: apiRole.id,
         name: apiRole.name,
-        isAdmin: apiRole.isAdmin ?? false,
-        config: apiRole.config ?? undefined
+        isAdmin: apiRole.isAdmin ?? false
     };
 }
 
@@ -477,8 +473,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
             // Update
             const data = await apiRequest(`/roles/${role.id}`, "PUT", {
                 name: role.name,
-                isAdmin: role.isAdmin,
-                config: role.config
+                isAdmin: role.isAdmin
             });
             const updated = convertRole(data.role);
             setRoles(prev => prev.map(r => r.id === updated.id ? updated : r));
@@ -487,8 +482,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
             const data = await apiRequest("/roles", "POST", {
                 id: role.id,
                 name: role.name,
-                isAdmin: role.isAdmin ?? false,
-                config: role.config
+                isAdmin: role.isAdmin ?? false
             });
             const created = convertRole(data.role);
             setRoles(prev => [...prev, created]);
@@ -558,7 +552,6 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
         deleteRole,
         isAdmin,
         allowDefaultRolesCreation: isAdmin,
-        includeCollectionConfigPermissions: true,
         defineRolesFor,
         getUser,
         searchUsers,

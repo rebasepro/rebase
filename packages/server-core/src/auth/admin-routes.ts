@@ -513,8 +513,7 @@ displayName: existing.displayName }, appName);
             id: r.id,
             name: r.name,
             isAdmin: r.isAdmin,
-            defaultPermissions: r.defaultPermissions,
-            config: r.config
+            defaultPermissions: r.defaultPermissions
         }));
 
         adminRoles = await applyRoleAfterReadBatch(adminRoles, hookCtx);
@@ -535,7 +534,7 @@ displayName: existing.displayName }, appName);
 
     router.post("/roles", requireAdmin, async (c) => {
         const body = await c.req.json();
-        const { id, name, isAdmin, defaultPermissions, config } = body;
+        const { id, name, isAdmin, defaultPermissions } = body;
 
         if (!id || !name) {
             throw ApiError.badRequest("Role ID and name are required", "INVALID_INPUT");
@@ -550,8 +549,7 @@ displayName: existing.displayName }, appName);
             id,
             name,
             isAdmin: isAdmin ?? false,
-            defaultPermissions: defaultPermissions ?? null,
-            config: config ?? null
+            defaultPermissions: defaultPermissions ?? null
         });
 
         return c.json({ role }, 201);
@@ -560,7 +558,7 @@ displayName: existing.displayName }, appName);
     router.put("/roles/:roleId", requireAdmin, async (c) => {
         const roleId = c.req.param("roleId");
         const body = await c.req.json();
-        const { name, isAdmin, defaultPermissions, config } = body;
+        const { name, isAdmin, defaultPermissions } = body;
 
         const existing = await authRepo.getRoleById(roleId);
         if (!existing) {
@@ -570,8 +568,7 @@ displayName: existing.displayName }, appName);
         const role = await authRepo.updateRole(roleId, {
             name,
             isAdmin,
-            defaultPermissions,
-            config
+            defaultPermissions
         });
 
         return c.json({ role });

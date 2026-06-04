@@ -1,4 +1,3 @@
-import { CollectionEditorPermissionsBuilder } from "./config_permissions";
 import { CollectionsConfigController } from "./config_controller";
 import { Entity, EntityCollection, Property } from "@rebasepro/types";
 
@@ -56,8 +55,6 @@ export interface CollectionEditorController {
      * The config controller that this editor represents.
      */
     configController: CollectionsConfigController;
-
-    configPermissions: CollectionEditorPermissionsBuilder;
 
     pathSuggestions: string[] | undefined;
 
