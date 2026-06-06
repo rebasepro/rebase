@@ -13,6 +13,7 @@ const CronJobsView = lazy(() => import("./CronJobs/CronJobsView").then(m => ({ d
 const SchemaVisualizer = lazy(() => import("./SchemaVisualizer/SchemaVisualizer").then(m => ({ default: m.SchemaVisualizer })));
 const BranchesView = lazy(() => import("./Branches/BranchesView").then(m => ({ default: m.BranchesView })));
 const ApiExplorer = lazy(() => import("./ApiExplorer/ApiExplorer").then(m => ({ default: m.ApiExplorer })));
+const LogsExplorer = lazy(() => import("./LogsExplorer/LogsExplorer").then(m => ({ default: m.LogsExplorer })));
 
 import { StudioHomePage } from "./StudioHomePage";
 
@@ -33,7 +34,7 @@ export function RebaseStudio({ tools, homePage }: RebaseStudioConfig) {
 
     const devViews: AppView[] = useMemo(() => {
         const views: AppView[] = [];
-        const activeTools = tools ?? ["sql", "js", "rls", "storage", "cron", "schema-visualizer", "branches", "api"];
+        const activeTools = tools ?? ["sql", "js", "rls", "storage", "cron", "schema-visualizer", "branches", "api", "logs"];
         const suspense = (el: React.ReactNode) => <Suspense fallback={<CircularProgressCenter/>}>{el}</Suspense>;
 
         if (activeTools.includes("sql")) {
@@ -99,6 +100,14 @@ group: "API",
 icon: "BookOpen",
 description: "Interactive API documentation and testing",
 view: suspense(<ApiExplorer/>) });
+        }
+        if (activeTools.includes("logs")) {
+            views.push({ slug: "logs",
+name: "Logs Explorer",
+group: "Database",
+icon: "Activity",
+description: "Real-time system and query logs",
+view: suspense(<LogsExplorer/>) });
         }
         // Note: "schema" tool is auto-injected by RebaseShell when collectionEditor is enabled.
         // It is NOT registered here anymore.

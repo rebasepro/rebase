@@ -550,8 +550,16 @@ colors: true }));
                     // Route subscription messages to RealtimeService
                     case "subscribe_collection":
                     case "subscribe_entity":
-                    case "unsubscribe": {
-                        wsDebug("🔄 [WebSocket Server] Routing subscription message to RealtimeService:", type);
+                    case "unsubscribe":
+                    // Broadcast channels
+                    case "join_channel":
+                    case "leave_channel":
+                    case "broadcast":
+                    // Presence
+                    case "presence_track":
+                    case "presence_untrack":
+                    case "presence_state": {
+                        wsDebug("🔄 [WebSocket Server] Routing realtime message to RealtimeService:", type);
                         // Attach auth context from the WS session so RLS-aware refetches work
                         const session = clientSessions.get(clientId);
                         const authContext = session?.user

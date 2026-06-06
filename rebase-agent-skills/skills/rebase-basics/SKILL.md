@@ -62,7 +62,7 @@ Please adhere to these principles when working with Rebase, as they ensure relia
    - `packages/utils` — Utility functions
    - `app/` — Local example application (scaffolded via CLI for testing/dev)
 
-7. **Never deploy to production:** Agents should never run `rebase deploy`, `firebase deploy`, `gcloud deploy`, or any command that pushes code to live infrastructure. Provide the exact command and let the user run it themselves.
+7. **Never deploy unless explicitly asked:** Agents should never run `rebase deploy`, `firebase deploy`, `gcloud deploy`, or any command that pushes code to live infrastructure unless the user explicitly asks you to deploy in the current conversation. Provide the exact command and let the user run it themselves if they prefer.
 
 8. **Scripting and Data Tasks:** Default to using the Rebase SDK (`@rebasepro/client` or `@rebasepro/server-core`) to write scripts or tasks for manipulating data. For standalone scripts running locally, you can dynamically read the active backend URL from the `.rebase-dev-url` temp file automatically created by the dev server. For internal server-side backend tasks, use the global `import { rebase } from "@rebasepro/server-core"` singleton. For calling custom backend functions from the frontend, use `client.functions.invoke('name', payload)` — NEVER manually construct `/api/functions/` URLs or extract auth tokens from `localStorage`. NEVER default to using raw `psql` queries or raw REST API calls (`fetch`/`curl`) unless explicitly instructed or the SDK lacks the functionality.
 
@@ -126,7 +126,6 @@ rebase/
 |---------|-------------|
 | `rebase login` | Authenticate with Rebase Cloud |
 | `rebase init` | Scaffold a new Rebase project |
-| `rebase init --pro` | Scaffold a Rebase PRO project |
 | `rebase deploy` | Deploy to Rebase Cloud |
 | `rebase deploy --env dev` | Deploy to dev environment |
 

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { ApiError, errorHandler } from "../api/errors";
 import { randomBytes, createHash } from "crypto";
-import type { AuthRepository, OAuthProvider } from "./interfaces";
+import type { AuthRepository, OAuthProvider, CreateUserData } from "./interfaces";
 import { generateAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry, getAccessTokenExpiry } from "./jwt";
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
@@ -11,6 +11,7 @@ import { getPasswordResetTemplate, getEmailVerificationTemplate, getWelcomeEmail
 import { HonoEnv } from "../api/types";
 import { defaultAuthLimiter, strictAuthLimiter } from "./rate-limiter";
 import { z } from "zod";
+import { generateTotpSecret, verifyTotp, base32Decode, generateRecoveryCodes, hashRecoveryCode } from "./mfa";
 
 /**
  * Shared configuration for auth and admin route factories.
@@ -191,7 +192,18 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     async function createSessionAndTokens(userId: string, userAgent: string, ipAddress: string) {
         const roles = await authRepo.getUserRoles(userId);
         const roleIds = roles.map(r => r.id);
-        const accessToken = generateAccessToken(userId, roleIds);
+
+        // Allow customization of access token claims via hook
+        let customClaims: Record<string, unknown> | undefined;
+        if (authHooks?.customizeAccessToken) {
+            const user = await authRepo.getUserById(userId);
+            if (user) {
+                const defaultClaims: Record<string, unknown> = { userId, roles: roleIds, aal: "aal1" };
+                customClaims = await authHooks.customizeAccessToken(defaultClaims, user);
+            }
+        }
+
+        const accessToken = generateAccessToken(userId, roleIds, "aal1", customClaims);
         const refreshToken = generateRefreshToken();
 
         await authRepo.createRefreshToken(
@@ -294,6 +306,11 @@ displayName: user.displayName });
      */
     router.post("/login", defaultAuthLimiter, async (c) => {
         const { email, password } = parseBody(loginSchema, await c.req.json());
+
+        // Call beforeLogin hook if provided (throw to reject)
+        if (authHooks?.beforeLogin) {
+            await authHooks.beforeLogin(email, "login");
+        }
 
         let user;
 
@@ -513,6 +530,13 @@ displayName: user.displayName }, appName);
         // Invalidate all refresh tokens (security: log out all sessions)
         await authRepo.deleteAllRefreshTokensForUser(storedToken.userId);
 
+        // Fire onPasswordReset hook (fire-and-forget)
+        if (authHooks?.onPasswordReset) {
+            authHooks.onPasswordReset(storedToken.userId).catch(err => {
+                console.error("[AuthHooks] onPasswordReset error:", err instanceof Error ? err.message : err);
+            });
+        }
+
         return c.json({ success: true,
 message: "Password has been reset successfully" });
     });
@@ -660,7 +684,17 @@ message: "Email verified successfully" });
         const roles = await authRepo.getUserRoles(storedToken.userId);
         const roleIds = roles.map(r => r.id);
 
-        const newAccessToken = generateAccessToken(storedToken.userId, roleIds);
+        // Allow customization of access token claims via hook
+        let customClaims: Record<string, unknown> | undefined;
+        if (authHooks?.customizeAccessToken) {
+            const user = await authRepo.getUserById(storedToken.userId);
+            if (user) {
+                const defaultClaims: Record<string, unknown> = { userId: storedToken.userId, roles: roleIds, aal: "aal1" };
+                customClaims = await authHooks.customizeAccessToken(defaultClaims, user);
+            }
+        }
+
+        const newAccessToken = generateAccessToken(storedToken.userId, roleIds, "aal1", customClaims);
         const newRefreshToken = generateRefreshToken();
 
         // Rotate refresh token (delete old, create new)
@@ -695,6 +729,19 @@ message: "Email verified successfully" });
         if (refreshToken) {
             const tokenHash = hashRefreshToken(refreshToken);
             await authRepo.deleteRefreshToken(tokenHash);
+        }
+
+        // Call afterLogout hook (fire-and-forget)
+        // Extract userId from the access token if present
+        const authHeader = c.req.header("authorization");
+        if (authHooks?.afterLogout && authHeader?.startsWith("Bearer ")) {
+            const { verifyAccessToken } = await import("./jwt");
+            const payload = verifyAccessToken(authHeader.substring(7));
+            if (payload) {
+                authHooks.afterLogout(payload.userId).catch(err => {
+                    console.error("[AuthHooks] afterLogout error:", err instanceof Error ? err.message : err);
+                });
+            }
         }
 
         return c.json({ success: true });
@@ -855,6 +902,379 @@ message: "Session revoked successfully" });
             emailServiceEnabled: isEmailConfigured(),
             enabledProviders
         });
+    });
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ANONYMOUS SIGN-IN
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * POST /auth/anonymous
+     * Create an anonymous user with temporary credentials
+     */
+    router.post("/anonymous", strictAuthLimiter, async (c) => {
+        const anonId = randomBytes(16).toString("hex");
+        const anonEmail = `anon_${anonId.slice(0, 8)}@anonymous.local`;
+
+        let createData: CreateUserData = {
+            email: anonEmail,
+            emailVerified: false,
+            isAnonymous: true
+        };
+
+        if (authHooks?.beforeUserCreate) {
+            createData = await authHooks.beforeUserCreate(createData);
+        }
+
+        const user = await authRepo.createUser(createData);
+
+        // Assign default role (follow register route pattern, but never auto-admin)
+        if (config.defaultRole) {
+            await authRepo.assignDefaultRole(user.id, config.defaultRole);
+        }
+
+        const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
+            user.id,
+            c.req.header("user-agent") || "unknown",
+            c.req.header("x-forwarded-for") || "unknown"
+        );
+
+        // Fire afterUserCreate hook
+        if (authHooks?.afterUserCreate) {
+            authHooks.afterUserCreate(user).catch(err => {
+                console.error("[AuthHooks] afterUserCreate error:", err instanceof Error ? err.message : err);
+            });
+        }
+
+        // Fire onAuthenticated hook
+        if (authHooks?.onAuthenticated) {
+            authHooks.onAuthenticated(user, "anonymous").catch(err => {
+                console.error("[AuthHooks] onAuthenticated error:", err instanceof Error ? err.message : err);
+            });
+        }
+
+        return c.json(buildAuthResponse(user, roleIds, accessToken, refreshToken), 201);
+    });
+
+    /**
+     * POST /auth/anonymous/link
+     * Upgrade an anonymous user to a permanent account with email/password
+     */
+    router.post("/anonymous/link", requireAuth, async (c) => {
+        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        if (!userCtx) {
+            throw ApiError.unauthorized("Not authenticated");
+        }
+
+        const user = await authRepo.getUserById(userCtx.userId);
+        if (!user?.isAnonymous) {
+            throw ApiError.badRequest("User is not anonymous", "NOT_ANONYMOUS");
+        }
+
+        const linkSchema = z.object({
+            email: z.string().email("Invalid email address").max(255),
+            password: z.string().min(1, "Password is required").max(128)
+        });
+        const { email, password } = parseBody(linkSchema, await c.req.json());
+
+        // Validate password strength
+        const passwordValidation = ops.validatePasswordStrength(password);
+        if (!passwordValidation.valid) {
+            throw ApiError.badRequest(passwordValidation.errors.join(". "), "WEAK_PASSWORD");
+        }
+
+        // Check if email is already taken
+        const existingUser = await authRepo.getUserByEmail(email.toLowerCase());
+        if (existingUser) {
+            throw ApiError.conflict("Email already registered", "EMAIL_EXISTS");
+        }
+
+        // Hash password
+        const passwordHash = await ops.hashPassword(password);
+
+        // Update user: set email, password, remove anonymous flag
+        const updatedUser = await authRepo.updateUser(user.id, {
+            email: email.toLowerCase(),
+            passwordHash,
+            isAnonymous: false
+        });
+
+        if (!updatedUser) {
+            throw ApiError.notFound("User not found");
+        }
+
+        // Generate new tokens with updated identity
+        const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
+            user.id,
+            c.req.header("user-agent") || "unknown",
+            c.req.header("x-forwarded-for") || "unknown"
+        );
+
+        return c.json(buildAuthResponse(updatedUser, roleIds, accessToken, refreshToken));
+    });
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MFA / TOTP
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * POST /auth/mfa/enroll
+     * Start MFA enrollment: generate TOTP secret and recovery codes
+     */
+    router.post("/mfa/enroll", requireAuth, async (c) => {
+        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        if (!userCtx) {
+            throw ApiError.unauthorized("Not authenticated");
+        }
+
+        const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+        const friendlyName = typeof body.friendlyName === "string" ? body.friendlyName : undefined;
+        const issuer = typeof body.issuer === "string" ? body.issuer : (emailConfig?.appName || "Rebase");
+
+        // Get user for account name
+        const user = await authRepo.getUserById(userCtx.userId);
+        if (!user) {
+            throw ApiError.notFound("User not found");
+        }
+
+        // Generate TOTP secret
+        const { secret, uri } = generateTotpSecret(issuer, user.email);
+
+        // Store the factor (unverified until user confirms with a valid code)
+        const factor = await authRepo.createMfaFactor(
+            user.id,
+            "totp",
+            secret, // In production, encrypt this before storage
+            friendlyName
+        );
+
+        // Generate recovery codes
+        const codes = generateRecoveryCodes(10);
+        const codeHashes = codes.map(hashRecoveryCode);
+        await authRepo.createRecoveryCodes(user.id, codeHashes);
+
+        return c.json({
+            factor: {
+                id: factor.id,
+                factorType: factor.factorType,
+                friendlyName: factor.friendlyName
+            },
+            totp: {
+                secret,
+                uri,
+                qrUri: uri // Client can use a QR library to render this
+            },
+            recoveryCodes: codes
+        }, 201);
+    });
+
+    /**
+     * POST /auth/mfa/verify
+     * Verify TOTP code to complete MFA enrollment
+     */
+    router.post("/mfa/verify", requireAuth, async (c) => {
+        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        if (!userCtx) {
+            throw ApiError.unauthorized("Not authenticated");
+        }
+
+        const verifySchema = z.object({
+            factorId: z.string().min(1, "Factor ID is required"),
+            code: z.string().length(6, "Code must be 6 digits")
+        });
+        const { factorId, code } = parseBody(verifySchema, await c.req.json());
+
+        // Get the factor
+        const factor = await authRepo.getMfaFactorById(factorId);
+        if (!factor || factor.userId !== userCtx.userId) {
+            throw ApiError.notFound("MFA factor not found");
+        }
+
+        if (factor.verified) {
+            throw ApiError.badRequest("Factor is already verified", "ALREADY_VERIFIED");
+        }
+
+        // Verify the TOTP code
+        const secretBuffer = base32Decode(factor.secretEncrypted);
+        const isValid = verifyTotp(secretBuffer, code);
+
+        if (!isValid) {
+            throw ApiError.unauthorized("Invalid TOTP code", "INVALID_CODE");
+        }
+
+        // Mark factor as verified
+        await authRepo.verifyMfaFactor(factorId);
+
+        return c.json({ success: true, message: "MFA factor verified and enrolled" });
+    });
+
+    /**
+     * POST /auth/mfa/challenge
+     * Create an MFA challenge during login (user has MFA enrolled)
+     */
+    router.post("/mfa/challenge", requireAuth, async (c) => {
+        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        if (!userCtx) {
+            throw ApiError.unauthorized("Not authenticated");
+        }
+
+        const challengeSchema = z.object({
+            factorId: z.string().min(1, "Factor ID is required")
+        });
+        const { factorId } = parseBody(challengeSchema, await c.req.json());
+
+        // Verify the factor belongs to this user and is verified
+        const factor = await authRepo.getMfaFactorById(factorId);
+        if (!factor || factor.userId !== userCtx.userId) {
+            throw ApiError.notFound("MFA factor not found");
+        }
+
+        if (!factor.verified) {
+            throw ApiError.badRequest("MFA factor is not yet verified", "FACTOR_NOT_VERIFIED");
+        }
+
+        const ipAddress = c.req.header("x-forwarded-for") || "unknown";
+        const challenge = await authRepo.createMfaChallenge(factorId, ipAddress);
+
+        return c.json({
+            challengeId: challenge.id,
+            factorId: challenge.factorId,
+            expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString()
+        });
+    });
+
+    /**
+     * POST /auth/mfa/challenge/verify
+     * Verify a TOTP code for an active challenge, upgrade aal1 → aal2
+     */
+    router.post("/mfa/challenge/verify", requireAuth, async (c) => {
+        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        if (!userCtx) {
+            throw ApiError.unauthorized("Not authenticated");
+        }
+
+        const challengeVerifySchema = z.object({
+            challengeId: z.string().min(1, "Challenge ID is required"),
+            code: z.string().min(1, "Code is required")
+        });
+        const { challengeId, code } = parseBody(challengeVerifySchema, await c.req.json());
+
+        // Find the challenge
+        const challenge = await authRepo.getMfaChallengeById(challengeId);
+        if (!challenge) {
+            throw ApiError.badRequest("Invalid or expired challenge", "INVALID_CHALLENGE");
+        }
+
+        // Get the factor and verify ownership
+        const factor = await authRepo.getMfaFactorById(challenge.factorId);
+        if (!factor || factor.userId !== userCtx.userId) {
+            throw ApiError.notFound("MFA factor not found");
+        }
+
+        // Check if this is a recovery code (10 chars with hyphen) or TOTP (6 digits)
+        const isRecoveryCode = code.length > 6;
+        let isValid = false;
+
+        if (isRecoveryCode) {
+            // Try recovery code
+            const codeHash = hashRecoveryCode(code);
+            isValid = await authRepo.useRecoveryCode(userCtx.userId, codeHash);
+        } else {
+            // Verify TOTP
+            const secretBuffer = base32Decode(factor.secretEncrypted);
+            isValid = verifyTotp(secretBuffer, code);
+        }
+
+        if (!isValid) {
+            throw ApiError.unauthorized("Invalid verification code", "INVALID_CODE");
+        }
+
+        // Mark challenge as verified
+        await authRepo.verifyMfaChallenge(challengeId);
+
+        // Generate new access token with aal2
+        const roles = await authRepo.getUserRoles(userCtx.userId);
+        const roleIds = roles.map(r => r.id);
+        const accessToken = generateAccessToken(userCtx.userId, roleIds, "aal2");
+        const refreshToken = generateRefreshToken();
+
+        // Create new refresh token
+        await authRepo.createRefreshToken(
+            userCtx.userId,
+            hashRefreshToken(refreshToken),
+            getRefreshTokenExpiry(),
+            c.req.header("user-agent") || "unknown",
+            c.req.header("x-forwarded-for") || "unknown"
+        );
+
+        // Fire onMfaVerified hook
+        if (authHooks?.onMfaVerified) {
+            authHooks.onMfaVerified(userCtx.userId, factor.id).catch(err => {
+                console.error("[AuthHooks] onMfaVerified error:", err instanceof Error ? err.message : err);
+            });
+        }
+
+        return c.json({
+            tokens: {
+                accessToken,
+                refreshToken,
+                accessTokenExpiresAt: getAccessTokenExpiry()
+            }
+        });
+    });
+
+    /**
+     * GET /auth/mfa/factors
+     * List enrolled MFA factors for the current user
+     */
+    router.get("/mfa/factors", requireAuth, async (c) => {
+        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        if (!userCtx) {
+            throw ApiError.unauthorized("Not authenticated");
+        }
+
+        const factors = await authRepo.getMfaFactors(userCtx.userId);
+        return c.json({
+            factors: factors.map(f => ({
+                id: f.id,
+                factorType: f.factorType,
+                friendlyName: f.friendlyName,
+                verified: f.verified,
+                createdAt: f.createdAt
+            }))
+        });
+    });
+
+    /**
+     * DELETE /auth/mfa/unenroll
+     * Remove an MFA factor
+     */
+    router.delete("/mfa/unenroll", requireAuth, async (c) => {
+        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        if (!userCtx) {
+            throw ApiError.unauthorized("Not authenticated");
+        }
+
+        const unenrollSchema = z.object({
+            factorId: z.string().min(1, "Factor ID is required")
+        });
+        const { factorId } = parseBody(unenrollSchema, await c.req.json());
+
+        // Verify ownership
+        const factor = await authRepo.getMfaFactorById(factorId);
+        if (!factor || factor.userId !== userCtx.userId) {
+            throw ApiError.notFound("MFA factor not found");
+        }
+
+        await authRepo.deleteMfaFactor(factorId, userCtx.userId);
+
+        // If no more verified factors, clean up recovery codes
+        const hasFactors = await authRepo.hasVerifiedMfaFactors(userCtx.userId);
+        if (!hasFactors) {
+            await authRepo.deleteAllRecoveryCodes(userCtx.userId);
+        }
+
+        return c.json({ success: true, message: "MFA factor removed" });
     });
 
     return router;

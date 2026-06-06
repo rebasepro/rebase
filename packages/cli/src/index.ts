@@ -6,5 +6,7 @@ export * from "./commands/dev";
 export * from "./commands/build";
 export * from "./commands/start";
 export * from "./commands/auth";
-export * from "./auth";
+export * from "./commands/doctor";
+export * from "./commands/generate_sdk";
 export * from "./utils/project";
+export * from "./utils/package-manager";

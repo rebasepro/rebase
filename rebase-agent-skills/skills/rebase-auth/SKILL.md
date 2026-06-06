@@ -76,6 +76,11 @@ const backend = await initializeRebaseBackend({
         google: {                    // Optional: Google OAuth
             clientId: process.env.GOOGLE_CLIENT_ID!,
         },
+        hooks: {                     // Optional: Auth lifecycle and operation hooks
+            afterUserCreate: async (user) => {
+                console.log(`User created: ${user.email}`);
+            }
+        }
     },
 });
 ```
@@ -111,6 +116,7 @@ Auth tables (`rebase.users`, `rebase.roles`, etc.) are auto-created on first sta
 | `defaultRole` | `string` | — | Default role for new users |
 | `serviceKey` | `string` | — | Service-to-service auth key |
 | `google` | `{ clientId }` | — | Google OAuth configuration |
+| `hooks` | `AuthHooks` | — | Auth lifecycle and operation hooks (e.g. `afterUserCreate`) |
 
 ### 2. Define Roles
 

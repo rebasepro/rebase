@@ -312,7 +312,19 @@ function createUserManagementFromRepo(repo: AuthRepository, resolvedOps: Resolve
         },
 
         async deleteUser(id: string): Promise<void> {
+            // Call beforeUserDelete hook (throw to prevent deletion)
+            if (authHooks?.beforeUserDelete) {
+                await authHooks.beforeUserDelete(id);
+            }
+
             await repo.deleteUser(id);
+
+            // Fire afterUserDelete hook (fire-and-forget)
+            if (authHooks?.afterUserDelete) {
+                authHooks.afterUserDelete(id).catch(err => {
+                    console.error("[AuthHooks] afterUserDelete error:", err instanceof Error ? err.message : err);
+                });
+            }
         },
 
         async getUserRoles(userId: string): Promise<AuthRoleData[]> {

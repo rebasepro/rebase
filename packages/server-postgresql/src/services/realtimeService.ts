@@ -41,6 +41,14 @@ type RealTimeListenEntityProps = ListenEntityProps & { subscriptionId: string };
  */
 export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private clients = new Map<string, WebSocket>();
+
+    // Broadcast channels: channel name → set of client IDs
+    private channels = new Map<string, Set<string>>();
+
+    // Presence: channel → Map<clientId, { state, lastSeen }>
+    private presence = new Map<string, Map<string, { state: Record<string, unknown>; lastSeen: number }>>();
+    private presenceInterval?: ReturnType<typeof setInterval>;
+    private static readonly PRESENCE_TIMEOUT_MS = 30000; // 30s
     private entityService: EntityService;
     // Enhanced subscriptions storage with full request parameters
     private _subscriptions = new Map<string, {
@@ -237,9 +245,24 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 }
             }
         }
+
+        // Remove from all broadcast channels
+        for (const [channel, members] of this.channels.entries()) {
+            if (members.has(clientId)) {
+                members.delete(clientId);
+                this.removePresence(clientId, channel);
+                if (members.size === 0) this.channels.delete(channel);
+            }
+        }
+
+        // Remove from all presence channels
+        for (const [channel] of this.presence) {
+            this.removePresence(clientId, channel);
+        }
     }
 
     private async handleMessage(clientId: string, message: WebSocketMessage, authContext?: SubscriptionAuthContext) {
+        const payload = message.payload as Record<string, unknown> | undefined;
         switch (message.type) {
             case "subscribe_collection":
                 await this.handleCollectionSubscription(clientId, message.payload as RealTimeListenCollectionProps, authContext);
@@ -250,6 +273,40 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             case "unsubscribe":
                 await this.handleUnsubscribe(clientId, message.subscriptionId!);
                 break;
+
+            // ── Broadcast Channels ──
+            case "join_channel":
+                this.joinChannel(clientId, payload?.channel as string);
+                break;
+            case "leave_channel":
+                this.leaveChannel(clientId, payload?.channel as string);
+                break;
+            case "broadcast":
+                this.broadcastToChannel(
+                    clientId,
+                    payload?.channel as string,
+                    payload?.event as string,
+                    payload?.payload
+                );
+                break;
+
+            // ── Presence ──
+            case "presence_track":
+                // Auto-join the channel so presence works without a separate join
+                this.joinChannel(clientId, payload?.channel as string);
+                this.trackPresence(
+                    clientId,
+                    payload?.channel as string,
+                    payload?.state as Record<string, unknown> ?? {}
+                );
+                break;
+            case "presence_untrack":
+                this.removePresence(clientId, payload?.channel as string);
+                break;
+            case "presence_state":
+                this.sendPresenceState(clientId, payload?.channel as string);
+                break;
+
             default:
                 this.sendError(clientId, "Unknown message type " + message.type, message.subscriptionId);
         }
@@ -839,6 +896,153 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
 
         return parentPaths;
     }
+
+    // =============================================================================
+    // Broadcast Channels
+    // =============================================================================
+
+    /** Join a broadcast channel */
+    joinChannel(clientId: string, channel: string): void {
+        if (!this.channels.has(channel)) {
+            this.channels.set(channel, new Set());
+        }
+        this.channels.get(channel)!.add(clientId);
+        this.debugLog(`📡 [Broadcast] Client ${clientId} joined channel: ${channel}`);
+    }
+
+    /** Leave a broadcast channel */
+    leaveChannel(clientId: string, channel: string): void {
+        const members = this.channels.get(channel);
+        if (members) {
+            members.delete(clientId);
+            if (members.size === 0) this.channels.delete(channel);
+        }
+        // Also remove presence
+        this.removePresence(clientId, channel);
+    }
+
+    /** Broadcast a message to all clients in a channel except sender */
+    broadcastToChannel(clientId: string, channel: string, event: string, payload: unknown): void {
+        const members = this.channels.get(channel);
+        if (!members) return;
+
+        const message = JSON.stringify({
+            type: "broadcast",
+            channel,
+            event,
+            payload
+        });
+
+        for (const memberId of members) {
+            if (memberId === clientId) continue; // Don't echo back to sender
+            const ws = this.clients.get(memberId);
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(message);
+            }
+        }
+    }
+
+    // =============================================================================
+    // Presence
+    // =============================================================================
+
+    /** Track presence in a channel */
+    trackPresence(clientId: string, channel: string, state: Record<string, unknown>): void {
+        if (!this.presence.has(channel)) {
+            this.presence.set(channel, new Map());
+        }
+
+        const channelPresence = this.presence.get(channel)!;
+        channelPresence.set(clientId, { state, lastSeen: Date.now() });
+
+        // Broadcast join / state update to channel
+        this.broadcastPresenceDiff(channel, { [clientId]: state }, {});
+
+        // Start cleanup interval if not running
+        this.ensurePresenceCleanup();
+    }
+
+    /** Remove presence from a channel */
+    removePresence(clientId: string, channel: string): void {
+        const channelPresence = this.presence.get(channel);
+        if (!channelPresence) return;
+
+        const entry = channelPresence.get(clientId);
+        if (entry) {
+            channelPresence.delete(clientId);
+            this.broadcastPresenceDiff(channel, {}, { [clientId]: entry.state });
+        }
+
+        if (channelPresence.size === 0) {
+            this.presence.delete(channel);
+        }
+    }
+
+    /** Send full presence state to a specific client */
+    sendPresenceState(clientId: string, channel: string): void {
+        const channelPresence = this.presence.get(channel);
+        const presences: Record<string, Record<string, unknown>> = {};
+
+        if (channelPresence) {
+            for (const [id, { state }] of channelPresence) {
+                presences[id] = state;
+            }
+        }
+
+        const ws = this.clients.get(clientId);
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: "presence_state",
+                channel,
+                presences
+            }));
+        }
+    }
+
+    /** Broadcast presence diff (joins/leaves) to channel */
+    private broadcastPresenceDiff(
+        channel: string,
+        joins: Record<string, Record<string, unknown>>,
+        leaves: Record<string, Record<string, unknown>>
+    ): void {
+        const members = this.channels.get(channel);
+        if (!members) return;
+
+        const message = JSON.stringify({
+            type: "presence_diff",
+            channel,
+            joins,
+            leaves
+        });
+
+        for (const memberId of members) {
+            const ws = this.clients.get(memberId);
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(message);
+            }
+        }
+    }
+
+    /** Periodic cleanup for stale presences */
+    private ensurePresenceCleanup(): void {
+        if (this.presenceInterval) return;
+        this.presenceInterval = setInterval(() => {
+            const now = Date.now();
+            for (const [channel, channelPresence] of this.presence) {
+                for (const [clientId, entry] of channelPresence) {
+                    if (now - entry.lastSeen > RealtimeService.PRESENCE_TIMEOUT_MS) {
+                        this.removePresence(clientId, channel);
+                    }
+                }
+            }
+            // Stop interval if no presences tracked
+            if (this.presence.size === 0 && this.presenceInterval) {
+                clearInterval(this.presenceInterval);
+                this.presenceInterval = undefined;
+            }
+        }, 10000); // Check every 10s
+    }
+
     // =============================================================================
     // Lifecycle / Cleanup
     // =============================================================================
@@ -865,10 +1069,18 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         this._subscriptions.clear();
         this.subscriptionCallbacks.clear();
 
-        // 3. Disconnect the dedicated LISTEN client
+        // 3. Clear broadcast channels and presence
+        this.channels.clear();
+        this.presence.clear();
+        if (this.presenceInterval) {
+            clearInterval(this.presenceInterval);
+            this.presenceInterval = undefined;
+        }
+
+        // 4. Disconnect the dedicated LISTEN client
         await this.stopListening();
 
-        // 4. Drop client references (don't close — server.close drains them)
+        // 5. Drop client references (don't close — server.close drains them)
         this.clients.clear();
 
         this.debugLog("🧹 [RealtimeService] destroy() complete — all resources released.");

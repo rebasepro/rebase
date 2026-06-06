@@ -38,7 +38,15 @@ export class DrizzleConditionBuilder {
             if (!filterParam) continue;
 
             const [op, value] = filterParam as [WhereFilterOp, any];
-            const fieldColumn = table[field as keyof typeof table] as AnyPgColumn;
+            let fieldColumn = table[field as keyof typeof table] as AnyPgColumn;
+
+            if (!fieldColumn) {
+                // Fallback for relations (e.g. project -> project_id)
+                const relationKey = `${field}_id`;
+                if (relationKey in table) {
+                    fieldColumn = table[relationKey as keyof typeof table] as AnyPgColumn;
+                }
+            }
 
             if (!fieldColumn) {
                 console.warn(`Filtering by field '${field}', but it does not exist in table for collection '${collectionPath}'`);

@@ -1,52 +1,56 @@
 ## Rebase CLI
 
-This CLI tool allows you to create new Rebase projects and to deploy them to Rebase Cloud.
-**IMPORTANT**: You should not be using this tool directly, but `rebase` instead.
+Developer tools for scaffolding, running, and managing Rebase projects.
 
-### CLI
+### Installation
 
-You can use the following commands:
-
-```bash
-rebase login
-```
+The CLI is bundled with every Rebase project. You can also install it globally:
 
 ```bash
-rebase init
+pnpm add -g @rebasepro/cli
 ```
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `rebase init` | Scaffold a new Rebase project |
+| `rebase dev` | Start the development server (backend + frontend) |
+| `rebase build` | Build all workspace packages |
+| `rebase start` | Start the backend server (production) |
+| `rebase schema generate` | Generate Drizzle schema from collection definitions |
+| `rebase schema introspect` | Introspect an existing database to generate collections |
+| `rebase db push` | Apply schema directly to database (development) |
+| `rebase db generate` | Generate SQL migration files |
+| `rebase db migrate` | Run pending migrations |
+| `rebase db studio` | Open Drizzle Studio |
+| `rebase generate-sdk` | Generate a typed JS SDK from collections |
+| `rebase auth reset-password` | Reset a user's password |
+| `rebase doctor` | Detect schema drift between collections, schema, and DB |
+
+### Quick Start
 
 ```bash
-rebase deploy
+rebase init my-app
+cd my-app
+docker compose up -d db
+pnpm run db:push
+pnpm run dev
 ```
 
-### Using different templates
+### Help
 
-You can initialize a new project using different templates. Please not that these templates can't
-be deployed to Rebase Cloud. For example:
+Run `rebase --help` or `rebase <command> --help` for detailed usage information.
 
-For Rebase Cloud
+### Development
+
+For local development of the CLI itself, link the package:
 
 ```bash
-rebase init
+pnpm link --global
 ```
 
-For Rebase PRO:
-
-```bash
-rebase init --pro
-```
-
-#### To run locally
-
-For development purposes, you can link the package locally.
-
-```bash
-npm link rebase
-```
-
-### Development only
-
-You can change the environment when deploying to Rebase Cloud by defining the --env variable.
+You can change the environment when deploying to Rebase Cloud by defining the `--env` variable.
 Possible values are `prod` (default) and `dev`.
 
 ```bash

@@ -230,6 +230,72 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: Postg
         // Seed default roles if none exist
         await seedDefaultRoles(db, rolesTableName);
 
+        // ── Migration: Add is_anonymous column (safe for existing tables) ────
+        await db.execute(sql`
+            ALTER TABLE ${sql.raw(usersTableName)}
+            ADD COLUMN IF NOT EXISTS is_anonymous BOOLEAN DEFAULT FALSE
+        `);
+
+        // ── MFA tables ──────────────────────────────────────────────────────
+        const mfaFactorsTableName = `"${rolesSchema}"."mfa_factors"`;
+        const mfaChallengesTableName = `"${rolesSchema}"."mfa_challenges"`;
+        const recoveryCodesTableName = `"${rolesSchema}"."recovery_codes"`;
+
+        // Create mfa_factors table
+        await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS ${sql.raw(mfaFactorsTableName)} (
+                id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+                user_id ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
+                factor_type TEXT NOT NULL DEFAULT 'totp',
+                secret_encrypted TEXT NOT NULL,
+                friendly_name TEXT,
+                verified BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            )
+        `);
+
+        // Create indexes on mfa_factors
+        await db.execute(sql`
+            CREATE INDEX IF NOT EXISTS idx_mfa_factors_user
+            ON ${sql.raw(mfaFactorsTableName)}(user_id)
+        `);
+
+        // Create mfa_challenges table
+        await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS ${sql.raw(mfaChallengesTableName)} (
+                id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+                factor_id TEXT NOT NULL REFERENCES ${sql.raw(mfaFactorsTableName)}(id) ON DELETE CASCADE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                verified_at TIMESTAMP WITH TIME ZONE,
+                ip_address TEXT,
+                expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+            )
+        `);
+
+        // Create indexes on mfa_challenges
+        await db.execute(sql`
+            CREATE INDEX IF NOT EXISTS idx_mfa_challenges_factor
+            ON ${sql.raw(mfaChallengesTableName)}(factor_id)
+        `);
+
+        // Create recovery_codes table
+        await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS ${sql.raw(recoveryCodesTableName)} (
+                id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+                user_id ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
+                code_hash TEXT NOT NULL,
+                used_at TIMESTAMP WITH TIME ZONE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            )
+        `);
+
+        // Create indexes on recovery_codes
+        await db.execute(sql`
+            CREATE INDEX IF NOT EXISTS idx_recovery_codes_user
+            ON ${sql.raw(recoveryCodesTableName)}(user_id)
+        `);
+
         console.log("✅ Auth tables ready");
     } catch (error) {
         console.error("❌ Failed to create auth tables:", error);

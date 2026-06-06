@@ -282,8 +282,8 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                     env
                 });
                 console.log(chalk.green("  ✓ Initial schema and SDK generated successfully.\n"));
-            } catch (err: any) {
-                console.error(chalk.red(`  ✗ Initial schema/SDK generation failed: ${err.message || err}\n`));
+            } catch (err: unknown) {
+                console.error(chalk.red(`  ✗ Initial schema/SDK generation failed: ${err instanceof Error ? err.message : err}\n`));
             }
 
             // Watch collections folder for changes
@@ -312,8 +312,8 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                                 env
                             });
                             console.log(chalk.green("  ✓ Schema & SDK regenerated successfully. Hono will reload."));
-                        } catch (err: any) {
-                            console.error(chalk.red(`  ✗ Failed to regenerate schema/SDK: ${err.message || err}`));
+                        } catch (err: unknown) {
+                            console.error(chalk.red(`  ✗ Failed to regenerate schema/SDK: ${err instanceof Error ? err.message : err}`));
                         }
                     }, 300);
                 });

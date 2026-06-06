@@ -32,7 +32,7 @@ const ButtonInner = React.memo(React.forwardRef<
    }: ButtonProps<any>, ref) => {
 
     const baseClasses =
-        "typography-button h-fit rounded-md whitespace-nowrap inline-flex items-center justify-center p-2 px-4 focus:outline-none transition-all ease-in-out duration-150 gap-2 active:scale-[0.98]";
+        "typography-button h-fit rounded-md whitespace-nowrap inline-flex items-center justify-center p-1.5 px-3 focus:outline-none transition-all ease-in-out duration-150 gap-1.5 active:scale-[0.98]";
 
     const buttonClasses = cls({
         "w-full": fullWidth,
@@ -68,11 +68,11 @@ const ButtonInner = React.memo(React.forwardRef<
 
     const sizeClasses = cls(
         {
-            "py-1 px-2": size === "small",
-            "py-2 px-4": size === "medium",
-            "py-2.5 px-5": size === "large",
-            "py-3 px-6": size === "xl",
-            "py-4 px-10": size === "2xl"
+            "py-0.5 px-1.5": size === "small",
+            "py-1.5 px-3": size === "medium",
+            "py-2 px-4": size === "large",
+            "py-2.5 px-5": size === "xl",
+            "py-3 px-6": size === "2xl"
         }
     );
 

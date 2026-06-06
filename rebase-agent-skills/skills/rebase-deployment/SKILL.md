@@ -114,12 +114,13 @@ This eliminates the need for a separate web server or CDN for the frontend in si
 
 ## ⛔ Agent Deployment Rules
 
-**Agents should NEVER deploy to production.** This includes:
+**Agents should NEVER deploy or run deployment commands unless explicitly asked by the user in the current conversation.** This includes:
 - `rebase deploy` (any variant)
 - `firebase deploy` (any variant)
 - `gcloud functions deploy`
 - `gcloud run deploy`
-- Any command targeting production environments
+- `terraform apply` (any variant that deploys resources)
+- Any command targeting staging or production environments
 
 **What agents CAN do:**
 - Edit source code
@@ -127,7 +128,7 @@ This eliminates the need for a separate web server or CDN for the frontend in si
 - Run tests (`pnpm test`)
 - Run local dev server (`pnpm dev`)
 - Check logs (read-only)
-- Provide the exact deployment commands for the user to run
+- Run deployment commands *only* if the user explicitly asks you to deploy in the current conversation. Otherwise, provide the exact commands for the user to run.
 
 ## Environment Variables
 

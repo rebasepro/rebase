@@ -2,14 +2,16 @@
 description: Deployment rules and restrictions for the Rebase backend and all services
 ---
 
-# ⛔ CRITICAL: NEVER DEPLOY TO PRODUCTION ⛔
+# ⛔ CRITICAL: DO NOT DEPLOY UNLESS I EXPLICITLY ASK YOU ⛔
 
-**Under NO circumstances should any agent deploy to production.** This includes:
+**Do not deploy or run deployment commands unless the user explicitly asks you to in the current conversation.**
 
+This applies to:
 - `rebase deploy` (any variant)
 - `firebase deploy` (any variant)
 - `gcloud functions deploy`
 - `gcloud run deploy`
+- `terraform apply` (any variant that deploys resources)
 - Any command that pushes code, functions, or configuration to a live environment
 - Any command targeting `production`, `prod`, or `staging` environments
 - Any command using service account keys to modify live infrastructure
@@ -22,22 +24,14 @@ description: Deployment rules and restrictions for the Rebase backend and all se
 4. **Run local dev server** — `pnpm dev` is fine
 5. **Check logs** — read-only log queries are fine
 6. **List resources** — read-only commands are fine
+7. **Deploy** — execute deployment commands *only* when the user has explicitly asked you to in the current conversation.
 
-## What you MUST NOT do
+## Rules for Deployment
 
-1. **NEVER run `rebase deploy`** — not even with `--env dev`
-2. **NEVER run `firebase deploy`** — not even with `--only functions:specificFunction`
-3. **NEVER run deploy scripts** — e.g. `pnpm run deploy:prod`, `pnpm run deploy:staging`
-4. **NEVER modify live infrastructure** — no creating, updating, or deleting cloud resources
-5. **NEVER bypass predeploy hooks** — do not modify configuration to skip build steps for deployment purposes
-6. **NEVER approve deployment prompts** — if a command asks "Would you like to proceed with deployment?", the answer is always NO
-
-## If the user asks you to deploy
-
-- **Provide the exact command** they should run themselves
-- **Explain what the command will do** before they run it
-- **Never run it on their behalf** — unless they explicitly ask you to.
+1. **Do not deploy automatically** — never trigger a deploy command on your own.
+2. **Obtain explicit user request** — only execute a deploy command if the user explicitly asks you to (e.g., "deploy everything" or "run the deploy command").
+3. **Explain before executing** — before running a deployment command on behalf of the user, explain exactly what commands will be executed and what they will do.
 
 ## Summary
 
-The agent's role is to write code, debug, analyze logs, and prepare changes. **Deployment is always the user's responsibility.**
+The agent should prepare and test code locally. **Deployment commands can only be executed by the agent if the user explicitly asks them to.**

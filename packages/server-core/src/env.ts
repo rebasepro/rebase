@@ -102,6 +102,8 @@ const rebaseEnvSchema = z.object({
     DB_POOL_MAX: z.string().default("20").transform(Number),
     DB_POOL_IDLE_TIMEOUT: z.string().default("30000").transform(Number),
     DB_POOL_CONNECT_TIMEOUT: z.string().default("10000").transform(Number),
+    DATABASE_DIRECT_URL: z.string().url().optional(),
+    DATABASE_READ_URL: z.string().url().optional(),
     FORCE_LOCAL_STORAGE: optionalBoolString,
     STORAGE_TYPE: z.enum(["local", "s3"]).default("local"),
     STORAGE_PATH: z.string().optional(),

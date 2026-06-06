@@ -151,7 +151,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         name: "introspect",
         message: "Would you like to introspect this database to automatically generate collections?",
         default: true,
-        when: (answers: any) => !!(answers.databaseUrl as string)?.trim()
+        when: (answers: Record<string, unknown>) => !!(answers.databaseUrl as string)?.trim()
     });
 
     const answers = await inquirer.prompt(questions as unknown as Parameters<typeof inquirer.prompt>[0]);

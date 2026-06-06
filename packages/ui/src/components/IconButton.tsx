@@ -19,10 +19,10 @@ const buttonClasses = "hover:bg-surface-accent-200 hover:bg-opacity-75 hover:bg-
 const baseClasses = "inline-flex items-center justify-center p-2 text-sm font-medium focus:outline-none transition-colors ease-in-out duration-150";
 const colorClasses = "text-surface-accent-500 visited:text-surface-accent-500 dark:text-surface-accent-300 dark:visited:text-surface-300";
 const sizeClasses = {
-    medium: "w-10 !h-10 min-w-10 min-h-10",
-    small: "w-8 !h-8 min-w-8 min-h-8",
-    smallest: "w-6 !h-6 min-w-6 min-h-6",
-    large: "w-12 !h-12 min-w-12 min-h-12"
+    medium: "w-9 !h-9 min-w-9 min-h-9",
+    small: "w-7 !h-7 min-w-7 min-h-7",
+    smallest: "w-5 !h-5 min-w-5 min-h-5",
+    large: "w-10 !h-10 min-w-10 min-h-10"
 }
 const shapeClasses = {
     circular: "rounded-full",

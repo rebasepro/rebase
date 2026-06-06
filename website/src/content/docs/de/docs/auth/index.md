@@ -44,6 +44,11 @@ await initializeRebaseBackend({
                 pass: "app-password",
                 from: "Rebase <noreply@example.com>"
             }
+        },
+        hooks: {                             // Optional — Lifecycle-Hooks
+            afterUserCreate: async (user) => {
+                console.log(`Neuer Benutzer registriert: ${user.email}`);
+            }
         }
     }
 });

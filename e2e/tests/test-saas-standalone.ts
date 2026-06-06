@@ -13,7 +13,7 @@ async function run() {
   page.on("console", msg => console.log(`[Browser Console] ${msg.type().toUpperCase()}: ${msg.text()}`));
   page.on("pageerror", err => console.error(`[Browser PageError] ${err.message}\n${err.stack}`));
 
-  const screenshotDir = "/Users/francesco/.gemini/antigravity/brain/a5f85618-9dcb-44b7-a61e-0bfbf9e30879/browser_recordings";
+  const screenshotDir = "/Users/francesco/.gemini/antigravity/brain/7baea084-2ed5-46df-a88e-e8184f453daf/browser_recordings";
   fs.mkdirSync(screenshotDir, { recursive: true });
 
   console.log("🚀 Starting SaaS Browser Flow Verification");
@@ -51,8 +51,8 @@ async function run() {
 
     // 5. Fill Step 1
     console.log("Filling Step 1 (Repo info)...");
-    await page.fill('input[placeholder="My CMS App"]', "My E2E Project");
-    await page.fill('input[placeholder="https://github.com/rebasepro/my-rebase-project"]', "https://github.com/rebasepro/saas-e2e-demo");
+    await page.getByLabel("Project Name").fill("My E2E Project");
+    await page.getByLabel("GitHub Repository URL").fill("https://github.com/rebasepro/saas-e2e-demo");
     await page.screenshot({ path: path.join(screenshotDir, "5-create-project-step1-filled.png") });
     await page.click('button:has-text("Continue")');
     await page.waitForTimeout(1000);
@@ -70,12 +70,37 @@ async function run() {
     await page.waitForTimeout(1000);
     await page.screenshot({ path: path.join(screenshotDir, "8-create-project-step4.png") });
 
-    // 8. Select plan and deploy
+    // 8. Select plan and deploy (checkout cancel flow first)
     console.log("Deploying project...");
-    await page.click('button:has-text("Deploy Developer")');
-    console.log("Waiting for deployment simulation to start and redirect...");
-    await page.waitForTimeout(5000); // Wait for API calls and redirect
-    await page.screenshot({ path: path.join(screenshotDir, "9-project-detail-logs.png") });
+    await page.click('button:has-text("Subscribe & Deploy")');
+    console.log("Waiting for Stripe Checkout redirect...");
+    await page.waitForTimeout(3000);
+    await page.screenshot({ path: path.join(screenshotDir, "9-stripe-checkout-project.png") });
+
+    console.log("Canceling Stripe checkout...");
+    await page.click('button:has-text("Cancel")');
+    await page.waitForTimeout(3000); // Wait for redirect to /billing
+    await page.screenshot({ path: path.join(screenshotDir, "9b-billing-page-pending.png") });
+
+    console.log("Upgrading to active subscription from billing page...");
+    await page.click('button:has-text("Complete Payment")');
+    await page.waitForTimeout(3000); // Wait for Stripe Checkout redirect again
+    await page.screenshot({ path: path.join(screenshotDir, "9c-stripe-checkout-project-retry.png") });
+
+    console.log("Confirming Stripe check-out payment...");
+    await page.click('button:has-text("Pay & Subscribe")');
+    await page.waitForTimeout(3000); // wait for webhook simulation and redirect back to /billing
+    await page.screenshot({ path: path.join(screenshotDir, "9d-billing-page-paid.png") });
+
+    console.log("Navigating back to Projects page...");
+    await page.click('a:has-text("Projects")');
+    await page.waitForTimeout(2000);
+    await page.screenshot({ path: path.join(screenshotDir, "9e-projects-page.png") });
+
+    console.log("Opening project details page...");
+    await page.click('text=My E2E Project');
+    await page.waitForTimeout(3000);
+    await page.screenshot({ path: path.join(screenshotDir, "9f-project-detail-logs.png") });
 
     // 9. Verify details page tabs
     console.log("Testing database tab connection...");
@@ -125,21 +150,11 @@ async function run() {
     await page.waitForTimeout(6500); // wait for multi-step simulation logs
     await page.screenshot({ path: path.join(screenshotDir, "19-project-detail-backups-completed.png") });
 
-    // 10. Billing Upgrade
+    // 10. Billing Verification
     console.log("Navigating to Billing section...");
     await page.click('a:has-text("Billing & Subscriptions")');
-    await page.waitForTimeout(1000);
-    await page.screenshot({ path: path.join(screenshotDir, "20-billing.png") });
-
-    console.log("Upgrading to Scale/Pro plan...");
-    await page.click('button:has-text("Upgrade")');
-    await page.waitForTimeout(2000); // wait for redirect to Stripe Simulator
-    await page.screenshot({ path: path.join(screenshotDir, "21-stripe-simulator.png") });
-
-    console.log("Confirming Stripe check-out payment...");
-    await page.click('button:has-text("Pay & Subscribe")');
-    await page.waitForTimeout(2000); // wait for webhook simulation and redirect back
-    await page.screenshot({ path: path.join(screenshotDir, "22-billing-upgraded.png") });
+    await page.waitForTimeout(2000);
+    await page.screenshot({ path: path.join(screenshotDir, "20-billing-final.png") });
 
     console.log("✅ SaaS Browser Flow Verification Completed Successfully!");
 

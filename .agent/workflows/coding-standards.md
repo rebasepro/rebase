@@ -53,4 +53,10 @@ When contributing to the Rebase monorepo, you MUST adhere strictly to the follow
 - **No legacy references**: Never include phrases like "this is the modern alternative to X", "this is the successor to Y", or "we migrated this because Z". 
 - **Treat the codebase as new**: The user considers this a new project. Historical context about soft-deprecations or transitions should be kept out of inline source code comments.
 
-*These rules were instated because lazy abstractions, dynamic requires, and hacking around problems instead of fixing the root cause have previously caused critical technical debt and system instability.*
+## 11. NO POLLING FOR DATA SYNC (Use Realtime Sync)
+- **Zero Tolerance for REST Polling**: Never use `setInterval` or background polling loops (`setInterval(fetchProjects, 5000)`) in React components to get live database updates. Rebase is built around a WebSocket real-time sync engine.
+- **Use Subscriptions**: Always use `rebaseClient.data.collection().listen()` or `listenById()` for real-time collections and document tracking. It instantly streams inserts, updates, and deletes, respecting Postgres RLS rules.
+- **Graceful Fallback**: Wrap subscription calls in support checks (e.g., `if (collection.listen)`) to handle environments where WebSockets are unavailable and fallback gracefully to one-time REST requests.
+- **RPC Telemetry Polling**: Telemetry or metrics endpoints (which run custom server-side RPC functions) can be polled, but only when their respective tab/component is actively visible in the UI to minimize server overhead.
+
+*These rules were instated because lazy abstractions, dynamic requires, REST polling on a real-time framework, and hacking around problems instead of fixing the root cause have previously caused critical technical debt and system instability.*

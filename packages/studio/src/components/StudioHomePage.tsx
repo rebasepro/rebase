@@ -34,7 +34,8 @@ const SECTIONS: StudioSection[] = [
             { path: "/schema-visualizer", name: "Schema Visualizer", description: "Interactive ERD showing tables, columns, and relationships", icon: "Network" },
             { path: "/sql", name: "SQL Console", description: "Execute raw SQL queries directly against your database", icon: "terminal" },
             { path: "/branches", name: "Branches", description: "Create and manage isolated database copies for development", icon: "GitBranch" },
-            { path: "/rls", name: "RLS Policies", description: "Configure Row Level Security for fine-grained data access", icon: "ShieldCheck" }
+            { path: "/rls", name: "RLS Policies", description: "Configure Row Level Security for fine-grained data access", icon: "ShieldCheck" },
+            { path: "/logs", name: "Logs Explorer", description: "Real-time system, query, and authentication logs", icon: "Activity" }
         ]
     },
     {

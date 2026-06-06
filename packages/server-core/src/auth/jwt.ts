@@ -11,6 +11,8 @@ export interface AccessTokenPayload {
     userId: string;
     roles: string[];
     uid?: string;
+    /** Authentication Assurance Level: aal1 = password/oauth, aal2 = MFA verified */
+    aal?: "aal1" | "aal2";
 }
 
 let jwtConfig: JwtConfig = {
@@ -70,13 +72,22 @@ export function configureJwt(config: JwtConfig): void {
 /**
  * Generate an access token (short-lived, 1 hour by default)
  */
-export function generateAccessToken(userId: string, roles: string[]): string {
+export function generateAccessToken(
+    userId: string,
+    roles: string[],
+    aal: "aal1" | "aal2" = "aal1",
+    customClaims?: Record<string, unknown>
+): string {
     if (!jwtConfig.secret) {
         throw new Error("JWT secret not configured. Call configureJwt() first.");
     }
 
-    const payload: AccessTokenPayload = { userId,
-roles };
+    const payload: Record<string, unknown> = {
+        userId,
+        roles,
+        aal,
+        ...customClaims
+    };
 
     return jwt.sign(payload, jwtConfig.secret, {
         expiresIn: jwtConfig.accessExpiresIn as jwt.SignOptions["expiresIn"],
@@ -124,16 +135,19 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
     }
 
     try {
-        const decoded = jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] }) as { userId?: string; uid?: string; sub?: string; roles?: string[] };
+        const decoded = jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] }) as { userId?: string; uid?: string; sub?: string; roles?: string[]; aal?: string };
         const id = decoded.userId || decoded.uid || decoded.sub;
         if (!id) {
             console.error("[JWT] Verification failed: missing id in payload", decoded);
             return null;
         }
 
+        const aal = (decoded.aal === "aal1" || decoded.aal === "aal2") ? decoded.aal : "aal1";
+
         return {
             userId: id,
-            roles: decoded.roles || []
+            roles: decoded.roles || [],
+            aal
         };
     } catch (error) {
         console.error("[JWT] Verification failed:", error, "Token start:", token.substring(0, 15));

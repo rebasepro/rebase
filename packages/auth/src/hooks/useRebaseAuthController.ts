@@ -744,10 +744,10 @@ roles: customRoles.map(r => r.id) };
             emailPasswordLogin: true,
             googleLogin: !!(props.googleClientId),
             registration: authConfig?.registrationEnabled ?? false,
-            passwordReset: true,
+            passwordReset: authConfig?.passwordReset ?? false,
             sessionManagement: true,
             profileUpdate: true,
-            emailVerification: false,
+            emailVerification: authConfig?.emailVerification ?? false,
             enabledProviders: authConfig?.enabledProviders ?? []
         }
     };

@@ -29,7 +29,9 @@ export type AuthChangeEvent = "SIGNED_IN" | "SIGNED_OUT" | "TOKEN_REFRESHED" | "
 export interface AuthConfig {
     needsSetup: boolean;
     registrationEnabled: boolean;
-    emailServiceEnabled: boolean;
+    emailServiceEnabled?: boolean;
+    passwordReset?: boolean;
+    emailVerification?: boolean;
     enabledProviders: string[];
 }
 

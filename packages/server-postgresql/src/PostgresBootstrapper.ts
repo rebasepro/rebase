@@ -50,6 +50,7 @@ import type { HonoEnv } from "@rebasepro/server-core";
  */
 export interface PostgresDriverInternals {
     db: NodePgDatabase<any>;
+    readDb?: NodePgDatabase<any>;
     registry: PostgresCollectionRegistry;
     realtimeService: RealtimeService;
     driver: PostgresBackendDriver;
@@ -120,6 +121,20 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
 
             // Create services
             const realtimeService = new RealtimeService(schemaAwareDb, registry);
+
+            // Initialize read replica connection if configured
+            let readDb: import("drizzle-orm/node-postgres").NodePgDatabase<any> | undefined;
+            const readUrl = process.env.DATABASE_READ_URL;
+            if (readUrl && readUrl !== pgConfig.connectionString) {
+                try {
+                    const { createReadReplicaConnection } = await import("./connection");
+                    const readResources = createReadReplicaConnection(readUrl, mergedSchema);
+                    readDb = readResources.db;
+                    console.log("📖 [PostgresBootstrapper] Read replica connection established");
+                } catch (err) {
+                    console.warn("⚠️ Could not connect to read replica, falling back to primary for all queries:", err);
+                }
+            }
             const poolManager = pgConfig.adminConnectionString
                 ? new DatabasePoolManager(pgConfig.adminConnectionString)
                 : undefined;
@@ -136,9 +151,11 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             }
 
             // Enable cross-instance realtime (opt-in)
-            if (pgConfig.connectionString) {
+            // Prefer DATABASE_DIRECT_URL to bypass PgBouncer for LISTEN/NOTIFY
+            const directUrl = process.env.DATABASE_DIRECT_URL || pgConfig.connectionString;
+            if (directUrl) {
                 try {
-                    await realtimeService.startListening(pgConfig.connectionString);
+                    await realtimeService.startListening(directUrl);
                 } catch (err) {
                     console.warn("⚠️ Cross-instance realtime could not be started:", err);
                 }
@@ -146,6 +163,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
 
             const internals: PostgresDriverInternals = {
                 db: schemaAwareDb,
+                readDb,
                 registry,
                 realtimeService,
                 driver,

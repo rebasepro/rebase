@@ -37,6 +37,7 @@ function mockUserData(overrides: Partial<UserData>): UserData {
         createdAt: expect.any(Date),
         updatedAt: expect.any(Date),
         metadata: {},
+        isAnonymous: false,
         ...overrides
     };
 }

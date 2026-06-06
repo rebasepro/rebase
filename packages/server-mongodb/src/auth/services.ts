@@ -15,8 +15,9 @@ import {
     PasswordResetTokenInfo,
     UserIdentityData,
     ListUsersOptions,
-    PaginatedUsersResult
-// @ts-ignore
+    PaginatedUsersResult,
+    MfaFactor,
+    MfaChallengeInfo
 } from "@rebasepro/server-core";
 
 export type Role = RoleData;
@@ -46,7 +47,7 @@ export class MongoUserService implements UserRepository {
     private get collection() {
         return this.db.collection<MongoDoc>("rebase_users");
     }
-    
+
     private get identitiesCollection() {
         return this.db.collection<MongoDoc>("rebase_user_identities");
     }
@@ -131,7 +132,7 @@ export class MongoUserService implements UserRepository {
     async updateUser(id: string, data: Partial<Omit<CreateUserData, "id">>): Promise<UserData | null> {
         const updateData: Record<string, unknown> = { ...data, updatedAt: new Date() };
         if (typeof updateData.email === "string") updateData.email = updateData.email.toLowerCase();
-        
+
         await this.collection.updateOne({ id }, { $set: updateData });
         return this.getUserById(id);
     }
@@ -156,7 +157,7 @@ export class MongoUserService implements UserRepository {
         const roleId = options?.roleId;
 
         const query: Record<string, unknown> = {};
-        
+
         if (search) {
             const escapedSearch = escapeRegExp(search);
             query.$or = [
@@ -402,14 +403,14 @@ export class MongoPasswordResetTokenService {
     }
 
     async findValidByHash(tokenHash: string): Promise<{ userId: string; expiresAt: Date } | null> {
-        const doc = await this.collection.findOne({ 
-            tokenHash, 
-            usedAt: null, 
-            expiresAt: { $gt: new Date() } 
+        const doc = await this.collection.findOne({
+            tokenHash,
+            usedAt: null,
+            expiresAt: { $gt: new Date() }
         });
-        
+
         if (!doc) return null;
-        
+
         return {
             userId: doc.userId,
             expiresAt: new Date(doc.expiresAt)
@@ -635,5 +636,46 @@ export class MongoAuthRepository implements AuthRepository {
 
     async deleteExpiredTokens(): Promise<void> {
         await this.tokenRepository.deleteExpiredTokens();
+    }
+
+    // MFA Repository Stub
+    async createMfaFactor(userId: string, factorType: "totp", secretEncrypted: string, friendlyName?: string): Promise<MfaFactor> {
+        throw new Error("MFA is not implemented for MongoDB");
+    }
+    async getMfaFactors(userId: string): Promise<MfaFactor[]> {
+        return [];
+    }
+    async getMfaFactorById(factorId: string): Promise<(MfaFactor & { secretEncrypted: string }) | null> {
+        return null;
+    }
+    async verifyMfaFactor(factorId: string): Promise<void> {
+        throw new Error("MFA is not implemented for MongoDB");
+    }
+    async deleteMfaFactor(factorId: string, userId: string): Promise<void> {
+        throw new Error("MFA is not implemented for MongoDB");
+    }
+    async createMfaChallenge(factorId: string, ipAddress?: string): Promise<MfaChallengeInfo> {
+        throw new Error("MFA is not implemented for MongoDB");
+    }
+    async getMfaChallengeById(challengeId: string): Promise<MfaChallengeInfo | null> {
+        return null;
+    }
+    async verifyMfaChallenge(challengeId: string): Promise<void> {
+        throw new Error("MFA is not implemented for MongoDB");
+    }
+    async createRecoveryCodes(userId: string, codeHashes: string[]): Promise<void> {
+        throw new Error("MFA is not implemented for MongoDB");
+    }
+    async useRecoveryCode(userId: string, codeHash: string): Promise<boolean> {
+        return false;
+    }
+    async getUnusedRecoveryCodeCount(userId: string): Promise<number> {
+        return 0;
+    }
+    async deleteAllRecoveryCodes(userId: string): Promise<void> {
+        // No-op
+    }
+    async hasVerifiedMfaFactors(userId: string): Promise<boolean> {
+        return false;
     }
 }

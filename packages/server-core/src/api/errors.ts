@@ -115,15 +115,24 @@ export const errorHandler: ErrorHandler = (err, c) => {
         logMessage = `Database schema mismatch (${issue} missing): ${error.message}. Did you forget to run migrations ('pnpm db:push' or 'pnpm db:migrate')?`;
     }
 
-    // Unexpected errors — log at error level
-    console.error(
-        `❌ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}`
-    );
-
-    // Suppress the huge stack trace for known DB errors (it's noisy and leaks SQL)
     const causePg = (error.cause && typeof error.cause === "object") ? (error.cause as PgLikeError) : undefined;
     const pgErrorCode = causePg?.code || error.code;
-    const suppressStack = pgErrorCode === "42703" || pgErrorCode === "42P01" || (statusCode < 500 && code === "BAD_REQUEST");
+    const isDbSchemaMismatch = pgErrorCode === "42703" || pgErrorCode === "42P01";
+
+    if (isDbSchemaMismatch) {
+        // Database schema mismatch is logged as a warning instead of a fatal error
+        console.warn(
+            `⚠️ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}`
+        );
+    } else {
+        // Unexpected errors — log at error level
+        console.error(
+            `❌ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}`
+        );
+    }
+
+    // Suppress the huge stack trace for known DB errors (it's noisy and leaks SQL)
+    const suppressStack = isDbSchemaMismatch || (statusCode < 500 && code === "BAD_REQUEST");
     if (!suppressStack) {
         console.error(error.stack || error);
     }

@@ -61,7 +61,7 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
                 env
             });
         }
-    } catch (err: unknown) {
+    } catch {
         process.exit(1);
     }
 }

@@ -56,7 +56,8 @@ accessExpiresIn: "2h" });
             const payload = verifyAccessToken(token);
             expect(payload).toEqual({
                 userId: "user-456",
-                roles: ["viewer"]
+                roles: ["viewer"],
+                aal: "aal1"
             });
         });
 
@@ -73,7 +74,8 @@ accessExpiresIn: "2h" });
             const payload = verifyAccessToken(token);
             expect(payload).toEqual({
                 userId: "user-123",
-                roles: ["admin"]
+                roles: ["admin"],
+                aal: "aal1"
             });
         });
 

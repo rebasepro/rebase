@@ -22,3 +22,19 @@
 /.idea/
 /.vscode/
 /.astro/
+
+# Terraform state and provider cache (not needed for Docker builds, contains secrets)
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.backup
+**/.terraform.tfstate.lock.info
+
+# Exclude untracked WIP admin components that fail Cloud Build compilation
+/packages/admin/src/components/LogsExplorer.tsx
+/packages/admin/src/components/SchemaVisualizer.tsx
+
+# Exclude large logs and reports
+/eslint_report.json
+/*.log
+/yarn.lock
+

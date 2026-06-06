@@ -61,7 +61,7 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
                 env
             });
         }
-    } catch (err: unknown) {
+    } catch {
         // If the process exits with an error code, execa will throw,
         // but inherit stdio means the user already saw the output.
         process.exit(1);

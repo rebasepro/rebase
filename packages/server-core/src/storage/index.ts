@@ -16,6 +16,9 @@ export { S3StorageController } from "./S3StorageController";
 export { createStorageRoutes } from "./routes";
 export type { StorageRoutesConfig } from "./routes";
 export * from "./storage-registry";
+export { parseTransformOptions, transformImage, isTransformableImage, TransformCache } from "./image-transform";
+export type { ImageTransformOptions } from "./image-transform";
+export { TusHandler } from "./tus-handler";
 
 import { BackendStorageConfig, StorageController } from "./types";
 import { LocalStorageController } from "./LocalStorageController";

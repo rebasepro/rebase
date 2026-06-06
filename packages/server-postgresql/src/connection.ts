@@ -82,3 +82,80 @@ export function createPostgresDatabaseConnection(
 pool,
 connectionString };
 }
+
+/**
+ * Create a direct (non-pooled) connection for operations that require
+ * session-level features incompatible with PgBouncer transaction mode,
+ * such as LISTEN/NOTIFY, prepared statements, or advisory locks.
+ *
+ * Uses a smaller pool since this is only for specific use cases.
+ */
+export function createDirectDatabaseConnection(
+    connectionString: string,
+    schema?: Record<string, unknown>,
+    poolConfig?: PostgresPoolConfig
+) {
+    const opts = {
+        ...DEFAULT_POOL,
+        max: 5,
+        ...poolConfig
+    };
+
+    const pgPoolConfig: PoolConfig = {
+        connectionString,
+        max: opts.max,
+        idleTimeoutMillis: opts.idleTimeoutMillis,
+        connectionTimeoutMillis: opts.connectionTimeoutMillis,
+        query_timeout: opts.queryTimeout,
+        statement_timeout: opts.statementTimeout,
+        keepAlive: opts.keepAlive,
+        keepAliveInitialDelayMillis: 0
+    };
+
+    const pool = new Pool(pgPoolConfig);
+
+    pool.on("error", (err) => {
+        console.error("[pg-direct-pool] Unexpected pool error:", err.message);
+    });
+
+    const db = schema ? drizzle(pool, { schema }) : drizzle(pool);
+
+    return { db, pool, connectionString };
+}
+
+/**
+ * Create a read-only connection for routing read queries to replicas.
+ * Uses a moderate pool size since reads are distributed across replicas.
+ */
+export function createReadReplicaConnection(
+    connectionString: string,
+    schema?: Record<string, unknown>,
+    poolConfig?: PostgresPoolConfig
+) {
+    const opts = {
+        ...DEFAULT_POOL,
+        max: 10,
+        ...poolConfig
+    };
+
+    const pgPoolConfig: PoolConfig = {
+        connectionString,
+        max: opts.max,
+        idleTimeoutMillis: opts.idleTimeoutMillis,
+        connectionTimeoutMillis: opts.connectionTimeoutMillis,
+        query_timeout: opts.queryTimeout,
+        statement_timeout: opts.statementTimeout,
+        keepAlive: opts.keepAlive,
+        keepAliveInitialDelayMillis: 0
+    };
+
+    const pool = new Pool(pgPoolConfig);
+
+    pool.on("error", (err) => {
+        console.error("[pg-replica-pool] Unexpected pool error:", err.message);
+    });
+
+    const db = schema ? drizzle(pool, { schema }) : drizzle(pool);
+
+    return { db, pool, connectionString };
+}

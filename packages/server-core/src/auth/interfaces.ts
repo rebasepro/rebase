@@ -20,6 +20,7 @@ export interface UserData {
     emailVerified: boolean;
     emailVerificationToken?: string | null;
     emailVerificationSentAt?: Date | null;
+    isAnonymous?: boolean;
     metadata?: Record<string, unknown>;
     createdAt: Date;
     updatedAt: Date;
@@ -34,6 +35,7 @@ export interface CreateUserData {
     displayName?: string;
     photoUrl?: string;
     emailVerified?: boolean;
+    isAnonymous?: boolean;
     metadata?: Record<string, unknown>;
 }
 
@@ -357,7 +359,115 @@ export interface TokenRepository {
     deleteExpiredTokens(): Promise<void>;
 }
 
+// =============================================================================
+// MFA INTERFACES
+// =============================================================================
+
+/**
+ * MFA factor data structure
+ */
+export interface MfaFactor {
+    id: string;
+    userId: string;
+    factorType: "totp";
+    friendlyName?: string;
+    verified: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+/**
+ * MFA challenge information
+ */
+export interface MfaChallengeInfo {
+    id: string;
+    factorId: string;
+    createdAt: Date;
+    verifiedAt?: Date;
+    ipAddress?: string;
+}
+
+/**
+ * Recovery code data structure
+ */
+export interface RecoveryCode {
+    id: string;
+    userId: string;
+    usedAt?: Date;
+}
+
+/**
+ * Abstract MFA repository interface.
+ * Handles all MFA-related database operations.
+ */
+export interface MfaRepository {
+    /**
+     * Create a new MFA factor for a user
+     */
+    createMfaFactor(userId: string, factorType: "totp", secretEncrypted: string, friendlyName?: string): Promise<MfaFactor>;
+
+    /**
+     * Get all MFA factors for a user
+     */
+    getMfaFactors(userId: string): Promise<MfaFactor[]>;
+
+    /**
+     * Get a specific MFA factor by ID
+     */
+    getMfaFactorById(factorId: string): Promise<(MfaFactor & { secretEncrypted: string }) | null>;
+
+    /**
+     * Mark an MFA factor as verified
+     */
+    verifyMfaFactor(factorId: string): Promise<void>;
+
+    /**
+     * Delete an MFA factor
+     */
+    deleteMfaFactor(factorId: string, userId: string): Promise<void>;
+
+    /**
+     * Create an MFA challenge
+     */
+    createMfaChallenge(factorId: string, ipAddress?: string): Promise<MfaChallengeInfo>;
+
+    /**
+     * Get an MFA challenge by ID
+     */
+    getMfaChallengeById(challengeId: string): Promise<MfaChallengeInfo | null>;
+
+    /**
+     * Mark an MFA challenge as verified
+     */
+    verifyMfaChallenge(challengeId: string): Promise<void>;
+
+    /**
+     * Create recovery codes for a user
+     */
+    createRecoveryCodes(userId: string, codeHashes: string[]): Promise<void>;
+
+    /**
+     * Use a recovery code (mark as used)
+     */
+    useRecoveryCode(userId: string, codeHash: string): Promise<boolean>;
+
+    /**
+     * Get unused recovery code count for a user
+     */
+    getUnusedRecoveryCodeCount(userId: string): Promise<number>;
+
+    /**
+     * Delete all recovery codes for a user
+     */
+    deleteAllRecoveryCodes(userId: string): Promise<void>;
+
+    /**
+     * Check if a user has any verified MFA factors
+     */
+    hasVerifiedMfaFactors(userId: string): Promise<boolean>;
+}
+
 /**
  * Combined auth repository interface for convenience
  */
-export interface AuthRepository extends UserRepository, RoleRepository, TokenRepository { }
+export interface AuthRepository extends UserRepository, RoleRepository, TokenRepository, MfaRepository { }

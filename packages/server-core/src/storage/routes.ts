@@ -9,6 +9,11 @@ import { LocalStorageController } from "./LocalStorageController";
 import { requireAuth as jwtRequireAuth, optionalAuth } from "../auth/middleware";
 import { ApiError, errorHandler } from "../api/errors";
 import { HonoEnv } from "../api/types";
+import { parseTransformOptions, transformImage, isTransformableImage, TransformCache } from "./image-transform";
+import { TusHandler } from "./tus-handler";
+
+/** Shared image transform cache (LRU, 500 entries, 1 hour TTL). */
+const transformCache = new TransformCache();
 
 export interface StorageRoutesConfig {
     controller: StorageController;
@@ -129,6 +134,9 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
 
         const filePath = decodeURIComponent(rawPath);
 
+        // Parse image transform query params (e.g. ?width=300&format=webp)
+        const transformOpts = parseTransformOptions(c.req.query() as Record<string, string>);
+
         // For local storage, serve the file directly from disk
         if (controller.getType() === "local") {
             const localController = controller as LocalStorageController;
@@ -153,9 +161,22 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                 }
             }
 
-            c.header("Content-Type", contentType);
-            // In a better scenario, we should pipe the stream instead of reading whole file
             const fileContent = fs.readFileSync(absolutePath);
+
+            // Apply image transforms if requested and the file is a transformable image
+            if (transformOpts && isTransformableImage(contentType)) {
+                const cacheKey = transformCache.buildKey(filePath, transformOpts);
+                let cached = transformCache.get(cacheKey);
+                if (!cached) {
+                    cached = await transformImage(Buffer.from(fileContent), transformOpts);
+                    transformCache.set(cacheKey, cached.data, cached.contentType);
+                }
+                c.header("Content-Type", cached.contentType);
+                c.header("Cache-Control", "public, max-age=31536000, immutable");
+                return c.body(new Uint8Array(cached.data));
+            }
+
+            c.header("Content-Type", contentType);
             return c.body(new Uint8Array(fileContent));
         }
 
@@ -169,7 +190,23 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             throw ApiError.notFound("File not found");
         }
 
-        c.header("Content-Type", fileObject.type || "application/octet-stream");
+        const remoteContentType = fileObject.type || "application/octet-stream";
+
+        // Apply image transforms for remote storage too
+        if (transformOpts && isTransformableImage(remoteContentType)) {
+            const cacheKey = transformCache.buildKey(filePath, transformOpts);
+            let cached = transformCache.get(cacheKey);
+            if (!cached) {
+                const buf = Buffer.from(await fileObject.arrayBuffer());
+                cached = await transformImage(buf, transformOpts);
+                transformCache.set(cacheKey, cached.data, cached.contentType);
+            }
+            c.header("Content-Type", cached.contentType);
+            c.header("Cache-Control", "public, max-age=31536000, immutable");
+            return c.body(new Uint8Array(cached.data));
+        }
+
+        c.header("Content-Type", remoteContentType);
         c.header("Cache-Control", "public, max-age=3600, immutable");
         const buf = await fileObject.arrayBuffer();
         return c.body(new Uint8Array(buf));
@@ -287,6 +324,22 @@ message: "No file to delete" });
             message: "Folder created"
         }, 201);
     });
+
+    // -----------------------------------------------------------------------
+    // TUS Resumable Uploads
+    // -----------------------------------------------------------------------
+
+    const tusBaseDir = controller.getType() === "local"
+        ? (controller as LocalStorageController).getBasePath()
+        : (process.env.STORAGE_PATH || "./uploads");
+    const tusHandler = new TusHandler(tusBaseDir, controller);
+    tusHandler.startCleanup();
+
+    router.options("/tus", (_c) => tusHandler.options());
+    router.post("/tus", writeAuthMiddleware, async (c) => tusHandler.create(c));
+    router.get("/tus/:id", readAuthMiddleware, (c) => tusHandler.head(c, c.req.param("id")));
+    router.patch("/tus/:id", writeAuthMiddleware, async (c) => tusHandler.patch(c, c.req.param("id")));
+    router.delete("/tus/:id", writeAuthMiddleware, async (c) => tusHandler.delete(c, c.req.param("id")));
 
     return router;
 }

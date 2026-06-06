@@ -33,7 +33,7 @@ const isExternal = (id: string) => {
     // Externalize only deps the consumer app explicitly installs
     if (CONSUMER_EXTERNALS.some(ext => id === ext || id.startsWith(ext + "/"))) return true;
     // Externalize Node built-ins
-    if (["fs", "path", "url", "util", "crypto", "http", "https", "net", "tls", "stream", "events", "os", "child_process", "buffer", "assert", "node:"].some(b => id === b || id.startsWith("node:") || id.startsWith(b + "/"))) return true;
+    if (["fs", "path", "url", "util", "crypto", "http", "https", "net", "tls", "stream", "events", "os", "child_process", "buffer", "assert", "dns", "zlib", "querystring", "node:"].some(b => id === b || id.startsWith("node:") || id.startsWith(b + "/"))) return true;
     // Inline everything else (jsonwebtoken, ws, zod, etc.)
     return false;
 };

@@ -67,7 +67,8 @@ describe("Auth Middleware", () => {
             expect(nextFn).toHaveBeenCalled();
             expect(getUser()).toEqual({
                 userId: "user-123",
-                roles: ["admin", "editor"]
+                roles: ["admin", "editor"],
+                aal: "aal1"
             });
         });
 
@@ -144,7 +145,8 @@ describe("Auth Middleware", () => {
             expect(nextFn).toHaveBeenCalled();
             expect(getUser()).toEqual({
                 userId: "user-123",
-                roles: ["viewer"]
+                roles: ["viewer"],
+                aal: "aal1"
             });
         });
     });
@@ -159,7 +161,8 @@ describe("Auth Middleware", () => {
             expect(nextFn).toHaveBeenCalled();
             expect(getUser()).toEqual({
                 userId: "user-456",
-                roles: ["viewer"]
+                roles: ["viewer"],
+                aal: "aal1"
             });
         });
 
@@ -273,7 +276,8 @@ roles: ["schema-adminstration", "admins", "admin "] } });
 
             expect(payload).toEqual({
                 userId: "ws-user-123",
-                roles: ["admin"]
+                roles: ["admin"],
+                aal: "aal1"
             });
         });
 
@@ -293,7 +297,8 @@ roles: ["schema-adminstration", "admins", "admin "] } });
 
             expect(payload).toEqual({
                 userId: "user-no-roles",
-                roles: []
+                roles: [],
+                aal: "aal1"
             });
         });
     });

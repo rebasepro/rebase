@@ -6,6 +6,7 @@ import {
     UserRepository,
     RoleRepository,
     TokenRepository,
+    MfaRepository,
     AuthRepository,
     UserData,
     CreateUserData,
@@ -16,6 +17,8 @@ import {
     UserIdentityData,
     ListUsersOptions,
     PaginatedUsersResult,
+    MfaFactor,
+    MfaChallengeInfo,
     RoleData as Role
 // @ts-ignore
 } from "@rebasepro/server-core";
@@ -97,6 +100,7 @@ export class UserService implements UserRepository {
         const emailVerified = (row.email_verified ?? row.emailVerified ?? false) as boolean;
         const emailVerificationToken = (row.email_verification_token ?? row.emailVerificationToken ?? null) as string | null | undefined;
         const emailVerificationSentAt = (row.email_verification_sent_at ?? row.emailVerificationSentAt ?? null) as string | number | Date | null;
+        const isAnonymous = (row.is_anonymous ?? row.isAnonymous ?? false) as boolean;
         const createdAt = (row.created_at ?? row.createdAt) as string | number | Date | undefined;
         const updatedAt = (row.updated_at ?? row.updatedAt) as string | number | Date | undefined;
 
@@ -110,6 +114,7 @@ export class UserService implements UserRepository {
             "email_verified", "emailVerified",
             "email_verification_token", "emailVerificationToken",
             "email_verification_sent_at", "emailVerificationSentAt",
+            "is_anonymous", "isAnonymous",
             "created_at", "createdAt",
             "updated_at", "updatedAt",
             "metadata"
@@ -131,6 +136,7 @@ export class UserService implements UserRepository {
             emailVerified,
             emailVerificationToken,
             emailVerificationSentAt: emailVerificationSentAt ? new Date(emailVerificationSentAt) : null,
+            isAnonymous,
             createdAt: createdAt ? new Date(createdAt) : new Date(),
             updatedAt: updatedAt ? new Date(updatedAt) : new Date(),
             metadata
@@ -150,6 +156,7 @@ export class UserService implements UserRepository {
         const emailVerifiedKey = getColumnKey(this.usersTable, "emailVerified", "email_verified") || "emailVerified";
         const emailVerificationTokenKey = getColumnKey(this.usersTable, "emailVerificationToken", "email_verification_token") || "emailVerificationToken";
         const emailVerificationSentAtKey = getColumnKey(this.usersTable, "emailVerificationSentAt", "email_verification_sent_at") || "emailVerificationSentAt";
+        const isAnonymousKey = getColumnKey(this.usersTable, "isAnonymous", "is_anonymous") || "isAnonymous";
         const createdAtKey = getColumnKey(this.usersTable, "createdAt", "created_at") || "createdAt";
         const updatedAtKey = getColumnKey(this.usersTable, "updatedAt", "updated_at") || "updatedAt";
         const metadataKey = getColumnKey(this.usersTable, "metadata") || "metadata";
@@ -162,6 +169,7 @@ export class UserService implements UserRepository {
         if ("emailVerified" in data) payload[emailVerifiedKey] = data.emailVerified;
         if ("emailVerificationToken" in data) payload[emailVerificationTokenKey] = data.emailVerificationToken;
         if ("emailVerificationSentAt" in data) payload[emailVerificationSentAtKey] = data.emailVerificationSentAt;
+        if ("isAnonymous" in data) payload[isAnonymousKey] = data.isAnonymous;
         if ("createdAt" in data) payload[createdAtKey] = data.createdAt;
         if ("updatedAt" in data) payload[updatedAtKey] = data.updatedAt;
 
@@ -179,6 +187,7 @@ export class UserService implements UserRepository {
                 tableColKey !== emailVerifiedKey && 
                 tableColKey !== emailVerificationTokenKey && 
                 tableColKey !== emailVerificationSentAtKey && 
+                tableColKey !== isAnonymousKey &&
                 tableColKey !== createdAtKey && 
                 tableColKey !== updatedAtKey && 
                 tableColKey !== metadataKey) {
@@ -1029,6 +1038,273 @@ export class PostgresAuthRepository implements AuthRepository {
 
     async deleteExpiredTokens(): Promise<void> {
         await this.tokenRepository.deleteExpiredTokens();
+    }
+
+    // MFA operations (delegate to MfaService)
+
+    private _mfaService: MfaService | null = null;
+    private getMfaService(): MfaService {
+        if (!this._mfaService) {
+            this._mfaService = new MfaService(this.db);
+        }
+        return this._mfaService;
+    }
+
+    async createMfaFactor(userId: string, factorType: "totp", secretEncrypted: string, friendlyName?: string): Promise<MfaFactor> {
+        return this.getMfaService().createMfaFactor(userId, factorType, secretEncrypted, friendlyName);
+    }
+
+    async getMfaFactors(userId: string): Promise<MfaFactor[]> {
+        return this.getMfaService().getMfaFactors(userId);
+    }
+
+    async getMfaFactorById(factorId: string): Promise<(MfaFactor & { secretEncrypted: string }) | null> {
+        return this.getMfaService().getMfaFactorById(factorId);
+    }
+
+    async verifyMfaFactor(factorId: string): Promise<void> {
+        return this.getMfaService().verifyMfaFactor(factorId);
+    }
+
+    async deleteMfaFactor(factorId: string, userId: string): Promise<void> {
+        return this.getMfaService().deleteMfaFactor(factorId, userId);
+    }
+
+    async createMfaChallenge(factorId: string, ipAddress?: string): Promise<MfaChallengeInfo> {
+        return this.getMfaService().createMfaChallenge(factorId, ipAddress);
+    }
+
+    async getMfaChallengeById(challengeId: string): Promise<MfaChallengeInfo | null> {
+        return this.getMfaService().getMfaChallengeById(challengeId);
+    }
+
+    async verifyMfaChallenge(challengeId: string): Promise<void> {
+        return this.getMfaService().verifyMfaChallenge(challengeId);
+    }
+
+    async createRecoveryCodes(userId: string, codeHashes: string[]): Promise<void> {
+        return this.getMfaService().createRecoveryCodes(userId, codeHashes);
+    }
+
+    async useRecoveryCode(userId: string, codeHash: string): Promise<boolean> {
+        return this.getMfaService().useRecoveryCode(userId, codeHash);
+    }
+
+    async getUnusedRecoveryCodeCount(userId: string): Promise<number> {
+        return this.getMfaService().getUnusedRecoveryCodeCount(userId);
+    }
+
+    async deleteAllRecoveryCodes(userId: string): Promise<void> {
+        return this.getMfaService().deleteAllRecoveryCodes(userId);
+    }
+
+    async hasVerifiedMfaFactors(userId: string): Promise<boolean> {
+        return this.getMfaService().hasVerifiedMfaFactors(userId);
+    }
+}
+
+// =============================================================================
+// MFA SERVICE
+// =============================================================================
+
+/**
+ * PostgreSQL implementation of MfaRepository.
+ * Handles all MFA-related database operations.
+ */
+export class MfaService implements MfaRepository {
+    constructor(private db: NodePgDatabase, private schemaName: string = "rebase") {}
+
+    private qualify(tableName: string): string {
+        return `"${this.schemaName}"."${tableName}"`;
+    }
+
+    async createMfaFactor(
+        userId: string,
+        factorType: "totp",
+        secretEncrypted: string,
+        friendlyName?: string
+    ): Promise<MfaFactor> {
+        const tableName = this.qualify("mfa_factors");
+        const result = await this.db.execute(sql`
+            INSERT INTO ${sql.raw(tableName)} (user_id, factor_type, secret_encrypted, friendly_name)
+            VALUES (${userId}, ${factorType}, ${secretEncrypted}, ${friendlyName ?? null})
+            RETURNING id, user_id, factor_type, friendly_name, verified, created_at, updated_at
+        `);
+
+        const row = result.rows[0] as Record<string, unknown>;
+        return {
+            id: row.id as string,
+            userId: row.user_id as string,
+            factorType: row.factor_type as "totp",
+            friendlyName: (row.friendly_name as string | null) ?? undefined,
+            verified: row.verified as boolean,
+            createdAt: new Date(row.created_at as string),
+            updatedAt: new Date(row.updated_at as string)
+        };
+    }
+
+    async getMfaFactors(userId: string): Promise<MfaFactor[]> {
+        const tableName = this.qualify("mfa_factors");
+        const result = await this.db.execute(sql`
+            SELECT id, user_id, factor_type, friendly_name, verified, created_at, updated_at
+            FROM ${sql.raw(tableName)}
+            WHERE user_id = ${userId}
+            ORDER BY created_at
+        `);
+
+        return (result.rows as Array<Record<string, unknown>>).map(row => ({
+            id: row.id as string,
+            userId: row.user_id as string,
+            factorType: row.factor_type as "totp",
+            friendlyName: (row.friendly_name as string | null) ?? undefined,
+            verified: row.verified as boolean,
+            createdAt: new Date(row.created_at as string),
+            updatedAt: new Date(row.updated_at as string)
+        }));
+    }
+
+    async getMfaFactorById(factorId: string): Promise<(MfaFactor & { secretEncrypted: string }) | null> {
+        const tableName = this.qualify("mfa_factors");
+        const result = await this.db.execute(sql`
+            SELECT id, user_id, factor_type, secret_encrypted, friendly_name, verified, created_at, updated_at
+            FROM ${sql.raw(tableName)}
+            WHERE id = ${factorId}
+        `);
+
+        if (result.rows.length === 0) return null;
+
+        const row = result.rows[0] as Record<string, unknown>;
+        return {
+            id: row.id as string,
+            userId: row.user_id as string,
+            factorType: row.factor_type as "totp",
+            secretEncrypted: row.secret_encrypted as string,
+            friendlyName: (row.friendly_name as string | null) ?? undefined,
+            verified: row.verified as boolean,
+            createdAt: new Date(row.created_at as string),
+            updatedAt: new Date(row.updated_at as string)
+        };
+    }
+
+    async verifyMfaFactor(factorId: string): Promise<void> {
+        const tableName = this.qualify("mfa_factors");
+        await this.db.execute(sql`
+            UPDATE ${sql.raw(tableName)}
+            SET verified = TRUE, updated_at = NOW()
+            WHERE id = ${factorId}
+        `);
+    }
+
+    async deleteMfaFactor(factorId: string, userId: string): Promise<void> {
+        const tableName = this.qualify("mfa_factors");
+        await this.db.execute(sql`
+            DELETE FROM ${sql.raw(tableName)}
+            WHERE id = ${factorId} AND user_id = ${userId}
+        `);
+    }
+
+    async createMfaChallenge(factorId: string, ipAddress?: string): Promise<MfaChallengeInfo> {
+        const tableName = this.qualify("mfa_challenges");
+        // Challenges expire in 5 minutes
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+        const result = await this.db.execute(sql`
+            INSERT INTO ${sql.raw(tableName)} (factor_id, ip_address, expires_at)
+            VALUES (${factorId}, ${ipAddress ?? null}, ${expiresAt})
+            RETURNING id, factor_id, created_at, verified_at, ip_address
+        `);
+
+        const row = result.rows[0] as Record<string, unknown>;
+        return {
+            id: row.id as string,
+            factorId: row.factor_id as string,
+            createdAt: new Date(row.created_at as string),
+            verifiedAt: row.verified_at ? new Date(row.verified_at as string) : undefined,
+            ipAddress: (row.ip_address as string | null) ?? undefined
+        };
+    }
+
+    async getMfaChallengeById(challengeId: string): Promise<MfaChallengeInfo | null> {
+        const tableName = this.qualify("mfa_challenges");
+        const result = await this.db.execute(sql`
+            SELECT id, factor_id, created_at, verified_at, ip_address, expires_at
+            FROM ${sql.raw(tableName)}
+            WHERE id = ${challengeId} AND expires_at > NOW() AND verified_at IS NULL
+        `);
+
+        if (result.rows.length === 0) return null;
+
+        const row = result.rows[0] as Record<string, unknown>;
+        return {
+            id: row.id as string,
+            factorId: row.factor_id as string,
+            createdAt: new Date(row.created_at as string),
+            verifiedAt: row.verified_at ? new Date(row.verified_at as string) : undefined,
+            ipAddress: (row.ip_address as string | null) ?? undefined
+        };
+    }
+
+    async verifyMfaChallenge(challengeId: string): Promise<void> {
+        const tableName = this.qualify("mfa_challenges");
+        await this.db.execute(sql`
+            UPDATE ${sql.raw(tableName)}
+            SET verified_at = NOW()
+            WHERE id = ${challengeId}
+        `);
+    }
+
+    async createRecoveryCodes(userId: string, codeHashes: string[]): Promise<void> {
+        const tableName = this.qualify("recovery_codes");
+        // Delete existing codes first
+        await this.db.execute(sql`
+            DELETE FROM ${sql.raw(tableName)} WHERE user_id = ${userId}
+        `);
+
+        // Insert new codes
+        for (const hash of codeHashes) {
+            await this.db.execute(sql`
+                INSERT INTO ${sql.raw(tableName)} (user_id, code_hash)
+                VALUES (${userId}, ${hash})
+            `);
+        }
+    }
+
+    async useRecoveryCode(userId: string, codeHash: string): Promise<boolean> {
+        const tableName = this.qualify("recovery_codes");
+        const result = await this.db.execute(sql`
+            UPDATE ${sql.raw(tableName)}
+            SET used_at = NOW()
+            WHERE user_id = ${userId} AND code_hash = ${codeHash} AND used_at IS NULL
+            RETURNING id
+        `);
+
+        return result.rows.length > 0;
+    }
+
+    async getUnusedRecoveryCodeCount(userId: string): Promise<number> {
+        const tableName = this.qualify("recovery_codes");
+        const result = await this.db.execute(sql`
+            SELECT COUNT(*)::int as count FROM ${sql.raw(tableName)}
+            WHERE user_id = ${userId} AND used_at IS NULL
+        `);
+
+        return (result.rows[0] as { count: number }).count;
+    }
+
+    async deleteAllRecoveryCodes(userId: string): Promise<void> {
+        const tableName = this.qualify("recovery_codes");
+        await this.db.execute(sql`
+            DELETE FROM ${sql.raw(tableName)} WHERE user_id = ${userId}
+        `);
+    }
+
+    async hasVerifiedMfaFactors(userId: string): Promise<boolean> {
+        const tableName = this.qualify("mfa_factors");
+        const result = await this.db.execute(sql`
+            SELECT COUNT(*)::int as count FROM ${sql.raw(tableName)}
+            WHERE user_id = ${userId} AND verified = TRUE
+        `);
+
+        return (result.rows[0] as { count: number }).count > 0;
     }
 }
 

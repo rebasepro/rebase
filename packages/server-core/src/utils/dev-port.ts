@@ -43,6 +43,20 @@ export function listenWithPortRetry(
     const maxAttempts = options?.maxAttempts ?? MAX_PORT_ATTEMPTS;
     const portFileDir = options?.portFileDir;
 
+    const isProd = process.env.NODE_ENV === "production";
+    if (isProd) {
+        return new Promise<number>((resolve, reject) => {
+            const onError = (err: Error) => {
+                reject(err);
+            };
+            server.once("error", onError);
+            server.listen(startPort, host, () => {
+                server.removeListener("error", onError);
+                resolve(startPort);
+            });
+        });
+    }
+
     // Read affinity port from a previous run's port file.
     // This ensures tsx watch restarts land on the same port the frontend was
     // configured with, even if the CLI-computed port was different.

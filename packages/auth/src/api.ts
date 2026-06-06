@@ -350,7 +350,11 @@ export interface AuthConfigResponse {
     /** Whether new user registration is enabled */
     registrationEnabled: boolean;
     /** Whether email service is configured */
-    emailServiceEnabled: boolean;
+    emailServiceEnabled?: boolean;
+    /** Whether password reset is supported */
+    passwordReset?: boolean;
+    /** Whether email verification is supported */
+    emailVerification?: boolean;
     /** Complete list of enabled OAuth provider IDs (e.g. ["google", "github", "discord"]) */
     enabledProviders: string[];
 }
