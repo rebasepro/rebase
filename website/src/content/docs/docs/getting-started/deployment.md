@@ -11,7 +11,7 @@ The generated project includes a `Dockerfile` and `docker-compose.yml`. This is 
 ```yaml title="docker-compose.yml"
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: rebase
       POSTGRES_PASSWORD: rebase

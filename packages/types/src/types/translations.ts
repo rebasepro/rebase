@@ -121,6 +121,12 @@ export interface RebaseTranslations {
     navigation_drawer: string;
     collapse: string;
     expand: string;
+    /** Tooltip for the language switcher in the drawer footer */
+    change_language?: string;
+    /** Tooltip for the theme toggle in the drawer footer */
+    toggle_theme?: string;
+    /** Aria label for the user menu trigger in the drawer footer */
+    user_menu?: string;
 
     // ─── Error states ─────────────────────────────────────────────
     error: string;
@@ -486,18 +492,28 @@ export interface RebaseTranslations {
 
     select_reference: string;
     select_references: string;
-    account_settings: string;
-    profile: string;
-    sessions: string;
-    display_name: string;
-    photo_url: string;
-    save_profile: string;
-    saving: string;
-    no_active_sessions: string;
-    revoking: string;
-    revoke_all_sessions: string;
-    unknown_device: string;
-    current: string;
+    account_settings?: string;
+    profile?: string;
+    sessions?: string;
+    security?: string;
+    change_password?: string;
+    current_password?: string;
+    new_password?: string;
+    confirm_password?: string;
+    password_changed?: string;
+    passwords_dont_match?: string;
+    password_too_short?: string;
+    password_change_not_available?: string;
+    changing_password?: string;
+    display_name?: string;
+    photo_url?: string;
+    save_profile?: string;
+    saving?: string;
+    no_active_sessions?: string;
+    revoking?: string;
+    revoke_all_sessions?: string;
+    unknown_device?: string;
+    current?: string;
     role_id: string;
     role_name: string;
     add_reference: string;

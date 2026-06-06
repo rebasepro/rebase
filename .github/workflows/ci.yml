@@ -65,7 +65,7 @@ jobs:
 
       - name: Start PostgreSQL container
         run: |
-          docker run --name rebase-postgres -e POSTGRES_DB=rebase_saas -e POSTGRES_USER=rebase -e POSTGRES_PASSWORD=rebase -p 5432:5432 -d postgres:16
+          docker run --name rebase-postgres -e POSTGRES_DB=rebase_saas -e POSTGRES_USER=rebase -e POSTGRES_PASSWORD=rebase -p 5432:5432 -d postgres:18
           until docker exec rebase-postgres pg_isready -U rebase -d rebase_saas; do
             echo "Waiting for postgres..."
             sleep 1

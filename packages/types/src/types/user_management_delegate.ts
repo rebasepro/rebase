@@ -130,6 +130,13 @@ export interface UserManagementDelegate<USER extends User = User> {
     defineRolesFor?: (user: USER) => Promise<Role[] | undefined> | Role[] | undefined;
 
     /**
+     * Whether any admin users exist. Used by the bootstrap banner to decide
+     * whether to prompt.  Populated via a lightweight check (e.g. `limit=1`
+     * query) instead of loading all users.
+     */
+    hasAdminUsers?: boolean;
+
+    /**
      * Optional function to bootstrap an admin user.
      * Often used when the database is empty.
      */

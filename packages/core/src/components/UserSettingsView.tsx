@@ -24,24 +24,36 @@ interface SessionInfo {
 interface ExtendedAuthController {
     user: { displayName?: string | null; photoURL?: string | null; email?: string | null } | null;
     updateProfile?: (displayName: string, photoURL: string) => Promise<void>;
+    changePassword?: (oldPassword: string, newPassword: string) => Promise<void>;
     fetchSessions?: () => Promise<SessionInfo[]>;
     revokeSession?: (id: string) => Promise<void>;
     revokeAllSessions?: () => Promise<void>;
     signOut: () => Promise<void>;
 }
 
+type ActiveTab = "profile" | "security" | "sessions";
+
 export function UserSettingsView() {
     const authController = useAuthController() as ExtendedAuthController;
     const user = authController.user;
     const { t } = useTranslation();
 
-    const [activeTab, setActiveTab] = useState<"profile" | "sessions">("profile");
+    const hasPasswordChange = !!authController.changePassword;
+    const [activeTab, setActiveTab] = useState<ActiveTab>("profile");
 
     // Profile state
     const [displayName, setDisplayName] = useState(user?.displayName || "");
     const [photoURL, setPhotoURL] = useState(user?.photoURL || "");
     const [savingProfile, setSavingProfile] = useState(false);
     const [profileError, setProfileError] = useState<string | null>(null);
+
+    // Password change state
+    const [currentPassword, setCurrentPassword] = useState("");
+    const [newPassword, setNewPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [changingPassword, setChangingPassword] = useState(false);
+    const [passwordError, setPasswordError] = useState<string | null>(null);
+    const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
 
     // Sessions state
     const [sessions, setSessions] = useState<SessionInfo[]>([]);
@@ -71,6 +83,41 @@ export function UserSettingsView() {
             setProfileError(e instanceof Error ? e.message : String(e));
         } finally {
             setSavingProfile(false);
+        }
+    };
+
+    const handleChangePassword = async () => {
+        setPasswordError(null);
+        setPasswordSuccess(null);
+
+        // Validate
+        if (newPassword.length < 8) {
+            setPasswordError(t("password_too_short"));
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            setPasswordError(t("passwords_dont_match"));
+            return;
+        }
+
+        setChangingPassword(true);
+        try {
+            if (authController.changePassword) {
+                await authController.changePassword(currentPassword, newPassword);
+                setPasswordSuccess(t("password_changed"));
+                setCurrentPassword("");
+                setNewPassword("");
+                setConfirmPassword("");
+                // Backend invalidates all sessions on password change,
+                // so the user will be logged out shortly
+                setTimeout(() => {
+                    authController.signOut();
+                }, 2000);
+            }
+        } catch (e: unknown) {
+            setPasswordError(e instanceof Error ? e.message : String(e));
+        } finally {
+            setChangingPassword(false);
         }
     };
 
@@ -134,8 +181,9 @@ export function UserSettingsView() {
         <div className="flex-grow max-w-4xl w-full mx-auto p-4 sm:p-6 md:p-12">
             <Typography variant="h4" className="mb-8">{t("account_settings")}</Typography>
 
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "profile" | "sessions")} className="mb-8">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ActiveTab)} className="mb-8">
                 <Tab value="profile">{t("profile")}</Tab>
+                {hasPasswordChange && <Tab value="security">{t("security")}</Tab>}
                 <Tab value="sessions">{t("sessions")}</Tab>
             </Tabs>
 
@@ -160,6 +208,51 @@ export function UserSettingsView() {
                     <div className="mt-4">
                         <Button variant="filled" onClick={handleSaveProfile} disabled={savingProfile}>
                             {savingProfile ? t("saving") : t("save_profile")}
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === "security" && hasPasswordChange && (
+                <div className="flex flex-col gap-6 max-w-xl">
+                    <Typography variant="h6" className="mb-2">{t("change_password")}</Typography>
+
+                    <TextField
+                        label={t("current_password")}
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        autoComplete="current-password"
+                    />
+                    <TextField
+                        label={t("new_password")}
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        autoComplete="new-password"
+                    />
+                    <TextField
+                        label={t("confirm_password")}
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        autoComplete="new-password"
+                    />
+
+                    {passwordError && (
+                        <Typography color="error">{passwordError}</Typography>
+                    )}
+                    {passwordSuccess && (
+                        <Typography className="text-emerald-600 dark:text-emerald-400">{passwordSuccess}</Typography>
+                    )}
+
+                    <div className="mt-4">
+                        <Button
+                            variant="filled"
+                            onClick={handleChangePassword}
+                            disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
+                        >
+                            {changingPassword ? t("changing_password") : t("change_password")}
                         </Button>
                     </div>
                 </div>

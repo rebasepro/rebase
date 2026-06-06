@@ -30,7 +30,7 @@ Before using the Rebase MCP server, ensure Node.js and the required tools are in
 
 - **PostgreSQL**: Required for the Rebase backend
   - Check: `psql --version`
-  - Or use Docker: `docker run --name rebase-postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:16`
+  - Or use Docker: `docker run --name rebase-postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:18`
 
 
 ## Usage and Features

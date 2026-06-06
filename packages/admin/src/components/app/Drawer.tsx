@@ -13,6 +13,7 @@ export function Drawer({
                            title,
                            logo,
                            logoDestination,
+                           footerActions,
                            className,
                            style
                        }: {
@@ -20,10 +21,17 @@ export function Drawer({
     title?: React.ReactNode,
     logo?: string,
     logoDestination?: string,
+    /**
+     * Custom content for the drawer footer actions area (language, theme, user menu).
+     * - `undefined` — renders the default `DrawerFooterActions`.
+     * - `null` — renders nothing (hides the footer actions).
+     * - `ReactNode` — renders the provided custom content.
+     */
+    footerActions?: React.ReactNode | null,
     className?: string,
     style?: React.CSSProperties
 }) {
-    const usedChildren = children ?? <DefaultDrawer title={title} logo={logo} logoDestination={logoDestination} className={className} style={style}/>;
+    const usedChildren = children ?? <DefaultDrawer title={title} logo={logo} logoDestination={logoDestination} footerActions={footerActions} className={className} style={style}/>;
     return <>{usedChildren}</>;
 }
 

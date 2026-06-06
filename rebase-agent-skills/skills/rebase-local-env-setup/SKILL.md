@@ -59,13 +59,13 @@ docker run --name rebase-postgres \
   -e POSTGRES_PASSWORD=postgres \
   -e POSTGRES_DB=rebase \
   -p 5432:5432 \
-  -d postgres:16
+  -d postgres:18
 ```
 
 ### Option B: Local Installation
 
-- **macOS**: `brew install postgresql@16 && brew services start postgresql@16`
-- **Linux**: `sudo apt-get install postgresql-16`
+- **macOS**: `brew install postgresql@18 && brew services start postgresql@18`
+- **Linux**: `sudo apt-get install postgresql-18`
 - **Windows**: Download from [postgresql.org](https://www.postgresql.org/download/)
 
 ### Verify Connection

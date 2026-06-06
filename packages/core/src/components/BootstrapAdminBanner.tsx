@@ -27,10 +27,19 @@ export function BootstrapAdminBanner({
         return null;
     }
 
-    const { users, loading: delegateLoading, bootstrapAdmin, usersError } = userManagement;
-    const hasAdmin = users.some(u => u.roles?.includes("admin"));
+    // Non-admin users don't load the users list (admin API is skipped to
+    // avoid 403s), so `users` would be empty and falsely trigger this banner.
+    // Only admin users (or users with no roles yet, during initial bootstrap)
+    // should ever see this prompt.
+    const loggedInUserRoles = loggedInUser.roles ?? [];
+    const isLoggedInUserAdmin = loggedInUserRoles.length === 0 || loggedInUserRoles.some(r => r === "admin");
+    if (!isLoggedInUserAdmin) {
+        return null;
+    }
 
-    if (delegateLoading || hasAdmin || usersError || !bootstrapAdmin) {
+    const { hasAdminUsers, loading: delegateLoading, bootstrapAdmin, usersError } = userManagement;
+
+    if (delegateLoading || hasAdminUsers || usersError || !bootstrapAdmin) {
         return null;
     }
 

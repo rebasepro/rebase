@@ -1,16 +1,35 @@
 import type { NavigationEntry, NavigationResult } from "@rebasepro/types";
 import React, { useMemo } from "react";
 
-import { useCollapsedGroups, buildCollapsedDefaults, useLargeLayout, useAdminModeController, useTranslation, useSlot, useRebaseContext, useAnalyticsController, useRebaseRegistry } from "@rebasepro/core";
+import { useCollapsedGroups, buildCollapsedDefaults, useLargeLayout, useAdminModeController, useAuthController, useModeController, useTranslation, useSlot, useRebaseContext, useAnalyticsController, useRebaseRegistry } from "@rebasepro/core";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
 
 
 import { Link, useNavigate } from "react-router-dom";
 import { AnalyticsEvent } from "@rebasepro/types";
-import { ChevronsLeftIcon, ChevronsRightIcon, cls, iconSize, Tooltip, Typography } from "@rebasepro/ui";
+import {
+    Avatar,
+    ChevronsLeftIcon,
+    ChevronsRightIcon,
+    cls,
+    iconSize,
+    IconButton,
+    LanguagesIcon,
+    LogOutIcon,
+    Menu,
+    MenuItem,
+    MoonIcon,
+    Separator,
+    SettingsIcon,
+    Skeleton,
+    SunIcon,
+    SunMoonIcon,
+    Tooltip,
+    Typography
+} from "@rebasepro/ui";
 import { DrawerNavigationGroup } from "./DrawerNavigationGroup";
-import { RebaseLogo } from "@rebasepro/core";
+import { LanguageToggle, RebaseLogo } from "@rebasepro/core";
 import { useApp } from "./app/useApp";
 
 /**
@@ -21,12 +40,20 @@ export function DefaultDrawer({
     title,
     logo,
     logoDestination,
+    footerActions,
     className,
     style
 }: {
     title?: React.ReactNode;
     logo?: string;
     logoDestination?: string;
+    /**
+     * Custom content for the drawer footer actions area (language, theme, user menu).
+     * - `undefined` — renders the default `DrawerFooterActions`.
+     * - `null` — renders nothing (hides the footer actions).
+     * - `ReactNode` — renders the provided custom content.
+     */
+    footerActions?: React.ReactNode | null;
     className?: string;
     style?: React.CSSProperties;
 }) {
@@ -135,7 +162,7 @@ context });
                 <div
                     ref={scrollRef}
                     onScroll={handleScroll}
-                    className={"flex-grow min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar"}
+                    className={"flex-grow min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar px-2"}
                     style={{
                         maskImage: scrolled
                             ? "linear-gradient(to bottom, transparent 0, black 20px, black calc(100% - 20px), transparent 100%)"
@@ -162,6 +189,15 @@ context });
                 </div>
 
                 {footerSlot}
+
+                {footerActions !== null && (
+                    footerActions !== undefined
+                        ? footerActions
+                        : <DrawerFooterActions
+                            drawerOpen={drawerOpen}
+                            drawerHovered={drawerHovered}
+                        />
+                )}
 
                 <DrawerToggle
                     drawerOpen={drawerOpen}
@@ -282,7 +318,7 @@ export function DrawerToggle({
                         }
                     }}
                 >
-                    <div className="shrink-0 flex items-center justify-center w-[56px] h-[24px] text-surface-500 dark:text-surface-400">
+                    <div className="shrink-0 flex items-center justify-center w-[44px] h-[24px] text-surface-500 dark:text-surface-400">
                         {isExpanded
                             ? <ChevronsLeftIcon size={iconSize.small}/>
                             : <ChevronsRightIcon size={iconSize.small}/>
@@ -360,6 +396,143 @@ function DrawerModeSwitch({
                     Studio
                 </button>
             </div>
+        </div>
+    );
+}
+
+/**
+ * Footer actions rendered at the bottom of the drawer, above the collapse/expand toggle.
+ * Replaces the app bar icons (language, theme, user avatar) with a drawer-native layout
+ * that adapts between collapsed (icons only) and expanded (full labels + user bar) states.
+ *
+ * @group Core
+ */
+export function DrawerFooterActions({
+    drawerOpen,
+    drawerHovered,
+    /**
+     * Custom content to render inside the user dropdown menu.
+     * When provided, these items are appended after the user info header
+     * and before the default Sign Out item.
+     */
+    dropDownActions,
+    /**
+     * Override the user object displayed in the footer.
+     * When omitted, falls back to `authController.user`.
+     */
+    user: userProp
+}: {
+    drawerOpen: boolean;
+    drawerHovered: boolean;
+    dropDownActions?: React.ReactNode;
+    user?: import("@rebasepro/types").User;
+}) {
+    const authController = useAuthController();
+    const {
+        mode,
+        setMode
+    } = useModeController();
+    const navigate = useNavigate();
+    const { t } = useTranslation();
+
+    const user = userProp ?? authController.user;
+    const showFullContent = drawerOpen || drawerHovered;
+    const isFloating = drawerHovered && !drawerOpen;
+    const portalRef = React.useRef<HTMLDivElement>(null);
+
+    // User avatar
+    let avatarComponent: React.ReactElement | null;
+    if (user) {
+        const initial = user?.displayName
+            ? user.displayName[0].toUpperCase()
+            : (user?.email ? user.email[0].toUpperCase() : "A");
+        avatarComponent = <Avatar src={user.photoURL ?? undefined} className="w-8 h-8 text-xs">
+            {initial}
+        </Avatar>;
+    } else if (user === undefined || authController.initialLoading) {
+        avatarComponent = <Skeleton className="w-8 h-8 rounded-full"/>;
+    } else {
+        avatarComponent = null;
+    }
+
+    return (
+        <div className="shrink-0 pb-1" ref={portalRef}>
+            {avatarComponent && (
+                <div className="flex items-center px-[16px] py-1">
+                    <Menu
+                        trigger={
+                            <div
+                                className={cls(
+                                    "shrink-0 flex items-center justify-center w-[44px] cursor-pointer",
+                                    "rounded-md py-1",
+                                    "hover:bg-surface-accent-100 dark:hover:bg-surface-800",
+                                    "transition-colors duration-150"
+                                )}
+                                role="button"
+                                tabIndex={0}
+                                aria-label={t("user_menu") || "User menu"}
+                            >
+                                {avatarComponent}
+                            </div>
+                        }
+                        side="top"
+                        align="start"
+                    >
+                        {user && <div className="px-4 py-2 mb-1">
+                            {user.displayName && <Typography variant="body1" color="secondary">
+                                {user.displayName}
+                            </Typography>}
+                            {user.email && <Typography variant="body2" color="secondary">
+                                {user.email}
+                            </Typography>}
+                        </div>}
+
+                        {dropDownActions}
+
+                        {!dropDownActions && <>
+                            <MenuItem onClick={() => navigate("/settings")}>
+                                <SettingsIcon/>
+                                {t("account_settings")}
+                            </MenuItem>
+                            <MenuItem onClick={async () => {
+                                await authController.signOut();
+                                navigate("/");
+                            }}>
+                                <LogOutIcon/>
+                                {t("log_out")}
+                            </MenuItem>
+                        </>}
+                    </Menu>
+
+                    {/* Language + Theme — only when expanded */}
+                    {showFullContent && (
+                        <div className="flex items-center gap-0">
+                            <LanguageToggle/>
+                            <Menu
+                                trigger={
+                                    <IconButton
+                                        color="inherit"
+                                        aria-label={t("toggle_theme") || "Toggle theme"}
+                                        className="text-surface-500 dark:text-surface-400"
+                                    >
+                                        {mode === "dark"
+                                            ? <MoonIcon size={iconSize.small}/>
+                                            : mode === "light"
+                                                ? <SunIcon size={iconSize.small}/>
+                                                : <SunMoonIcon size={iconSize.small}/>}
+                                    </IconButton>
+                                }
+                                portalContainer={portalRef.current}
+                                side="top"
+                            >
+                                <MenuItem onClick={() => setMode("dark")}><MoonIcon size={iconSize.smallest}/> {t("dark_mode")}</MenuItem>
+                                <MenuItem onClick={() => setMode("light")}><SunIcon size={iconSize.smallest}/> {t("light_mode")}</MenuItem>
+                                <MenuItem onClick={() => setMode("system")}><SunMoonIcon size={iconSize.smallest}/> {t("system_mode")}</MenuItem>
+                            </Menu>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

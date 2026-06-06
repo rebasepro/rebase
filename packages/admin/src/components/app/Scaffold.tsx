@@ -74,7 +74,11 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
         const [onHover, setOnHover] = React.useState(false);
 
         const setOnHoverTrue = useCallback(() => setOnHover(true), []);
-        const setOnHoverFalse = useCallback(() => setOnHover(false), []);
+        const setOnHoverFalse = useCallback(() => {
+            // Don't collapse the drawer while a popover/dropdown is open
+            if (document.querySelector("[data-radix-popper-content-wrapper]")) return;
+            setOnHover(false);
+        }, []);
 
         const handleDrawerOpen = useCallback(() => {
             setDrawerOpen(true);

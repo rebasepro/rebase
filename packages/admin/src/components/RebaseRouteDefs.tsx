@@ -27,7 +27,7 @@ function SettingsView() {
     const breadcrumbs = useBreadcrumbsController();
     useEffect(() => {
         breadcrumbs.set({
-            breadcrumbs: [{ title: t("project_settings"),
+            breadcrumbs: [{ title: t("account_settings"),
 url: "/settings" }]
         });
 

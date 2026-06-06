@@ -71,7 +71,7 @@ services:
       - db
 
   db:
-    image: postgres:16
+    image: postgres:18
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres

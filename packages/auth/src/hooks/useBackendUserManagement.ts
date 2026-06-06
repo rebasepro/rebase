@@ -7,6 +7,7 @@ import { Role, User } from "@rebasepro/types";
  */
 export interface UserManagement<USER extends User = User> {
     loading: boolean;
+    hasAdminUsers?: boolean;
 
     users: USER[];
     saveUser: (user: USER) => Promise<USER>;
@@ -123,9 +124,10 @@ function convertRole(apiRole: ApiRole): Role {
 export function useBackendUserManagement(config: BackendUserManagementConfig): UserManagement {
     const { client, apiUrl, getAuthToken, currentUser } = config;
 
-    // We no longer load ALL users into memory.
-    // `users` now only holds admin/role-bearing users for getUser/defineRolesFor lookups.
-    const [users, setUsers] = useState<User[]>([]);
+    // Lazy user cache — populated on demand from search results, saves, and
+    // individual API lookups.  We never load ALL users into memory.
+    const [userCache, setUserCache] = useState<Map<string, User>>(new Map());
+    const [hasAdminUsers, setHasAdminUsers] = useState(false);
     const [roles, setRoles] = useState<Role[]>([]);
     const [loading, setLoading] = useState(true);
     const [usersError, setUsersError] = useState<Error | undefined>();
@@ -134,6 +136,17 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
     // Tracks the UID for which roles+users were last successfully loaded.
     // Prevents redundant refetches on React StrictMode double-mounts.
     const lastLoadedUidRef = useRef<string | null>(null);
+
+    /** Merge one or more users into the cache without replacing the whole Map. */
+    const mergeIntoCache = useCallback((incoming: User[]) => {
+        setUserCache(prev => {
+            const next = new Map(prev);
+            for (const u of incoming) {
+                next.set(u.uid, u);
+            }
+            return next;
+        });
+    }, []);
 
     // Ref to hold the latest apiRequest so the initial-load effect doesn't
     // re-trigger every time the callback identity changes.
@@ -249,21 +262,25 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
     }, [apiRequest]);
 
     /**
-     * Load users for getUser/defineRolesFor lookups and for UserSelect dropdowns.
+     * Lightweight admin-existence check: fetch a single admin user.
+     * Used by the BootstrapAdminBanner to decide whether to show.
      */
-    const loadUsers = useCallback(async (signal?: AbortSignal) => {
+    const checkAdminExists = useCallback(async (signal?: AbortSignal) => {
         try {
-            // Load all users to satisfy Rebase CMS UserSelect field bindings
-            const data = await apiRequest("/users", "GET", undefined, 6, signal);
-            const allUsers: User[] = data.users.map((u: ApiUser) => convertUser(u));
-            setUsers(allUsers);
+            const data = await apiRequest("/users?role=admin&limit=1", "GET", undefined, 6, signal);
+            const adminUsers: User[] = data.users.map((u: ApiUser) => convertUser(u));
+            setHasAdminUsers(adminUsers.length > 0);
+            // Also cache these admin users for getUser lookups
+            if (adminUsers.length > 0) {
+                mergeIntoCache(adminUsers);
+            }
             setUsersError(undefined);
         } catch (error: unknown) {
             if (error instanceof Error && error.name === "AbortError") return;
-            console.error("Failed to load users:", error);
+            console.error("Failed to check admin users:", error);
             setUsersError(error instanceof Error ? error : new Error(String(error)));
         }
-    }, [apiRequest]);
+    }, [apiRequest, mergeIntoCache]);
 
     /**
      * Initial data load - only when user is logged in
@@ -312,9 +329,9 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
                 console.error("Failed to load roles:", error);
                 setRolesError(error instanceof Error ? error : new Error(String(error)));
 
-                // If the error is a permission issue (e.g. 403), skip loading
-                // users — they will fail with the same error and we'd show a
-                // duplicate snackbar / error message.
+                // If the error is a permission issue (e.g. 403), skip the
+                // admin check — it will fail with the same error and we'd
+                // show a duplicate snackbar / error message.
                 const status = (error as { status?: number }).status;
                 if (status === 403 || status === 401) {
                     setUsersError(error instanceof Error ? error : new Error(String(error)));
@@ -323,16 +340,19 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
                 }
             }
 
-            // Then load all users if not aborted
+            // Lightweight admin-existence check (NOT loading all users)
             if (!abortController.signal.aborted) {
                 try {
-                    const data = await request("/users", "GET", undefined, 6, abortController.signal);
-                    const allUsers: User[] = data.users.map((u: ApiUser) => convertUser(u));
-                    setUsers(allUsers);
+                    const data = await request("/users?role=admin&limit=1", "GET", undefined, 6, abortController.signal);
+                    const adminUsers: User[] = data.users.map((u: ApiUser) => convertUser(u));
+                    setHasAdminUsers(adminUsers.length > 0);
+                    if (adminUsers.length > 0) {
+                        mergeIntoCache(adminUsers);
+                    }
                     setUsersError(undefined);
                 } catch (error: unknown) {
                     if (error instanceof Error && error.name === "AbortError") return;
-                    console.error("Failed to load users:", error);
+                    console.error("Failed to check admin users:", error);
                     setUsersError(error instanceof Error ? error : new Error(String(error)));
                 }
             }
@@ -353,6 +373,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
     /**
      * Search users with server-side pagination.
      * This is the primary method used by the UsersView table.
+     * Results are also merged into the cache for getUser lookups.
      */
     const searchUsers = useCallback(async (options: {
         search?: string;
@@ -372,43 +393,30 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
         const qs = params.toString();
 
         const data = await apiRequest("/users" + (qs ? "?" + qs : ""), "GET");
+        const converted = data.users.map((u: ApiUser) => convertUser(u));
+        // Feed search results into cache for getUser/defineRolesFor
+        mergeIntoCache(converted);
         return {
-            users: data.users.map((u: ApiUser) => convertUser(u)),
+            users: converted,
             total: data.total
         };
-    }, [apiRequest]);
+    }, [apiRequest, mergeIntoCache]);
 
     /**
-     * Save user (create or update)
+     * Save user (update existing user)
      */
     const saveUser = useCallback(async (user: User): Promise<User> => {
         const roleIds = user.roles ?? [];
 
-        // Check if user exists
-        const existingUser = users.find(u => u.uid === user.uid);
-
-        if (existingUser) {
-            // Update
-            const data = await apiRequest(`/users/${user.uid}`, "PUT", {
-                email: user.email,
-                displayName: user.displayName,
-                roles: roleIds
-            });
-            const updated = convertUser(data.user);
-            setUsers(prev => prev.map(u => u.uid === updated.uid ? updated : u));
-            return updated;
-        } else {
-            // Create
-            const data = await apiRequest("/users", "POST", {
-                email: user.email,
-                displayName: user.displayName,
-                roles: roleIds
-            });
-            const created = convertUser(data.user);
-            setUsers(prev => [...prev, created]);
-            return created;
-        }
-    }, [apiRequest, users, roles]);
+        const data = await apiRequest(`/users/${user.uid}`, "PUT", {
+            email: user.email,
+            displayName: user.displayName,
+            roles: roleIds
+        });
+        const updated = convertUser(data.user);
+        mergeIntoCache([updated]);
+        return updated;
+    }, [apiRequest, mergeIntoCache]);
 
     /**
      * Create a new user with invitation/password generation support.
@@ -427,14 +435,13 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
             roles: roleIds
         });
         const created = convertUser(data.user);
-        // Add to users cache
-        setUsers(prev => [...prev, created]);
+        mergeIntoCache([created]);
         return {
             user: created,
             invitationSent: data.invitationSent ?? false,
             temporaryPassword: data.temporaryPassword
         };
-    }, [apiRequest, roles]);
+    }, [apiRequest, mergeIntoCache]);
 
     /**
      * Reset the password for an existing user
@@ -446,20 +453,24 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
     }> => {
         const data = await apiRequest(`/users/${user.uid}/reset-password`, "POST");
         const updatedUser = convertUser(data.user);
-        setUsers(prev => prev.map(u => u.uid === updatedUser.uid ? updatedUser : u));
+        mergeIntoCache([updatedUser]);
         return {
             user: updatedUser,
             invitationSent: data.invitationSent ?? false,
             temporaryPassword: data.temporaryPassword
         };
-    }, [apiRequest]);
+    }, [apiRequest, mergeIntoCache]);
 
     /**
      * Delete user
      */
     const deleteUser = useCallback(async (user: User): Promise<void> => {
         await apiRequest(`/users/${user.uid}`, "DELETE");
-        setUsers(prev => prev.filter(u => u.uid !== user.uid));
+        setUserCache(prev => {
+            const next = new Map(prev);
+            next.delete(user.uid);
+            return next;
+        });
     }, [apiRequest]);
 
     /**
@@ -501,21 +512,32 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
      * Get user by uid
      */
     const getUser = useCallback((uid: string): User | null => {
-        return users.find(u => u.uid === uid) ?? null;
-    }, [users]);
+        return userCache.get(uid) ?? null;
+    }, [userCache]);
 
     /**
      * Define roles for a given user (for authController)
      */
     const defineRolesFor = useCallback(async (user: User): Promise<Role[] | undefined> => {
-        // Find the user in our list
-        const existingUser = users.find(u => u.uid === user.uid || u.email === user.email);
-        if (!existingUser) return undefined;
+        // Check cache first
+        let existingUser = userCache.get(user.uid)
+            ?? Array.from(userCache.values()).find(u => u.email === user.email);
+
+        // If not cached, fetch from API
+        if (!existingUser) {
+            try {
+                const data = await apiRequest(`/users/${user.uid}`, "GET");
+                existingUser = convertUser(data.user);
+                mergeIntoCache([existingUser]);
+            } catch {
+                return undefined;
+            }
+        }
 
         // Return roles from our cached role data (string IDs → full Role objects)
         const userRoleIds = existingUser.roles ?? [];
         return roles.filter(r => userRoleIds.includes(r.id));
-    }, [users, roles]);
+    }, [userCache, roles, apiRequest, mergeIntoCache]);
 
     /**
      * Check if current user is admin
@@ -529,20 +551,25 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
     const bootstrapAdmin = useCallback(async (): Promise<void> => {
         try {
             await apiRequest("/bootstrap", "POST");
-            // Reload users and roles after successful bootstrap
+            // Reload roles and re-check admin existence after successful bootstrap
             const data = await apiRequest("/roles");
             const loadedRoles = data.roles.map(convertRole);
             setRoles(loadedRoles);
-            await loadUsers();
+            await checkAdminExists();
         } catch (error) {
             console.error("Failed to bootstrap admin:", error);
             throw error;
         }
-    }, [apiRequest, loadUsers]);
+    }, [apiRequest, checkAdminExists]);
+
+    // Expose cached users as an array for backward compat (BootstrapAdminBanner,
+    // UsersView fallback).  This is NOT the full user list — just the cache.
+    const users = Array.from(userCache.values());
 
     return {
         loading,
         users,
+        hasAdminUsers,
         saveUser,
         createUser,
         resetPassword,

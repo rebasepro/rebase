@@ -44,7 +44,26 @@ export type DefaultAppBarProps<ADDITIONAL_PROPS = object> = {
 
     dropDownActions?: React.ReactNode;
 
+    /**
+     * Whether to render the dark/light/system mode toggle in the app bar.
+     * Set to `false` when the drawer owns this action.
+     * @default true
+     */
     includeModeToggle?: boolean;
+
+    /**
+     * Whether to render the language switcher in the app bar.
+     * Set to `false` when the drawer owns this action.
+     * @default true
+     */
+    includeLanguageToggle?: boolean;
+
+    /**
+     * Whether to render the user avatar / menu in the app bar.
+     * Set to `false` when the drawer owns this action.
+     * @default true
+     */
+    includeUserMenu?: boolean;
 
     className?: string;
 
@@ -67,6 +86,8 @@ export const DefaultAppBar = function DefaultAppBar({
     startAdornment,
     dropDownActions,
     includeModeToggle = true,
+    includeLanguageToggle = true,
+    includeUserMenu = true,
     className,
     style,
     user: userProp,
@@ -193,8 +214,6 @@ export const DefaultAppBar = function DefaultAppBar({
             </div>
             {startAdornment}
 
-            {startAdornment}
-
             <div className={"grow"}/>
 
             {endAdornment &&
@@ -202,7 +221,7 @@ export const DefaultAppBar = function DefaultAppBar({
                     {endAdornment}
                 </ErrorBoundary>}
 
-            <LanguageToggle/>
+            {includeLanguageToggle && <LanguageToggle/>}
 
             {includeModeToggle &&
                 <Menu
@@ -220,34 +239,36 @@ export const DefaultAppBar = function DefaultAppBar({
                         size={iconSize.smallest}/>{t("system_mode")}</MenuItem>
                 </Menu>}
 
-            <Menu trigger={<div aria-label="User menu" role="button">{avatarComponent}</div>}>
-                {user && <div className={"px-4 py-2 mb-2"}>
-                    {user.displayName && <Typography variant={"body1"} color={"secondary"}>
-                        {user.displayName}
-                    </Typography>}
-                    {user.email && <Typography variant={"body2"} color={"secondary"}>
-                        {user.email}
-                    </Typography>}
-                </div>}
 
-                {dropDownActions}
+            {includeUserMenu &&
+                <Menu trigger={<div aria-label="User menu" role="button">{avatarComponent}</div>}>
+                    {user && <div className={"px-4 py-2 mb-2"}>
+                        {user.displayName && <Typography variant={"body1"} color={"secondary"}>
+                            {user.displayName}
+                        </Typography>}
+                        {user.email && <Typography variant={"body2"} color={"secondary"}>
+                            {user.email}
+                        </Typography>}
+                    </div>}
 
-                {!dropDownActions && <>
-                    <MenuItem onClick={() => navigate("/settings")}>
-                        <SettingsIcon/>
-                        {t("project_settings")}
-                    </MenuItem>
-                    <MenuItem onClick={async () => {
-                        await authController.signOut();
-                        // replace current route with home
-                        navigate("/");
-                    }}>
-                        <LogOutIcon/>
-                        {t("log_out")}
-                    </MenuItem>
-                </>}
+                    {dropDownActions}
 
-            </Menu>
+                    {!dropDownActions && <>
+                        <MenuItem onClick={() => navigate("/settings")}>
+                            <SettingsIcon/>
+                            {t("account_settings")}
+                        </MenuItem>
+                        <MenuItem onClick={async () => {
+                            await authController.signOut();
+                            // replace current route with home
+                            navigate("/");
+                        }}>
+                            <LogOutIcon/>
+                            {t("log_out")}
+                        </MenuItem>
+                    </>}
+
+                </Menu>}
 
         </div>
     );

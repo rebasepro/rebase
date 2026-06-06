@@ -31,7 +31,7 @@ export async function startPgContainer(): Promise<PgContainer> {
         "-p",
         "5432",
         "-d",
-        "postgres:15-alpine"
+        "postgres:18-alpine"
     ]);
 
     // Find the randomly assigned port on the host

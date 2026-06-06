@@ -212,8 +212,8 @@ message: error instanceof Error ? error.message : "Failed to load users" });
 
     const totalPages = Math.max(1, Math.ceil(displayTotal / PAGE_SIZE));
 
-    // Check if any admin exists
-    const hasAdmin = allUsers.some(u => u.roles?.includes("admin"));
+    // Check if any admin exists (use dedicated flag from delegate, or fallback to array scan)
+    const hasAdmin = userManagement.hasAdminUsers ?? allUsers.some(u => u.roles?.includes("admin"));
 
     const handleBootstrap = async () => {
         if (!bootstrapAdmin) return;

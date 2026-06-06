@@ -53,7 +53,11 @@ export function RebaseLayout(props: RebaseLayoutProps) {
 
     const adminModeController = useAdminModeController();
 
-    const ActiveAppBar = appBar ?? <AppBar/>;
+    const ActiveAppBar = appBar ?? <AppBar
+        includeLanguageToggle={false}
+        includeModeToggle={false}
+        includeUserMenu={false}
+    />;
     const ActiveDrawer = drawer ?? (
         <Drawer
             title={title}
