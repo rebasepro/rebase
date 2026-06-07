@@ -1,29 +1,30 @@
 import React from "react";
+import { Checkbox, Label } from "@rebasepro/ui";
 import { ReactNodeViewProps } from "./ReactNodeView";
 
 export const TaskItemComponent: React.FC<ReactNodeViewProps> = ({ node, view, getPos }) => {
     const checked = node.attrs.checked;
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleCheckedChange = (isChecked: boolean) => {
         const pos = getPos();
         if (typeof pos !== "number") return;
 
         view.dispatch(
             view.state.tr.setNodeMarkup(pos, undefined, {
                 ...node.attrs,
-                checked: e.target.checked
+                checked: isChecked
             })
         );
     };
 
     return (
-        <label contentEditable={false} className="flex items-start select-none px-1">
-            <input
-                type="checkbox"
+        <Label contentEditable={false} className="flex items-start select-none px-1 cursor-pointer">
+            <Checkbox
                 checked={checked}
-                onChange={handleChange}
-                className="mt-1 flex-shrink-0 cursor-pointer"
+                onCheckedChange={handleCheckedChange}
+                padding={false}
+                size="small"
             />
-        </label>
+        </Label>
     );
 };

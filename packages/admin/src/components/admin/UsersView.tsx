@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { User } from "@rebasepro/types";
-import { useSnackbarController, useAuthController, useTranslation } from "@rebasepro/core";
+import { useSnackbarController, useAuthController, useTranslation, useInternalUserManagementController } from "@rebasepro/core";
 import { useBreadcrumbsController } from "../../index";
 import {
     Alert,
@@ -50,9 +50,14 @@ const PAGE_SIZE = 25;
 // ============================================
 // UsersView Component
 // ============================================
-export function UsersView({ userManagement }: {
-    userManagement: UserManagementDelegate;
+export function UsersView({ userManagement: userManagementProp }: {
+    userManagement?: UserManagementDelegate;
 }) {
+    const userManagementContext = useInternalUserManagementController();
+    const userManagement = userManagementProp ?? userManagementContext;
+    if (!userManagement) {
+        return null;
+    }
     const { roles, saveUser, createUser, deleteUser, resetPassword, loading: delegateLoading, bootstrapAdmin, usersError } = userManagement;
     const snackbarController = useSnackbarController();
     const { user: loggedInUser } = useAuthController();
@@ -394,9 +399,10 @@ roles: ["w-16", "w-16"] }
                                             </Tooltip>
                                         )}
                                         {deleteUser && (
-                                            <Tooltip asChild title={t("delete_this_user")}>
+                                            <Tooltip asChild title={loggedInUser?.uid === user.uid ? (t("cannot_delete_own_account") || "Cannot delete your own account") : t("delete_this_user")}>
                                                 <IconButton
                                                     size="small"
+                                                    disabled={loggedInUser?.uid === user.uid}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         setUserToDelete(user);

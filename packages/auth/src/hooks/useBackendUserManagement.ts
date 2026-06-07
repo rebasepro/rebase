@@ -129,13 +129,22 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
     const [userCache, setUserCache] = useState<Map<string, User>>(new Map());
     const [hasAdminUsers, setHasAdminUsers] = useState(false);
     const [roles, setRoles] = useState<Role[]>([]);
-    const [loading, setLoading] = useState(true);
+    const userRoles = currentUser?.roles ?? [];
+    const isUserAdmin = userRoles.some(r => r === "admin" || r === "schema-admin");
+
+    const [loading, setLoading] = useState(() => {
+        if (!currentUser) return false;
+        if (!isUserAdmin) return false;
+        return true;
+    });
     const [usersError, setUsersError] = useState<Error | undefined>();
     const [rolesError, setRolesError] = useState<Error | undefined>();
 
     // Tracks the UID for which roles+users were last successfully loaded.
     // Prevents redundant refetches on React StrictMode double-mounts.
     const lastLoadedUidRef = useRef<string | null>(null);
+
+    const effectiveLoading = loading || !!(currentUser && isUserAdmin && lastLoadedUidRef.current !== currentUser.uid);
 
     /** Merge one or more users into the cache without replacing the whole Map. */
     const mergeIntoCache = useCallback((incoming: User[]) => {
@@ -567,7 +576,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
     const users = Array.from(userCache.values());
 
     return {
-        loading,
+        loading: effectiveLoading,
         users,
         hasAdminUsers,
         saveUser,

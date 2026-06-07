@@ -10,6 +10,7 @@ import {
     DialogContent,
     DialogTitle,
     iconSize,
+    TextField,
     Typography
 } from "@rebasepro/ui";
 import { EntityCollection } from "@rebasepro/types";
@@ -52,7 +53,7 @@ export function CollectionJsonImportDialog({
     const [errors, setErrors] = useState<CollectionValidationError[]>([]);
     const [touched, setTouched] = useState(false);
 
-    const handleJsonChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const handleJsonChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const value = e.target.value;
         setJsonValue(value);
         setTouched(true);
@@ -105,20 +106,15 @@ export function CollectionJsonImportDialog({
                     <code className="bg-surface-200 dark:bg-surface-700 px-1 rounded">properties</code>.
                 </Typography>
 
-                <textarea
+                <TextField
+                    multiline
+                    minRows={12}
                     value={jsonValue}
                     onChange={handleJsonChange}
                     placeholder={EXAMPLE_JSON}
-                    rows={12}
-                    className={cls(
-                        "w-full p-3 font-mono text-sm rounded-md border resize-none overflow-y-auto",
-                        "bg-surface-50 dark:bg-surface-800",
-                        "focus:outline-none focus:ring-2 focus:ring-primary",
-                        "h-[300px]",
-                        errors.length > 0 && touched
-                            ? "border-red-500 dark:border-red-400"
-                            : "border-surface-300 dark:border-surface-600"
-                    )}
+                    error={errors.length > 0 && touched}
+                    className="w-full"
+                    inputClassName="font-mono text-sm resize-none overflow-y-auto h-[300px]"
                 />
 
                 {errors.length > 0 && touched && (

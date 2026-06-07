@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Select, SelectItem, TextField, Checkbox, Label } from "@rebasepro/ui";
 
 interface LogEntry {
     id: string;
@@ -90,54 +91,53 @@ export function LogsExplorer() {
                 alignItems: "center",
                 flexWrap: "wrap"
             }}>
-                <select
+                <Select
                     value={level}
-                    onChange={e => setLevel(e.target.value)}
-                    style={selectStyle}
+                    onValueChange={setLevel}
+                    size="small"
+                    placeholder="All Levels"
                 >
-                    <option value="">All Levels</option>
-                    <option value="debug">Debug</option>
-                    <option value="info">Info</option>
-                    <option value="warn">Warn</option>
-                    <option value="error">Error</option>
-                </select>
-                <select
+                    <SelectItem value="">All Levels</SelectItem>
+                    <SelectItem value="debug">Debug</SelectItem>
+                    <SelectItem value="info">Info</SelectItem>
+                    <SelectItem value="warn">Warn</SelectItem>
+                    <SelectItem value="error">Error</SelectItem>
+                </Select>
+                <Select
                     value={source}
-                    onChange={e => setSource(e.target.value)}
-                    style={selectStyle}
+                    onValueChange={setSource}
+                    size="small"
+                    placeholder="All Sources"
                 >
-                    <option value="">All Sources</option>
-                    <option value="api">API</option>
-                    <option value="auth">Auth</option>
-                    <option value="storage">Storage</option>
-                    <option value="realtime">Realtime</option>
-                    <option value="system">System</option>
-                </select>
-                <input
-                    type="text"
+                    <SelectItem value="">All Sources</SelectItem>
+                    <SelectItem value="api">API</SelectItem>
+                    <SelectItem value="auth">Auth</SelectItem>
+                    <SelectItem value="storage">Storage</SelectItem>
+                    <SelectItem value="realtime">Realtime</SelectItem>
+                    <SelectItem value="system">System</SelectItem>
+                </Select>
+                <TextField
+                    size="small"
                     placeholder="Search logs..."
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    style={{
-                        ...selectStyle,
-                        flex: 1,
-                        minWidth: 200
-                    }}
+                    className="flex-1 min-w-[200px]"
                 />
-                <label style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                    cursor: "pointer",
-                    fontSize: 12
-                }}>
-                    <input
-                        type="checkbox"
+                <div className="flex items-center gap-1.5 cursor-pointer">
+                    <Checkbox
+                        id="auto-scroll"
                         checked={autoScroll}
-                        onChange={e => setAutoScroll(e.target.checked)}
+                        onCheckedChange={setAutoScroll}
+                        size="small"
+                        padding={false}
                     />
-                    Auto-scroll
-                </label>
+                    <Label
+                        htmlFor="auto-scroll"
+                        className="text-xs select-none cursor-pointer"
+                    >
+                        Auto-scroll
+                    </Label>
+                </div>
                 <span style={{ fontSize: 12, color: "#6c7086" }}>
                     {logs.length} entries
                 </span>

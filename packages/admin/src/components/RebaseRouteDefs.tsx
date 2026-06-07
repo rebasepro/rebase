@@ -10,10 +10,9 @@ import {
 } from "@rebasepro/core";
 import { CircularProgressCenter } from "@rebasepro/ui";
 
-// Lazy-load admin views — rarely visited, no need in initial bundle
-const ContentHomePage = lazy(() => import("./HomePage/ContentHomePage").then(m => ({ default: m.ContentHomePage })));
-const UsersView = lazy(() => import("./admin/UsersView").then(m => ({ default: m.UsersView })));
-const RolesView = lazy(() => import("./admin/RolesView").then(m => ({ default: m.RolesView })));
+import { ContentHomePage } from "./HomePage/ContentHomePage";
+import { UsersView } from "./admin/UsersView";
+import { RolesView } from "./admin/RolesView";
 import { RebaseRoute } from "../routes/RebaseRoute";
 import { CustomViewRoute } from "../routes/CustomViewRoute";
 import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
@@ -87,8 +86,8 @@ export function RebaseRouteDefs({ children, layout }: RebaseRouteDefsProps) {
 
             <Route path={"/c/*"} element={<RebaseRoute/>}/>
             <Route path={"/settings"} element={<SettingsView/>}/>
-            {userManagement && <Route path={"/roles"} element={<Suspense fallback={<CircularProgressCenter/>}><RolesView userManagement={userManagement}/></Suspense>}/>}
-            {userManagement && <Route path={"/users"} element={<Suspense fallback={<CircularProgressCenter/>}><UsersView userManagement={userManagement}/></Suspense>}/>}
+            {userManagement && <Route path={"/roles"} element={<RolesView userManagement={userManagement}/>}/>}
+            {userManagement && <Route path={"/users"} element={<UsersView userManagement={userManagement}/>}/>}
 
             {/* Hidden debug route */}
             <Route path={"/debug/ui"} element={<UIReferenceView/>}/>

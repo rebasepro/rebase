@@ -55,7 +55,7 @@ function createApp(opts: { defaultRole?: string } = {}) {
         getUserByIdentity: jest.fn().mockResolvedValue(null),
         linkUserIdentity: jest.fn().mockResolvedValue(undefined),
         getUserIdentities: jest.fn().mockResolvedValue([]),
-        getUserById: jest.fn().mockResolvedValue(null),
+        getUserById: jest.fn().mockImplementation((id) => Promise.resolve(mockUser({ id }))),
         createUser: jest.fn().mockImplementation((data) =>
             Promise.resolve(mockUser({ email: data.email,
 displayName: data.displayName,
@@ -404,6 +404,8 @@ displayName: "Updated" }),
             it("updates roles when specified", async () => {
                 const app = createApp();
                 mockAuthRepo.getUserById.mockResolvedValueOnce(mockUser({ id: "u1" }));
+                mockAuthRepo.getUserRoleIds.mockResolvedValueOnce(["admin"]);
+                mockAuthRepo.listUsersPaginated.mockResolvedValueOnce({ total: 2 });
                 mockAuthRepo.getUserWithRoles.mockResolvedValueOnce({
                     user: mockUser({ id: "u1" }),
                     roles: [mockRole("admin")]
@@ -416,6 +418,44 @@ displayName: "Updated" }),
                     body: JSON.stringify({ roles: ["admin"] })
                 });
                 expect(mockAuthRepo.setUserRoles).toHaveBeenCalledWith("u1", ["admin"]);
+            });
+
+            it("prevents demoting the last admin", async () => {
+                const app = createApp();
+                mockAuthRepo.getUserById.mockResolvedValueOnce(mockUser({ id: "u1" }));
+                mockAuthRepo.getUserRoleIds.mockResolvedValueOnce(["admin"]);
+                mockAuthRepo.listUsersPaginated.mockResolvedValueOnce({ total: 1 });
+
+                const res = await app.request("/admin/users/u1", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json",
+...adminAuth() },
+                    body: JSON.stringify({ roles: ["editor"] })
+                });
+                expect(res.status).toBe(403);
+                const body = await res.json() as any;
+                expect(body.error.code).toBe("LAST_ADMIN");
+                expect(mockAuthRepo.setUserRoles).not.toHaveBeenCalled();
+            });
+
+            it("allows demoting an admin if there are other admins", async () => {
+                const app = createApp();
+                mockAuthRepo.getUserById.mockResolvedValueOnce(mockUser({ id: "u1" }));
+                mockAuthRepo.getUserRoleIds.mockResolvedValueOnce(["admin"]);
+                mockAuthRepo.listUsersPaginated.mockResolvedValueOnce({ total: 2 });
+                mockAuthRepo.getUserWithRoles.mockResolvedValueOnce({
+                    user: mockUser({ id: "u1" }),
+                    roles: [mockRole("editor")]
+                });
+
+                const res = await app.request("/admin/users/u1", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json",
+...adminAuth() },
+                    body: JSON.stringify({ roles: ["editor"] })
+                });
+                expect(res.status).toBe(200);
+                expect(mockAuthRepo.setUserRoles).toHaveBeenCalledWith("u1", ["editor"]);
             });
 
             it("returns 404 for non-existent user", async () => {
@@ -455,6 +495,36 @@ displayName: "Updated" }),
                 expect(res.status).toBe(400);
                 const body = await res.json() as any;
                 expect(body.error.code).toBe("SELF_DELETE");
+            });
+
+            it("prevents last-admin deletion", async () => {
+                const app = createApp();
+                mockAuthRepo.getUserById.mockResolvedValueOnce(mockUser({ id: "u2" }));
+                mockAuthRepo.getUserRoleIds.mockResolvedValueOnce(["admin"]);
+                mockAuthRepo.listUsersPaginated.mockResolvedValueOnce({ total: 1 });
+
+                const res = await app.request("/admin/users/u2", {
+                    method: "DELETE",
+                    headers: { ...adminAuth("admin-1") }
+                });
+                expect(res.status).toBe(403);
+                const body = await res.json() as any;
+                expect(body.error.code).toBe("LAST_ADMIN");
+                expect(mockAuthRepo.deleteUser).not.toHaveBeenCalled();
+            });
+
+            it("allows deleting an admin if there are other admins", async () => {
+                const app = createApp();
+                mockAuthRepo.getUserById.mockResolvedValueOnce(mockUser({ id: "u2" }));
+                mockAuthRepo.getUserRoleIds.mockResolvedValueOnce(["admin"]);
+                mockAuthRepo.listUsersPaginated.mockResolvedValueOnce({ total: 2 });
+
+                const res = await app.request("/admin/users/u2", {
+                    method: "DELETE",
+                    headers: { ...adminAuth("admin-1") }
+                });
+                expect(res.status).toBe(200);
+                expect(mockAuthRepo.deleteUser).toHaveBeenCalledWith("u2");
             });
 
             it("returns 404 for non-existent user", async () => {

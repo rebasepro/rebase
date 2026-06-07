@@ -40,7 +40,7 @@ import { EntityCollectionListView } from "./EntityCollectionListView";
 import { SplitListView } from "./SplitListView";
 import { EntityCollectionBoardView } from "./EntityCollectionBoardView";
 import { ViewModeToggle, KanbanPropertyOption } from "./ViewModeToggle";
-import { Button, cls, focusedDisabled, IconButton, Markdown, Popover, Skeleton, Tooltip, Typography, VirtualTableColumn , iconSize } from "@rebasepro/ui";
+import { Button, cls, focusedDisabled, IconButton, Markdown, Popover, Skeleton, TextField, Tooltip, Typography, VirtualTableColumn , iconSize } from "@rebasepro/ui";
 import { ArrowRightToLineIcon, ErrorBoundary, PlusIcon, SearchIcon } from "@rebasepro/ui";
 import { setIn } from "@rebasepro/formex";
 import { getSubcollectionColumnId } from "../EntityCollectionTable/internal/common";
@@ -1335,15 +1335,17 @@ function EntityIdHeaderWidget({
                         className={"w-96 max-w-full"}>
 
                         <div className="flex p-2 w-full gap-2">
-                            <input
+                            <TextField
                                 autoFocus={openPopup}
                                 placeholder={t("find_entity_by_id")}
-                                // size={"small"}
+                                size="small"
                                 onChange={(e) => {
                                     setSearchString(e.target.value);
                                 }}
                                 value={searchString}
-                                className={"rounded-lg bg-white dark:bg-surface-900 flex-grow outline-none p-2 " + focusedDisabled}/>
+                                className="flex-grow"
+                                inputClassName={cls("rounded-lg bg-white dark:bg-surface-900", focusedDisabled)}
+                            />
                             <Button variant={"text"}
                                 disabled={!(searchString.trim())}
                                 type={"submit"}

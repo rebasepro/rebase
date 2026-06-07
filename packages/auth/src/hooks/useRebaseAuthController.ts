@@ -625,6 +625,10 @@ roles: customRoles.map(r => r.id) };
                     }
                 } catch (meError: unknown) {
                     if (!isMountedRef.current) return;
+                    if (meError instanceof authApi.AuthApiError && (meError.code === "NOT_FOUND" || meError.code === "UNAUTHORIZED")) {
+                        clearSessionAndSignOut();
+                        return;
+                    }
                     userToSet = convertToUser(stored.user);
                 }
 

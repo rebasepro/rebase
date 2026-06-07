@@ -33,13 +33,24 @@ import { LanguageToggle, RebaseLogo } from "@rebasepro/core";
 import { useApp } from "./app/useApp";
 
 /**
- * Default drawer used in the CMS
+ * Default drawer used in the CMS.
+ *
+ * When no `children` are provided, renders the full CMS navigation
+ * (collection groups, mode switch, plugin slots).
+ *
+ * When `children` **are** provided, renders the shared drawer shell
+ * (logo, scrollable area, footer actions, collapse toggle) with the
+ * custom content injected in the scrollable area. This lets consumers
+ * like the SaaS dashboard reuse the identical structural layout while
+ * supplying their own navigation items.
+ *
  * @group Core
  */
 export function DefaultDrawer({
     title,
     logo,
     logoDestination,
+    children,
     footerActions,
     className,
     style
@@ -47,6 +58,13 @@ export function DefaultDrawer({
     title?: React.ReactNode;
     logo?: string;
     logoDestination?: string;
+    /**
+     * Custom navigation content for the drawer.
+     * When provided, replaces the default CMS navigation (collection groups,
+     * mode switch, slots). The shared shell (logo, scroll area, footer
+     * actions, collapse toggle) is still rendered around it.
+     */
+    children?: React.ReactNode;
     /**
      * Custom content for the drawer footer actions area (language, theme, user menu).
      * - `undefined` — renders the default `DrawerFooterActions`.
@@ -63,13 +81,11 @@ export function DefaultDrawer({
         drawerOpen,
         openDrawer,
         closeDrawer,
-        closeHover,
         logo: appLogo
     } = useApp();
 
     const resolvedLogo = logo ?? appLogo;
 
-    const [adminMenuOpen, setAdminMenuOpen] = React.useState(false);
     const scrollRef = React.useRef<HTMLDivElement>(null);
     const [scrolled, setScrolled] = React.useState(false);
 
@@ -78,6 +94,64 @@ export function DefaultDrawer({
             setScrolled(scrollRef.current.scrollTop > 0);
         }
     };
+
+    return (
+        <div role="navigation" aria-label="Main navigation" className={cls("flex flex-col h-full relative grow w-full", className)} style={style}>
+
+            <DrawerLogo
+                logo={resolvedLogo}
+                title={title}
+                logoDestination={logoDestination}
+                drawerOpen={drawerOpen}
+                drawerHovered={drawerHovered}
+            />
+
+            <div
+                ref={scrollRef}
+                onScroll={handleScroll}
+                className={"flex-grow min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar px-2"}
+                style={{
+                    maskImage: scrolled
+                        ? "linear-gradient(to bottom, transparent 0, black 20px, black calc(100% - 20px), transparent 100%)"
+                        : "linear-gradient(to bottom, black 0, black calc(100% - 20px), transparent 100%)"
+                }}>
+                {children ?? <CMSNavigationContent />}
+            </div>
+
+            {footerActions !== null && (
+                footerActions !== undefined
+                    ? footerActions
+                    : <DrawerFooterActions
+                        drawerOpen={drawerOpen}
+                        drawerHovered={drawerHovered}
+                    />
+            )}
+
+            <DrawerToggle
+                drawerOpen={drawerOpen}
+                drawerHovered={drawerHovered}
+                openDrawer={openDrawer}
+                closeDrawer={closeDrawer}
+            />
+        </div>
+    );
+}
+
+/**
+ * Default CMS navigation content — rendered inside DefaultDrawer when no
+ * custom `children` are provided.  Contains the mode switch, navigation
+ * groups, and header / footer plugin slots.
+ */
+function CMSNavigationContent() {
+
+    const {
+        drawerHovered,
+        drawerOpen,
+        closeDrawer,
+        closeHover
+    } = useApp();
+
+    const [adminMenuOpen, setAdminMenuOpen] = React.useState(false);
 
     const analyticsController = useAnalyticsController();
     const navigationState = useNavigationStateController();
@@ -121,8 +195,6 @@ context });
     if (!navigationState.topLevelNavigation)
         return null;
 
-    const groups = navigationState.topLevelNavigation.groups;
-
     const onItemClick = (view: NavigationEntry) => {
         const eventName: AnalyticsEvent = view.type === "collection"
             ? "drawer_navigate_to_collection"
@@ -135,78 +207,37 @@ context });
         }
     };
 
-    const isStudioDark = adminModeController.mode === "studio";
     const drawerVisuallyOpen = drawerOpen || drawerHovered;
 
     return (
         <>
-            <div role="navigation" aria-label="Main navigation" className={cls("flex flex-col h-full relative grow w-full", className)} style={style}>
-
-                <DrawerLogo
-                    logo={resolvedLogo}
-                    title={title}
-                    logoDestination={logoDestination}
+            {registry.studioConfig && (
+                <DrawerModeSwitch
                     drawerOpen={drawerOpen}
                     drawerHovered={drawerHovered}
                 />
+            )}
 
-                {registry.studioConfig && (
-                    <DrawerModeSwitch
-                        drawerOpen={drawerOpen}
-                        drawerHovered={drawerHovered}
+            {headerSlot}
+
+            {groupsToRender.map((group) => {
+                const entriesInGroup = filteredEntries.filter(e => e.group === group);
+                return (
+                    <DrawerNavigationGroup
+                        key={`drawer_group_${group}`}
+                        group={group}
+                        entries={entriesInGroup}
+                        collapsed={isGroupCollapsed(group)}
+                        onToggleCollapsed={() => toggleGroupCollapsed(group)}
+                        drawerOpen={drawerVisuallyOpen}
+                        tooltipsOpen={tooltipsOpen}
+                        adminMenuOpen={adminMenuOpen}
+                        onItemClick={onItemClick}
                     />
-                )}
+                );
+            })}
 
-                {headerSlot}
-
-                <div
-                    ref={scrollRef}
-                    onScroll={handleScroll}
-                    className={"flex-grow min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar px-2"}
-                    style={{
-                        maskImage: scrolled
-                            ? "linear-gradient(to bottom, transparent 0, black 20px, black calc(100% - 20px), transparent 100%)"
-                            : "linear-gradient(to bottom, black 0, black calc(100% - 20px), transparent 100%)"
-                    }}>
-
-                    {groupsToRender.map((group) => {
-                        const entriesInGroup = filteredEntries.filter(e => e.group === group);
-                        return (
-                            <DrawerNavigationGroup
-                                key={`drawer_group_${group}`}
-                                group={group}
-                                entries={entriesInGroup}
-                                collapsed={isGroupCollapsed(group)}
-                                onToggleCollapsed={() => toggleGroupCollapsed(group)}
-                                drawerOpen={drawerVisuallyOpen}
-                                tooltipsOpen={tooltipsOpen}
-                                adminMenuOpen={adminMenuOpen}
-                                onItemClick={onItemClick}
-                            />
-                        );
-                    })}
-
-                </div>
-
-                {footerSlot}
-
-                {footerActions !== null && (
-                    footerActions !== undefined
-                        ? footerActions
-                        : <DrawerFooterActions
-                            drawerOpen={drawerOpen}
-                            drawerHovered={drawerHovered}
-                        />
-                )}
-
-                <DrawerToggle
-                    drawerOpen={drawerOpen}
-                    drawerHovered={drawerHovered}
-                    openDrawer={openDrawer}
-                    closeDrawer={closeDrawer}
-                />
-            </div>
-
+            {footerSlot}
         </>
     );
 }
@@ -214,7 +245,7 @@ context });
 export function DrawerLogo({
     logo,
     title,
-    logoDestination,
+    logoDestination = "/",
     drawerOpen,
     drawerHovered
 }: {
@@ -225,7 +256,6 @@ export function DrawerLogo({
     drawerHovered: boolean;
 }) {
 
-    const urlController = useUrlController();
     const showFullContent = drawerOpen || (drawerHovered && !drawerOpen);
 
     return (
@@ -233,7 +263,7 @@ export function DrawerLogo({
             {/* Logo — always visible */}
             <Link
                 className="shrink-0 flex items-center justify-center w-[56px] h-[40px]"
-                to={logoDestination || urlController.basePath}
+                to={logoDestination}
             >
                 {logo
                     ? <img src={logo} alt="Logo" className="w-[28px] h-[28px] object-contain"/>
@@ -251,7 +281,7 @@ export function DrawerLogo({
                 {title && (
                     <Link
                         className="visited:text-inherit dark:visited:text-inherit block truncate"
-                        to={logoDestination || urlController.basePath}
+                        to={logoDestination}
                     >
                         {typeof title === "string"
                             ? <Typography variant="subtitle1" noWrap className="truncate">{title}</Typography>

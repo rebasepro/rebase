@@ -23,9 +23,8 @@ import { UserManagementDelegate } from "@rebasepro/types";
 import { resolveAppViews } from "./useNavigationResolution";
 
 
-// Lazy-load admin views — only rendered when navigation reaches /users or /roles
-const UsersView = lazy(() => import("../../components/admin/UsersView").then(m => ({ default: m.UsersView })));
-const RolesView = lazy(() => import("../../components/admin/RolesView").then(m => ({ default: m.RolesView })));
+import { UsersView } from "../../components/admin/UsersView";
+import { RolesView } from "../../components/admin/RolesView";
 
 export type UseResolvedViewsProps<USER extends User> = {
     authController: AuthController<USER>;
@@ -115,13 +114,15 @@ export function useResolvedViews<USER extends User>(
     resolvedAuthControllerRef.current = resolvedAuthController;
 
     // Memoize JSX elements for injected admin views to ensure stable references.
+    const hasUserManagement = !!userManagement;
+    const hasRoles = !!userManagement?.roles;
     const usersViewElement = useMemo(() =>
-        userManagement ? <Suspense fallback={null}><UsersView userManagement={userManagement as unknown as UserManagementDelegate<User>}/></Suspense> : null,
-        [userManagement]
+        hasUserManagement ? <UsersView /> : null,
+        [hasUserManagement]
     );
     const rolesViewElement = useMemo(() =>
-        userManagement?.roles ? <Suspense fallback={null}><RolesView userManagement={userManagement as unknown as UserManagementDelegate<User>}/></Suspense> : null,
-        [userManagement]
+        hasRoles ? <RolesView /> : null,
+        [hasRoles]
     );
 
     const injectedAdminViews: AppView[] = useMemo(() => {

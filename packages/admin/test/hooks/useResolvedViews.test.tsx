@@ -6,6 +6,13 @@ import { useResolvedViews } from "../../src/hooks/navigation/useResolvedViews";
 import { AuthController, AppView, DataDriver } from "@rebasepro/types";
 import { jest } from "@jest/globals";
 
+jest.mock("../../src/components/admin/UsersView", () => ({
+    UsersView: () => null
+}));
+jest.mock("../../src/components/admin/RolesView", () => ({
+    RolesView: () => null
+}));
+
 describe("useResolvedViews", () => {
 
     const mockDataDriver: DataDriver = {} as DataDriver;

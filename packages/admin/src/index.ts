@@ -42,6 +42,7 @@ export {
     Scaffold,
     AppBar,
     Drawer,
+    DefaultDrawer,
     DrawerFooterActions,
     AdminModeSyncer,
     // ContentHomePage, UsersView, RolesView are lazy-loaded — not re-exported here

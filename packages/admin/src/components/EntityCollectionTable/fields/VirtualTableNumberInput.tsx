@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useDebouncedCallback, cls, focusedDisabled } from "@rebasepro/ui";
+import { useDebouncedCallback, cls, focusedDisabled, TextField } from "@rebasepro/ui";
 
 export function VirtualTableNumberInput(props: {
     error: Error | undefined;
@@ -50,21 +50,24 @@ export function VirtualTableNumberInput(props: {
         [value, focused]
     );
 
-    const ref = React.useRef<HTMLInputElement>(null);
+    const inputRef = React.useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        if (ref.current && focused) {
-            ref.current.focus({ preventScroll: true });
+        if (inputRef.current && focused) {
+            inputRef.current.focus({ preventScroll: true });
         }
-    }, [focused, ref]);
+    }, [focused, inputRef]);
 
     const regexp = /^-?[0-9]+[,.]?[0-9]*$/;
 
     return (
-        <input
-            ref={ref}
-            className={cls("w-full text-right p-0 m-0 bg-transparent border-none resize-none outline-hidden font-normal leading-normal text-unset", focusedDisabled)}
-            style={{
+        <TextField
+            inputRef={inputRef}
+            invisible={true}
+            size="small"
+            className="w-full"
+            inputClassName={cls("p-0 m-0 bg-transparent border-none outline-hidden font-normal leading-normal text-unset", focusedDisabled)}
+            inputStyle={{
                 textAlign: align
             }}
             value={internalValue ?? ""}

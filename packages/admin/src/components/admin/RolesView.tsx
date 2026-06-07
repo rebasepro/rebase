@@ -1,7 +1,7 @@
 
 import React, { useState } from "react";
 import { useCollectionRegistryController } from "../../index";
-import { useSnackbarController, useTranslation } from "@rebasepro/core";
+import { useSnackbarController, useTranslation, useInternalUserManagementController } from "@rebasepro/core";
 import { getDataSourceCapabilities, Role, SecurityRule, UserManagementDelegate } from "@rebasepro/types";
 import { useBreadcrumbsController } from "../../index";
 import {
@@ -38,7 +38,12 @@ import { ConfirmationDialog } from "@rebasepro/core";
 // ============================================
 // RolesView Component
 // ============================================
-export function RolesView({ userManagement }: { userManagement: UserManagementDelegate }) {
+export function RolesView({ userManagement: userManagementProp }: { userManagement?: UserManagementDelegate }) {
+    const userManagementContext = useInternalUserManagementController();
+    const userManagement = userManagementProp ?? userManagementContext;
+    if (!userManagement) {
+        return null;
+    }
     const { roles, saveRole, deleteRole, loading, allowDefaultRolesCreation, rolesError } = userManagement;
     const snackbarController = useSnackbarController();
     const { t } = useTranslation();

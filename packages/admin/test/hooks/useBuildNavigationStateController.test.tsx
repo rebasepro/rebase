@@ -7,6 +7,13 @@ import { AuthController, UrlController, CollectionRegistryController, DataDriver
 import { CollectionRegistry } from "@rebasepro/common";
 import { jest } from "@jest/globals";
 
+jest.mock("../../src/components/admin/UsersView", () => ({
+    UsersView: () => null
+}));
+jest.mock("../../src/components/admin/RolesView", () => ({
+    RolesView: () => null
+}));
+
 describe("useBuildNavigationStateController", () => {
 
     const mockDataDriver: DataDriver = {} as DataDriver;

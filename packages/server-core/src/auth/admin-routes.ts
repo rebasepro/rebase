@@ -174,6 +174,10 @@ export function createAdminRoutes(config: AdminRouteOptions): Hono<HonoEnv> {
         if (!userId) {
             throw ApiError.unauthorized("User ID not found in auth context");
         }
+        const caller = await authRepo.getUserById(userId);
+        if (!caller) {
+            throw ApiError.notFound("Authenticated user does not exist in the database. Please sign out and sign in/register again.", "USER_NOT_FOUND");
+        }
         await authRepo.setUserRoles(userId, ["admin"]);
 
         // ── Set persistent flag ──────────────────────────────────────
@@ -456,6 +460,19 @@ displayName: existing.displayName }, appName);
         }
 
         if (roles !== undefined && Array.isArray(roles)) {
+            const currentRoles = await authRepo.getUserRoleIds(userId);
+            const wasAdmin = currentRoles.includes("admin");
+            const willBeAdmin = roles.includes("admin");
+            
+            if (wasAdmin && !willBeAdmin) {
+                const adminUsers = await authRepo.listUsersPaginated({
+                    roleId: "admin",
+                    limit: 1
+                });
+                if (adminUsers.total <= 1) {
+                    throw ApiError.forbidden("Cannot demote the last administrator", "LAST_ADMIN");
+                }
+            }
             await authRepo.setUserRoles(userId, roles);
         }
 
@@ -485,6 +502,17 @@ displayName: existing.displayName }, appName);
         const existing = await authRepo.getUserById(userId);
         if (!existing) {
             throw ApiError.notFound("User not found");
+        }
+
+        const roles = await authRepo.getUserRoleIds(userId);
+        if (roles.includes("admin")) {
+            const adminUsers = await authRepo.listUsersPaginated({
+                roleId: "admin",
+                limit: 1
+            });
+            if (adminUsers.total <= 1) {
+                throw ApiError.forbidden("Cannot delete the last administrator", "LAST_ADMIN");
+            }
         }
 
         // Apply beforeDelete hook (throw to abort)

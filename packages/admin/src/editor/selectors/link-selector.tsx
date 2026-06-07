@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Button, CheckIcon, cls, focusedDisabled, iconSize, Popover, Trash2Icon } from "@rebasepro/ui";
+import { Button, CheckIcon, cls, focusedDisabled, iconSize, Popover, TextField, Trash2Icon } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/core";
 import { useProseMirrorContext } from "../hooks/useProseMirrorContext";
 import { getMarkAttributes, isMarkActive, setMark, unsetMark } from "../utils/prosemirror-utils";
@@ -87,12 +87,15 @@ export const LinkSelector = ({
                 onSubmit={handleSubmit}
                 className="flex p-1 gap-1"
             >
-                <input
-                    ref={inputRef}
+                <TextField
+                    inputRef={inputRef}
                     autoFocus={open}
                     placeholder={t("editor_paste_or_type_link")}
                     defaultValue={href}
-                    className={cls("text-surface-900 dark:text-white flex-grow bg-transparent p-1 text-sm outline-none", focusedDisabled)}/>
+                    size="small"
+                    className="flex-grow text-surface-900 dark:text-white"
+                    inputClassName={cls("bg-transparent p-1 text-sm outline-none", focusedDisabled)}
+                />
 
                 {href ? (
                     <Button
