@@ -34,7 +34,7 @@ export function TableStorageUpload(props: {
     selected: boolean;
     focused: boolean;
     property: StringProperty | ArrayProperty;
-    entity: Entity<any>;
+    entity: Entity<Record<string, unknown>>;
     path: string;
     previewSize: PreviewSize;
     openPopup?: (cellRect?: DOMRect) => void;
@@ -112,13 +112,13 @@ interface StorageUploadProps {
     autoFocus: boolean;
     selected: boolean;
     disabled: boolean;
-    entity: Entity<any>;
+    entity: Entity<Record<string, unknown>>;
     previewSize: PreviewSize;
     storage: StorageConfig;
     onFilesAdded: (acceptedFiles: File[]) => void;
     storagePathBuilder: (file: File) => string;
     openPopup?: (cellRect?: DOMRect) => void;
-    onFileUploadComplete: (uploadedPath: string, entry: StorageFieldItem, fileMetadata?: any) => Promise<void>;
+    onFileUploadComplete: (uploadedPath: string, entry: StorageFieldItem, fileMetadata?: Record<string, unknown>) => Promise<void>;
 }
 
 function StorageUpload({
@@ -156,7 +156,7 @@ function StorageUpload({
         }
     }
 
-    const metadata: any | undefined = storage?.metadata;
+    const metadata: Record<string, unknown> | undefined = storage?.metadata;
     const hasValue = Boolean(internalValue);
 
     const snackbarContext = useSnackbarController();
@@ -288,7 +288,7 @@ interface TableStorageItemPreviewProps {
     property: StringProperty;
     value: string,
     size: PreviewSize;
-    entity: Entity<any>;
+    entity: Entity<Record<string, unknown>>;
 }
 
 export function TableStorageItemPreview({

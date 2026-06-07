@@ -103,7 +103,7 @@ export const localSearchControllerBuilder: FirestoreTextSearchControllerBuilder 
                 return (a.score ?? 0) - (b.score ?? 0);
             }
         });
-        return searchResult.map((e: any) => e.item.id);
+        return searchResult.map((e) => e.item.id);
     };
 
     return {

@@ -41,7 +41,7 @@ export type FirebaseAccessGate<USER extends User = User> = (props: {
  *
  * @group Firebase
  */
-export function useFirebaseAccessGate<USER extends User = any>
+export function useFirebaseAccessGate<USER extends User = User>
 ({
      disabled,
      authController,
@@ -58,14 +58,14 @@ export function useFirebaseAccessGate<USER extends User = any>
  }): {
     canAccessMainView: boolean,
     authLoading: boolean,
-    notAllowedError: any,
+    notAllowedError: unknown,
     authVerified: boolean,
 } {
 
     const gateEnabled = Boolean(accessGate);
 
     const [authLoading, setAuthLoading] = useState<boolean>(gateEnabled);
-    const [notAllowedError, setNotAllowedError] = useState<any>(false);
+    const [notAllowedError, setNotAllowedError] = useState<unknown>(false);
     const [authVerified, setAuthVerified] = useState<boolean>(!gateEnabled || Boolean(authController.loginSkipped));
 
     const canAccessMainView = (authVerified) &&

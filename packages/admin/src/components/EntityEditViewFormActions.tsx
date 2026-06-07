@@ -122,11 +122,11 @@ type ActionsViewProps<M extends Record<string, unknown>> = {
     disabled: boolean,
     status: "new" | "existing" | "copy",
     sideDialogContext: SideDialogController,
-    pluginActions?: any[],
+    pluginActions?: React.ReactNode[],
     openEntityMode: "side_panel" | "full_screen" | "split" | "dialog";
     navigateBack: () => void;
     formContext: FormContext,
-    formex: FormexController<any>;
+    formex: FormexController<Record<string, unknown>>;
     t: (key: string, vars?: Record<string, string>) => string;
     className?: string;
 };
@@ -174,7 +174,7 @@ function buildBottomActions<M extends Record<string, unknown>>({
                     openEntityMode,
                     navigateBack,
                     formContext
-                } satisfies EntityActionClickProps<any>;
+                } satisfies EntityActionClickProps<Record<string, unknown>>;
 
                 const isEnabled = !action.isEnabled || action.isEnabled(props);
                 return (
@@ -316,7 +316,7 @@ function EntityActionButton({
 }: {
     action: EntityAction,
     enabled: boolean,
-    props: EntityActionClickProps<any, any>
+    props: EntityActionClickProps<Record<string, unknown>>
 }) {
     const snackbarController = useSnackbarController();
     const [loading, setLoading] = React.useState(false);

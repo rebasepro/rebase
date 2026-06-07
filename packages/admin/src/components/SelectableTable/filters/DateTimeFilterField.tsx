@@ -6,8 +6,8 @@ import { useCustomizationController } from "@rebasepro/core";
 interface DateTimeFilterFieldProps {
     name: string,
     mode?: "date" | "date_time",
-    value?: [op: VirtualTableWhereFilterOp, fieldValue: any];
-    setValue: (value?: [op: VirtualTableWhereFilterOp, newValue: any]) => void;
+    value?: [op: VirtualTableWhereFilterOp, fieldValue: unknown];
+    setValue: (value?: [op: VirtualTableWhereFilterOp, newValue: unknown]) => void;
     isArray?: boolean;
     title?: string;
     timezone?: string;

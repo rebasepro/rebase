@@ -94,11 +94,11 @@ export function resolveRefName(ref: string): string {
 /**
  * Resolve a $ref to its actual schema from the spec.
  */
-export function resolveRef(spec: OpenApiSpec, ref: string): any {
+export function resolveRef(spec: OpenApiSpec, ref: string): unknown {
     const parts = ref.replace("#/", "").split("/");
-    let current: any = spec;
+    let current: unknown = spec;
     for (const part of parts) {
-        current = current?.[part];
+        current = (current as Record<string, unknown>)?.[part];
     }
     return current ?? {};
 }

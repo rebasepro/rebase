@@ -93,7 +93,7 @@ export function KeyValueFieldBinding({
     );
 }
 
-interface MapEditViewParams<T extends Record<string, any>> {
+interface MapEditViewParams<T extends Record<string, unknown>> {
     value?: T;
     initialValue?: T;
     setValue: (value: (T | null)) => void;
@@ -101,7 +101,7 @@ interface MapEditViewParams<T extends Record<string, any>> {
     disabled?: boolean
 }
 
-function MapEditView<T extends Record<string, any>>({
+function MapEditView<T extends Record<string, unknown>>({
     value,
     initialValue,
     setValue,
@@ -238,7 +238,7 @@ function MapEditView<T extends Record<string, any>>({
     </div>;
 }
 
-function MapKeyValueRow<T extends Record<string, any>>({
+function MapKeyValueRow<T extends Record<string, unknown>>({
     rowId,
     fieldKey,
     value,
@@ -256,7 +256,7 @@ function MapKeyValueRow<T extends Record<string, any>>({
     onFieldKeyChange: (newKey: string) => void,
     onDeleteClick: () => void,
     setValue: (value: (T | null)) => void,
-    entryValue: any,
+    entryValue: unknown,
     type: DataType,
     disabled?: boolean,
     updatetype: (rowId: number, type: DataType) => void
@@ -265,7 +265,7 @@ function MapKeyValueRow<T extends Record<string, any>>({
     const { locale } = useCustomizationController();
     const { t } = useTranslation();
 
-    function buildInput(entryValue: any, fieldKey: string, type: DataType) {
+    function buildInput(entryValue: unknown, fieldKey: string, type: DataType) {
         if (type === "string" || type === "number") {
             return <TextField
                 key={type}
@@ -455,7 +455,7 @@ function ArrayKeyValueRow<T>({
         setSelectedtype(type);
     }
 
-    function buildInput(entryValue: any, type: DataType) {
+    function buildInput(entryValue: unknown, type: DataType) {
         if (type === "string" || type === "number") {
             return <TextField value={entryValue}
                 type={type === "number" ? "number" : "text"}
@@ -546,7 +546,7 @@ function getRandomId() {
     return Math.floor(Math.random() * Math.floor(Number.MAX_SAFE_INTEGER));
 }
 
-function gettype(value: any): DataType | undefined {
+function gettype(value: unknown): DataType | undefined {
     if (typeof value === "string" || value === null) {
         return "string";
     } else if (typeof value === "number") {
@@ -557,7 +557,7 @@ function gettype(value: any): DataType | undefined {
         return "array";
     } else if (value instanceof Date) {
         return "date";
-    } else if (value?.isEntityReference && value?.isEntityReference()) {
+    } else if (value && typeof value === "object" && "isEntityReference" in value && typeof (value as Record<string, unknown>).isEntityReference === "function" && (value as Record<string, (...args: unknown[]) => unknown>).isEntityReference()) {
         return "reference";
     } else if (value instanceof GeoPoint) {
         return "geopoint";

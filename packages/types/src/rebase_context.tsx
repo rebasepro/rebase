@@ -32,7 +32,7 @@ export type RebaseCallContext<USER extends User = User> = {
      * const { client } = props.context;
      * const result = await client.functions.invoke('extract-job', { url });
      */
-    client: RebaseClient<any>;
+    client: RebaseClient;
 
     /**
      * Unified data access — `context.data.products.create(...)`.

@@ -132,8 +132,8 @@ export function useFirebaseStorageSource({
                 const response = await fetch(url);
                 const blob = await response.blob();
                 return new File([blob], path);
-            } catch (e: any) {
-                if (e?.code === "storage/object-not-found") return null;
+            } catch (e: unknown) {
+                if (typeof e === "object" && e !== null && "code" in e && (e as { code: string }).code === "storage/object-not-found") return null;
                 throw e;
             }
         },
@@ -170,8 +170,8 @@ export function useFirebaseStorageSource({
                 }
                 urlsCache[storagePathOrUrl] = result;
                 return result;
-            } catch (e: any) {
-                if (e?.code === "storage/object-not-found") return {
+            } catch (e: unknown) {
+                if (typeof e === "object" && e !== null && "code" in e && (e as { code: string }).code === "storage/object-not-found") return {
                     url: null,
                     fileNotFound: true
                 };

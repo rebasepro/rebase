@@ -33,7 +33,7 @@ export function DrawerNavigationItem({
                 width: "100%",
                 transition: drawerOpen ? "width 150ms ease-in" : undefined
             }}
-            className={({ isActive }: any) => cls("rounded-md truncate",
+            className={({ isActive }: { isActive: boolean }) => cls("rounded-md truncate",
                 "hover:bg-surface-100 dark:hover:bg-surface-800/60 text-surface-700 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white",
                 "flex flex-row items-center",
                 drawerOpen ? "pr-4 h-[30px]" : "h-[30px]",

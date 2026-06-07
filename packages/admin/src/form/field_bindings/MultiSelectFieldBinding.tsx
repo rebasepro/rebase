@@ -28,7 +28,7 @@ export function MultiSelectFieldBinding({
     includeDescription,
     size = "large",
     autoFocus
-}: FieldProps<ArrayProperty, any, any>) {
+}: FieldProps<ArrayProperty, unknown, Record<string, unknown>>) {
 
     const of = property.of;
     if (!of) {
@@ -74,7 +74,7 @@ export function MultiSelectFieldBinding({
                 onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    setValue((value ?? []).filter((v: any) => v !== enumKey));
+                    setValue((value ?? []).filter((v: string | number) => v !== enumKey));
                 }}
             >
                 <XIcon size={iconSize.smallest}/>

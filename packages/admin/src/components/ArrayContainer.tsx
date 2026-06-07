@@ -60,7 +60,7 @@ export interface ArrayContainerProps<T> {
     max?: number;
 }
 
-const buildIdsMap = (value: any[]) =>
+const buildIdsMap = (value: unknown[]) =>
     value && Array.isArray(value) && value.length > 0
         ? value
             .map((v, index) => {
@@ -143,7 +143,7 @@ function SortableItem({
 type ArrayContainerItemProps = {
     nodeRef: (node: HTMLElement | null) => void;
     style: React.CSSProperties;
-    dragHandleProps: any;
+    dragHandleProps: Record<string, unknown>;
     index: number;
     internalId: number;
     size?: "small" | "medium";
@@ -220,7 +220,7 @@ export function ArrayItemOptions({
     sortable,
     addInIndex
 }: {
-    dragHandleProps: any;
+    dragHandleProps: Record<string, unknown>;
     direction?: "row" | "column";
     disabled: boolean;
     remove: (index: number) => void;

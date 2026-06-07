@@ -77,7 +77,7 @@ export function ArrayCustomShapedFieldBinding({
             setValue,
             setFieldValue,
             customProps
-        } as FieldProps<any>;
+        } as FieldProps;
         return <div key={`custom_shaped_array_${index}`} className="pb-4">
             <PropertyFieldBinding {...fieldProps}/>
         </div>;

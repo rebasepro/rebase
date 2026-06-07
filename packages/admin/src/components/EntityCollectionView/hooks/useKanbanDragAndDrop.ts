@@ -1,8 +1,9 @@
 import { useCallback, useMemo } from "react";
 import { setIn } from "@rebasepro/formex";
-import { EntityCollection, SaveEntityProps, RebaseData, RebaseContext } from "@rebasepro/types";
+import { EntityCollection, SaveEntityProps, RebaseData, RebaseContext, AnalyticsController } from "@rebasepro/types";
 import { saveEntityWithCallbacks } from "@rebasepro/core";
 import { BoardItem } from "../board_types";
+import { BoardDataController } from "../useBoardDataController";
 import { generateKeyBetween } from "fractional-indexing";
 
 export interface UseKanbanDragAndDropParams<M extends Record<string, unknown>> {
@@ -12,8 +13,8 @@ export interface UseKanbanDragAndDropParams<M extends Record<string, unknown>> {
     orderProperty?: string;
     dataClient: RebaseData;
     context: RebaseContext;
-    boardDataController: any;
-    analyticsController: any;
+    boardDataController: BoardDataController<M>;
+    analyticsController: AnalyticsController;
 }
 
 export function useKanbanDragAndDrop<M extends Record<string, unknown>>({

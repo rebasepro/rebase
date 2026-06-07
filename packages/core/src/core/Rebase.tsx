@@ -183,7 +183,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
     }
 
     const content = (
-        <RebaseI18nProvider locale={locale} translations={translations as any}>
+        <RebaseI18nProvider locale={locale} translations={translations}>
         <SnackbarProvider>
         <ModeControllerProvider value={modeController}>
         <AdminModeControllerProvider value={adminModeController}>

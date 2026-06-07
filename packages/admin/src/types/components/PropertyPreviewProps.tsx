@@ -15,7 +15,7 @@ export interface PropertyPreviewProps<P extends Property | Property, CustomProps
      */
     propertyKey?: string;
 
-    value: any;
+    value: unknown;
 
     /**
      * Property this display is related to, now strongly typed to P

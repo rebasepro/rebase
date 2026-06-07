@@ -6,6 +6,5 @@ export * from "./hash";
 export * from "./regexp";
 export * from "./flatten_object";
 export * from "./plurals";
-export * from "./os";
 export * from "./names";
 export * from "./fields";

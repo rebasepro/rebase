@@ -16,7 +16,7 @@ import { EditorState } from "prosemirror-state";
 
 
 export interface TableBubbleProps {
-    options?: any;
+    options?: { placement?: string; offset?: number };
     className?: string;
 }
 

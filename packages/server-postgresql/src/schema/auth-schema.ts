@@ -8,8 +8,8 @@ export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchema
     const rolesSchema = rolesSchemaName === "public" ? null : pgSchema(rolesSchemaName);
     const usersSchema = usersSchemaName === "public" ? null : pgSchema(usersSchemaName);
 
-    const rolesTableCreator: any = rolesSchema ? rolesSchema.table.bind(rolesSchema) : pgTable;
-    const usersTableCreator: any = usersSchema ? usersSchema.table.bind(usersSchema) : pgTable;
+    const rolesTableCreator = (rolesSchema ? rolesSchema.table.bind(rolesSchema) : pgTable) as typeof pgTable;
+    const usersTableCreator = (usersSchema ? usersSchema.table.bind(usersSchema) : pgTable) as typeof pgTable;
 
     /**
      * Users table - stores both email/password and OAuth users
@@ -24,7 +24,7 @@ export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchema
         emailVerificationToken: varchar("email_verification_token", { length: 255 }),
         emailVerificationSentAt: timestamp("email_verification_sent_at"),
         isAnonymous: boolean("is_anonymous").default(false).notNull(),
-        metadata: jsonb("metadata").$type<Record<string, any>>().default({}).notNull(),
+        metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
         createdAt: timestamp("created_at").defaultNow().notNull(),
         updatedAt: timestamp("updated_at").defaultNow().notNull()
     });
@@ -58,7 +58,7 @@ export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchema
     const userRoles = rolesTableCreator("user_roles", {
         userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
         roleId: varchar("role_id", { length: 50 }).notNull().references(() => roles.id, { onDelete: "cascade" })
-    }, (table: any) => ({
+    }, (table) => ({
         pk: primaryKey({ columns: [table.userId, table.roleId] })
     }));
 
@@ -73,7 +73,7 @@ export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchema
         userAgent: varchar("user_agent", { length: 500 }),
         ipAddress: varchar("ip_address", { length: 45 }),
         createdAt: timestamp("created_at").defaultNow().notNull()
-    }, (table: any) => ({
+    }, (table) => ({
         uniqueDeviceSession: unique("unique_device_session").on(table.userId, table.userAgent, table.ipAddress)
     }));
 
@@ -109,7 +109,7 @@ export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchema
         profileData: jsonb("profile_data"),
         createdAt: timestamp("created_at").defaultNow().notNull(),
         updatedAt: timestamp("updated_at").defaultNow().notNull()
-    }, (table: any) => ({
+    }, (table) => ({
         uniqueProviderId: unique("unique_provider_id").on(table.provider, table.providerId)
     }));
 

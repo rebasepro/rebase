@@ -7,11 +7,11 @@ import { removeClassesFromJson } from "./utils/remove_classes";
 import { DOMParser as ProseMirrorDOMParser, DOMSerializer } from "prosemirror-model";
 
 export interface UseProseMirrorOptions {
-    content?: any;
+    content?: unknown;
     plugins?: Plugin[];
     editable?: boolean;
     onMarkdownContentChange?: (content: string) => void;
-    onJsonContentChange?: (content: any | null) => void;
+    onJsonContentChange?: (content: unknown | null) => void;
     onHtmlContentChange?: (content: string) => void;
     version?: number;
 }

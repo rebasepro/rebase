@@ -2,7 +2,7 @@ import { useEntitySelectionDialog } from "../../hooks/useEntitySelectionDialog";
 import type { FieldProps } from "../../types/fields";
 import type { RelationProperty } from "@rebasepro/types";
 import React, { useCallback } from "react";
-import { Entity, getDataSourceCapabilities } from "@rebasepro/types";
+import { Entity, EntityRelation, getDataSourceCapabilities } from "@rebasepro/types";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
 import { EntityPreviewContainer } from "../../components/EntityPreview";
 import { IconForView } from "@rebasepro/core";
@@ -56,7 +56,7 @@ function RelationSelectorBinding({
     setValue,
     relation,
     manyRelation
-}: FieldProps<RelationProperty> & { relation: any; manyRelation: boolean }) {
+}: FieldProps<RelationProperty> & { relation: EntityRelation; manyRelation: boolean }) {
     const normalizedSingle = (!manyRelation && value && !Array.isArray(value)) ? normalizeToEntityRelation(value) : null;
     const singleValue = normalizedSingle ?? null;
     const multipleValue = (manyRelation && Array.isArray(value)) ? value : [];
@@ -108,7 +108,7 @@ function SingleRelationFieldBinding({
     includeDescription,
     setValue,
     relation
-}: FieldProps<RelationProperty> & { relation: any }) {
+}: FieldProps<RelationProperty> & { relation: EntityRelation }) {
     const normalizedValue = value && !Array.isArray(value) ? normalizeToEntityRelation(value) : null;
     const validValue = !!normalizedValue;
 
@@ -118,7 +118,7 @@ function SingleRelationFieldBinding({
         throw Error(`Couldn't find the corresponding collection for the relation: ${propertyKey}`);
     }
 
-    const onSingleEntitySelected = useCallback((e: Entity<any> | null) => {
+    const onSingleEntitySelected = useCallback((e: Entity<Record<string, unknown>> | null) => {
         setValue(e ? getRelationFrom(e) : null);
     }, [setValue]);
 

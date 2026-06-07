@@ -125,8 +125,8 @@ export function TryItPanel({ endpoint, apiUrl, getAuthToken, user, basePath = ""
         if (hasBody && body.trim()) {
             try {
                 JSON.parse(body);
-            } catch (err: any) {
-                setValidationError(`Invalid JSON: ${err.message}`);
+            } catch (err: unknown) {
+                setValidationError(`Invalid JSON: ${err instanceof Error ? err.message : String(err)}`);
                 return;
             }
         }
@@ -171,11 +171,11 @@ export function TryItPanel({ endpoint, apiUrl, getAuthToken, user, basePath = ""
 statusText: res.statusText,
 body: text,
 time: elapsed });
-        } catch (err: any) {
+        } catch (err: unknown) {
             setResponse({
                 status: 0,
                 statusText: "Network Error",
-                body: err.message ?? "Request failed",
+                body: err instanceof Error ? err.message : "Request failed",
                 time: Math.round(performance.now() - start)
             });
         } finally {
@@ -479,7 +479,7 @@ function buildBodyTemplate(endpoint: ParsedEndpoint): string {
     return lines.join("\n");
 }
 
-function defaultValue(schema: any): string {
+function defaultValue(schema: { type?: string; format?: string; enum?: (string | number)[] }): string {
     if (schema.enum) return JSON.stringify(schema.enum[0]);
     switch (schema.type) {
         case "string":

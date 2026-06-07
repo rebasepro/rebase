@@ -35,7 +35,7 @@ function getSimpleProperty(property: Property): InputProperty {
     };
 }
 
-function getSimplifiedProperty(property: Property, path: string, value?: any): Record<string, InputProperty> {
+function getSimplifiedProperty(property: Property, path: string, value?: unknown): Record<string, InputProperty> {
     if (isPropertyBuilder(property)) return {};
     if (property.type === "array") {
 
@@ -115,7 +115,7 @@ function getSimplifiedProperty(property: Property, path: string, value?: any): R
         if (property.properties) {
             const mapProperties: Record<string, InputProperty> = Object.entries(property.properties)
                 .map(([key, childProperty]) => {
-                    const childValue = value?.[key];
+                    const childValue = value && typeof value === "object" ? (value as Record<string, unknown>)[key] : undefined;
                     return getSimplifiedProperty(childProperty, key, childValue);
                 })
                 .map(o => attachPathToKeys(o, path))
@@ -149,7 +149,7 @@ function getSimplifiedProperty(property: Property, path: string, value?: any): R
 }
 
 // attach a path to every key in an object
-function attachPathToKeys(obj: Record<string, any>, path = ""): Record<string, any> {
+function attachPathToKeys(obj: Record<string, InputProperty>, path = ""): Record<string, InputProperty> {
     return Object.entries(obj)
         .map(([key, value]) => {
             const fullKey = path ? `${path}.${key}` : key;

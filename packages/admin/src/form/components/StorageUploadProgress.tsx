@@ -7,11 +7,11 @@ import { cls, paperMixin, Skeleton } from "@rebasepro/ui";
 
 export interface StorageUploadItemProps {
     storagePath: string;
-    metadata?: any,
+    metadata?: Record<string, unknown>,
     entry: StorageFieldItem,
     onFileUploadComplete: (value: string,
         entry: StorageFieldItem,
-        metadata?: any,
+        metadata?: Record<string, unknown>,
         uploadedUrl?: string) => Promise<void>;
     imageSize: number;
     simple: boolean;

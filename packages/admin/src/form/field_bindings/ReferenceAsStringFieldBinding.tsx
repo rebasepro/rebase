@@ -71,7 +71,7 @@ path });
         throw Error(`Couldn't find the corresponding collection for the path: ${path}`);
     }
 
-    const onSingleEntitySelected = useCallback((e: Entity<any> | null) => {
+    const onSingleEntitySelected = useCallback((e: Entity<Record<string, unknown>> | null) => {
         setValue(e ? String(e.id) : null);
     }, [setValue]);
 

@@ -4,6 +4,7 @@ import type { EntityCollectionsBuilder } from "../types/builders";
 import type { EntityCustomView } from "../types/entity_views";
 import type { EntityAction } from "../types/entity_actions";
 import type { AppView, NavigationGroupMapping } from "./navigation";
+import type { RebasePlugin } from "../types/plugins";
 
 /**
  * Options to enable the built-in collection editor.
@@ -21,12 +22,12 @@ export interface CollectionEditorOptions {
     pathSuggestions?: string[];
 }
 
-export interface RebaseCMSConfig<EC extends EntityCollection = any> {
+export interface RebaseCMSConfig<EC extends EntityCollection = EntityCollection> {
     collections?: EC[] | EntityCollectionsBuilder<EC>;
     homePage?: ReactNode;
-    entityViews?: EntityCustomView<any>[];
+    entityViews?: EntityCustomView[];
     entityActions?: EntityAction[];
-    plugins?: any[];
+    plugins?: RebasePlugin[];
 
     /**
      * Centralized configuration for how collections and views are grouped

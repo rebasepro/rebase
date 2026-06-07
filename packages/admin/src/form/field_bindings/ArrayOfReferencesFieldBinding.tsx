@@ -64,7 +64,7 @@ export function ArrayOfReferencesFieldBinding({
         throw Error(`Couldn't find the corresponding collection for the path: ${ofProperty.path}`);
     }
 
-    const onMultipleEntitiesSelected = useCallback((entities: Entity<any>[]) => {
+    const onMultipleEntitiesSelected = useCallback((entities: Entity<Record<string, unknown>>[]) => {
         const refs = entities.map(e => getReferenceFrom(e));
         setValue(refs);
     }, [setValue]);

@@ -13,7 +13,8 @@ import { isLazyComponentRef } from "@rebasepro/types";
  * to the `React.lazy()` wrapper it produced. Strings are keyed by a separate
  * plain Map since they can't be WeakMap keys.
  */
-const lazyCache = new WeakMap<object | ((..._args: any[]) => any), React.ComponentType<any>>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const lazyCache = new WeakMap<object | Function, React.ComponentType<any>>();
 
 /**
  * Resolves a `ComponentRef` into a renderable `React.ComponentType`.
@@ -62,7 +63,7 @@ export function useResolvedComponent<P = unknown>(
  * same loader always returns the same lazy component identity.
  */
 function getOrCreateLazy<P>(
-    key: object | ((..._args: any[]) => any),
+    key: object | Function,
     loader: () => Promise<{ default: React.ComponentType<P> }>
 ): React.ComponentType<P> {
     const cached = lazyCache.get(key);
@@ -108,7 +109,7 @@ export function resolveComponentRef<P = unknown>(
 
     // 3. Function — either a React component or a lazy import loader.
     if (typeof ref === "function") {
-        const fn = ref as (..._args: any[]) => any;
+        const fn = ref as Function;
 
         // Class components (React.Component / PureComponent) have this flag
         if (fn.prototype?.isReactComponent) {

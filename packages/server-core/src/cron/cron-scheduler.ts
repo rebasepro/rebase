@@ -8,6 +8,7 @@ import type {
 import type { RebaseClient } from "@rebasepro/client";
 import type { LoadedCronJob } from "./cron-loader";
 import type { CronStore } from "./cron-store";
+import { logger } from "../utils/logger.js";
 
 // ─── Cron expression parser (minimal, no external dependency) ────────
 // Supports standard 5-field cron (minute hour dom month dow).
@@ -207,15 +208,13 @@ export class CronScheduler {
             // Validate schedule up-front — reject invalid schedules
             const validation = validateCronExpression(loaded.definition.schedule);
             if (!validation.valid) {
-                console.error(
-                    `[cron] Rejecting job "${loaded.id}": invalid schedule "${loaded.definition.schedule}" — ${validation.reason}`
-                );
+                logger.error(`[cron] Rejecting job "${loaded.id}": invalid schedule "${loaded.definition.schedule}" — ${validation.reason}`);
                 continue;
             }
 
             const existing = this.jobs.get(loaded.id);
             if (existing) {
-                console.warn(`[cron] Duplicate cron job id: "${loaded.id}". Overwriting.`);
+                logger.warn(`[cron] Duplicate cron job id: "${loaded.id}". Overwriting.`);
                 this.stopJob(loaded.id);
             }
 
@@ -260,7 +259,7 @@ export class CronScheduler {
                     }
                 }
             }).catch((err) => {
-                console.warn("[cron] Failed to seed job stats from database:", err);
+                logger.warn("[cron] Failed to seed job stats from database", { error: err });
             });
         }
 
@@ -269,7 +268,7 @@ export class CronScheduler {
                 this.scheduleNext(id);
             }
         }
-        console.log(`⏰ Cron scheduler started with ${this.jobs.size} job(s)`);
+        logger.info(`⏰ Cron scheduler started with ${this.jobs.size} job(s)`);
     }
 
     /**
@@ -356,7 +355,7 @@ export class CronScheduler {
 
         // Concurrency guard — don't run two instances simultaneously
         if (job.executing) {
-            console.warn(`[cron] Skipping manual trigger of "${id}" — already executing`);
+            logger.warn(`[cron] Skipping manual trigger of "${id}" — already executing`);
             const logEntry: CronJobLogEntry = {
                 jobId: id,
                 startedAt: new Date().toISOString(),
@@ -411,7 +410,7 @@ export class CronScheduler {
 
                 // Concurrency guard: if somehow we're already executing, skip
                 if (job.executing) {
-                    console.warn(`[cron] Skipping scheduled run of "${id}" — still executing from previous run`);
+                    logger.warn(`[cron] Skipping scheduled run of "${id}" — still executing from previous run`);
                     // Re-schedule to try again later
                     this.scheduleNext(id);
                     return;
@@ -433,7 +432,7 @@ export class CronScheduler {
 
             job.timerId = timer;
         } catch (err: unknown) {
-            console.error(`[cron] Failed to schedule "${id}":`, err);
+            logger.error(`[cron] Failed to schedule "${id}"`, { error: err });
             job.state = "error";
             job.lastError = err instanceof Error ? err.message : String(err);
         }
@@ -544,14 +543,14 @@ export class CronScheduler {
         // Persist to database (non-blocking)
         if (this.store) {
             this.store.insertLog(logEntry).catch((persistErr) => {
-                console.error(`[cron] Failed to persist log for "${job.id}":`, persistErr);
+                logger.error(`[cron] Failed to persist log for "${job.id}"`, { error: persistErr });
             });
         }
 
         if (success) {
-            console.log(`✅ [cron] "${job.id}" completed in ${durationMs}ms`);
+            logger.info(`✅ [cron] "${job.id}" completed in ${durationMs}ms`);
         } else {
-            console.error(`❌ [cron] "${job.id}" failed in ${durationMs}ms: ${error}`);
+            logger.error(`❌ [cron] "${job.id}" failed in ${durationMs}ms: ${error}`);
         }
 
         return logEntry;

@@ -102,7 +102,7 @@ export function CollectionRLSTab() {
                     return [];
                 };
                 const pRows = extractRows(result);
-                const policies: PostgresPolicy[] = pRows.map((p: any) => {
+                const policies: PostgresPolicy[] = pRows.map((p: Record<string, unknown>) => {
                     let parsedRoles: string[] = [];
                     const r = p.roles || p.ROLES;
                     if (Array.isArray(r)) {
@@ -313,7 +313,7 @@ function InlinePolicyEditor({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="flex flex-col gap-1.5">
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">Policy Name</Typography>
-                            <TextField value={name} onChange={(e: any) => setName(e.target.value)} placeholder="e.g. allow_read_all"/>
+                            <TextField value={name} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setName(e.target.value)} placeholder="e.g. allow_read_all"/>
                         </div>
                         <div className="flex flex-col gap-1.5">
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">Behavior</Typography>
@@ -342,13 +342,13 @@ function InlinePolicyEditor({
                     {command !== "INSERT" && (
                         <div className="flex flex-col gap-1.5">
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">USING expression</Typography>
-                            <TextField value={usingExpr} onChange={(e: any) => setUsingExpr(e.target.value)} placeholder="e.g. auth.uid() = user_id"/>
+                            <TextField value={usingExpr} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setUsingExpr(e.target.value)} placeholder="e.g. auth.uid() = user_id"/>
                         </div>
                     )}
                     {showCheck && (
                         <div className="flex flex-col gap-1.5">
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">WITH CHECK expression</Typography>
-                            <TextField value={checkExpr} onChange={(e: any) => setCheckExpr(e.target.value)} placeholder="e.g. auth.uid() = user_id"/>
+                            <TextField value={checkExpr} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setCheckExpr(e.target.value)} placeholder="e.g. auth.uid() = user_id"/>
                         </div>
                     )}
                 </Paper>

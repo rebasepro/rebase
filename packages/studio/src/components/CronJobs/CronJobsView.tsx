@@ -91,8 +91,33 @@ export function CronJobsView() {
         }
 
         load();
-        const t = setInterval(load, 15_000);
-        return () => { cancelled = true; clearInterval(t); };
+
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+        const scheduleNext = () => {
+            if (cancelled) return;
+            timeoutId = setTimeout(async () => {
+                if (document.visibilityState === "visible") {
+                    await load();
+                }
+                scheduleNext();
+            }, 15_000);
+        };
+
+        scheduleNext();
+
+        const handleVisibility = () => {
+            if (document.visibilityState === "visible") {
+                load();
+            }
+        };
+        document.addEventListener("visibilitychange", handleVisibility);
+
+        return () => {
+            cancelled = true;
+            if (timeoutId) clearTimeout(timeoutId);
+            document.removeEventListener("visibilitychange", handleVisibility);
+        };
     }, []); // runs once
 
     // ── Fetch logs when selection changes ──

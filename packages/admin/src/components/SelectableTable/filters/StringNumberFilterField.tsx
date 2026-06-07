@@ -9,8 +9,8 @@ import { useTranslation } from "@rebasepro/core";
 interface StringNumberFilterFieldProps {
     name: string,
     type: "string" | "number";
-    value?: [op: VirtualTableWhereFilterOp, fieldValue: any];
-    setValue: (value?: [op: VirtualTableWhereFilterOp, newValue: any]) => void;
+    value?: [op: VirtualTableWhereFilterOp, fieldValue: unknown];
+    setValue: (value?: [op: VirtualTableWhereFilterOp, newValue: unknown]) => void;
     isArray?: boolean;
     enumValues?: EnumValueConfig[];
     title?: string;

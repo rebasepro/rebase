@@ -65,7 +65,7 @@ export function MapFieldBinding({
                 .filter(([_, property]) => !isHidden(property))
                 .map(([entryKey, childProperty], index) => {
                     const thisDisabled = isReadOnly(childProperty) || Boolean(childProperty.ui?.disabled);
-                    const fieldBindingProps: PropertyFieldBindingProps<any> = {
+                    const fieldBindingProps: PropertyFieldBindingProps<Record<string, unknown>> = {
                         propertyKey: `${propertyKey}.${entryKey}`,
                         disabled: disabled || thisDisabled,
                         property: childProperty,
@@ -133,7 +133,7 @@ export function MapFieldBinding({
     );
 }
 
-const buildPickKeysSelect = (disabled: boolean, properties: Properties, setValue: (value: any) => void, value: any) => {
+const buildPickKeysSelect = (disabled: boolean, properties: Properties, setValue: (value: Record<string, unknown> | null) => void, value: Record<string, unknown> | undefined) => {
 
     const keys = Object.keys(properties)
         .filter((key) => !value || !(key in value));

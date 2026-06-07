@@ -47,12 +47,12 @@ import { AuthSimulationSelector } from "../AuthSimulationSelector";
 
 interface ConsoleEntry {
     type: "log" | "warn" | "error" | "info";
-    args: any[];
+    args: unknown[];
     timestamp: number;
 }
 
 interface ExecutionResult {
-    value: any;
+    value: unknown;
     console: ConsoleEntry[];
     duration: number;
     error?: string;
@@ -101,7 +101,7 @@ function saveToStorage<T>(key: string, value: T) {
     } catch { /* quota */ }
 }
 
-function formatJSON(value: any): string {
+function formatJSON(value: unknown): string {
     try {
         return JSON.stringify(value, null, 2);
     } catch {
@@ -125,7 +125,7 @@ interface MatchedJSCollection {
  */
 function detectCollectionsInResult(
     code: string,
-    resultValue: any,
+    resultValue: unknown,
     collections: EntityCollection[]
 ): MatchedJSCollection[] {
     if (!resultValue || !collections?.length) return [];
@@ -151,9 +151,10 @@ function detectCollectionsInResult(
     if (mentionedSlugs.size === 0) return [];
 
     // Check if result has rows with an "id" field
-    let rows: any[] = [];
-    if (resultValue?.data && Array.isArray(resultValue.data)) {
-        rows = resultValue.data;
+    let rows: Record<string, unknown>[] = [];
+    const rv = resultValue as Record<string, unknown>;
+    if (rv?.data && Array.isArray(rv.data)) {
+        rows = rv.data;
     } else if (Array.isArray(resultValue)) {
         rows = resultValue;
     }
@@ -405,7 +406,7 @@ isScoped: true };
             info: console.info
         };
 
-        const captureConsole = (type: ConsoleEntry["type"]) => (...args: any[]) => {
+        const captureConsole = (type: ConsoleEntry["type"]) => (...args: unknown[]) => {
             consoleEntries.push({ type,
 args,
 timestamp: Date.now() });
@@ -451,7 +452,8 @@ timestamp: Date.now() });
             });
 
             // Auto-detect best view
-            if (value?.data && Array.isArray(value.data)) {
+            const resultObj = value as Record<string, unknown> | undefined;
+            if (resultObj?.data && Array.isArray(resultObj.data)) {
                 setResultView("table");
             } else if (consoleEntries.length > 0 && value === undefined) {
                 setResultView("console");
@@ -522,11 +524,12 @@ message: "Snippet saved" });
         if (!result?.value) return { columns: [] as VirtualTableColumn[],
 data: [] as Record<string, unknown>[] };
 
-        let rows: any[] = [];
-        if (result.value?.data && Array.isArray(result.value.data)) {
-            rows = result.value.data.map((entity: any) => ({
+        let rows: Record<string, unknown>[] = [];
+        const val = result.value as Record<string, unknown>;
+        if (val?.data && Array.isArray(val.data)) {
+            rows = (val.data as Record<string, unknown>[]).map((entity) => ({
                 id: entity.id,
-                ...entity.values,
+                ...(entity.values as Record<string, unknown> ?? {}),
                 ...(entity.values ? {} : entity)
             }));
         } else if (Array.isArray(result.value)) {
@@ -564,13 +567,13 @@ data: rows };
         );
     }, [result, activeTab?.code, collectionRegistry?.collections]);
 
-    const getRowEntityActions = useCallback((rowData: any): { collection: MatchedJSCollection; entityId: string | number }[] => {
+    const getRowEntityActions = useCallback((rowData: Record<string, unknown>): { collection: MatchedJSCollection; entityId: string | number }[] => {
         if (!rowData || matchedCollections.length === 0) return [];
         return matchedCollections
             .filter(mc => rowData[mc.pkColumn] != null)
             .map(mc => ({
                 collection: mc,
-                entityId: rowData[mc.pkColumn]
+                entityId: rowData[mc.pkColumn] as string | number
             }));
     }, [matchedCollections]);
 
@@ -685,7 +688,7 @@ message: t("studio_sql_markdown_copy_failed") });
                                         </IconButton>
                                     </Tooltip>
 
-                                    {result?.value && (
+                                    {result?.value != null && (
                                         <Tooltip title="Export result as JSON">
                                             <IconButton size="small" onClick={exportResult}>
                                                 <DownloadIcon size={iconSize.smallest}/>
@@ -843,7 +846,7 @@ resizable: false }, ...tableData.columns]
                                                                 cellRenderer={({ rowData, column, rowIndex }: CellRendererParams<Record<string, unknown>>) => {
                                                                     // Entity action column
                                                                     if (column.key === "__entity_action__") {
-                                                                        const rowActions = getRowEntityActions(rowData);
+                                                                        const rowActions = getRowEntityActions(rowData ?? {});
                                                                         if (rowActions.length === 0) return <div className="h-full w-full"/>;
                                                                         if (rowActions.length === 1) {
                                                                             const ra = rowActions[0];
@@ -1037,7 +1040,7 @@ id: String(ra.entityId) })}
 
 // ─── JSON Syntax Highlighting ────────────────────────────────────────
 
-function JSONHighlight({ value }: { value: any }) {
+function JSONHighlight({ value }: { value: unknown }) {
     const json = formatJSON(value);
     const { mode } = useModeController();
 

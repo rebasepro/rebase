@@ -8,22 +8,22 @@ type VirtualTableCellProps<T> = {
     dataKey: string;
     column: VirtualTableColumn;
     columns: VirtualTableColumn[];
-    rowData: any;
-    cellData: any;
-    rowIndex: any;
+    rowData: T;
+    cellData: unknown;
+    rowIndex: number;
     columnIndex: number;
     cellRenderer: (props: CellRendererParams<T>) => React.ReactNode;
     // Sortable props
     sortableNodeRef?: (node: HTMLElement | null) => void;
     sortableStyle?: React.CSSProperties;
-    sortableAttributes?: Record<string, any>;
+    sortableAttributes?: Record<string, unknown>;
     isDragging?: boolean;
     isDraggable?: boolean;
     frozen?: boolean;
-    extraData?: any;
+    extraData?: unknown;
 };
 
-export const VirtualTableCell = React.memo<VirtualTableCellProps<any>>(
+export const VirtualTableCell = React.memo<VirtualTableCellProps<unknown>>(
     function VirtualTableCell<T>(props: VirtualTableCellProps<T>) {
         return props.rowData ? props.cellRenderer(
             {

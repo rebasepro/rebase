@@ -3,7 +3,7 @@
 import React from "react";
 import { FilterFormFieldProps } from "./VirtualTableHeader";
 
-export type OnRowClickParams<T extends Record<string, any>> = {
+export type OnRowClickParams<T extends Record<string, unknown>> = {
     rowData: T;
     rowIndex: number;
     event: React.SyntheticEvent
@@ -13,7 +13,7 @@ export type OnRowClickParams<T extends Record<string, any>> = {
  * @see Table
  * @group Components
  */
-export interface VirtualTableProps<T extends Record<string, any>> {
+export interface VirtualTableProps<T extends Record<string, unknown>> {
 
     /**
      * Array of arbitrary data
@@ -77,13 +77,13 @@ export interface VirtualTableProps<T extends Record<string, any>> {
     /**
      * In case this table should have some filters set by default
      */
-    filter?: VirtualTableFilterValues<any>;
+    filter?: VirtualTableFilterValues<string>;
 
     /**
      * Callback used when filters are updated
      * @param filter
      */
-    onFilterUpdate?: (filter?: VirtualTableFilterValues<any> | undefined) => void;
+    onFilterUpdate?: (filter?: VirtualTableFilterValues<string> | undefined) => void;
 
     /**
      * Callback when the table is scrolled
@@ -137,7 +137,7 @@ export interface VirtualTableProps<T extends Record<string, any>> {
      * Callback to create a filter field, displayed in the header as a dropdown
      * @param props
      */
-    createFilterField?: (props: FilterFormFieldProps<any>) => React.ReactNode;
+    createFilterField?: (props: FilterFormFieldProps<unknown>) => React.ReactNode;
 
     /**
      * Class name applied to the table
@@ -174,11 +174,11 @@ export interface VirtualTableProps<T extends Record<string, any>> {
     /**
      * Extra data passed to the cell renderer
      */
-    extraData?: any;
+    extraData?: unknown;
 
 }
 
-export type CellRendererParams<T = any> = {
+export type CellRendererParams<T = unknown> = {
     column: VirtualTableColumn;
     columns: VirtualTableColumn[];
     columnIndex: number;
@@ -189,18 +189,18 @@ export type CellRendererParams<T = any> = {
     // Sortable props for dnd-kit integration
     sortableNodeRef?: (node: HTMLElement | null) => void;
     sortableStyle?: React.CSSProperties;
-    sortableAttributes?: Record<string, any>;
+    sortableAttributes?: Record<string, unknown>;
     isDragging?: boolean;
     isDraggable?: boolean;
     frozen?: boolean;
-    extraData?: any;
+    extraData?: unknown;
 };
 
 /**
  * @see Table
  * @group Components
  */
-export interface VirtualTableColumn<CustomProps = any> {
+export interface VirtualTableColumn<CustomProps = unknown> {
 
     /**
      * Data key for the cell value, could be "a.b.c"
@@ -284,7 +284,7 @@ export type VirtualTableSort = "asc" | "desc" | undefined;
  * @see Table
  * @group Components
  */
-export type VirtualTableFilterValues<Key extends string> = Partial<Record<Key, [VirtualTableWhereFilterOp, any]>>;
+export type VirtualTableFilterValues<Key extends string> = Partial<Record<Key, [VirtualTableWhereFilterOp, unknown]>>;
 
 /**
  * Filter conditions in a `Query.where()` clause are specified using the

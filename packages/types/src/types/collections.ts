@@ -716,10 +716,7 @@ export interface FilterPreset<Key extends string = string> {
     sort?: [Key, "asc" | "desc"];
 }
 
-/**
- * @deprecated Use {@link FilterPreset} instead.
- */
-export type QuickFilter<Key extends string = string> = FilterPreset<Key>;
+
 
 /**
  * Used to indicate valid filter combinations (e.g. created in Firestore)

@@ -8,7 +8,7 @@ interface Header {
 
 export interface DownloadEntitiesExportParams<M extends Record<string, unknown>> {
     data: Entity<M>[];
-    additionalData: Record<string, any>[] | undefined;
+    additionalData: Record<string, unknown>[] | undefined;
     properties: Properties;
     propertiesOrder: string[] | undefined;
     name: string;
@@ -52,14 +52,14 @@ export function downloadEntitiesExport<M extends Record<string, unknown>>({
     }
 }
 
-export function getEntityCSVExportableData(data: Entity<any>[],
-    additionalData: Record<string, any>[] | undefined,
+export function getEntityCSVExportableData(data: Entity<Record<string, unknown>>[],
+    additionalData: Record<string, unknown>[] | undefined,
     properties: Properties,
     headers: Header[],
     dateExportType: "timestamp" | "string"
 ) {
 
-    const mergedData: any[] = data.map(e => ({
+    const mergedData: Record<string, unknown>[] = data.map(e => ({
         id: e.id,
         ...processValuesForExport(e.values, properties, "csv", dateExportType)
     }));
@@ -76,13 +76,13 @@ export function getEntityCSVExportableData(data: Entity<any>[],
     });
 }
 
-export function getEntityJsonExportableData(data: Entity<any>[],
-    additionalData: Record<string, any>[] | undefined,
+export function getEntityJsonExportableData(data: Entity<Record<string, unknown>>[],
+    additionalData: Record<string, unknown>[] | undefined,
     properties: Properties,
     dateExportType: "timestamp" | "string"
 ) {
 
-    const mergedData: any[] = data.map(e => ({
+    const mergedData: Record<string, unknown>[] = data.map(e => ({
         id: e.id,
         ...processValuesForExport(e.values, properties, "json", dateExportType)
     }));
@@ -154,15 +154,15 @@ function getHeaders(property: Property, propertyKey: string, prefix = ""): Heade
     }
 }
 
-function processValueForExport(inputValue: any,
+function processValueForExport(inputValue: unknown,
     property: Property,
     exportType: "csv" | "json",
     dateExportType: "timestamp" | "string"
-): any {
+): unknown {
 
-    let value;
+    let value: unknown;
     if (property.type === "map" && property.properties) {
-        value = processValuesForExport(inputValue, property.properties as Properties, exportType, dateExportType);
+        value = processValuesForExport(inputValue as Record<string, unknown>, property.properties as Properties, exportType, dateExportType);
     } else if (property.type === "array") {
         if (property.of && Array.isArray(inputValue)) {
             if (Array.isArray(property.of)) {
@@ -178,7 +178,7 @@ function processValueForExport(inputValue: any,
         } else {
             value = inputValue;
         }
-    } else if (property.type === "reference" && inputValue && inputValue.isEntityReference && inputValue.isEntityReference()) {
+    } else if (property.type === "reference" && inputValue && typeof inputValue === "object" && "isEntityReference" in inputValue && typeof (inputValue as EntityReference).isEntityReference === "function" && (inputValue as EntityReference).isEntityReference()) {
         const ref = inputValue ? inputValue as EntityReference : undefined;
         value = ref ? ref.fullPath : null;
     } else if (property.type === "date" && inputValue instanceof Date) {
@@ -191,11 +191,11 @@ function processValueForExport(inputValue: any,
 }
 
 function processValuesForExport<M extends Record<string, unknown>>
-    (inputValues: Record<keyof M, any>,
+    (inputValues: Record<string, unknown>,
         properties: Properties,
         exportType: "csv" | "json",
         dateExportType: "timestamp" | "string"
-    ): Record<keyof M, any> {
+    ): Record<string, unknown> {
     const updatedValues = Object.entries(properties)
         .map(([key, property]) => {
             const inputValue = inputValues && (inputValues)[key];
@@ -204,14 +204,14 @@ function processValuesForExport<M extends Record<string, unknown>>
             return ({ [key]: updatedValue });
         })
         .reduce((a, b) => ({ ...a,
-...b }), {}) as Record<keyof M, any>;
+...b }), {}) as Record<string, unknown>;
     return { ...inputValues,
 ...updatedValues };
 }
 
-function entryToCSVRow(entry: any[]) {
+function entryToCSVRow(entry: unknown[]) {
     return entry
-        .map((v: any) => {
+        .map((v: unknown) => {
             if (v === null || v === undefined) return "";
             if (Array.isArray(v))
                 return "\"" + JSON.stringify(v).replaceAll("\"", "\"\"") + "\"";

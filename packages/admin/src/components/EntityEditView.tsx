@@ -84,7 +84,7 @@ export interface EntityEditViewProps<M extends Record<string, unknown> = Record<
     onTabChange?: (props: OnTabChangeParams<M>) => void;
     navigateBack?: () => void;
     layout?: "side_panel" | "full_screen" | "split" | "dialog";
-    barActions?: (params: BarActionsParams) => any;
+    barActions?: (params: BarActionsParams) => React.ReactNode;
     formProps?: Partial<EntityFormProps<M>>,
     /**
      * Pre-populate the form with these values when creating a new entity.
@@ -270,7 +270,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
             openEntityMode: layout,
             status: status,
             values: usedEntity?.values ?? ({} as M),
-            setFieldValue: (key: string, value: any) => {
+            setFieldValue: (key: string, value: unknown) => {
                 throw new Error("You can't update values in read only mode");
             },
             save: () => {
@@ -289,7 +289,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
         [resolvedEntityViews]
     );
 
-    const customViewsView: any[] | undefined = customViews && nonActionCustomViews
+    const customViewsView: React.ReactNode[] | undefined = customViews && nonActionCustomViews
         .map((customView) => {
 
             if (!customView)
@@ -605,7 +605,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
     return result;
 }
 
-function EntityFormSkeleton({ collection }: { collection: EntityCollection<any> }) {
+function EntityFormSkeleton({ collection }: { collection: EntityCollection }) {
     return (
         <div className="flex-1 flex flex-row w-full overflow-y-auto justify-center">
             <div className="relative flex flex-row max-w-4xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-6xl w-full h-fit">

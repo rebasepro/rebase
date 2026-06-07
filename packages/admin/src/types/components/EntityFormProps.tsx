@@ -47,10 +47,10 @@ export type EntityFormProps<M extends Record<string, unknown>> = {
 };
 
 export type OnUpdateParams = {
-    entity: Entity<any>,
+    entity: Entity<Record<string, unknown>>,
     status: EntityStatus,
     path: string,
     entityId?: string | number;
     selectedTab?: string;
-    collection: EntityCollection<any>
+    collection: EntityCollection<Record<string, unknown>>
 };

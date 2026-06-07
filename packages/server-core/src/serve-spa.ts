@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { serveStatic } from "@hono/node-server/serve-static";
 import * as path from "path";
 import * as fs from "fs";
+import { logger } from "./utils/logger.js";
 
 /**
  * Configuration for serving a Single Page Application
@@ -45,8 +46,8 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
 
     // Validate frontend path exists
     if (!fs.existsSync(frontendPath)) {
-        console.warn(`⚠️ Frontend build path does not exist: ${frontendPath}`);
-        console.warn("   SPA serving is disabled. Build your frontend first.");
+        logger.warn(`⚠️ Frontend build path does not exist: ${frontendPath}`);
+        logger.warn("   SPA serving is disabled. Build your frontend first.");
         return;
     }
 
@@ -68,7 +69,7 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
         const indexPath = path.join(frontendPath, indexFile);
 
         if (!fs.existsSync(indexPath)) {
-            console.warn(`⚠️ Index file not found: ${indexPath}`);
+            logger.warn(`⚠️ Index file not found: ${indexPath}`);
             return next();
         }
 
@@ -76,6 +77,6 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
         return c.html(html);
     });
 
-    console.log(`✅ SPA serving enabled from: ${frontendPath}`);
+    logger.info(`✅ SPA serving enabled from: ${frontendPath}`);
 }
 

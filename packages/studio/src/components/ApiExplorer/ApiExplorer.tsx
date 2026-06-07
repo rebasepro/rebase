@@ -50,9 +50,9 @@ export function ApiExplorer() {
                     setSpec(data);
                     setLoading(false);
                 }
-            } catch (err: any) {
+            } catch (err: unknown) {
                 if (!cancelled) {
-                    setError(err.message ?? "Failed to load API spec");
+                    setError(err instanceof Error ? err.message : "Failed to load API spec");
                     setLoading(false);
                 }
             }

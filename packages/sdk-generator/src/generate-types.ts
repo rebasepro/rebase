@@ -1,4 +1,4 @@
-import { EntityCollection, PostgresCollection, Property, Properties, MapProperty, ArrayProperty, RelationProperty, StringProperty, NumberProperty } from "@rebasepro/types";
+import { EntityCollection, PostgresCollection, Property, Properties, MapProperty, ArrayProperty, Relation, RelationProperty, StringProperty, NumberProperty } from "@rebasepro/types";
 import { resolveCollectionRelations } from "@rebasepro/common";
 import { toPascalCase, toSafeIdentifier } from "./utils";
 
@@ -8,7 +8,7 @@ function propertyToTypeScriptType(prop: Property): string {
             const sp = prop as StringProperty;
             if (sp.enum) {
                 const ids = Array.isArray(sp.enum)
-                    ? sp.enum.map((e: any) => typeof e === "object" ? String(e.id) : String(e))
+                    ? sp.enum.map((e: string | number | { id: string | number }) => typeof e === "object" ? String(e.id) : String(e))
                     : Object.keys(sp.enum);
                 return ids.map(v => `"${v}"`).join(" | ");
             }
@@ -18,7 +18,7 @@ function propertyToTypeScriptType(prop: Property): string {
             const np = prop as NumberProperty;
             if (np.enum) {
                 const ids = Array.isArray(np.enum)
-                    ? np.enum.map((e: any) => typeof e === "object" ? String(e.id) : String(e))
+                    ? np.enum.map((e: string | number | { id: string | number }) => typeof e === "object" ? String(e.id) : String(e))
                     : Object.keys(np.enum);
                 return ids.join(" | ");
             }
@@ -75,7 +75,7 @@ export function generateTypedefs(collections: EntityCollection[]): string {
         const properties = (collection.properties ?? {}) as Properties;
 
         // Resolve relations
-        let resolvedRelations: Record<string, any> = {};
+        let resolvedRelations: Record<string, Relation> = {};
         try {
             resolvedRelations = resolveCollectionRelations(collection);
         } catch { /* ignore */ }
@@ -110,7 +110,7 @@ export function generateTypedefs(collections: EntityCollection[]): string {
                         target = target.default || target;
                     }
                     if (target && target.properties) {
-                        const idProp = Object.entries(target.properties).find(([_, p]: [string, any]) => p.isId);
+                        const idProp = Object.entries(target.properties).find(([_, p]) => (p as Record<string, unknown>).isId);
                         if (idProp) {
                             fkType = (idProp[1] as Property).type === "number" ? "number" : "string";
                         }

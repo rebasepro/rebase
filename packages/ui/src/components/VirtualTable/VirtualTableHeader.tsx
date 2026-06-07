@@ -14,8 +14,8 @@ import { defaultBorderMixin } from "../../styles";
 import { cls } from "../../util/cls";
 interface FilterFormProps<T> {
     column: VirtualTableColumn<T>;
-    onFilterUpdate: (filter?: [VirtualTableWhereFilterOp, any], newOpenFilterState?: boolean) => void;
-    filter?: [VirtualTableWhereFilterOp, any];
+    onFilterUpdate: (filter?: [VirtualTableWhereFilterOp, unknown], newOpenFilterState?: boolean) => void;
+    filter?: [VirtualTableWhereFilterOp, unknown];
     onHover: boolean,
     createFilterField: (props: FilterFormFieldProps<T>) => React.ReactNode;
     hidden: boolean;
@@ -24,31 +24,31 @@ interface FilterFormProps<T> {
 
 export type FilterFormFieldProps<CustomProps> = {
     id: React.Key,
-    filterValue: [VirtualTableWhereFilterOp, any] | undefined,
-    setFilterValue: (filterValue?: [VirtualTableWhereFilterOp, any]) => void;
+    filterValue: [VirtualTableWhereFilterOp, unknown] | undefined,
+    setFilterValue: (filterValue?: [VirtualTableWhereFilterOp, unknown]) => void;
     column: VirtualTableColumn<CustomProps>;
     hidden: boolean;
     setHidden: (hidden: boolean) => void;
 };
 
-type VirtualTableHeaderProps<M extends Record<string, any>> = {
+type VirtualTableHeaderProps<M extends Record<string, unknown>> = {
     resizeHandleRef: React.Ref<HTMLDivElement>;
     columnIndex: number;
     isResizingIndex: number;
-    column: VirtualTableColumn<any>;
+    column: VirtualTableColumn<unknown>;
     onColumnSort: (key: Extract<keyof M, string>) => void;
-    filter?: [VirtualTableWhereFilterOp, any];
+    filter?: [VirtualTableWhereFilterOp, unknown];
     sort: VirtualTableSort;
-    onFilterUpdate: (column: VirtualTableColumn, filterForProperty?: [VirtualTableWhereFilterOp, any]) => void;
+    onFilterUpdate: (column: VirtualTableColumn, filterForProperty?: [VirtualTableWhereFilterOp, unknown]) => void;
     onClickResizeColumn?: (columnIndex: number, column: VirtualTableColumn) => void;
-    createFilterField?: (props: FilterFormFieldProps<any>) => React.ReactNode;
+    createFilterField?: (props: FilterFormFieldProps<unknown>) => React.ReactNode;
     AdditionalHeaderWidget?: (props: { onHover: boolean }) => React.ReactNode;
     isDragging?: boolean;
     isDraggable?: boolean;
 };
 
-export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<any>>(
-    function VirtualTableHeader<M extends Record<string, any>>({
+export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<Record<string, unknown>>>(
+    function VirtualTableHeader<M extends Record<string, unknown>>({
         resizeHandleRef,
         columnIndex,
         isResizingIndex,
@@ -73,7 +73,7 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<any>>(
             setOpenFilter(true);
         }, []);
 
-        const update = useCallback((filterForProperty?: [VirtualTableWhereFilterOp, any], newOpenFilterState?: boolean) => {
+        const update = useCallback((filterForProperty?: [VirtualTableWhereFilterOp, unknown], newOpenFilterState?: boolean) => {
             onFilterUpdate(column, filterForProperty);
             if (newOpenFilterState !== undefined)
                 setOpenFilter(newOpenFilterState);
@@ -182,7 +182,7 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<any>>(
                     </div>}
 
                     {column.resizable && <div
-                        ref={resizeHandleRef as any}
+                        ref={resizeHandleRef as React.Ref<HTMLDivElement>}
                         data-no-dnd="true"
                         className={cls(
                             "absolute h-full w-[6px] top-0 right-0 cursor-col-resize",
@@ -199,7 +199,7 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<any>>(
 
             </ErrorBoundary>
         );
-    }, equal) as React.FunctionComponent<VirtualTableHeaderProps<any>>;
+    }, equal) as React.FunctionComponent<VirtualTableHeaderProps<Record<string, unknown>>>;
 
 function FilterForm<M>({
     column,
@@ -213,7 +213,7 @@ function FilterForm<M>({
 
     const id = column.key;
 
-    const [filterInternal, setFilterInternal] = useState<[VirtualTableWhereFilterOp, any] | undefined>(filter);
+    const [filterInternal, setFilterInternal] = useState<[VirtualTableWhereFilterOp, unknown] | undefined>(filter);
 
     useEffect(() => {
         setFilterInternal(filter);

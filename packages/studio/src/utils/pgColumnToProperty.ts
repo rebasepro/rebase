@@ -186,8 +186,22 @@ export function buildCollectionFromTableMetadata(
 ): Partial<EntityCollection> {
     const properties: Record<string, Property> = {};
     const propertiesOrder: string[] = [];
-    const relations: any[] = []; // In the builder/editor, target can be a string path before hydration
-    const securityRules: any[] = [];
+    const relations: Array<{
+        id: string;
+        relationName: string;
+        target: string;
+        cardinality: "one" | "many";
+        direction: "owning" | "inverse";
+        localKey?: string;
+        through?: { table: string; sourceColumn: string; targetColumn: string };
+    }> = [];
+    const securityRules: Array<{
+        name: string;
+        operations: string[];
+        roles: string[];
+        qual: string | null | undefined;
+        with_check: string | null | undefined;
+    }> = [];
 
     // Parse columns
     for (const column of metadata.columns) {

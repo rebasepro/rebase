@@ -36,7 +36,7 @@ database };
 /**
  * Check if a string value looks like a reference
  */
-export function looksLikeReference(value: any): boolean {
+export function looksLikeReference(value: unknown): boolean {
     if (typeof value !== "string") return false;
     return parseReferenceString(value) !== null;
 }
@@ -45,13 +45,13 @@ export function findCommonInitialStringInPath(valuesCount?: ValuesCountEntry) {
 
     if (!valuesCount) return undefined;
 
-    function getPath(value: any): string | undefined {
+    function getPath(value: unknown): string | undefined {
         let pathString: string | undefined;
 
         if (typeof value === "string") {
             pathString = value;
-        } else if (value.slug) {
-            pathString = value.slug;
+        } else if (value && typeof value === "object" && "slug" in value && typeof (value as Record<string, unknown>).slug === "string") {
+            pathString = (value as Record<string, unknown>).slug as string;
         } else {
             console.warn("findCommonInitialStringInPath: value is not a string or document with path", value);
             return undefined;

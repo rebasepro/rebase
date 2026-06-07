@@ -1,4 +1,5 @@
 import { DataDriver, DeleteEntityProps, Entity, EntityCollection, EntityReference, FetchCollectionProps, FetchEntityProps, FilterCombination, FilterValues, GeoPoint, ListenCollectionProps, ListenEntityProps, SaveEntityProps, WhereFilterOp } from "@rebasepro/types";
+import { User } from "@firebase/auth";
 import {
     collection as collectionClause,
     CollectionReference,
@@ -27,6 +28,7 @@ import {
     vector,
     where as whereClause
 } from "@firebase/firestore";
+import type { FieldValue } from "@firebase/firestore";
 import { FirebaseApp } from "@firebase/app";
 import { FirestoreTextSearchController, FirestoreTextSearchControllerBuilder } from "../types/text_search";
 import { useCallback, useEffect, useRef } from "react";
@@ -477,7 +479,7 @@ export function useFirestoreDriver({
             } else {
                 documentReference = doc(collectionReference);
             }
-            return setDoc(documentReference, values, { merge: true })
+            return setDoc(documentReference, values as Record<string, unknown>, { merge: true })
                 .then(() => {
                     return {
                         id: documentReference.id,
@@ -524,7 +526,7 @@ export function useFirestoreDriver({
         checkUniqueField: useCallback(async (
             path: string,
             name: string,
-            value: any,
+            value: unknown,
             entityId?: string | number,
             collection?: EntityCollection<any>
         ): Promise<boolean> => {
@@ -618,7 +620,7 @@ const createEntityFromDocument = <M extends Record<string, any>>(
     docSnap: DocumentSnapshot,
     databaseId?: string
 ): Entity<M> => {
-    const values = firestoreToCMSModel(docSnap.data());
+    const values = firestoreToCMSModel(docSnap.data()) as M;
     const path = getCMSPathFromFirestorePath(docSnap.ref.path);
     return {
         id: docSnap.id,
@@ -638,16 +640,16 @@ const createEntityFromDocument = <M extends Record<string, any>>(
  * @param data
  * @group Firestore
  */
-export function firestoreToCMSModel(data: any): any {
+export function firestoreToCMSModel(data: unknown): unknown {
     if (data === null || data === undefined) return null;
-    if (deleteField().isEqual(data)) {
+    if (typeof data === "object" && data !== null && "isEqual" in data && typeof (data as FieldValue).isEqual === "function" && deleteField().isEqual(data as FieldValue)) {
         return undefined;
     }
-    if (serverTimestamp().isEqual(data)) {
+    if (typeof data === "object" && data !== null && "isEqual" in data && typeof (data as FieldValue).isEqual === "function" && serverTimestamp().isEqual(data as FieldValue)) {
         return null;
     }
-    if (data instanceof Timestamp || (typeof data.toDate === "function" && data.toDate() instanceof Date)) {
-        return data.toDate();
+    if (data instanceof Timestamp || (typeof data === "object" && data !== null && "toDate" in data && typeof (data as Record<string, unknown>).toDate === "function" && ((data as Record<string, unknown>).toDate as () => unknown)() instanceof Date)) {
+        return (data as { toDate: () => Date }).toDate();
     }
     if (data instanceof Date) {
         return data;
@@ -655,9 +657,9 @@ export function firestoreToCMSModel(data: any): any {
     if (typeof data === "object" && "__type__" in data && data.__type__ === "__vector__") {
         return data; // already translated
     }
-    if (data instanceof VectorValue || (typeof data === "object" && data !== null && typeof data.toArray === "function" && data.constructor?.name === "VectorValue")) {
+    if (data instanceof VectorValue || (typeof data === "object" && data !== null && "toArray" in data && typeof (data as Record<string, unknown>).toArray === "function" && (data as { constructor?: { name?: string } }).constructor?.name === "VectorValue")) {
         return { __type__: "__vector__",
-value: data.toArray() };
+value: (data as { toArray: () => number[] }).toArray() };
     }
 
     if (data instanceof FirestoreGeoPoint) {
@@ -674,9 +676,9 @@ databaseId });
         return data.map(firestoreToCMSModel).filter(v => v !== undefined);
     }
     if (typeof data === "object") {
-        const result: Record<string, any> = {};
+        const result: Record<string, unknown> = {};
         for (const key of Object.keys(data)) {
-            const childValue = firestoreToCMSModel(data[key]);
+            const childValue = firestoreToCMSModel((data as Record<string, unknown>)[key]);
             if (childValue !== undefined)
                 result[key] = childValue;
         }
@@ -696,24 +698,26 @@ function getCMSPathFromFirestorePath(fsPath: string): string {
 }
 
 
-export function cmsToFirestoreModel(data: any, firestore: Firestore, inArray = false): any {
+export function cmsToFirestoreModel(data: unknown, firestore: Firestore, inArray = false): unknown {
     if (data === undefined) {
         return deleteField();
     } else if (data === null) {
         return null;
     } else if (Array.isArray(data)) {
-        return data.filter(v => v !== undefined).map(v => cmsToFirestoreModel(v, firestore, true));
-    } else if (data.isEntityReference && data.isEntityReference()) {
-        const targetFirestore = data.databaseId ? getFirestore(firestore.app, data.databaseId) : firestore;
-        return doc(targetFirestore, data.path, data.id);
-    } else if (data && typeof data === "object" && data.__type === "relation" && data.path && data.id) {
-        return doc(firestore, data.path, String(data.id));
+        return (data as unknown[]).filter(v => v !== undefined).map(v => cmsToFirestoreModel(v, firestore, true));
+    } else if (typeof data === "object" && data !== null && "isEntityReference" in data && typeof (data as Record<string, unknown>).isEntityReference === "function" && (data as { isEntityReference: () => boolean }).isEntityReference()) {
+        const entityRef = data as EntityReference;
+        const targetFirestore = entityRef.databaseId ? getFirestore(firestore.app, entityRef.databaseId) : firestore;
+        return doc(targetFirestore, entityRef.path, entityRef.id);
+    } else if (data && typeof data === "object" && "__type" in data && (data as Record<string, unknown>).__type === "relation" && "path" in data && "id" in data) {
+        const rel = data as { path: string; id: string | number };
+        return doc(firestore, rel.path, String(rel.id));
     } else if (data instanceof GeoPoint) {
         return new FirestoreGeoPoint(data.latitude, data.longitude);
     } else if (data instanceof Date) {
         return Timestamp.fromDate(data);
-    } else if (data && typeof data === "object" && "__type__" in data && data.__type__ === "__vector__") {
-        return vector(data.value || []);
+    } else if (data && typeof data === "object" && "__type__" in data && (data as Record<string, unknown>).__type__ === "__vector__") {
+        return vector((data as { value?: number[] }).value || []);
     } else if (data && typeof data === "object") {
         return Object.entries(data)
             .map(([key, v]) => {
@@ -729,7 +733,7 @@ export function cmsToFirestoreModel(data: any, firestore: Firestore, inArray = f
     return data;
 }
 
-function currentTime(): any {
+function currentTime(): unknown {
     return serverTimestamp();
 }
 
@@ -774,7 +778,7 @@ function buildTextSearchControllerWithLocalSearch({
         search: async (props: {
             searchString: string,
             path: string,
-            currentUser?: any,
+            currentUser?: User,
             databaseId?: string
         }) => {
             const search = await textSearchController.search(props);

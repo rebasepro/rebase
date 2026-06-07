@@ -48,7 +48,7 @@ export const LinkSelector = ({
 
     if (!state || !view) return null;
 
-    const handleSubmit = (e: any) => {
+    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const value = inputRef.current?.value;
         if (!value) return;

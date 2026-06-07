@@ -10,18 +10,11 @@ import {
     SearchBar,
     Tooltip
 } from "@rebasepro/ui";
-import { iconsSearch, iconSynonyms } from "@rebasepro/core";
+import { iconsSearch } from "@rebasepro/core";
 import { useTranslation } from "@rebasepro/core";
 
 const UPDATE_SEARCH_INDEX_WAIT_MS = 220;
 
-if (iconSynonyms && process.env.NODE_ENV !== "production") {
-    Object.keys(iconSynonyms).forEach((icon: string) => {
-        if (!iconKeys.includes(icon)) {
-            console.warn(`The icon ${icon} no longer exists. Remove it from \`iconSynonyms\``);
-        }
-    });
-}
 
 function toPascalCase(str: string): string {
     return str.split(/[-_]/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('');

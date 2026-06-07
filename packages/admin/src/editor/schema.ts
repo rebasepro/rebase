@@ -253,7 +253,7 @@ class: "flex items-start my-4" }, 0];
             background: {
                 default: null,
                 getFromDOM(dom: HTMLElement) { return dom.style.backgroundColor || null },
-                setDOMAttr(value: any, attrs: any) { if (value) attrs.style = (attrs.style || "") + `background-color: ${value};` }
+                setDOMAttr(value: string | null, attrs: Record<string, string>) { if (value) attrs.style = (attrs.style || "") + `background-color: ${value};` }
             }
         }
     })

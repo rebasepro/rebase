@@ -152,8 +152,8 @@ export interface BaseUIConfig<CustomProps = unknown> {
     disabled?: boolean | PropertyDisabledConfig;
     widthPercentage?: number;
     customProps?: CustomProps;
-    Field?: ComponentRef<any>;
-    Preview?: ComponentRef<any>;
+    Field?: ComponentRef;
+    Preview?: ComponentRef;
 }
 
 export interface BaseProperty<CustomProps = unknown> {

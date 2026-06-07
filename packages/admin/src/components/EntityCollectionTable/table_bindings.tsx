@@ -1,5 +1,6 @@
 import React from "react";
 import { ArrayProperty, DateProperty, Entity, EntityReference, EntityRelation, NumberProperty, Property, ReferenceProperty, RelationProperty, StringProperty } from "@rebasepro/types";
+import { TableSize } from "@rebasepro/core";
 
 import { VirtualTableInput } from "./fields/VirtualTableInput";
 import { VirtualTableSelect } from "./fields/VirtualTableSelect";
@@ -14,7 +15,7 @@ import { TableRelationSelectorField } from "./fields/TableRelationSelectorField"
 
 import { getPreviewSizeFrom } from "../../preview/util";
 
-export interface TableFieldBindingProps<T = any> {
+export interface TableFieldBindingProps<T = unknown> {
     propertyKey: string;
     property: Property;
     internalValue: T;
@@ -23,9 +24,9 @@ export interface TableFieldBindingProps<T = any> {
     validationError?: Error;
     disabled: boolean;
     selected: boolean;
-    size: any;
+    size: TableSize;
     align: "left" | "center" | "right";
-    entity: Entity<any>;
+    entity: Entity<Record<string, unknown>>;
     path: string;
     openPopup?: (cellRect: DOMRect | undefined) => void;
 }

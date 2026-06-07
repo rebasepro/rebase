@@ -39,8 +39,8 @@ export type DefaultFieldConfig =
  */
 export interface FieldProps<
     P extends Property | Property = Property,
-    CustomProps = any,
-    M extends Record<string, any> = any> {
+    CustomProps = unknown,
+    M extends Record<string, unknown> = Record<string, unknown>> {
 
     /**
      * Key of the property
@@ -51,12 +51,12 @@ export interface FieldProps<
     /**
      * Current value of this field, inferred from the property type P
      */
-    value: any;
+    value: unknown;
 
     /**
      * Set value of field directly
      */
-    setValue: (value: any | null, shouldValidate?: boolean) => void;
+    setValue: (value: unknown | null, shouldValidate?: boolean) => void;
 
     /**
      * Set value of a different field directly

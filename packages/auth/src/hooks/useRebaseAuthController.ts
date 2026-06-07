@@ -113,12 +113,11 @@ export function useRebaseAuthController(
 
     // Configure API URL on mount
     useEffect(() => {
-        if (client) {
-            authApi.setApiUrl(client.baseUrl);
-        } else if (apiUrl) {
-            authApi.setApiUrl(apiUrl);
+        const url = client?.baseUrl || apiUrl;
+        if (url) {
+            authApi.setApiUrl(url);
         }
-    }, [client, apiUrl]);
+    }, [client, client?.baseUrl, apiUrl]);
 
     const clearError = useCallback(() => {
         setAuthProviderError(null);
@@ -281,7 +280,7 @@ export function useRebaseAuthController(
     // Install token getter onto client
     useEffect(() => {
         if (client) {
-            client.setAuthTokenGetter(async () => {
+            client.setAuthTokenGetter?.(async () => {
                 try { return await getAuthToken(); } catch { return null; }
             });
             if (client.setOnUnauthorized) {

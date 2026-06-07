@@ -149,7 +149,7 @@ export interface AuthUserData {
     displayName?: string | null;
     photoUrl?: string | null;
     emailVerified?: boolean;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
     createdAt?: Date;
     updatedAt?: Date;
 }
@@ -163,7 +163,7 @@ export interface AuthCreateUserData {
     password?: string;
     displayName?: string;
     photoUrl?: string;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
 }
 
 /**

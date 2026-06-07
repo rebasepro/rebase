@@ -111,7 +111,7 @@ interface RebaseAuth {
     changePassword(oldPassword: string, newPassword: string): Promise<{ success: boolean; message: string }>;
     sendVerificationEmail(): Promise<{ success: boolean; message: string }>;
     verifyEmail(token: string): Promise<{ success: boolean; message: string }>;
-    getSessions(): Promise<any[]>;
+    getSessions(): Promise<RebaseSession[]>;
     revokeSession(sessionId: string): Promise<{ success: boolean }>;
     revokeAllSessions(): Promise<{ success: boolean }>;
     getSession(): RebaseSession | null;
@@ -133,8 +133,8 @@ interface RebaseRole {
     id: string;
     name: string;
     isAdmin: boolean;
-    defaultPermissions: Record<string, any> | null;
-    config: Record<string, any> | null;
+    defaultPermissions: Record<string, unknown> | null;
+    config: Record<string, unknown> | null;
 }
 
 interface RebaseAdmin {
@@ -145,8 +145,8 @@ interface RebaseAdmin {
     deleteUser(userId: string): Promise<{ success: boolean }>;
     listRoles(): Promise<{ roles: RebaseRole[] }>;
     getRole(roleId: string): Promise<{ role: RebaseRole }>;
-    createRole(data: { id: string; name: string; isAdmin?: boolean; defaultPermissions?: any; config?: any }): Promise<{ role: RebaseRole }>;
-    updateRole(roleId: string, data: { name?: string; isAdmin?: boolean; defaultPermissions?: any; config?: any }): Promise<{ role: RebaseRole }>;
+    createRole(data: { id: string; name: string; isAdmin?: boolean; defaultPermissions?: Record<string, unknown>; config?: Record<string, unknown> }): Promise<{ role: RebaseRole }>;
+    updateRole(roleId: string, data: { name?: string; isAdmin?: boolean; defaultPermissions?: Record<string, unknown>; config?: Record<string, unknown> }): Promise<{ role: RebaseRole }>;
     deleteRole(roleId: string): Promise<{ success: boolean }>;
     bootstrap(): Promise<{ success: boolean; message: string; user: { uid: string; roles: string[] } }>;
 }
@@ -155,7 +155,7 @@ interface UploadFileProps {
     file: FileIcon;
     fileName?: string;
     path?: string;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
     bucket?: string;
 }
 
@@ -168,7 +168,7 @@ interface UploadFileResult {
 interface DownloadConfig {
     url: string | null;
     fileNotFound?: boolean;
-    metadata?: any;
+    metadata?: Record<string, unknown>;
 }
 
 interface StorageSource {
@@ -176,7 +176,7 @@ interface StorageSource {
     getSignedUrl(pathOrUrl: string, bucket?: string): Promise<DownloadConfig>;
     getObject(path: string, bucket?: string): Promise<FileIcon | null>;
     deleteObject(path: string, bucket?: string): Promise<void>;
-    listObjects(path: string, options?: { bucket?: string; maxResults?: number; pageToken?: string }): Promise<any>;
+    listObjects(path: string, options?: { bucket?: string; maxResults?: number; pageToken?: string }): Promise<unknown>;
 }
 
 type RebaseData = {
@@ -220,9 +220,9 @@ interface RebaseClient {
     /** Storage operations */
     storage?: StorageSource;
     /** Call a custom server-side endpoint */
-    call<T = any>(endpoint: string, payload?: any): Promise<T>;
+    call<T = unknown>(endpoint: string, payload?: unknown): Promise<T>;
     /** Direct collection access (shorthand) */
-    [collectionSlug: string]: any;
+    [collectionSlug: string]: unknown;
 }
 
 /** The pre-configured client instance. Already authenticated with the current user session. */

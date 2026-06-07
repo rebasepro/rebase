@@ -97,11 +97,11 @@ type ActionsViewProps<M extends Record<string, unknown>> = {
     sideEntityController: SideEntityController,
     disabled: boolean,
     status: "new" | "existing" | "copy",
-    pluginActions?: any[],
+    pluginActions?: React.ReactNode[],
     openEntityMode: "side_panel" | "full_screen" | "split" | "dialog";
     navigateBack: () => void;
     formContext: FormContext,
-    formex: FormexController<any>;
+    formex: FormexController<Record<string, unknown>>;
     t: (key: string) => string;
     className?: string;
 };

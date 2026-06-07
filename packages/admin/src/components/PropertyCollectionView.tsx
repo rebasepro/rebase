@@ -101,7 +101,7 @@ export const PropertyCollectionView = ({
     suppressHeader = false,
     size = "small"
 }: {
-    data: any;
+    data: unknown;
     properties: Properties;
     baseKey?: string;
     suppressHeader?: boolean;

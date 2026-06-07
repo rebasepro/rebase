@@ -50,7 +50,13 @@ export type RebaseAuthController = AuthController & {
  */
 export interface RebaseAuthControllerProps {
     /** The Rebase Client instance */
-    client?: any;
+    client?: {
+        baseUrl?: string;
+        resolveToken?: () => Promise<string | null>;
+        setAuthTokenGetter?: (getter: () => Promise<string | null>) => void;
+        setOnUnauthorized?: (handler: () => Promise<boolean>) => void;
+        ws?: { setAuthTokenGetter: (getter: () => Promise<string>) => void };
+    };
     /** Base URL of the backend API */
     apiUrl?: string;
     /** Google OAuth client ID (optional, enables Google login) */

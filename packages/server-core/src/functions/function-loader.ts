@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { pathToFileURL } from "url";
 import { Hono } from "hono";
+import { logger } from "../utils/logger.js";
 
 export interface LoadedFunction {
     /** Endpoint name derived from filename (e.g., "send-invoice") */
@@ -49,9 +50,7 @@ export async function loadFunctionsFromDirectory(
                 const exported = mod.default;
 
                 if (!exported) {
-                    console.warn(
-                        `[functions] ${file}: no default export. Skipping.`
-                    );
+                    logger.warn(`[functions] ${file}: no default export. Skipping.`);
                     continue;
                 }
 
@@ -61,7 +60,7 @@ export async function loadFunctionsFromDirectory(
                     const name = path.basename(file, path.extname(file));
                     functions.push({ name,
 app: exported as Hono });
-                    console.log(`⚡ Loaded function route: ${name}`);
+                    logger.info(`⚡ Loaded function route: ${name}`);
                     continue;
                 }
 
@@ -72,7 +71,7 @@ app: exported as Hono });
                         const name = path.basename(file, path.extname(file));
                         functions.push({ name,
 app: result as Hono });
-                        console.log(`⚡ Loaded function route: ${name}`);
+                        logger.info(`⚡ Loaded function route: ${name}`);
                         continue;
                     }
                 }
@@ -82,7 +81,7 @@ app: result as Hono });
                 const keys = exported && typeof exported === "object"
                     ? Object.getOwnPropertyNames(Object.getPrototypeOf(exported)).slice(0, 10).join(", ")
                     : "N/A";
-                console.warn(
+                logger.warn(
                     `[functions] ${file}: default export is not a Hono app or factory. Skipping.\n` +
                     `  export type: ${exportType}${exported?.constructor?.name ? ` (${exported.constructor.name})` : ""}\n` +
                     `  prototype methods: ${keys}\n` +
@@ -92,9 +91,7 @@ app: result as Hono });
             } catch (err: unknown) {
                 const message =
                     err instanceof Error ? err.message : String(err);
-                console.error(
-                    `[functions] Failed to load ${file}: ${message}`
-                );
+                logger.error(`[functions] Failed to load ${file}: ${message}`);
             }
         }
     }

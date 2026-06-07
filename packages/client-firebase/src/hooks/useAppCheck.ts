@@ -15,7 +15,7 @@ export interface InitializeAppCheckProps {
 export interface InitializeAppCheckResult {
     loading: boolean;
     appCheckVerified?: boolean;
-    error?: any;
+    error?: unknown;
 }
 
 /**
@@ -35,7 +35,7 @@ export function useAppCheck({
 
     const [appCheckLoading, setAppCheckLoading] = React.useState<boolean>(false);
     const [appCheckVerified, setAppCheckVerified] = React.useState<boolean | undefined>(undefined);
-    const [error, setError] = React.useState<any>();
+    const [error, setError] = React.useState<unknown>();
 
     const initialCheck = useRef<boolean>(false);
 
@@ -51,9 +51,9 @@ export function useAppCheck({
                 setAppCheckVerified(true);
                 console.debug("App Check success.");
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error("App Check error:", e);
-            setError(e.message);
+            setError(e instanceof Error ? e.message : String(e));
         }
     }, [options?.forceRefresh]);
 

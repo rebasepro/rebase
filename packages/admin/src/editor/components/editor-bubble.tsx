@@ -5,7 +5,7 @@ import { NodeSelection } from "prosemirror-state";
 
 export interface EditorBubbleProps {
     children: ReactNode;
-    options?: any;
+    options?: { placement?: string; offset?: number };
     className?: string;
 }
 

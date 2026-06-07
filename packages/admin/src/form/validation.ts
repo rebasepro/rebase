@@ -7,7 +7,7 @@ import { getValueInPath, hydrateRegExp } from "@rebasepro/utils";
 
 export type CustomFieldValidator = (props: {
     name: string,
-    value: any,
+    value: unknown,
     property: Property,
     entityId?: string | number,
     parentProperty?: MapProperty | ArrayProperty,
@@ -18,13 +18,13 @@ interface PropertyContext<P extends Property> {
     parentProperty?: MapProperty | ArrayProperty,
     entityId?: string | number,
     customFieldValidator?: CustomFieldValidator,
-    name?: any
+    name?: string
 }
 
 export function getEntitySchema<M extends Record<string, unknown>>(
     entityId: string | number | undefined,
     properties: Properties,
-    customFieldValidator?: CustomFieldValidator): z.ZodObject<any> {
+    customFieldValidator?: CustomFieldValidator): z.ZodObject<Record<string, ZodTypeAny>> {
     const shape: Record<string, ZodTypeAny> = {};
     Object.entries(properties as Record<string, Property>)
         .forEach(([name, property]) => {
@@ -153,14 +153,14 @@ function getZodStringSchema({
         const allowedValues = (isRequired ? entries : [...entries, null])
             .map((enumValueConfig) => enumValueConfig?.id ?? null);
         schema = schema.refine(
-            (value: any) => allowedValues.includes(value),
+            (value: unknown) => allowedValues.includes(value as string | null),
             { message: `Must be one of: ${allowedValues.filter(Boolean).join(", ")}` }
         );
     }
 
     if (isRequired && !property.enum) {
         schema = schema.refine(
-            (value: any) => value !== undefined && value !== null && value !== "",
+            (value: unknown) => value !== undefined && value !== null && value !== "",
             { message: validation?.requiredMessage ? validation.requiredMessage : "Required" }
         );
     }
@@ -168,36 +168,36 @@ function getZodStringSchema({
     if (validation) {
 
         if (validation.min || validation.min === 0) schema = schema.refine(
-            (value: any) => value == null || value.length >= validation.min!,
+            (value: unknown) => value == null || (typeof value === "string" && value.length >= validation.min!),
             { message: `${property.name} must be min ${validation.min} characters long` }
         );
         if (validation.max || validation.max === 0) schema = schema.refine(
-            (value: any) => value == null || value.length <= validation.max!,
+            (value: unknown) => value == null || (typeof value === "string" && value.length <= validation.max!),
             { message: `${property.name} must be max ${validation.max} characters long` }
         );
         if (validation.matches) {
             const regExp = typeof validation.matches === "string" ? hydrateRegExp(validation.matches) : validation.matches;
             if (regExp) {
                 schema = schema.refine(
-                    (value: any) => value == null || regExp.test(value),
+                    (value: unknown) => value == null || (typeof value === "string" && regExp.test(value)),
                     { message: validation.matchesMessage ?? "Invalid format" }
                 );
             }
         }
-        if (validation.trim) schema = z.preprocess((v: any) => typeof v === "string" ? v.trim() : v, schema);
-        if (validation.lowercase) schema = z.preprocess((v: any) => typeof v === "string" ? v.toLowerCase() : v, schema);
-        if (validation.uppercase) schema = z.preprocess((v: any) => typeof v === "string" ? v.toUpperCase() : v, schema);
+        if (validation.trim) schema = z.preprocess((v: unknown) => typeof v === "string" ? v.trim() : v, schema);
+        if (validation.lowercase) schema = z.preprocess((v: unknown) => typeof v === "string" ? v.toLowerCase() : v, schema);
+        if (validation.uppercase) schema = z.preprocess((v: unknown) => typeof v === "string" ? v.toUpperCase() : v, schema);
         if (property.email) schema = schema.refine(
-            (value: any) => value == null || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
+            (value: unknown) => value == null || (typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)),
             { message: `${property.name} must be an email` }
         );
         if (property.ui?.url) {
             if (!property.storage || property.storage?.storeUrl) {
                 schema = schema.refine(
-                    (value: any) => {
+                    (value: unknown) => {
                         if (value == null) return true;
                         try {
-                            new URL(value);
+                            new URL(value as string);
                             return true;
                         } catch {
                             return false;
@@ -236,7 +236,7 @@ function getZodNumberSchema({
 
     if (isRequired) {
         schema = schema.refine(
-            (value: any) => value !== undefined && value !== null,
+            (value: unknown) => value !== undefined && value !== null,
             { message: validation?.requiredMessage ? validation.requiredMessage : "Required" }
         );
     }
@@ -244,31 +244,31 @@ function getZodNumberSchema({
     if (validation) {
 
         if (validation.min || validation.min === 0) schema = schema.refine(
-            (value: any) => value == null || value >= validation.min!,
+            (value: unknown) => value == null || (typeof value === "number" && value >= validation.min!),
             { message: `${property.name} must be higher or equal to ${validation.min}` }
         );
         if (validation.max || validation.max === 0) schema = schema.refine(
-            (value: any) => value == null || value <= validation.max!,
+            (value: unknown) => value == null || (typeof value === "number" && value <= validation.max!),
             { message: `${property.name} must be lower or equal to ${validation.max}` }
         );
         if (validation.lessThan || validation.lessThan === 0) schema = schema.refine(
-            (value: any) => value == null || value < validation.lessThan!,
+            (value: unknown) => value == null || (typeof value === "number" && value < validation.lessThan!),
             { message: `${property.name} must be higher than ${validation.lessThan}` }
         );
         if (validation.moreThan || validation.moreThan === 0) schema = schema.refine(
-            (value: any) => value == null || value > validation.moreThan!,
+            (value: unknown) => value == null || (typeof value === "number" && value > validation.moreThan!),
             { message: `${property.name} must be lower than ${validation.moreThan}` }
         );
         if (validation.positive) schema = schema.refine(
-            (value: any) => value == null || value > 0,
+            (value: unknown) => value == null || (typeof value === "number" && value > 0),
             { message: `${property.name} must be positive` }
         );
         if (validation.negative) schema = schema.refine(
-            (value: any) => value == null || value < 0,
+            (value: unknown) => value == null || (typeof value === "number" && value < 0),
             { message: `${property.name} must be negative` }
         );
         if (validation.integer) schema = schema.refine(
-            (value: any) => value == null || Number.isInteger(value),
+            (value: unknown) => value == null || (typeof value === "number" && Number.isInteger(value)),
             { message: `${property.name} must be an integer` }
         );
     }
@@ -288,7 +288,7 @@ function getZodGeoPointSchema({
 
     if (validation?.required) {
         schema = schema.refine(
-            (value: any) => value !== undefined && value !== null,
+            (value: unknown) => value !== undefined && value !== null,
             { message: validation.requiredMessage ? validation.requiredMessage : "Required" }
         );
     }
@@ -315,17 +315,17 @@ function getZodDateSchema({
     if (validation) {
         if (validation.required) {
             schema = schema.refine(
-                (value: any) => value !== undefined && value !== null,
+                (value: unknown) => value !== undefined && value !== null,
                 { message: validation?.requiredMessage ? validation.requiredMessage : "Required" }
             );
         }
 
         if (validation.min) schema = schema.refine(
-            (value: any) => value == null || value >= validation.min!,
+            (value: unknown) => value == null || (value instanceof Date && value >= validation.min!),
             { message: `${property.name} must be after ${validation.min}` }
         );
         if (validation.max) schema = schema.refine(
-            (value: any) => value == null || value <= validation.max!,
+            (value: unknown) => value == null || (value instanceof Date && value <= validation.max!),
             { message: `${property.name} must be before ${validation.min}` }
         );
     }
@@ -345,7 +345,7 @@ function getZodReferenceSchema({
     if (validation) {
         if (validation.required) {
             schema = schema.refine(
-                (value: any) => value !== undefined && value !== null,
+                (value: unknown) => value !== undefined && value !== null,
                 { message: validation?.requiredMessage ? validation.requiredMessage : "Required" }
             );
         }
@@ -370,7 +370,7 @@ function getZodRelationSchema({
     if (validation) {
         if (validation.required) {
             schema = schema.refine(
-                (value: any) => {
+                (value: unknown) => {
                     if (isMany) {
                         return value !== undefined && value !== null && Array.isArray(value) && value.length > 0;
                     }
@@ -397,7 +397,7 @@ function getZodBooleanSchema({
     if (validation) {
         if (validation.required) {
             schema = schema.refine(
-                (value: any) => value !== undefined && value !== null,
+                (value: unknown) => value !== undefined && value !== null,
                 { message: validation?.requiredMessage ? validation.requiredMessage : "Required" }
             );
         }
@@ -480,13 +480,13 @@ function getZodArraySchema({
             if (arrayUniqueFields) {
                 if (typeof arrayUniqueFields === "boolean") {
                     arraySchema = arraySchema.refine(
-                        (values: any) => !values || values.length === new Set(values.map((v: any) => v)).size,
+                        (values: unknown) => !values || !Array.isArray(values) || values.length === new Set(values).size,
                         { message: `${property.name} should have unique values within the array` }
                     );
                 } else if (Array.isArray(arrayUniqueFields)) {
                     arrayUniqueFields.forEach(([fieldName, childProperty]) => {
                         arraySchema = arraySchema.refine(
-                            (values: any) => !values || values.length === new Set(values.map((v: any) => v && v[fieldName])).size,
+                            (values: unknown) => !values || !Array.isArray(values) || values.length === new Set(values.map((v: unknown) => v && typeof v === "object" ? (v as Record<string, unknown>)[fieldName] : v)).size,
                             { message: `${property.name} → ${childProperty.name ?? fieldName}: should have unique values within the array` }
                         );
                     });
@@ -499,22 +499,22 @@ function getZodArraySchema({
     if (validation) {
         if (validation.required) {
             arraySchema = arraySchema.refine(
-                (value: any) => value !== undefined && value !== null && value.length > 0,
+                (value: unknown) => value !== undefined && value !== null && Array.isArray(value) && value.length > 0,
                 { message: validation?.requiredMessage ? validation.requiredMessage : "Required" }
             );
         }
         if (validation.min || validation.min === 0) arraySchema = arraySchema.refine(
-            (value: any) => !value || value.length >= validation.min!,
+            (value: unknown) => !value || !Array.isArray(value) || value.length >= validation.min!,
             { message: `${property.name} should be min ${validation.min} entries long` }
         );
         if (validation.max) arraySchema = arraySchema.refine(
-            (value: any) => !value || value.length <= validation.max!,
+            (value: unknown) => !value || !Array.isArray(value) || value.length <= validation.max!,
             { message: `${property.name} should be max ${validation.max} entries long` }
         );
         // Handle uniqueInArray at the array level
         if (validation.uniqueInArray) {
             arraySchema = arraySchema.refine(
-                (values: any) => !values || values.length === new Set(values.map((v: any) => v)).size,
+                (values: unknown) => !values || !Array.isArray(values) || values.length === new Set(values).size,
                 { message: `${property.name} should have unique values within the array` }
             );
         }
@@ -526,12 +526,12 @@ function getZodVectorSchema({
     property
 }: PropertyContext<VectorProperty>): ZodTypeAny {
     let schema: ZodTypeAny = z.preprocess(
-        (val: any) => {
-            if (val && typeof val === "object" && "__type" in val && val.__type === "Vector") {
-                return val.value;
+        (val: unknown) => {
+            if (val && typeof val === "object" && "__type" in val && (val as Record<string, unknown>).__type === "Vector") {
+                return (val as Record<string, unknown>).value;
             }
-            if (val && typeof val === "object" && "value" in val && Array.isArray(val.value)) {
-                return val.value;
+            if (val && typeof val === "object" && "value" in val && Array.isArray((val as Record<string, unknown>).value)) {
+                return (val as Record<string, unknown>).value;
             }
             return val;
         },
@@ -540,14 +540,14 @@ function getZodVectorSchema({
     
     if (property.dimensions) {
         schema = schema.refine(
-            (val: any) => val === null || val === undefined || val.length === property.dimensions,
+            (val: unknown) => val === null || val === undefined || (Array.isArray(val) && val.length === property.dimensions),
             { message: `${property.name ?? "Vector"} must have exactly ${property.dimensions} dimensions` }
         );
     }
     
     if (property.validation?.required) {
         schema = schema.refine(
-            (val: any) => val !== null && val !== undefined && val.length > 0,
+            (val: unknown) => val !== null && val !== undefined && Array.isArray(val) && val.length > 0,
             { message: property.validation?.requiredMessage ?? "Required" }
         );
     }
@@ -563,7 +563,7 @@ function getZodBinarySchema({
 
     if (validation?.required) {
         schema = schema.nullable().optional().refine(
-            (value: any) => value !== undefined && value !== null && value !== "",
+            (value: unknown) => value !== undefined && value !== null && value !== "",
             { message: validation.requiredMessage ? validation.requiredMessage : "Required" }
         );
     }

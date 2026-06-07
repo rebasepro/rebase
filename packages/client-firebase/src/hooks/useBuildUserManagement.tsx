@@ -12,9 +12,9 @@ import {
 } from "@rebasepro/types";
 import { FirebaseAccessGate } from "./useFirebaseAccessGate";
 
-type UserWithRoleIds<USER extends User = any> = Omit<USER, "roles"> & { roles: string[] };
+type UserWithRoleIds<USER extends User = User> = Omit<USER, "roles"> & { roles: string[] };
 
-export interface UserManagementDelegateParams<CONTROLLER extends AuthController<any> = AuthController<any>> {
+export interface UserManagementDelegateParams<CONTROLLER extends AuthController<User> = AuthController<User>> {
 
     authController: CONTROLLER;
 
@@ -61,8 +61,8 @@ export interface UserManagementDelegateParams<CONTROLLER extends AuthController<
  * @param roles
  * @param allowDefaultRolesCreation
  */
-export function useBuildUserManagement<CONTROLLER extends AuthController<any> = AuthController<any>,
-    USER extends User = CONTROLLER extends AuthController<infer U> ? U : any>
+export function useBuildUserManagement<CONTROLLER extends AuthController<User> = AuthController<User>,
+    USER extends User = CONTROLLER extends AuthController<infer U> ? U : User>
 ({
      authController,
      dataSourceDelegate,
@@ -118,10 +118,10 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<any> = 
                 }
                 setRolesLoading(false);
             },
-            onError(e: any): void {
+            onError(e: unknown): void {
                 setRoles([]);
                 console.error("Error loading roles", e);
-                setRolesError(e);
+                setRolesError(e instanceof Error ? e : new Error(String(e)));
                 setRolesLoading(false);
             }
         });
@@ -144,7 +144,7 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<any> = 
                 console.debug("Updating users", entities);
                 setUsersError(undefined);
                 try {
-                    const newUsers = entitiesToUsers(entities);
+                    const newUsers = entitiesToUsers(entities) as UserWithRoleIds<USER>[];
                     // if (!equal(newUsers, usersWithRoleIds))
                     setUsersWithRoleIds(newUsers);
                 } catch (e) {
@@ -154,10 +154,10 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<any> = 
                 }
                 setUsersLoading(false);
             },
-            onError(e: any): void {
+            onError(e: unknown): void {
                 console.error("Error loading users", e);
                 setUsersWithRoleIds([]);
-                setUsersError(e);
+                setUsersError(e instanceof Error ? e : new Error(String(e)));
                 setUsersLoading(false);
             }
         });
@@ -350,8 +350,8 @@ const entitiesToUsers = (docs: Entity<Omit<UserWithRoleIds, "id">>[]): (UserWith
         const data = doc.values;
         const record = data as Record<string, unknown>;
         const newVar = {
-            uid: doc.id,
             ...data,
+            uid: doc.id,
             created_on: record.created_on as Date | undefined,
             updated_on: record.updated_on as Date | undefined
         };

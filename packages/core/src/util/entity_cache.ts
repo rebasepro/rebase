@@ -154,9 +154,7 @@ export function getEntityFromMemoryCache(path: string): object | undefined {
     return entityCache.get(path);
 }
 
-export function hasEntityInCache(path: string): boolean {
-    return entityCache.has(path);
-}
+
 
 /**
  * Retrieves an entity from the in-memory cache or `sessionStorage`.
@@ -212,31 +210,7 @@ export function removeEntityFromCache(path: string): void {
     }
 }
 
-/**
- * Clears the entire in-memory cache and removes all related entities from `sessionStorage`.
- */
-export function clearEntityCache(): void {
-    // Clear the in-memory cache
-    entityCache.clear();
 
-    // Remove all entities with the specified prefix from sessionStorage
-    if (isSessionStorageAvailable) {
-        try {
-            const keysToRemove: string[] = [];
-            for (let i = 0; i < sessionStorage.length; i++) {
-                const fullKey = sessionStorage.key(i);
-                if (fullKey && fullKey.startsWith(LOCAL_STORAGE_PREFIX)) {
-                    keysToRemove.push(fullKey);
-                }
-            }
-
-            // Remove the keys after collecting them to avoid issues while iterating
-            keysToRemove.forEach((key) => sessionStorage.removeItem(key));
-        } catch (error) {
-            console.error("Failed to clear entity cache from sessionStorage:", error);
-        }
-    }
-}
 
 export function flattenKeys(obj: Record<string, unknown> | unknown[], prefix = "", result: string[] = []): string[] {
 

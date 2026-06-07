@@ -1,16 +1,16 @@
 import type { Property } from "@rebasepro/types";
 import { CollectionSize, SelectedCellProps } from "@rebasepro/types";
 
-export type EntityCollectionTableController<M extends Record<string, any>> = {
+export type EntityCollectionTableController<M extends Record<string, unknown>> = {
 
     /**
      * This cell is displayed as selected
      */
-    selectedCell?: SelectedCellProps<any>;
+    selectedCell?: SelectedCellProps;
     /**
      * Store used to sync selection state across cells efficiently.
      */
-    selectionStore?: any;
+    selectionStore?: { getSnapshot: () => SelectedCellProps | undefined; subscribe: (cb: () => void) => () => void };
     /**
      * Select a table cell
      * @param cell
@@ -25,7 +25,7 @@ export type EntityCollectionTableController<M extends Record<string, any>> = {
      * Callback used when the value of a cell has changed.
      * @param params
      */
-    onValueChange?: (params: OnCellValueChangeParams<any, M>) => void;
+    onValueChange?: (params: OnCellValueChangeParams<unknown, M>) => void;
     /**
      * Size of the elements in the collection
      */
@@ -36,7 +36,7 @@ export type EntityCollectionTableController<M extends Record<string, any>> = {
  * Props passed in a callback when the content of a cell in a table has been edited
  * @group Collection components
  */
-export interface OnCellValueChangeParams<T = any, D = any> {
+export interface OnCellValueChangeParams<T = unknown, D = unknown> {
     value: T,
     propertyKey: string,
     data?: D,
@@ -49,7 +49,7 @@ export interface OnCellValueChangeParams<T = any, D = any> {
  */
 export type UniqueFieldValidator = (props: {
     name: string,
-    value: any,
+    value: unknown,
     property: Property,
     entityId?: string | number
 }) => Promise<boolean>;
@@ -58,7 +58,7 @@ export type UniqueFieldValidator = (props: {
  * Callback when a cell has changed in a table
  * @group Collection components
  */
-export type OnCellValueChange<T, M extends Record<string, any>> = (params: OnCellValueChangeParams<T, M>) => Promise<void> | void;
+export type OnCellValueChange<T, M extends Record<string, unknown>> = (params: OnCellValueChangeParams<T, M>) => Promise<void> | void;
 
 /**
  * @group Collection components

@@ -169,14 +169,22 @@ headers });
         if (res.status === 204) return undefined as T; // SAFETY: HTTP 204 No Content has no body
 
         const text = await res.text().catch(() => "");
-        let body: any = {};
+        let body: Record<string, unknown> = {};
         if (text) {
             try {
-                body = JSON.parse(text, rebaseReviver);
+                body = JSON.parse(text, rebaseReviver) as Record<string, unknown>;
             } catch (e) {
                 // If not valid JSON, fallback
             }
         }
+
+        const getErrorField = (obj: Record<string, unknown>, field: string): unknown => {
+            const err = obj?.error;
+            if (err && typeof err === "object" && err !== null && field in (err as Record<string, unknown>)) {
+                return (err as Record<string, unknown>)[field];
+            }
+            return obj?.[field];
+        };
 
         if (res.status === 401 && onUnauthorizedHandler) {
             const retried = await onUnauthorizedHandler();
@@ -195,7 +203,7 @@ headers });
 headers: retryHeaders });
                 if (retryRes.status === 204) return undefined as T; // SAFETY: HTTP 204 No Content has no body
                 const retryText = await retryRes.text().catch(() => "");
-                let retryBody: any = {};
+                let retryBody: Record<string, unknown> = {};
                 if (retryText) {
                     try {
                         retryBody = JSON.parse(retryText, rebaseReviver);
@@ -209,9 +217,9 @@ headers: retryHeaders });
                     }
                     throw new RebaseApiError(
                         retryRes.status,
-                        retryBody?.error?.message || retryBody?.message || fallbackMessage || `Request failed with status ${retryRes.status}`,
-                        retryBody?.error?.code || retryBody?.code,
-                        retryBody?.error?.details || retryBody?.details
+                        String(getErrorField(retryBody, "message") || fallbackMessage || `Request failed with status ${retryRes.status}`),
+                        getErrorField(retryBody, "code") as string | undefined,
+                        getErrorField(retryBody, "details")
                     );
                 }
                 return retryBody as T;
@@ -226,9 +234,9 @@ headers: retryHeaders });
             }
             throw new RebaseApiError(
                 res.status,
-                body?.error?.message || body?.message || fallbackMessage || `Request failed with status ${res.status}`,
-                body?.error?.code || body?.code,
-                body?.error?.details || body?.details
+                String(getErrorField(body, "message") || fallbackMessage || `Request failed with status ${res.status}`),
+                getErrorField(body, "code") as string | undefined,
+                getErrorField(body, "details")
             );
         }
 

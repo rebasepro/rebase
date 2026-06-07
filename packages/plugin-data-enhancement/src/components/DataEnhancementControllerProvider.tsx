@@ -58,7 +58,7 @@ export function DataEnhancementControllerProvider({
     path,
     collection,
     formContext
-}: PropsWithChildren<DataEnhancementControllerProviderProps & PluginFormActionProps<any>>) {
+}: PropsWithChildren<DataEnhancementControllerProviderProps & PluginFormActionProps>) {
 
     const [enabled, setEnabled] = useState(false);
     const [suggestions, setSuggestions] = useState<Record<string, string | number>>({});
@@ -193,7 +193,7 @@ export function DataEnhancementControllerProvider({
         }));
     }, [properties, formContext]);
 
-    const displayNeededSubscriptionSnackbar = useCallback((projectId: any) => {
+    const displayNeededSubscriptionSnackbar = useCallback((projectId: unknown) => {
         snackbarController.open({
             type: "warning",
             message: "A valid subscription is needed in order to use this function.",
@@ -207,7 +207,7 @@ export function DataEnhancementControllerProvider({
         setSuggestions({});
     }, []);
 
-    const enhance = useCallback(async (props: EnhanceParams<any>): Promise<EnhancedDataResult | null> => {
+    const enhance = useCallback(async (props: EnhanceParams<Record<string, unknown>>): Promise<EnhancedDataResult | null> => {
 
         if (!authController.user) {
             snackbarController.open({
@@ -232,10 +232,13 @@ export function DataEnhancementControllerProvider({
         const currentValues = valuesRef.current ?? {};
 
         return new Promise((resolve, reject) => {
-            function onError(e: any) {
+            function onError(e: unknown) {
                 setLoadingSuggestions([]);
-                if (e.code === "payment-required") {
-                    const projectId = e.data.projectId;
+                const err = e instanceof Error ? e : typeof e === "object" && e !== null ? e : new Error(String(e));
+                const errorObj = err as Record<string, unknown>;
+                if (errorObj.code === "payment-required") {
+                    const data = errorObj.data as Record<string, unknown> | undefined;
+                    const projectId = data?.projectId;
                     displayNeededSubscriptionSnackbar(projectId);
                 } else {
                     console.error("Enhance error", e);
@@ -286,7 +289,7 @@ export function DataEnhancementControllerProvider({
                         enhancingInProgress.current = false;
                     }
                 }).catch(onError);
-            } catch (e: any) {
+            } catch (e: unknown) {
                 onError(e);
             }
         });

@@ -61,7 +61,7 @@ export interface CronJobContext {
     log: (...args: unknown[]) => void;
 
     /** The RebaseClient instance to interact with the database. */
-    client: RebaseClient<any>;
+    client: RebaseClient;
 }
 
 // =============================================================================

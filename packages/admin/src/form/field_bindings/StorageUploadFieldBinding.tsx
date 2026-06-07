@@ -134,7 +134,7 @@ interface SortableStorageItemProps {
     name: string;
     metadata?: Record<string, unknown>;
     storagePathBuilder: (file: File) => string;
-    onFileUploadComplete: (uploadedPath: string, entry: StorageFieldItem, fileMetadata?: any) => Promise<void>;
+    onFileUploadComplete: (uploadedPath: string, entry: StorageFieldItem, fileMetadata?: Record<string, unknown>) => Promise<void>;
     onClear: (clearedStoragePathOrDownloadUrl: string) => void;
     disabled: boolean;
     isSortable: boolean; // Kept for consistency, though dnd-kit handles sortability via context
@@ -241,9 +241,9 @@ function FileDropComponent({
     internalValue: StorageFieldItem[],
     property: StringProperty,
     onClear: (clearedStoragePathOrDownloadUrl: string) => void,
-    metadata?: any,
+    metadata?: Record<string, unknown>,
     storagePathBuilder: (file: File) => string,
-    onFileUploadComplete: (uploadedPath: string, entry: StorageFieldItem, fileMetadata?: any) => Promise<void>,
+    onFileUploadComplete: (uploadedPath: string, entry: StorageFieldItem, fileMetadata?: Record<string, unknown>) => Promise<void>,
     name: string,
     helpText: string,
     isDndItemDragging?: boolean
@@ -357,7 +357,7 @@ export interface StorageUploadProps {
     storage: StorageConfig;
     onFilesAdded: (acceptedFiles: File[]) => Promise<void>; // Updated from useStorageUploadController
     storagePathBuilder: (file: File) => string;
-    onFileUploadComplete: (uploadedPath: string, entry: StorageFieldItem, fileMetadata?: any) => Promise<void>;
+    onFileUploadComplete: (uploadedPath: string, entry: StorageFieldItem, fileMetadata?: Record<string, unknown>) => Promise<void>;
 }
 
 export function StorageUpload({

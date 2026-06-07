@@ -5,7 +5,7 @@ export function RebaseRouter({
     children,
     basePath
 }: {
-    children: any,
+    children: React.ReactNode,
     basePath?: string;
 }) {
     return <RouterProvider router={createBrowserRouter([

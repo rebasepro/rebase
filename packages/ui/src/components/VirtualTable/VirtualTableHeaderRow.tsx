@@ -28,13 +28,13 @@ const SortableColumnHeader = ({
     columnIndex: number;
     columnRefs: React.Ref<HTMLDivElement>[];
     isResizing: number;
-    onFilterUpdate: any;
-    filter: [VirtualTableWhereFilterOp, any] | undefined;
+    onFilterUpdate: (column: VirtualTableColumn, filterForProperty?: [VirtualTableWhereFilterOp, unknown]) => void;
+    filter: [VirtualTableWhereFilterOp, unknown] | undefined;
     sortByProperty: string | undefined;
     currentSort: "asc" | "desc" | undefined;
-    onColumnSort: any;
+    onColumnSort: (key: string) => void;
     onClickResizeColumn: (index: number) => void;
-    createFilterField: any;
+    createFilterField: ((props: import("./VirtualTableHeader").FilterFormFieldProps<unknown>) => React.ReactNode) | undefined;
     isDragging: boolean;
     isDraggable: boolean;
 }) => {
@@ -125,7 +125,7 @@ export const VirtualTableHeaderRow = ({
     rowHeight = 54,
     draggingColumnId,
     headerHeight = 48
-}: VirtualTableContextProps<any>) => {
+}: VirtualTableContextProps<Record<string, unknown>>) => {
 
     const columnRefs = useMemo(() => columns.map(() => createRef<HTMLDivElement>()), [columns.length]);
     const [isResizing, setIsResizing] = useState(-1);
@@ -212,7 +212,7 @@ export const VirtualTableHeaderRow = ({
                 className={cls(defaultBorderMixin, "z-20 sticky min-w-full flex w-fit flex-row top-0 left-0 border-b bg-surface-50 dark:bg-surface-900")}
                 style={{ height: headerHeight }}>
                 {columns.map((column, columnIndex) => {
-                    const filterForThisProperty: [VirtualTableWhereFilterOp, any] | undefined =
+                    const filterForThisProperty: [VirtualTableWhereFilterOp, unknown] | undefined =
                         column && filter && filter[column.key]
                             ? filter[column.key]
                             : undefined;

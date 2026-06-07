@@ -40,7 +40,7 @@ VirtualListContext.displayName = "VirtualListContext";
 
 type InnerElementProps = {
     children: React.ReactNode,
-    style: any
+    style: React.CSSProperties
 };
 
 // eslint-disable-next-line react/display-name
@@ -107,8 +107,8 @@ zIndex: 20 }}>
  *
  * @group Components
  */
-export const VirtualTable = React.memo<VirtualTableProps<any>>(
-    function VirtualTable<T extends Record<string, any>>({
+export const VirtualTable = React.memo<VirtualTableProps<Record<string, unknown>>>(
+    function VirtualTable<T extends Record<string, unknown>>({
         data,
         onResetPagination,
         onEndReached,
@@ -229,7 +229,7 @@ export const VirtualTable = React.memo<VirtualTableProps<any>>(
         }, [columns, onColumnResize, onColumnResizeEnd]);
 
         // saving the current filter as a ref as a workaround for header closure
-        const filterRef = useRef<VirtualTableFilterValues<any> | undefined>(undefined);
+        const filterRef = useRef<VirtualTableFilterValues<string> | undefined>(undefined);
 
         useEffect(() => {
             filterRef.current = filterInput;
@@ -299,11 +299,11 @@ export const VirtualTable = React.memo<VirtualTableProps<any>>(
                 onEndReachedInternal(scrollOffset);
         }, [maxScroll, onEndReachedInternal]);
 
-        const onFilterUpdateInternal = useCallback((column: VirtualTableColumn, filterForProperty?: [VirtualTableWhereFilterOp, any]) => {
+        const onFilterUpdateInternal = useCallback((column: VirtualTableColumn, filterForProperty?: [VirtualTableWhereFilterOp, unknown]) => {
 
             endReachCallbackThreshold.current = 0;
             const filter = filterRef.current;
-            let newFilterValue: VirtualTableFilterValues<any> = filter ? { ...filter } : {};
+            let newFilterValue: VirtualTableFilterValues<string> = filter ? { ...filter } : {};
 
             if (!filterForProperty) {
                 delete newFilterValue[column.key];
@@ -506,7 +506,7 @@ function MemoizedList({
     const Row = useCallback(({
         index,
         style
-    }: any) => {
+    }: { index: number; style: React.CSSProperties }) => {
         return <VirtualListContext.Consumer>
             {({
                 onRowClick,
@@ -535,7 +535,7 @@ function MemoizedList({
                     </div>;
                 }
 
-                const rowData = data && data[index];
+                const rowData = (data ? data[index] : undefined) as Record<string, unknown>;
                 return (
                     <VirtualTableRow
                         key={`row_${index}`}

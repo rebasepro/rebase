@@ -22,16 +22,16 @@ function normalizeError(error: unknown): string | undefined {
 
         // Extract all string values from the object (e.g., nested validation errors)
         const messages: string[] = [];
-        const extractMessages = (obj: any) => {
+        const extractMessages = (obj: Record<string, unknown>) => {
             for (const key in obj) {
                 if (typeof obj[key] === "string") {
-                    messages.push(obj[key]);
+                    messages.push(obj[key] as string);
                 } else if (typeof obj[key] === "object" && obj[key] !== null) {
-                    extractMessages(obj[key]);
+                    extractMessages(obj[key] as Record<string, unknown>);
                 }
             }
         };
-        extractMessages(error);
+        extractMessages(error as Record<string, unknown>);
         if (messages.length > 0) {
             return Array.from(new Set(messages)).join(", ");
         }

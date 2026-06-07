@@ -5,6 +5,5 @@ export type {
     DataEnhancementPluginProps
 } from "./useDataEnhancementPlugin";
 
-export type { SubscriptionMessageProps } from "./types/subscriptions_message_props";
 
 export * from "./editor/useEditorAIController";

@@ -1,11 +1,11 @@
-import { iconSynonyms } from "./icon_synonyms";
+const iconSynonyms: Record<string, string> = {};
 import { iconKeys } from "@rebasepro/ui";
 import Fuse from "fuse.js";
 
 
 const map = iconKeys
     .map((importName) => {
-        const iconSynonym = importName in iconSynonyms ? (iconSynonyms as Record<string, string>)[importName] : "";
+        const iconSynonym = importName in iconSynonyms ? iconSynonyms[importName] : "";
         return {
             key: importName,
             synonyms: iconSynonym

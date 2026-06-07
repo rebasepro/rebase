@@ -4,8 +4,8 @@ import { deepEqual as equal } from "fast-equals"
 
 import { VirtualTableRowProps } from "./types";
 import { cls } from "../../util/cls";
-export const VirtualTableRow = React.memo<VirtualTableRowProps<any>>(
-    function VirtualTableRow<T>({
+export const VirtualTableRow = React.memo<VirtualTableRowProps<Record<string, unknown>>>(
+    function VirtualTableRow<T extends Record<string, unknown>>({
         rowData,
         rowIndex,
         children,

@@ -79,7 +79,7 @@ export function SelectFieldBinding({
                         : null;
                     return setValue(newValue);
                 }}
-                renderValue={(enumKey: any) => {
+                renderValue={(enumKey: string) => {
                     return <EnumValuesChip
                         enumKey={enumKey}
                         enumValues={enumValues}

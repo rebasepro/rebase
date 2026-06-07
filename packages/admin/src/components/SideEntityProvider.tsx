@@ -1,3 +1,4 @@
+import type { SideEntityController } from "@rebasepro/types";
 import React from "react";
 import { useBuildSideEntityController } from "../hooks/useBuildSideEntityController";
 import { useBuildSideDialogsController } from "../hooks/useBuildSideDialogsController";
@@ -68,7 +69,7 @@ export function SideEntityProvider({ children }: { children: React.ReactNode }) 
  * Internal component that auto-registers side entity and breadcrumbs
  * into the Studio bridge. Must be a child of BreadcrumbsProvider.
  */
-function BridgeAutoRegistrar({ sideEntityController }: { sideEntityController: any }) {
+function BridgeAutoRegistrar({ sideEntityController }: { sideEntityController: SideEntityController }) {
     const breadcrumbs = useBreadcrumbsController();
     useBridgeRegistration("sideEntityController", sideEntityController);
     useBridgeRegistration("breadcrumbs", breadcrumbs);

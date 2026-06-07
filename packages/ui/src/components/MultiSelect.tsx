@@ -98,7 +98,7 @@ export const MultiSelect = React.forwardRef<
     ) => {
         const [isMounted, setIsMounted] = useState(false);
         const [isPopoverOpen, setIsPopoverOpen] = useState(open ?? false);
-        const [selectedValues, setSelectedValues] = useState<any[]>(value ?? []);
+        const [selectedValues, setSelectedValues] = useState<string[]>(value ?? []);
 
         // Get the portal container from context
         const contextContainer = usePortalContainer();
@@ -143,17 +143,17 @@ export const MultiSelect = React.forwardRef<
             setSelectedValues(value ?? []);
         }, [value]);
 
-        const updateValues = React.useCallback((values: any[]) => {
+        const updateValues = React.useCallback((values: string[]) => {
             setSelectedValues(values);
             onValueChange?.(values);
         }, [onValueChange]);
 
-        const onItemClick = React.useCallback((newValue: any) => {
-            let newSelectedValues: any[];
+        const onItemClick = React.useCallback((newValue: MultiSelectValue) => {
+            let newSelectedValues: string[];
             if (selectedValues.some(v => String(v) === String(newValue))) {
                 newSelectedValues = selectedValues.filter(v => String(v) !== String(newValue));
             } else {
-                newSelectedValues = [...selectedValues, newValue];
+                newSelectedValues = [...selectedValues, String(newValue)];
             }
             updateValues(newSelectedValues);
         }, [selectedValues, updateValues]);
@@ -170,7 +170,7 @@ export const MultiSelect = React.forwardRef<
             }
         };
 
-        const toggleOption = (value: any) => {
+        const toggleOption = (value: string) => {
             const newSelectedValues = selectedValues.some(v => String(v) === String(value))
                 ? selectedValues.filter(v => String(v) !== String(value))
                 : [...selectedValues, value];

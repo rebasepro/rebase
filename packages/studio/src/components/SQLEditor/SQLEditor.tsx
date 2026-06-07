@@ -66,10 +66,31 @@ const QueryLoadingView = () => {
 
     useEffect(() => {
         const start = Date.now();
-        const interval = setInterval(() => {
-            setElapsed(Date.now() - start);
-        }, 100);
-        return () => clearInterval(interval);
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        let cancelled = false;
+
+        const tick = () => {
+            if (cancelled) return;
+            if (document.visibilityState === "visible") {
+                setElapsed(Date.now() - start);
+            }
+            timeoutId = setTimeout(tick, 100);
+        };
+
+        tick();
+
+        const handleVisibility = () => {
+            if (document.visibilityState === "visible") {
+                setElapsed(Date.now() - start);
+            }
+        };
+        document.addEventListener("visibilitychange", handleVisibility);
+
+        return () => {
+            cancelled = true;
+            if (timeoutId) clearTimeout(timeoutId);
+            document.removeEventListener("visibilitychange", handleVisibility);
+        };
     }, []);
 
     return (
@@ -1054,7 +1075,7 @@ resizable: false }, ...dataColumns]
                         cellRenderer={({ rowData, column, rowIndex }) => {
                             // Dedicated collection action column
                             if (column.key === "__cms_action__") {
-                                const rowActions = getRowEntityActions(rowData);
+                                const rowActions = getRowEntityActions(rowData ?? {});
                                 if (rowActions.length === 0) {
                                     return <div className="h-full w-full"/>;
                                 }
@@ -1128,7 +1149,7 @@ id: String(ra.entityId) })}
                                 return (
                                     <FixedEditorOverlay
                                         displayValue={displayValue}
-                                        onSave={(val) => handleCellSave(val, rowData, column.key, rowIndex)}
+                                        onSave={(val) => handleCellSave(val, rowData ?? {}, column.key, rowIndex)}
                                         onCancel={() => setEditingCell(null)}
                                     />
                                 );
@@ -1137,7 +1158,7 @@ id: String(ra.entityId) })}
                             return (
                                 <div
                                     className="px-4 py-1.5 h-full flex items-center whitespace-nowrap text-[13px] text-text-primary dark:text-text-primary-dark font-mono cursor-text group/cell"
-                                    onDoubleClick={() => handleDoubleClick(rowIndex, column.key, displayValue, rowData)}
+                                    onDoubleClick={() => handleDoubleClick(rowIndex, column.key, displayValue, rowData ?? {})}
                                 >
                                     <div className="truncate flex-grow" title={displayValue}>
                                         {displayValue === "" ? <span className="text-text-disabled dark:text-text-disabled-dark italic text-[11px]">NULL</span> : displayValue}

@@ -16,13 +16,16 @@ debug: 3 };
     if (currentLevel < 0) console.error = () => { };
 }
 
+/** Module-scoped backup of the original console methods. */
+let originalConsole: Pick<Console, "log" | "warn" | "error" | "debug"> | undefined;
+
 /**
  * Reset console methods to their original state
  */
 export function resetConsole() {
     // Store original methods if not already stored
-    if (!(global as Record<string, unknown>).__originalConsole) {
-        (global as Record<string, unknown>).__originalConsole = {
+    if (!originalConsole) {
+        originalConsole = {
             log: console.log,
             warn: console.warn,
             error: console.error,
@@ -30,9 +33,8 @@ export function resetConsole() {
         };
     }
 
-    const original = (global as Record<string, unknown>).__originalConsole as Console;
-    console.log = original.log;
-    console.warn = original.warn;
-    console.error = original.error;
-    console.debug = original.debug;
+    console.log = originalConsole.log;
+    console.warn = originalConsole.warn;
+    console.error = originalConsole.error;
+    console.debug = originalConsole.debug;
 }

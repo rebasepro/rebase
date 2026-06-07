@@ -71,7 +71,7 @@ databaseId }) as Promise<Entity<M> | undefined>;
             return client.deleteEntity({ entity });
         },
 
-        async checkUniqueField(path: string, name: string, value: any, entityId?: string, collection?: EntityCollection): Promise<boolean> {
+        async checkUniqueField(path: string, name: string, value: unknown, entityId?: string, collection?: EntityCollection): Promise<boolean> {
             return client.checkUniqueField(path, name, value, entityId, collection);
         },
 

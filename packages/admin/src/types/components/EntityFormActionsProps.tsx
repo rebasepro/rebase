@@ -9,7 +9,7 @@ export interface EntityFormActionsProps {
     entity?: Entity;
     layout: "bottom" | "side" | "responsive";
     savingError?: Error;
-    formex: FormexController<any>;
+    formex: FormexController<Record<string, unknown>>;
     disabled: boolean;
     status: "new" | "existing" | "copy";
     pluginActions: React.ReactNode[];

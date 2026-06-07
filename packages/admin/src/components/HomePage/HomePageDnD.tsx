@@ -2,6 +2,7 @@ import type { NavigationEntry } from "@rebasepro/types";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     Active,
+    Over,
     closestCenter,
     closestCorners,
     CollisionDetection,
@@ -347,7 +348,7 @@ export function useHomePageDnd({
     const handleDragOver = ({
         active,
         over
-    }: { active: Active; over: any }) => {
+    }: { active: Active; over: Over | null }) => {
         if (disabled || !over) return;
 
         const activeIdNow = active.id;
@@ -398,7 +399,7 @@ export function useHomePageDnd({
     const handleDragEnd = ({
         active,
         over
-    }: { active: Active; over: any }) => {
+    }: { active: Active; over: Over | null }) => {
         if (disabled || !over) {
             resetDragState();
             return;

@@ -6,7 +6,7 @@ export interface OpenApiSpec {
     paths: Record<string, Record<string, OpenApiOperation>>;
     components?: {
         schemas?: Record<string, OpenApiSchema>;
-        securitySchemes?: Record<string, any>;
+        securitySchemes?: Record<string, unknown>;
     };
     tags?: { name: string; description?: string }[];
     security?: Record<string, string[]>[];
@@ -57,8 +57,8 @@ export interface OpenApiSchema {
     maximum?: number;
     maxLength?: number;
     minLength?: number;
-    default?: any;
-    example?: any;
+    default?: unknown;
+    example?: unknown;
     additionalProperties?: boolean | OpenApiSchema;
 }
 

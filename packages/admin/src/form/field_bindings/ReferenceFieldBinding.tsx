@@ -70,7 +70,7 @@ function ReferenceFieldBindingInternal({
         throw Error(`Couldn't find the corresponding collection for the path: ${property.path}`);
     }
 
-    const onSingleEntitySelected = useCallback((e: Entity<any> | null) => {
+    const onSingleEntitySelected = useCallback((e: Entity<Record<string, unknown>> | null) => {
         const ref = e ? getReferenceFrom(e) : null;
         setValue(ref);
     }, [setValue, propertyKey]);

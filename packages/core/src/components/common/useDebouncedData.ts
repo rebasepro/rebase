@@ -9,7 +9,7 @@ import { deepEqual as equal } from "fast-equals";
  * @param deps
  * @param timeoutMs
  */
-export function useDebouncedData<T>(data: T[], deps: any, timeoutMs = 5000) {
+export function useDebouncedData<T>(data: T[], deps: unknown, timeoutMs = 5000) {
 
     const [deferredData, setDeferredData] = React.useState(data);
     const dataLength = React.useRef(deferredData.length ?? 0);
@@ -32,7 +32,7 @@ export function useDebouncedData<T>(data: T[], deps: any, timeoutMs = 5000) {
 
         pendingUpdate.current = true;
 
-        let handler: any;
+        let handler: ReturnType<typeof setTimeout> | undefined;
         if (immediateUpdate)
             performUpdate()
         else

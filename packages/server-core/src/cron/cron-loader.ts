@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { pathToFileURL } from "url";
 import type { CronJobDefinition } from "@rebasepro/types";
+import { logger } from "../utils/logger.js";
 
 export interface LoadedCronJob {
     /** Job ID derived from filename (e.g. "cleanup-sessions"). */
@@ -48,17 +49,13 @@ export async function loadCronJobsFromDirectory(
                 const exported: unknown = mod.default;
 
                 if (!exported || typeof exported !== "object") {
-                    console.warn(
-                        `[cron] ${file}: no valid default export. Skipping.`
-                    );
+                    logger.warn(`[cron] ${file}: no valid default export. Skipping.`);
                     continue;
                 }
 
                 const def = exported as Record<string, unknown>;
                 if (typeof def.schedule !== "string" || typeof def.handler !== "function") {
-                    console.warn(
-                        `[cron] ${file}: default export missing required 'schedule' or 'handler'. Skipping.`
-                    );
+                    logger.warn(`[cron] ${file}: default export missing required 'schedule' or 'handler'. Skipping.`);
                     continue;
                 }
 
@@ -74,13 +71,11 @@ export async function loadCronJobsFromDirectory(
 
                 jobs.push({ id,
 definition });
-                console.log(`⏰ Loaded cron job: ${id} (${definition.schedule})`);
+                logger.info(`⏰ Loaded cron job: ${id} (${definition.schedule})`);
             } catch (err: unknown) {
                 const message =
                     err instanceof Error ? err.message : String(err);
-                console.error(
-                    `[cron] Failed to load ${file}: ${message}`
-                );
+                logger.error(`[cron] Failed to load ${file}: ${message}`);
             }
         }
     }

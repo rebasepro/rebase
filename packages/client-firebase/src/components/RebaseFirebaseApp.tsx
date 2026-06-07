@@ -26,7 +26,7 @@ import {
     SideEntityProvider,
     RebaseRoute
 } from "@rebasepro/admin";
-import { Entity, PropertyConfig, UserManagementDelegate } from "@rebasepro/types";
+import { Entity, PropertyConfig, RebaseContext, UserManagementDelegate } from "@rebasepro/types";
 import { CenteredView, CircularProgressCenter } from "@rebasepro/ui";
 import { buildRebaseData } from "@rebasepro/common";
 import { Route, Outlet, Navigate } from "react-router-dom";
@@ -234,7 +234,7 @@ export function RebaseFirebaseApp({
                         {({
                             context,
                             loading
-                        }: { context: any, loading: boolean }) => {
+                        }: { context: RebaseContext, loading: boolean }) => {
 
                             let component;
                             if (loading || authLoading) {
@@ -250,7 +250,7 @@ export function RebaseFirebaseApp({
                                             signInOptions={signInOptions ?? DEFAULT_SIGN_IN_OPTIONS}
                                             firebaseApp={firebaseApp}
                                             authController={authController}
-                                            notAllowedError={notAllowedError}/>
+                                            notAllowedError={notAllowedError instanceof Error ? notAllowedError : typeof notAllowedError === "string" ? notAllowedError : undefined}/>
                                     );
                                 } else {
                                     const firstCollectionEntry = navigationStateController.topLevelNavigation?.navigationEntries.find(e => e.type === "collection");

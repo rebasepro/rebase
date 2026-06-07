@@ -1,6 +1,7 @@
 import type { CronJobLogEntry } from "@rebasepro/types";
 import type { DataDriver } from "@rebasepro/types";
 import { isSQLAdmin } from "@rebasepro/types";
+import { logger } from "../utils/logger.js";
 
 /**
  * Persistence layer for cron job execution logs.
@@ -38,7 +39,7 @@ const TABLE = "rebase.cron_logs";
 export function createCronStore(driver: DataDriver): CronStore | undefined {
     const admin = driver.admin;
     if (!isSQLAdmin(admin)) {
-        console.warn("⚠️ [cron-store] DataDriver does not support SQL admin — cron logs will not be persisted.");
+        logger.warn("⚠️ [cron-store] DataDriver does not support SQL admin — cron logs will not be persisted.");
         return undefined;
     }
 
@@ -68,10 +69,10 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
                     ON ${TABLE}(job_id, started_at DESC)
                 `);
 
-                console.log("✅ Cron logs table ready");
+                logger.info("✅ Cron logs table ready");
             } catch (err) {
-                console.error("❌ Failed to create cron logs table:", err);
-                console.warn("⚠️ Continuing without cron log persistence.");
+                logger.error("❌ Failed to create cron logs table", { error: err });
+                logger.warn("⚠️ Continuing without cron log persistence.");
             }
         },
 
@@ -97,7 +98,7 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
                 `);
             } catch (err) {
                 // Non-blocking — log persistence should never crash the scheduler
-                console.error(`[cron-store] Failed to persist log for "${entry.jobId}":`, err);
+                logger.error(`[cron-store] Failed to persist log for "${entry.jobId}"`, { error: err });
             }
         },
 
@@ -113,7 +114,7 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
 
                 return rows.map(rowToLogEntry);
             } catch (err) {
-                console.error(`[cron-store] Failed to fetch logs for "${jobId}":`, err);
+                logger.error(`[cron-store] Failed to fetch logs for "${jobId}"`, { error: err });
                 return [];
             }
         },
@@ -139,7 +140,7 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
                     });
                 }
             } catch (err) {
-                console.error("[cron-store] Failed to fetch job stats:", err);
+                logger.error("[cron-store] Failed to fetch job stats", { error: err });
             }
             return stats;
         }

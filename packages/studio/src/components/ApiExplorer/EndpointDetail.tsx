@@ -153,7 +153,7 @@ function SchemaBlock({ schema, spec, depth }: { schema: OpenApiSchema; spec: Ope
     // Resolve $ref
     if (schema.$ref) {
         const name = resolveRefName(schema.$ref);
-        const resolved = resolveRef(spec, schema.$ref);
+        const resolved = resolveRef(spec, schema.$ref) as OpenApiSchema;
         return (
             <div>
                 <Typography

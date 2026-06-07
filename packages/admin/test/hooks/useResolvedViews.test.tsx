@@ -3,22 +3,18 @@
  */
 import { renderHook, waitFor } from "@testing-library/react";
 import { useResolvedViews } from "../../src/hooks/navigation/useResolvedViews";
-import { AuthController, AppView, DataDriver } from "@rebasepro/types";
+import { AuthController, AppView, RebaseData } from "@rebasepro/types";
 import { jest } from "@jest/globals";
 
-jest.mock("../../src/components/admin/UsersView", () => ({
-    UsersView: () => null
-}));
 jest.mock("../../src/components/admin/RolesView", () => ({
     RolesView: () => null
 }));
 
 describe("useResolvedViews", () => {
 
-    const mockDataDriver: DataDriver = {} as DataDriver;
+    const mockData: RebaseData = {} as RebaseData;
 
     it("should resolve views array and set loading to false", async () => {
-        // ... (auth controller and collections setup identical to useResolvedCollections test, but testing views) ...
         const mockAuthController = {
             initialLoading: false,
             user: { uid: "test-user" }
@@ -33,7 +29,7 @@ view: null! }
         const { result } = renderHook(() => useResolvedViews({
             authController: mockAuthController,
             views: mockViews,
-            driver: mockDataDriver
+            data: mockData
         }));
 
         expect(result.current.loading).toBe(true);
@@ -56,7 +52,7 @@ view: null! }
         const { result, rerender } = renderHook(() => useResolvedViews({
             authController: mockAuthController,
             views: [],
-            driver: mockDataDriver
+            data: mockData
         }));
 
         expect(result.current.loading).toBe(true);
@@ -73,7 +69,7 @@ view: null! }
         expect(result.current.views).toEqual([]);
     });
 
-    it("should inject Users and Roles admin views if userManagement is true", async () => {
+    it("should inject Roles admin view if userManagement has roles", async () => {
         const mockAuthController = {
             initialLoading: false,
             user: { uid: "test-user" }
@@ -88,7 +84,7 @@ view: null! }
             authController: mockAuthController,
             views: undefined,
             userManagement: userManagementActive,
-            driver: mockDataDriver
+            data: mockData
         }));
 
         await waitFor(() => {
@@ -96,16 +92,14 @@ view: null! }
         });
 
         const activeAdminViews = result.current.adminViews!;
-        expect(activeAdminViews).toHaveLength(2);
-        const usersView = activeAdminViews.find(v => v.slug === "users");
+        // Users is now a collection view, only Roles is injected as an admin view
+        expect(activeAdminViews).toHaveLength(1);
         const rolesView = activeAdminViews.find(v => v.slug === "roles");
-        expect(usersView).toBeDefined();
-        expect(usersView?.group).toBe("Settings");
         expect(rolesView).toBeDefined();
         expect(rolesView?.group).toBe("Settings");
     });
 
-    it("should NOT inject Users and Roles admin views if collections are registered", async () => {
+    it("should NOT inject Roles admin view if already provided as a custom admin view", async () => {
         const mockAuthController = {
             initialLoading: false,
             user: { uid: "test-user" }
@@ -116,17 +110,16 @@ view: null! }
             users: true
         };
 
-        const mockCollections = [
-            { slug: "users", name: "Users" } as any,
-            { slug: "roles", name: "Roles" } as any
+        const customAdminViews: AppView[] = [
+            { slug: "roles", name: "Custom Roles", view: null! }
         ];
 
         const { result } = renderHook(() => useResolvedViews({
             authController: mockAuthController,
             views: undefined,
+            adminViews: customAdminViews,
             userManagement: userManagementActive,
-            driver: mockDataDriver,
-            collections: mockCollections
+            data: mockData
         }));
 
         await waitFor(() => {
@@ -134,7 +127,8 @@ view: null! }
         });
 
         const activeAdminViews = result.current.adminViews!;
-        expect(activeAdminViews).toHaveLength(0);
+        // Custom admin view overrides the injected one
+        expect(activeAdminViews).toHaveLength(1);
+        expect(activeAdminViews[0].name).toBe("Custom Roles");
     });
 });
-

@@ -55,7 +55,7 @@ export function MultipleRelationFieldBinding({
     const selectedEntityIds = value && Array.isArray(value) ? value.map((ref) => ref.id) : [];
     const collection = relation.target();
 
-    const onMultipleEntitiesSelected = useCallback((entities: Entity<any>[]) => {
+    const onMultipleEntitiesSelected = useCallback((entities: Entity<Record<string, unknown>>[]) => {
         setValue(entities.map(e => getRelationFrom(e)));
     }, [setValue]);
 

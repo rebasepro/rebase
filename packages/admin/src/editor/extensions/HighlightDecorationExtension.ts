@@ -1,5 +1,6 @@
 import { Plugin, PluginKey, Transaction, EditorState } from "prosemirror-state";
 import { Decoration, DecorationSet } from "prosemirror-view";
+import { Node as ProseMirrorNode } from "prosemirror-model";
 
 export interface HighlightRange {
     from: number
@@ -13,8 +14,8 @@ interface AutocompleteHighlightState {
 
 export const highlightDecorationKey = new PluginKey<AutocompleteHighlightState>("highlightDecoration");
 
-function buildDecorationSet(highlight: any, doc: any) {
-    const decorations: [any?] = [];
+function buildDecorationSet(highlight: HighlightRange | undefined, doc: ProseMirrorNode) {
+    const decorations: Decoration[] = [];
 
     if (highlight) {
         decorations.push(

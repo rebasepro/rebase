@@ -3,6 +3,7 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { getTableConfig, AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { getColumnMeta } from "../services/entity-helpers";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
+import { logger } from "@rebasepro/server-core";
 
 /**
  * Default roles to seed on first run
@@ -33,7 +34,7 @@ const DEFAULT_ROLES = [
  * This runs on startup to ensure the database is ready for auth
  */
 export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: PostgresCollectionRegistry): Promise<void> {
-    console.log("🔍 Checking auth tables...");
+    logger.info("🔍 Checking auth tables...");
 
     try {
         // Resolve dynamic user table name and ID type
@@ -296,10 +297,10 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: Postg
             ON ${sql.raw(recoveryCodesTableName)}(user_id)
         `);
 
-        console.log("✅ Auth tables ready");
+        logger.info("✅ Auth tables ready");
     } catch (error) {
-        console.error("❌ Failed to create auth tables:", error);
-        console.warn("⚠️ Continuing without creating auth tables.");
+        logger.error("❌ Failed to create auth tables", { error });
+        logger.warn("⚠️ Continuing without creating auth tables.");
     }
 }
 
@@ -312,11 +313,11 @@ async function seedDefaultRoles(db: NodePgDatabase, rolesTableName: string): Pro
     const count = parseInt((result.rows[0] as Record<string, string | number>)?.count as string || "0", 10);
 
     if (count > 0) {
-        console.log(`📋 Found ${count} existing roles`);
+        logger.info(`📋 Found ${count} existing roles`);
         return;
     }
 
-    console.log("🌱 Seeding default roles...");
+    logger.info("🌱 Seeding default roles...");
 
     for (const role of DEFAULT_ROLES) {
         await db.execute(sql`
@@ -331,5 +332,5 @@ async function seedDefaultRoles(db: NodePgDatabase, rolesTableName: string): Pro
         `);
     }
 
-    console.log("✅ Default roles created: admin, editor, viewer");
+    logger.info("✅ Default roles created: admin, editor, viewer");
 }

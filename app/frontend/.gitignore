@@ -38,3 +38,7 @@ test-results/
 playwright/.cache
 blob-report/
 dom*.html
+
+# build stats
+stats.json
+

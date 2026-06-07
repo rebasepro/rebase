@@ -13,7 +13,7 @@ interface EntityTableCellProps {
     /**
      * The value is used only to check changes and force re-renders
      */
-    value?: any;
+    value?: unknown;
     disabled: boolean;
     savedTimestamp?: number;
     error?: Error;
@@ -31,7 +31,7 @@ interface EntityTableCellProps {
     // Sortable props for dnd-kit integration
     sortableNodeRef?: (node: HTMLElement | null) => void;
     sortableStyle?: React.CSSProperties;
-    sortableAttributes?: Record<string, any>;
+    sortableAttributes?: Record<string, string | number | undefined>;
     isDragging?: boolean;
     isDraggable?: boolean;
     frozen?: boolean;

@@ -14,6 +14,7 @@ import { existsSync } from "fs";
 import { join } from "path";
 import type { Context } from "hono";
 import type { StorageController } from "./types";
+import { logger } from "../utils/logger.js";
 
 /** Metadata for an in-progress resumable upload. */
 interface TusUpload {
@@ -284,7 +285,7 @@ export class TusHandler {
 
         if (!this.storageController) {
             // No controller — leave temp file in place
-            console.warn("[TUS] Upload completed but no StorageController configured. Temp file remains:", upload.filePath);
+            logger.warn("[TUS] Upload completed but no StorageController configured. Temp file remains:", { filePath: upload.filePath });
             return;
         }
 
@@ -306,9 +307,9 @@ export class TusHandler {
             try { await unlink(upload.filePath); } catch { /* ok */ }
             this.uploads.delete(upload.id);
 
-            console.log(`[TUS] Upload ${upload.id} finalized → ${fileName}`);
+            logger.info(`[TUS] Upload ${upload.id} finalized → ${fileName}`);
         } catch (err) {
-            console.error(`[TUS] Failed to finalize upload ${upload.id}:`, err);
+            logger.error(`[TUS] Failed to finalize upload ${upload.id}`, { error: err });
         }
     }
 }

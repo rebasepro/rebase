@@ -25,8 +25,8 @@ export async function enhanceDataAPIStream<M extends Record<string, unknown>>(pr
 
     instructions?: string,
     firebaseToken: string,
-    onUpdate: (suggestions: Record<string, any>) => void;
-    onUpdateDelta: (propertyKey: string, partialValue: any) => void;
+    onUpdate: (suggestions: Record<string, string | number>) => void;
+    onUpdateDelta: (propertyKey: string, partialValue: string) => void;
     onError: (error: Error) => void;
     onEnd: (result: EnhancedDataResult) => void;
     host?: string;
@@ -89,10 +89,10 @@ export async function enhanceDataAPIStream<M extends Record<string, unknown>>(pr
                                 props.onEnd(data.data);
                         }
                     });
-                } catch (e: any) {
+                } catch (e: unknown) {
                     console.error("str", str);
                     console.error("Error parsing stream", e);
-                    props.onError(e);
+                    props.onError(e instanceof Error ? e : new Error(String(e)));
                 }
             }
 

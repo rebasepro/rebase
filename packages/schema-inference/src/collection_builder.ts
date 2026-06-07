@@ -11,7 +11,7 @@ import { buildReferenceProperty } from "./builders/reference_property_builder";
 import { extractEnumFromValues, mergeDeep, prettifyIdentifier, resolveEnumValues } from "./util";
 import { DataType, EnumValues, Properties, Property, StringProperty, Vector } from "@rebasepro/types";
 
-export type InferenceTypeBuilder = (value: any) => DataType;
+export type InferenceTypeBuilder = (value: unknown) => DataType;
 
 export async function buildEntityPropertiesFromData(
     data: object[],
@@ -34,7 +34,7 @@ export async function buildEntityPropertiesFromData(
 }
 
 export function buildPropertyFromData(
-    data: any[],
+    data: unknown[],
     property: Property,
     getType: InferenceTypeBuilder
 ): Property {
@@ -97,7 +97,7 @@ export function buildPropertiesOrder(
 function increaseTypeCount(
     type: DataType,
     typesCount: TypesCount,
-    fieldValue: any,
+    fieldValue: unknown,
     getType: InferenceTypeBuilder
 ) {
     if (type === "map") {
@@ -107,7 +107,7 @@ function increaseTypeCount(
                 mapTypesCount = {};
                 typesCount[type] = mapTypesCount;
             }
-            Object.entries(fieldValue).forEach(([key, value]) => {
+            Object.entries(fieldValue as Record<string, unknown>).forEach(([key, value]) => {
                 increaseMapTypeCount(mapTypesCount as TypesCountRecord, key, value, getType);
             });
         }
@@ -146,7 +146,7 @@ function increaseTypeCount(
 function increaseMapTypeCount(
     typesCountRecord: TypesCountRecord,
     key: string,
-    fieldValue: any,
+    fieldValue: unknown,
     getType: InferenceTypeBuilder
 ) {
     if (key.startsWith("_")) return; // Ignore properties starting with _
@@ -167,7 +167,7 @@ function increaseMapTypeCount(
 function increaseValuesCount(
     typeValuesRecord: ValuesCountRecord,
     key: string,
-    fieldValue: any,
+    fieldValue: unknown,
     getType: InferenceTypeBuilder
 ) {
     if (key.startsWith("_")) return; // Ignore properties starting with _
@@ -175,8 +175,8 @@ function increaseValuesCount(
     const type = getType(fieldValue);
 
     let valuesRecord: {
-        values: any[];
-        valuesCount: Map<any, number>;
+        values: unknown[];
+        valuesCount: Map<unknown, number>;
         map?: ValuesCountRecord;
     } = typeValuesRecord[key];
 
@@ -195,7 +195,7 @@ function increaseValuesCount(
             valuesRecord.map = mapValuesRecord;
         }
         if (fieldValue)
-            Object.entries(fieldValue).forEach(([subKey, value]) =>
+            Object.entries(fieldValue as Record<string, unknown>).forEach(([subKey, value]) =>
                 increaseValuesCount(mapValuesRecord as ValuesCountRecord, subKey, value, getType)
             );
     } else if (type === "array") {
@@ -370,7 +370,7 @@ function countMaxDocumentsUnder(typesCount: TypesCount) {
 }
 
 function getMostProbableTypeInArray(
-    array: any[],
+    array: unknown[],
     getType: InferenceTypeBuilder
 ): DataType {
     const typesCount: TypesCount = {};
@@ -393,9 +393,9 @@ function checkTypesCountHighVariability(typesCount: TypesCount) {
 }
 
 
-export function inferTypeFromValue(value: any): DataType {
+export function inferTypeFromValue(value: unknown): DataType {
     if (value === null || value === undefined) return "string";
-    if (value instanceof Vector || (value && typeof value === "object" && value.__type === "Vector")) return "vector";
+    if (value instanceof Vector || (value && typeof value === "object" && "__type" in value && (value as Record<string, unknown>).__type === "Vector")) return "vector";
     if (typeof value === "string") return "string";
     if (typeof value === "number") return "number";
     if (typeof value === "boolean") return "boolean";

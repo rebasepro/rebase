@@ -238,7 +238,7 @@ values: {} as Record<string, unknown> }
             } : undefined,
 
         // Fluent Query Builder
-        where(column: keyof M & string, operator: any, value: unknown) {
+        where(column: keyof M & string, operator: WhereFilterOp, value: unknown) {
             return new QueryBuilder<M>(accessor).where(column, operator, value);
         },
         orderBy(column: keyof M & string, ascending?: "asc" | "desc") {

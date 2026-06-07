@@ -12,7 +12,7 @@ export type ButtonProps<C extends React.ElementType = "button"> = {
     fullWidth?: boolean;
     className?: string;
     component?: C;
-    onClick?: React.MouseEventHandler<any>;
+    onClick?: React.MouseEventHandler<HTMLElement>;
 } & React.ComponentPropsWithoutRef<C>;
 
 const ButtonInner = React.memo(React.forwardRef<
@@ -29,7 +29,7 @@ const ButtonInner = React.memo(React.forwardRef<
        component: Component,
        color = "neutral",
        ...props
-   }: ButtonProps<any>, ref) => {
+   }: ButtonProps<React.ElementType>, ref) => {
 
     const baseClasses =
         "typography-button h-fit rounded-md whitespace-nowrap inline-flex items-center justify-center p-1.5 px-3 focus:outline-none transition-all ease-in-out duration-150 gap-1.5 active:scale-[0.98]";
@@ -83,7 +83,7 @@ const ButtonInner = React.memo(React.forwardRef<
     if (Component) {
         return (
             <Component
-                ref={ref as any}
+                ref={ref}
                 onClick={props.onClick}
                 className={cls(startIcon ? "pl-3" : "", baseClasses, buttonClasses, sizeClasses, iconColorClass, className)}
                 {...props}>
@@ -94,7 +94,7 @@ const ButtonInner = React.memo(React.forwardRef<
     }
 
     return (
-        <button ref={ref as any}
+        <button ref={ref as React.Ref<HTMLButtonElement>}
                 type={props.type ?? "button"}
                 onClick={props.onClick}
                 className={cls(startIcon ? "pl-3" : "", baseClasses, buttonClasses, sizeClasses, iconColorClass, className)}
@@ -111,4 +111,4 @@ const ButtonInner = React.memo(React.forwardRef<
 
 ButtonInner.displayName = "Button"
 
-export const Button = ButtonInner as React.FC<ButtonProps<any>>;
+export const Button = ButtonInner as React.FC<ButtonProps<React.ElementType>>;

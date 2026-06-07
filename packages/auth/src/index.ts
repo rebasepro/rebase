@@ -22,5 +22,5 @@ export { useBackendUserManagement } from "./hooks/useBackendUserManagement";
 export type { BackendUserManagementConfig, UserManagement } from "./hooks/useBackendUserManagement";
 
 // API utilities
-export { setApiUrl, getApiUrl, fetchAuthConfig, clearAuthConfigCache, AuthApiError } from "./api";
+export { setApiUrl, getApiUrl, fetchAuthConfig, AuthApiError } from "./api";
 export type { AuthConfigResponse } from "./api";

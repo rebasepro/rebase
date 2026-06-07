@@ -25,7 +25,8 @@ import {
     createAuthRoutes,
     createAdminRoutes,
     requireAuth,
-    requireAdmin
+    requireAdmin,
+    logger
 // @ts-ignore
 } from "@rebasepro/server-core";
 import { ensureAuthTablesExist } from "./auth/ensure-tables";
@@ -84,7 +85,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             const registry = new PostgresCollectionRegistry();
             if (collections) {
                 registry.registerMultiple(collections);
-                console.log(`📋 [PostgresRegistry] Registered ${registry.getCollections().length} collections: [${registry.getCollections().map(c => c.slug).join(", ")}]`);
+                logger.info(`📋 [PostgresRegistry] Registered ${registry.getCollections().length} collections: [${registry.getCollections().map(c => c.slug).join(", ")}]`);
             }
 
             // Register tables
@@ -115,8 +116,8 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             try {
                 await schemaAwareDb.execute(sql`SELECT 1`);
             } catch (err) {
-                console.error("❌ Failed to connect to PostgreSQL:", err);
-                console.warn("⚠️ Continuing without initial database verification. Drizzle/PG will attempt to connect on subsequent queries.");
+                logger.error("❌ Failed to connect to PostgreSQL", { error: err });
+                logger.warn("⚠️ Continuing without initial database verification. Drizzle/PG will attempt to connect on subsequent queries.");
             }
 
             // Create services
@@ -130,9 +131,9 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                     const { createReadReplicaConnection } = await import("./connection");
                     const readResources = createReadReplicaConnection(readUrl, mergedSchema);
                     readDb = readResources.db;
-                    console.log("📖 [PostgresBootstrapper] Read replica connection established");
+                    logger.info("📖 [PostgresBootstrapper] Read replica connection established");
                 } catch (err) {
-                    console.warn("⚠️ Could not connect to read replica, falling back to primary for all queries:", err);
+                    logger.warn("⚠️ Could not connect to read replica, falling back to primary for all queries", { error: err });
                 }
             }
             const poolManager = pgConfig.adminConnectionString
@@ -146,7 +147,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 try {
                     await driver.branchService.ensureBranchMetadataTable();
                 } catch (err) {
-                    console.warn("⚠️ Could not initialize branch metadata table:", err);
+                    logger.warn("⚠️ Could not initialize branch metadata table", { error: err });
                 }
             }
 
@@ -157,7 +158,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 try {
                     await realtimeService.startListening(directUrl);
                 } catch (err) {
-                    console.warn("⚠️ Cross-instance realtime could not be started:", err);
+                    logger.warn("⚠️ Cross-instance realtime could not be started", { error: err });
                 }
             }
 

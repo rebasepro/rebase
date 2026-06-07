@@ -80,7 +80,7 @@ export class ReactNodeView implements NodeView {
         this.root.unmount();
     }
 
-    ignoreMutation(mutation: any) {
+    ignoreMutation(mutation: MutationRecord | { type: "selection"; target: Node }) {
         if (!this.contentDOM) {
             return true;
         }

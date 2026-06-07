@@ -5,8 +5,8 @@ import { useTranslation } from "@rebasepro/core";
 
 interface BooleanFieldProps {
     name: string,
-    value?: [op: VirtualTableWhereFilterOp, fieldValue: any];
-    setValue: (value?: [op: VirtualTableWhereFilterOp, newValue: any]) => void;
+    value?: [op: VirtualTableWhereFilterOp, fieldValue: unknown];
+    setValue: (value?: [op: VirtualTableWhereFilterOp, newValue: unknown]) => void;
     title?: string;
 }
 
@@ -37,7 +37,7 @@ export function BooleanFilterField({
         <div className="w-full">
             <BooleanSwitchWithLabel
                 size={"medium"}
-                value={valueSetToTrue}
+                value={valueSetToTrue as boolean | null}
                 allowIndeterminate={true}
                 onValueChange={(v: boolean | null) => updateFilter(v === null ? undefined : v)}
                 label={!valueSet

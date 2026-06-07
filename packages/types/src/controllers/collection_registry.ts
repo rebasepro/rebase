@@ -7,7 +7,7 @@ import type { EntityReference } from "../types/entities";
  */
 export type CollectionRegistryController<
     DB = Record<string, unknown>,
-    EC extends EntityCollection = EntityCollection<any>
+    EC extends EntityCollection = EntityCollection
 > = {
 
     /**

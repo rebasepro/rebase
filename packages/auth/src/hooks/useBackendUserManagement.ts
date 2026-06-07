@@ -55,7 +55,7 @@ export interface BackendUserManagementConfig {
     /**
      * The Rebase Client instance
      */
-    client?: any;
+    client?: { baseUrl?: string; resolveToken?: () => Promise<string | null> };
 
     /**
      * Base API URL for the backend (optional, extracted from client if not provided)
@@ -88,6 +88,12 @@ interface ApiRole {
     name: string;
     isAdmin?: boolean;
 }
+
+/** Response shapes from the admin API */
+interface ApiRolesResponse { roles: ApiRole[] }
+interface ApiUsersResponse { users: ApiUser[]; total: number }
+interface ApiUserResponse { user: ApiUser; invitationSent?: boolean; temporaryPassword?: string }
+interface ApiRoleResponse { role: ApiRole }
 
 /**
  * Convert API user to Rebase User
@@ -164,13 +170,13 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
     /**
      * Make authenticated API request
      */
-    const apiRequest = useCallback(async (
+    const apiRequest = useCallback(async <T = Record<string, unknown>>(
         endpoint: string,
         method = "GET",
         body?: Record<string, unknown>,
         retryCount = 6,
         signal?: AbortSignal
-    ): Promise<any> => {
+    ): Promise<T> => {
         let lastError: Error | null = null;
         for (let attempt = 0; attempt < retryCount; attempt++) {
             if (signal?.aborted) {
@@ -181,7 +187,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
 
             try {
                 // Determine token provider
-                const token = getAuthToken ? await getAuthToken() : (client ? await client.resolveToken() : null);
+                const token = getAuthToken ? await getAuthToken() : (client?.resolveToken ? await client.resolveToken() : null);
                 const baseUrl = apiUrl || (client?.baseUrl ? client.baseUrl : "");
 
                 // Use /api/admin prefix for admin endpoints
@@ -260,7 +266,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
      */
     const loadRoles = useCallback(async (signal?: AbortSignal) => {
         try {
-            const data = await apiRequest("/roles", "GET", undefined, 6, signal);
+            const data = await apiRequest<ApiRolesResponse>("/roles", "GET", undefined, 6, signal);
             setRoles(data.roles.map(convertRole));
             setRolesError(undefined);
         } catch (error: unknown) {
@@ -276,7 +282,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
      */
     const checkAdminExists = useCallback(async (signal?: AbortSignal) => {
         try {
-            const data = await apiRequest("/users?role=admin&limit=1", "GET", undefined, 6, signal);
+            const data = await apiRequest<ApiUsersResponse>("/users?role=admin&limit=1", "GET", undefined, 6, signal);
             const adminUsers: User[] = data.users.map((u: ApiUser) => convertUser(u));
             setHasAdminUsers(adminUsers.length > 0);
             // Also cache these admin users for getUser lookups
@@ -330,7 +336,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
 
             // Load roles first
             try {
-                const data = await request("/roles", "GET", undefined, 6, abortController.signal);
+                const data = await request<ApiRolesResponse>("/roles", "GET", undefined, 6, abortController.signal);
                 setRoles(data.roles.map(convertRole));
                 setRolesError(undefined);
             } catch (error: unknown) {
@@ -352,7 +358,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
             // Lightweight admin-existence check (NOT loading all users)
             if (!abortController.signal.aborted) {
                 try {
-                    const data = await request("/users?role=admin&limit=1", "GET", undefined, 6, abortController.signal);
+                    const data = await request<ApiUsersResponse>("/users?role=admin&limit=1", "GET", undefined, 6, abortController.signal);
                     const adminUsers: User[] = data.users.map((u: ApiUser) => convertUser(u));
                     setHasAdminUsers(adminUsers.length > 0);
                     if (adminUsers.length > 0) {
@@ -401,7 +407,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
         if (options.roleId) params.set("role", options.roleId);
         const qs = params.toString();
 
-        const data = await apiRequest("/users" + (qs ? "?" + qs : ""), "GET");
+        const data = await apiRequest<ApiUsersResponse>("/users" + (qs ? "?" + qs : ""), "GET");
         const converted = data.users.map((u: ApiUser) => convertUser(u));
         // Feed search results into cache for getUser/defineRolesFor
         mergeIntoCache(converted);
@@ -417,7 +423,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
     const saveUser = useCallback(async (user: User): Promise<User> => {
         const roleIds = user.roles ?? [];
 
-        const data = await apiRequest(`/users/${user.uid}`, "PUT", {
+        const data = await apiRequest<ApiUserResponse>(`/users/${user.uid}`, "PUT", {
             email: user.email,
             displayName: user.displayName,
             roles: roleIds
@@ -438,7 +444,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
     }> => {
         const roleIds = user.roles ?? [];
 
-        const data = await apiRequest("/users", "POST", {
+        const data = await apiRequest<ApiUserResponse>("/users", "POST", {
             email: user.email,
             displayName: user.displayName,
             roles: roleIds
@@ -460,7 +466,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
         invitationSent: boolean;
         temporaryPassword?: string;
     }> => {
-        const data = await apiRequest(`/users/${user.uid}/reset-password`, "POST");
+        const data = await apiRequest<ApiUserResponse>(`/users/${user.uid}/reset-password`, "POST");
         const updatedUser = convertUser(data.user);
         mergeIntoCache([updatedUser]);
         return {
@@ -491,7 +497,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
 
         if (existingRole) {
             // Update
-            const data = await apiRequest(`/roles/${role.id}`, "PUT", {
+            const data = await apiRequest<ApiRoleResponse>(`/roles/${role.id}`, "PUT", {
                 name: role.name,
                 isAdmin: role.isAdmin
             });
@@ -499,7 +505,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
             setRoles(prev => prev.map(r => r.id === updated.id ? updated : r));
         } else {
             // Create
-            const data = await apiRequest("/roles", "POST", {
+            const data = await apiRequest<ApiRoleResponse>("/roles", "POST", {
                 id: role.id,
                 name: role.name,
                 isAdmin: role.isAdmin ?? false
@@ -535,7 +541,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
         // If not cached, fetch from API
         if (!existingUser) {
             try {
-                const data = await apiRequest(`/users/${user.uid}`, "GET");
+                const data = await apiRequest<ApiUserResponse>(`/users/${user.uid}`, "GET");
                 existingUser = convertUser(data.user);
                 mergeIntoCache([existingUser]);
             } catch {
@@ -561,7 +567,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
         try {
             await apiRequest("/bootstrap", "POST");
             // Reload roles and re-check admin existence after successful bootstrap
-            const data = await apiRequest("/roles");
+            const data = await apiRequest<ApiRolesResponse>("/roles");
             const loadedRoles = data.roles.map(convertRole);
             setRoles(loadedRoles);
             await checkAdminExists();

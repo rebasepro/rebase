@@ -11,8 +11,8 @@ import { useCollectionRegistryController } from "../../../index";
 
 interface ReferenceFilterFieldProps {
     name: string,
-    value?: [op: VirtualTableWhereFilterOp, fieldValue: any];
-    setValue: (filterValue?: [VirtualTableWhereFilterOp, any]) => void;
+    value?: [op: VirtualTableWhereFilterOp, fieldValue: unknown];
+    setValue: (filterValue?: [VirtualTableWhereFilterOp, unknown]) => void;
     isArray?: boolean;
     path?: string;
     title?: string;
@@ -104,11 +104,11 @@ export function ReferenceFilterField({
         return path ? collectionRegistryController.getCollection(path) : undefined;
     }, [path]);
 
-    const onSingleEntitySelected = (entity: Entity<any>) => {
+    const onSingleEntitySelected = (entity: Entity<Record<string, unknown>>) => {
         updateFilter(operation, getReferenceFrom(entity));
     };
 
-    const onMultipleEntitiesSelected = (entities: Entity<any>[]) => {
+    const onMultipleEntitiesSelected = (entities: Entity<Record<string, unknown>>[]) => {
         updateFilter(operation, entities.map(e => getReferenceFrom(e)));
     };
 

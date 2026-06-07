@@ -126,7 +126,7 @@ export function BlockFieldBinding({
 interface BlockEntryProps {
     name: string;
     index: number;
-    value: any;
+    value: Record<string, unknown>;
     /**
      * Name of the field to use as the discriminator for type
      * Defaults to `type`
@@ -148,7 +148,7 @@ interface BlockEntryProps {
     /**
      * Additional values related to the state of the form or the entity
      */
-    context: FormContext<any>;
+    context: FormContext;
 
     storedProps?: object,
     storeProps: (props: object) => void
@@ -218,7 +218,7 @@ function BlockEntry({
         }
         : undefined;
 
-    const updateType = (newType: any) => {
+    const updateType = (newType: string | undefined) => {
         const newSelectedProperty = newType ? properties[newType] : undefined;
         setTypeInternal(newType);
         formex.setFieldTouched(typeFieldName, true);
@@ -244,7 +244,7 @@ function BlockEntry({
                                 fullWidth={true}
                                 position={"item-aligned"}
                                 value={value1}
-                                renderValue={(enumKey: any) =>
+                                renderValue={(enumKey: string) =>
                                     <EnumValuesChip
                                         enumKey={enumKey}
                                         enumValues={enumValuesConfigs}

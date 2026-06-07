@@ -36,8 +36,8 @@ import { getValueInPath, isObject, mergeDeep } from "@rebasepro/utils";
 import { useCollectionRegistryController, useSideEntityController, useCMSContext } from "../index";
 
 // extract touched values for nested touched trees and map to current values
-export function extractTouchedValues(values: any, touched: Record<string, boolean>): Record<string, any> {
-    let acc: Record<string, any> = {};
+export function extractTouchedValues(values: unknown, touched: Record<string, boolean>): Record<string, unknown> {
+    let acc: Record<string, unknown> = {};
     if (!touched || typeof touched !== "object") {
         return acc;
     }
@@ -60,20 +60,20 @@ export function extractTouchedValues(values: any, touched: Record<string, boolea
 /**
  * CheckIcon if a value is semantically empty (null, undefined, or empty string).
  */
-function isSemanticEmpty(v: any): boolean {
+function isSemanticEmpty(v: unknown): boolean {
     return v === null || v === undefined || v === "";
 }
 
-function removeEmptyContainers(obj: any): any {
+function removeEmptyContainers(obj: unknown): unknown {
     if (Array.isArray(obj)) {
         const cleaned = obj.map(removeEmptyContainers);
         // Keep arrays even if they contain only nulls/undefined — that's intentional data
         return cleaned;
     }
     if (obj && typeof obj === "object" && Object.getPrototypeOf(obj) === Object.prototype) {
-        const result: Record<string, any> = {};
+        const result: Record<string, unknown> = {};
         for (const key of Object.keys(obj)) {
-            const cleaned = removeEmptyContainers(obj[key]);
+            const cleaned = removeEmptyContainers((obj as Record<string, unknown>)[key]);
             // Skip empty plain objects
             if (cleaned && typeof cleaned === "object" && !Array.isArray(cleaned)
                 && Object.getPrototypeOf(cleaned) === Object.prototype
@@ -729,7 +729,7 @@ export function EntityForm<M extends Record<string, unknown>>({
         throw Error("INTERNAL: Collection and path must be defined in form context");
     }
 
-    const EntityFormActionsRender = EntityFormActionsComponent as React.FC<any>;
+    const EntityFormActionsRender = EntityFormActionsComponent as React.FC<EntityFormActionsProps>;
 
     const dialogActions = <EntityFormActionsRender
         collection={collection}
@@ -844,8 +844,8 @@ export function getInitialEntityValues<M extends Record<string, unknown>>(
     }
 }
 
-export function zodToFormErrors(zodError: z.ZodError): Record<string, any> {
-    let errors: Record<string, any> = {};
+export function zodToFormErrors(zodError: z.ZodError): Record<string, unknown> {
+    let errors: Record<string, unknown> = {};
     for (const issue of zodError.issues) {
         const path = issue.path.join(".");
         if (path && !getIn(errors, path)) {
@@ -855,7 +855,7 @@ export function zodToFormErrors(zodError: z.ZodError): Record<string, any> {
     return errors;
 }
 
-function useOnAutoSave(autoSave: undefined | boolean, formex: FormexController<any>, lastSavedValues: any, save: (values: EntityValues<any>) => Promise<Entity<any> | void>) {
+function useOnAutoSave(autoSave: undefined | boolean, formex: FormexController<Record<string, unknown>>, lastSavedValues: React.MutableRefObject<unknown>, save: (values: EntityValues<Record<string, unknown>>) => Promise<Entity<Record<string, unknown>> | void>) {
     useEffect(() => {
         if (!autoSave) return;
         if (formex.values && !equal(formex.values, lastSavedValues.current)) {

@@ -114,7 +114,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
             [onValueUpdated, value]
         );
 
-        const saveValues = async (value: any) => {
+        const saveValues = async (value: unknown) => {
             if (equal(value, internalValueRef.current))
                 return;
             const result = await validation.safeParseAsync(value);
@@ -153,9 +153,9 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
                 });
         }, [internalValue, validation, propertyKey, property, entity]);
 
-        const updateValue = (newValue: any | null) => {
+        const updateValue = (newValue: unknown | null) => {
 
-            let updatedValue: any;
+            let updatedValue: unknown;
             if (newValue === undefined) {
                 updatedValue = null;
             } else {
@@ -165,7 +165,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
             saveValues(updatedValue);
         };
 
-        useClearRestoreValue<any>({
+        useClearRestoreValue<unknown>({
             property,
             value: internalValue,
             setValue: updateValue

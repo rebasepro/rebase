@@ -6,7 +6,7 @@ import { TextField, defaultBorderMixin, Typography, cls } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/core";
 
 export interface ImageBubbleProps {
-    options?: any;
+    options?: { placement?: string; offset?: number };
     className?: string;
 }
 

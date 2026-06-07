@@ -1,4 +1,4 @@
-import { DataType } from "@rebasepro/types";
+
 
 export type TypesCount = {
     number?: number,
@@ -14,13 +14,11 @@ export type TypesCount = {
     binary?: number,
 };
 
-export type TypesCountRecord<K extends keyof DataType = any> = {
-    [P in K]: TypesCount
-};
+export type TypesCountRecord = Record<string, TypesCount>;
 
 export type ValuesCountEntry = {
-    values: any[];
-    valuesCount: Map<any, number>;
+    values: unknown[];
+    valuesCount: Map<unknown, number>;
     mapValues?: ValuesCountRecord;
 };
 

@@ -9,12 +9,12 @@ import {
 } from "./VirtualTableProps";
 import { FilterFormFieldProps } from "./VirtualTableHeader";
 
-export type VirtualTableRowProps<T> = {
-    style: any,
+export type VirtualTableRowProps<T extends Record<string, unknown>> = {
+    style: React.CSSProperties,
     rowHeight: number,
     rowData: T;
     rowIndex: number;
-    onRowClick?: (props: OnRowClickParams<any>) => void;
+    onRowClick?: (props: OnRowClickParams<Record<string, unknown>>) => void;
     children: React.ReactNode[];
     columns: VirtualTableColumn[];
     hoverRow?: boolean;
@@ -28,20 +28,20 @@ export type VirtualTableContextProps<T> = {
     columns: VirtualTableColumn[];
     cellRenderer: React.ComponentType<CellRendererParams<T>>;
     currentSort: "asc" | "desc" | undefined;
-    filter?: VirtualTableFilterValues<any>;
-    onRowClick?: (props: OnRowClickParams<any>) => void;
-    onColumnSort: (key: string) => any;
+    filter?: VirtualTableFilterValues<string>;
+    onRowClick?: (props: OnRowClickParams<Record<string, unknown>>) => void;
+    onColumnSort: (key: string) => void;
     onColumnResize: (params: OnVirtualTableColumnResizeParams) => void;
     onColumnResizeEnd: (params: OnVirtualTableColumnResizeParams) => void;
-    onFilterUpdate: (column: VirtualTableColumn, filterForProperty?: [VirtualTableWhereFilterOp, any]) => void;
+    onFilterUpdate: (column: VirtualTableColumn, filterForProperty?: [VirtualTableWhereFilterOp, unknown]) => void;
     sortByProperty?: string;
     customView?: React.ReactNode,
     hoverRow: boolean;
-    createFilterField?: (props: FilterFormFieldProps<any>) => React.ReactNode;
+    createFilterField?: (props: FilterFormFieldProps<unknown>) => React.ReactNode;
     rowClassName?: (rowData: T) => string | undefined;
     endAdornment?: React.ReactNode;
     AddColumnComponent?: React.ComponentType;
     onColumnsOrderChange?: (columns: VirtualTableColumn[]) => void;
     draggingColumnId?: string | null;
-    extraData?: Record<string, any>;
+    extraData?: unknown;
 };

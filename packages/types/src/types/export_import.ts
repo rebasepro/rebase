@@ -20,7 +20,7 @@ export interface ExportMappingFunction<USER extends User = User> {
         entity,
         context
     }: {
-        entity: Entity<any>,
+        entity: Entity,
         context: RebaseContext<USER>
     }) => Promise<string> | string;
 }

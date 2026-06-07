@@ -1,5 +1,10 @@
 import React from "react";
-import { Locale, User, AuthController, AnalyticsEvent, DataDriver, StorageSource, UserConfigurationPersistence, CollectionRegistryController, DatabaseAdmin, UrlController, NavigationStateController, RebaseData, RebaseClient, RebaseContext, UserManagementDelegate, EntityLinkBuilder, RebasePlugin, SlotContribution, PropertyConfig, EntityCustomView, EntityAction } from "@rebasepro/types";
+import { Locale, User, AuthController, AnalyticsEvent, DataDriver, StorageSource, UserConfigurationPersistence, CollectionRegistryController, DatabaseAdmin, UrlController, NavigationStateController, RebaseData, RebaseClient, RebaseContext, UserManagementDelegate, EntityLinkBuilder, RebasePlugin, SlotContribution, PropertyConfig, EntityCustomView, EntityAction, RebaseTranslations } from "@rebasepro/types";
+
+/** DeepPartial helper — allows partial overrides at any nesting level */
+type DeepPartial<T> = T extends object
+    ? { [K in keyof T]?: DeepPartial<T[K]> }
+    : T;
 
 /**
  * Controller to simulate different roles when dev mode is active.
@@ -138,7 +143,7 @@ export type RebaseProps<USER extends User> = {
     /**
      * Entity Views
      */
-    entityViews?: EntityCustomView<any>[];
+    entityViews?: EntityCustomView[];
 
     /**
      * Entity Actions
@@ -165,7 +170,7 @@ export type RebaseProps<USER extends User> = {
      * Override or extend any Rebase UI string, keyed by locale.
      */
     translations?: {
-        [locale: string]: Record<string, any>;
+        [locale: string]: DeepPartial<RebaseTranslations>;
     };
 
 };

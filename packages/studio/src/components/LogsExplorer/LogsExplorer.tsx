@@ -32,8 +32,6 @@ export function LogsExplorer() {
     const [search, setSearch] = useState("");
     const [autoScroll, setAutoScroll] = useState(true);
     const containerRef = useRef<HTMLDivElement>(null);
-    const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
-
     const fetchLogs = useCallback(async () => {
         try {
             const params = new URLSearchParams();
@@ -53,10 +51,34 @@ export function LogsExplorer() {
     }, [level, source, search]);
 
     useEffect(() => {
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        let cancelled = false;
+
         fetchLogs();
-        pollRef.current = setInterval(fetchLogs, 3000);
+
+        const scheduleNext = () => {
+            if (cancelled) return;
+            timeoutId = setTimeout(async () => {
+                if (document.visibilityState === "visible") {
+                    await fetchLogs();
+                }
+                scheduleNext();
+            }, 3000);
+        };
+
+        scheduleNext();
+
+        const handleVisibility = () => {
+            if (document.visibilityState === "visible") {
+                fetchLogs();
+            }
+        };
+        document.addEventListener("visibilitychange", handleVisibility);
+
         return () => {
-            if (pollRef.current) clearInterval(pollRef.current);
+            cancelled = true;
+            if (timeoutId) clearTimeout(timeoutId);
+            document.removeEventListener("visibilitychange", handleVisibility);
         };
     }, [fetchLogs]);
 

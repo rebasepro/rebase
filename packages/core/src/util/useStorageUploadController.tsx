@@ -21,7 +21,7 @@ export interface StorageFieldItem {
     storagePathOrDownloadUrl?: string;
     file?: File;
     fileName?: string;
-    metadata?: any,
+    metadata?: Record<string, unknown>,
     size: StorageFieldSize
 }
 
@@ -63,7 +63,7 @@ export function useStorageUploadController<M extends Record<string, unknown>>({
 
     const processFile = storage?.processFile;
 
-    const metadata: Record<string, any> | undefined = storage?.metadata;
+    const metadata: Record<string, unknown> | undefined = storage?.metadata;
     const size = multipleFilesSupported ? "medium" : "large";
 
     const imageResize = storage?.imageResize;
@@ -116,7 +116,7 @@ export function useStorageUploadController<M extends Record<string, unknown>>({
 
     const onFileUploadComplete = useCallback(async (uploadedPath: string,
         entry: StorageFieldItem,
-        metadata?: any,
+        metadata?: Record<string, unknown>,
         uploadedUrl?: string) => {
 
         console.debug("onFileUploadComplete", uploadedPath, entry);
@@ -242,7 +242,7 @@ export function useStorageUploadController<M extends Record<string, unknown>>({
 
 function getInternalInitialValue(multipleFilesSupported: boolean,
     value: string | string[] | null,
-    metadata: Record<string, any> | undefined,
+    metadata: Record<string, unknown> | undefined,
     size: StorageFieldSize): StorageFieldItem[] {
     let strings: string[] = [];
     if (multipleFilesSupported) {

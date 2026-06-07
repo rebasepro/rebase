@@ -30,15 +30,15 @@ import { GetCodeDialog } from "./GetCodeDialog";
 import { useAIModifiedPaths } from "./AIModifiedPathsContext";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
 
-type PropertyOrBuilder = Property | any;
+type PropertyOrBuilder = Property | Record<string, unknown>;
 
 type CollectionEditorFormProps = {
     showErrors: boolean;
     isNewCollection: boolean;
-    propertyErrorsRef?: React.MutableRefObject<any>;
-    onPropertyError: (propertyKey: string, namespace: string | undefined, error?: Record<string, any>) => void;
+    propertyErrorsRef?: React.MutableRefObject<Record<string, unknown> | undefined>;
+    onPropertyError: (propertyKey: string, namespace: string | undefined, error?: Record<string, unknown>) => void;
     setDirty?: (dirty: boolean) => void;
-    extraIcon: React.ReactNode | any;
+    extraIcon: React.ReactNode;
     getUser?: (uid: string) => User | null;
     getData?: () => Promise<object[]>;
     doCollectionInference?: (collection: EntityCollection) => Promise<Partial<EntityCollection> | null> | undefined;
@@ -354,7 +354,7 @@ export function CollectionPropertiesEditorForm({
 
     };
 
-    const onPropertyErrorInternal = (id: string, namespace?: string, error?: Record<string, any>) => {
+    const onPropertyErrorInternal = (id: string, namespace?: string, error?: Record<string, unknown>) => {
         const propertyPath = id ? getFullId(id, namespace) : undefined;
         console.debug("onPropertyErrorInternal", {
             id,

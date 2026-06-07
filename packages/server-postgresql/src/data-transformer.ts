@@ -263,8 +263,8 @@ export function serializePropertyToServer(value: unknown, property: Property): u
             if (value instanceof Vector) {
                 return value.value;
             }
-            if (value && typeof value === "object" && "value" in value && Array.isArray((value as any).value)) {
-                return (value as any).value.map(Number);
+            if (value && typeof value === "object" && "value" in value && Array.isArray((value as { value: unknown }).value)) {
+                return (value as { value: unknown[] }).value.map(Number);
             }
             if (Array.isArray(value)) {
                 return value.map(Number);

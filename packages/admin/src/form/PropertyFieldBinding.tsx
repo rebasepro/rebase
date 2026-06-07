@@ -6,7 +6,7 @@ import { deepEqual as equal } from "fast-equals"
 
 import { resolveComponentRef } from "@rebasepro/core";
 
-import { Field, FieldProps as FormexFieldProps, getIn } from "@rebasepro/formex";
+import { Field, FormexFieldProps, getIn } from "@rebasepro/formex";
 
 ;
 import { ReadOnlyFieldBinding } from "./field_bindings/ReadOnlyFieldBinding";
@@ -42,7 +42,7 @@ import { ErrorBoundary } from "@rebasepro/ui";
  * @param autoFocus
  * @group Form custom fields
  */
-export const PropertyFieldBinding = React.memo(PropertyFieldBindingInternal, (a: PropertyFieldBindingProps<any>, b: PropertyFieldBindingProps<any>) => {
+export const PropertyFieldBinding = React.memo(PropertyFieldBindingInternal, (a: PropertyFieldBindingProps<Record<string, unknown>>, b: PropertyFieldBindingProps<Record<string, unknown>>) => {
     if (a.propertyKey !== b.propertyKey) {
         return false;
     }
@@ -178,7 +178,7 @@ type ResolvedPropertyFieldBindingProps<M extends Record<string, unknown> = Recor
         property: Property
     };
 
-function FieldInternal<CustomProps, M extends Record<string, any>>
+function FieldInternal<CustomProps, M extends Record<string, unknown>>
     ({
         Component,
         componentProps: {
@@ -200,21 +200,21 @@ function FieldInternal<CustomProps, M extends Record<string, any>>
         {
             Component: ComponentType<FieldProps>,
             componentProps: ResolvedPropertyFieldBindingProps<M>,
-            formexFieldProps: FormexFieldProps<any, any>
+            formexFieldProps: FormexFieldProps<unknown, Record<string, unknown>>
         }) {
 
     const { plugins } = useCustomizationController();
 
-    const customFieldProps: any = property.ui?.customProps;
+    const customFieldProps: unknown = property.ui?.customProps;
     const value = formexFieldProps.field.value;
     const error = getIn(formexFieldProps.form.errors, propertyKey) as string | string[] | undefined;
     const touched = getIn(formexFieldProps.form.touched, propertyKey) as boolean | undefined;
 
     const showError = Boolean(error &&
         (formexFieldProps.form.submitCount > 0 || property.validation?.unique) &&
-        (!Array.isArray(error) || !!error.filter((e: any) => !!e).length));
+        (!Array.isArray(error) || !!error.filter((e: unknown) => !!e).length));
 
-    const WrappedComponent: ComponentType<FieldProps<any, any, M>> | null = useWrappedComponent({
+    const WrappedComponent: ComponentType<FieldProps<Property, unknown, M>> | null = useWrappedComponent({
         path: context.path,
         collection: context.collection,
         propertyKey: propertyKey,
@@ -226,17 +226,17 @@ function FieldInternal<CustomProps, M extends Record<string, any>>
 
     const isSubmitting = formexFieldProps.form.isSubmitting;
 
-    const setValue = useCallback((value: any | null, shouldValidate?: boolean) => {
+    const setValue = useCallback((value: unknown | null, shouldValidate?: boolean) => {
         formexFieldProps.form.setFieldTouched(propertyKey, true, false);
         formexFieldProps.form.setFieldValue(propertyKey, value, shouldValidate);
     }, []);
 
-    const setFieldValue = useCallback((otherPropertyKey: string, value: any | null, shouldValidate?: boolean) => {
+    const setFieldValue = useCallback((otherPropertyKey: string, value: unknown | null, shouldValidate?: boolean) => {
         formexFieldProps.form.setFieldTouched(propertyKey, true, false);
         formexFieldProps.form.setFieldValue(otherPropertyKey, value, shouldValidate);
     }, []);
 
-    const cmsFieldProps: FieldProps<any, CustomProps, M> = {
+    const cmsFieldProps: FieldProps<Property, CustomProps, M> = {
         propertyKey,
         value,
         setValue,
@@ -253,7 +253,7 @@ function FieldInternal<CustomProps, M extends Record<string, any>>
         partOfBlock: partOfBlock ?? false,
         minimalistView: minimalistView ?? false,
         autoFocus: autoFocus ?? false,
-        customProps: customFieldProps,
+        customProps: customFieldProps as CustomProps,
         context,
         size,
         onPropertyChange
@@ -295,11 +295,11 @@ interface UseWrappedComponentParams<M extends Record<string, unknown> = Record<s
     collection?: EntityCollection<M>,
     propertyKey: string,
     property: Property,
-    Component: ComponentType<FieldProps<any, any, M>>,
+    Component: ComponentType<FieldProps<Property, unknown, M>>,
     plugins?: RebasePlugin[]
 }
 
-function useWrappedComponent<T, M extends Record<string, any> = any>(
+function useWrappedComponent<T, M extends Record<string, unknown> = Record<string, unknown>>(
     {
         path,
         collection,
@@ -308,10 +308,10 @@ function useWrappedComponent<T, M extends Record<string, any> = any>(
         Component,
         plugins
     }: UseWrappedComponentParams<M>
-): ComponentType<FieldProps<any, any, M>> | null {
+): ComponentType<FieldProps<Property, unknown, M>> | null {
 
-    const wrapperRef = useRef<ComponentType<FieldProps<any, any, M>> | null>((() => {
-        let Wrapper: ComponentType<FieldProps<any, any, M>> | null = null;
+    const wrapperRef = useRef<ComponentType<FieldProps<Property, unknown, M>> | null>((() => {
+        let Wrapper: ComponentType<FieldProps<Property, unknown, M>> | null = null;
         if (plugins) {
             plugins.forEach((plugin) => {
                 const fieldId = getFieldId(property);
@@ -327,7 +327,7 @@ function useWrappedComponent<T, M extends Record<string, any> = any>(
                     };
                     const enabled = plugin.fieldBuilder.enabled?.(params);
                     if (enabled === undefined || enabled)
-                        Wrapper = (plugin.fieldBuilder.wrap(params) as unknown as ComponentType<FieldProps<any, any, M>> | null) ?? Wrapper;
+                        Wrapper = (plugin.fieldBuilder.wrap(params) as unknown as ComponentType<FieldProps<Property, unknown, M>> | null) ?? Wrapper;
                 }
                 if (!fieldId) {
                     console.warn("INTERNAL: Field id not found for property", property);

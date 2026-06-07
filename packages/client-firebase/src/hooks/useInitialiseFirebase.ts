@@ -71,9 +71,9 @@ export function useInitialiseFirebase({
             setConfigError(undefined);
             setFirebaseConfigLoading(false);
             setFirebaseApp(initialisedFirebaseApp);
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error("Error initialising Firebase", e);
-            setConfigError(hostingError + "\n" + (e.message ?? JSON.stringify(e)));
+            setConfigError(hostingError + "\n" + (e instanceof Error ? e.message : JSON.stringify(e)));
         }
     }, [name]);
 

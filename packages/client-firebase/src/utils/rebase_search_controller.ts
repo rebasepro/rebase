@@ -96,7 +96,7 @@ export function buildRebaseSearchController(
     const extensionInstanceId = options?.extensionInstanceId || "typesense-search";
 
     let searchConfig: SearchConfig | null = null;
-    let typesenseClient: any = null;
+    let typesenseClient: unknown = null;
     let initPromise: Promise<void> | null = null;
 
     return ({ firebaseApp }: { firebaseApp: FirebaseApp }): FirestoreTextSearchController => {
@@ -131,12 +131,12 @@ export function buildRebaseSearchController(
                     if (options?.collections && options.collections.length > 0) {
                         searchConfig.collectionsToIndex = options.collections;
                     }
-                } catch (error: any) {
+                } catch (error: unknown) {
                     console.error("Failed to get search config from extension:", error);
                     throw new Error(
                         "Failed to initialize Rebase Search. " +
                         "Make sure the rebase-search extension is installed and configured. " +
-                        `Error: ${error.message || error}`
+                        `Error: ${error instanceof Error ? error.message : String(error)}`
                     );
                 }
             }
@@ -253,11 +253,11 @@ export function buildRebaseSearchController(
             }
 
             try {
-                const collection = await typesenseClient.collections(collectionName).retrieve();
+                const collection = await (typesenseClient as Record<string, Function>).collections(collectionName).retrieve();
 
                 // Extract string fields from the schema
-                const stringFields = collection.fields
-                    .filter((f: any) => {
+                const stringFields = (collection.fields as Array<{ type: string; name: string }>)
+                    .filter((f) => {
                         // Include string and string[] types, exclude internal fields
                         const isStringType = f.type === "string" ||
                             f.type === "string[]" ||
@@ -266,12 +266,12 @@ export function buildRebaseSearchController(
                         const isNotInternal = !f.name.startsWith("_") && f.name !== ".*";
                         return isStringType && isNotInternal;
                     })
-                    .map((f: any) => f.name);
+                    .map((f) => f.name);
 
                 schemaCache.set(collectionName, stringFields);
                 return stringFields;
-            } catch (error: any) {
-                if (error.httpStatus === 404) {
+            } catch (error: unknown) {
+                if (error instanceof Error && "httpStatus" in error && (error as Record<string, unknown>).httpStatus === 404) {
                     throw new Error(
                         `Collection "${collectionName}" not found in Typesense. ` +
                         "Make sure the collection has been indexed. Try running the backfill function."
@@ -322,7 +322,7 @@ export function buildRebaseSearchController(
             const queryBy = searchableFields.join(",");
 
             try {
-                const searchParams: any = {
+                const searchParams: Record<string, unknown> = {
                     q: props.searchString,
                     query_by: queryBy,
                     per_page: 100,
@@ -335,18 +335,18 @@ export function buildRebaseSearchController(
                     searchParams.filter_by = parentFilter;
                 }
 
-                const result = await typesenseClient
+                const result = await (typesenseClient as Record<string, Function>)
                     .collections(collectionName)
                     .documents()
                     .search(searchParams);
 
                 // Extract document IDs from hits
-                const ids = result.hits?.map((hit: any) => hit.document.id) ?? [];
+                const ids = (result.hits as Array<{ document: { id: string } }> | undefined)?.map((hit) => hit.document.id) ?? [];
 
                 return ids as readonly string[];
-            } catch (error: any) {
+            } catch (error: unknown) {
                 // Parse error message for user-friendly display
-                const message = error.message || error.toString();
+                const message = error instanceof Error ? error.message : String(error);
                 throw new Error(`Search failed: ${message}`);
             }
         };
