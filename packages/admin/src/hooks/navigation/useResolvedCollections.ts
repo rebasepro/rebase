@@ -3,7 +3,8 @@ import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 
 import { AuthController, CollectionRegistryController, RebaseData, User } from "@rebasepro/types";
 import type { EntityCollectionsBuilder } from "@rebasepro/types";
-import { CollectionRegistry } from "@rebasepro/common";
+import { CollectionRegistry, defaultUsersCollection } from "@rebasepro/common";
+import { UserManagementDelegate } from "@rebasepro/types";
 
 import { resolveCollections } from "./useNavigationResolution";
 import { areCollectionListsEqual } from "./utils";
@@ -15,6 +16,7 @@ export type UseResolvedCollectionsProps<EC extends EntityCollection, USER extend
     plugins?: RebasePlugin[];
     disabled?: boolean;
     collectionRegistryController: CollectionRegistryController<EC> & { collectionRegistryRef: React.MutableRefObject<CollectionRegistry> };
+    userManagement?: UserManagementDelegate<USER>;
 };
 
 export type UseResolvedCollectionsResult = {
@@ -27,6 +29,10 @@ export type UseResolvedCollectionsResult = {
 /**
  * Hook that resolves collection props (which may be async builders or arrays)
  * into concrete EntityCollection[], and registers them with the CollectionRegistry.
+ *
+ * When userManagement is provided, the default users collection is always
+ * prepended. Developer collections override via generic slug-based dedup
+ * (Map keyed by slug, last-write-wins). No hardcoded string checks.
  *
  * Uses refs for potentially-unstable dependencies (driver, authController,
  * plugins) to avoid re-triggering effects when their object identity changes.
@@ -41,7 +47,8 @@ export function useResolvedCollections<EC extends EntityCollection, USER extends
         data,
         plugins,
         disabled,
-        collectionRegistryController
+        collectionRegistryController,
+        userManagement
     } = props;
 
     const [loading, setLoading] = useState(true);
@@ -63,6 +70,8 @@ export function useResolvedCollections<EC extends EntityCollection, USER extends
     authControllerRef.current = authController;
     const pluginsRef = useRef(plugins);
     pluginsRef.current = plugins;
+    const userManagementRef = useRef(userManagement);
+    userManagementRef.current = userManagement;
 
     // Ref for resolved collections change detection
     const resolvedCollectionsRef = useRef<EntityCollection[]>([]);
@@ -86,17 +95,27 @@ export function useResolvedCollections<EC extends EntityCollection, USER extends
 
                 if (cancelled) return;
 
+                // Prepend system defaults; developer collections override via generic dedup.
+                // Map keyed by slug — last-write-wins, so developer collections overwrite defaults.
+                const defaults: EntityCollection[] = [];
+                if (userManagementRef.current) {
+                    defaults.push(defaultUsersCollection);
+                }
+                const deduped = Array.from(
+                    new Map([...defaults, ...resolved].map(c => [c.slug, c])).values()
+                );
+
                 // Register with the CollectionRegistry; returns true if changed
-                const changed = collectionRegistryController.collectionRegistryRef.current.registerMultiple(resolved);
+                const changed = collectionRegistryController.collectionRegistryRef.current.registerMultiple(deduped);
 
                 if (changed) {
-                    console.debug("Collections have changed", resolved);
+                    console.debug("Collections have changed", deduped);
                 }
 
                 // Only update state if collections actually changed
-                if (!areCollectionListsEqual(resolvedCollectionsRef.current, resolved)) {
-                    resolvedCollectionsRef.current = resolved;
-                    setResolvedCollections(resolved);
+                if (!areCollectionListsEqual(resolvedCollectionsRef.current, deduped)) {
+                    resolvedCollectionsRef.current = deduped;
+                    setResolvedCollections(deduped);
                 }
 
                 setError(undefined);
@@ -131,3 +150,4 @@ export function useResolvedCollections<EC extends EntityCollection, USER extends
         refresh
     }), [resolvedCollections, loading, error, refresh]);
 }
+

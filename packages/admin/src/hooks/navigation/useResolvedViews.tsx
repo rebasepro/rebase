@@ -23,7 +23,6 @@ import { UserManagementDelegate } from "@rebasepro/types";
 import { resolveAppViews } from "./useNavigationResolution";
 
 
-import { UsersView } from "../../components/admin/UsersView";
 import { RolesView } from "../../components/admin/RolesView";
 
 export type UseResolvedViewsProps<USER extends User> = {
@@ -35,7 +34,6 @@ export type UseResolvedViewsProps<USER extends User> = {
     adminMode?: "content" | "studio" | "settings";
     effectiveRoleController?: EffectiveRoleController;
     userManagement?: UserManagementDelegate<USER>;
-    collections?: EntityCollection[];
 };
 
 export type UseResolvedViewsResult = {
@@ -48,8 +46,8 @@ export type UseResolvedViewsResult = {
 
 /**
  * Hook that resolves view and admin view props (which may be async builders or arrays)
- * into concrete AppView[]. Also injects Users/Roles admin views when userManagement
- * is provided.
+ * into concrete AppView[]. Also injects the Roles admin view when userManagement
+ * is provided with roles.
  *
  * Uses refs for potentially-unstable dependencies (driver, authController,
  * plugins) to avoid re-triggering effects when their object identity changes.
@@ -66,8 +64,7 @@ export function useResolvedViews<USER extends User>(
         plugins,
         adminMode = "content",
         effectiveRoleController,
-        userManagement,
-        collections
+        userManagement
     } = props;
 
     const [loading, setLoading] = useState(true);
@@ -113,13 +110,8 @@ export function useResolvedViews<USER extends User>(
     const resolvedAuthControllerRef = useRef(resolvedAuthController);
     resolvedAuthControllerRef.current = resolvedAuthController;
 
-    // Memoize JSX elements for injected admin views to ensure stable references.
-    const hasUserManagement = !!userManagement;
+    // Memoize JSX element for injected Roles admin view to ensure stable reference.
     const hasRoles = !!userManagement?.roles;
-    const usersViewElement = useMemo(() =>
-        hasUserManagement ? <UsersView /> : null,
-        [hasUserManagement]
-    );
     const rolesViewElement = useMemo(() =>
         hasRoles ? <RolesView /> : null,
         [hasRoles]
@@ -128,30 +120,17 @@ export function useResolvedViews<USER extends User>(
     const injectedAdminViews: AppView[] = useMemo(() => {
         const views: AppView[] = [];
         const isUserAdmin = userManagement?.isAdmin !== false;
-        if (userManagement && isUserAdmin && usersViewElement) {
-            const hasUsersCollection = collections?.some(c => c.slug === "users");
-            if (!hasUsersCollection) {
-                views.push({
-                    slug: "users",
-                    name: "Users",
-                    icon: "Headset",
-                    view: usersViewElement,
-                    group: "Settings"
-                });
-            }
-            const hasRolesCollection = collections?.some(c => c.slug === "roles");
-            if (userManagement.roles && rolesViewElement && !hasRolesCollection) {
-                views.push({
-                    slug: "roles",
-                    name: "Roles",
-                    icon: "Shield",
-                    view: rolesViewElement,
-                    group: "Settings"
-                });
-            }
+        if (userManagement && isUserAdmin && userManagement.roles && rolesViewElement) {
+            views.push({
+                slug: "roles",
+                name: "Roles",
+                icon: "Shield",
+                view: rolesViewElement,
+                group: "Settings"
+            });
         }
         return views;
-    }, [userManagement, usersViewElement, rolesViewElement, collections]);
+    }, [userManagement, rolesViewElement]);
 
     // Store injectedAdminViews in a ref for effect access
     const injectedAdminViewsRef = useRef(injectedAdminViews);
@@ -172,12 +151,12 @@ export function useResolvedViews<USER extends User>(
                     resolveAppViews(adminViewsProp, resolvedAuthControllerRef.current, dataRef.current)
                 ]);
 
-                const hasCustomUsers = newAdminViewsProp.some(v => v.slug === "users");
-                const hasCustomRoles = newAdminViewsProp.some(v => v.slug === "roles");
+                // Generic dedup: developer-provided admin views override any injected ones with the same slug.
+                // No hardcoded slug checks — works for any slug generically.
+                const customSlugs = new Set(newAdminViewsProp.flatMap(v => Array.isArray(v.slug) ? v.slug : [v.slug]));
                 const finalInjected = injectedAdminViewsRef.current.filter(v => {
-                    if (v.slug === "users" && hasCustomUsers) return false;
-                    if (v.slug === "roles" && hasCustomRoles) return false;
-                    return true;
+                    const slugs = Array.isArray(v.slug) ? v.slug : [v.slug];
+                    return slugs.every(s => !customSlugs.has(s));
                 });
                 const newAdminViews = [...newAdminViewsProp, ...finalInjected];
 
@@ -216,8 +195,7 @@ export function useResolvedViews<USER extends User>(
         refreshTrigger,
         adminMode,
         initialLoading,
-        user,
-        collections
+        user
     ]);
 
     return useMemo(() => ({
@@ -228,3 +206,4 @@ export function useResolvedViews<USER extends User>(
         refresh
     }), [resolvedViews, resolvedAdminViews, loading, error, refresh]);
 }
+

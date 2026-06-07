@@ -1,0 +1,79 @@
+import { PostgresCollection } from "@rebasepro/types";
+
+/**
+ * Default users collection definition.
+ *
+ * Shared between the admin UI (for navigation/display) and the backend
+ * (for schema generation). Both consumers prepend this to the developer's
+ * collections array and rely on generic slug-based deduplication
+ * (Map keyed by slug, last-write-wins) so that developer-defined
+ * collections with the same slug override this default — no hardcoded
+ * string checks required.
+ */
+export const defaultUsersCollection: PostgresCollection = {
+    name: "Users",
+    singularName: "User",
+    slug: "users",
+    table: "users",
+    schema: "rebase",
+    icon: "Users",
+    group: "Settings",
+    properties: {
+        id: {
+            name: "ID",
+            type: "string",
+            isId: "uuid"
+        },
+        email: {
+            name: "Email",
+            type: "string",
+            validation: { required: true, unique: true }
+        },
+        password_hash: {
+            name: "Password Hash",
+            type: "string",
+            ui: { hideFromCollection: true }
+        },
+        display_name: {
+            name: "Display Name",
+            type: "string"
+        },
+        photo_url: {
+            name: "Photo URL",
+            type: "string"
+        },
+        email_verified: {
+            name: "Email Verified",
+            type: "boolean",
+            defaultValue: false
+        },
+        email_verification_token: {
+            name: "Email Verification Token",
+            type: "string",
+            ui: { hideFromCollection: true }
+        },
+        email_verification_sent_at: {
+            name: "Email Verification Sent At",
+            type: "date",
+            ui: { hideFromCollection: true }
+        },
+        metadata: {
+            name: "Metadata",
+            type: "map",
+            defaultValue: {},
+            ui: { hideFromCollection: true }
+        },
+        created_at: {
+            name: "Created At",
+            type: "date",
+            autoValue: "on_create",
+            ui: { readOnly: true, hideFromCollection: true }
+        },
+        updated_at: {
+            name: "Updated At",
+            type: "date",
+            autoValue: "on_update",
+            ui: { readOnly: true, hideFromCollection: true }
+        }
+    }
+};

@@ -59,7 +59,6 @@ export function useBuildNavigationStateController<EC extends EntityCollection, U
         userManagement
     } = props;
 
-    // Step 1: Resolve collections
     const {
         collections,
         loading: collectionsLoading,
@@ -71,10 +70,10 @@ export function useBuildNavigationStateController<EC extends EntityCollection, U
         data,
         plugins,
         disabled,
-        collectionRegistryController
+        collectionRegistryController,
+        userManagement
     });
 
-    // Step 2: Resolve views and admin views
     const {
         views,
         adminViews,
@@ -89,8 +88,7 @@ export function useBuildNavigationStateController<EC extends EntityCollection, U
         plugins,
         adminMode,
         effectiveRoleController,
-        userManagement,
-        collections
+        userManagement
     });
 
     // Step 3: Compute top-level navigation (pure derived state)

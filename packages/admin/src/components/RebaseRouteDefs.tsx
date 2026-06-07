@@ -11,7 +11,6 @@ import {
 import { CircularProgressCenter } from "@rebasepro/ui";
 
 import { ContentHomePage } from "./HomePage/ContentHomePage";
-import { UsersView } from "./admin/UsersView";
 import { RolesView } from "./admin/RolesView";
 import { RebaseRoute } from "../routes/RebaseRoute";
 import { CustomViewRoute } from "../routes/CustomViewRoute";
@@ -87,7 +86,6 @@ export function RebaseRouteDefs({ children, layout }: RebaseRouteDefsProps) {
             <Route path={"/c/*"} element={<RebaseRoute/>}/>
             <Route path={"/settings"} element={<SettingsView/>}/>
             {userManagement && <Route path={"/roles"} element={<RolesView userManagement={userManagement}/>}/>}
-            {userManagement && <Route path={"/users"} element={<UsersView userManagement={userManagement}/>}/>}
 
             {/* Hidden debug route */}
             <Route path={"/debug/ui"} element={<UIReferenceView/>}/>
