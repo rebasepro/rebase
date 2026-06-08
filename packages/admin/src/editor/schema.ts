@@ -23,41 +23,65 @@ const marks: { [key: string]: MarkSpec } = {
             }
         ],
         toDOM(node) {
-            const { href, title, target } = node.attrs;
-            return ["a", { href,
-title,
-target,
-class: "text-surface-700 dark:text-surface-accent-200 underline underline-offset-[3px] hover:text-primary transition-colors cursor-pointer" }, 0];
+            const {
+                href,
+                title,
+                target
+            } = node.attrs;
+            return ["a", {
+                href,
+                title,
+                target,
+                class: "text-surface-700 dark:text-surface-accent-200 underline underline-offset-[3px] hover:text-primary transition-colors cursor-pointer"
+            }, 0];
         }
     },
     bold: {
         parseDOM: [
             { tag: "strong" },
-            { tag: "b",
-getAttrs: (node: HTMLElement | string) => typeof node !== "string" && node.style.fontWeight !== "normal" && null },
-            { style: "font-weight=400",
-clearMark: m => m.type.name === "bold" },
-            { style: "font-weight",
-getAttrs: (value: string | HTMLElement) => typeof value === "string" && /^(bold(er)?|[5-9]\d{2,})$/.test(value) && null }
+            {
+                tag: "b",
+                getAttrs: (node: HTMLElement | string) => typeof node !== "string" && node.style.fontWeight !== "normal" && null
+            },
+            {
+                style: "font-weight=400",
+                clearMark: m => m.type.name === "bold"
+            },
+            {
+                style: "font-weight",
+                getAttrs: (value: string | HTMLElement) => typeof value === "string" && /^(bold(er)?|[5-9]\d{2,})$/.test(value) && null
+            }
         ],
-        toDOM() { return ["strong", 0]; }
+        toDOM() {
+            return ["strong", 0];
+        }
     },
     italic: {
         parseDOM: [{ tag: "i" }, { tag: "em" }, { style: "font-style=italic" }],
-        toDOM() { return ["em", 0]; }
+        toDOM() {
+            return ["em", 0];
+        }
     },
     strike: {
         parseDOM: [{ tag: "s" }, { tag: "del" }, { tag: "strike" }, { style: "text-decoration=line-through" }],
-        toDOM() { return ["s", 0]; }
+        toDOM() {
+            return ["s", 0];
+        }
     },
     underline: {
         parseDOM: [{ tag: "u" }, { style: "text-decoration=underline" }],
-        toDOM() { return ["u", 0]; }
+        toDOM() {
+            return ["u", 0];
+        }
     },
     code: {
         parseDOM: [{ tag: "code" }],
-        toDOM() { return ["code", { class: "rounded-md bg-surface-accent-50 dark:bg-surface-700 px-1.5 py-1 font-mono font-medium",
-spellcheck: "false" }, 0]; }
+        toDOM() {
+            return ["code", {
+                class: "rounded-md bg-surface-accent-50 dark:bg-surface-700 px-1.5 py-1 font-mono font-medium",
+                spellcheck: "false"
+            }, 0];
+        }
     },
     textStyle: {
         attrs: { color: { default: null } },
@@ -88,8 +112,10 @@ spellcheck: "false" }, 0]; }
             }
         ],
         toDOM(mark) {
-            return ["mark", mark.attrs.color ? { style: `background-color: ${mark.attrs.color}; color: inherit;`,
-"data-color": mark.attrs.color } : {}, 0];
+            return ["mark", mark.attrs.color ? {
+                style: `background-color: ${mark.attrs.color}; color: inherit;`,
+                "data-color": mark.attrs.color
+            } : {}, 0];
         }
     }
 };
@@ -102,7 +128,9 @@ const nodes: { [key: string]: NodeSpec } = {
         content: "inline*",
         group: "block",
         parseDOM: [{ tag: "p" }],
-        toDOM() { return ["p", 0]; }
+        toDOM() {
+            return ["p", 0];
+        }
     },
     text: {
         group: "inline"
@@ -112,7 +140,9 @@ const nodes: { [key: string]: NodeSpec } = {
         group: "block",
         defining: true,
         parseDOM: [{ tag: "blockquote" }],
-        toDOM() { return ["blockquote", { class: "border-l-4 border-primary" }, 0]; }
+        toDOM() {
+            return ["blockquote", { class: "border-l-4 border-primary" }, 0];
+        }
     },
     heading: {
         attrs: { level: { default: 1 } },
@@ -120,25 +150,41 @@ const nodes: { [key: string]: NodeSpec } = {
         group: "block",
         defining: true,
         parseDOM: [
-            { tag: "h1",
-attrs: { level: 1 } },
-            { tag: "h2",
-attrs: { level: 2 } },
-            { tag: "h3",
-attrs: { level: 3 } },
-            { tag: "h4",
-attrs: { level: 4 } },
-            { tag: "h5",
-attrs: { level: 5 } },
-            { tag: "h6",
-attrs: { level: 6 } }
+            {
+                tag: "h1",
+                attrs: { level: 1 }
+            },
+            {
+                tag: "h2",
+                attrs: { level: 2 }
+            },
+            {
+                tag: "h3",
+                attrs: { level: 3 }
+            },
+            {
+                tag: "h4",
+                attrs: { level: 4 }
+            },
+            {
+                tag: "h5",
+                attrs: { level: 5 }
+            },
+            {
+                tag: "h6",
+                attrs: { level: 6 }
+            }
         ],
-        toDOM(node) { return ["h" + node.attrs.level, 0]; }
+        toDOM(node) {
+            return ["h" + node.attrs.level, 0];
+        }
     },
     horizontal_rule: {
         group: "block",
         parseDOM: [{ tag: "hr" }],
-        toDOM() { return ["hr", { class: "mt-4 mb-6 border-t border-solid border-gray-200 dark:border-gray-800" }]; }
+        toDOM() {
+            return ["hr", { class: "mt-4 mb-6 border-t border-solid border-gray-200 dark:border-gray-800" }];
+        }
     },
     code_block: {
         content: "text*",
@@ -148,10 +194,14 @@ attrs: { level: 6 } }
         defining: true,
         attrs: { language: { default: null } },
         parseDOM: [
-            { tag: "pre",
-preserveWhitespace: "full" }
+            {
+                tag: "pre",
+                preserveWhitespace: "full"
+            }
         ],
-        toDOM(node) { return ["pre", { class: "rounded bg-blue-50 dark:bg-surface-700 border border-solid border-gray-200 dark:border-gray-800 p-5 font-mono font-medium text-gray-800 dark:text-gray-200" }, ["code", 0]]; }
+        toDOM(node) {
+            return ["pre", { class: "rounded bg-blue-50 dark:bg-surface-700 border border-solid border-gray-200 dark:border-gray-800 p-5 font-mono font-medium text-gray-800 dark:text-gray-200" }, ["code", 0]];
+        }
     },
     image: {
         inline: false,
@@ -176,18 +226,26 @@ preserveWhitespace: "full" }
             }
         ],
         toDOM(node) {
-            const { src, alt, title } = node.attrs;
-            return ["img", { src,
-alt,
-title,
-class: "rounded-lg max-w-full !m-0" }];
+            const {
+                src,
+                alt,
+                title
+            } = node.attrs;
+            return ["img", {
+                src,
+                alt,
+                title,
+                class: "rounded-lg max-w-full !m-0"
+            }];
         }
     },
     bullet_list: {
         content: "list_item+",
         group: "block",
         parseDOM: [{ tag: "ul" }],
-        toDOM() { return ["ul", { class: "list-disc list-outside leading-3 -mt-2" }, 0]; }
+        toDOM() {
+            return ["ul", { class: "list-disc list-outside leading-3 -mt-2" }, 0];
+        }
     },
     ordered_list: {
         content: "list_item+",
@@ -203,22 +261,30 @@ class: "rounded-lg max-w-full !m-0" }];
             }
         ],
         toDOM(node) {
-            return node.attrs.order === 1 ? ["ol", { class: "list-decimal list-outside leading-3 -mt-2" }, 0] : ["ol", { start: node.attrs.order,
-class: "list-decimal list-outside leading-3 -mt-2" }, 0];
+            return node.attrs.order === 1 ? ["ol", { class: "list-decimal list-outside leading-3 -mt-2" }, 0] : ["ol", {
+                start: node.attrs.order,
+                class: "list-decimal list-outside leading-3 -mt-2"
+            }, 0];
         }
     },
     list_item: {
         content: "paragraph block*",
         parseDOM: [{ tag: "li" }],
-        toDOM() { return ["li", { class: "leading-normal -mb-2" }, 0]; },
+        toDOM() {
+            return ["li", { class: "leading-normal -mb-2" }, 0];
+        },
         defining: true
     },
     task_list: {
         group: "block",
         content: "task_item+",
-        parseDOM: [{ tag: 'ul[data-type="taskList"]' }],
-        toDOM() { return ["ul", { "data-type": "taskList",
-class: "not-prose" }, 0]; }
+        parseDOM: [{ tag: "ul[data-type=\"taskList\"]" }],
+        toDOM() {
+            return ["ul", {
+                "data-type": "taskList",
+                class: "not-prose"
+            }, 0];
+        }
     },
     task_item: {
         content: "paragraph block*",
@@ -226,7 +292,7 @@ class: "not-prose" }, 0]; }
         attrs: { checked: { default: false } },
         parseDOM: [
             {
-                tag: 'li[data-type="taskItem"]',
+                tag: "li[data-type=\"taskItem\"]",
                 getAttrs(dom: HTMLElement | string) {
                     if (typeof dom === "string") return false;
                     return { checked: dom.getAttribute("data-checked") === "true" };
@@ -234,9 +300,11 @@ class: "not-prose" }, 0]; }
             }
         ],
         toDOM(node) {
-            return ["li", { "data-type": "taskItem",
-"data-checked": node.attrs.checked ? "true" : "false",
-class: "flex items-start my-4" }, 0];
+            return ["li", {
+                "data-type": "taskItem",
+                "data-checked": node.attrs.checked ? "true" : "false",
+                class: "flex items-start my-4"
+            }, 0];
         }
     },
     hard_break: {
@@ -244,7 +312,9 @@ class: "flex items-start my-4" }, 0];
         group: "inline",
         selectable: false,
         parseDOM: [{ tag: "br" }],
-        toDOM() { return ["br"]; }
+        toDOM() {
+            return ["br"];
+        }
     },
     ...tableNodes({
         tableGroup: "block",
@@ -252,12 +322,18 @@ class: "flex items-start my-4" }, 0];
         cellAttributes: {
             background: {
                 default: null,
-                getFromDOM(dom: HTMLElement) { return dom.style.backgroundColor || null },
-                setDOMAttr(value: string | null, attrs: Record<string, string>) { if (value) attrs.style = (attrs.style || "") + `background-color: ${value};` }
+                getFromDOM(dom: HTMLElement) {
+                    return dom.style.backgroundColor || null
+                },
+                setDOMAttr(value: unknown, attrs: Record<string, string>) {
+                    if (value && typeof value === "string") attrs.style = (attrs.style || "") + `background-color: ${value};`
+                }
             }
         }
     })
 };
 
-export const schema = new Schema({ nodes,
-marks });
+export const schema = new Schema({
+    nodes,
+    marks
+});

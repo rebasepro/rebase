@@ -70,21 +70,21 @@ export const PropertyFieldBinding = React.memo(PropertyFieldBindingInternal, (a:
 }) as typeof PropertyFieldBindingInternal;
 
 function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record<string, unknown>>
-    ({
-        propertyKey,
-        property,
-        context,
-        includeDescription,
-        underlyingValueHasChanged,
-        disabled: disabledProp,
-        partOfArray,
-        partOfBlock,
-        minimalistView,
-        autoFocus,
-        index,
-        size,
-        onPropertyChange
-    }: PropertyFieldBindingProps<M>): ReactElement<PropertyFieldBindingProps<M>> {
+({
+     propertyKey,
+     property,
+     context,
+     includeDescription,
+     underlyingValueHasChanged,
+     disabled: disabledProp,
+     partOfArray,
+     partOfBlock,
+     minimalistView,
+     autoFocus,
+     index,
+     size,
+     onPropertyChange
+ }: PropertyFieldBindingProps<M>): ReactElement<PropertyFieldBindingProps<M>> {
 
     const authController = useAuthController();
     const customizationController = useCustomizationController();
@@ -96,7 +96,7 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
         >
             {(fieldProps) => {
 
-                let Component: ComponentType<FieldProps<Property, unknown, M>> | undefined;
+                let Component: ComponentType<FieldProps<Property, any, any>> | undefined;
                 const resolvedProperty = resolveProperty({
                     propertyKey,
                     property: property,
@@ -118,7 +118,7 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
                 } else if (resolvedProperty.ui?.Field) {
                     const resolved = resolveComponentRef(resolvedProperty.ui.Field);
                     if (resolved) {
-                        Component = resolved as ComponentType<FieldProps<Property, unknown, M>>;
+                        Component = resolved as ComponentType<FieldProps<Property, any, any>>;
                     }
                 } else {
                     const propertyConfig = getFieldConfig(resolvedProperty, customizationController.propertyConfigs);
@@ -135,7 +135,7 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
                         index,
                         authController
                     }) as Property | null;
-                    Component = resolveComponentRef(configProperty?.ui?.Field) as ComponentType<FieldProps<Property, unknown, M>> | undefined;
+                    Component = resolveComponentRef(configProperty?.ui?.Field) as ComponentType<FieldProps<Property, any, any>> | undefined;
                 }
                 if (!Component) {
                     console.warn(`No field component found for property ${propertyKey}`);
@@ -163,7 +163,7 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
                 };
 
                 return <FieldInternal
-                    Component={Component as ComponentType<FieldProps<Property, unknown, M>>}
+                    Component={Component as ComponentType<FieldProps<Property, any, any>>}
                     componentProps={componentProps}
                     formexFieldProps={fieldProps as FormexFieldProps<unknown, Record<string, unknown>>}/>;
             }}
@@ -175,33 +175,33 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
 type ResolvedPropertyFieldBindingProps<M extends Record<string, unknown> = Record<string, unknown>> =
     Omit<PropertyFieldBindingProps<M>, "property">
     & {
-        property: Property
-    };
+    property: Property
+};
 
 function FieldInternal<CustomProps, M extends Record<string, unknown>>
-    ({
-        Component,
-        componentProps: {
-            propertyKey,
-            property,
-            includeDescription,
-            underlyingValueHasChanged,
-            partOfArray,
-            partOfBlock,
-            minimalistView,
-            autoFocus,
-            context,
-            disabled,
-            size,
-            onPropertyChange
-        },
-        formexFieldProps
-    }:
-        {
-            Component: ComponentType<FieldProps<Property, unknown, M>>,
-            componentProps: ResolvedPropertyFieldBindingProps<M>,
-            formexFieldProps: FormexFieldProps<unknown, Record<string, unknown>>
-        }) {
+({
+     Component,
+     componentProps: {
+         propertyKey,
+         property,
+         includeDescription,
+         underlyingValueHasChanged,
+         partOfArray,
+         partOfBlock,
+         minimalistView,
+         autoFocus,
+         context,
+         disabled,
+         size,
+         onPropertyChange
+     },
+     formexFieldProps
+ }:
+ {
+     Component: ComponentType<FieldProps<Property, any, any>>,
+     componentProps: ResolvedPropertyFieldBindingProps<M>,
+     formexFieldProps: FormexFieldProps<unknown, Record<string, unknown>>
+ }) {
 
     const { plugins } = useCustomizationController();
 
@@ -214,15 +214,15 @@ function FieldInternal<CustomProps, M extends Record<string, unknown>>
         (formexFieldProps.form.submitCount > 0 || property.validation?.unique) &&
         (!Array.isArray(error) || !!error.filter((e: unknown) => !!e).length));
 
-    const WrappedComponent: ComponentType<FieldProps<Property, unknown, M>> | null = useWrappedComponent({
+    const WrappedComponent: ComponentType<FieldProps<Property, any, any>> | null = useWrappedComponent<unknown, any>({
         path: context.path,
         collection: context.collection,
         propertyKey: propertyKey,
         property: property,
-        Component: Component,
+        Component: Component as any, // Cast component here since it is a generic component type
         plugins: plugins
     });
-    const UsedComponent: ComponentType<FieldProps<Property, unknown, M>> = (WrappedComponent ?? Component) as ComponentType<FieldProps<Property, unknown, M>>;
+    const UsedComponent: ComponentType<FieldProps<Property, any, any>> = WrappedComponent ?? Component;
 
     const isSubmitting = formexFieldProps.form.isSubmitting;
 

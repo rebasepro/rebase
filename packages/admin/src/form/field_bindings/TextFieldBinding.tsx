@@ -26,17 +26,17 @@ import { getIconForProperty } from "../../util/property_utils";
  * @group Form fields
  */
 export function TextFieldBinding<T extends string | number>({
-    propertyKey,
-    value,
-    setValue,
-    error,
-    showError,
-    disabled,
-    autoFocus,
-    property,
-    includeDescription,
-    size = "large"
-}: FieldProps<StringProperty | NumberProperty>) {
+                                                                propertyKey,
+                                                                value,
+                                                                setValue,
+                                                                error,
+                                                                showError,
+                                                                disabled,
+                                                                autoFocus,
+                                                                property,
+                                                                includeDescription,
+                                                                size = "large"
+                                                            }: FieldProps<StringProperty | NumberProperty>) {
 
     let multiline: boolean | undefined;
     let url: boolean | PreviewType | undefined;
@@ -50,6 +50,8 @@ export function TextFieldBinding<T extends string | number>({
         value,
         setValue
     });
+
+    const displayValue = (value !== undefined && value !== null) ? String(value) : "";
 
     const handleClearClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
@@ -89,76 +91,78 @@ export function TextFieldBinding<T extends string | number>({
             title={property.name ?? propertyKey}/>
     );
     return (<>
-        <PropertyIdCopyTooltip propertyKey={propertyKey}>
-            {isMultiline ? (
-                <div className={cls(
-                    "rounded-md relative max-w-full min-h-[64px]",
-                    fieldBackgroundMixin,
-                    fieldBackgroundHoverMixin,
-                    showError && error ? "border border-red-500 dark:border-red-600" : "",
-                    property.ui?.widthPercentage !== undefined ? "mt-8" : undefined
-                )}>
-                    <div className="pointer-events-none absolute top-1 text-xs font-medium px-3 text-text-secondary dark:text-text-secondary-dark">
-                        {label}
+            <PropertyIdCopyTooltip propertyKey={propertyKey}>
+                {isMultiline ? (
+                    <div className={cls(
+                        "rounded-md relative max-w-full min-h-[64px]",
+                        fieldBackgroundMixin,
+                        fieldBackgroundHoverMixin,
+                        showError && error ? "border border-red-500 dark:border-red-600" : "",
+                        property.ui?.widthPercentage !== undefined ? "mt-8" : undefined
+                    )}>
+                        <div
+                            className="pointer-events-none absolute top-1 text-xs font-medium px-3 text-text-secondary dark:text-text-secondary-dark">
+                            {label}
+                        </div>
+                        <TextareaAutosize
+                            value={displayValue}
+                            onChange={onChange}
+                            autoFocus={autoFocus}
+                            disabled={disabled}
+                            className={cls(
+                                "rounded-md resize-none w-full outline-none p-[32px] text-base bg-transparent min-h-[64px] px-3 pt-8",
+                                disabled && "outline-none opacity-50 text-surface-accent-600 dark:text-surface-accent-500",
+                                showError && error ? "text-red-500 dark:text-red-600" : ""
+                            )}
+                        />
+                        {property.ui?.clearable && (
+                            <div
+                                className="flex flex-row justify-center items-center absolute h-full right-0 top-0 mr-4">
+                                <IconButton onClick={handleClearClick}>
+                                    <XIcon/>
+                                </IconButton>
+                            </div>
+                        )}
                     </div>
-                    <TextareaAutosize
-                        value={value ?? ""}
+                ) : (
+                    <TextField
+                        size={size}
+                        value={displayValue}
                         onChange={onChange}
                         autoFocus={autoFocus}
+                        className={property.ui?.widthPercentage !== undefined ? "mt-8" : undefined}
+                        label={<LabelWithIcon
+                            icon={getIconForProperty(property, "small")}
+                            required={property.validation?.required || property.isId === true}
+                            title={property.name ?? propertyKey}/>}
+                        type={inputType}
                         disabled={disabled}
-                        className={cls(
-                            "rounded-md resize-none w-full outline-none p-[32px] text-base bg-transparent min-h-[64px] px-3 pt-8",
-                            disabled && "outline-none opacity-50 text-surface-accent-600 dark:text-surface-accent-500",
-                            showError && error ? "text-red-500 dark:text-red-600" : ""
-                        )}
-                    />
-                    {property.ui?.clearable && (
-                        <div className="flex flex-row justify-center items-center absolute h-full right-0 top-0 mr-4">
-                            <IconButton onClick={handleClearClick}>
+                        endAdornment={
+                            property.ui?.clearable && <IconButton
+                                onClick={handleClearClick}>
                                 <XIcon/>
                             </IconButton>
-                        </div>
-                    )}
-                </div>
-            ) : (
-                <TextField
-                    size={size}
-                    value={value ?? ""}
-                    onChange={onChange}
-                    autoFocus={autoFocus}
-                    className={property.ui?.widthPercentage !== undefined ? "mt-8" : undefined}
-                    label={<LabelWithIcon
-                        icon={getIconForProperty(property, "small")}
-                        required={property.validation?.required || property.isId === true}
-                        title={property.name ?? propertyKey}/>}
-                    type={inputType}
-                    disabled={disabled}
-                    endAdornment={
-                        property.ui?.clearable && <IconButton
-                            onClick={handleClearClick}>
-                            <XIcon/>
-                        </IconButton>
-                    }
-                    error={showError ? !!error : undefined}
-                    inputClassName={error ? "text-red-500 dark:text-red-600" : ""}/>
-            )}
-        </PropertyIdCopyTooltip>
-        <FieldHelperText includeDescription={includeDescription}
-            showError={showError}
-            error={error}
-            disabled={disabled}
-            property={property}/>
+                        }
+                        error={showError ? !!error : undefined}
+                        inputClassName={error ? "text-red-500 dark:text-red-600" : ""}/>
+                )}
+            </PropertyIdCopyTooltip>
+            <FieldHelperText includeDescription={includeDescription}
+                             showError={showError}
+                             error={error}
+                             disabled={disabled}
+                             property={property}/>
 
-        {url && <Collapse
-            className="mt-1 ml-1"
-            in={Boolean(value)}>
-            <PropertyPreview
-                value={value}
-                property={property}
-                size={size}/>
-        </Collapse>}
+            {url && <Collapse
+                className="mt-1 ml-1"
+                in={Boolean(value)}>
+                <PropertyPreview
+                    value={value}
+                    property={property}
+                    size={size}/>
+            </Collapse>}
 
-    </>
+        </>
     );
 
 }

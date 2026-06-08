@@ -1,17 +1,32 @@
 import { forwardRef, type ReactNode, useEffect, useRef, useState } from "react";
 import { useProseMirrorContext } from "../hooks/useProseMirrorContext";
-import { autoUpdate, computePosition, flip, offset, shift, type VirtualElement } from "@floating-ui/dom";
+import {
+    autoUpdate,
+    computePosition,
+    flip,
+    offset,
+    shift,
+    type VirtualElement,
+    type Placement
+} from "@floating-ui/dom";
 import { NodeSelection } from "prosemirror-state";
 
 export interface EditorBubbleProps {
     children: ReactNode;
-    options?: { placement?: string; offset?: number };
+    options?: { placement?: Placement; offset?: number };
     className?: string;
 }
 
 export const EditorBubble = forwardRef<HTMLDivElement, EditorBubbleProps>(
-    ({ children, options, className }, ref) => {
-        const { view, state } = useProseMirrorContext();
+    ({
+         children,
+         options,
+         className
+     }, ref) => {
+        const {
+            view,
+            state
+        } = useProseMirrorContext();
         const menuRef = useRef<HTMLDivElement>(null);
         const [show, setShow] = useState(false);
 
@@ -43,7 +58,10 @@ export const EditorBubble = forwardRef<HTMLDivElement, EditorBubbleProps>(
         useEffect(() => {
             if (!show || !view || !state || !menuRef.current) return;
 
-            const { from, to } = state.selection;
+            const {
+                from,
+                to
+            } = state.selection;
 
             // Fallback for end selection coords
             let start = view.coordsAtPos(from);
@@ -83,7 +101,10 @@ export const EditorBubble = forwardRef<HTMLDivElement, EditorBubbleProps>(
                     placement: options?.placement || "top",
                     middleware: [offset(options?.offset || 8), flip(), shift()],
                     strategy: "fixed"
-                }).then(({ x, y }) => {
+                }).then(({
+                             x,
+                             y
+                         }) => {
                     if (menuRef.current) {
                         Object.assign(menuRef.current.style, {
                             left: `${x}px`,
@@ -102,9 +123,11 @@ export const EditorBubble = forwardRef<HTMLDivElement, EditorBubbleProps>(
             <div
                 ref={menuRef}
                 className={className}
-                style={{ position: "fixed",
-zIndex: 9999,
-visibility: "hidden" }}
+                style={{
+                    position: "fixed",
+                    zIndex: 9999,
+                    visibility: "hidden"
+                }}
                 onMouseDown={(e) => {
                     e.preventDefault(); // Don't lose focus inside ProseMirror
                 }}

@@ -11,8 +11,14 @@ export interface ImageBubbleProps {
 }
 
 export const ImageBubble = forwardRef<HTMLDivElement, ImageBubbleProps>(
-    ({ options, className }, ref) => {
-        const { view, state } = useProseMirrorContext();
+    ({
+         options,
+         className
+     }, ref) => {
+        const {
+            view,
+            state
+        } = useProseMirrorContext();
         const { t } = useTranslation();
         const menuRef = useRef<HTMLDivElement>(null);
         const [show, setShow] = useState(false);
@@ -23,8 +29,10 @@ export const ImageBubble = forwardRef<HTMLDivElement, ImageBubbleProps>(
         useEffect(() => {
             if (!view) return;
             const handleContextMenu = (e: MouseEvent) => {
-                const posInfo = view.posAtCoords({ left: e.clientX,
-top: e.clientY });
+                const posInfo = view.posAtCoords({
+                    left: e.clientX,
+                    top: e.clientY
+                });
                 if (posInfo && posInfo.inside >= 0) {
                     const node = view.state.doc.nodeAt(posInfo.inside);
                     if (node && node.type.name === "image") {
@@ -56,7 +64,10 @@ top: e.clientY });
         useEffect(() => {
             if (!show || !view || !state || !menuRef.current) return;
 
-            const { from, to } = state.selection;
+            const {
+                from,
+                to
+            } = state.selection;
             let start = view.coordsAtPos(from);
             let end = view.coordsAtPos(to);
 
@@ -92,7 +103,10 @@ top: e.clientY });
                     placement: options?.placement || "bottom",
                     middleware: [offset(options?.offset || 8), flip(), shift()],
                     strategy: "fixed"
-                }).then(({ x, y }) => {
+                }).then(({
+                             x,
+                             y
+                         }) => {
                     if (menuRef.current) {
                         Object.assign(menuRef.current.style, {
                             left: `${x}px`,
@@ -126,9 +140,11 @@ top: e.clientY });
         return (
             <div
                 ref={menuRef}
-                style={{ visibility: "hidden",
-position: "fixed",
-zIndex: 50 }}
+                style={{
+                    visibility: "hidden",
+                    position: "fixed",
+                    zIndex: 50
+                }}
                 className={cls("flex flex-col gap-1.5 p-2 w-56 max-w-[90vw] rounded-lg border bg-white dark:bg-surface-800 shadow-lg", defaultBorderMixin, className)}
                 onMouseDown={(e) => {
                     // Prevent mousedown from stealing focus from inputs

@@ -1,4 +1,3 @@
-
 import type { FieldProps } from "../../types/fields";
 import type { MapProperty } from "@rebasepro/types";
 import React, { useEffect, useState } from "react";
@@ -39,19 +38,19 @@ type MapEditViewRowState = [number, {
  * @group Form fields
  */
 export function KeyValueFieldBinding({
-    propertyKey,
-    value,
-    showError,
-    error,
-    disabled,
-    property,
-    setValue,
-    minimalistView,
-    includeDescription,
-    underlyingValueHasChanged,
-    autoFocus,
-    context
-}: FieldProps<MapProperty>) {
+                                         propertyKey,
+                                         value,
+                                         showError,
+                                         error,
+                                         disabled,
+                                         property,
+                                         setValue,
+                                         minimalistView,
+                                         includeDescription,
+                                         underlyingValueHasChanged,
+                                         autoFocus,
+                                         context
+                                     }: FieldProps<MapProperty>) {
 
     const expanded = (property.ui?.expanded === undefined ? true : property.ui?.expanded) || autoFocus;
 
@@ -62,10 +61,10 @@ export function KeyValueFieldBinding({
     const initialValues = getIn(context.formex.initialValues, propertyKey) as Record<string, unknown> | undefined;
 
     const mapFormView = <MapEditView value={value}
-        setValue={setValue}
-        disabled={disabled}
-        initialValue={initialValues}
-        fieldName={property.name ?? propertyKey}/>;
+                                     setValue={setValue}
+                                     disabled={disabled}
+                                     initialValue={initialValues}
+                                     fieldName={property.name ?? propertyKey}/>;
 
     const title = <LabelWithIconAndTooltip
         propertyKey={propertyKey}
@@ -78,16 +77,16 @@ export function KeyValueFieldBinding({
         <>
 
             {!minimalistView && <ExpandablePanel initiallyExpanded={expanded}
-                title={title}
-                innerClassName={"px-2 md:px-4 pb-2 md:pb-4 pt-1 md:pt-2"}>{mapFormView}</ExpandablePanel>}
+                                                 title={title}
+                                                 innerClassName={"px-2 md:px-4 pb-2 md:pb-4 pt-1 md:pt-2"}>{mapFormView}</ExpandablePanel>}
 
             {minimalistView && mapFormView}
 
             <FieldHelperText includeDescription={includeDescription}
-                showError={showError}
-                error={error}
-                disabled={disabled}
-                property={property}/>
+                             showError={showError}
+                             error={error}
+                             disabled={disabled}
+                             property={property}/>
 
         </>
     );
@@ -102,12 +101,12 @@ interface MapEditViewParams<T extends Record<string, unknown>> {
 }
 
 function MapEditView<T extends Record<string, unknown>>({
-    value,
-    initialValue,
-    setValue,
-    fieldName,
-    disabled
-}: MapEditViewParams<T>) {
+                                                            value,
+                                                            initialValue,
+                                                            setValue,
+                                                            fieldName,
+                                                            disabled
+                                                        }: MapEditViewParams<T>) {
     const [internalState, setInternalState] = React.useState<MapEditViewRowState[]>(
         Object.keys(initialValue ?? {}).map((key) => [getRandomId(), {
             key,
@@ -158,80 +157,80 @@ function MapEditView<T extends Record<string, unknown>>({
     return <div className="py-1 flex flex-col gap-1">
         {internalState
             .map(([rowId, {
-                key: fieldKey,
-                type
-            }], index) => {
-                const entryValue = fieldKey ? value?.[fieldKey] : "";
-                const onFieldKeyChange = (newKey: string) => {
+                    key: fieldKey,
+                    type
+                }], index) => {
+                    const entryValue = fieldKey ? value?.[fieldKey] : "";
+                    const onFieldKeyChange = (newKey: string) => {
 
-                    setInternalState(internalState.map((currentRowId) => {
-                        if (currentRowId[0] === rowId) {
-                            return [rowId, {
-                                key: newKey ?? "",
-                                type: currentRowId[1].type
-                            }];
+                        setInternalState(internalState.map((currentRowId) => {
+                            if (currentRowId[0] === rowId) {
+                                return [rowId, {
+                                    key: newKey ?? "",
+                                    type: currentRowId[1].type
+                                }];
+                            }
+                            return currentRowId;
+                        }));
+
+                        if (typeof value === "object" && newKey in value) {
+                            // if the key is already there, don't delete the previous value
+                            return;
                         }
-                        return currentRowId;
-                    }));
 
-                    if (typeof value === "object" && newKey in value) {
-                        // if the key is already there, don't delete the previous value
-                        return;
-                    }
-
-                    const newValue = { ...(value ?? {}) } as T;
-                    if (typeof initialValue === "object" && fieldKey in initialValue) {
-                        (newValue as Record<string, unknown>)[fieldKey] = undefined; // set to undefined to remove from the object, the driver will remove it from the backend
-                    } else {
-                        delete (newValue as Record<string, unknown>)[fieldKey];
-                    }
-                    setValue({
-                        ...newValue,
-                        [newKey ?? ""]: entryValue
-                    });
-                };
-                return <MapKeyValueRow rowId={rowId}
-                    key={rowId}
-                    fieldKey={fieldKey}
-                    value={value ?? {} as T}
-                    onDeleteClick={() => {
-                        const newValue = { ...(value ?? {}) as T };
-                        if (initialValue && fieldKey in initialValue) {
-                            (newValue as Record<string, unknown>)[fieldKey] = undefined;
+                        const newValue = { ...(value ?? {}) } as T;
+                        if (typeof initialValue === "object" && fieldKey in initialValue) {
+                            (newValue as Record<string, unknown>)[fieldKey] = undefined; // set to undefined to remove from the object, the driver will remove it from the backend
                         } else {
                             delete (newValue as Record<string, unknown>)[fieldKey];
                         }
-                        setInternalState(internalState.filter((currentRowId) => currentRowId[0] !== rowId));
                         setValue({
-                            ...newValue
+                            ...newValue,
+                            [newKey ?? ""]: entryValue
                         });
-                    }}
-                    onFieldKeyChange={onFieldKeyChange}
-                    setValue={setValue}
-                    entryValue={entryValue}
-                    type={type}
-                    disabled={disabled}
-                    updatetype={updatetype}/>;
-            }
+                    };
+                    return <MapKeyValueRow rowId={rowId}
+                                           key={rowId}
+                                           fieldKey={fieldKey}
+                                           value={value ?? {} as T}
+                                           onDeleteClick={() => {
+                                               const newValue = { ...(value ?? {}) as T };
+                                               if (initialValue && fieldKey in initialValue) {
+                                                   (newValue as Record<string, unknown>)[fieldKey] = undefined;
+                                               } else {
+                                                   delete (newValue as Record<string, unknown>)[fieldKey];
+                                               }
+                                               setInternalState(internalState.filter((currentRowId) => currentRowId[0] !== rowId));
+                                               setValue({
+                                                   ...newValue
+                                               });
+                                           }}
+                                           onFieldKeyChange={onFieldKeyChange}
+                                           setValue={setValue}
+                                           entryValue={entryValue}
+                                           type={type}
+                                           disabled={disabled}
+                                           updatetype={updatetype}/>;
+                }
             )}
 
         <Button variant={"text"}
-            size={"small"}
-            className="w-full"
-            disabled={disabled}
-            startIcon={<PlusIcon/>}
-            onClick={(e) => {
-                e.preventDefault();
-                setValue({
-                    ...(value ?? {} as T),
-                    "": null
-                });
-                setInternalState([...internalState, [getRandomId(), {
-                    key: "",
-                    type: "string"
-                }]]);
-            }
-            }>
+                size={"small"}
+                className="w-full"
+                disabled={disabled}
+                startIcon={<PlusIcon/>}
+                onClick={(e) => {
+                    e.preventDefault();
+                    setValue({
+                        ...(value ?? {} as T),
+                        "": null
+                    });
+                    setInternalState([...internalState, [getRandomId(), {
+                        key: "",
+                        type: "string"
+                    }]]);
+                }
+                }>
             {fieldName ? t("add_to_field", { fieldName }) : t("add")}
         </Button>
 
@@ -239,17 +238,17 @@ function MapEditView<T extends Record<string, unknown>>({
 }
 
 function MapKeyValueRow<T extends Record<string, unknown>>({
-    rowId,
-    fieldKey,
-    value,
-    onFieldKeyChange,
-    onDeleteClick,
-    setValue,
-    entryValue,
-    type,
-    updatetype,
-    disabled
-}: {
+                                                               rowId,
+                                                               fieldKey,
+                                                               value,
+                                                               onFieldKeyChange,
+                                                               onDeleteClick,
+                                                               setValue,
+                                                               entryValue,
+                                                               type,
+                                                               updatetype,
+                                                               disabled
+                                                           }: {
     rowId: number,
     fieldKey: string,
     value: T,
@@ -302,73 +301,73 @@ function MapKeyValueRow<T extends Record<string, unknown>>({
                 }}/>;
         } else if (type === "date") {
             return <DateTimeField value={entryValue}
-                size={"medium"}
-                locale={locale}
-                disabled={disabled || !fieldKey}
-                onChange={(date) => {
-                    setValue({
-                        ...value,
-                        [fieldKey]: date
-                    });
-                }}/>;
+                                  size={"medium"}
+                                  locale={locale}
+                                  disabled={disabled || !fieldKey}
+                                  onChange={(date) => {
+                                      setValue({
+                                          ...value,
+                                          [fieldKey]: date
+                                      });
+                                  }}/>;
         } else if (type === "boolean") {
             return <BooleanSwitchWithLabel value={entryValue}
-                size={"medium"}
-                position={"start"}
-                disabled={disabled || !fieldKey}
-                onValueChange={(newValue) => {
-                    setValue({
-                        ...value,
-                        [fieldKey]: newValue
-                    });
-                }}/>;
+                                           size={"medium"}
+                                           position={"start"}
+                                           disabled={disabled || !fieldKey}
+                                           onValueChange={(newValue) => {
+                                               setValue({
+                                                   ...value,
+                                                   [fieldKey]: newValue
+                                               });
+                                           }}/>;
         } else if (type === "array") {
             return <div
                 className={cls(defaultBorderMixin, "ml-2 pl-2 border-l border-solid")}>
                 <ArrayContainer value={entryValue}
-                    newDefaultEntry={""}
-                    droppableId={rowId.toString()}
-                    addLabel={fieldKey ? t("add_to_field", { fieldName: fieldKey }) : t("add")}
-                    size={"small"}
-                    disabled={disabled || !fieldKey}
-                    canAddElements={true}
-                    onValueChange={(newValue) => {
-                        setValue({
-                            ...value,
-                            [fieldKey]: newValue
-                        });
-                    }}
-                    buildEntry={({
-                        index,
-                        internalId
-                    }) => {
-                        return <ArrayKeyValueRow
-                            index={index}
-                            id={internalId}
-                            value={entryValue[index]}
-                            disabled={disabled || !fieldKey}
-                            setValue={(newValue) => {
-                                const newArrayValue = [...entryValue];
-                                newArrayValue[index] = newValue;
-                                setValue({
-                                    ...value,
-                                    [fieldKey]: newArrayValue
-                                });
-                            }}
-                        />
-                    }}/>
+                                newDefaultEntry={""}
+                                droppableId={rowId.toString()}
+                                addLabel={fieldKey ? t("add_to_field", { fieldName: fieldKey }) : t("add")}
+                                size={"small"}
+                                disabled={disabled || !fieldKey}
+                                canAddElements={true}
+                                onValueChange={(newValue) => {
+                                    setValue({
+                                        ...value,
+                                        [fieldKey]: newValue
+                                    });
+                                }}
+                                buildEntry={({
+                                                 index,
+                                                 internalId
+                                             }) => {
+                                    return <ArrayKeyValueRow
+                                        index={index}
+                                        id={internalId}
+                                        value={entryValue[index]}
+                                        disabled={disabled || !fieldKey}
+                                        setValue={(newValue) => {
+                                            const newArrayValue = [...entryValue];
+                                            newArrayValue[index] = newValue;
+                                            setValue({
+                                                ...value,
+                                                [fieldKey]: newArrayValue
+                                            });
+                                        }}
+                                    />
+                                }}/>
             </div>;
         } else if (type === "map") {
             return <div
                 className={cls(defaultBorderMixin, "ml-2 pl-2 border-l border-solid")}>
                 <MapEditView value={entryValue}
-                    fieldName={fieldKey}
-                    setValue={(updatedValue) => {
-                        setValue({
-                            ...value,
-                            [fieldKey]: updatedValue
-                        });
-                    }}/>
+                             fieldName={fieldKey}
+                             setValue={(updatedValue) => {
+                                 setValue({
+                                     ...value,
+                                     [fieldKey]: updatedValue
+                                 });
+                             }}/>
             </div>;
         } else {
             return <Typography
@@ -383,64 +382,64 @@ function MapKeyValueRow<T extends Record<string, unknown>>({
     }
 
     return (<>
-        <Typography key={rowId.toString()}
-            component={"div"}
-            className="font-mono flex flex-row gap-1">
-            <div className="w-[300px] max-w-[30%]">
-                <TextField
-                    value={fieldKey}
-                    placeholder={"key"}
-                    disabled={disabled || (entryValue !== undefined && entryValue !== null && entryValue !== "")}
-                    size={"medium"}
-                    onChange={(event) => {
-                        onFieldKeyChange(event.target.value);
-                    }}/>
-            </div>
+            <Typography key={rowId.toString()}
+                        component={"div"}
+                        className="font-mono flex flex-row gap-1">
+                <div className="w-[300px] max-w-[30%]">
+                    <TextField
+                        value={fieldKey}
+                        placeholder={"key"}
+                        disabled={disabled || (entryValue !== undefined && entryValue !== null && entryValue !== "")}
+                        size={"medium"}
+                        onChange={(event) => {
+                            onFieldKeyChange(event.target.value);
+                        }}/>
+                </div>
 
-            <div className="grow">
-                {(type !== "map" && type !== "array") && buildInput(entryValue, fieldKey, type)}
-            </div>
-            <div className={"flex flex-col"}>
-                <Menu
-                    trigger={<IconButton size={"smallest"}>
-                        <ChevronDownIcon size={iconSize.small}/>
-                    </IconButton>}
-                >
-                    <MenuItem dense
-                        onClick={() => doUpdatetype("string")}>string</MenuItem>
-                    <MenuItem dense
-                        onClick={() => doUpdatetype("number")}>number</MenuItem>
-                    <MenuItem dense
-                        onClick={() => doUpdatetype("boolean")}>boolean</MenuItem>
-                    <MenuItem dense
-                        onClick={() => doUpdatetype("date")}>date</MenuItem>
-                    <MenuItem dense
-                        onClick={() => doUpdatetype("map")}>map</MenuItem>
-                    <MenuItem dense
-                        onClick={() => doUpdatetype("array")}>array</MenuItem>
-                </Menu>
+                <div className="grow">
+                    {(type !== "map" && type !== "array") && buildInput(entryValue, fieldKey, type)}
+                </div>
+                <div className={"flex flex-col"}>
+                    <Menu
+                        trigger={<IconButton size={"smallest"}>
+                            <ChevronDownIcon size={iconSize.small}/>
+                        </IconButton>}
+                    >
+                        <MenuItem dense
+                                  onClick={() => doUpdatetype("string")}>string</MenuItem>
+                        <MenuItem dense
+                                  onClick={() => doUpdatetype("number")}>number</MenuItem>
+                        <MenuItem dense
+                                  onClick={() => doUpdatetype("boolean")}>boolean</MenuItem>
+                        <MenuItem dense
+                                  onClick={() => doUpdatetype("date")}>date</MenuItem>
+                        <MenuItem dense
+                                  onClick={() => doUpdatetype("map")}>map</MenuItem>
+                        <MenuItem dense
+                                  onClick={() => doUpdatetype("array")}>array</MenuItem>
+                    </Menu>
 
-                <IconButton aria-label="delete"
-                    size={"smallest"}
-                    onClick={onDeleteClick}>
-                    <MinusIcon size={iconSize.smallest}/>
-                </IconButton>
-            </div>
-        </Typography>
+                    <IconButton aria-label="delete"
+                                size={"smallest"}
+                                onClick={onDeleteClick}>
+                        <MinusIcon size={iconSize.smallest}/>
+                    </IconButton>
+                </div>
+            </Typography>
 
-        {(type === "map" || type === "array") && buildInput(entryValue, fieldKey, type)}
+            {(type === "map" || type === "array") && buildInput(entryValue, fieldKey, type)}
 
-    </>
+        </>
 
     );
 }
 
 function ArrayKeyValueRow<T>({
-    id,
-    index,
-    value,
-    setValue
-}: {
+                                 id,
+                                 index,
+                                 value,
+                                 setValue
+                             }: {
     id: number,
     index: number,
     value: T,
@@ -458,36 +457,36 @@ function ArrayKeyValueRow<T>({
     function buildInput(entryValue: unknown, type: DataType) {
         if (type === "string" || type === "number") {
             return <TextField value={entryValue}
-                type={type === "number" ? "number" : "text"}
-                size={"medium"}
-                onChange={(event) => {
-                    if (type === "number") {
-                        const numberValue = event.target.value ? parseFloat(event.target.value) : undefined;
-                        if (numberValue && isNaN(numberValue)) {
-                            setValue(null);
-                        } else if (numberValue !== undefined && numberValue !== null) {
-                            setValue(numberValue as T);
-                        } else {
-                            setValue(null);
-                        }
-                    } else {
-                        setValue(event.target.value as T);
-                    }
-                }}/>;
+                              type={type === "number" ? "number" : "text"}
+                              size={"medium"}
+                              onChange={(event) => {
+                                  if (type === "number") {
+                                      const numberValue = event.target.value ? parseFloat(event.target.value) : undefined;
+                                      if (numberValue && isNaN(numberValue)) {
+                                          setValue(null);
+                                      } else if (numberValue !== undefined && numberValue !== null) {
+                                          setValue(numberValue as T);
+                                      } else {
+                                          setValue(null);
+                                      }
+                                  } else {
+                                      setValue(event.target.value as T);
+                                  }
+                              }}/>;
         } else if (type === "date") {
             return <DateTimeField value={entryValue}
-                size={"medium"}
-                locale={locale}
-                onChange={(date) => {
-                    setValue(date as T);
-                }}/>;
+                                  size={"medium"}
+                                  locale={locale}
+                                  onChange={(date) => {
+                                      setValue(date as T);
+                                  }}/>;
         } else if (type === "boolean") {
             return <BooleanSwitchWithLabel value={entryValue}
-                size={"small"}
-                position={"start"}
-                onValueChange={(v) => {
-                    setValue(v as T);
-                }}/>;
+                                           size={"small"}
+                                           position={"start"}
+                                           onValueChange={(v) => {
+                                               setValue(v as T);
+                                           }}/>;
         } else if (type === "array") {
             return <Typography variant={"caption"}>
                 Arrays of arrays are not supported.
@@ -495,9 +494,9 @@ function ArrayKeyValueRow<T>({
         } else if (type === "map") {
             return <div className={cls(defaultBorderMixin, "ml-2 pl-2 border-l border-solid")}>
                 <MapEditView value={entryValue}
-                    setValue={(updatedValue) => {
-                        setValue(updatedValue);
-                    }}/>
+                             setValue={(updatedValue) => {
+                                 setValue(updatedValue);
+                             }}/>
             </div>;
         } else {
             return <Typography
@@ -508,36 +507,36 @@ function ArrayKeyValueRow<T>({
     }
 
     return (<>
-        <Typography key={id.toString()}
-            component={"div"}
-            className="font-mono flex min-h-12 flex-row gap-1 items-center">
+            <Typography key={id.toString()}
+                        component={"div"}
+                        className="font-mono flex min-h-12 flex-row gap-1 items-center">
 
-            <div className="grow">
-                {selectedtype !== "map" && buildInput(value, selectedtype)}
-            </div>
+                <div className="grow">
+                    {selectedtype !== "map" && buildInput(value, selectedtype)}
+                </div>
 
-            <Menu
-                trigger={<IconButton size={"small"}
-                    className="h-7 w-7">
-                    <ChevronDownIcon/>
-                </IconButton>}>
-                <MenuItem dense
-                    onClick={() => doUpdatetype("string")}>string</MenuItem>
-                <MenuItem dense
-                    onClick={() => doUpdatetype("number")}>number</MenuItem>
-                <MenuItem dense
-                    onClick={() => doUpdatetype("boolean")}>boolean</MenuItem>
-                <MenuItem dense
-                    onClick={() => doUpdatetype("map")}>map</MenuItem>
-                <MenuItem dense
-                    onClick={() => doUpdatetype("date")}>date</MenuItem>
-            </Menu>
+                <Menu
+                    trigger={<IconButton size={"small"}
+                                         className="h-7 w-7">
+                        <ChevronDownIcon/>
+                    </IconButton>}>
+                    <MenuItem dense
+                              onClick={() => doUpdatetype("string")}>string</MenuItem>
+                    <MenuItem dense
+                              onClick={() => doUpdatetype("number")}>number</MenuItem>
+                    <MenuItem dense
+                              onClick={() => doUpdatetype("boolean")}>boolean</MenuItem>
+                    <MenuItem dense
+                              onClick={() => doUpdatetype("map")}>map</MenuItem>
+                    <MenuItem dense
+                              onClick={() => doUpdatetype("date")}>date</MenuItem>
+                </Menu>
 
-        </Typography>
+            </Typography>
 
-        {selectedtype === "map" && buildInput(value, selectedtype)}
+            {selectedtype === "map" && buildInput(value, selectedtype)}
 
-    </>
+        </>
 
     );
 }

@@ -19,18 +19,18 @@ type UserSelectProps = FieldProps<StringProperty>;
  * @group Form fields
  */
 export function UserSelectFieldBinding({
-    propertyKey,
-    value,
-    setValue,
-    error,
-    showError,
-    disabled,
-    autoFocus,
-    touched,
-    property,
-    includeDescription,
-    size = "large"
-}: UserSelectProps) {
+                                           propertyKey,
+                                           value,
+                                           setValue,
+                                           error,
+                                           showError,
+                                           disabled,
+                                           autoFocus,
+                                           touched,
+                                           property,
+                                           includeDescription,
+                                           size = "large"
+                                       }: UserSelectProps) {
 
     const selectorSize: "small" | "medium" | undefined = size === "large" ? "medium" : size;
 
@@ -46,7 +46,7 @@ export function UserSelectFieldBinding({
             </PropertyIdCopyTooltip>
 
             <UserSelector
-                value={value ?? null}
+                value={value as string | null | undefined}
                 onValueChange={(userId) => {
                     setValue(userId);
                 }}
@@ -56,10 +56,10 @@ export function UserSelectFieldBinding({
             />
 
             <FieldHelperText includeDescription={includeDescription}
-                showError={showError}
-                error={error}
-                disabled={disabled}
-                property={property}/>
+                             showError={showError}
+                             error={error}
+                             disabled={disabled}
+                             property={property}/>
 
         </>
     );

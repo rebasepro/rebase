@@ -7,6 +7,7 @@ import { Field, useFormex } from "@rebasepro/formex";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
 import { PropertyFieldBinding } from "../PropertyFieldBinding";
 import { EnumValuesChip } from "../../preview";
+
 ;
 import { DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE, getDefaultValueFor } from "@rebasepro/common";
 import { getIconForProperty } from "../../util/property_utils";
@@ -25,20 +26,20 @@ import { mergeDeep } from "@rebasepro/utils";
  * @group Form fields
  */
 export function BlockFieldBinding({
-    propertyKey,
-    value,
-    error,
-    showError,
-    isSubmitting,
-    setValue,
-    setFieldValue,
-    minimalistView: minimalistViewProp,
-    property,
-    includeDescription,
-    underlyingValueHasChanged,
-    context,
-    disabled
-}: FieldProps<ArrayProperty>) {
+                                      propertyKey,
+                                      value,
+                                      error,
+                                      showError,
+                                      isSubmitting,
+                                      setValue,
+                                      setFieldValue,
+                                      minimalistView: minimalistViewProp,
+                                      property,
+                                      includeDescription,
+                                      underlyingValueHasChanged,
+                                      context,
+                                      disabled
+                                  }: FieldProps<ArrayProperty>) {
 
     const minimalistView = minimalistViewProp || property.ui?.minimalistView;
     const { t } = useTranslation();
@@ -56,11 +57,11 @@ export function BlockFieldBinding({
     const [lastAddedId, setLastAddedId] = useState<number | undefined>();
 
     const buildEntry = ({
-        index,
-        internalId,
-        storedProps,
-        storeProps
-    }: ArrayEntryParams) => {
+                            index,
+                            internalId,
+                            storedProps,
+                            storeProps
+                        }: ArrayEntryParams) => {
 
         return <BlockEntry
             key={`array_one_of_${internalId}`}
@@ -87,18 +88,18 @@ export function BlockFieldBinding({
 
     const firstOneOfKey = Object.keys(property.oneOf.properties)[0];
     const body = <ArrayContainer value={value}
-        className={"flex flex-col gap-3"}
-        droppableId={propertyKey}
-        addLabel={property.name ? t("add_to_field", { fieldName: property.name }) : t("add_entry")}
-        buildEntry={buildEntry}
-        onInternalIdAdded={setLastAddedId}
-        disabled={isSubmitting || Boolean(property.ui?.disabled)}
-        canAddElements={!property.ui?.disabled}
-        onValueChange={(value) => setFieldValue(propertyKey, value)}
-        newDefaultEntry={{
-            [property.oneOf!.typeField ?? DEFAULT_ONE_OF_TYPE]: firstOneOfKey,
-            [property.oneOf!.valueField ?? DEFAULT_ONE_OF_VALUE]: getDefaultValueFor(property.oneOf.properties[firstOneOfKey])
-        }}/>;
+                                 className={"flex flex-col gap-3"}
+                                 droppableId={propertyKey}
+                                 addLabel={property.name ? t("add_to_field", { fieldName: property.name }) : t("add_entry")}
+                                 buildEntry={buildEntry}
+                                 onInternalIdAdded={setLastAddedId}
+                                 disabled={isSubmitting || Boolean(property.ui?.disabled)}
+                                 canAddElements={!property.ui?.disabled}
+                                 onValueChange={(value) => setFieldValue(propertyKey, value)}
+                                 newDefaultEntry={{
+                                     [property.oneOf!.typeField ?? DEFAULT_ONE_OF_TYPE]: firstOneOfKey,
+                                     [property.oneOf!.valueField ?? DEFAULT_ONE_OF_VALUE]: getDefaultValueFor(property.oneOf.properties[firstOneOfKey])
+                                 }}/>;
     return (
 
         <>
@@ -114,10 +115,10 @@ export function BlockFieldBinding({
             {minimalistView && body}
 
             <FieldHelperText includeDescription={includeDescription}
-                showError={showError}
-                error={error}
-                disabled={disabled}
-                property={property}/>
+                             showError={showError}
+                             error={error}
+                             disabled={disabled}
+                             property={property}/>
 
         </>
     );
@@ -156,17 +157,17 @@ interface BlockEntryProps {
 }
 
 function BlockEntry({
-    name,
-    index,
-    value,
-    typeField,
-    valueField,
-    properties,
-    autoFocus,
-    context,
-    storedProps,
-    storeProps
-}: BlockEntryProps) {
+                        name,
+                        index,
+                        value,
+                        typeField,
+                        valueField,
+                        properties,
+                        autoFocus,
+                        context,
+                        storedProps,
+                        storeProps
+                    }: BlockEntryProps) {
 
     const type = value && value[typeField];
     const [typeInternal, setTypeInternal] = useState<string | undefined>(type ?? undefined);
@@ -239,7 +240,7 @@ function BlockEntry({
                             <Select
                                 className="mb-2"
                                 placeholder={<Typography variant={"caption"}
-                                    className={"px-4 py-2 font-medium"}>{t("type")}</Typography>}
+                                                         className={"px-4 py-2 font-medium"}>{t("type")}</Typography>}
                                 size={"medium"}
                                 fullWidth={true}
                                 position={"item-aligned"}

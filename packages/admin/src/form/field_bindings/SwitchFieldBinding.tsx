@@ -17,17 +17,17 @@ import { PropertyIdCopyTooltip } from "../../components/PropertyIdCopyTooltip";
  * @group Form fields
  */
 export const SwitchFieldBinding = function SwitchFieldBinding({
-    propertyKey,
-    value,
-    setValue,
-    error,
-    showError,
-    autoFocus,
-    disabled,
-    size = "large",
-    property,
-    includeDescription
-}: FieldProps<BooleanProperty>) {
+                                                                  propertyKey,
+                                                                  value,
+                                                                  setValue,
+                                                                  error,
+                                                                  showError,
+                                                                  autoFocus,
+                                                                  disabled,
+                                                                  size = "large",
+                                                                  property,
+                                                                  includeDescription
+                                                              }: FieldProps<BooleanProperty>) {
 
     useClearRestoreValue({
         property,
@@ -40,7 +40,7 @@ export const SwitchFieldBinding = function SwitchFieldBinding({
 
             <PropertyIdCopyTooltip propertyKey={propertyKey}>
                 <BooleanSwitchWithLabel
-                    value={value}
+                    value={value as boolean | null}
                     onValueChange={(v) => setValue(v)}
                     error={showError}
                     className={property.ui?.widthPercentage !== undefined ? "mt-8" : undefined}
@@ -55,10 +55,10 @@ export const SwitchFieldBinding = function SwitchFieldBinding({
             </PropertyIdCopyTooltip>
 
             <FieldHelperText includeDescription={includeDescription}
-                showError={showError}
-                error={error}
-                disabled={disabled}
-                property={property}/>
+                             showError={showError}
+                             error={error}
+                             disabled={disabled}
+                             property={property}/>
         </>
 
     );

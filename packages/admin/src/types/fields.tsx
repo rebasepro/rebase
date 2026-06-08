@@ -51,12 +51,12 @@ export interface FieldProps<
     /**
      * Current value of this field, inferred from the property type P
      */
-    value: unknown;
+    value: any;
 
     /**
      * Set value of field directly
      */
-    setValue: (value: unknown | null, shouldValidate?: boolean) => void;
+    setValue: (value: any | null, shouldValidate?: boolean) => void;
 
     /**
      * Set value of a different field directly

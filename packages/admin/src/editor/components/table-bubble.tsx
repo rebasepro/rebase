@@ -1,6 +1,14 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { useProseMirrorContext } from "../hooks/useProseMirrorContext";
-import { autoUpdate, computePosition, flip, offset, shift, type VirtualElement } from "@floating-ui/dom";
+import {
+    autoUpdate,
+    computePosition,
+    flip,
+    offset,
+    shift,
+    type VirtualElement,
+    type Placement
+} from "@floating-ui/dom";
 import { IconButton, Tooltip, defaultBorderMixin, cls } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/core";
 import {
@@ -14,9 +22,8 @@ import {
 } from "prosemirror-tables";
 import { EditorState } from "prosemirror-state";
 
-
 export interface TableBubbleProps {
-    options?: { placement?: string; offset?: number };
+    options?: { placement?: Placement; offset?: number };
     className?: string;
 }
 
@@ -35,8 +42,14 @@ const isSelectionInTable = (state: EditorState) => {
 // Wait, I will use generic SVGs for these since I don't know if @rebasepro/ui has them.
 
 export const TableBubble = forwardRef<HTMLDivElement, TableBubbleProps>(
-    ({ options, className }, ref) => {
-        const { view, state } = useProseMirrorContext();
+    ({
+         options,
+         className
+     }, ref) => {
+        const {
+            view,
+            state
+        } = useProseMirrorContext();
         const { t } = useTranslation();
         const menuRef = useRef<HTMLDivElement>(null);
         const [show, setShow] = useState(false);
@@ -49,7 +62,10 @@ export const TableBubble = forwardRef<HTMLDivElement, TableBubbleProps>(
         useEffect(() => {
             if (!show || !view || !state || !menuRef.current) return;
 
-            const { from, to } = state.selection;
+            const {
+                from,
+                to
+            } = state.selection;
 
             // Safety measure: if view.docView is destroyed, coordsAtPos might crash
             if (view.isDestroyed) return;
@@ -90,7 +106,10 @@ export const TableBubble = forwardRef<HTMLDivElement, TableBubbleProps>(
                     placement: options?.placement || "top",
                     middleware: [offset(options?.offset || 8), flip(), shift()],
                     strategy: "fixed"
-                }).then(({ x, y }) => {
+                }).then(({
+                             x,
+                             y
+                         }) => {
                     if (menuRef.current) {
                         Object.assign(menuRef.current.style, {
                             left: `${x}px`,
@@ -113,9 +132,11 @@ export const TableBubble = forwardRef<HTMLDivElement, TableBubbleProps>(
         return (
             <div
                 ref={menuRef}
-                style={{ visibility: "hidden",
-position: "fixed",
-zIndex: 50 }}
+                style={{
+                    visibility: "hidden",
+                    position: "fixed",
+                    zIndex: 50
+                }}
                 className={cls("flex flex-row gap-1 p-1 rounded-lg border bg-white dark:bg-surface-800 shadow-lg", defaultBorderMixin, className)}
                 onMouseDown={(e) => {
                     // Prevent mousedown from stealing focus from the editor
@@ -125,17 +146,34 @@ zIndex: 50 }}
                 <div className="flex gap-1 border-r pr-1 mr-1 dark:border-gray-700">
                     <Tooltip title={t("add_row_before")}>
                         <IconButton size="small" onClick={() => executeCommand(addRowBefore)}>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line><line x1="3" y1="9" x2="21" y2="9"></line></svg>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="12" y1="8" x2="12" y2="16"></line>
+                                <line x1="8" y1="12" x2="16" y2="12"></line>
+                                <line x1="3" y1="9" x2="21" y2="9"></line>
+                            </svg>
                         </IconButton>
                     </Tooltip>
                     <Tooltip title={t("add_row_after")}>
                         <IconButton size="small" onClick={() => executeCommand(addRowAfter)}>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="12" x2="12" y2="20"></line><line x1="8" y1="16" x2="16" y2="16"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="12" y1="12" x2="12" y2="20"></line>
+                                <line x1="8" y1="16" x2="16" y2="16"></line>
+                                <line x1="3" y1="15" x2="21" y2="15"></line>
+                            </svg>
                         </IconButton>
                     </Tooltip>
                     <Tooltip title={t("delete_row")}>
                         <IconButton size="small" onClick={() => executeCommand(deleteRow)}>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="12" x2="21" y2="12"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="3" y1="12" x2="21" y2="12"></line>
+                                <line x1="8" y1="12" x2="16" y2="12"></line>
+                            </svg>
                         </IconButton>
                     </Tooltip>
                 </div>
@@ -143,24 +181,48 @@ zIndex: 50 }}
                 <div className="flex gap-1 border-r pr-1 mr-1 dark:border-gray-700">
                     <Tooltip title={t("add_column_before")}>
                         <IconButton size="small" onClick={() => executeCommand(addColumnBefore)}>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="8" y1="12" x2="16" y2="12"></line><line x1="12" y1="8" x2="12" y2="16"></line><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="8" y1="12" x2="16" y2="12"></line>
+                                <line x1="12" y1="8" x2="12" y2="16"></line>
+                                <line x1="9" y1="3" x2="9" y2="21"></line>
+                            </svg>
                         </IconButton>
                     </Tooltip>
                     <Tooltip title={t("add_column_after")}>
                         <IconButton size="small" onClick={() => executeCommand(addColumnAfter)}>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="12" x2="20" y2="12"></line><line x1="16" y1="8" x2="16" y2="16"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="12" y1="12" x2="20" y2="12"></line>
+                                <line x1="16" y1="8" x2="16" y2="16"></line>
+                                <line x1="15" y1="3" x2="15" y2="21"></line>
+                            </svg>
                         </IconButton>
                     </Tooltip>
                     <Tooltip title={t("delete_column")}>
                         <IconButton size="small" onClick={() => executeCommand(deleteColumn)}>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="3" x2="12" y2="21"></line><line x1="12" y1="8" x2="12" y2="16"></line></svg>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="12" y1="3" x2="12" y2="21"></line>
+                                <line x1="12" y1="8" x2="12" y2="16"></line>
+                            </svg>
                         </IconButton>
                     </Tooltip>
                 </div>
 
                 <Tooltip title={t("delete_table")}>
                     <IconButton size="small" onClick={() => executeCommand(deleteTable)}>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path
+                                d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                        </svg>
                     </IconButton>
                 </Tooltip>
             </div>
