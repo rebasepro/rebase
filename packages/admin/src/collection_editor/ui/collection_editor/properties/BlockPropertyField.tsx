@@ -10,7 +10,7 @@ import {
     namespaceToPropertiesPath
 } from "../util";
 import { PropertyTree } from "../PropertyTree";
-import { ArrayProperty, PropertyConfig } from "@rebasepro/types";
+import { ArrayProperty, PropertyConfig, Property } from "@rebasepro/types";
 
 export function BlockPropertyField({
     disabled,
@@ -59,7 +59,7 @@ export function BlockPropertyField({
 
         setFieldValue(`oneOf.${idToPropertiesPath(fullId)}`, undefined, false);
         const propertiesOrderPath = `oneOf.${namespaceToPropertiesOrderPath(namespace)}`;
-        const currentPropertiesOrder: string[] = getIn(values, propertiesOrderPath) ?? Object.keys(getIn(values, namespaceToPropertiesPath(namespace)));
+        const currentPropertiesOrder: string[] = (getIn(values, propertiesOrderPath) as string[] | undefined) ?? Object.keys(getIn(values, namespaceToPropertiesPath(namespace)) as object ?? {});
         setFieldValue(propertiesOrderPath, currentPropertiesOrder.filter((p) => p !== propertyKey), false);
 
         setPropertyDialogOpen(false);
@@ -134,7 +134,7 @@ export function BlockPropertyField({
                 onDelete={deleteProperty}
                 propertyKey={selectedPropertyKey}
                 propertyNamespace={selectedPropertyNamespace}
-                property={selectedProperty}
+                property={selectedProperty as Property | undefined}
                 existingProperty={Boolean(selectedPropertyKey)}
                 autoUpdateId={!selectedPropertyKey}
                 autoOpenTypeSelect={!selectedPropertyKey}

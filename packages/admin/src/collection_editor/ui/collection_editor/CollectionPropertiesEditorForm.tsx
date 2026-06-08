@@ -138,16 +138,16 @@ export function CollectionPropertiesEditorForm({
                             } else if (
                                 typeof newProp === "object" &&
                                 "type" in newProp &&
-                                newProp.dataType === "map" &&
-                                newProp.properties
+                                (newProp as MapProperty).type === "map" &&
+                                (newProp as MapProperty).properties
                             ) {
                                 // This is a map property, check for new nested properties
                                 const existingMapProps = typeof existingProp === "object" &&
                                     "type" in existingProp &&
-                                    existingProp.dataType === "map"
+                                    (existingProp as MapProperty).type === "map"
                                     ? (existingProp as MapProperty).properties
                                     : undefined;
-                                keys.push(...findNewPropertyKeys(existingMapProps, newProp.properties as Record<string, PropertyOrBuilder>, fullKey));
+                                keys.push(...findNewPropertyKeys(existingMapProps, (newProp as MapProperty).properties as Record<string, PropertyOrBuilder>, fullKey));
                             }
                         }
                         return keys;
@@ -174,11 +174,11 @@ export function CollectionPropertiesEditorForm({
                             } else if (
                                 typeof existingProp === "object" &&
                                 "type" in existingProp &&
-                                existingProp.dataType === "map" &&
+                                (existingProp as MapProperty).type === "map" &&
                                 typeof newProp === "object" &&
                                 "type" in newProp &&
-                                newProp.dataType === "map" &&
-                                newProp.properties
+                                (newProp as MapProperty).type === "map" &&
+                                (newProp as MapProperty).properties
                             ) {
                                 // Both are map properties, recursively add new nested properties
                                 // Only if the existing map has properties, merge them; otherwise keep existing as-is
@@ -188,9 +188,9 @@ export function CollectionPropertiesEditorForm({
                                         ...existingProp,
                                         properties: addNewPropertiesOnly(
                                             existingMapProps,
-                                            newProp.properties as Record<string, PropertyOrBuilder>
-                                        )
-                                    };
+                                            (newProp as MapProperty).properties as Record<string, PropertyOrBuilder>
+                                        ) as Properties
+                                    } as MapProperty;
                                 }
                                 // If existingProp doesn't have properties, keep it as-is (don't overwrite with inferred)
                             }
@@ -374,7 +374,7 @@ export function CollectionPropertiesEditorForm({
         setSelectedPropertyKey(undefined);
     };
 
-    const initialErrors = selectedPropertyKey && propertyErrorsRef?.current?.properties ? propertyErrorsRef.current.properties[selectedPropertyKey] : undefined;
+    const initialErrors = selectedPropertyKey && propertyErrorsRef?.current?.properties ? (propertyErrorsRef.current.properties as Record<string, unknown>)[selectedPropertyKey] as Record<string, any> | undefined : undefined;
 
     const emptyCollection = (values?.propertiesOrder === undefined || values.propertiesOrder.length === 0)
         && (!values?.properties || Object.keys(values.properties).length === 0);
@@ -496,8 +496,8 @@ export function CollectionPropertiesEditorForm({
                         className="sticky top-8 min-h-full w-full flex flex-col justify-center">
 
                         {selectedPropertyFullId &&
-                            selectedProperty &&
-                            !isPropertyBuilder(selectedProperty) &&
+                            !!selectedProperty &&
+                            !isPropertyBuilder(selectedProperty as Property) &&
                             <PropertyForm
                                 inArray={false}
                                 key={`edit_view_${selectedPropertyIndex}_${generationCounter}`}
@@ -507,7 +507,7 @@ export function CollectionPropertiesEditorForm({
                                 autoOpenTypeSelect={false}
                                 propertyKey={selectedPropertyKey}
                                 propertyNamespace={selectedPropertyNamespace}
-                                property={selectedProperty}
+                                property={selectedProperty as Property}
                                 onPropertyChanged={onPropertyChanged}
                                 onDelete={deleteProperty}
                                 onError={onPropertyErrorInternal}
@@ -534,7 +534,7 @@ export function CollectionPropertiesEditorForm({
                                 </Button>
                             </div>}
 
-                        {selectedProperty && isPropertyBuilder(selectedProperty) &&
+                        {!!selectedProperty && isPropertyBuilder(selectedProperty as Property) &&
                             <Typography variant={"label"} className="flex items-center justify-center">
                                 {"This property is defined as a property builder in code"}
                             </Typography>}
@@ -551,7 +551,7 @@ export function CollectionPropertiesEditorForm({
                 autoOpenTypeSelect={false}
                 propertyKey={selectedPropertyKey}
                 propertyNamespace={selectedPropertyNamespace}
-                property={selectedProperty}
+                property={selectedProperty as Property | undefined}
                 onPropertyChanged={onPropertyChanged}
                 onDelete={deleteProperty}
                 onError={onPropertyErrorInternal}

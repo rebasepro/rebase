@@ -9,8 +9,8 @@ export function VectorPropertyField({ disabled }: {
     const { values, setFieldValue, touched, errors } = useFormex();
 
     const dimensionsPath = "dimensions";
-    const dimensionsValue = getIn(values, dimensionsPath);
-    const dimensionsError = getIn(touched, dimensionsPath) && getIn(errors, dimensionsPath);
+    const dimensionsValue = getIn(values, dimensionsPath) as number | undefined;
+    const dimensionsError = (getIn(touched, dimensionsPath) && getIn(errors, dimensionsPath)) as string | undefined;
 
     return (
         <div className={"col-span-12"}>

@@ -117,20 +117,20 @@ export function DateTimePropertyField({ disabled }: {
     const { t } = useTranslation();
 
     const modePath = "mode";
-    const modeValue: string | undefined = getIn(values, modePath);
-    const modeError: string | undefined = getIn(touched, modePath) && getIn(errors, modePath);
+    const modeValue: string | undefined = getIn(values, modePath) as string | undefined;
+    const modeError: string | undefined = (getIn(touched, modePath) && getIn(errors, modePath)) as string | undefined;
 
     const autoValuePath = "autoValue";
-    const autoValueValue: string | undefined = getIn(values, autoValuePath);
-    const autoValueError: string | undefined = getIn(touched, autoValuePath) && getIn(errors, autoValuePath);
+    const autoValueValue: string | undefined = getIn(values, autoValuePath) as string | undefined;
+    const autoValueError: string | undefined = (getIn(touched, autoValuePath) && getIn(errors, autoValuePath)) as string | undefined;
 
     const timezonePath = "timezone";
-    const timezoneValue: string | undefined = getIn(values, timezonePath);
-    const timezoneError: string | undefined = getIn(touched, timezonePath) && getIn(errors, timezonePath);
+    const timezoneValue: string | undefined = getIn(values, timezonePath) as string | undefined;
+    const timezoneError: string | undefined = (getIn(touched, timezonePath) && getIn(errors, timezonePath)) as string | undefined;
 
     const columnTypePath = "columnType";
-    const columnTypeValue: string | undefined = getIn(values, columnTypePath);
-    const columnTypeError: string | undefined = getIn(touched, columnTypePath) && getIn(errors, columnTypePath);
+    const columnTypeValue: string | undefined = getIn(values, columnTypePath) as string | undefined;
+    const columnTypeError: string | undefined = (getIn(touched, columnTypePath) && getIn(errors, columnTypePath)) as string | undefined;
 
     return (
         <>

@@ -57,7 +57,7 @@ export function StringNumberFilterField({
 
     const [fieldOperation, fieldValue] = value || [possibleOperations[0], undefined];
     const [operation, setOperation] = useState<VirtualTableWhereFilterOp | "is-null">(fieldOperation === "==" && fieldValue === null ? "is-null" : fieldOperation);
-    const [internalValue, setInternalValue] = useState<string | number | string[] | number[] | null | undefined>(fieldValue);
+    const [internalValue, setInternalValue] = useState<string | number | string[] | number[] | null | undefined>(fieldValue as string | number | string[] | number[] | null | undefined);
 
     const isNullOperation = operation === "is-null";
 

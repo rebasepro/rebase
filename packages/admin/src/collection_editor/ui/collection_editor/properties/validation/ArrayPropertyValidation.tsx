@@ -30,7 +30,7 @@ export function ArrayPropertyValidation({
             <GeneralPropertyValidation disabled={disabled}/>
 
             {min && <div className={"col-span-6"}>
-                <DebouncedTextField value={getIn(values, validationMin)}
+                <DebouncedTextField value={getIn(values, validationMin) as number | undefined}
                     disabled={disabled}
                     label={t("min_length")}
                     name={validationMin}
@@ -39,7 +39,7 @@ export function ArrayPropertyValidation({
                     onChange={handleChange}/>
             </div>}
             {max && <div className={"col-span-6"}>
-                <DebouncedTextField value={getIn(values, validationMax)}
+                <DebouncedTextField value={getIn(values, validationMax) as number | undefined}
                     disabled={disabled}
                     label={t("max_length")}
                     name={validationMax}

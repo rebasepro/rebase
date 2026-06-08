@@ -31,7 +31,7 @@ export function NumberPropertyValidation({ disabled }: {
 
 
             <div className={"col-span-6"}>
-                <DebouncedTextField value={getIn(values, validationMin)}
+                <DebouncedTextField value={getIn(values, validationMin) as number | undefined}
                     label={t("min_value")}
                     name={validationMin}
                     type="number"
@@ -41,12 +41,11 @@ export function NumberPropertyValidation({ disabled }: {
             </div>
 
             <div className={"col-span-6"}>
-                <DebouncedTextField value={getIn(values, validationMax)}
+                <DebouncedTextField value={getIn(values, validationMax) as number | undefined}
                     label={t("max_value")}
                     name={validationMax}
                     type="number"
                     size="small"
-
                     disabled={disabled}
                     onChange={handleChange}/>
             </div>
@@ -54,24 +53,22 @@ export function NumberPropertyValidation({ disabled }: {
 
             <div className={"col-span-6"}>
                 <DebouncedTextField
-                    value={getIn(values, validationLessThan)}
+                    value={getIn(values, validationLessThan) as number | undefined}
                     label={t("less_than")}
                     name={validationLessThan}
                     type="number"
                     size="small"
-
                     disabled={disabled}
                     onChange={handleChange}/>
             </div>
 
             <div className={"col-span-6"}>
                 <DebouncedTextField
-                    value={getIn(values, validationMoreThan)}
+                    value={getIn(values, validationMoreThan) as number | undefined}
                     label={t("more_than")}
                     name={validationMoreThan}
                     type="number"
                     size="small"
-
                     disabled={disabled}
                     onChange={handleChange}/>
             </div>

@@ -78,18 +78,18 @@ export function useKanbanDragAndDrop<M extends Record<string, unknown>>({
                     b = null;
                 }
                 const newKey = generateKeyBetween(a, b);
-                updatedValues = setIn(updatedValues, orderProperty, newKey);
+                updatedValues = setIn(updatedValues, orderProperty, newKey) as Record<string, unknown>;
             } catch (e) {
                 // Fallback: if keys are somehow invalid, generate from scratch
                 console.warn("fractional-indexing error, falling back:", e);
                 const newKey = generateKeyBetween(null, null);
-                updatedValues = setIn(updatedValues, orderProperty, newKey);
+                updatedValues = setIn(updatedValues, orderProperty, newKey) as Record<string, unknown>;
             }
         }
 
         // Update column if it changed
         if (isColumnChange) {
-            updatedValues = setIn(updatedValues, columnProperty, moveInfo.targetColumn);
+            updatedValues = setIn(updatedValues, columnProperty, moveInfo.targetColumn) as Record<string, unknown>;
         }
 
         // Apply optimistic UI update to boardDataController's internal state

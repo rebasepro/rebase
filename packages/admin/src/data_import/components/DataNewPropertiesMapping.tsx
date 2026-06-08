@@ -143,7 +143,7 @@ export function DataNewPropertiesMapping({
                                             defaultValue={getIn(importConfig.defaultValues, key)}
                                             onValueChange={(value) => {
                                                 const newValues = setIn(importConfig.defaultValues, key, value);
-                                                importConfig.setDefaultValues(newValues);
+                                                importConfig.setDefaultValues(newValues as Record<string, any>);
                                             }}/>
                                     </TableCell>
                                 </TableRow>;

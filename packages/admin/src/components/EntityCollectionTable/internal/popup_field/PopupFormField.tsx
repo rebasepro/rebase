@@ -248,7 +248,7 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
             if (!validationSchema) return {};
             const result = await validationSchema.safeParseAsync(values);
             if (result.success) return {};
-            return zodToFormErrors(result.error);
+            return zodToFormErrors(result.error) as Record<string, string>;
         },
         validateOnInitialRender: true,
         onSubmit: (values, actions) => {

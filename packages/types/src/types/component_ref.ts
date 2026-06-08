@@ -37,7 +37,7 @@ export interface LazyComponentRef<P = unknown> {
  *
  * @group Types
  */
-export type ComponentRef<P = unknown> =
+export type ComponentRef<P = any> =
     | React.ComponentType<P>
     | LazyComponentRef<P>
     | (() => Promise<{ default: React.ComponentType<P> }>)

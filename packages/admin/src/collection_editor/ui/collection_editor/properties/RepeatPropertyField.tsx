@@ -33,8 +33,8 @@ export function RepeatPropertyField({
     } = useFormex<ArrayProperty>();
 
     const [propertyDialogOpen, setPropertyDialogOpen] = useState(false);
-    const ofProperty = getIn(values, "of");
-    const ofPropertyError = getIn(touched, "of") && getIn(errors, "of");
+    const ofProperty = getIn(values, "of") as Property | undefined;
+    const ofPropertyError = (getIn(touched, "of") && getIn(errors, "of")) as string | undefined;
 
     const onPropertyChanged = ({ id, property, namespace }:
         { id?: string, property: Property, namespace?: string }) => {

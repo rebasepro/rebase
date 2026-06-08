@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { getIn, useFormex } from "@rebasepro/formex";
 import { useSnackbarController, useTranslation } from "@rebasepro/core";
-import { EnumValueConfig } from "@rebasepro/types";
+import { EnumValueConfig, EnumValues } from "@rebasepro/types";
 import { resolveEnumValues } from "@rebasepro/common";
 import { Select, SelectItem } from "@rebasepro/ui";
 import { EnumForm } from "../EnumForm";
@@ -39,9 +39,9 @@ export function EnumPropertyField({
 
     const enumValuesPath = multiselect ? "of.enum" : "enum";
 
-    const defaultValue = getIn(values, "defaultValue");
+    const defaultValue = getIn(values, "defaultValue") as string | number | undefined;
 
-    const valuesEnumValues = getIn(values, enumValuesPath);
+    const valuesEnumValues = getIn(values, enumValuesPath) as EnumValues | undefined;
     const enumValues: EnumValueConfig[] = useMemo(() => {
         if (!valuesEnumValues || typeof valuesEnumValues === "boolean")
             return [] as EnumValueConfig[];
@@ -81,7 +81,7 @@ export function EnumPropertyField({
                     }}
                     getData={getData && fullPropertyPath
                         ? () => getData()
-                            .then(res => res.map(entry => getIn(entry, fullPropertyPath)).filter(Boolean))
+                            .then(res => res.map(entry => getIn(entry, fullPropertyPath) as string).filter(Boolean))
                         : undefined}
                     onValuesChanged={onValuesChanged}/>
             </div>
@@ -108,7 +108,7 @@ export function EnumPropertyField({
                         setFieldValue("defaultValue", value);
                     }}
                     label={t("default_value")}
-                    value={defaultValue ?? ""}>
+                    value={defaultValue?.toString() ?? ""}>
                     {enumValues
                         .filter((enumValue) => Boolean(enumValue?.id))
                         .map((enumValue) => (

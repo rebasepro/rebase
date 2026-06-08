@@ -15,12 +15,12 @@ export function NumberPropertyField({ disabled }: {
     const { t } = useTranslation();
 
     const columnTypePath = "columnType";
-    const columnTypeValue: string | undefined = getIn(values, columnTypePath);
-    const columnTypeError: string | undefined = getIn(touched, columnTypePath) && getIn(errors, columnTypePath);
+    const columnTypeValue: string | undefined = getIn(values, columnTypePath) as string | undefined;
+    const columnTypeError: string | undefined = (getIn(touched, columnTypePath) && getIn(errors, columnTypePath)) as string | undefined;
 
     const isIdPath = "isId";
-    const isIdValue: string | boolean | undefined = getIn(values, isIdPath);
-    const isIdError: string | undefined = getIn(touched, isIdPath) && getIn(errors, isIdPath);
+    const isIdValue: string | boolean | undefined = getIn(values, isIdPath) as string | boolean | undefined;
+    const isIdError: string | undefined = (getIn(touched, isIdPath) && getIn(errors, isIdPath)) as string | undefined;
 
     return (
         <>
@@ -109,7 +109,7 @@ export function NumberPropertyField({ disabled }: {
                         setFieldValue("defaultValue", e.target.value === "" ? undefined : parseFloat(e.target.value));
                     }}
                     label={t("default_value")}
-                    value={getIn(values, "defaultValue") ?? ""}/>
+                    value={(getIn(values, "defaultValue") as string | number | undefined) ?? ""}/>
 
             </div>
         </>

@@ -60,7 +60,7 @@ export function ReferenceFilterField({
 
     const [fieldOperation, fieldValue] = value || [possibleOperations[0], undefined];
     const [operation, setOperation] = useState<VirtualTableWhereFilterOp>(fieldOperation);
-    const [internalValue, setInternalValue] = useState<EntityReference | EntityReference[] | undefined | null>(fieldValue);
+    const [internalValue, setInternalValue] = useState<EntityReference | EntityReference[] | undefined | null>(fieldValue as EntityReference | EntityReference[] | undefined | null);
 
     const selectedEntityIds = internalValue
         ? (Array.isArray(internalValue) ? internalValue.map((ref) => {

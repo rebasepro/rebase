@@ -46,7 +46,7 @@ export function DateTimeFilterField({
 
     const [fieldOperation, fieldValue] = value || [possibleOperations[0], undefined];
     const [operation, setOperation] = useState<VirtualTableWhereFilterOp | "is-null">(fieldOperation === "==" && fieldValue === null ? "is-null" : fieldOperation);
-    const [internalValue, setInternalValue] = useState<Date | null | undefined>(fieldValue);
+    const [internalValue, setInternalValue] = useState<Date | null | undefined>(fieldValue as Date | null | undefined);
 
     const isNullOperation = operation === "is-null";
 

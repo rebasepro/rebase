@@ -49,7 +49,7 @@ export function StringPropertyValidation({
     const matchesError = getIn(errors, validationMatches);
 
     const matchesValue = getIn(values, validationMatches);
-    const matchesStringValue = typeof matchesValue === "string" ? matchesValue : serializeRegExp(matchesValue);
+    const matchesStringValue = typeof matchesValue === "string" ? matchesValue : serializeRegExp(matchesValue as RegExp);
     return (
         <div className={"grid grid-cols-12 gap-2"}>
 
@@ -101,7 +101,7 @@ export function StringPropertyValidation({
             <div className={"grid grid-cols-12 gap-2 col-span-12"}>
                 {length && <div className={"col-span-4"}>
                     <DebouncedTextField
-                        value={getIn(values, validationLength)}
+                        value={getIn(values, validationLength) as number | undefined}
                         label={t("exact_length")}
                         name={validationLength}
                         type="number"
@@ -112,7 +112,7 @@ export function StringPropertyValidation({
                 </div>}
 
                 {min && <div className={"col-span-4"}>
-                    <DebouncedTextField value={getIn(values, validationMin)}
+                    <DebouncedTextField value={getIn(values, validationMin) as number | undefined}
                         label={t("min_length")}
                         name={validationMin}
                         type="number"
@@ -123,7 +123,7 @@ export function StringPropertyValidation({
                 </div>}
 
                 {max && <div className={"col-span-4"}>
-                    <DebouncedTextField value={getIn(values, validationMax)}
+                    <DebouncedTextField value={getIn(values, validationMax) as number | undefined}
                         label={t("max_length")}
                         name={validationMax}
                         type="number"

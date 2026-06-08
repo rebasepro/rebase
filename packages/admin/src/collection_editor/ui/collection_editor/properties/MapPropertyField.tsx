@@ -53,7 +53,7 @@ export function MapPropertyField({ disabled, getData, allowDataInference, proper
         const propertiesPath = idToPropertiesPath(fullId);
         const propertiesOrderPath = namespaceToPropertiesOrderPath(namespace);
 
-        const currentPropertiesOrder: string[] = getIn(values, propertiesOrderPath) ?? Object.keys(getIn(values, namespaceToPropertiesPath(namespace)));
+        const currentPropertiesOrder: string[] = (getIn(values, propertiesOrderPath) as string[] | undefined) ?? Object.keys(getIn(values, namespaceToPropertiesPath(namespace)) as object ?? {});
 
         setFieldValue(propertiesPath, undefined, false);
         setFieldValue(propertiesOrderPath, currentPropertiesOrder.filter((p) => p !== propertyKey), false);
@@ -139,7 +139,7 @@ export function MapPropertyField({ disabled, getData, allowDataInference, proper
                 onDelete={deleteProperty}
                 propertyKey={selectedPropertyKey}
                 propertyNamespace={selectedPropertyNamespace}
-                property={selectedProperty}
+                property={selectedProperty as Property | undefined}
                 existingProperty={Boolean(selectedPropertyKey)}
                 autoUpdateId={!selectedPropertyKey}
                 autoOpenTypeSelect={!selectedPropertyKey}

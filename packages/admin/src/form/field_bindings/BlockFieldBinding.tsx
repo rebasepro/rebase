@@ -169,7 +169,7 @@ function BlockEntry({
                         storeProps
                     }: BlockEntryProps) {
 
-    const type = value && value[typeField];
+    const type = value && (value[typeField] as string | undefined);
     const [typeInternal, setTypeInternal] = useState<string | undefined>(type ?? undefined);
 
     const formex = useFormex();

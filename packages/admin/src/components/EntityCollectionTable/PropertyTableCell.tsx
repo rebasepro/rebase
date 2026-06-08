@@ -1,4 +1,4 @@
-import { useCellSelected } from "../SelectableTable/SelectionStore";
+import { useCellSelected, createSelectionStore } from "../SelectableTable/SelectionStore";
 import type { ArrayProperty, NumberProperty, Property, ReferenceProperty, StringProperty } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { deepEqual as equal } from "fast-equals"
@@ -76,7 +76,9 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
             setPopupCell
         } = useSelectableTableController();
 
-        const selected = useCellSelected(selectionStore, propertyKey, entity.path, entity.id);
+        const dummySelectionStore = useMemo(() => createSelectionStore(), []);
+        const activeSelectionStore = selectionStore || dummySelectionStore;
+        const selected = useCellSelected(activeSelectionStore, propertyKey, entity.path, entity.id);
 
         const [internalValue, setInternalValue] = useState<any | null>(value);
         const internalValueRef = useRef(value);
@@ -120,7 +122,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
             const result = await validation.safeParseAsync(value);
             if (result.success) {
                     setValidationError(undefined);
-                    internalValueRef.current = value;
+                    internalValueRef.current = value as T;
                     if (onValueChange) {
                         try {
                             onValueChange({

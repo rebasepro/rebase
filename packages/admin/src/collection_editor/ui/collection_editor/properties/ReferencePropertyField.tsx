@@ -34,8 +34,8 @@ export function ReferencePropertyField({
         </div>;
 
     const pathPath = asString ? "reference.slug" : (multiple ? "of.slug" : "path");
-    const pathValue: string | undefined = getIn(values, pathPath);
-    const pathError: string | undefined = showErrors && getIn(errors, pathPath);
+    const pathValue: string | undefined = getIn(values, pathPath) as string | undefined;
+    const pathError: string | undefined = (showErrors && getIn(errors, pathPath)) as string | undefined;
 
     return (
         <>

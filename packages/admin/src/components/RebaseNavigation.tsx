@@ -13,11 +13,11 @@ import {
     CustomizationControllerContext
 } from "@rebasepro/core";
 import { CircularProgressCenter } from "@rebasepro/ui";
-import type { AppView, CollectionEditorOptions, EntityCustomView, EntityAction, EntityCollection } from "@rebasepro/types";
+import type { AppView, CollectionEditorOptions, EntityCustomView, EntityAction, EntityCollection, RebasePlugin } from "@rebasepro/types";
 import type { CollectionRegistryController } from "@rebasepro/types";
 import type { UrlController, NavigationStateController } from "@rebasepro/types";
 
-const EMPTY_PLUGINS: unknown[] = [];
+const EMPTY_PLUGINS: RebasePlugin[] = [];
 const EMPTY_COLLECTIONS: EntityCollection[] = [];
 
 import { useBuildNavigationStateController } from "../hooks/navigation/useBuildNavigationStateController";

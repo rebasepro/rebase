@@ -44,7 +44,7 @@ export function extractTouchedValues(values: unknown, touched: Record<string, bo
 
     Object.entries(touched).forEach(([key, value]) => {
         if (value) {
-            acc = setIn(acc, key, getIn(values, key));
+            acc = setIn(acc, key, getIn(values, key)) as Record<string, unknown>;
         }
     })
 
@@ -281,7 +281,7 @@ export function EntityForm<M extends Record<string, unknown>>({
         return cleaned;
     }, [localChangesDataRaw, initialValues]);
 
-    const hasLocalChanges = !localChangesCleared && localChangesData && Object.keys(localChangesData).length > 0;
+    const hasLocalChanges = !localChangesCleared && !!localChangesData && Object.keys(localChangesData as object).length > 0;
 
     const internalFormex = useCreateFormex<M>({
         initialValues: initialValues as M,
@@ -737,14 +737,14 @@ export function EntityForm<M extends Record<string, unknown>>({
         entity={entity}
         layout={forceActionsAtTheBottom ? "bottom" : "responsive"}
         savingError={savingError}
-        formex={formex}
+        formex={formex as any}
         disabled={actionsDisabled}
         status={status}
         pluginActions={pluginFormActions ?? []}
         openEntityMode={openEntityMode}
         showDefaultActions={showDefaultActions}
         navigateBack={navigateBack}
-        formContext={formContext}
+        formContext={formContext as any}
     />;
 
     return (
@@ -844,18 +844,18 @@ export function getInitialEntityValues<M extends Record<string, unknown>>(
     }
 }
 
-export function zodToFormErrors(zodError: z.ZodError): Record<string, unknown> {
-    let errors: Record<string, unknown> = {};
+export function zodToFormErrors(zodError: z.ZodError): Record<string, string> {
+    let errors: Record<string, string> = {};
     for (const issue of zodError.issues) {
         const path = issue.path.join(".");
         if (path && !getIn(errors, path)) {
-            errors = setIn(errors, path, issue.message);
+            errors = setIn(errors, path, issue.message) as Record<string, string>;
         }
     }
     return errors;
 }
 
-function useOnAutoSave(autoSave: undefined | boolean, formex: FormexController<Record<string, unknown>>, lastSavedValues: React.MutableRefObject<unknown>, save: (values: EntityValues<Record<string, unknown>>) => Promise<Entity<Record<string, unknown>> | void>) {
+function useOnAutoSave(autoSave: undefined | boolean, formex: FormexController<any>, lastSavedValues: React.MutableRefObject<any>, save: (values: EntityValues<any>) => Promise<Entity<any> | void>) {
     useEffect(() => {
         if (!autoSave) return;
         if (formex.values && !equal(formex.values, lastSavedValues.current)) {

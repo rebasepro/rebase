@@ -79,7 +79,7 @@ export function StorageUploadFieldBinding({
         path: context.path,
         property,
         propertyKey,
-        value: value as string | string[] | null | undefined,
+        value: value as string | string[] | null,
         storageSource,
         disabled: disabled ?? false,
         onChange: setValue
@@ -87,7 +87,7 @@ export function StorageUploadFieldBinding({
 
     useClearRestoreValue<string | string[]>({
         property,
-        value: value as string | string[] | null | undefined,
+        value: value as string | string[] | null,
         setValue
     });
 

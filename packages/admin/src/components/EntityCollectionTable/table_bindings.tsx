@@ -101,7 +101,7 @@ export function getTableBindingForProperty(
                     property={property as StringProperty | ArrayProperty}
                     entity={entity}
                     path={path}
-                    value={internalValue}
+                    value={internalValue as string | string[] | null}
                     previewSize={getPreviewSizeFrom(size)}
                     updateValue={updateValue}
                     propertyKey={propertyKey}

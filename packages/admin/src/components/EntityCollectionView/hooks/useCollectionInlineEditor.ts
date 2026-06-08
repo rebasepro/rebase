@@ -43,7 +43,7 @@ export function useCollectionInlineEditor<M extends Record<string, unknown>>({
         data: entity
     }) => {
 
-        const updatedValues = setIn({}, propertyKey, value);
+        const updatedValues = setIn({}, propertyKey, value) as Partial<Record<string, unknown>>;
 
         const saveProps: SaveEntityProps = {
             path: entity.path ?? path,

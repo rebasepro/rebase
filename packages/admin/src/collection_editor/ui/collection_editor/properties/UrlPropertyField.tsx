@@ -15,7 +15,8 @@ export function UrlPropertyField({
 
     const { values, setFieldValue } = useFormex();
 
-    const urlValue = getIn(values, "url");
+    const urlRawValue = getIn(values, "url");
+    const urlValue = typeof urlRawValue === "string" ? urlRawValue : "[NONE]";
 
     return (
         <>
@@ -82,7 +83,7 @@ export function UrlPropertyField({
                         setFieldValue("defaultValue", e.target.value === "" ? undefined : e.target.value);
                     }}
                     label={"Default value"}
-                    value={getIn(values, "defaultValue") ?? ""}/>
+                    value={(getIn(values, "defaultValue") as string | undefined) ?? ""}/>
 
             </div>
         </>

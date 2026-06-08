@@ -269,7 +269,7 @@ function MapKeyValueRow<T extends Record<string, unknown>>({
             return <TextField
                 key={type}
                 placeholder={"value"}
-                value={entryValue}
+                value={entryValue as string | number | undefined}
                 type={type === "number" ? "number" : "text"}
                 size={"medium"}
                 disabled={disabled || !fieldKey}
@@ -300,7 +300,7 @@ function MapKeyValueRow<T extends Record<string, unknown>>({
                     }
                 }}/>;
         } else if (type === "date") {
-            return <DateTimeField value={entryValue}
+            return <DateTimeField value={entryValue as Date | null | undefined}
                                   size={"medium"}
                                   locale={locale}
                                   disabled={disabled || !fieldKey}
@@ -311,7 +311,7 @@ function MapKeyValueRow<T extends Record<string, unknown>>({
                                       });
                                   }}/>;
         } else if (type === "boolean") {
-            return <BooleanSwitchWithLabel value={entryValue}
+            return <BooleanSwitchWithLabel value={entryValue as boolean | null}
                                            size={"medium"}
                                            position={"start"}
                                            disabled={disabled || !fieldKey}
@@ -322,9 +322,10 @@ function MapKeyValueRow<T extends Record<string, unknown>>({
                                                });
                                            }}/>;
         } else if (type === "array") {
+            const arrayValue = (entryValue as string[]) || [];
             return <div
                 className={cls(defaultBorderMixin, "ml-2 pl-2 border-l border-solid")}>
-                <ArrayContainer value={entryValue}
+                <ArrayContainer value={arrayValue}
                                 newDefaultEntry={""}
                                 droppableId={rowId.toString()}
                                 addLabel={fieldKey ? t("add_to_field", { fieldName: fieldKey }) : t("add")}
@@ -344,10 +345,10 @@ function MapKeyValueRow<T extends Record<string, unknown>>({
                                     return <ArrayKeyValueRow
                                         index={index}
                                         id={internalId}
-                                        value={entryValue[index]}
+                                        value={arrayValue[index]}
                                         disabled={disabled || !fieldKey}
                                         setValue={(newValue) => {
-                                            const newArrayValue = [...entryValue];
+                                            const newArrayValue = [...arrayValue] as any[];
                                             newArrayValue[index] = newValue;
                                             setValue({
                                                 ...value,
@@ -360,7 +361,7 @@ function MapKeyValueRow<T extends Record<string, unknown>>({
         } else if (type === "map") {
             return <div
                 className={cls(defaultBorderMixin, "ml-2 pl-2 border-l border-solid")}>
-                <MapEditView value={entryValue}
+                <MapEditView value={entryValue as Record<string, unknown> | undefined}
                              fieldName={fieldKey}
                              setValue={(updatedValue) => {
                                  setValue({
@@ -456,7 +457,7 @@ function ArrayKeyValueRow<T>({
 
     function buildInput(entryValue: unknown, type: DataType) {
         if (type === "string" || type === "number") {
-            return <TextField value={entryValue}
+            return <TextField value={entryValue as string | number | undefined}
                               type={type === "number" ? "number" : "text"}
                               size={"medium"}
                               onChange={(event) => {
@@ -474,14 +475,14 @@ function ArrayKeyValueRow<T>({
                                   }
                               }}/>;
         } else if (type === "date") {
-            return <DateTimeField value={entryValue}
+            return <DateTimeField value={entryValue as Date | null | undefined}
                                   size={"medium"}
                                   locale={locale}
                                   onChange={(date) => {
                                       setValue(date as T);
                                   }}/>;
         } else if (type === "boolean") {
-            return <BooleanSwitchWithLabel value={entryValue}
+            return <BooleanSwitchWithLabel value={entryValue as boolean | null}
                                            size={"small"}
                                            position={"start"}
                                            onValueChange={(v) => {
@@ -492,10 +493,11 @@ function ArrayKeyValueRow<T>({
                 Arrays of arrays are not supported.
             </Typography>;
         } else if (type === "map") {
+            const mapValue = (entryValue && typeof entryValue === "object") ? (entryValue as Record<string, unknown>) : undefined;
             return <div className={cls(defaultBorderMixin, "ml-2 pl-2 border-l border-solid")}>
-                <MapEditView value={entryValue}
+                <MapEditView value={mapValue}
                              setValue={(updatedValue) => {
-                                 setValue(updatedValue);
+                                 setValue(updatedValue as T | null);
                              }}/>
             </div>;
         } else {

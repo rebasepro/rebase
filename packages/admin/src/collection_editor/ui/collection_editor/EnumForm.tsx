@@ -335,7 +335,7 @@ function EnumEntryDialog({
         errors
     } = useFormex<EnumValues>();
 
-    const idError = index !== undefined ? getIn(errors, `${enumValuesPath}[${index}].id`) : undefined;
+    const idError = index !== undefined ? getIn(errors, `${enumValuesPath}[${index}].id`) as string | undefined : undefined;
     return <Dialog
         maxWidth="md"
         aria-labelledby="enum-edit-dialog"

@@ -61,16 +61,16 @@ export function StoragePropertyField({
     const imageResizeFormat = `${imageResize}.format`;
     const imageResizeQuality = `${imageResize}.quality`;
 
-    const fileNameValue = getIn(values, fileName) ?? "{rand}_{file}";
-    const storagePathValue = getIn(values, storagePath) ?? "/";
-    const maxSizeValue = getIn(values, maxSize);
+    const fileNameValue = (getIn(values, fileName) as string | undefined) ?? "{rand}_{file}";
+    const storagePathValue = (getIn(values, storagePath) as string | undefined) ?? "/";
+    const maxSizeValue = getIn(values, maxSize) as number | undefined;
 
     // Image resize values
-    const imageResizeMaxWidthValue = getIn(values, imageResizeMaxWidth);
-    const imageResizeMaxHeightValue = getIn(values, imageResizeMaxHeight);
-    const imageResizeModeValue = getIn(values, imageResizeMode) ?? "cover";
-    const imageResizeFormatValue = getIn(values, imageResizeFormat) ?? "original";
-    const imageResizeQualityValue = getIn(values, imageResizeQuality);
+    const imageResizeMaxWidthValue = getIn(values, imageResizeMaxWidth) as number | undefined;
+    const imageResizeMaxHeightValue = getIn(values, imageResizeMaxHeight) as number | undefined;
+    const imageResizeModeValue = (getIn(values, imageResizeMode) as string | undefined) ?? "cover";
+    const imageResizeFormatValue = (getIn(values, imageResizeFormat) as string | undefined) ?? "original";
+    const imageResizeQualityValue = getIn(values, imageResizeQuality) as number | undefined;
 
     const storedValue = getIn(values, acceptedFiles);
     const fileTypesValue: string[] | undefined = Array.isArray(storedValue) ? storedValue : undefined;

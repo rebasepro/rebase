@@ -41,15 +41,15 @@ export function MarkdownPropertyField({
     const htmlPath = `${baseMarkdownPath}.html`;
     const transformPastedTextPath = `${baseMarkdownPath}.transformPastedText`;
 
-    const fileNameValue = getIn(values, fileName) ?? "{rand}_{file}";
-    const storagePathValue = getIn(values, storagePath) ?? "/";
+    const fileNameValue = (getIn(values, fileName) as string | undefined) ?? "{rand}_{file}";
+    const storagePathValue = (getIn(values, storagePath) as string | undefined) ?? "/";
     const maxSizeValue = getIn(values, maxSize);
 
     // Markdown config values - check if markdown is an object or boolean
     const markdownValue = getIn(values, "markdown");
     const isMarkdownObject = typeof markdownValue === "object" && markdownValue !== null;
-    const htmlValue = isMarkdownObject ? (markdownValue.html ?? true) : true;
-    const transformPastedTextValue = isMarkdownObject ? (markdownValue.transformPastedText ?? false) : false;
+    const htmlValue = isMarkdownObject ? (((markdownValue as Record<string, unknown>).html as boolean | undefined) ?? true) : true;
+    const transformPastedTextValue = isMarkdownObject ? (((markdownValue as Record<string, unknown>).transformPastedText as boolean | undefined) ?? false) : false;
 
     const hasFilenameCallback = typeof fileNameValue === "function";
     const hasStoragePathCallback = typeof storagePathValue === "function";
@@ -209,7 +209,7 @@ export function MarkdownPropertyField({
                         setFieldValue("defaultValue", e.target.value === "" ? undefined : e.target.value);
                     }}
                     label={t("default_value")}
-                    value={getIn(values, "defaultValue") ?? ""}/>
+                    value={(getIn(values, "defaultValue") as string | undefined) ?? ""}/>
 
             </div>
         </>

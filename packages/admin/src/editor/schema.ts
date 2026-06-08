@@ -325,7 +325,7 @@ const nodes: { [key: string]: NodeSpec } = {
                 getFromDOM(dom: HTMLElement) {
                     return dom.style.backgroundColor || null
                 },
-                setDOMAttr(value: unknown, attrs: Record<string, string>) {
+                setDOMAttr(value: unknown, attrs: any) {
                     if (value && typeof value === "string") attrs.style = (attrs.style || "") + `background-color: ${value};`
                 }
             }

@@ -52,7 +52,7 @@ export function GeneralPropertyValidation({ disabled }: {
             {getIn(values, validationRequired) && <div className={"col-span-12"}>
                 <DebouncedTextField
                     disabled={disabled}
-                    value={getIn(values, validationRequiredMessage)}
+                    value={getIn(values, validationRequiredMessage) as string | undefined}
                     label={t("required_message")}
                     name={validationRequiredMessage}
                     size="small"

@@ -35,13 +35,13 @@ export const CommonPropertyFields = React.forwardRef<HTMLDivElement, CommonPrope
         const { t } = useTranslation();
 
         const name = "name";
-        const nameError = showErrors && getIn(errors, name);
+        const nameError = showErrors && (getIn(errors, name) as string | undefined);
 
         const id = "id";
-        const idError = showErrors && getIn(errors, id);
+        const idError = showErrors && (getIn(errors, id) as string | undefined);
 
         const description = "description";
-        const descriptionError = showErrors && getIn(errors, description);
+        const descriptionError = showErrors && (getIn(errors, description) as string | undefined);
 
         return (
             <div className={"flex flex-col gap-2 col-span-12"}>

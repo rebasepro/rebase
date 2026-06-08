@@ -1,6 +1,6 @@
 import type { AdditionalFieldDelegate } from "@rebasepro/types";
 import React, { useCallback, useMemo, useRef } from "react";
-import { CollectionSize, Entity, RebaseContext, User } from "@rebasepro/types";
+import { CollectionSize, Entity, RebaseContext, User, Property } from "@rebasepro/types";
 import { PropertyTableCell } from "./PropertyTableCell";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { useRebaseContext, useLargeLayout } from "@rebasepro/core";
@@ -138,11 +138,12 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
 
         const propertyKey = column.key;
 
-        let disabled = column.custom?.disabled;
+        const columnCustom = column.custom as { disabled?: boolean; resolvedProperty?: Property } | undefined;
+        let disabled: boolean = columnCustom?.disabled ?? false;
         const property = getPropertyFor?.({
             propertyKey,
             entity
-        }) ?? column.custom.resolvedProperty;
+        }) ?? columnCustom?.resolvedProperty;
         if (!property?.ui?.disabled) {
             disabled = false;
         }
@@ -231,7 +232,7 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
                 disabledTooltip={"This column can't be edited directly"}
                 sortableNodeRef={sortableNodeRef}
                 sortableStyle={sortableStyle}
-                sortableAttributes={sortableAttributes}
+                sortableAttributes={sortableAttributes as Record<string, string | number | undefined>}
                 isDragging={isDragging}
                 isDraggable={isDraggable}
                 frozen={frozen}
@@ -337,7 +338,7 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
                 disabled={true}
                 sortableNodeRef={props.sortableNodeRef}
                 sortableStyle={props.sortableStyle}
-                sortableAttributes={props.sortableAttributes}
+                sortableAttributes={props.sortableAttributes as Record<string, string | number | undefined>}
                 isDragging={props.isDragging}
                 isDraggable={props.isDraggable}
                 frozen={props.frozen}>

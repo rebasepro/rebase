@@ -1,12 +1,12 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { useProseMirrorContext } from "../hooks/useProseMirrorContext";
-import { autoUpdate, computePosition, flip, offset, shift, type VirtualElement } from "@floating-ui/dom";
+import { autoUpdate, computePosition, flip, offset, shift, type VirtualElement, type Placement } from "@floating-ui/dom";
 import { NodeSelection } from "prosemirror-state";
 import { TextField, defaultBorderMixin, Typography, cls } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/core";
 
 export interface ImageBubbleProps {
-    options?: { placement?: string; offset?: number };
+    options?: { placement?: Placement; offset?: number };
     className?: string;
 }
 

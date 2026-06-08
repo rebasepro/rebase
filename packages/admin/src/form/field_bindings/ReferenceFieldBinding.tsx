@@ -106,7 +106,7 @@ function ReferenceFieldBindingInternal({
 
             {collection && <>
 
-                {value && <ReferencePreview
+                {refValue && <ReferencePreview
                     disabled={!property.path}
                     previewProperties={property.ui?.previewProperties}
                     hover={!disabled}
@@ -117,7 +117,7 @@ function ReferenceFieldBindingInternal({
                     includeId={property.includeId}
                 />}
 
-                {!value && <div className="justify-center text-left">
+                {!refValue && <div className="justify-center text-left">
                     <EntityPreviewContainer className={cls("px-6 h-16 text-sm font-medium flex items-center gap-6",
                         disabled || isSubmitting
                             ? "text-surface-accent-500"

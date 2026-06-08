@@ -43,7 +43,7 @@ export type SelectionStore = ReturnType<typeof createSelectionStore>;
  * `selected` boolean actually changes (not on every store update).
  */
 export function useCellSelected(
-    store: SelectionStore,
+    store: { getSnapshot: () => SelectedCellProps<any> | undefined; subscribe: (listener: () => void) => () => void },
     propertyKey: string,
     entityPath: string,
     entityId: string | number

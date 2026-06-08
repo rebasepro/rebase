@@ -243,11 +243,11 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
                 ref={ref}>
 
                 <VirtualTable
-                    data={data}
+                    data={data as any}
                     columns={columns}
                     // @ts-ignore
                     cellRenderer={cellRenderer}
-                    onRowClick={inlineEditing ? undefined : (onEntityClick ? onRowClick : undefined)}
+                    onRowClick={inlineEditing ? undefined : (onEntityClick ? (onRowClick as any) : undefined)}
                     onEndReached={loadNextPage}
                     onResetPagination={resetPagination}
                     error={dataLoadingError}
@@ -262,8 +262,8 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
                     initialScroll={initialScroll}
                     onScroll={onScroll}
                     checkFilterCombination={checkFilterCombination}
-                    createFilterField={filterable ? createFilterField : undefined}
-                    rowClassName={useCallback((entity: Entity<M>) => {
+                    createFilterField={filterable ? (createFilterField as any) : undefined}
+                    rowClassName={useCallback((entity: any) => {
                         return highlightedRow?.(entity) ? "bg-surface-accent-50 dark:!bg-surface-accent-900" : "";
                     }, [highlightedRow])}
                     className="grow"
@@ -287,16 +287,13 @@ function createFilterField({
     column,
     hidden,
     setHidden
-}: FilterFormFieldProps<{
-    resolvedProperty: Property,
-    disabled: boolean,
-}>): React.ReactNode {
+}: FilterFormFieldProps<any>): React.ReactNode {
 
     if (!column.custom) {
         return null;
     }
 
-    const { resolvedProperty } = column.custom;
+    const { resolvedProperty } = column.custom as { resolvedProperty?: Property };
 
     const isArray = resolvedProperty?.type === "array";
     const ofVal = isArray && resolvedProperty ? resolvedProperty.of : undefined;
@@ -316,7 +313,7 @@ function createFilterField({
             hidden={hidden}
             setHidden={setHidden}/>;
     } else if (baseProperty.type === "relation" && baseProperty.relation) {
-        return <RelationFilterField value={filterValue}
+        return <RelationFilterField value={filterValue as any}
             setValue={setFilterValue}
             name={id as string}
             relation={baseProperty.relation}
@@ -350,7 +347,7 @@ function createFilterField({
     }
 
     return (
-        <div>{`Currently the filter field ${resolvedProperty.type} is not supported`}</div>
+        <div>{`Currently the filter field ${resolvedProperty?.type} is not supported`}</div>
     );
 }
 
