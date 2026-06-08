@@ -131,3 +131,95 @@ export const strictAuthLimiter = createRateLimiter({
     limit: 50,
     message: "Too many requests to this sensitive endpoint, please try again later."
 });
+
+/**
+ * Key generator for API-key-based rate limiting.
+ *
+ * Uses the API key ID (from `c.get("apiKey")`) as the rate limit key.
+ * Falls back to IP-based keying when the request is not authenticated
+ * via an API key.
+ */
+export function apiKeyKeyGenerator(c: Parameters<MiddlewareHandler<HonoEnv>>[0]): string {
+    const apiKey = c.get("apiKey") as { id: string } | undefined;
+    if (apiKey) {
+        return `api-key:${apiKey.id}`;
+    }
+    return defaultKeyGenerator(c);
+}
+
+/**
+ * Create a rate limiter specifically for API key requests.
+ *
+ * When a request is authenticated via an API key that has a `rate_limit`
+ * configured, this limiter enforces per-key limits using the key's ID
+ * as the rate limit bucket.
+ *
+ * @param defaultLimit - Fallback limit when the key has no `rate_limit` set.
+ * @param windowMs     - Time window in milliseconds (default: 15 minutes).
+ */
+export function createApiKeyRateLimiter(
+    defaultLimit = 1000,
+    windowMs = 15 * 60 * 1000,
+): MiddlewareHandler<HonoEnv> {
+    // We maintain a single shared store keyed by API key ID.
+    // The actual limit is resolved per-request from the key's metadata.
+    const store = new Map<string, { timestamps: number[] }>();
+
+    const cleanupInterval = setInterval(() => {
+        const now = Date.now();
+        for (const [key, entry] of store.entries()) {
+            entry.timestamps = entry.timestamps.filter(t => now - t < windowMs);
+            if (entry.timestamps.length === 0) {
+                store.delete(key);
+            }
+        }
+    }, windowMs);
+
+    if (cleanupInterval.unref) {
+        cleanupInterval.unref();
+    }
+
+    return async (c, next) => {
+        const apiKey = c.get("apiKey") as { id: string; rate_limit: number | null } | undefined;
+        if (!apiKey) {
+            // Not an API key request — skip this limiter
+            return next();
+        }
+
+        const limit = apiKey.rate_limit ?? defaultLimit;
+        const key = `api-key:${apiKey.id}`;
+        const now = Date.now();
+
+        let entry = store.get(key);
+        if (!entry) {
+            entry = { timestamps: [] };
+            store.set(key, entry);
+        }
+
+        entry.timestamps = entry.timestamps.filter(t => now - t < windowMs);
+
+        if (entry.timestamps.length >= limit) {
+            const retryAfterMs = entry.timestamps[0] + windowMs - now;
+            const retryAfterSec = Math.ceil(retryAfterMs / 1000);
+
+            c.header("Retry-After", String(retryAfterSec));
+            c.header("X-RateLimit-Limit", String(limit));
+            c.header("X-RateLimit-Remaining", "0");
+            c.header("X-RateLimit-Reset", String(Math.ceil((now + retryAfterMs) / 1000)));
+
+            return c.json({
+                error: {
+                    message: "API key rate limit exceeded, please try again later.",
+                    code: "RATE_LIMITED"
+                }
+            }, 429);
+        }
+
+        entry.timestamps.push(now);
+
+        c.header("X-RateLimit-Limit", String(limit));
+        c.header("X-RateLimit-Remaining", String(limit - entry.timestamps.length));
+
+        return next();
+    };
+}

@@ -34,7 +34,7 @@ export function ArrayPropertyPreview({
         authController
     });
 
-    const values = value;
+    const values = value as unknown[];
 
     if (!values) return null;
 
@@ -43,7 +43,7 @@ export function ArrayPropertyPreview({
     return (
         <div className="w-full flex flex-col gap-2">
             {values &&
-                values.map((value: any, index: number) => {
+                values.map((val, index: number) => {
                     if (!resolvedProperties) {
                         throw Error("Property resolvedProperties is undefined");
                     }
@@ -56,7 +56,7 @@ export function ArrayPropertyPreview({
                                 <ErrorBoundary>
                                     <PropertyPreview
                                         propertyKey={propertyKey}
-                                        value={value}
+                                        value={val}
                                         property={of}
                                         size={childSize}/>
                                 </ErrorBoundary>

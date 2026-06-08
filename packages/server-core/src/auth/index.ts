@@ -35,7 +35,11 @@ export type { AuthModuleConfig } from "./routes";
 export { createAdminRoutes } from "./admin-routes";
 
 
-export { createRateLimiter, defaultAuthLimiter, strictAuthLimiter } from "./rate-limiter";
+export { createRateLimiter, defaultAuthLimiter, strictAuthLimiter, createApiKeyRateLimiter, apiKeyKeyGenerator } from "./rate-limiter";
+
+// API Keys
+export { createApiKeyStore, createApiKeyRoutes, isApiKeyToken, validateApiKey, httpMethodToOperation, isOperationAllowed } from "./api-keys";
+export type { ApiKey, ApiKeyMasked, ApiKeyPermission, ApiKeyWithSecret, CreateApiKeyRequest, UpdateApiKeyRequest, ApiKeyStore, ApiKeyOperation } from "./api-keys";
 
 // Auth Adapters
 export { createBuiltinAuthAdapter } from "./builtin-auth-adapter";

@@ -1,4 +1,4 @@
-import type { ArrayProperty, ReferenceProperty } from "@rebasepro/types";
+import type { ArrayProperty, ReferenceProperty, EntityReference } from "@rebasepro/types";
 import type { PropertyPreviewProps, PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { ReferencePreview } from "../components/ReferencePreview";
 
@@ -23,8 +23,8 @@ export function ArrayOfReferencesPreview({
 
     return (
         <div className="flex flex-col w-full">
-            {value &&
-                value.map((reference: any, index: number) => {
+            {value ?
+                (value as EntityReference[]).map((reference, index: number) => {
                     const ofProperty = property.of as ReferenceProperty;
                     return <div className="mt-1 mb-1 w-full"
                         key={`preview_array_ref_${propertyKey}_${index}`}>
@@ -38,7 +38,7 @@ export function ArrayOfReferencesPreview({
                         />
                     </div>;
                 }
-                )}
+                ) : null}
         </div>
     );
 }

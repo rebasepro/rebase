@@ -437,8 +437,8 @@ export const de = {
 
 
   // AI & Agents Section
-  "ai.badge": "Entkoppelte KI-Architektur",
-  "ai.title": "KI-Apps entwickeln, <span class=\"text-primary subtle-shimmer\">den Core sauber halten.</span>",
-  "ai.subtitle": "Entkopple deine KI-Funktionen von deiner Haupt-Codebasis. Rebase bietet die Vorlagen und Event-Pipelines, um LLM-Logik mühelos auf Postgres zu installieren, anzupassen und auszulösen.",
+  "ai.badge": "Agenten-Infrastruktur",
+  "ai.title": "Das Backend, das <span class=\"text-primary subtle-shimmer\">KI-Agenten brauchen.</span>",
+  "ai.subtitle": "Vektorsuche, Scoped API-Keys, benutzerdefinierte Funktionen, Echtzeit-Synchronisation und Cron-Jobs — alles, was deine KI-Agenten brauchen, um autonom auf deine Postgres-Daten zu lesen, zu schreiben und zu handeln.",
 };
 

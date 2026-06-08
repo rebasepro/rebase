@@ -25,9 +25,15 @@ export interface CreateRebaseClientOptions extends RebaseClientConfig {
 
 import { RebaseWebSocketClient } from "./websocket";
 import { RebaseClient as BaseRebaseClient, RebaseData, CollectionAccessor, StorageSource } from "@rebasepro/types";
+export type { Entity, FindResponse } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 
-export type RebaseClient<DB = Record<string, unknown>> = BaseRebaseClient<DB> & {
+type KebabToCamelCase<S extends string> =
+  S extends `${infer T}-${infer U}`
+    ? `${T}${Capitalize<KebabToCamelCase<U>>}`
+    : S;
+
+export type RebaseClient<DB = Record<string, unknown>> = Omit<BaseRebaseClient<DB>, "data"> & {
     setToken: (token: string | null) => void;
     setAuthTokenGetter: (getter: () => Promise<string | null>) => void;
     setOnUnauthorized: (handler: () => Promise<boolean>) => void;
@@ -39,15 +45,17 @@ export type RebaseClient<DB = Record<string, unknown>> = BaseRebaseClient<DB> & 
     ws?: RebaseWebSocketClient;
     storage?: StorageSource;
     call: <T = unknown>(endpoint: string, payload?: unknown) => Promise<T>;
-    data: RebaseData & {
-        collection<K extends keyof DB>(slug: Extract<K, string>): CollectionClient<
-            DB[K] extends { Row: infer R extends Record<string, unknown> } ? R : Record<string, unknown>
+    data: {
+        collection<S extends string>(slug: S): CollectionClient<
+            KebabToCamelCase<S> extends keyof DB
+                ? (DB[KebabToCamelCase<S>] extends { Row: infer R extends Record<string, unknown> } ? R : Record<string, unknown>)
+                : Record<string, unknown>
         >;
     } & {
         [K in keyof DB]: CollectionClient<
             DB[K] extends { Row: infer R extends Record<string, unknown> } ? R : Record<string, unknown>
         >;
-    };
+    } & RebaseData;
 };
 
 import { createStorage } from "./storage";

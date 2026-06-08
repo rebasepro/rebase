@@ -3,6 +3,8 @@ import { DataDriver, Entity, EntityCollection, FetchCollectionProps, DataHooks, 
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError } from "../errors";
 import { parseQueryOptions } from "./query-parser";
+import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
+import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
 
 
 /**
@@ -48,6 +50,27 @@ export class RestApiGenerator {
     }
 
     /**
+     * Check API key permissions for a collection operation.
+     * Throws 403 if the key doesn't have the required permission.
+     * No-ops if the request is not authenticated via an API key.
+     */
+    private enforceApiKeyPermission(
+        c: { get: (key: string) => unknown; req: { method: string } },
+        collectionSlug: string,
+    ): void {
+        const apiKey = c.get("apiKey") as ApiKeyMasked | undefined;
+        if (!apiKey) return; // Not an API key request — skip
+
+        const operation = httpMethodToOperation(c.req.method);
+        if (!isOperationAllowed(apiKey.permissions, collectionSlug, operation)) {
+            throw ApiError.forbidden(
+                `API key does not have "${operation}" permission for collection "${collectionSlug}"`,
+                "API_KEY_FORBIDDEN",
+            );
+        }
+    }
+
+    /**
      * Get the typed RestFetchService from a driver if it exposes one (for include support).
      */
     private getFetchService(driver: DataDriver): RestFetchService | undefined {
@@ -63,6 +86,7 @@ export class RestApiGenerator {
 
         // GET /collection/count - Count entities (with optional filters)
         this.router.get(`${basePath}/count`, async (c) => {
+            this.enforceApiKeyPermission(c, collection.slug);
             const queryDict = c.req.query();
             const queryOptions = parseQueryOptions(queryDict);
             const searchString = queryDict.searchString as string | undefined;
@@ -74,6 +98,7 @@ export class RestApiGenerator {
 
         // GET /collection - List entities
         this.router.get(basePath, async (c) => {
+            this.enforceApiKeyPermission(c, collection.slug);
             const queryDict = c.req.query();
             const queryOptions = parseQueryOptions(queryDict);
             const searchString = queryDict.searchString as string | undefined;
@@ -93,7 +118,8 @@ export class RestApiGenerator {
                         offset: queryOptions.offset,
                         orderBy: queryOptions.orderBy?.[0]?.field,
                         order: queryOptions.orderBy?.[0]?.direction === "desc" ? "desc" : "asc",
-                        searchString
+                        searchString,
+                        vectorSearch: queryOptions.vectorSearch
                     },
                     queryOptions.include
                 );
@@ -133,6 +159,7 @@ export class RestApiGenerator {
 
         // GET /collection/:id - Get single entity
         this.router.get(`${basePath}/:id`, async (c) => {
+            this.enforceApiKeyPermission(c, collection.slug);
             const id = c.req.param("id");
             const queryDict = c.req.query();
             const queryOptions = parseQueryOptions(queryDict);
@@ -179,6 +206,7 @@ export class RestApiGenerator {
         // POST /collection - Create entity
         this.router.post(basePath, async (c) => {
             try {
+                this.enforceApiKeyPermission(c, collection.slug);
                 const driver = c.get("driver") || this.driver;
                 const path = collection.slug;
                 const hookCtx = this.buildHookContext(c, "POST");
@@ -215,6 +243,7 @@ export class RestApiGenerator {
         // PUT /collection/:id - Update entity
         this.router.put(`${basePath}/:id`, async (c) => {
             try {
+                this.enforceApiKeyPermission(c, collection.slug);
                 const id = c.req.param("id");
                 const driver = c.get("driver") || this.driver;
                 const hookCtx = this.buildHookContext(c, "PUT");
@@ -261,6 +290,7 @@ export class RestApiGenerator {
 
         // DELETE /collection/:id - Delete entity
         this.router.delete(`${basePath}/:id`, async (c) => {
+            this.enforceApiKeyPermission(c, collection.slug);
             const id = c.req.param("id");
             const driver = c.get("driver") || this.driver;
             const hookCtx = this.buildHookContext(c, "DELETE");
@@ -354,6 +384,8 @@ entityId };
 
             const driver = c.get("driver") || this.driver;
 
+            this.enforceApiKeyPermission(c, c.req.param("parent"));
+
             if (parsed.entityId === "count") {
                 // GET /parent/:parentId/child/count — count child entities
                 const queryDict = c.req.query();
@@ -407,6 +439,8 @@ entityId };
             if (!parsed || parsed.entityId) return next();
 
             const driver = c.get("driver") || this.driver;
+
+            this.enforceApiKeyPermission(c, c.req.param("parent"));
             const body = await c.req.json().catch(() => ({}));
 
             const entity = await driver.saveEntity({
@@ -427,6 +461,9 @@ entityId };
             if (!parsed || !parsed.entityId) return next();
 
             const driver = c.get("driver") || this.driver;
+
+            this.enforceApiKeyPermission(c, c.req.param("parent"));
+
             const body = await c.req.json().catch(() => ({}));
 
             const entity = await driver.saveEntity({
@@ -448,6 +485,8 @@ entityId };
             if (!parsed || !parsed.entityId) return next();
 
             const driver = c.get("driver") || this.driver;
+
+            this.enforceApiKeyPermission(c, c.req.param("parent"));
 
             const existingEntity = await driver.fetchEntity({
                 path: parsed.collectionPath,
@@ -520,7 +559,8 @@ entityId };
             orderBy: queryOptions.orderBy?.[0]?.field,
             order: queryOptions.orderBy?.[0]?.direction === "desc" ? "desc" : "asc",
             startAfter: queryOptions.offset ? String(queryOptions.offset) : undefined,
-            searchString
+            searchString,
+            vectorSearch: queryOptions.vectorSearch
         });
 
         return entities.map(entity => this.flattenEntity(entity));

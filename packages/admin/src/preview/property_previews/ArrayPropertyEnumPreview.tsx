@@ -29,7 +29,7 @@ export function ArrayPropertyEnumPreview({
         )
 
     return <ArrayEnumPreview name={propertyKey}
-        value={value}
+        value={value as string[] | number[]}
         enumValues={enumValues}
         size={size}/>;
 }

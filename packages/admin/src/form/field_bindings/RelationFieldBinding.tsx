@@ -2,7 +2,7 @@ import { useEntitySelectionDialog } from "../../hooks/useEntitySelectionDialog";
 import type { FieldProps } from "../../types/fields";
 import type { RelationProperty } from "@rebasepro/types";
 import React, { useCallback } from "react";
-import { Entity, EntityRelation, getDataSourceCapabilities } from "@rebasepro/types";
+import { Entity, EntityRelation, getDataSourceCapabilities, Relation } from "@rebasepro/types";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
 import { EntityPreviewContainer } from "../../components/EntityPreview";
 import { IconForView } from "@rebasepro/core";
@@ -56,7 +56,7 @@ function RelationSelectorBinding({
     setValue,
     relation,
     manyRelation
-}: FieldProps<RelationProperty> & { relation: EntityRelation; manyRelation: boolean }) {
+}: FieldProps<RelationProperty> & { relation: Relation; manyRelation: boolean }) {
     const normalizedSingle = (!manyRelation && value && !Array.isArray(value)) ? normalizeToEntityRelation(value) : null;
     const singleValue = normalizedSingle ?? null;
     const multipleValue = (manyRelation && Array.isArray(value)) ? value : [];
@@ -108,7 +108,7 @@ function SingleRelationFieldBinding({
     includeDescription,
     setValue,
     relation
-}: FieldProps<RelationProperty> & { relation: EntityRelation }) {
+}: FieldProps<RelationProperty> & { relation: Relation | undefined }) {
     const normalizedValue = value && !Array.isArray(value) ? normalizeToEntityRelation(value) : null;
     const validValue = !!normalizedValue;
 

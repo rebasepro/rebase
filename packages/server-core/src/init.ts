@@ -18,6 +18,10 @@ import { logger } from "./utils/logger";
 import { requestLogger } from "./utils/request-logger";
 import { createAdminRoutes, createAuthRoutes, requireAuth, requireAdmin, configureJwt } from "./auth";
 import { createStorageController, createStorageRoutes, DEFAULT_STORAGE_ID, DefaultStorageRegistry, BackendStorageConfig, StorageController, StorageRegistry } from "./storage";
+import { createApiKeyStore } from "./auth/api-keys/api-key-store";
+import { createApiKeyRoutes } from "./auth/api-keys/api-key-routes";
+import type { ApiKeyStore } from "./auth/api-keys/api-key-store";
+import { createApiKeyRateLimiter } from "./auth/rate-limiter";
 import { createRebaseClient } from "@rebasepro/client";
 import { createHistoryRoutes } from "./history";
 import { EmailConfig, createEmailService } from "./email";
@@ -601,6 +605,23 @@ collectionRegistry });
         }
     }
 
+    // ─── API Key Store Bootstrap ──────────────────────────────────────────
+    let apiKeyStore: ApiKeyStore | undefined;
+    const apiKeyStoreResult = createApiKeyStore(defaultDriver);
+    if (apiKeyStoreResult) {
+        apiKeyStore = apiKeyStoreResult;
+        await apiKeyStore.ensureTable();
+        logger.info("Service API Keys initialized");
+
+        // Mount API key admin routes
+        const apiKeyRoutes = createApiKeyRoutes({
+            store: apiKeyStore,
+            serviceKey,
+        });
+        config.app.route(`${basePath}/admin/api-keys`, apiKeyRoutes);
+        logger.info("API key admin routes mounted", { path: `${basePath}/admin/api-keys` });
+    }
+
     if (config.collectionsDir) {
         if (process.env.NODE_ENV !== "production") {
             const { createSchemaEditorRoutes } = await import("./api/schema-editor-routes");
@@ -676,13 +697,20 @@ collectionRegistry });
                 adapter: authAdapter,
                 driver: defaultDriver,
                 requireAuth: dataRequireAuth,
+                apiKeyStore,
             }));
         } else {
             dataRouter.use("/*", createAuthMiddleware({
                 driver: defaultDriver,
                 requireAuth: dataRequireAuth,
-                serviceKey
+                serviceKey,
+                apiKeyStore,
             }));
+        }
+
+        // Per-API-key rate limiting (no-op for non-API-key requests)
+        if (apiKeyStore) {
+            dataRouter.use("/*", createApiKeyRateLimiter());
         }
 
         // Mount history routes BEFORE the REST API subcollection catch-all so
@@ -800,12 +828,14 @@ collectionRegistry });
                     adapter: authAdapter,
                     driver: defaultDriver,
                     requireAuth: functionsRequireAuth,
+                    apiKeyStore,
                 }));
             } else {
                 functionsRouter.use("/*", createAuthMiddleware({
                     driver: defaultDriver,
                     requireAuth: functionsRequireAuth,
-                    serviceKey
+                    serviceKey,
+                    apiKeyStore,
                 }));
             }
 

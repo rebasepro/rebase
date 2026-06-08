@@ -1,5 +1,6 @@
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Entity, FilterValues } from "@rebasepro/types";
+import type { VectorSearchParams } from "@rebasepro/types";
 import { EntityFetchService } from "./EntityFetchService";
 import { EntityPersistService } from "./EntityPersistService";
 import { RelationService } from "./RelationService";
@@ -66,6 +67,7 @@ export class EntityService implements EntityRepository {
             startAfter?: Record<string, unknown>;
             searchString?: string;
             databaseId?: string;
+            vectorSearch?: VectorSearchParams;
         } = {}
     ): Promise<Entity<M>[]> {
         return this.fetchService.fetchCollection<M>(collectionPath, options);

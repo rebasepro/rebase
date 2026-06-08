@@ -1,3 +1,4 @@
+import type { VectorSearchParams } from "@rebasepro/types";
 import { QueryOptions } from "../types";
 
 /**
@@ -39,7 +40,7 @@ export function parseQueryOptions(query: Record<string, unknown>): QueryOptions 
 
 
     // PostgREST-style filtering: ?field=op.value
-    const reservedQueryKeys = ["limit", "offset", "page", "orderBy", "include", "fields", "searchString"];
+    const reservedQueryKeys = ["limit", "offset", "page", "orderBy", "include", "fields", "searchString", "vector_search", "vector", "vector_distance", "vector_threshold"];
     for (const [key, rawValue] of Object.entries(query)) {
         if (reservedQueryKeys.includes(key)) continue;
 
@@ -131,6 +132,41 @@ export function parseQueryOptions(query: Record<string, unknown>): QueryOptions 
     if (query.fields) {
         const fieldsStr = String(query.fields).trim();
         options.fields = fieldsStr.split(",").map(s => s.trim()).filter(Boolean);
+    }
+
+    // Vector similarity search
+    if (query.vector_search && query.vector) {
+        const vectorStr = String(query.vector);
+        let queryVector: number[];
+        try {
+            queryVector = JSON.parse(vectorStr) as number[];
+            if (!Array.isArray(queryVector) || !queryVector.every(v => typeof v === "number")) {
+                throw new Error("Expected array of numbers");
+            }
+        } catch {
+            throw new Error("Invalid vector format. Expected JSON array of numbers, e.g. [0.1,0.2,0.3]");
+        }
+
+        const distanceParam = query.vector_distance ? String(query.vector_distance) : "cosine";
+        if (distanceParam !== "cosine" && distanceParam !== "l2" && distanceParam !== "inner_product") {
+            throw new Error(`Invalid vector_distance: ${distanceParam}. Expected: cosine, l2, or inner_product`);
+        }
+
+        const vectorSearch: VectorSearchParams = {
+            property: String(query.vector_search),
+            vector: queryVector,
+            distance: distanceParam,
+        };
+
+        if (query.vector_threshold) {
+            const threshold = parseFloat(String(query.vector_threshold));
+            if (isNaN(threshold)) {
+                throw new Error("Invalid vector_threshold. Expected a number.");
+            }
+            vectorSearch.threshold = threshold;
+        }
+
+        options.vectorSearch = vectorSearch;
     }
 
     return options;

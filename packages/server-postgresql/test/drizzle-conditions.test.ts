@@ -893,3 +893,171 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
         });
     });
 });
+
+describe("DrizzleConditionBuilder - Filter Operators", () => {
+    // Mock table for filter tests
+    const mockUsersTable = pgTable("users", {
+        id: serial("id").primaryKey(),
+        name: varchar("name").notNull(),
+        email: varchar("email").notNull(),
+        age: integer("age")
+    });
+
+    describe("buildSingleFilterCondition - array-contains", () => {
+        it("should generate a non-null condition for a single value", () => {
+            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
+                mockUsersTable.name,
+                "array-contains",
+                "featured"
+            );
+            expect(condition).not.toBeNull();
+        });
+    });
+
+    describe("buildSingleFilterCondition - array-contains-any", () => {
+        it("should generate a non-null condition for an array of values", () => {
+            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
+                mockUsersTable.name,
+                "array-contains-any",
+                ["featured", "popular", "trending"]
+            );
+            expect(condition).not.toBeNull();
+        });
+
+        it("should fallback to array-contains for a single (non-array) value", () => {
+            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
+                mockUsersTable.name,
+                "array-contains-any",
+                "featured"
+            );
+            expect(condition).not.toBeNull();
+        });
+    });
+
+    describe("buildSingleFilterCondition - not-in", () => {
+        it("should generate a non-null condition for an array of values", () => {
+            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
+                mockUsersTable.age,
+                "not-in",
+                [1, 2, 3]
+            );
+            expect(condition).not.toBeNull();
+        });
+
+        it("should return null for empty array", () => {
+            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
+                mockUsersTable.age,
+                "not-in",
+                []
+            );
+            expect(condition).toBeNull();
+        });
+
+        it("should return null for non-array value", () => {
+            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
+                mockUsersTable.age,
+                "not-in",
+                42
+            );
+            expect(condition).toBeNull();
+        });
+    });
+
+    describe("buildSingleFilterCondition - existing operators", () => {
+        it("should generate a condition for equality", () => {
+            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
+                mockUsersTable.name,
+                "==",
+                "alice"
+            );
+            expect(condition).not.toBeNull();
+        });
+
+        it("should generate IS NULL for equality with null", () => {
+            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
+                mockUsersTable.name,
+                "==",
+                null
+            );
+            expect(condition).not.toBeNull();
+        });
+
+        it("should generate IS NOT NULL for inequality with null", () => {
+            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
+                mockUsersTable.name,
+                "!=",
+                null
+            );
+            expect(condition).not.toBeNull();
+        });
+
+        it("should handle in operator with array", () => {
+            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
+                mockUsersTable.age,
+                "in",
+                [18, 21, 25]
+            );
+            expect(condition).not.toBeNull();
+        });
+
+        it("should return null for in operator with empty array", () => {
+            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
+                mockUsersTable.age,
+                "in",
+                []
+            );
+            expect(condition).toBeNull();
+        });
+
+        it("should warn and return null for unsupported operators", () => {
+            const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
+                mockUsersTable.age,
+                "unknown-op" as any,
+                42
+            );
+            expect(condition).toBeNull();
+            expect(warnSpy).toHaveBeenCalledWith("Unsupported filter operation: unknown-op");
+            warnSpy.mockRestore();
+        });
+    });
+
+    describe("buildFilterConditions - integration with array operators", () => {
+        it("should build filter with array-contains operator", () => {
+            const conditions = DrizzleConditionBuilder.buildFilterConditions(
+                { name: ["array-contains", "featured"] },
+                mockUsersTable,
+                "users"
+            );
+            expect(conditions).toHaveLength(1);
+        });
+
+        it("should build filter with array-contains-any operator", () => {
+            const conditions = DrizzleConditionBuilder.buildFilterConditions(
+                { name: ["array-contains-any", ["featured", "popular"]] },
+                mockUsersTable,
+                "users"
+            );
+            expect(conditions).toHaveLength(1);
+        });
+
+        it("should build filter with not-in operator", () => {
+            const conditions = DrizzleConditionBuilder.buildFilterConditions(
+                { age: ["not-in", [1, 2, 3]] },
+                mockUsersTable,
+                "users"
+            );
+            expect(conditions).toHaveLength(1);
+        });
+
+        it("should skip not-in filter with empty array", () => {
+            const conditions = DrizzleConditionBuilder.buildFilterConditions(
+                { age: ["not-in", []] },
+                mockUsersTable,
+                "users"
+            );
+            expect(conditions).toHaveLength(0);
+        });
+    });
+});
+

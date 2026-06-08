@@ -44,6 +44,10 @@ describe("Utils", () => {
         it("converts kebab-case to camelCase", () => {
             expect(toCamelCase("private-notes")).toBe("privateNotes");
         });
+        it("preserves already camelCase and PascalCase when no separators are present", () => {
+            expect(toCamelCase("customDomain")).toBe("customDomain");
+            expect(toCamelCase("GitRepoUrl")).toBe("gitRepoUrl");
+        });
     });
 
     describe("toSafeIdentifier", () => {

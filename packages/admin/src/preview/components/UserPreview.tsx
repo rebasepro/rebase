@@ -17,7 +17,7 @@ import { User } from "@rebasepro/types";
 export function UserPreview({ value }: PropertyPreviewProps<StringProperty>) {
     const getUser = useInternalUserManagementController<User>()?.getUser;
 
-    if (!value) {
+    if (typeof value !== "string" || !value) {
         return <EmptyValue/>;
     }
 

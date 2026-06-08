@@ -57,7 +57,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
     if (property === null) {
         content = <EmptyValue/>;
     } else if (property.ui?.Preview) {
-        const ResolvedPreview = resolveComponentRef(property.ui.Preview);
+        const ResolvedPreview = resolveComponentRef(property.ui.Preview) as React.ComponentType<PropertyPreviewProps<Property>> | undefined;
         if (ResolvedPreview) {
             content = <Suspense fallback={null}>
                 {createElement(ResolvedPreview,
@@ -205,7 +205,7 @@ path: stringProperty.reference.path })}
         }
     } else if (property.type === "reference") {
         if (typeof property.path === "string") {
-            if (typeof value === "object" && "isEntityReference" in value && value.isEntityReference()) {
+            if (typeof value === "object" && value !== null && "isEntityReference" in value && (value as EntityReference).isEntityReference()) {
                 content = <ReferencePreview
                     disabled={!property.path}
                     previewProperties={property.ui?.previewProperties}

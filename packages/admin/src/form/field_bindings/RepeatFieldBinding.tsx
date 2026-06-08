@@ -95,7 +95,7 @@ export function RepeatFieldBinding({
     const sortable = property.sortable === undefined ? true : property.sortable;
     const arrayContainer = <ArrayContainer droppableId={propertyKey}
         addLabel={property.name ? t("add_to_field", { fieldName: property.name }) : t("add_entry")}
-        value={value ?? []}
+        value={(value as unknown[]) ?? []}
         buildEntry={buildEntry}
         onInternalIdAdded={setLastAddedId}
         disabled={isSubmitting || Boolean(property.ui?.disabled)}

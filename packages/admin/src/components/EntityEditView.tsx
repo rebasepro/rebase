@@ -35,7 +35,8 @@ import {
     useEntityFetch,
     useRebaseContext,
     useLargeLayout,
-    useSlot
+    useSlot,
+    getIcon
 } from "@rebasepro/core";
 import { getEntityFromMemoryCache } from "@rebasepro/core";
 import { EntityForm } from "../form";
@@ -466,33 +467,55 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
         Builder={resolveComponentRef(selectedSecondaryForm?.Builder as ComponentRef<EntityCustomViewParams<M>> | undefined) as React.ComponentType<EntityCustomViewParams<M>> | undefined}
     />;
 
-    const subcollectionTabs = subcollections && subcollections.map((subcollection) =>
-        <Tab
-            className="text-sm min-w-[90px]"
-            value={subcollection.slug}
-            key={`entity_detail_collection_tab_${subcollection.name}`}>
-            {subcollection.name}
-        </Tab>
-    );
+    const subcollectionTabs = subcollections && subcollections.map((subcollection) => {
+        const icon = getIcon(subcollection.icon, undefined, undefined, "small");
+        return (
+            <Tab
+                className="text-sm min-w-[90px]"
+                value={subcollection.slug}
+                key={`entity_detail_collection_tab_${subcollection.name}`}>
+                <span className="flex items-center gap-1.5">
+                    {icon}
+                    {subcollection.name}
+                </span>
+            </Tab>
+        );
+    });
 
     const customViewTabsStart = resolvedEntityViews.filter(view => view.position === "start")
-        .map((view) =>
-            <Tab
-                className={!view.tabComponent ? "text-sm min-w-[90px]" : undefined}
-                value={view.key}
-                key={`entity_detail_collection_tab_${view.name}`}>
-                {view.tabComponent ?? view.name}
-            </Tab>
-        );
+        .map((view) => {
+            const icon = getIcon(view.icon, undefined, undefined, "small");
+            return (
+                <Tab
+                    className={!view.tabComponent ? "text-sm min-w-[90px]" : undefined}
+                    value={view.key}
+                    key={`entity_detail_collection_tab_${view.name}`}>
+                    {view.tabComponent ?? (
+                        <span className="flex items-center gap-1.5">
+                            {icon}
+                            {view.name}
+                        </span>
+                    )}
+                </Tab>
+            );
+        });
     const customViewTabsEnd = resolvedEntityViews.filter(view => !view.position || view.position === "end")
-        .map((view) =>
-            <Tab
-                className={!view.tabComponent ? "text-sm min-w-[90px]" : undefined}
-                value={view.key}
-                key={`entity_detail_collection_tab_${view.name}`}>
-                {view.tabComponent ?? view.name}
-            </Tab>
-        );
+        .map((view) => {
+            const icon = getIcon(view.icon, undefined, undefined, "small");
+            return (
+                <Tab
+                    className={!view.tabComponent ? "text-sm min-w-[90px]" : undefined}
+                    value={view.key}
+                    key={`entity_detail_collection_tab_${view.name}`}>
+                    {view.tabComponent ?? (
+                        <span className="flex items-center gap-1.5">
+                            {icon}
+                            {view.name}
+                        </span>
+                    )}
+                </Tab>
+            );
+        });
 
     const shouldShowTopBar = Boolean(barActions) || hasAdditionalViews || layout === "side_panel" || layout === "dialog";
 

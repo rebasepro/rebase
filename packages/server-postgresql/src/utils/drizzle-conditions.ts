@@ -95,8 +95,22 @@ export class DrizzleConditionBuilder {
                 }
                 return null;
             case "array-contains":
-                // For JSONB arrays
+                // For JSONB arrays: checks if the column contains the given value
                 return sql`${column} @> ${JSON.stringify([value])}`;
+            case "array-contains-any":
+                // For JSONB arrays: checks if the column contains any of the given values
+                if (Array.isArray(value) && value.length > 0) {
+                    // Use the ?| operator for JSONB overlap with text array
+                    const textValues = value.map(v => String(v));
+                    return sql`${column} ?| array[${sql.join(textValues.map(v => sql`${v}`), sql`, `)}]`;
+                }
+                // Single value fallback: treat as array-contains
+                return sql`${column} @> ${JSON.stringify([value])}`;
+            case "not-in":
+                if (Array.isArray(value) && value.length > 0) {
+                    return sql`${column} NOT IN (${sql.join(value.map(v => sql`${v}`), sql`, `)})`;
+                }
+                return null;
             default:
                 console.warn(`Unsupported filter operation: ${op}`);
                 return null;
@@ -1013,6 +1027,55 @@ export class DrizzleConditionBuilder {
             return null;
         }
     }
+
+    /**
+     * Build vector similarity search expressions for pgvector.
+     *
+     * Returns:
+     * - `orderBy`: SQL expression to ORDER BY distance (ascending = closest first)
+     * - `filter`: optional WHERE clause for distance threshold
+     * - `distanceSelect`: SQL expression for selecting the distance as `_distance`
+     */
+    static buildVectorSearchConditions(
+        table: PgTable<any>,
+        vectorSearch: {
+            property: string;
+            vector: number[];
+            distance?: "cosine" | "l2" | "inner_product";
+            threshold?: number;
+        }
+    ): { orderBy: SQL; filter?: SQL; distanceSelect: SQL } {
+        const column = table[vectorSearch.property as keyof typeof table] as AnyPgColumn;
+        if (!column) {
+            throw new Error(`Vector column '${vectorSearch.property}' not found in table`);
+        }
+
+        const vectorLiteral = `'[${vectorSearch.vector.join(",")}]'::vector`;
+        const distanceFn = vectorSearch.distance || "cosine";
+
+        let operator: string;
+        switch (distanceFn) {
+            case "cosine":
+                operator = "<=>";
+                break;
+            case "l2":
+                operator = "<->";
+                break;
+            case "inner_product":
+                operator = "<#>";
+                break;
+        }
+
+        const distanceExpr = sql`${column} ${sql.raw(operator)} ${sql.raw(vectorLiteral)}`;
+
+        return {
+            orderBy: distanceExpr,
+            filter: vectorSearch.threshold != null
+                ? sql`(${column} ${sql.raw(operator)} ${sql.raw(vectorLiteral)}) < ${vectorSearch.threshold}`
+                : undefined,
+            distanceSelect: sql`(${column} ${sql.raw(operator)} ${sql.raw(vectorLiteral)})`,
+        };
+    }
 }
 
 /**
@@ -1020,3 +1083,4 @@ export class DrizzleConditionBuilder {
  * This allows code to use PostgresConditionBuilder alongside future MongoConditionBuilder, etc.
  */
 export const PostgresConditionBuilder = DrizzleConditionBuilder;
+

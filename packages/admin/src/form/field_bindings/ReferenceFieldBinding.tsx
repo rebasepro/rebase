@@ -53,13 +53,15 @@ function ReferenceFieldBindingInternal({
         throw new Error("Property path is required for ReferenceFieldBinding");
     }
 
+    const refValue = value as EntityReference | null | undefined;
+
     useClearRestoreValue({
         property,
         value,
         setValue
     });
 
-    const validValue = value && value.isEntityReference && value.isEntityReference();
+    const validValue = refValue && typeof refValue === "object" && "isEntityReference" in refValue && refValue.isEntityReference();
 
     const collectionRegistryController = useCollectionRegistryController();
     const collection: EntityCollection | undefined = useMemo(() => {
@@ -80,7 +82,7 @@ function ReferenceFieldBindingInternal({
         path: property.path,
         collection,
         onSingleEntitySelected,
-        selectedEntityIds: validValue ? [value.id] : undefined,
+        selectedEntityIds: validValue && refValue ? [refValue.id] : undefined,
         fixedFilter: property.fixedFilter
     }
     );
@@ -110,7 +112,7 @@ function ReferenceFieldBindingInternal({
                     hover={!disabled}
                     size={size}
                     onClick={disabled || isSubmitting ? undefined : onEntryClick}
-                    reference={value}
+                    reference={refValue}
                     includeEntityLink={property.includeEntityLink}
                     includeId={property.includeId}
                 />}

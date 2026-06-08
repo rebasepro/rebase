@@ -25,8 +25,8 @@ export function ArrayOfRelationsPreview({
 
     return (
         <div className="flex flex-col w-full gap-0.5">
-            {value &&
-                value.map((relation: unknown, index: number) => {
+            {value ?
+                (value as unknown[]).map((relation: unknown, index: number) => {
                     const entityRelation = normalizeToEntityRelation(relation);
 
                     if (!entityRelation) return null;
@@ -44,7 +44,7 @@ export function ArrayOfRelationsPreview({
                             />
                         </div>
                     );
-                })}
+                }) : null}
         </div>
     );
 }

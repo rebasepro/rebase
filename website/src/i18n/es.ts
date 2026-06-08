@@ -447,8 +447,8 @@ export const es = {
 
 
   // AI & Agents Section
-  "ai.badge": "Arquitectura de IA Desacoplada",
-  "ai.title": "Construye apps de IA, <span class=\"text-primary subtle-shimmer\">mantén tu núcleo limpio.</span>",
-  "ai.subtitle": "Desacopla tus funcionalidades de IA de tu base de código principal. Rebase proporciona las plantillas y los flujos de eventos para instalar, personalizar y disparar lógica LLM sin esfuerzo sobre Postgres.",
+  "ai.badge": "Infraestructura para Agentes",
+  "ai.title": "El backend que <span class=\"text-primary subtle-shimmer\">los agentes de IA necesitan.</span>",
+  "ai.subtitle": "Búsqueda vectorial, API keys con alcance, funciones personalizadas, sincronización en tiempo real y cron jobs — todo lo que tus agentes de IA necesitan para leer, escribir y actuar sobre tus datos de Postgres de forma autónoma.",
 };
 

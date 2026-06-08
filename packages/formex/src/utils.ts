@@ -62,7 +62,7 @@ export function setIn(obj: unknown, path: string, value: unknown): unknown {
     }
 
     // Return original object if new value is the same as current
-    if ((i === 0 ? obj : resVal)[pathArray[i]] === value) {
+    if ((i === 0 ? (obj as Record<string, unknown>) : resVal)[pathArray[i]] === value) {
         return obj;
     }
 

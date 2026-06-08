@@ -1,7 +1,8 @@
-import { EntityCollection } from "@rebasepro/types";
+import { EntityCollection, VectorSearchParams } from "@rebasepro/types";
 import { AuthResult } from "../auth/middleware";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { DataDriver } from "@rebasepro/types";
+import type { ApiKeyMasked } from "../auth/api-keys/api-key-types";
 
 /**
  * Hono Environment Variables
@@ -11,6 +12,8 @@ export type HonoEnv = {
     Variables: {
         user?: AuthResult | { userId?: string, roles?: string[] };
         driver?: DataDriver;
+        /** Set when the request is authenticated via a Service API Key. */
+        apiKey?: ApiKeyMasked;
     }
 };
 
@@ -78,6 +81,8 @@ export interface QueryOptions {
     include?: string[];
     /** Columns to return in the response (field-level selection) */
     fields?: string[];
+    /** Vector similarity search configuration */
+    vectorSearch?: VectorSearchParams;
 }
 
 /**

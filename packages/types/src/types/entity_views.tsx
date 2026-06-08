@@ -66,6 +66,7 @@ export interface FormContext<M extends Record<string, unknown> = Record<string, 
 export type EntityCustomView<M extends Record<string, unknown> = Record<string, unknown>> = {
     key: string;
     name: string;
+    icon?: string | React.ReactNode;
     tabComponent?: React.ReactNode;
     includeActions?: boolean | "bottom";
     Builder?: ComponentRef<EntityCustomViewParams<M>>;

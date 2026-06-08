@@ -34,7 +34,7 @@
     "watch": "vite build --watch",
     "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json",
     "test:lint": "eslint \"src/**\" --quiet",
-    "test": "jest --passWithNoTests --forceExit",
+    "test": "cross-env NODE_OPTIONS=\"--experimental-vm-modules\" jest --passWithNoTests --forceExit",
     "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f"
   },
   "exports": {
@@ -75,6 +75,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4.7.0",
+    "cross-env": "^7.0.3",
     "jest": "^29.7.0",
     "ts-jest": "29.4.1",
     "typescript": "^5.9.3",

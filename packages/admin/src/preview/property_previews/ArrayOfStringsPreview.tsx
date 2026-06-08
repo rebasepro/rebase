@@ -25,11 +25,12 @@ export function ArrayOfStringsPreview({
         return <div>{`Unexpected value: ${value}`}</div>;
     }
     const stringProperty = property.of as StringProperty;
+    const arrayValues = value as string[];
 
     return (
         <div className="flex flex-col gap-2">
-            {value &&
-                value.map((v: any, index: number) =>
+            {arrayValues &&
+                arrayValues.map((v, index: number) =>
                     <div key={`preview_array_strings_${propertyKey}_${index}`}>
                         <ErrorBoundary>
                             <StringPropertyPreview propertyKey={propertyKey}

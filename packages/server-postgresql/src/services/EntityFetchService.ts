@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, getTableName, gt, lt, or, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { Entity, EntityCollection, FilterValues, Relation } from "@rebasepro/types";
+import type { VectorSearchParams } from "@rebasepro/types";
 import { resolveCollectionRelations, findRelation, createRelationRef, createRelationRefWithData } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
@@ -698,6 +699,7 @@ export class EntityFetchService {
             startAfter?: Record<string, unknown>;
             searchString?: string;
             databaseId?: string;
+            vectorSearch?: VectorSearchParams;
         } = {}
     ): Promise<Entity<M>[]> {
         const collection = getCollectionByPath(collectionPath, this.registry);
@@ -722,7 +724,9 @@ export class EntityFetchService {
         const withConfig = this.buildWithConfig(collection);
         const hasRelations = withConfig && Object.keys(withConfig).length > 0;
 
-        if (qb && !options.searchString && !hasRelations) {
+        // Skip db.query path when vectorSearch is present — it doesn't support
+        // custom SELECT expressions needed for the _distance column.
+        if (qb && !options.searchString && !hasRelations && !options.vectorSearch) {
             try {
                 const queryOpts = this.buildDrizzleQueryOptions<M>(
                     table, idField, idInfo, options, collectionPath, undefined
@@ -746,7 +750,15 @@ export class EntityFetchService {
         }
 
         // Fallback: db.select + processEntityResults (N+1 for relations)
-        let query = this.db.select().from(table).$dynamic();
+        // When vectorSearch is present, add _distance to the SELECT.
+        let vectorMeta: { orderBy: SQL; filter?: SQL; distanceSelect: SQL } | undefined;
+        if (options.vectorSearch) {
+            vectorMeta = DrizzleConditionBuilder.buildVectorSearchConditions(table, options.vectorSearch);
+        }
+
+        let query = vectorMeta
+            ? this.db.select({ table_row: table, _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
+            : this.db.select().from(table).$dynamic();
         const allConditions: SQL[] = [];
 
         if (options.searchString) {
@@ -762,13 +774,21 @@ export class EntityFetchService {
             if (filterConditions.length > 0) allConditions.push(...filterConditions);
         }
 
+        // Vector distance threshold filter
+        if (vectorMeta?.filter) {
+            allConditions.push(vectorMeta.filter);
+        }
+
         if (allConditions.length > 0) {
             const finalCondition = DrizzleConditionBuilder.combineConditionsWithAnd(allConditions);
             if (finalCondition) query = query.where(finalCondition);
         }
 
         const orderExpressions = [];
-        if (options.orderBy) {
+        // Vector search overrides ORDER BY with distance (ascending = closest first)
+        if (vectorMeta) {
+            orderExpressions.push(asc(vectorMeta.orderBy));
+        } else if (options.orderBy) {
             const orderByField = this.resolveOrderByField(table, options.orderBy, collection);
             if (orderByField) {
                 orderExpressions.push(options.order === "asc" ? asc(orderByField) : desc(orderByField));
@@ -786,13 +806,24 @@ export class EntityFetchService {
             }
         }
 
-        const limitValue = options.searchString ? (options.limit || 50) : options.limit;
+        const limitValue = options.vectorSearch
+            ? (options.limit || 10)
+            : options.searchString ? (options.limit || 50) : options.limit;
         if (limitValue) query = query.limit(limitValue);
 
         // Offset (numeric pagination)
         if (options.offset && options.offset > 0) query = query.offset(options.offset);
 
-        const results = await query;
+        const rawResults = await query;
+
+        // When vector search is active, unwrap the nested select shape and
+        // attach _distance to each entity's values.
+        const results = vectorMeta
+            ? (rawResults as { table_row: Record<string, unknown>; _distance: unknown }[]).map(r => ({
+                ...r.table_row,
+                _distance: typeof r._distance === "number" ? r._distance : parseFloat(String(r._distance))
+            }))
+            : rawResults as Record<string, unknown>[];
 
         return this.processEntityResults<M>(results, collection, collectionPath, idInfo, options.databaseId, false, idInfoArray);
     }
@@ -919,6 +950,7 @@ export class EntityFetchService {
             startAfter?: Record<string, unknown>;
             searchString?: string;
             databaseId?: string;
+            vectorSearch?: VectorSearchParams;
         } = {}
     ): Promise<Entity<M>[]> {
         // Handle multi-segment paths by resolving through relations
@@ -1164,6 +1196,7 @@ export class EntityFetchService {
             startAfter?: Record<string, unknown>;
             searchString?: string;
             databaseId?: string;
+            vectorSearch?: VectorSearchParams;
         } = {},
         include?: string[]
     ): Promise<Record<string, unknown>[]> {
@@ -1181,7 +1214,8 @@ export class EntityFetchService {
         const tableName = getTableName(table);
 
         const qb = this.getQueryBuilder(tableName);
-        if (qb && !options.searchString) {
+        // Skip db.query path when vectorSearch is present — needs custom SELECT
+        if (qb && !options.searchString && !options.vectorSearch) {
             try {
                 const withConfig = (include && include.length > 0)
                     ? this.buildWithConfig(collection, include)
@@ -1389,6 +1423,7 @@ export class EntityFetchService {
             offset?: number;
             startAfter?: Record<string, unknown>;
             searchString?: string;
+            vectorSearch?: VectorSearchParams;
         } = {}
     ): Promise<Record<string, unknown>[]> {
         const collection = getCollectionByPath(collectionPath, this.registry);
@@ -1397,7 +1432,14 @@ export class EntityFetchService {
         const idInfo = idInfoArray[0];
         const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
 
-        let query = this.db.select().from(table).$dynamic();
+        let vectorMeta: { orderBy: SQL; filter?: SQL; distanceSelect: SQL } | undefined;
+        if (options.vectorSearch) {
+            vectorMeta = DrizzleConditionBuilder.buildVectorSearchConditions(table, options.vectorSearch);
+        }
+
+        let query = vectorMeta
+            ? this.db.select({ table_row: table, _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
+            : this.db.select().from(table).$dynamic();
         const allConditions: SQL[] = [];
 
         if (options.searchString) {
@@ -1413,13 +1455,19 @@ export class EntityFetchService {
             if (filterConditions.length > 0) allConditions.push(...filterConditions);
         }
 
+        if (vectorMeta?.filter) {
+            allConditions.push(vectorMeta.filter);
+        }
+
         if (allConditions.length > 0) {
             const finalCondition = DrizzleConditionBuilder.combineConditionsWithAnd(allConditions);
             if (finalCondition) query = query.where(finalCondition);
         }
 
         const orderExpressions = [];
-        if (options.orderBy) {
+        if (vectorMeta) {
+            orderExpressions.push(asc(vectorMeta.orderBy));
+        } else if (options.orderBy) {
             const orderByField = this.resolveOrderByField(table, options.orderBy, collection);
             if (orderByField) {
                 orderExpressions.push(options.order === "asc" ? asc(orderByField) : desc(orderByField));
@@ -1428,13 +1476,24 @@ export class EntityFetchService {
         orderExpressions.push(desc(idField));
         if (orderExpressions.length > 0) query = query.orderBy(...orderExpressions);
 
-        const limitValue = options.searchString ? (options.limit || 50) : options.limit;
+        const limitValue = options.vectorSearch
+            ? (options.limit || 10)
+            : options.searchString ? (options.limit || 50) : options.limit;
         if (limitValue) query = query.limit(limitValue);
 
         // Offset (numeric pagination)
         if (options.offset && options.offset > 0) query = query.offset(options.offset);
 
-        return await query as Record<string, unknown>[];
+        const rawResults = await query;
+
+        if (vectorMeta) {
+            return (rawResults as { table_row: Record<string, unknown>; _distance: unknown }[]).map(r => ({
+                ...r.table_row,
+                _distance: typeof r._distance === "number" ? r._distance : parseFloat(String(r._distance))
+            }));
+        }
+
+        return rawResults as Record<string, unknown>[];
     }
 
     /**

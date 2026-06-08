@@ -4,6 +4,8 @@ import { verifyAccessToken, AccessTokenPayload } from "./jwt";
 import { HonoEnv } from "../api/types";
 import { scopeDataDriver } from "./rls-scope";
 import { safeCompare } from "./crypto-utils";
+import { isApiKeyToken, validateApiKey } from "./api-keys/api-key-middleware";
+import type { ApiKeyStore } from "./api-keys/api-key-store";
 
 /**
  * Result from a custom auth validator.
@@ -44,6 +46,12 @@ export interface AuthMiddlewareOptions {
      * timing attacks. The key must be at least 32 characters.
      */
     serviceKey?: string;
+    /**
+     * API key store for authenticating `rk_` prefixed tokens.
+     * When set, tokens starting with `rk_` are validated against the
+     * database instead of being treated as JWTs.
+     */
+    apiKeyStore?: ApiKeyStore;
 }
 
 /**
@@ -223,7 +231,7 @@ export function extractUserFromToken(token: string): AccessTokenPayload | null {
  */
 
 export function createAuthMiddleware(options: AuthMiddlewareOptions): MiddlewareHandler<HonoEnv> {
-    const { driver, requireAuth: enforceAuth = true, validator, serviceKey } = options;
+    const { driver, requireAuth: enforceAuth = true, validator, serviceKey, apiKeyStore } = options;
 
     return async (c, next) => {
         if (validator) {
@@ -290,6 +298,17 @@ code: "UNAUTHORIZED" } }, 401);
                         console.error("[AUTH] RLS scoping failed for service key:", error);
                         return c.json({ error: { message: "Internal authentication error",
 code: "INTERNAL_ERROR" } }, 500);
+                    }
+                } else if (apiKeyStore && isApiKeyToken(token)) {
+                    // ── API Key verification ──────────────────────────────
+                    // Tokens starting with `rk_` are validated against the
+                    // api_keys table instead of JWT verification.
+                    const result = await validateApiKey(c, token, {
+                        store: apiKeyStore,
+                        driver,
+                    });
+                    if (result !== true) {
+                        return result;
                     }
                 } else {
                     // ── JWT verification ───────────────────────────────────

@@ -572,9 +572,9 @@ export const en = {
 
 
   // AI & Agents Section
-  "ai.badge": "Decoupled AI Architecture",
-  "ai.title": "Build AI apps, <span class=\"text-primary subtle-shimmer\">keep your core clean.</span>",
-  "ai.subtitle": "Decouple your AI features from your core codebase. Rebase provides the blueprints and event pipelines to install, customize, and trigger LLM logic effortlessly on Postgres.",
+  "ai.badge": "Agent Infrastructure",
+  "ai.title": "The backend <span class=\"text-primary subtle-shimmer\">AI agents need.</span>",
+  "ai.subtitle": "Vector search, scoped API keys, custom functions, real-time sync, and cron jobs — everything your AI agents need to read, write, and act on your Postgres data autonomously.",
 
   // Grouped Features Section
   "features.group.baas.title": "Postgres BaaS",

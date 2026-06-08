@@ -6,9 +6,10 @@
  * an `AuthAdapter` to `initializeRebaseBackend()`.
  *
  * The middleware:
- * 1. Calls `adapter.verifyRequest(request)` to resolve the user
- * 2. Scopes the DataDriver via `withAuth()` for RLS
- * 3. Enforces auth (401) when `requireAuth` is true and no user is found
+ * 1. Checks for API key tokens (`rk_` prefix) first — these are Rebase-level
+ * 2. Falls back to `adapter.verifyRequest(request)` to resolve the user
+ * 3. Scopes the DataDriver via `withAuth()` for RLS
+ * 4. Enforces auth (401) when `requireAuth` is true and no user is found
  *
  * The behavior is identical to `createAuthMiddleware()` — only the
  * token verification strategy is pluggable.
@@ -17,7 +18,9 @@
 import type { MiddlewareHandler } from "hono";
 import type { DataDriver, AuthAdapter } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types";
+import type { ApiKeyStore } from "./api-keys/api-key-store";
 import { scopeDataDriver } from "./rls-scope";
+import { validateApiKey } from "./api-keys/api-key-middleware";
 
 export interface AdapterAuthMiddlewareOptions {
     /** The auth adapter to delegate verification to. */
@@ -29,15 +32,28 @@ export interface AdapterAuthMiddlewareOptions {
      * Defaults to `true` (secure by default).
      */
     requireAuth?: boolean;
+    /** Optional API key store — when provided, `rk_` bearer tokens are accepted. */
+    apiKeyStore?: ApiKeyStore;
 }
 
 /**
  * Create a Hono middleware that uses an `AuthAdapter` for request verification.
  */
 export function createAdapterAuthMiddleware(options: AdapterAuthMiddlewareOptions): MiddlewareHandler<HonoEnv> {
-    const { adapter, driver, requireAuth: enforceAuth = true } = options;
+    const { adapter, driver, requireAuth: enforceAuth = true, apiKeyStore } = options;
 
     return async (c, next) => {
+        // ── API Key check (Rebase-level, independent of auth adapter) ────
+        if (apiKeyStore) {
+            const authHeader = c.req.header("authorization") || "";
+            const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+            if (token.startsWith("rk_")) {
+                const result = await validateApiKey(c, token, { store: apiKeyStore, driver });
+                if (result === true) return next();
+                return result;
+            }
+        }
+
         let authenticatedUser = null;
 
         try {

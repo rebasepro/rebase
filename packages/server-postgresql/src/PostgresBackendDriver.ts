@@ -145,7 +145,8 @@ propertyCallbacks: undefined };
         startAfter,
         orderBy,
         searchString,
-        order
+        order,
+        vectorSearch
     }: FetchCollectionProps<M>): Promise<Entity<M>[]> {
 
         const entities = await this.entityService.fetchCollection<M>(path, {
@@ -156,7 +157,8 @@ propertyCallbacks: undefined };
             offset,
             startAfter: startAfter as Record<string, unknown> | undefined,
             databaseId: collection?.databaseId,
-            searchString
+            searchString,
+            vectorSearch
         });
 
         const { collection: resolvedCollection, callbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);

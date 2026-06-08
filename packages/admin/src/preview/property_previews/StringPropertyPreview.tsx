@@ -18,8 +18,10 @@ export function StringPropertyPreview({
     size
 }: PropertyPreviewProps<StringProperty>): React.ReactElement {
 
+    const strValue = value as string;
+
     if (property.enum) {
-        const enumKey = value;
+        const enumKey = strValue;
         return <EnumValuesChip
             enumKey={enumKey}
             enumValues={property.enum}
@@ -31,19 +33,19 @@ export function StringPropertyPreview({
                 <Chip
                     colorScheme={colorScheme}
                     size={size}>
-                    {value}
+                    {strValue}
                 </Chip>
             </ErrorBoundary>);
     } else if (property.ui?.url) {
         return (
             <UrlComponentPreview size={size}
-                url={value}
+                url={strValue}
                 previewType={typeof property.ui?.url === "string" ? property.ui?.url as PreviewType : undefined}/>
         );
     } else {
-        if (!value) return <></>;
-        const lines = value.split("\n");
-        return value && value.includes("\n")
+        if (!strValue) return <></>;
+        const lines = strValue.split("\n");
+        return strValue && strValue.includes("\n")
             ? <div className={cls("overflow-x-scroll overflow-hidden", size === "small" ? "text-sm" : "")}>
                 {lines.map((str: any, index: number) =>
                     <React.Fragment key={`string_preview_${index}`}>
@@ -52,8 +54,8 @@ export function StringPropertyPreview({
                     </React.Fragment>)}
             </div>
             : (size === "small"
-                ? <span className={"text-sm"}>{value}</span>
-                : <>{value}</>
+                ? <span className={"text-sm"}>{strValue}</span>
+                : <>{strValue}</>
             );
     }
 }

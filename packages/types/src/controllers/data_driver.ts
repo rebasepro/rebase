@@ -25,6 +25,22 @@ export type ListenEntityProps<M extends Record<string, unknown> = Record<string,
     }
 
 /**
+ * Configuration for vector similarity search queries.
+ * Vector search applies an ORDER BY distance expression and optionally
+ * filters results by a distance threshold.
+ */
+export interface VectorSearchParams {
+    /** Property name containing the vector column */
+    property: string;
+    /** Query vector to compare against */
+    vector: number[];
+    /** Distance function (default: "cosine") */
+    distance?: "cosine" | "l2" | "inner_product";
+    /** Only return results within this distance threshold */
+    threshold?: number;
+}
+
+/**
  * @internal
  */
 export interface FetchCollectionProps<M extends Record<string, unknown> = Record<string, unknown>> {
@@ -37,6 +53,8 @@ export interface FetchCollectionProps<M extends Record<string, unknown> = Record
     orderBy?: string;
     searchString?: string;
     order?: "desc" | "asc";
+    /** Vector similarity search configuration */
+    vectorSearch?: VectorSearchParams;
 }
 
 /**
@@ -240,6 +258,7 @@ export interface RestFetchService {
             startAfter?: Record<string, unknown>;
             searchString?: string;
             databaseId?: string;
+            vectorSearch?: VectorSearchParams;
         },
         include?: string[]
     ): Promise<Record<string, unknown>[]>;

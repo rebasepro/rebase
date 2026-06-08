@@ -34,8 +34,8 @@ export function ArrayOfStorageComponentsPreview({
     }
     return (
         <div className={"flex flex-wrap gap-2"}>
-            {value &&
-                value.map((v: any, index: number) =>
+            {value ?
+                (value as string[]).map((v, index: number) =>
                     <ErrorBoundary key={`preview_array_storage_${propertyKey}_${index}`}>
                         <PropertyPreview
                             propertyKey={propertyKey}
@@ -43,7 +43,7 @@ export function ArrayOfStorageComponentsPreview({
                             property={property.of as Property}
                             size={childSize}/>
                     </ErrorBoundary>
-                )}
+                ) : null}
         </div>
     );
 }

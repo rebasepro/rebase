@@ -96,7 +96,7 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
         >
             {(fieldProps) => {
 
-                let Component: ComponentType<FieldProps> | undefined;
+                let Component: ComponentType<FieldProps<Property, unknown, M>> | undefined;
                 const resolvedProperty = resolveProperty({
                     propertyKey,
                     property: property,
@@ -135,7 +135,7 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
                         index,
                         authController
                     }) as Property | null;
-                    Component = resolveComponentRef(configProperty?.ui?.Field) as ComponentType<FieldProps> | undefined;
+                    Component = resolveComponentRef(configProperty?.ui?.Field) as ComponentType<FieldProps<Property, unknown, M>> | undefined;
                 }
                 if (!Component) {
                     console.warn(`No field component found for property ${propertyKey}`);
@@ -163,9 +163,9 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
                 };
 
                 return <FieldInternal
-                    Component={Component as ComponentType<FieldProps>}
+                    Component={Component as ComponentType<FieldProps<Property, unknown, M>>}
                     componentProps={componentProps}
-                    formexFieldProps={fieldProps}/>;
+                    formexFieldProps={fieldProps as FormexFieldProps<unknown, Record<string, unknown>>}/>;
             }}
         </Field>
     );
@@ -198,7 +198,7 @@ function FieldInternal<CustomProps, M extends Record<string, unknown>>
         formexFieldProps
     }:
         {
-            Component: ComponentType<FieldProps>,
+            Component: ComponentType<FieldProps<Property, unknown, M>>,
             componentProps: ResolvedPropertyFieldBindingProps<M>,
             formexFieldProps: FormexFieldProps<unknown, Record<string, unknown>>
         }) {
@@ -222,7 +222,7 @@ function FieldInternal<CustomProps, M extends Record<string, unknown>>
         Component: Component,
         plugins: plugins
     });
-    const UsedComponent: ComponentType<FieldProps> = WrappedComponent ?? Component;
+    const UsedComponent: ComponentType<FieldProps<Property, unknown, M>> = (WrappedComponent ?? Component) as ComponentType<FieldProps<Property, unknown, M>>;
 
     const isSubmitting = formexFieldProps.form.isSubmitting;
 

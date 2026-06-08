@@ -27,7 +27,7 @@ export function ArrayOfMapsPreview({
     if (!properties) {
         throw Error(`You need to specify a 'properties' prop (or specify a custom field) in your map property ${propertyKey}`);
     }
-    const values = value;
+    const values = value as Record<string, unknown>[];
     const previewProperties: string[] | undefined = (mapProperty as MapProperty).previewProperties;
 
     if (!values) return null;
@@ -43,7 +43,7 @@ export function ArrayOfMapsPreview({
         <div className="table-auto text-xs">
             <div>
                 {values &&
-                    values.map((v: any, index: number) => {
+                    values.map((v, index: number) => {
                         return (
                             <div key={`table_${v}_${index}`}
                                 className="border-b last:border-b-0 py-2">

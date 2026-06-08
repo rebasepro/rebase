@@ -29,17 +29,43 @@
     "./package.json": "./package.json"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.2",
+    "@types/jest": "^29.5.14",
     "@types/node": "^20.19.41",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.7.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "ts-jest": "^29.4.10",
     "typescript": "^5.9.3",
     "vite": "^7.3.3"
   },
   "scripts": {
     "dev": "vite",
     "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json",
+    "test": "jest --passWithNoTests",
     "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f"
+  },
+  "jest": {
+    "transform": {
+      "^.+\\.tsx?$": "ts-jest"
+    },
+    "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "jsx",
+      "json",
+      "node"
+    ],
+    "testEnvironment": "jsdom",
+    "moduleNameMapper": {
+      "^@rebasepro/core$": "<rootDir>/../core/src/index.ts",
+      "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
+      "^@rebasepro/ui$": "<rootDir>/../ui/src/index.ts"
+    }
   },
   "files": [
     "dist",

@@ -14,16 +14,18 @@ export function NumberPropertyPreview({
     size
 }: PropertyPreviewProps<NumberProperty>): React.ReactElement {
 
+    const numValue = value as number;
+
     if (property.enum) {
-        const enumKey = value;
+        const enumKey = numValue;
         const enumValues = enumToObjectEntries(property.enum);
         if (!enumValues)
-            return <span className={size === "small" ? "text-sm" : ""}>{value}</span>;
+            return <span className={size === "small" ? "text-sm" : ""}>{numValue}</span>;
         return <EnumValuesChip
             enumKey={enumKey}
             enumValues={enumValues}
             size={size !== "medium" ? "small" : "medium"}/>;
     } else {
-        return <span className={size === "small" ? "text-sm" : ""}>{value}</span>;
+        return <span className={size === "small" ? "text-sm" : ""}>{numValue}</span>;
     }
 }

@@ -30,6 +30,7 @@ export function MapPropertyPreview({
     }
 
     if (!value) return null;
+    const mapValue = value as Record<string, unknown>;
 
     const mapPropertyKeys: string[] = Object.keys(mapProperty.properties)
 
@@ -41,7 +42,7 @@ export function MapPropertyPreview({
                         <ErrorBoundary
                             key={"map_preview_" + mapProperty.name + key + index}>
                             <PropertyPreview propertyKey={key}
-                                value={(value)[key]}
+                                value={mapValue[key]}
                                 property={mapProperty.properties![key]}
                                 // entity={entity}
                                 size={size}/>
@@ -78,7 +79,7 @@ export function MapPropertyPreview({
                                         {!isArrayOrMap &&
                                             <PropertyPreview
                                                 propertyKey={key}
-                                                value={(value)[key]}
+                                                value={mapValue[key]}
                                                 property={childProperty}
                                                 // entity={entity}
                                                 size={size}/>}
@@ -90,7 +91,7 @@ export function MapPropertyPreview({
                                 <div className={cls(defaultBorderMixin, "border-l pl-4 ml-2 my-2")}>
                                     <PropertyPreview
                                         propertyKey={key}
-                                        value={(value)[key]}
+                                        value={mapValue[key]}
                                         property={childProperty}
                                         // entity={entity}
                                         size={size}/>

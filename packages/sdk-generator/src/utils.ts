@@ -18,6 +18,9 @@ export function toPascalCase(str: string): string {
  * e.g. "private_notes" → "privateNotes"
  */
 export function toCamelCase(str: string): string {
+    if (!/[_\-\s]/.test(str)) {
+        return str.charAt(0).toLowerCase() + str.slice(1);
+    }
     const pascal = toPascalCase(str);
     return pascal.charAt(0).toLowerCase() + pascal.slice(1);
 }

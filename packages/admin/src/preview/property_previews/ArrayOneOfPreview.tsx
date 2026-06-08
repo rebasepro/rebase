@@ -33,7 +33,7 @@ export function ArrayOneOfPreview({
         throw Error(`You need to specify an 'of' or 'oneOf' prop (or specify a custom field) in your array property ${propertyKey}`);
     }
 
-    const values = value;
+    const values = value as Record<string, unknown>[];
 
     if (!values) return null;
 
@@ -46,20 +46,18 @@ export function ArrayOneOfPreview({
     return (
         <div className={"flex flex-col"}>
             {values &&
-                values.map((value: any, index: number) => {
-                    const resolvedProperty = properties[value?.[typeField]];
-                    if (!value || !resolvedProperty) return null;
+                values.map((val, index: number) => {
+                    const resolvedProperty = properties[val?.[typeField] as string];
+                    if (!val || !resolvedProperty) return null;
                     return (
                         <React.Fragment
-                            key={"preview_array_" + value + "_" + index}>
+                            key={"preview_array_" + index}>
                             <div className={cls(defaultBorderMixin, "m-1 border-b last:border-b-0 py-2")}>
                                 <ErrorBoundary>
                                     <PropertyPreview
                                         propertyKey={propertyKey}
-                                        // @ts-ignore
-                                        value={value[valueField]}
+                                        value={val[valueField]}
                                         // entity={entity}
-                                        // @ts-ignore
                                         property={resolvedProperty as Property}
                                         size={childSize}/>
                                 </ErrorBoundary>
