@@ -23,6 +23,16 @@ export interface CollectionFetchProps<M extends Record<string, any>> {
     itemCount?: number;
 
     /**
+     * Number of items to skip
+     */
+    offset?: number;
+
+    /**
+     * Page number (1-indexed), alternative to offset
+     */
+    page?: number;
+
+    /**
      * Filter the fetched data by the property
      */
     filterValues?: FilterValues<Extract<keyof M, string>>;
@@ -46,6 +56,7 @@ export interface CollectionFetchResult<M extends Record<string, any>> {
     dataLoading: boolean;
     noMoreToLoad: boolean;
     dataLoadingError?: Error;
+    totalCount?: number;
 }
 
 /**
@@ -55,6 +66,8 @@ export interface CollectionFetchResult<M extends Record<string, any>> {
  * @param filterValues
  * @param sortBy
  * @param itemCount
+ * @param offset
+ * @param page
  * @param searchString
  * @group Hooks and utilities
  */
@@ -65,6 +78,8 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
         filterValues,
         sortBy,
         itemCount,
+        offset,
+        page,
         searchString
     }: CollectionFetchProps<M>): CollectionFetchResult<M> {
     const dataClient = useData();
@@ -99,12 +114,13 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
     const [dataLoading, setDataLoading] = useState<boolean>(false);
     const [dataLoadingError, setDataLoadingError] = useState<Error | undefined>();
     const [noMoreToLoad, setNoMoreToLoad] = useState<boolean>(false);
+    const [totalCount, setTotalCount] = useState<number | undefined>();
 
     useEffect(() => {
 
         setDataLoading(true);
 
-        const onEntitiesUpdate = async (res: { data: Entity<M>[], meta: { hasMore: boolean } }) => {
+        const onEntitiesUpdate = async (res: { data: Entity<M>[], meta: { hasMore: boolean; total?: number } }) => {
             const entities = res.data;
             setDataLoading(false);
             setDataLoadingError(undefined);
@@ -112,6 +128,7 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
                 ...e
             })));
             setNoMoreToLoad(!res.meta.hasMore);
+            setTotalCount(res.meta.total);
         };
 
         const onError = (error: Error) => {
@@ -119,6 +136,7 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
             setDataLoading(false);
             setData([]);
             setDataLoadingError(error);
+            setTotalCount(undefined);
         };
 
         const accessor = dataClient.collection(path);
@@ -133,6 +151,8 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
             return accessor.listen({
                 where: whereParams,
                 limit: itemCount,
+                offset,
+                page,
                 orderBy: orderByParams,
                 searchString,
                 include: includeParams
@@ -141,6 +161,8 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
             accessor.find({
                 where: whereParams,
                 limit: itemCount,
+                offset,
+                page,
                 orderBy: orderByParams,
                 searchString,
                 include: includeParams
@@ -150,13 +172,14 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
             return () => {
             };
         }
-    }, [path, itemCount, currentSort, sortByProperty, filterValues, searchString, dataClient, collection]);
+    }, [path, itemCount, offset, page, currentSort, sortByProperty, filterValues, searchString, dataClient, collection]);
 
     return useMemo(() => ({
         data,
         dataLoading,
         dataLoadingError,
-        noMoreToLoad
-    }), [data, dataLoading, dataLoadingError, noMoreToLoad]);
+        noMoreToLoad,
+        totalCount
+    }), [data, dataLoading, dataLoadingError, noMoreToLoad, totalCount]);
 
 }

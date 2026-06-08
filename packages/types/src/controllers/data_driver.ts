@@ -154,6 +154,12 @@ export interface DataDriver {
     deleteEntity<M extends Record<string, unknown> = Record<string, unknown>>(props: DeleteEntityProps<M>): Promise<void>;
 
     /**
+     * Delete all entities from a collection.
+     * @param path Collection path
+     */
+    deleteAll?(path: string): Promise<void>;
+
+    /**
      * Check if the given property is unique in the given collection
      * @param path Collection path
      * @param name of the property

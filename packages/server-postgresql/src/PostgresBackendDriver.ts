@@ -631,6 +631,12 @@ propertyCallbacks: undefined };
 
     }
 
+    async deleteAll(path: string): Promise<void> {
+        await this.entityService.deleteAll(path);
+        // Notify real-time subscribers of bulk change
+        await this.realtimeService.notifyEntityUpdate(path, "*", null);
+    }
+
     async checkUniqueField(
         path: string,
         name: string,
@@ -1070,6 +1076,10 @@ roles: this.user?.roles ?? [] };
 
     async deleteEntity<M extends Record<string, unknown>>(props: DeleteEntityProps<M>): Promise<void> {
         return this.withTransaction((delegate) => delegate.deleteEntity(props));
+    }
+
+    async deleteAll(path: string): Promise<void> {
+        return this.delegate.deleteAll(path);
     }
 
     async checkUniqueField(

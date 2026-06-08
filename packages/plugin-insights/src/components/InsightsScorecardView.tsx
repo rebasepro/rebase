@@ -39,6 +39,7 @@ export function InsightsScorecardView({
     title,
     compact = false,
     embedded = false,
+    fixedHeight,
 }: {
     config: ScorecardConfig;
     data: DataRow;
@@ -46,6 +47,8 @@ export function InsightsScorecardView({
     compact?: boolean;
     /** When true, skip own border/bg since the parent card provides them. */
     embedded?: boolean;
+    /** Explicit height to prevent layout shift between skeleton → loaded. */
+    fixedHeight?: number;
 }) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [containerWidth, setContainerWidth] = useState<number | null>(null);
@@ -124,7 +127,7 @@ export function InsightsScorecardView({
         : cls("rounded-lg flex flex-col min-w-0 bg-transparent border", defaultBorderMixin, isSmall ? "px-3.5 py-3" : "px-5 py-4");
 
     return (
-        <div ref={containerRef} className={baseClass} style={embedded ? undefined : { minHeight: isSmall ? 68 : 92 }}>
+        <div ref={containerRef} className={baseClass} style={embedded ? undefined : fixedHeight ? { height: fixedHeight } : { minHeight: isSmall ? 68 : 92 }}>
             {/* Title row */}
             <div className={`flex items-center justify-between ${isSmall ? "mb-1" : "mb-2"}`}>
                 <div className="flex flex-col min-w-0">

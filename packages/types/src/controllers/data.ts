@@ -147,6 +147,11 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     delete(id: string | number): Promise<void>;
 
     /**
+     * Delete all records in this collection.
+     */
+    deleteAll?(): Promise<void>;
+
+    /**
      * Subscribe to a collection for real-time updates.
      * Optional method, may not be supported by all implementations (like stateless HTTP clients).
      */

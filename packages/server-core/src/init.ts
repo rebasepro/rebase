@@ -800,6 +800,17 @@ collectionRegistry });
         logger.info("Email service attached to singleton", { configured: emailService.isConfigured() });
     }
 
+    // Attach raw SQL capability when the driver supports it (Postgres, MySQL).
+    // Document databases (MongoDB, Firestore) won't have this.
+    const driverAdmin = defaultBootstrapper.getAdmin?.(defaultDriverResult);
+    if (isSQLAdmin(driverAdmin)) {
+        Object.assign(serverClient, {
+            sql: (query: string, options?: { database?: string; role?: string }) =>
+                driverAdmin.executeSql(query, options)
+        });
+        logger.info("SQL capability attached to singleton");
+    }
+
     _initRebase(serverClient);
     logger.info("Rebase singleton initialized");
 

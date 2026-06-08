@@ -54,6 +54,15 @@ export class EntityPersistService {
     }
 
     /**
+     * Delete all entities from a collection
+     */
+    async deleteAll(collectionPath: string, _databaseId?: string): Promise<void> {
+        const collection = getCollectionByPath(collectionPath, this.registry);
+        const table = getTableForCollection(collection, this.registry);
+        await this.db.delete(table);
+    }
+
+    /**
      * Save an entity (create or update)
      */
     async saveEntity<M extends Record<string, unknown>>(

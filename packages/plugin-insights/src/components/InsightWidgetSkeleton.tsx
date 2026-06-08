@@ -21,12 +21,15 @@ export function InsightWidgetSkeleton({
     config,
     compact = false,
     embedded = false,
+    fixedHeight,
 }: {
     /** Scorecard config — used to match optional elements (comparison, dateRange, icon). */
     config: ScorecardConfig;
     compact?: boolean;
     /** When true, skip own border since the parent card provides it. */
     embedded?: boolean;
+    /** Explicit height to prevent layout shift between skeleton → loaded. */
+    fixedHeight?: number;
 }) {
     const hasComparison = Boolean(config.comparison);
     const hasIcon = Boolean(config.icon);
@@ -74,6 +77,7 @@ export function InsightWidgetSkeleton({
         hasIcon={hasIcon}
         hasDateRange={hasDateRange}
         embedded={embedded}
+        fixedHeight={fixedHeight}
     />;
 }
 
@@ -112,11 +116,13 @@ function StandardSkeleton({
     hasIcon,
     hasDateRange,
     embedded,
+    fixedHeight,
 }: {
     hasComparison: boolean;
     hasIcon: boolean;
     hasDateRange: boolean;
     embedded: boolean;
+    fixedHeight?: number;
 }) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [containerWidth, setContainerWidth] = useState<number | null>(null);
@@ -158,7 +164,7 @@ function StandardSkeleton({
         <div
             ref={containerRef}
             className={cls("animate-pulse", baseClass)}
-            style={embedded ? undefined : { minHeight: isSmall ? 68 : 92 }}
+            style={embedded ? undefined : fixedHeight ? { height: fixedHeight } : { minHeight: isSmall ? 68 : 92 }}
         >
             {/* Title row — identical flex structure to InsightsScorecardView */}
             <div className={`flex items-center justify-between ${isSmall ? "mb-1" : "mb-2"}`}>

@@ -5349,7 +5349,9 @@ function ProductList() {
 |-----------|------|-------------|
 | `path` | `string` | Absolute collection path (e.g., `"products"`). |
 | `collection` | `EntityCollection` | The collection definition object. |
-| `itemCount` | `number` | Optional. Number of entities to fetch. |
+| `itemCount` | `number` | Optional. Number of entities to fetch (SQL limit). |
+| `offset` | `number` | Optional. Number of items to skip. |
+| `page` | `number` | Optional. Page number (1-indexed), alternative to offset. |
 | `filterValues` | `FilterValues` | Optional. Query filters. Supports shorthand equality, tuples `[op, val]`, and PostgREST operator strings. |
 | `sortBy` | `[string, "asc" \| "desc"]` | Optional. Sort field and order direction tuple. |
 | `searchString` | `string` | Optional. Query for full-text search. |
@@ -5362,6 +5364,7 @@ function ProductList() {
 | `dataLoading` | `boolean` | True if the initial load is in progress. |
 | `dataLoadingError` | `Error` | Error object if the fetch fails. |
 | `noMoreToLoad` | `boolean` | True if there are no more records beyond the current page/limit. |
+| `totalCount` | `number` | Optional. The total count of records matching the filter in the database. |
 
 ### `useEntityFetch`
 

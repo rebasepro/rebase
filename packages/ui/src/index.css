@@ -117,7 +117,7 @@
 }
 
 .typography-button {
-    @apply text-[13px] font-semibold;
+    @apply text-sm font-semibold;
 }
 
 :focus-visible {

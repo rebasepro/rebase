@@ -48,29 +48,25 @@ export function App() {
     const dataEnhancementPlugin = useDataEnhancementPlugin();
 
     // ── Insights Plugin ──────────────────────────────────────────────
-    // Each insight widget has its own `data()` callback using the
-    // existing Rebase client SDK — no custom backend endpoint needed.
-    //
-    // NOTE: `collection.find()` returns `Entity[]` where each entity
-    // wraps data in `.values`. We extract `.values` for aggregation.
+    // Insight data is fetched via a backend function that runs SQL
+    // aggregations server-side — no need to pull hundreds of rows
+    // to the browser just to sum/count them.
+    const fetchHomeInsights = React.useCallback(
+        () => rebaseClient.functions.invoke<{
+            totalRevenue: number;
+            totalOrders: number;
+            avgOrderValue: number;
+            refundedOrders: number;
+        }>("insights", undefined, { method: "GET", path: "home" }),
+        [rebaseClient]
+    );
 
-    // Inflight dedup for insight data calls — widgets with identical
-    // queries (e.g. three widgets all fetching orders with limit 500)
-    // share a single network request instead of firing separately.
-    const insightFetchCache = React.useMemo(() => new Map<string, Promise<any>>(), []);
-
-    const cachedFind = React.useCallback((collection: string, params: Record<string, unknown> = {}) => {
-        const key = `${collection}:${JSON.stringify(params)}`;
-        if (!insightFetchCache.has(key)) {
-            const promise = rebaseClient.data.collection(collection).find(params)
-                .finally(() => {
-                    // Clear after a short window so co-occurring widgets share the request
-                    setTimeout(() => insightFetchCache.delete(key), 200);
-                });
-            insightFetchCache.set(key, promise);
-        }
-        return insightFetchCache.get(key)!;
-    }, [rebaseClient, insightFetchCache]);
+    const fetchCollectionInsights = React.useCallback(
+        (slug: string) => rebaseClient.functions.invoke<Record<string, number>>(
+            "insights", undefined, { method: "GET", path: `collection/${slug}` }
+        ),
+        [rebaseClient]
+    );
 
     const insightsConfig = React.useMemo<InsightsPluginConfig>(() => ({
         cacheTTL: 120_000,
@@ -80,10 +76,8 @@ export function App() {
                     id: "total-revenue",
                     title: "Total Revenue",
                     data: async () => {
-                        const res = await cachedFind("orders", { limit: 500 });
-                        const total = res.data.reduce((sum: number, e: any) => sum + (Number(e.values?.total) || 0), 0);
-                        const diff = 0.15; // Mock comparison +15%
-                        return { rows: [{ value: total, comp: diff }] };
+                        const stats = await fetchHomeInsights();
+                        return { rows: [{ value: stats.totalRevenue, comp: 0.15 }] };
                     },
                     scorecard: {
                         value: { field: "value", format: { style: "currency", currency: "USD", notation: "compact", decimals: 1 } },
@@ -96,9 +90,8 @@ export function App() {
                     id: "total-orders",
                     title: "Orders",
                     data: async () => {
-                        const res = await cachedFind("orders", { limit: 1 });
-                        const diff = 0.124; // Mock comparison +12.4%
-                        return { rows: [{ value: res.meta.total, comp: diff }] };
+                        const stats = await fetchHomeInsights();
+                        return { rows: [{ value: stats.totalOrders, comp: 0.124 }] };
                     },
                     scorecard: {
                         value: { field: "value", format: { style: "decimal" } },
@@ -111,11 +104,8 @@ export function App() {
                     id: "avg-order-value",
                     title: "Avg. Order Value",
                     data: async () => {
-                        const res = await cachedFind("orders", { limit: 500 });
-                        const total = res.data.reduce((sum: number, e: any) => sum + (Number(e.values?.total) || 0), 0);
-                        const avg = res.data.length > 0 ? total / res.data.length : 0;
-                        const diff = -0.052; // Mock comparison -5.2%
-                        return { rows: [{ value: avg, comp: diff }] };
+                        const stats = await fetchHomeInsights();
+                        return { rows: [{ value: stats.avgOrderValue, comp: -0.052 }] };
                     },
                     scorecard: {
                         value: { field: "value", format: { style: "currency", currency: "USD", decimals: 2 } },
@@ -128,12 +118,8 @@ export function App() {
                     id: "refunded-orders",
                     title: "Refunded Orders",
                     data: async () => {
-                        const res = await cachedFind("orders", {
-                            limit: 1,
-                            where: { status: "eq.refunded" },
-                        });
-                        const diff = 0.021; // Mock comparison +2.1%
-                        return { rows: [{ value: res.meta.total, comp: diff }] };
+                        const stats = await fetchHomeInsights();
+                        return { rows: [{ value: stats.refundedOrders, comp: 0.021 }] };
                     },
                     scorecard: {
                         value: { field: "value", format: { style: "decimal" } },
@@ -143,21 +129,14 @@ export function App() {
                     },
                 },
             ],
-
-            // ── Collection-level insights ───────────────────────────
-            // Scorecards are auto-extracted for the home page cards
-            // and rendered inline in the collection list view.
             collections: {
                 orders: [
                     {
                         id: "orders-confirmed-count",
                         title: "Confirmed",
-                        data: async (context) => {
-                            if (context?.path && context.path !== "orders") {
-                                return { rows: [] }; // Filtering by join table not supported in demo yet
-                            }
-                            const res = await cachedFind("orders", { limit: 1, where: { status: "eq.confirmed" } });
-                            return { rows: [{ value: res.meta.total, comp: 0.18 }] };
+                        data: async () => {
+                            const stats = await fetchCollectionInsights("orders");
+                            return { rows: [{ value: stats.confirmed, comp: 0.18 }] };
                         },
                         scorecard: {
                             value: { field: "value", format: { style: "decimal" } },
@@ -169,12 +148,9 @@ export function App() {
                     {
                         id: "orders-shipped-count",
                         title: "Shipped",
-                        data: async (context) => {
-                            if (context?.path && context.path !== "orders") {
-                                return { rows: [] };
-                            }
-                            const res = await cachedFind("orders", { limit: 1, where: { status: "eq.shipped" } });
-                            return { rows: [{ value: res.meta.total, comp: 0.074 }] };
+                        data: async () => {
+                            const stats = await fetchCollectionInsights("orders");
+                            return { rows: [{ value: stats.shipped, comp: 0.074 }] };
                         },
                         scorecard: {
                             value: { field: "value", format: { style: "decimal" } },
@@ -183,17 +159,12 @@ export function App() {
                             dateRange: "vs Previous Week",
                         },
                     },
-
                     {
                         id: "orders-revenue",
                         title: "Revenue",
-                        data: async (context) => {
-                            if (context?.path && context.path !== "orders") {
-                                return { rows: [] };
-                            }
-                            const res = await cachedFind("orders", { limit: 500 });
-                            const total = res.data.reduce((sum: number, e: any) => sum + (Number(e.values?.total) || 0), 0);
-                            return { rows: [{ value: total }] };
+                        data: async () => {
+                            const stats = await fetchCollectionInsights("orders");
+                            return { rows: [{ value: stats.revenue }] };
                         },
                         scorecard: {
                             value: { field: "value", format: { style: "currency", currency: "USD", notation: "compact", decimals: 1 } },
@@ -205,8 +176,8 @@ export function App() {
                         id: "products-catalog-count",
                         title: "Catalog",
                         data: async () => {
-                            const res = await cachedFind("products", { limit: 1 });
-                            return { rows: [{ value: res.meta.total }] };
+                            const stats = await fetchCollectionInsights("products");
+                            return { rows: [{ value: stats.total }] };
                         },
                         scorecard: {
                             value: { field: "value", format: { style: "decimal" } },
@@ -218,11 +189,8 @@ export function App() {
                         id: "tickets-open-count",
                         title: "Open",
                         data: async () => {
-                            const res = await cachedFind("tickets", {
-                                limit: 1,
-                                where: { status: "eq.open" },
-                            });
-                            return { rows: [{ value: res.meta.total }] };
+                            const stats = await fetchCollectionInsights("tickets");
+                            return { rows: [{ value: stats.openCount }] };
                         },
                         scorecard: {
                             value: { field: "value", format: { style: "decimal" } },
@@ -231,7 +199,7 @@ export function App() {
                 ],
             },
         },
-    }), [cachedFind]);
+    }), [fetchHomeInsights, fetchCollectionInsights]);
 
     const insightsPlugin = useInsightsPlugin(insightsConfig);
 

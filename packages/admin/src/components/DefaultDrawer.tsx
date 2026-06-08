@@ -317,7 +317,7 @@ export function DrawerToggle({
     const { t } = useTranslation();
 
     return (
-        <div className="shrink-0 mt-auto px-2 py-2">
+        <div className="shrink-0 mt-auto px-4 pt-0.5 pb-2">
             <Tooltip
                 title={isExpanded ? t("collapse") : t("expand")}
                 side="right"
@@ -486,7 +486,7 @@ export function DrawerFooterActions({
     }
 
     return (
-        <div className="shrink-0 pb-1" ref={portalRef}>
+        <div className="shrink-0 pt-2 pb-0" ref={portalRef}>
             {avatarComponent && (
                 <div className="flex items-center px-[16px] py-1">
                     <Menu

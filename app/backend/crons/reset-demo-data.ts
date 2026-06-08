@@ -1,17 +1,22 @@
 import type { CronJobDefinition } from "@rebasepro/types";
-import { rebase } from "@rebasepro/server-core";
 
 const DEMO_EMAIL = "demo@rebase.pro";
 const DEMO_PASSWORD = "DemoRebase2026!";
 const DEMO_DISPLAY_NAME = "Demo User";
 
-/**
- * Hourly cron job that resets the demo environment.
- *
- * 1. Wipes all collection data (TRUNCATE CASCADE)
- * 2. Deletes all users except re-creates the demo user
- * 3. Re-runs the seed data
- */
+const collectionTables = [
+    "posts_tags",
+    "order_items",
+    "posts",
+    "orders",
+    "products",
+    "customers",
+    "tickets",
+    "exercises",
+    "authors",
+    "tags"
+];
+
 const job: CronJobDefinition = {
     schedule: "0 * * * *",
     name: "Reset Demo Data",
@@ -20,58 +25,31 @@ const job: CronJobDefinition = {
     async handler(ctx) {
         ctx.log("🔄 Starting demo data reset...");
 
-        // ── Step 1: Truncate all collection tables ────────────────────
-        const collectionTables = [
-            "posts_tags",
-            "order_items",
-            "posts",
-            "orders",
-            "products",
-            "customers",
-            "tickets",
-            "exercises",
-            "authors",
-            "tags"
-        ];
-
-        ctx.log("Truncating collection tables...");
+        // ── Step 1: Delete all data from each collection ─────────────
+        ctx.log("Deleting collection data...");
         for (const table of collectionTables) {
             try {
-                await rebase.data.collection(table).find({ limit: 0 });
-                // Use raw SQL via the data layer workaround
-            } catch {
-                // Table might not exist yet, skip
-            }
-        }
-
-        // Use the server singleton to access the driver for raw SQL
-        interface RebaseDriver { executeSql(sql: string): Promise<unknown>; }
-        interface RebaseWithDriver { _driver?: RebaseDriver; driver?: RebaseDriver; }
-        const rebaseInternal = rebase as unknown as RebaseWithDriver;
-        const driver = rebaseInternal._driver ?? rebaseInternal.driver;
-        if (driver?.executeSql) {
-            // Truncate in dependency order
-            for (const table of collectionTables) {
-                try {
-                    await driver.executeSql(`TRUNCATE TABLE "${table}" CASCADE`);
-                    ctx.log(`  ✓ Truncated ${table}`);
-                } catch (e: unknown) {
-                    const msg = e instanceof Error ? e.message : String(e);
-                    ctx.log(`  ⚠ Failed to truncate ${table}: ${msg}`);
+                const col = ctx.client.data.collection(table);
+                if (col.deleteAll) {
+                    await col.deleteAll();
+                    ctx.log(`  ✓ Deleted all from ${table}`);
+                } else {
+                    ctx.log(`  ⚠ deleteAll not available for ${table}`);
                 }
+            } catch (e: unknown) {
+                const msg = e instanceof Error ? e.message : String(e);
+                ctx.log(`  ⚠ Failed to delete ${table}: ${msg}`);
             }
-        } else {
-            ctx.log("⚠ No executeSql available — skipping table truncation");
         }
 
-        // ── Step 2: Reset users ───────────────────────────────────────
+        // ── Step 2: Reset users ──────────────────────────────────────
         ctx.log("Resetting users...");
-        if (rebase.admin) {
+        if (ctx.client.admin) {
             try {
-                const { users } = await rebase.admin.listUsers();
+                const { users } = await ctx.client.admin.listUsers();
                 for (const user of users) {
                     try {
-                        await rebase.admin.deleteUser(user.uid);
+                        await ctx.client.admin!.deleteUser(user.uid);
                         ctx.log(`  ✓ Deleted user ${user.email}`);
                     } catch (e: unknown) {
                         const msg = e instanceof Error ? e.message : String(e);
@@ -83,9 +61,8 @@ const job: CronJobDefinition = {
                 ctx.log(`  ⚠ Failed to list users: ${msg}`);
             }
 
-            // Re-create demo user
             try {
-                await rebase.admin.createUser({
+                await ctx.client.admin.createUser({
                     email: DEMO_EMAIL,
                     displayName: DEMO_DISPLAY_NAME,
                     password: DEMO_PASSWORD,
@@ -100,10 +77,9 @@ const job: CronJobDefinition = {
             ctx.log("⚠ Admin API not available — skipping user reset");
         }
 
-        // ── Step 3: Re-seed data ──────────────────────────────────────
+        // ── Step 3: Re-seed data ─────────────────────────────────────
         ctx.log("Re-seeding demo data...");
         try {
-            // Dynamic import so the seed module is only loaded when needed
             const seedModule = await import("../src/seed.js");
             if (typeof seedModule.runSeed === "function") {
                 await seedModule.runSeed();

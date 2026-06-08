@@ -145,4 +145,21 @@ export interface RebaseClient<DB = unknown> {
      * detection (e.g. `typeof ws.executeSql === "function"`).
      */
     ws?: unknown;
+
+    /**
+     * Execute raw SQL against the database.
+     *
+     * Only available server-side when the backend uses a SQL database
+     * (PostgreSQL, MySQL, etc.). `undefined` for document databases
+     * (MongoDB, Firestore) and on the client-side SDK.
+     *
+     * @example
+     * ```typescript
+     * // In a cron job or custom function:
+     * if (ctx.client.sql) {
+     *     const rows = await ctx.client.sql("SELECT count(*) FROM orders");
+     * }
+     * ```
+     */
+    sql?(query: string, options?: { database?: string; role?: string }): Promise<Record<string, unknown>[]>;
 }

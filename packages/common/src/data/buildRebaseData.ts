@@ -190,6 +190,12 @@ values: {} as Record<string, unknown> }
             });
         },
 
+        deleteAll: driver.deleteAll
+            ? async (): Promise<void> => {
+                return driver.deleteAll!(slug);
+            }
+            : undefined,
+
         count: driver.countEntities
             ? async (params?: FindParams): Promise<number> => {
                 return driver.countEntities!({

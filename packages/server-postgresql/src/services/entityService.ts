@@ -169,6 +169,13 @@ export class EntityService implements EntityRepository {
         return this.persistService.deleteEntity(collectionPath, entityId, databaseId);
     }
 
+    /**
+     * Delete all entities from a collection
+     */
+    async deleteAll(collectionPath: string, databaseId?: string): Promise<void> {
+        return this.persistService.deleteAll(collectionPath, databaseId);
+    }
+
 
     /**
      * Execute raw SQL

@@ -126,6 +126,16 @@ export interface LoginViewProps {
      * If not set, derived from `authController.capabilities.registration`.
      */
     registrationEnabled?: boolean;
+
+    /**
+     * Pre-fill the email field (e.g. for demo or testing environments).
+     */
+    defaultEmail?: string;
+
+    /**
+     * Pre-fill the password field (e.g. for demo or testing environments).
+     */
+    defaultPassword?: string;
 }
 
 type AuthMode = "buttons" | "login" | "register" | "forgot";
@@ -149,7 +159,9 @@ export function LoginView({
     subtitle,
     needsSetup,
     registrationEnabled,
-    additionalComponent
+    additionalComponent,
+    defaultEmail,
+    defaultPassword
 }: LoginViewProps) {
 
     const modeState = useModeController();
@@ -301,6 +313,8 @@ export function LoginView({
                             noUserComponent={noUserComponent}
                             disableSignupScreen={false}
                             bootstrapMode={true}
+                            defaultEmail={defaultEmail}
+                            defaultPassword={defaultPassword}
                         />
                     )}
 
@@ -376,6 +390,8 @@ export function LoginView({
                                     noUserComponent={noUserComponent}
                                     disableSignupScreen={disableSignupScreen}
                                     switchToRegister={showRegistration ? () => switchMode("register") : undefined}
+                                    defaultEmail={defaultEmail}
+                                    defaultPassword={defaultPassword}
                                 />
                             )}
 
@@ -389,6 +405,8 @@ export function LoginView({
                                     noUserComponent={noUserComponent}
                                     disableSignupScreen={disableSignupScreen}
                                     switchToLogin={() => switchMode("login")}
+                                    defaultEmail={defaultEmail}
+                                    defaultPassword={defaultPassword}
                                 />
                             )}
 
@@ -576,7 +594,9 @@ function LoginForm({
     disableSignupScreen,
     bootstrapMode = false,
     switchToRegister,
-    switchToLogin
+    switchToLogin,
+    defaultEmail,
+    defaultPassword
 }: {
     onClose: () => void,
     onForgotPassword?: () => void,
@@ -586,12 +606,14 @@ function LoginForm({
     disableSignupScreen: boolean,
     bootstrapMode?: boolean,
     switchToRegister?: () => void,
-    switchToLogin?: () => void
+    switchToLogin?: () => void,
+    defaultEmail?: string,
+    defaultPassword?: string
 }) {
     const passwordRef = useRef<HTMLInputElement | null>(null);
 
-    const [email, setEmail] = useState<string>();
-    const [password, setPassword] = useState<string>();
+    const [email, setEmail] = useState<string | undefined>(defaultEmail);
+    const [password, setPassword] = useState<string | undefined>(defaultPassword);
     const [displayName, setDisplayName] = useState<string>();
 
     useEffect(() => {
