@@ -3,6 +3,11 @@ import { AuthController } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";
 import { isReferenceProperty, isRelationProperty } from "./property_utils";
 
+function isHiddenProperty(property: Property | undefined): boolean {
+    if (!property) return false;
+    return Boolean(property.ui?.hideFromCollection);
+}
+
 export function getEntityPreviewKeys(
     authController: AuthController,
     targetCollection: EntityCollection<any>,
@@ -26,7 +31,7 @@ export function getEntityPreviewKeys(
             })
             .filter(key => {
                 const property = targetCollection.properties[key];
-                return property && !isPropertyBuilder(property) && !isReferenceProperty(property) && !isRelationProperty(property);
+                return property && !isPropertyBuilder(property) && !isReferenceProperty(property) && !isRelationProperty(property) && !isHiddenProperty(property);
             }).slice(0, limit);
     }
 }
@@ -43,6 +48,9 @@ export function getEntityTitlePropertyKey<M extends Record<string, unknown>>(col
         const property = collection.properties[key];
         if (property && !isPropertyBuilder(property)) {
             const prop = property as Property;
+            if (isHiddenProperty(prop)) {
+                continue;
+            }
             if (prop.type === "string" && !prop.ui?.multiline && !prop.ui?.markdown && !prop.storage && !prop.isId) {
                 if (!firstStringCandidate) {
                     firstStringCandidate = key;

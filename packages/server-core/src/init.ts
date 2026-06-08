@@ -23,6 +23,7 @@ import { createApiKeyRoutes } from "./auth/api-keys/api-key-routes";
 import type { ApiKeyStore } from "./auth/api-keys/api-key-store";
 import { createApiKeyRateLimiter } from "./auth/rate-limiter";
 import { createRebaseClient } from "@rebasepro/client";
+import { defaultUsersCollection } from "@rebasepro/common";
 import { createHistoryRoutes } from "./history";
 import { EmailConfig, createEmailService } from "./email";
 import type { EmailService } from "./email";
@@ -290,6 +291,13 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         activeCollections = await loadCollectionsFromDirectory(config.collectionsDir);
         logger.info("Auto-discovered collections", { count: activeCollections.length,
 dir: config.collectionsDir });
+    }
+
+    if (config.auth) {
+        // Prepend defaultUsersCollection if not overridden by the developer's collections
+        activeCollections = Array.from(
+            new Map([defaultUsersCollection, ...activeCollections].map(c => [c.slug, c])).values()
+        );
     }
 
     const realtimeServices: Record<string, RealtimeProvider> = {};

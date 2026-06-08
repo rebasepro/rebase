@@ -132,6 +132,24 @@ name: "Title" } as Property
         expect(result).not.toContain("id");
     });
 
+    it("excludes hidden properties from auto-selection", () => {
+        const collection: EntityCollection = {
+            id: "test",
+            name: "Test",
+            path: "test",
+            properties: {
+                title: { type: "string", name: "Title" } as Property,
+                secret: { type: "string", name: "Secret", ui: { hideFromCollection: true } } as Property,
+                body: { type: "string", name: "Body" } as Property
+            }
+        } as EntityCollection;
+
+        const result = getEntityPreviewKeys(mockAuthController, collection, fields);
+        expect(result).not.toContain("secret");
+        expect(result).toContain("title");
+        expect(result).toContain("body");
+    });
+
     it("respects the limit parameter", () => {
         const collection: EntityCollection = {
             id: "test",
@@ -292,5 +310,19 @@ name: "Flag" } as Property
         } as EntityCollection;
 
         expect(getEntityTitlePropertyKey(collection, fields)).toBeUndefined();
+    });
+
+    it("skips hidden properties when auto-detecting title", () => {
+        const collection: EntityCollection = {
+            id: "test",
+            name: "Test",
+            path: "test",
+            properties: {
+                secret: { type: "string", name: "Secret", ui: { hideFromCollection: true } } as Property,
+                name: { type: "string", name: "Name" } as Property
+            }
+        } as EntityCollection;
+
+        expect(getEntityTitlePropertyKey(collection, fields)).toBe("name");
     });
 });
