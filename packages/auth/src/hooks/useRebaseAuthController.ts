@@ -313,7 +313,7 @@ export function useRebaseAuthController(
         if (defineRolesFor) {
             const customRoles = await defineRolesFor(convertedUser);
             if (customRoles) {
-                convertedUser = { ...convertedUser, roles: customRoles.map(r => r.id) };
+                convertedUser = { ...convertedUser, roles: customRoles };
             }
         }
 
@@ -479,7 +479,7 @@ export function useRebaseAuthController(
                 const customRoles = await defineRolesFor(convertedUser);
                 if (customRoles) {
                     convertedUser = { ...convertedUser,
-roles: customRoles.map(r => r.id) };
+roles: customRoles };
                 }
             }
 
@@ -575,7 +575,7 @@ roles: customRoles.map(r => r.id) };
                     const customRoles = await defineRolesFor(userToSet);
                     if (customRoles) {
                         userToSet = { ...userToSet,
-roles: customRoles.map(r => r.id) };
+roles: customRoles };
                     }
                 }
 
@@ -619,7 +619,7 @@ roles: customRoles.map(r => r.id) };
                         if (!isMountedRef.current) return;
                         if (customRoles) {
                             userToSet = { ...userToSet,
-roles: customRoles.map(r => r.id) };
+roles: customRoles };
                         }
                     }
                 } catch (meError: unknown) {

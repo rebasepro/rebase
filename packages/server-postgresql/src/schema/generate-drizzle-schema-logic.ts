@@ -70,6 +70,8 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
                 columnDefinition = `${enumName}("${colName}")`;
             } else if ("isId" in stringProp && stringProp.isId === "uuid") {
                 columnDefinition = `uuid("${colName}")`;
+            } else if (stringProp.columnType === "uuid") {
+                columnDefinition = `uuid("${colName}")`;
             } else if (stringProp.columnType === "text") {
                 columnDefinition = `text("${colName}")`;
             } else if (stringProp.columnType === "char") {

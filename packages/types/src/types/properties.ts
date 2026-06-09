@@ -1,15 +1,12 @@
-import React from "react";
-
 import type { ComponentRef } from "./component_ref";
 
-import type { EntityReference, EntityRelation, EntityValues, GeoPoint, Entity, Vector } from "./entities";
-import type { Relation, JoinStep, OnAction } from "./relations";
+import type { Entity, EntityReference, EntityRelation, EntityValues, GeoPoint, Vector } from "./entities";
+import type { JoinStep, OnAction, Relation } from "./relations";
 import type { EntityCollection, FilterValues } from "./collections";
 import type { ColorKey, ColorScheme } from "./chips";
 import type { AuthController } from "../controllers/auth";
 import type { EntityAfterReadProps, EntityBeforeSaveProps } from "./entity_callbacks";
 import type { User } from "../users";
-import type { RebaseContext } from "../rebase_context";
 
 /**
  * Callbacks/Hooks for individual property fields
@@ -23,7 +20,6 @@ export type PropertyCallbacks<T = unknown, M extends Record<string, unknown> = R
         value: T;
         entity: Entity<M> | undefined;
     }): Promise<T> | T;
-
 
     /**
      * Callback used before saving, after validation.
@@ -85,17 +81,17 @@ export type FirebaseProperties = {
  */
 export type InferPropertyType<P extends Property> =
     P extends StringProperty ? string :
-    P extends NumberProperty ? number :
-    P extends BooleanProperty ? boolean :
-    P extends DateProperty ? Date :
-    P extends GeopointProperty ? GeoPoint :
-    P extends ReferenceProperty ? EntityReference :
-    P extends RelationProperty ? EntityRelation | EntityRelation[] :
-    P extends ArrayProperty ? (P["of"] extends Property ? InferPropertyType<P["of"]>[] : unknown[]) :
-    P extends MapProperty ? (P["properties"] extends Properties ? InferEntityType<P["properties"]> : Record<string, unknown>) :
-    P extends VectorProperty ? Vector :
-    P extends BinaryProperty ? string :
-    never;
+        P extends NumberProperty ? number :
+            P extends BooleanProperty ? boolean :
+                P extends DateProperty ? Date :
+                    P extends GeopointProperty ? GeoPoint :
+                        P extends ReferenceProperty ? EntityReference :
+                            P extends RelationProperty ? EntityRelation | EntityRelation[] :
+                                P extends ArrayProperty ? (P["of"] extends Property ? InferPropertyType<P["of"]>[] : unknown[]) :
+                                    P extends MapProperty ? (P["properties"] extends Properties ? InferEntityType<P["properties"]> : Record<string, unknown>) :
+                                        P extends VectorProperty ? Vector :
+                                            P extends BinaryProperty ? string :
+                                                never;
 
 /**
  * Helper type that determines whether a property is required.
@@ -189,10 +185,6 @@ export interface BaseProperty<CustomProps = unknown> {
      */
     columnName?: string;
 
-
-
-
-
     /**
      * Rules for validating this property
      */
@@ -202,9 +194,6 @@ export interface BaseProperty<CustomProps = unknown> {
      * This value will be set by default for new entities.
      */
     defaultValue?: unknown;
-
-
-
 
     /**
      * Use this to define dynamic properties that change based on certain conditions
@@ -232,7 +221,6 @@ export interface BaseProperty<CustomProps = unknown> {
      */
     callbacks?: PropertyCallbacks;
 
-
 }
 
 /**
@@ -253,7 +241,7 @@ export interface StringProperty extends BaseProperty {
      * Optional database column type. If not set, it defaults to `varchar` or `uuid` depending on `isId` configuration.
      * Use `text` for strings with unbound length, `char` for fixed-length strings, or `varchar` for variable-length strings with a limit.
      */
-    columnType?: "varchar" | "text" | "char";
+    columnType?: "varchar" | "text" | "char" | "uuid";
     /**
      * Rules for validating this property
      */
@@ -324,7 +312,6 @@ export interface StringProperty extends BaseProperty {
      * Should this string be rendered as a tag instead of just text.
      */
     previewAsTag?: boolean;
-
 
     /**
      * You can use this property (a string) to behave as a reference to another

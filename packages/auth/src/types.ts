@@ -1,4 +1,4 @@
-import { AuthController, Role, User } from "@rebasepro/types";
+import { AuthController, User } from "@rebasepro/types";
 
 /**
  * Auth controller that extends the base AuthController
@@ -64,7 +64,7 @@ export interface RebaseAuthControllerProps {
     /** Callback when user signs out */
     onSignOut?: () => void;
     /** Define roles for a user after login */
-    defineRolesFor?: (user: User) => Promise<Role[] | undefined> | Role[] | undefined;
+    defineRolesFor?: (user: User) => Promise<string[] | undefined> | string[] | undefined;
 }
 
 /**

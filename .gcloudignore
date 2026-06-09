@@ -13,7 +13,7 @@
 /test-cli-init-project/
 /scratch/
 /.yarn/
-/app/
+# /app/
 /website/
 /e2e/
 /videos/
