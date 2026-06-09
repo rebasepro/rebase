@@ -1,15 +1,14 @@
-import { pgSchema, pgTable, varchar, uuid, timestamp, boolean, jsonb, primaryKey, unique } from "drizzle-orm/pg-core";
+import { pgSchema, pgTable, varchar, uuid, timestamp, boolean, jsonb, text, unique } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 /**
  * Factory function to dynamically create the auth tables bound to the specified schema names.
  */
-export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchemaName: string = "rebase") {
-    const rolesSchema = rolesSchemaName === "public" ? null : pgSchema(rolesSchemaName);
+export function createAuthSchema(usersSchemaName: string = "rebase") {
     const usersSchema = usersSchemaName === "public" ? null : pgSchema(usersSchemaName);
 
-    const rolesTableCreator = (rolesSchema ? rolesSchema.table.bind(rolesSchema) : pgTable) as typeof pgTable;
-    const usersTableCreator = (usersSchema ? usersSchema.table.bind(usersSchema) : pgTable) as typeof pgTable;
+    const tableCreator = (usersSchema ? usersSchema.table.bind(usersSchema) : pgTable) as typeof pgTable;
+    const usersTableCreator = tableCreator;
 
     /**
      * Users table - stores both email/password and OAuth users
@@ -24,48 +23,18 @@ export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchema
         emailVerificationToken: varchar("email_verification_token", { length: 255 }),
         emailVerificationSentAt: timestamp("email_verification_sent_at"),
         isAnonymous: boolean("is_anonymous").default(false).notNull(),
+        roles: text("roles").array().default([]).notNull(),
         metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
         createdAt: timestamp("created_at").defaultNow().notNull(),
         updatedAt: timestamp("updated_at").defaultNow().notNull()
     });
 
-    /**
-     * Roles table - defines permission sets
-     */
-    const roles = rolesTableCreator("roles", {
-        id: varchar("id", { length: 50 }).primaryKey(), // 'admin', 'editor', 'viewer'
-        name: varchar("name", { length: 100 }).notNull(),
-        isAdmin: boolean("is_admin").default(false).notNull(),
-        defaultPermissions: jsonb("default_permissions").$type<{
-            read?: boolean;
-            create?: boolean;
-            edit?: boolean;
-            delete?: boolean;
-        }>(),
-        collectionPermissions: jsonb("collection_permissions").$type<
-            Record<string, {
-                read?: boolean;
-                create?: boolean;
-                edit?: boolean;
-                delete?: boolean;
-            }>
-        >()
-    });
 
-    /**
-     * User-Role junction table
-     */
-    const userRoles = rolesTableCreator("user_roles", {
-        userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-        roleId: varchar("role_id", { length: 50 }).notNull().references(() => roles.id, { onDelete: "cascade" })
-    }, (table) => ({
-        pk: primaryKey({ columns: [table.userId, table.roleId] })
-    }));
 
     /**
      * Refresh tokens for long-lived sessions
      */
-    const refreshTokens = rolesTableCreator("refresh_tokens", {
+    const refreshTokens = tableCreator("refresh_tokens", {
         id: uuid("id").defaultRandom().primaryKey(),
         userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
         tokenHash: varchar("token_hash", { length: 255 }).notNull().unique(),
@@ -80,7 +49,7 @@ export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchema
     /**
      * Password reset tokens for forgot password flow
      */
-    const passwordResetTokens = rolesTableCreator("password_reset_tokens", {
+    const passwordResetTokens = tableCreator("password_reset_tokens", {
         id: uuid("id").defaultRandom().primaryKey(),
         userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
         tokenHash: varchar("token_hash", { length: 255 }).notNull().unique(),
@@ -92,7 +61,7 @@ export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchema
     /**
      * App config - key/value store for custom settings
      */
-    const appConfig = rolesTableCreator("app_config", {
+    const appConfig = tableCreator("app_config", {
         key: varchar("key", { length: 100 }).primaryKey(),
         value: jsonb("value").notNull(),
         updatedAt: timestamp("updated_at").defaultNow().notNull()
@@ -101,7 +70,7 @@ export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchema
     /**
      * User identities - maps external OAuth profiles back to local users
      */
-    const userIdentities = rolesTableCreator("user_identities", {
+    const userIdentities = tableCreator("user_identities", {
         id: uuid("id").defaultRandom().primaryKey(),
         userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
         provider: varchar("provider", { length: 50 }).notNull(), // e.g. 'google', 'linkedin'
@@ -116,7 +85,7 @@ export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchema
     /**
      * MFA factors table - stores enrolled MFA methods
      */
-    const mfaFactors = rolesTableCreator("mfa_factors", {
+    const mfaFactors = tableCreator("mfa_factors", {
         id: uuid("id").defaultRandom().primaryKey(),
         userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
         factorType: varchar("factor_type", { length: 20 }).notNull(), // 'totp'
@@ -130,7 +99,7 @@ export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchema
     /**
      * MFA challenges table - tracks active MFA verification attempts
      */
-    const mfaChallenges = rolesTableCreator("mfa_challenges", {
+    const mfaChallenges = tableCreator("mfa_challenges", {
         id: uuid("id").defaultRandom().primaryKey(),
         factorId: uuid("factor_id").notNull().references(() => mfaFactors.id, { onDelete: "cascade" }),
         createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -142,7 +111,7 @@ export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchema
     /**
      * Recovery codes table - backup codes for MFA
      */
-    const recoveryCodes = rolesTableCreator("recovery_codes", {
+    const recoveryCodes = tableCreator("recovery_codes", {
         id: uuid("id").defaultRandom().primaryKey(),
         userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
         codeHash: varchar("code_hash", { length: 255 }).notNull(),
@@ -151,11 +120,8 @@ export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchema
     });
 
     return {
-        rolesSchema,
         usersSchema,
         users,
-        roles,
-        userRoles,
         refreshTokens,
         passwordResetTokens,
         appConfig,
@@ -167,14 +133,11 @@ export function createAuthSchema(rolesSchemaName: string = "rebase", usersSchema
 }
 
 // Instantiate default schema and tables using the default "rebase" schema
-const defaultAuthSchema = createAuthSchema("rebase", "rebase");
+const defaultAuthSchema = createAuthSchema("rebase");
 
-export const rebaseSchema = defaultAuthSchema.rolesSchema;
 export const usersSchema = defaultAuthSchema.usersSchema;
 
 export const users = defaultAuthSchema.users;
-export const roles = defaultAuthSchema.roles;
-export const userRoles = defaultAuthSchema.userRoles;
 export const refreshTokens = defaultAuthSchema.refreshTokens;
 export const passwordResetTokens = defaultAuthSchema.passwordResetTokens;
 export const appConfig = defaultAuthSchema.appConfig;
@@ -185,27 +148,11 @@ export const recoveryCodes = defaultAuthSchema.recoveryCodes;
 
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
-    userRoles: many(userRoles),
     refreshTokens: many(refreshTokens),
     passwordResetTokens: many(passwordResetTokens),
     userIdentities: many(userIdentities),
     mfaFactors: many(mfaFactors),
     recoveryCodes: many(recoveryCodes)
-}));
-
-export const rolesRelations = relations(roles, ({ many }) => ({
-    userRoles: many(userRoles)
-}));
-
-export const userRolesRelations = relations(userRoles, ({ one }) => ({
-    user: one(users, {
-        fields: [userRoles.userId],
-        references: [users.id]
-    }),
-    role: one(roles, {
-        fields: [userRoles.roleId],
-        references: [roles.id]
-    })
 }));
 
 export const refreshTokensRelations = relations(refreshTokens, ({ one }) => ({
@@ -254,9 +201,6 @@ export const recoveryCodesRelations = relations(recoveryCodes, ({ one }) => ({
 // Type exports
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
-export type Role = typeof roles.$inferSelect;
-export type NewRole = typeof roles.$inferInsert;
-export type UserRole = typeof userRoles.$inferSelect;
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type AppConfig = typeof appConfig.$inferSelect;

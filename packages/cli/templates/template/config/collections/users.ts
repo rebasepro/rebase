@@ -1,6 +1,5 @@
-import { EntityCollection } from "@rebasepro/types";
-import { resetPasswordAction, deleteEntityAction, RolesFilterSelect, UserRolesSelectField } from "@rebasepro/admin";
-import rolesCollection from "./roles.js";
+import type { EntityCollection } from "@rebasepro/types";
+import { resetPasswordAction, deleteEntityAction } from "@rebasepro/admin";
 
 const usersCollection: EntityCollection = {
     name: "Users",
@@ -12,7 +11,6 @@ const usersCollection: EntityCollection = {
     group: "Settings",
     openEntityMode: "dialog",
     disableDefaultActions: ["copy"],
-    Actions: [RolesFilterSelect],
     entityActions: [
         resetPasswordAction,
         {
@@ -41,6 +39,7 @@ const usersCollection: EntityCollection = {
         displayName: {
             name: "Name",
             type: "string",
+            columnName: "display_name",
             validation: {
                 required: true
             }
@@ -48,21 +47,20 @@ const usersCollection: EntityCollection = {
         photoURL: {
             name: "Photo URL",
             type: "string",
+            columnName: "photo_url",
             url: "image"
         },
         roles: {
             name: "Roles",
-            type: "relation",
-            target: () => rolesCollection,
-            cardinality: "many",
-            direction: "owning",
-            through: {
-                table: "user_roles",
-                sourceColumn: "user_id",
-                targetColumn: "role_id"
-            },
-            ui: {
-                Field: UserRolesSelectField
+            type: "array",
+            of: {
+                name: "Role",
+                type: "string",
+                enum: {
+                    admin: "Admin",
+                    editor: "Editor",
+                    viewer: "Viewer"
+                }
             }
         },
         passwordHash: {
@@ -114,6 +112,7 @@ const usersCollection: EntityCollection = {
         createdAt: {
             name: "Created At",
             type: "date",
+            columnName: "created_at",
             ui: {
                 readOnly: true
             }

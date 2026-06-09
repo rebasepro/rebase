@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Role, User } from "@rebasepro/types";
+import type { User } from "@rebasepro/types";
 
 /**
  * UserManagement interface - compatible with @rebasepro/user_management
@@ -23,13 +23,9 @@ export interface UserManagement<USER extends User = User> {
     }>;
     deleteUser: (user: USER) => Promise<void>;
 
-    roles: Role[];
-    saveRole: (role: Role) => Promise<void>;
-    deleteRole: (role: Role) => Promise<void>;
-
     isAdmin?: boolean;
     allowDefaultRolesCreation?: boolean;
-    defineRolesFor: (user: User) => Promise<Role[] | undefined> | Role[] | undefined;
+    defineRolesFor: (user: User) => Promise<string[] | undefined> | string[] | undefined;
     getUser: (uid: string) => User | null;
 
     /**
@@ -47,7 +43,6 @@ export interface UserManagement<USER extends User = User> {
     }) => Promise<{ users: USER[]; total: number }>;
 
     usersError?: Error;
-    rolesError?: Error;
     bootstrapAdmin?: () => Promise<void>;
 }
 
@@ -83,17 +78,9 @@ interface ApiUser {
     updatedAt?: string;
 }
 
-interface ApiRole {
-    id: string;
-    name: string;
-    isAdmin?: boolean;
-}
-
 /** Response shapes from the admin API */
-interface ApiRolesResponse { roles: ApiRole[] }
 interface ApiUsersResponse { users: ApiUser[]; total: number }
 interface ApiUserResponse { user: ApiUser; invitationSent?: boolean; temporaryPassword?: string }
-interface ApiRoleResponse { role: ApiRole }
 
 /**
  * Convert API user to Rebase User
@@ -113,17 +100,6 @@ function convertUser(apiUser: ApiUser): User {
 }
 
 /**
- * Convert API role to Rebase Role
- */
-function convertRole(apiRole: ApiRole): Role {
-    return {
-        id: apiRole.id,
-        name: apiRole.name,
-        isAdmin: apiRole.isAdmin ?? false
-    };
-}
-
-/**
  * Hook to manage users and roles via backend API
  * Compatible with Rebase UserManagement interface
  */
@@ -134,7 +110,6 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
     // individual API lookups.  We never load ALL users into memory.
     const [userCache, setUserCache] = useState<Map<string, User>>(new Map());
     const [hasAdminUsers, setHasAdminUsers] = useState(false);
-    const [roles, setRoles] = useState<Role[]>([]);
     const userRoles = currentUser?.roles ?? [];
     const isUserAdmin = userRoles.some(r => r === "admin" || r === "schema-admin");
 
@@ -144,7 +119,6 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
         return true;
     });
     const [usersError, setUsersError] = useState<Error | undefined>();
-    const [rolesError, setRolesError] = useState<Error | undefined>();
 
     // Tracks the UID for which roles+users were last successfully loaded.
     // Prevents redundant refetches on React StrictMode double-mounts.
@@ -261,20 +235,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
     // Keep the ref in sync after every render.
     apiRequestRef.current = apiRequest;
 
-    /**
-     * Load roles from API
-     */
-    const loadRoles = useCallback(async (signal?: AbortSignal) => {
-        try {
-            const data = await apiRequest<ApiRolesResponse>("/roles", "GET", undefined, 6, signal);
-            setRoles(data.roles.map(convertRole));
-            setRolesError(undefined);
-        } catch (error: unknown) {
-            if (error instanceof Error && error.name === "AbortError") return;
-            console.error("Failed to load roles:", error);
-            setRolesError(error instanceof Error ? error : new Error(String(error)));
-        }
-    }, [apiRequest]);
+
 
     /**
      * Lightweight admin-existence check: fetch a single admin user.
@@ -333,27 +294,6 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
         const load = async () => {
             setLoading(true);
             const request = apiRequestRef.current!;
-
-            // Load roles first
-            try {
-                const data = await request<ApiRolesResponse>("/roles", "GET", undefined, 6, abortController.signal);
-                setRoles(data.roles.map(convertRole));
-                setRolesError(undefined);
-            } catch (error: unknown) {
-                if (error instanceof Error && error.name === "AbortError") return;
-                console.error("Failed to load roles:", error);
-                setRolesError(error instanceof Error ? error : new Error(String(error)));
-
-                // If the error is a permission issue (e.g. 403), skip the
-                // admin check — it will fail with the same error and we'd
-                // show a duplicate snackbar / error message.
-                const status = (error as { status?: number }).status;
-                if (status === 403 || status === 401) {
-                    setUsersError(error instanceof Error ? error : new Error(String(error)));
-                    setLoading(false);
-                    return;
-                }
-            }
 
             // Lightweight admin-existence check (NOT loading all users)
             if (!abortController.signal.aborted) {
@@ -488,40 +428,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
         });
     }, [apiRequest]);
 
-    /**
-     * Save role (create or update)
-     */
-    const saveRole = useCallback(async (role: Role): Promise<void> => {
-        // Check if role exists
-        const existingRole = roles.find(r => r.id === role.id);
 
-        if (existingRole) {
-            // Update
-            const data = await apiRequest<ApiRoleResponse>(`/roles/${role.id}`, "PUT", {
-                name: role.name,
-                isAdmin: role.isAdmin
-            });
-            const updated = convertRole(data.role);
-            setRoles(prev => prev.map(r => r.id === updated.id ? updated : r));
-        } else {
-            // Create
-            const data = await apiRequest<ApiRoleResponse>("/roles", "POST", {
-                id: role.id,
-                name: role.name,
-                isAdmin: role.isAdmin ?? false
-            });
-            const created = convertRole(data.role);
-            setRoles(prev => [...prev, created]);
-        }
-    }, [apiRequest, roles]);
-
-    /**
-     * Delete role
-     */
-    const deleteRole = useCallback(async (role: Role): Promise<void> => {
-        await apiRequest(`/roles/${role.id}`, "DELETE");
-        setRoles(prev => prev.filter(r => r.id !== role.id));
-    }, [apiRequest]);
 
     /**
      * Get user by uid
@@ -533,7 +440,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
     /**
      * Define roles for a given user (for authController)
      */
-    const defineRolesFor = useCallback(async (user: User): Promise<Role[] | undefined> => {
+    const defineRolesFor = useCallback(async (user: User): Promise<string[] | undefined> => {
         // Check cache first
         let existingUser = userCache.get(user.uid)
             ?? Array.from(userCache.values()).find(u => u.email === user.email);
@@ -549,10 +456,10 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
             }
         }
 
-        // Return roles from our cached role data (string IDs → full Role objects)
+        // Return role IDs as simple strings
         const userRoleIds = existingUser.roles ?? [];
-        return roles.filter(r => userRoleIds.includes(r.id));
-    }, [userCache, roles, apiRequest, mergeIntoCache]);
+        return userRoleIds;
+    }, [userCache, apiRequest, mergeIntoCache]);
 
     /**
      * Check if current user is admin
@@ -566,10 +473,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
     const bootstrapAdmin = useCallback(async (): Promise<void> => {
         try {
             await apiRequest("/bootstrap", "POST");
-            // Reload roles and re-check admin existence after successful bootstrap
-            const data = await apiRequest<ApiRolesResponse>("/roles");
-            const loadedRoles = data.roles.map(convertRole);
-            setRoles(loadedRoles);
+            // Re-check admin existence after successful bootstrap
             await checkAdminExists();
         } catch (error) {
             console.error("Failed to bootstrap admin:", error);
@@ -589,16 +493,12 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
         createUser,
         resetPassword,
         deleteUser,
-        roles,
-        saveRole,
-        deleteRole,
         isAdmin,
         allowDefaultRolesCreation: isAdmin,
         defineRolesFor,
         getUser,
         searchUsers,
         usersError,
-        rolesError,
         bootstrapAdmin
     };
 }

@@ -1,4 +1,4 @@
-import { Role, User } from "../users";
+import type { User } from "../users";
 
 /**
  * Capabilities advertised by an auth provider.
@@ -77,7 +77,7 @@ export type AuthController<USER extends User = User, ExtraData = unknown> = {
 
     setUser?(user: USER | null): void;
 
-    setUserRoles?(roles: Role[]): void;
+    setUserRoles?(roles: string[]): void;
 
     /**
      * Capabilities advertised by the auth provider.

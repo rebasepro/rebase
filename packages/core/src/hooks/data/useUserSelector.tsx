@@ -142,7 +142,7 @@ export function useUserSelector(
     }, []);
 
     const getUser = useCallback((uid: string): User | null => {
-        return userManagement?.getUser(uid) ?? null;
+        return userManagement?.getUser?.(uid) ?? null;
     }, [userManagement]);
 
     return useMemo(() => ({

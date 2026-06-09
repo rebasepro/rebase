@@ -129,25 +129,12 @@ interface AdminUser {
     updatedAt: string;
 }
 
-interface RebaseRole {
-    id: string;
-    name: string;
-    isAdmin: boolean;
-    defaultPermissions: Record<string, unknown> | null;
-    config: Record<string, unknown> | null;
-}
-
 interface RebaseAdmin {
     listUsers(): Promise<{ users: AdminUser[] }>;
     getUser(userId: string): Promise<{ user: AdminUser }>;
     createUser(data: { email: string; displayName?: string; password?: string; roles?: string[] }): Promise<{ user: AdminUser }>;
     updateUser(userId: string, data: { email?: string; displayName?: string; password?: string; roles?: string[] }): Promise<{ user: AdminUser }>;
     deleteUser(userId: string): Promise<{ success: boolean }>;
-    listRoles(): Promise<{ roles: RebaseRole[] }>;
-    getRole(roleId: string): Promise<{ role: RebaseRole }>;
-    createRole(data: { id: string; name: string; isAdmin?: boolean; defaultPermissions?: Record<string, unknown>; config?: Record<string, unknown> }): Promise<{ role: RebaseRole }>;
-    updateRole(roleId: string, data: { name?: string; isAdmin?: boolean; defaultPermissions?: Record<string, unknown>; config?: Record<string, unknown> }): Promise<{ role: RebaseRole }>;
-    deleteRole(roleId: string): Promise<{ success: boolean }>;
     bootstrap(): Promise<{ success: boolean; message: string; user: { uid: string; roles: string[] } }>;
 }
 

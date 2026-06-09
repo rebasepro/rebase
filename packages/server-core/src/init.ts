@@ -386,7 +386,6 @@ collectionRegistry });
             // (the return type still exposes `auth?: BootstrappedAuth`)
             authConfigResult = {
                 userService: authAdapter.userManagement ?? {},
-                roleService: authAdapter.roleManagement ?? {},
             };
         } else {
             // ── RebaseAuthConfig — wrap in built-in adapter ──

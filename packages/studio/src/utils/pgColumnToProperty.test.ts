@@ -311,6 +311,7 @@ character_maximum_length: null }
 
             const prop = collection.properties!.tags as ArrayProperty;
             expect(prop.type).toBe("array");
+            expect(prop.columnType).toBe("text[]");
             expect(!Array.isArray(prop.of) && prop.of?.type).toBe("string");
         });
 

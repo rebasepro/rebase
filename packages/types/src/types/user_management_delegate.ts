@@ -1,4 +1,4 @@
-import { Role, User } from "../users";
+import type { User } from "../users";
 
 /**
  * Result of creating a new user via admin flow.
@@ -18,60 +18,45 @@ export interface UserCreationResult<USER extends User = User> {
 
 
 /**
- * Delegate to manage users, roles, and their permissions.
- * This interface allows the CMS to be completely agnostic of the underlying
- * authentication provider or backend.
+ * Delegate to manage auth-specific user operations.
+ *
+ * This interface allows the CMS to be agnostic of the underlying
+ * authentication provider or backend. User/role CRUD is now handled
+ * by the collection system; this delegate only exposes auth-specific
+ * operations (password hashing, invitations, bootstrap).
  *
  * @group Models
  */
 export interface UserManagementDelegate<USER extends User = User> {
 
     /**
-     * Are the users and roles currently being fetched?
+     * Are auth-related operations currently loading?
      */
     loading: boolean;
 
     /**
-     * List of users managed by the CMS.
+     * In-memory list of users (used for client-side filtering fallback).
      */
-    users: USER[];
+    users?: USER[];
 
     /**
-     * Optional error if users failed to load.
+     * Error from fetching the users list, if any.
      */
     usersError?: Error;
 
     /**
-     * Function to get a user by its uid. This is used to show
-     * user information when assigning ownership of an entity.
-     * @param uid
+     * Look up a single user by UID from the in-memory cache.
      */
-    getUser: (uid: string) => USER | null;
+    getUser?: (uid: string) => USER | null;
 
     /**
-     * Search users with server-side pagination.
-     * When provided, the CMS will use this for the users table
-     * instead of loading all users into memory.
+     * Server-side user search with pagination.
      */
-    searchUsers?: (options: {
-        search?: string;
-        limit?: number;
-        offset?: number;
-        orderBy?: string;
-        orderDir?: "asc" | "desc";
-        roleId?: string;
-    }) => Promise<{ users: USER[]; total: number }>;
-
-    /**
-     * Save a user (create or update)
-     * @param user
-     */
-    saveUser?: (user: USER) => Promise<USER>;
+    searchUsers?: (params: { search?: string; limit?: number; offset?: number }) => Promise<{ users: USER[]; total: number }>;
 
     /**
      * Create a new user with invitation/password generation support.
      * Returns additional info about how the credentials were delivered.
-     * Falls back to saveUser if not provided.
      */
     createUser?: (user: USER) => Promise<UserCreationResult<USER>>;
 
@@ -83,51 +68,15 @@ export interface UserManagementDelegate<USER extends User = User> {
     resetPassword?: (user: USER) => Promise<UserCreationResult<USER>>;
 
     /**
-     * Delete a user
-     * @param user
-     */
-    deleteUser?: (user: USER) => Promise<void>;
-
-    /**
-     * List of roles defined in the CMS.
-     */
-    roles?: Role[];
-
-    /**
-     * Optional error if roles failed to load.
-     */
-    rolesError?: Error;
-
-    /**
-     * Save a role (create or update)
-     * @param role
-     */
-    saveRole?: (role: Role) => Promise<void>;
-
-    /**
-     * Delete a role
-     * @param role
-     */
-    deleteRole?: (role: Role) => Promise<void>;
-
-    /**
      * Is the currently logged in user an admin?
      */
     isAdmin?: boolean;
 
     /**
-     * If true, the UI will allow the user to create the default roles (admin, editor, viewer).
-     */
-    allowDefaultRolesCreation?: boolean;
-
-
-
-
-    /**
      * Optionally define roles for a given user. This is useful when the roles
      * are coming from a separate provider than the one issuing the tokens.
      */
-    defineRolesFor?: (user: USER) => Promise<Role[] | undefined> | Role[] | undefined;
+    defineRolesFor?: (user: USER) => Promise<string[] | undefined> | string[] | undefined;
 
     /**
      * Whether any admin users exist. Used by the bootstrap banner to decide

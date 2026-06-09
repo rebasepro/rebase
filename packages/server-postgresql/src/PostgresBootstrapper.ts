@@ -30,7 +30,7 @@ import {
 // @ts-ignore
 } from "@rebasepro/server-core";
 import { ensureAuthTablesExist } from "./auth/ensure-tables";
-import { RoleService, UserService, PostgresAuthRepository, AuthSchemaTables } from "./auth/services";
+import { UserService, PostgresAuthRepository, AuthSchemaTables } from "./auth/services";
 import { createAuthSchema } from "./schema/auth-schema";
 
 // @ts-ignore
@@ -195,32 +195,23 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             }
 
             const customUsersTable = registry?.getTable("users");
-            const customRolesTable = registry?.getTable("roles");
 
             let usersSchemaName = "rebase";
-            let rolesSchemaName = "rebase";
 
             if (customUsersTable) {
                 usersSchemaName = getTableConfig(customUsersTable).schema || "public";
             }
-            if (customRolesTable) {
-                rolesSchemaName = getTableConfig(customRolesTable).schema || "public";
-            }
 
-            const authTables = createAuthSchema(rolesSchemaName, usersSchemaName) as unknown as AuthSchemaTables;
+            const authTables = createAuthSchema(usersSchemaName) as unknown as AuthSchemaTables;
             if (customUsersTable) {
                 authTables.users = customUsersTable as unknown as PgTable & Record<string, AnyPgColumn>;
             }
-            if (customRolesTable) {
-                authTables.roles = customRolesTable as unknown as PgTable & Record<string, AnyPgColumn>;
-            }
 
             const userService = new UserService(db, authTables);
-            const roleService = new RoleService(db, authTables);
             const authRepository = new PostgresAuthRepository(db, authTables);
 
             return { userService,
-roleService,
+roleService: userService,
 emailService,
 authRepository };
         },

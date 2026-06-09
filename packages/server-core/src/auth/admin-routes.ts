@@ -5,7 +5,7 @@ import { requireAuth, requireAdmin, createRequireAuth } from "./middleware";
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
 import { AuthModuleConfig } from "./routes";
-import type { BackendHooks, AdminUser, AdminRole, BackendHookContext } from "@rebasepro/types";
+import type { BackendHooks, AdminUser, BackendHookContext } from "@rebasepro/types";
 
 interface AdminRouteOptions extends AuthModuleConfig {
     serviceKey?: string;
@@ -99,12 +99,7 @@ export function createAdminRoutes(config: AdminRouteOptions): Hono<HonoEnv> {
         return results.filter((u): u is AdminUser => u !== null);
     }
 
-    /** Apply roles.afterRead hook to an array and filter nulls */
-    async function applyRoleAfterReadBatch(roles: AdminRole[], ctx: BackendHookContext): Promise<AdminRole[]> {
-        if (!hooks?.roles?.afterRead) return roles;
-        const results = await Promise.all(roles.map(r => hooks!.roles!.afterRead!(r, ctx)));
-        return results.filter((r): r is AdminRole => r !== null);
-    }
+
 
     /** Convert a DB user record + role IDs into the AdminUser API shape */
     function toAdminUser(u: { id: string; email: string; displayName?: string | null; photoUrl?: string | null; createdAt?: Date | string; updatedAt?: Date | string }, roles: string[]): AdminUser {
@@ -533,91 +528,7 @@ displayName: existing.displayName }, appName);
         return c.json({ success: true });
     });
 
-    router.get("/roles", requireAdmin, async (c) => {
-        const roles = await authRepo.listRoles();
-        const hookCtx = buildHookContext(c, "GET");
 
-        let adminRoles: AdminRole[] = roles.map(r => ({
-            id: r.id,
-            name: r.name,
-            isAdmin: r.isAdmin,
-            defaultPermissions: r.defaultPermissions
-        }));
-
-        adminRoles = await applyRoleAfterReadBatch(adminRoles, hookCtx);
-
-        return c.json({ roles: adminRoles });
-    });
-
-    router.get("/roles/:roleId", requireAdmin, async (c) => {
-        const roleId = c.req.param("roleId");
-        const role = await authRepo.getRoleById(roleId);
-
-        if (!role) {
-            throw ApiError.notFound("Role not found");
-        }
-
-        return c.json({ role });
-    });
-
-    router.post("/roles", requireAdmin, async (c) => {
-        const body = await c.req.json();
-        const { id, name, isAdmin, defaultPermissions } = body;
-
-        if (!id || !name) {
-            throw ApiError.badRequest("Role ID and name are required", "INVALID_INPUT");
-        }
-
-        const existing = await authRepo.getRoleById(id);
-        if (existing) {
-            throw ApiError.conflict("Role already exists", "ROLE_EXISTS");
-        }
-
-        const role = await authRepo.createRole({
-            id,
-            name,
-            isAdmin: isAdmin ?? false,
-            defaultPermissions: defaultPermissions ?? null
-        });
-
-        return c.json({ role }, 201);
-    });
-
-    router.put("/roles/:roleId", requireAdmin, async (c) => {
-        const roleId = c.req.param("roleId");
-        const body = await c.req.json();
-        const { name, isAdmin, defaultPermissions } = body;
-
-        const existing = await authRepo.getRoleById(roleId);
-        if (!existing) {
-            throw ApiError.notFound("Role not found");
-        }
-
-        const role = await authRepo.updateRole(roleId, {
-            name,
-            isAdmin,
-            defaultPermissions
-        });
-
-        return c.json({ role });
-    });
-
-    router.delete("/roles/:roleId", requireAdmin, async (c) => {
-        const roleId = c.req.param("roleId");
-
-        if (["admin", "editor", "viewer"].includes(roleId)) {
-            throw ApiError.badRequest("Cannot delete built-in roles", "BUILTIN_ROLE");
-        }
-
-        const existing = await authRepo.getRoleById(roleId);
-        if (!existing) {
-            throw ApiError.notFound("Role not found");
-        }
-
-        await authRepo.deleteRole(roleId);
-
-        return c.json({ success: true });
-    });
 
     return router;
 }

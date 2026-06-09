@@ -655,9 +655,11 @@ export interface ArrayProperty extends BaseProperty {
     ui?: ArrayUIConfig;
     type: "array";
     /**
-     * Optional database column type. Defaults to `jsonb`.
+     * Optional database column type. By default, maps to a native Postgres array
+     * (e.g. `text[]`, `integer[]`/`numeric[]`, `boolean[]`) if the element type
+     * is a primitive, otherwise defaults to `jsonb`.
      */
-    columnType?: "json" | "jsonb";
+    columnType?: "json" | "jsonb" | "text[]" | "integer[]" | "boolean[]" | "numeric[]";
     /**
      * The property of this array.
      * You can specify any property (except another Array property)

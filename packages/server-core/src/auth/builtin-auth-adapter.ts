@@ -15,13 +15,10 @@ import type {
     AuthenticatedUser,
     AuthAdapterCapabilities,
     UserManagementAdapter,
-    RoleManagementAdapter,
     AuthUserListOptions,
     AuthUserListResult,
     AuthUserData,
     AuthCreateUserData,
-    AuthRoleData,
-    AuthCreateRoleData,
     BootstrappedAuth,
     BackendHooks,
 } from "@rebasepro/types";
@@ -131,8 +128,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             // Resolve roles from the repository
             let roles: string[] = payload.roles || [];
             try {
-                const userRoles = await authRepository.getUserRoles(payload.userId);
-                roles = userRoles.map((r) => r.id);
+                roles = await authRepository.getUserRoleIds(payload.userId);
             } catch {
                 // Fall back to token roles if repository lookup fails
             }
@@ -174,8 +170,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
 
             let roles: string[] = payload.roles || [];
             try {
-                const userRoles = await authRepository.getUserRoles(payload.userId);
-                roles = userRoles.map((r) => r.id);
+                roles = await authRepository.getUserRoleIds(payload.userId);
             } catch {
                 // Fall back to token roles if repository lookup fails
             }
@@ -194,7 +189,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
 
         userManagement: createUserManagementFromRepo(authRepository, resolvedOps, authHooks),
 
-        roleManagement: createRoleManagementFromRepo(authRepository),
+
 
         createAuthRoutes(): Hono<HonoEnv> | undefined {
             return createAuthRoutes({
@@ -327,47 +322,12 @@ function createUserManagementFromRepo(repo: AuthRepository, resolvedOps: Resolve
             }
         },
 
-        async getUserRoles(userId: string): Promise<AuthRoleData[]> {
-            const roles = await repo.getUserRoles(userId);
-            return roles.map(toAuthRoleData);
+        async getUserRoles(userId: string): Promise<string[]> {
+            return repo.getUserRoleIds(userId);
         },
 
         async setUserRoles(userId: string, roleIds: string[]): Promise<void> {
             await repo.setUserRoles(userId, roleIds);
-        },
-    };
-}
-
-function createRoleManagementFromRepo(repo: AuthRepository): RoleManagementAdapter {
-    return {
-        async listRoles(): Promise<AuthRoleData[]> {
-            const roles = await repo.listRoles();
-            return roles.map(toAuthRoleData);
-        },
-
-        async getRoleById(id: string): Promise<AuthRoleData | null> {
-            const role = await repo.getRoleById(id);
-            return role ? toAuthRoleData(role) : null;
-        },
-
-        async createRole(data: AuthCreateRoleData): Promise<AuthRoleData> {
-            const role = await repo.createRole({
-                id: data.id,
-                name: data.name,
-                isAdmin: data.isAdmin,
-                defaultPermissions: data.defaultPermissions,
-                collectionPermissions: data.collectionPermissions,
-            });
-            return toAuthRoleData(role);
-        },
-
-        async updateRole(id: string, data: Partial<AuthRoleData>): Promise<AuthRoleData | null> {
-            const role = await repo.updateRole(id, data);
-            return role ? toAuthRoleData(role) : null;
-        },
-
-        async deleteRole(id: string): Promise<void> {
-            await repo.deleteRole(id);
         },
     };
 }
@@ -382,15 +342,5 @@ function toAuthUserData(user: { id: string; email: string; displayName?: string 
         metadata: user.metadata,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
-    };
-}
-
-function toAuthRoleData(role: { id: string; name: string; isAdmin: boolean; defaultPermissions?: unknown; collectionPermissions?: unknown }): AuthRoleData {
-    return {
-        id: role.id,
-        name: role.name,
-        isAdmin: role.isAdmin,
-        defaultPermissions: role.defaultPermissions as AuthRoleData["defaultPermissions"],
-        collectionPermissions: role.collectionPermissions as AuthRoleData["collectionPermissions"],
     };
 }

@@ -1,4 +1,4 @@
-import type { AdminUser, AdminRole } from "../controllers/client";
+import type { AdminUser } from "../controllers/client";
 
 /**
  * Context passed to every backend hook.
@@ -54,20 +54,6 @@ export interface UserHooks {
      * Called after a user is successfully deleted.
      */
     afterDelete?(userId: string, context: BackendHookContext): void | Promise<void>;
-}
-
-/**
- * Hooks for intercepting Admin Role data at the API boundary.
- * @group Backend Hooks
- */
-export interface RoleHooks {
-    /**
-     * Transform a role record after it's read from the database,
-     * before it's returned to the client.
-     *
-     * Return the modified role, or `null` to filter it out entirely.
-     */
-    afterRead?(role: AdminRole, context: BackendHookContext): AdminRole | null | Promise<AdminRole | null>;
 }
 
 /**
@@ -144,7 +130,7 @@ export interface DataHooks {
  * These hooks run server-side after database operations complete and before
  * API responses are sent.
  *
- * - `users` / `roles` — intercept admin user and role management endpoints
+ * - `users` — intercept admin user management endpoints
  * - `data` — intercept ALL collection entity data flowing through the REST API
  *
  * `data` hooks complement per-collection `EntityCallbacks`. Entity callbacks
@@ -178,8 +164,6 @@ export interface DataHooks {
 export interface BackendHooks {
     /** Hooks for intercepting user management data */
     users?: UserHooks;
-    /** Hooks for intercepting role management data */
-    roles?: RoleHooks;
     /** Hooks for intercepting ALL collection entity data via the REST API */
     data?: DataHooks;
 }

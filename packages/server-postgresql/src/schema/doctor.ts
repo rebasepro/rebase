@@ -84,10 +84,28 @@ export function getExpectedColumnType(prop: Property): string | null {
             if (dp.columnType === "time") return "time without time zone";
             return "timestamp with time zone";
         }
-        case "map":
         case "array": {
-            const ap = prop as ArrayProperty | MapProperty;
-            if (ap.columnType === "json") return "json";
+            const ap = prop as ArrayProperty;
+            let colType = ap.columnType;
+            if (!colType && ap.of && !Array.isArray(ap.of)) {
+                const ofProp = ap.of as Property;
+                if (ofProp.type === "string") {
+                    colType = "text[]";
+                } else if (ofProp.type === "number") {
+                    colType = ofProp.validation?.integer ? "integer[]" : "numeric[]";
+                } else if (ofProp.type === "boolean") {
+                    colType = "boolean[]";
+                }
+            }
+
+            if (colType === "json") return "json";
+            if (colType === "jsonb") return "jsonb";
+            if (colType && colType.endsWith("[]")) return "ARRAY";
+            return "jsonb";
+        }
+        case "map": {
+            const mp = prop as MapProperty;
+            if (mp.columnType === "json") return "json";
             return "jsonb";
         }
         case "relation":
@@ -484,6 +502,29 @@ export async function checkCollectionsVsDatabase(
                     let isMismatch = actualType !== expectedType;
                     if (prop.type === "vector" && dbCol.udt_name !== "vector") {
                         isMismatch = true;
+                    }
+                    if (prop.type === "array") {
+                        const ap = prop as ArrayProperty;
+                        let expectedColType = ap.columnType;
+                        if (!expectedColType && ap.of && !Array.isArray(ap.of)) {
+                            const ofProp = ap.of as Property;
+                            if (ofProp.type === "string") expectedColType = "text[]";
+                            else if (ofProp.type === "number") expectedColType = ofProp.validation?.integer ? "integer[]" : "numeric[]";
+                            else if (ofProp.type === "boolean") expectedColType = "boolean[]";
+                        }
+                        if (expectedColType && expectedColType.endsWith("[]")) {
+                            if (actualType !== "ARRAY") {
+                                isMismatch = true;
+                            } else {
+                                const expectedUdt = expectedColType === "text[]" ? "_text" :
+                                                    expectedColType === "integer[]" ? "_int4" :
+                                                    expectedColType === "boolean[]" ? "_bool" :
+                                                    expectedColType === "numeric[]" ? "_numeric" : "";
+                                if (expectedUdt && dbCol.udt_name !== expectedUdt) {
+                                    isMismatch = true;
+                                }
+                            }
+                        }
                     }
                     if (isMismatch) {
                         issues.push({

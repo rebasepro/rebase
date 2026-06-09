@@ -1,6 +1,6 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
-import { createAdmin, AdminUser, RebaseRole } from "../src/admin";
-import { Transport } from "../src/transport";
+import { createAdmin, AdminUser } from "../src/admin";
+import type { Transport } from "../src/transport";
 
 function createMockTransport() {
     const mockRequest = jest.fn() as jest.Mock<Transport["request"]>;
@@ -145,98 +145,6 @@ displayName: "New Name" };
             const result = await admin.deleteUser("usr_1");
             expect(result.success).toBe(true);
             expect(mockRequest).toHaveBeenCalledWith("/admin/users/usr_1", { method: "DELETE" });
-        });
-    });
-
-    // -----------------------------------------------------------------------
-    // Roles
-    // -----------------------------------------------------------------------
-    describe("Roles", () => {
-        it("listRoles calls GET /admin/roles", async () => {
-            const admin = createAdmin(transport);
-            const roles: RebaseRole[] = [
-                { id: "admin",
-name: "Admin",
-isAdmin: true,
-defaultPermissions: null }
-            ];
-            mockRequest.mockResolvedValueOnce({ roles });
-
-            const result = await admin.listRoles();
-            expect(result.roles).toHaveLength(1);
-            expect(result.roles[0].id).toBe("admin");
-            expect(mockRequest).toHaveBeenCalledWith("/admin/roles", { method: "GET" });
-        });
-
-        it("getRole calls GET /admin/roles/:id", async () => {
-            const admin = createAdmin(transport);
-            mockRequest.mockResolvedValueOnce({ role: { id: "admin",
-name: "Admin" } });
-
-            const result = await admin.getRole("admin");
-            expect(result.role.id).toBe("admin");
-            expect(mockRequest).toHaveBeenCalledWith("/admin/roles/admin", { method: "GET" });
-        });
-
-        it("createRole calls POST /admin/roles with full payload", async () => {
-            const admin = createAdmin(transport);
-            mockRequest.mockResolvedValueOnce({ role: { id: "editor" } });
-
-            const data = {
-                id: "editor",
-                name: "Editor",
-                isAdmin: false,
-                defaultPermissions: { canEdit: true }
-            };
-            await admin.createRole(data);
-
-            expect(mockRequest).toHaveBeenCalledWith("/admin/roles", { method: "POST",
-body: JSON.stringify(data) });
-        });
-
-        it("createRole with minimal payload", async () => {
-            const admin = createAdmin(transport);
-            mockRequest.mockResolvedValueOnce({ role: { id: "viewer" } });
-
-            const data = { id: "viewer",
-name: "Viewer" };
-            await admin.createRole(data);
-
-            expect(mockRequest).toHaveBeenCalledWith("/admin/roles", {
-                method: "POST",
-                body: JSON.stringify({ id: "viewer",
-name: "Viewer" })
-            });
-        });
-
-        it("updateRole calls PUT /admin/roles/:id with partial data", async () => {
-            const admin = createAdmin(transport);
-            mockRequest.mockResolvedValueOnce({ role: { id: "editor",
-name: "Senior Editor" } });
-
-            const patch = { name: "Senior Editor",
-isAdmin: true };
-            await admin.updateRole("editor", patch);
-
-            expect(mockRequest).toHaveBeenCalledWith("/admin/roles/editor", { method: "PUT",
-body: JSON.stringify(patch) });
-        });
-
-        it("deleteRole calls DELETE /admin/roles/:id", async () => {
-            const admin = createAdmin(transport);
-            mockRequest.mockResolvedValueOnce({ success: true });
-
-            const result = await admin.deleteRole("editor");
-            expect(result.success).toBe(true);
-            expect(mockRequest).toHaveBeenCalledWith("/admin/roles/editor", { method: "DELETE" });
-        });
-
-        it("deleteRole encodes special characters", async () => {
-            const admin = createAdmin(transport);
-            mockRequest.mockResolvedValueOnce({ success: true });
-
-            await admin.deleteRole("role/with/slashes");
-            expect(mockRequest).toHaveBeenCalledWith("/admin/roles/role%2Fwith%2Fslashes", { method: "DELETE" });
         });
     });
 

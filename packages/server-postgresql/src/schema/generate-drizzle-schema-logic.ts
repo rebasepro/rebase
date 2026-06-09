@@ -145,11 +145,39 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
             }
             break;
         }
-        case "map":
-        case "array": {
-            const arrayOrMapProp = prop as ArrayProperty | MapProperty;
-            if (arrayOrMapProp.columnType === "json") {
+        case "map": {
+            const mapProp = prop as MapProperty;
+            if (mapProp.columnType === "json") {
                 columnDefinition = `json("${colName}")`;
+            } else {
+                columnDefinition = `jsonb("${colName}")`;
+            }
+            break;
+        }
+        case "array": {
+            const arrayProp = prop as ArrayProperty;
+            let colType = arrayProp.columnType;
+            if (!colType && arrayProp.of && !Array.isArray(arrayProp.of)) {
+                const ofProp = arrayProp.of as Property;
+                if (ofProp.type === "string") {
+                    colType = "text[]";
+                } else if (ofProp.type === "number") {
+                    colType = ofProp.validation?.integer ? "integer[]" : "numeric[]";
+                } else if (ofProp.type === "boolean") {
+                    colType = "boolean[]";
+                }
+            }
+
+            if (colType === "json") {
+                columnDefinition = `json("${colName}")`;
+            } else if (colType === "text[]") {
+                columnDefinition = `text("${colName}").array()`;
+            } else if (colType === "integer[]") {
+                columnDefinition = `integer("${colName}").array()`;
+            } else if (colType === "boolean[]") {
+                columnDefinition = `boolean("${colName}").array()`;
+            } else if (colType === "numeric[]") {
+                columnDefinition = `numeric("${colName}").array()`;
             } else {
                 columnDefinition = `jsonb("${colName}")`;
             }

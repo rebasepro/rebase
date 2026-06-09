@@ -5,13 +5,12 @@ import {
     RebaseRoutes,
     UserSettingsView,
     UIReferenceView,
-    NotFoundPage,
-    useInternalUserManagementController
+    NotFoundPage
 } from "@rebasepro/core";
 import { CircularProgressCenter } from "@rebasepro/ui";
 
 import { ContentHomePage } from "./HomePage/ContentHomePage";
-import { RolesView } from "./admin/RolesView";
+
 import { RebaseRoute } from "../routes/RebaseRoute";
 import { CustomViewRoute } from "../routes/CustomViewRoute";
 import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
@@ -48,7 +47,7 @@ export interface RebaseRouteDefsProps {
  * Route definitions for the CMS.
  *
  * Defines all standard routes: home, studio home, collection view,
- * settings, users, roles, debug, custom views, and a catch-all 404.
+ * settings, debug, custom views, and a catch-all 404.
  *
  * **Independently usable**: Use this when you want Rebase routes
  * inside your own layout/navigation setup.
@@ -64,7 +63,6 @@ export interface RebaseRouteDefsProps {
  */
 export function RebaseRouteDefs({ children, layout }: RebaseRouteDefsProps) {
     const registry = useRebaseRegistry();
-    const userManagement = useInternalUserManagementController();
     const navigationStateController = useNavigationStateController();
 
     const cmsHomePage = registry.cmsConfig?.homePage ?? <Suspense fallback={<CircularProgressCenter/>}><ContentHomePage/></Suspense>;
@@ -85,7 +83,7 @@ export function RebaseRouteDefs({ children, layout }: RebaseRouteDefsProps) {
 
             <Route path={"/c/*"} element={<RebaseRoute/>}/>
             <Route path={"/settings"} element={<SettingsView/>}/>
-            {userManagement && <Route path={"/roles"} element={<RolesView userManagement={userManagement}/>}/>}
+
 
             {/* Hidden debug route */}
             <Route path={"/debug/ui"} element={<UIReferenceView/>}/>

@@ -33,7 +33,7 @@ export type BuildNavigationStateProps<EC extends EntityCollection, USER extends 
  * NavigationStateController. This is a thin composition of three focused hooks:
  *
  * - useResolvedCollections: resolves collection props and registers with CollectionRegistry
- * - useResolvedViews: resolves view/admin view props and injects Users/Roles views
+ * - useResolvedViews: resolves view/admin view props
  * - useTopLevelNavigation: computes the NavigationResult from resolved data
  *
  * The NavigationStateController type is preserved as a public API.
@@ -87,8 +87,7 @@ export function useBuildNavigationStateController<EC extends EntityCollection, U
         data,
         plugins,
         adminMode,
-        effectiveRoleController,
-        userManagement
+        effectiveRoleController
     });
 
     // Step 3: Compute top-level navigation (pure derived state)

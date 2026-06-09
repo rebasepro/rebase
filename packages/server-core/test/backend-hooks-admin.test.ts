@@ -362,32 +362,7 @@ describe("BackendHooks — Admin Routes", () => {
         });
     });
 
-    // ── roles.afterRead ─────────────────────────────────────────────────
-    describe("roles.afterRead", () => {
-        it("filters out roles from GET /admin/roles", async () => {
-            const hooks: BackendHooks = {
-                roles: {
-                    afterRead(role) {
-                        // Hide internal roles
-                        if (role.id === "internal") return null;
-                        return role;
-                    }
-                }
-            };
-            const app = createApp(hooks);
-            mockAuthRepo.listRoles.mockResolvedValueOnce([
-                mockRole("admin", true),
-                mockRole("internal"),
-                mockRole("editor")
-            ]);
 
-            const res = await app.request("/admin/roles", { headers: { ...adminAuth() } });
-            expect(res.status).toBe(200);
-            const body = await res.json() as any;
-            expect(body.roles).toHaveLength(2);
-            expect(body.roles.map((r: any) => r.id)).toEqual(["admin", "editor"]);
-        });
-    });
 
     // ── no hooks (passthrough) ──────────────────────────────────────────
     describe("no hooks configured", () => {

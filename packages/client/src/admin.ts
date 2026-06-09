@@ -1,4 +1,4 @@
-import { Transport } from "./transport";
+import type { Transport } from "./transport";
 
 export interface AdminUser {
     uid: string;
@@ -9,13 +9,6 @@ export interface AdminUser {
     roles: string[];
     createdAt: string;
     updatedAt: string;
-}
-
-export interface RebaseRole {
-    id: string;
-    name: string;
-    isAdmin: boolean;
-    defaultPermissions: Record<string, unknown> | null;
 }
 
 export interface CreateAdminOptions {
@@ -67,34 +60,6 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
         });
     }
 
-    async function listRoles() {
-        return transport.request<{ roles: RebaseRole[] }>(adminPath + "/roles", { method: "GET" });
-    }
-
-    async function getRole(roleId: string) {
-        return transport.request<{ role: RebaseRole }>(adminPath + "/roles/" + encodeURIComponent(roleId), { method: "GET" });
-    }
-
-    async function createRole(data: { id: string, name: string, isAdmin?: boolean, defaultPermissions?: Record<string, unknown> }) {
-        return transport.request<{ role: RebaseRole }>(adminPath + "/roles", {
-            method: "POST",
-            body: JSON.stringify(data)
-        });
-    }
-
-    async function updateRole(roleId: string, data: { name?: string, isAdmin?: boolean, defaultPermissions?: Record<string, unknown> }) {
-        return transport.request<{ role: RebaseRole }>(adminPath + "/roles/" + encodeURIComponent(roleId), {
-            method: "PUT",
-            body: JSON.stringify(data)
-        });
-    }
-
-    async function deleteRole(roleId: string) {
-        return transport.request<{ success: boolean }>(adminPath + "/roles/" + encodeURIComponent(roleId), {
-            method: "DELETE"
-        });
-    }
-
     async function bootstrap() {
         return transport.request<{ success: boolean; message: string; user: { uid: string; roles: string[] } }>(adminPath + "/bootstrap", {
             method: "POST"
@@ -108,11 +73,6 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
         createUser,
         updateUser,
         deleteUser,
-        listRoles,
-        getRole,
-        createRole,
-        updateRole,
-        deleteRole,
         bootstrap
     };
 }

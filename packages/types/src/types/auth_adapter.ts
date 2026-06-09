@@ -113,7 +113,7 @@ export interface AuthAdapterCapabilities {
     registrationEnabled?: boolean;
 }
 
-// ─── User & Role Management ─────────────────────────────────────────────────
+// ─── User Management ────────────────────────────────────────────────────────
 
 /**
  * Options for paginated user listing.
@@ -167,40 +167,6 @@ export interface AuthCreateUserData {
 }
 
 /**
- * Role data exposed by the auth adapter.
- * @group Auth
- */
-export interface AuthRoleData {
-    id: string;
-    name: string;
-    isAdmin: boolean;
-    defaultPermissions?: {
-        read?: boolean;
-        create?: boolean;
-        edit?: boolean;
-        delete?: boolean;
-    } | null;
-    collectionPermissions?: Record<string, {
-        read?: boolean;
-        create?: boolean;
-        edit?: boolean;
-        delete?: boolean;
-    }> | null;
-}
-
-/**
- * Data for creating a role.
- * @group Auth
- */
-export interface AuthCreateRoleData {
-    id: string;
-    name: string;
-    isAdmin?: boolean;
-    defaultPermissions?: AuthRoleData["defaultPermissions"];
-    collectionPermissions?: AuthRoleData["collectionPermissions"];
-}
-
-/**
  * User management operations for the admin panel.
  *
  * Optional — if not provided by the adapter, the user management UI is hidden.
@@ -213,23 +179,8 @@ export interface UserManagementAdapter {
     createUser(data: AuthCreateUserData): Promise<AuthUserData>;
     updateUser(id: string, data: Partial<AuthCreateUserData>): Promise<AuthUserData | null>;
     deleteUser(id: string): Promise<void>;
-    getUserRoles(userId: string): Promise<AuthRoleData[]>;
+    getUserRoles(userId: string): Promise<string[]>;
     setUserRoles(userId: string, roleIds: string[]): Promise<void>;
-}
-
-/**
- * Role management operations for the admin panel.
- *
- * Optional — if not provided by the adapter, role management is disabled.
- *
- * @group Auth
- */
-export interface RoleManagementAdapter {
-    listRoles(): Promise<AuthRoleData[]>;
-    getRoleById(id: string): Promise<AuthRoleData | null>;
-    createRole(data: AuthCreateRoleData): Promise<AuthRoleData>;
-    updateRole(id: string, data: Partial<AuthRoleData>): Promise<AuthRoleData | null>;
-    deleteRole(id: string): Promise<void>;
 }
 
 // ─── Auth Adapter ────────────────────────────────────────────────────────────
@@ -241,7 +192,7 @@ export interface RoleManagementAdapter {
  * database layer. Each auth adapter knows how to:
  *
  * 1. Verify incoming HTTP requests (`verifyRequest`)
- * 2. Optionally manage users and roles (for the admin panel)
+ * 2. Optionally manage users (for the admin panel)
  * 3. Optionally mount auth-specific routes (login, register, etc.)
  * 4. Advertise its capabilities so the frontend can adapt
  *
@@ -293,19 +244,13 @@ export interface AuthAdapter {
      */
     verifyToken?(token: string): Promise<AuthenticatedUser | null>;
 
-    // ── User & Role Management (for admin panel) ────────────────────────
+    // ── User Management (for admin panel) ────────────────────────────
 
     /**
      * User CRUD for the admin panel's user management UI.
      * Optional — if not provided, user management UI is hidden.
      */
     userManagement?: UserManagementAdapter;
-
-    /**
-     * Role CRUD for the admin panel.
-     * Optional — if not provided, role management is disabled.
-     */
-    roleManagement?: RoleManagementAdapter;
 
     // ── Auth Routes ─────────────────────────────────────────────────────
 
@@ -325,7 +270,7 @@ export interface AuthAdapter {
     createAuthRoutes?(): Hono<any, any, any> | undefined;
 
     /**
-     * Mount admin routes for user/role management.
+     * Mount admin routes for user management.
      *
      * Same typing rationale as `createAuthRoutes` — the sub-app env is
      * unconstrained to support arbitrary adapter implementations.
@@ -396,9 +341,6 @@ export interface CustomAuthAdapterOptions {
 
     /** Optional user management for the admin panel. */
     userManagement?: UserManagementAdapter;
-
-    /** Optional role management for the admin panel. */
-    roleManagement?: RoleManagementAdapter;
 
     /** Static service key for server-to-server auth. */
     serviceKey?: string;

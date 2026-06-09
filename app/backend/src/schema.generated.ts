@@ -56,12 +56,12 @@ export const exercises = pgTable("exercises", {
     id: uuid("id").primaryKey().defaultRandom(),
     name: varchar("name").notNull(),
     description: varchar("description"),
-    images: jsonb("images"),
+    images: text("images").array(),
     video_url: varchar("video_url"),
     difficulty: exercisesDifficulty("difficulty").notNull(),
     category: exercisesCategory("category").notNull(),
-    equipment: jsonb("equipment"),
-    body_parts: jsonb("body_parts"),
+    equipment: text("equipment").array(),
+    body_parts: text("body_parts").array(),
     instructions: varchar("instructions"),
     default_reps: numeric("default_reps"),
     default_sets: numeric("default_sets"),
@@ -151,8 +151,8 @@ export const products = pgTable("products", {
     name: varchar("name").notNull(),
     sku: varchar("sku").unique().notNull(),
     description: varchar("description"),
-    images: jsonb("images"),
-    available_locales: jsonb("available_locales"),
+    images: text("images").array(),
+    available_locales: text("available_locales").array(),
     brand: varchar("brand"),
     category: productsCategory("category").notNull(),
     price: numeric("price").notNull(),
@@ -169,16 +169,6 @@ export const products = pgTable("products", {
     updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`)
 }, (table) => ([
     pgPolicy("test_policy", { as: "permissive", for: "all", to: ["authenticated"], using: sql`true`, withCheck: sql`true` }),
-])).enableRLS();
-
-export const roles = rebaseSchema.table("roles", {
-    id: varchar("id").primaryKey().notNull(),
-    name: varchar("name").notNull(),
-    isAdmin: boolean("is_admin"),
-    defaultPermissions: jsonb("default_permissions"),
-    collectionPermissions: jsonb("collection_permissions")
-}, (table) => ([
-    pgPolicy("roles_public_access", { as: "permissive", for: "all", to: ["authenticated"], using: sql`true`, withCheck: sql`true` }),
 ])).enableRLS();
 
 export const tags = pgTable("tags", {
@@ -211,6 +201,7 @@ export const users = rebaseSchema.table("users", {
     email: varchar("email").unique().notNull(),
     displayName: varchar("display_name").notNull(),
     photoURL: varchar("photo_url"),
+    roles: text("roles").array(),
     passwordHash: varchar("password_hash"),
     emailVerified: boolean("email_verified"),
     emailVerificationToken: varchar("email_verification_token"),
@@ -219,13 +210,6 @@ export const users = rebaseSchema.table("users", {
     createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`)
 }).enableRLS();
-
-export const userRoles = rebaseSchema.table("user_roles", {
-    user_id: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    role_id: varchar("role_id").notNull().references(() => roles.id, { onDelete: "cascade" }),
-}, (table) => ({
-    pk: primaryKey({ columns: [table.user_id, table.role_id] })
-}));
 
 export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({
     "posts": many(posts, { relationName: "posts_author_id" })
@@ -303,24 +287,7 @@ export const ticketsRelations = drizzleRelations(tickets, ({ one, many }) => ({
     })
 }));
 
-export const usersRelations = drizzleRelations(users, ({ one, many }) => ({
-    "roles": many(userRoles, { relationName: "roles" })
-}));
-
-export const userRolesRelations = drizzleRelations(userRoles, ({ one, many }) => ({
-    "user_id": one(users, {
-        fields: [userRoles.user_id],
-        references: [users.id],
-        relationName: "roles"
-    }),
-    "role_id": one(roles, {
-        fields: [userRoles.role_id],
-        references: [roles.id],
-        relationName: "user_roles_role_id"
-    })
-}));
-
-export const tables = { authors, customers, exercises, orderItems, orders, posts, postsTags, productLocales, products, roles, tags, tickets, users, userRoles };
+export const tables = { authors, customers, exercises, orderItems, orders, posts, postsTags, productLocales, products, tags, tickets, users };
 export const enums = { exercisesDifficulty, exercisesCategory, exercisesStatus, ordersStatus, ordersPayment_status, ordersCurrency, postsStatus, productsCategory, productsStatus, ticketsStatus, ticketsPriority, ticketsCategory };
-export const relations = { authorsRelations, customersRelations, orderItemsRelations, ordersRelations, postsRelations, postsTagsRelations, productLocalesRelations, productsRelations, tagsRelations, ticketsRelations, usersRelations, userRolesRelations };
+export const relations = { authorsRelations, customersRelations, orderItemsRelations, ordersRelations, postsRelations, postsTagsRelations, productLocalesRelations, productsRelations, tagsRelations, ticketsRelations };
 

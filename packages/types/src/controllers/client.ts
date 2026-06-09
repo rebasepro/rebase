@@ -1,6 +1,6 @@
-import { User } from "../users";
-import { RebaseData } from "./data";
-import { EmailService } from "./email";
+import type { User } from "../users";
+import type { RebaseData } from "./data";
+import type { EmailService } from "./email";
 
 /**
  * Event type for authentication state changes
@@ -17,7 +17,7 @@ export interface RebaseSession {
     user: User;
 }
 
-import { StorageSource } from "./storage";
+import type { StorageSource } from "./storage";
 
 /**
  * Unified Authentication Client Interface
@@ -67,19 +67,8 @@ export interface AdminUser {
 }
 
 /**
- * Role record as returned by the Admin API.
- * @group Admin
- */
-export interface AdminRole {
-    id: string;
-    name: string;
-    isAdmin: boolean;
-    defaultPermissions: Record<string, unknown> | null;
-}
-
-/**
  * Client-side Admin API interface.
- * Provides user and role management operations.
+ * Provides user management operations.
  * @group Admin
  */
 export interface AdminAPI {
@@ -95,11 +84,6 @@ export interface AdminAPI {
     createUser(data: { email: string; displayName?: string; password?: string; roles?: string[]; metadata?: Record<string, any> }): Promise<{ user: AdminUser }>;
     updateUser(userId: string, data: { email?: string; displayName?: string; password?: string; roles?: string[]; metadata?: Record<string, any> }): Promise<{ user: AdminUser }>;
     deleteUser(userId: string): Promise<{ success: boolean }>;
-    listRoles(): Promise<{ roles: AdminRole[] }>;
-    getRole(roleId: string): Promise<{ role: AdminRole }>;
-    createRole(data: { id: string; name: string; isAdmin?: boolean; defaultPermissions?: Record<string, unknown> }): Promise<{ role: AdminRole }>;
-    updateRole(roleId: string, data: { name?: string; isAdmin?: boolean; defaultPermissions?: Record<string, unknown> }): Promise<{ role: AdminRole }>;
-    deleteRole(roleId: string): Promise<{ success: boolean }>;
     bootstrap(): Promise<{ success: boolean; message: string; user: { uid: string; roles: string[] } }>;
 }
 
@@ -128,7 +112,7 @@ export interface RebaseClient<DB = unknown> {
      */
     email?: EmailService;
 
-    /** Admin API for user and role management */
+    /** Admin API for user management */
     admin?: AdminAPI;
 
     /**

@@ -6,11 +6,16 @@ import {
     AuthController,
     DataDriver,
     Entity,
-    Role,
     User,
     UserManagementDelegate
 } from "@rebasepro/types";
 import { FirebaseAccessGate } from "./useFirebaseAccessGate";
+
+export interface Role {
+    id: string;
+    name: string;
+    isAdmin?: boolean;
+}
 
 type UserWithRoleIds<USER extends User = User> = Omit<USER, "roles"> & { roles: string[] };
 
@@ -254,12 +259,12 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<User> =
 
 
 
-    const defineRolesFor: ((user: User) => Role[] | undefined) = useCallback((user) => {
+    const defineRolesFor: ((user: User) => string[] | undefined) = useCallback((user) => {
         if (!usersWithRoleIds) throw Error("Users not loaded");
         const mgmtUser = usersWithRoleIds.find(u => u.email?.toLowerCase() === user?.email?.toLowerCase());
         if (!mgmtUser || !mgmtUser.roles) return undefined;
-        return roles.filter(r => mgmtUser.roles.includes(r.id));
-    }, [roles, usersWithRoleIds]);
+        return mgmtUser.roles;
+    }, [usersWithRoleIds]);
 
     const accessGate: FirebaseAccessGate<USER> = useCallback(({ user }) => {
 
@@ -303,9 +308,9 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<User> =
     }, [loading, users]);
 
     const userRoles = authController.user ? defineRolesFor(authController.user) : undefined;
-    const isAdmin = (userRoles ?? []).some(r => r.id === "admin");
+    const isAdmin = (userRoles ?? []).some(r => r === "admin");
 
-    const userRoleIds = userRoles?.map(r => r.id);
+    const userRoleIds = userRoles;
     useEffect(() => {
         console.debug("Setting user roles", {
             userRoles,

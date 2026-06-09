@@ -143,7 +143,7 @@ describe("createCustomAuthAdapter", () => {
         expect(adapter.serviceKey).toBe("sk_live_123");
     });
 
-    it("passes through userManagement and roleManagement when provided", () => {
+    it("passes through userManagement when provided", () => {
         const userMgmt = {
             getUser: jest.fn(),
             listUsers: jest.fn(),
@@ -151,27 +151,19 @@ describe("createCustomAuthAdapter", () => {
             updateUser: jest.fn(),
             deleteUser: jest.fn(),
         };
-        const roleMgmt = {
-            listRoles: jest.fn(),
-            getUserRoles: jest.fn(),
-            setUserRoles: jest.fn(),
-        };
 
         const adapter = createCustomAuthAdapter({
             verifyRequest: async () => null,
             userManagement: userMgmt as unknown as CustomAuthAdapterOptions["userManagement"],
-            roleManagement: roleMgmt as unknown as CustomAuthAdapterOptions["roleManagement"],
         });
 
         expect(adapter.userManagement).toBe(userMgmt);
-        expect(adapter.roleManagement).toBe(roleMgmt);
     });
 
-    it("omits userManagement and roleManagement when not provided", () => {
+    it("omits userManagement when not provided", () => {
         const adapter = createCustomAuthAdapter({
             verifyRequest: async () => null,
         });
         expect(adapter.userManagement).toBeUndefined();
-        expect(adapter.roleManagement).toBeUndefined();
     });
 });

@@ -1,6 +1,6 @@
 
-import type { AppView, AppViewsBuilder, EffectiveRoleController, EntityCollection, RebasePlugin } from "@rebasepro/types";
-import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { AppView, AppViewsBuilder, EffectiveRoleController, RebasePlugin } from "@rebasepro/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 /**
  * Compare two view arrays by their slug identity.
@@ -17,13 +17,9 @@ function viewSlugsEqual(a: AppView[] | undefined, b: AppView[] | undefined): boo
     return true;
 }
 
-import { AuthController, RebaseData, User } from "@rebasepro/types";
-import { UserManagementDelegate } from "@rebasepro/types";
+import type { AuthController, RebaseData, User } from "@rebasepro/types";
 
 import { resolveAppViews } from "./useNavigationResolution";
-
-
-import { RolesView } from "../../components/admin/RolesView";
 
 export type UseResolvedViewsProps<USER extends User> = {
     authController: AuthController<USER>;
@@ -33,7 +29,6 @@ export type UseResolvedViewsProps<USER extends User> = {
     plugins?: RebasePlugin[];
     adminMode?: "content" | "studio" | "settings";
     effectiveRoleController?: EffectiveRoleController;
-    userManagement?: UserManagementDelegate<USER>;
 };
 
 export type UseResolvedViewsResult = {
@@ -46,8 +41,7 @@ export type UseResolvedViewsResult = {
 
 /**
  * Hook that resolves view and admin view props (which may be async builders or arrays)
- * into concrete AppView[]. Also injects the Roles admin view when userManagement
- * is provided with roles.
+ * into concrete AppView[].
  *
  * Uses refs for potentially-unstable dependencies (driver, authController,
  * plugins) to avoid re-triggering effects when their object identity changes.
@@ -63,8 +57,7 @@ export function useResolvedViews<USER extends User>(
         data,
         plugins,
         adminMode = "content",
-        effectiveRoleController,
-        userManagement
+        effectiveRoleController
     } = props;
 
     const [loading, setLoading] = useState(true);
@@ -110,32 +103,6 @@ export function useResolvedViews<USER extends User>(
     const resolvedAuthControllerRef = useRef(resolvedAuthController);
     resolvedAuthControllerRef.current = resolvedAuthController;
 
-    // Memoize JSX element for injected Roles admin view to ensure stable reference.
-    const hasRoles = !!userManagement?.roles;
-    const rolesViewElement = useMemo(() =>
-        hasRoles ? <RolesView /> : null,
-        [hasRoles]
-    );
-
-    const injectedAdminViews: AppView[] = useMemo(() => {
-        const views: AppView[] = [];
-        const isUserAdmin = userManagement?.isAdmin !== false;
-        if (userManagement && isUserAdmin && userManagement.roles && rolesViewElement) {
-            views.push({
-                slug: "roles",
-                name: "Roles",
-                icon: "Shield",
-                view: rolesViewElement,
-                group: "Settings"
-            });
-        }
-        return views;
-    }, [userManagement, rolesViewElement]);
-
-    // Store injectedAdminViews in a ref for effect access
-    const injectedAdminViewsRef = useRef(injectedAdminViews);
-    injectedAdminViewsRef.current = injectedAdminViews;
-
     const initialLoading = resolvedAuthController.initialLoading;
     const user = resolvedAuthController.user;
 
@@ -146,19 +113,10 @@ export function useResolvedViews<USER extends User>(
 
         (async () => {
             try {
-                const [newViews, newAdminViewsProp] = await Promise.all([
+                const [newViews, newAdminViews] = await Promise.all([
                     resolveAppViews(viewsProp, resolvedAuthControllerRef.current, dataRef.current, pluginsRef.current),
                     resolveAppViews(adminViewsProp, resolvedAuthControllerRef.current, dataRef.current)
                 ]);
-
-                // Generic dedup: developer-provided admin views override any injected ones with the same slug.
-                // No hardcoded slug checks — works for any slug generically.
-                const customSlugs = new Set(newAdminViewsProp.flatMap(v => Array.isArray(v.slug) ? v.slug : [v.slug]));
-                const finalInjected = injectedAdminViewsRef.current.filter(v => {
-                    const slugs = Array.isArray(v.slug) ? v.slug : [v.slug];
-                    return slugs.every(s => !customSlugs.has(s));
-                });
-                const newAdminViews = [...newAdminViewsProp, ...finalInjected];
 
                 // Compare views by slug identity rather than deepEqual.
                 // Views contain React elements (JSX) whose internal properties

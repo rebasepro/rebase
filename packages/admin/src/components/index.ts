@@ -32,9 +32,7 @@ export * from "./field_configs";
 
 export * from "./SideEntityProvider";
 export * from "./AdminModeSyncer";
-// Admin views are lazy-loaded by RebaseRouteDefs and useResolvedViews
-// export * from "./admin/RolesView";
-// export * from "./admin/UsersView";
+// Admin views: only CreationResultDialog remains (used by resetPasswordAction)
 export * from "./app/AppBar";
 export * from "./app/Drawer";
 export * from "./app/Scaffold";

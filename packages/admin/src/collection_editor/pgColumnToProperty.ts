@@ -158,12 +158,29 @@ label: prettifyIdentifier(v) })),
             };
 
         case "array":
-        case "ARRAY":
+        case "ARRAY": {
+            let innerType = "string";
+            let colType: ArrayProperty["columnType"] = undefined;
+            if (udt_name === "_text" || udt_name === "_varchar") {
+                innerType = "string";
+                colType = "text[]";
+            } else if (udt_name === "_int4" || udt_name === "_int2" || udt_name === "_int8") {
+                innerType = "number";
+                colType = "integer[]";
+            } else if (udt_name === "_bool") {
+                innerType = "boolean";
+                colType = "boolean[]";
+            } else if (udt_name === "_numeric") {
+                innerType = "number";
+                colType = "numeric[]";
+            }
             return {
                 type: "array",
                 name: prettifiedName,
-                of: { type: "string" }
+                columnType: colType,
+                of: { type: innerType }
             } as ArrayProperty;
+        }
 
         default:
             // Fallback: treat unknown types as string

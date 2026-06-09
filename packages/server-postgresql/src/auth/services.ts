@@ -1,7 +1,7 @@
 import { eq, getTableName, sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { getTableConfig, PgTable, AnyPgColumn } from "drizzle-orm/pg-core";
-import { users, roles, userRoles, refreshTokens, passwordResetTokens, userIdentities } from "../schema/auth-schema";
+import { users, refreshTokens, passwordResetTokens, userIdentities } from "../schema/auth-schema";
 import {
     UserRepository,
     RoleRepository,
@@ -28,8 +28,6 @@ export type { Role };
 
 export interface AuthSchemaTables {
     users: PgTable & Record<string, AnyPgColumn>;
-    roles: PgTable & Record<string, AnyPgColumn>;
-    userRoles: PgTable & Record<string, AnyPgColumn>;
     refreshTokens: PgTable & Record<string, AnyPgColumn>;
     passwordResetTokens: PgTable & Record<string, AnyPgColumn>;
     appConfig: PgTable & Record<string, AnyPgColumn>;
@@ -61,25 +59,19 @@ function getColumn(table: (PgTable & Record<string, AnyPgColumn>) | undefined, .
 export class UserService implements UserRepository {
     private usersTable: PgTable & Record<string, AnyPgColumn>;
     private userIdentitiesTable: PgTable & Record<string, AnyPgColumn>;
-    private userRolesTable: PgTable & Record<string, AnyPgColumn>;
-    private rolesTable: PgTable & Record<string, AnyPgColumn>;
 
     constructor(
         private db: NodePgDatabase,
         tableOrTables?: (PgTable & Record<string, AnyPgColumn>) | Partial<AuthSchemaTables>
     ) {
-        if (tableOrTables && ((tableOrTables as Partial<AuthSchemaTables>).users || (tableOrTables as Partial<AuthSchemaTables>).roles)) {
+        if (tableOrTables && ((tableOrTables as Partial<AuthSchemaTables>).users)) {
             const tables = tableOrTables as Partial<AuthSchemaTables>;
             this.usersTable = (tables.users || users) as unknown as PgTable & Record<string, AnyPgColumn>;
             this.userIdentitiesTable = (tables.userIdentities || userIdentities) as unknown as PgTable & Record<string, AnyPgColumn>;
-            this.userRolesTable = (tables.userRoles || userRoles) as unknown as PgTable & Record<string, AnyPgColumn>;
-            this.rolesTable = (tables.roles || roles) as unknown as PgTable & Record<string, AnyPgColumn>;
         } else {
             const table = tableOrTables as (PgTable & Record<string, AnyPgColumn>) | undefined;
             this.usersTable = table || (users as unknown as PgTable & Record<string, AnyPgColumn>);
             this.userIdentitiesTable = userIdentities as unknown as PgTable & Record<string, AnyPgColumn>;
-            this.userRolesTable = userRoles as unknown as PgTable & Record<string, AnyPgColumn>;
-            this.rolesTable = roles as unknown as PgTable & Record<string, AnyPgColumn>;
         }
     }
 
@@ -115,6 +107,7 @@ export class UserService implements UserRepository {
             "email_verification_token", "emailVerificationToken",
             "email_verification_sent_at", "emailVerificationSentAt",
             "is_anonymous", "isAnonymous",
+            "roles",
             "created_at", "createdAt",
             "updated_at", "updatedAt",
             "metadata"
@@ -315,11 +308,9 @@ export class UserService implements UserRepository {
         const idColumn = idCol ? idCol.name : "id";
 
         const usersTableName = this.getQualifiedUsersTableName();
-        const rolesSchema = getTableConfig(this.userRolesTable).schema || "public";
-
         const conditions = [];
         if (roleId) {
-            conditions.push(sql`EXISTS (SELECT 1 FROM ${sql.raw(`"${rolesSchema}"."user_roles"`)} ur WHERE ur.user_id = ${sql.raw(usersTableName)}.${sql.raw(idColumn)} AND ur.role_id = ${roleId})`);
+            conditions.push(sql`${roleId} = ANY(${sql.raw(usersTableName)}.roles)`);
         }
         if (search) {
             const pattern = `%${search}%`;
@@ -331,7 +322,7 @@ export class UserService implements UserRepository {
         // Sorting: users with roles first if no role filter, then by requested order
         const orderByClause = roleId
             ? sql`ORDER BY ${sql.raw(usersTableName)}.${sql.raw(orderColumn)} ${direction}`
-            : sql`ORDER BY (SELECT count(*) FROM ${sql.raw(`"${rolesSchema}"."user_roles"`)} ur WHERE ur.user_id = ${sql.raw(usersTableName)}.${sql.raw(idColumn)}) DESC, ${sql.raw(usersTableName)}.${sql.raw(orderColumn)} ${direction}`;
+            : sql`ORDER BY array_length(${sql.raw(usersTableName)}.roles, 1) DESC NULLS LAST, ${sql.raw(usersTableName)}.${sql.raw(orderColumn)} ${direction}`;
 
         const countResult = await this.db.execute(sql`
             SELECT count(*)::int as total FROM ${sql.raw(usersTableName)}
@@ -428,23 +419,25 @@ export class UserService implements UserRepository {
     }
 
     /**
-     * Get roles for a user from database
+     * Get roles for a user from database (inline TEXT[] column)
      */
     async getUserRoles(userId: string): Promise<Role[]> {
-        const rolesSchema = getTableConfig(this.rolesTable).schema || "public";
+        const usersTableName = this.getQualifiedUsersTableName();
         const result = await this.db.execute(sql`
-            SELECT r.id, r.name, r.is_admin, r.default_permissions, r.collection_permissions
-            FROM ${sql.raw(`"${rolesSchema}"."roles"`)} r
-            INNER JOIN ${sql.raw(`"${rolesSchema}"."user_roles"`)} ur ON r.id = ur.role_id
-            WHERE ur.user_id = ${userId}
+            SELECT roles FROM ${sql.raw(usersTableName)} WHERE id = ${userId}
         `);
 
-        return (result.rows as Array<{ id: string; name: string; is_admin: boolean; default_permissions: Record<string, boolean> | null; collection_permissions: Record<string, Record<string, boolean>> | null }>).map(row => ({
-            id: row.id,
-            name: row.name,
-            isAdmin: row.is_admin,
-            defaultPermissions: row.default_permissions,
-            collectionPermissions: row.collection_permissions
+        if (result.rows.length === 0) return [];
+
+        const row = result.rows[0] as { roles: string[] | null };
+        const roleIds = row.roles ?? [];
+
+        return roleIds.map(id => ({
+            id,
+            name: id,
+            isAdmin: id === "admin",
+            defaultPermissions: null,
+            collectionPermissions: null
         }));
     }
 
@@ -452,37 +445,39 @@ export class UserService implements UserRepository {
      * Get role IDs for a user
      */
     async getUserRoleIds(userId: string): Promise<string[]> {
-        const roles = await this.getUserRoles(userId);
-        return roles.map(r => r.id);
+        const usersTableName = this.getQualifiedUsersTableName();
+        const result = await this.db.execute(sql`
+            SELECT roles FROM ${sql.raw(usersTableName)} WHERE id = ${userId}
+        `);
+
+        if (result.rows.length === 0) return [];
+
+        const row = result.rows[0] as { roles: string[] | null };
+        return row.roles ?? [];
     }
 
     /**
-     * Set roles for a user
+     * Set roles for a user (replaces existing roles)
      */
     async setUserRoles(userId: string, roleIds: string[]): Promise<void> {
-        const rolesSchema = getTableConfig(this.userRolesTable).schema || "public";
-        // Delete existing roles
-        await this.db.execute(sql`DELETE FROM ${sql.raw(`"${rolesSchema}"."user_roles"`)} WHERE user_id = ${userId}`);
-
-        // Insert new roles
-        for (const roleId of roleIds) {
-            await this.db.execute(sql`
-                INSERT INTO ${sql.raw(`"${rolesSchema}"."user_roles"`)} (user_id, role_id)
-                VALUES (${userId}, ${roleId})
-                ON CONFLICT DO NOTHING
-            `);
-        }
+        const usersTableName = this.getQualifiedUsersTableName();
+        const rolesArray = `{${roleIds.join(",")}}`;
+        await this.db.execute(sql`
+            UPDATE ${sql.raw(usersTableName)}
+            SET roles = ${rolesArray}::text[], updated_at = NOW()
+            WHERE id = ${userId}
+        `);
     }
 
     /**
-     * Assign a specific role to new user
+     * Assign a specific role to new user (appends if not present)
      */
     async assignDefaultRole(userId: string, roleId: string): Promise<void> {
-        const rolesSchema = getTableConfig(this.userRolesTable).schema || "public";
+        const usersTableName = this.getQualifiedUsersTableName();
         await this.db.execute(sql`
-            INSERT INTO ${sql.raw(`"${rolesSchema}"."user_roles"`)} (user_id, role_id)
-            VALUES (${userId}, ${roleId})
-            ON CONFLICT DO NOTHING
+            UPDATE ${sql.raw(usersTableName)}
+            SET roles = array_append(roles, ${roleId}), updated_at = NOW()
+            WHERE id = ${userId} AND NOT (${roleId} = ANY(roles))
         `);
     }
 
@@ -499,114 +494,7 @@ export class UserService implements UserRepository {
     }
 }
 
-/**
- * PostgreSQL implementation of RoleRepository.
- * Handles all role-related database operations using Drizzle ORM.
- */
-export class RoleService implements RoleRepository {
-    private rolesTable: PgTable & Record<string, AnyPgColumn>;
 
-    constructor(
-        private db: NodePgDatabase,
-        tableOrTables?: (PgTable & Record<string, AnyPgColumn>) | Partial<AuthSchemaTables>
-    ) {
-        if (tableOrTables && ((tableOrTables as Partial<AuthSchemaTables>).roles || (tableOrTables as Partial<AuthSchemaTables>).users)) {
-            this.rolesTable = ((tableOrTables as Partial<AuthSchemaTables>).roles || roles) as unknown as PgTable & Record<string, AnyPgColumn>;
-        } else {
-            this.rolesTable = (tableOrTables as unknown as PgTable & Record<string, AnyPgColumn>) || (roles as unknown as PgTable & Record<string, AnyPgColumn>);
-        }
-    }
-
-    private getQualifiedRolesTableName(): string {
-        const name = getTableName(this.rolesTable);
-        const schema = getTableConfig(this.rolesTable).schema || "public";
-        return `"${schema}"."${name}"`;
-    }
-
-    async getRoleById(id: string): Promise<Role | null> {
-        const tableName = this.getQualifiedRolesTableName();
-        const result = await this.db.execute(sql`
-            SELECT id, name, is_admin, default_permissions, collection_permissions
-            FROM ${sql.raw(tableName)}
-            WHERE id = ${id}
-        `);
-
-        if (result.rows.length === 0) return null;
-
-        const row = result.rows[0] as { id: string; name: string; is_admin: boolean; default_permissions: Record<string, boolean> | null; collection_permissions: Record<string, Record<string, boolean>> | null };
-        return {
-            id: row.id,
-            name: row.name,
-            isAdmin: row.is_admin,
-            defaultPermissions: row.default_permissions,
-            collectionPermissions: row.collection_permissions
-        };
-    }
-
-    async listRoles(): Promise<Role[]> {
-        const tableName = this.getQualifiedRolesTableName();
-        const result = await this.db.execute(sql`
-            SELECT id, name, is_admin, default_permissions, collection_permissions
-            FROM ${sql.raw(tableName)}
-            ORDER BY name
-        `);
-
-        return (result.rows as Array<{ id: string; name: string; is_admin: boolean; default_permissions: Record<string, boolean> | null; collection_permissions: Record<string, Record<string, boolean>> | null }>).map(row => ({
-            id: row.id,
-            name: row.name,
-            isAdmin: row.is_admin,
-            defaultPermissions: row.default_permissions,
-            collectionPermissions: row.collection_permissions
-        }));
-    }
-
-    async createRole(data: Omit<Role, "isAdmin" | "collectionPermissions"> & { isAdmin?: boolean; collectionPermissions?: Role["collectionPermissions"] }): Promise<Role> {
-        const tableName = this.getQualifiedRolesTableName();
-        const result = await this.db.execute(sql`
-            INSERT INTO ${sql.raw(tableName)} (id, name, is_admin, default_permissions, collection_permissions)
-            VALUES (
-                ${data.id},
-                ${data.name},
-                ${data.isAdmin ?? false},
-                ${data.defaultPermissions ? JSON.stringify(data.defaultPermissions) : null}::jsonb,
-                ${data.collectionPermissions ? JSON.stringify(data.collectionPermissions) : null}::jsonb
-            )
-            RETURNING id, name, is_admin, default_permissions, collection_permissions
-        `);
-
-        const row = result.rows[0] as { id: string; name: string; is_admin: boolean; default_permissions: Record<string, boolean> | null; collection_permissions: Record<string, Record<string, boolean>> | null };
-        return {
-            id: row.id,
-            name: row.name,
-            isAdmin: row.is_admin,
-            defaultPermissions: row.default_permissions,
-            collectionPermissions: row.collection_permissions
-        };
-    }
-
-    async updateRole(id: string, data: Partial<Omit<Role, "id">>): Promise<Role | null> {
-        const existing = await this.getRoleById(id);
-        if (!existing) return null;
-
-        const tableName = this.getQualifiedRolesTableName();
-        await this.db.execute(sql`
-            UPDATE ${sql.raw(tableName)}
-            SET 
-                name = ${data.name ?? existing.name},
-                is_admin = ${data.isAdmin ?? existing.isAdmin},
-                default_permissions = ${data.defaultPermissions ? JSON.stringify(data.defaultPermissions) : JSON.stringify(existing.defaultPermissions)}::jsonb,
-                collection_permissions = ${data.collectionPermissions !== undefined ? (data.collectionPermissions ? JSON.stringify(data.collectionPermissions) : null) : (existing.collectionPermissions ? JSON.stringify(existing.collectionPermissions) : null)}::jsonb
-            WHERE id = ${id}
-        `);
-
-        return this.getRoleById(id);
-    }
-
-    async deleteRole(id: string): Promise<void> {
-        const tableName = this.getQualifiedRolesTableName();
-        await this.db.execute(sql`DELETE FROM ${sql.raw(tableName)} WHERE id = ${id}`);
-    }
-}
 
 export class RefreshTokenService {
     private refreshTokensTable: PgTable & Record<string, AnyPgColumn>;
@@ -878,7 +766,6 @@ export class PostgresTokenRepository implements TokenRepository {
  */
 export class PostgresAuthRepository implements AuthRepository {
     private userService: UserService;
-    private roleService: RoleService;
     private tokenRepository: PostgresTokenRepository;
 
     constructor(
@@ -886,7 +773,6 @@ export class PostgresAuthRepository implements AuthRepository {
         tableOrTables?: (PgTable & Record<string, AnyPgColumn>) | Partial<AuthSchemaTables>
     ) {
         this.userService = new UserService(db, tableOrTables);
-        this.roleService = new RoleService(db, tableOrTables);
         this.tokenRepository = new PostgresTokenRepository(db, tableOrTables);
     }
 
@@ -968,30 +854,48 @@ export class PostgresAuthRepository implements AuthRepository {
         return this.userService.getUserWithRoles(userId);
     }
 
-    // Role operations (delegate to RoleService)
+    // Role operations (roles are inline on users, synthesized from string IDs)
 
     async getRoleById(id: string): Promise<RoleData | null> {
-        return this.roleService.getRoleById(id);
+        return {
+            id,
+            name: id,
+            isAdmin: id === "admin",
+            defaultPermissions: null,
+            collectionPermissions: null
+        };
     }
 
     async listRoles(): Promise<RoleData[]> {
-        return this.roleService.listRoles();
+        return [
+            { id: "admin", name: "Admin", isAdmin: true, defaultPermissions: null, collectionPermissions: null },
+            { id: "editor", name: "Editor", isAdmin: false, defaultPermissions: null, collectionPermissions: null },
+            { id: "viewer", name: "Viewer", isAdmin: false, defaultPermissions: null, collectionPermissions: null }
+        ];
     }
 
-    async createRole(data: CreateRoleData): Promise<RoleData> {
-        return this.roleService.createRole({
-            ...data,
-            defaultPermissions: data.defaultPermissions ?? null,
-            collectionPermissions: data.collectionPermissions ?? null
-        });
+    async createRole(_data: CreateRoleData): Promise<RoleData> {
+        return {
+            id: _data.id,
+            name: _data.name,
+            isAdmin: _data.isAdmin ?? false,
+            defaultPermissions: _data.defaultPermissions ?? null,
+            collectionPermissions: _data.collectionPermissions ?? null
+        };
     }
 
     async updateRole(id: string, data: Partial<Omit<RoleData, "id">>): Promise<RoleData | null> {
-        return this.roleService.updateRole(id, data);
+        return {
+            id,
+            name: data.name ?? id,
+            isAdmin: data.isAdmin ?? (id === "admin"),
+            defaultPermissions: data.defaultPermissions ?? null,
+            collectionPermissions: data.collectionPermissions ?? null
+        };
     }
 
-    async deleteRole(id: string): Promise<void> {
-        await this.roleService.deleteRole(id);
+    async deleteRole(_id: string): Promise<void> {
+        // No-op: roles are inline strings on users
     }
 
     // Token operations (delegate to PostgresTokenRepository)
@@ -1314,6 +1218,3 @@ export class MfaService implements MfaRepository {
 
 /** PostgreSQL user repository implementation */
 export type PostgresUserRepository = UserService;
-
-/** PostgreSQL role repository implementation */
-export type PostgresRoleRepository = RoleService;

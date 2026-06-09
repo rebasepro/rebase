@@ -37,7 +37,6 @@ export type User = {
 
     /**
      * Role IDs assigned to this user (e.g. ["admin", "editor"]).
-     * These are plain string IDs — use the UserManagementDelegate to look up full Role objects.
      */
     roles?: string[];
 

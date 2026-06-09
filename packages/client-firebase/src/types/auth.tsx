@@ -1,6 +1,6 @@
 import { ApplicationVerifier, ConfirmationResult, User as FirebaseUser } from "@firebase/auth";
 
-import { AuthController, Role, User } from "@rebasepro/types";
+import type { AuthController, User } from "@rebasepro/types";
 
 /**
  * @group Firebase
@@ -69,6 +69,6 @@ export type FirebaseAuthController<USER extends User = FirebaseUserWrapper, Extr
 
         setUser: (user: USER | null) => void;
 
-        setUserRoles: (roles: Role[]) => void;
+        setUserRoles: (roles: string[]) => void;
 
     };

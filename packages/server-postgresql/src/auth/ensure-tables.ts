@@ -5,29 +5,7 @@ import { getColumnMeta } from "../services/entity-helpers";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { logger } from "@rebasepro/server-core";
 
-/**
- * Default roles to seed on first run
- */
-const DEFAULT_ROLES = [
-    {
-        id: "admin",
-        name: "Admin",
-        is_admin: true,
-        default_permissions: { read: true, create: true, edit: true, delete: true }
-    },
-    {
-        id: "editor",
-        name: "Editor",
-        is_admin: false,
-        default_permissions: { read: true, create: true, edit: true, delete: true }
-    },
-    {
-        id: "viewer",
-        name: "Viewer",
-        is_admin: false,
-        default_permissions: { read: true, create: false, edit: false, delete: false }
-    }
-];
+
 
 /**
  * Auto-create auth tables if they don't exist
@@ -64,31 +42,19 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: Postg
             }
         }
 
-        // Resolve dynamic roles schema name
-        let rolesSchema = "rebase";
-        if (registry) {
-            const rolesTable = registry.getTable("roles");
-            if (rolesTable) {
-                rolesSchema = getTableConfig(rolesTable).schema || "public";
-            }
-        }
+
 
         // ── Create schemas (idempotent) ──────────────────────────────────
         if (usersSchema !== "public") {
             await db.execute(sql`CREATE SCHEMA IF NOT EXISTS ${sql.raw(usersSchema)}`);
         }
-        if (rolesSchema !== "public" && rolesSchema !== usersSchema) {
-            await db.execute(sql`CREATE SCHEMA IF NOT EXISTS ${sql.raw(rolesSchema)}`);
-        }
         await db.execute(sql`CREATE SCHEMA IF NOT EXISTS rebase`);
 
-        // Dynamic table names
-        const userIdentitiesTable = `"${rolesSchema}"."user_identities"`;
-        const rolesTableName = `"${rolesSchema}"."roles"`;
-        const userRolesTableName = `"${rolesSchema}"."user_roles"`;
-        const refreshTokensTableName = `"${rolesSchema}"."refresh_tokens"`;
-        const passwordResetTokensTableName = `"${rolesSchema}"."password_reset_tokens"`;
-        const appConfigTableName = `"${rolesSchema}"."app_config"`;
+        const authSchema = usersSchema === "public" ? "rebase" : usersSchema;
+        const userIdentitiesTable = `"${authSchema}"."user_identities"`;
+        const refreshTokensTableName = `"${authSchema}"."refresh_tokens"`;
+        const passwordResetTokensTableName = `"${authSchema}"."password_reset_tokens"`;
+        const appConfigTableName = `"${authSchema}"."app_config"`;
 
         // ── Create tables (idempotent) ──────────────────────────────────
 
@@ -113,32 +79,6 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: Postg
         `);
 
 
-        // Create roles table
-        await db.execute(sql`
-            CREATE TABLE IF NOT EXISTS ${sql.raw(rolesTableName)} (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                is_admin BOOLEAN DEFAULT FALSE,
-                default_permissions JSONB,
-                collection_permissions JSONB,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-            )
-        `);
-
-        // Create user_roles junction table
-        await db.execute(sql`
-            CREATE TABLE IF NOT EXISTS ${sql.raw(userRolesTableName)} (
-                user_id ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
-                role_id TEXT NOT NULL REFERENCES ${sql.raw(rolesTableName)}(id) ON DELETE CASCADE,
-                PRIMARY KEY (user_id, role_id)
-            )
-        `);
-
-        // Create index on user_id for faster lookups
-        await db.execute(sql`
-            CREATE INDEX IF NOT EXISTS idx_user_roles_user 
-            ON ${sql.raw(userRolesTableName)}(user_id)
-        `);
 
         // Create refresh tokens table (includes user_agent, ip_address, and unique constraint)
         await db.execute(sql`
@@ -229,7 +169,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: Postg
         });
 
         // Seed default roles if none exist
-        await seedDefaultRoles(db, rolesTableName);
+        // (no-op: roles are now stored inline on the users table)
 
         // ── Migration: Add is_anonymous column (safe for existing tables) ────
         await db.execute(sql`
@@ -237,10 +177,51 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: Postg
             ADD COLUMN IF NOT EXISTS is_anonymous BOOLEAN DEFAULT FALSE
         `);
 
+        // ── Migration: Add inline roles column (safe for existing tables) ────
+        await db.execute(sql`
+            ALTER TABLE ${sql.raw(usersTableName)}
+            ADD COLUMN IF NOT EXISTS roles TEXT[] DEFAULT '{}' NOT NULL
+        `);
+
+        // ── Migration: Copy roles from legacy junction table to inline column ──
+        // If the old rebase.user_roles and rebase.roles tables exist, migrate
+        // the data into the new TEXT[] column then drop the legacy tables.
+        try {
+            const legacyCheck = await db.execute(sql`
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = 'rebase' AND table_name = 'user_roles'
+                ) AS has_user_roles
+            `);
+            const hasLegacyTables = (legacyCheck.rows[0] as { has_user_roles: boolean }).has_user_roles;
+
+            if (hasLegacyTables) {
+                logger.info("🔄 Migrating roles from legacy user_roles table...");
+                // Update users' roles column from the junction table
+                await db.execute(sql`
+                    UPDATE ${sql.raw(usersTableName)} u
+                    SET roles = COALESCE((
+                        SELECT array_agg(ur.role_id)
+                        FROM "rebase"."user_roles" ur
+                        WHERE ur.user_id = u.id
+                    ), '{}')
+                    WHERE u.roles = '{}' OR u.roles IS NULL
+                `);
+
+                // Drop legacy tables (junction first due to FK)
+                await db.execute(sql`DROP TABLE IF EXISTS "rebase"."user_roles" CASCADE`);
+                await db.execute(sql`DROP TABLE IF EXISTS "rebase"."roles" CASCADE`);
+                logger.info("✅ Legacy roles tables migrated and dropped");
+            }
+        } catch (migrationError: unknown) {
+            // Non-fatal: log and continue — the column exists and will work
+            logger.warn(`⚠️  Legacy roles migration skipped: ${migrationError instanceof Error ? migrationError.message : String(migrationError)}`);
+        }
+
         // ── MFA tables ──────────────────────────────────────────────────────
-        const mfaFactorsTableName = `"${rolesSchema}"."mfa_factors"`;
-        const mfaChallengesTableName = `"${rolesSchema}"."mfa_challenges"`;
-        const recoveryCodesTableName = `"${rolesSchema}"."recovery_codes"`;
+        const mfaFactorsTableName = `"${authSchema}"."mfa_factors"`;
+        const mfaChallengesTableName = `"${authSchema}"."mfa_challenges"`;
+        const recoveryCodesTableName = `"${authSchema}"."recovery_codes"`;
 
         // Create mfa_factors table
         await db.execute(sql`
@@ -304,33 +285,3 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: Postg
     }
 }
 
-/**
- * Seed default roles if the roles table is empty
- */
-async function seedDefaultRoles(db: NodePgDatabase, rolesTableName: string): Promise<void> {
-    // Check if any roles exist
-    const result = await db.execute(sql`SELECT COUNT(*) as count FROM ${sql.raw(rolesTableName)}`);
-    const count = parseInt((result.rows[0] as Record<string, string | number>)?.count as string || "0", 10);
-
-    if (count > 0) {
-        logger.info(`📋 Found ${count} existing roles`);
-        return;
-    }
-
-    logger.info("🌱 Seeding default roles...");
-
-    for (const role of DEFAULT_ROLES) {
-        await db.execute(sql`
-            INSERT INTO ${sql.raw(rolesTableName)} (id, name, is_admin, default_permissions)
-            VALUES (
-                ${role.id}, 
-                ${role.name}, 
-                ${role.is_admin}, 
-                ${JSON.stringify(role.default_permissions)}::jsonb
-            )
-            ON CONFLICT (id) DO NOTHING
-        `);
-    }
-
-    logger.info("✅ Default roles created: admin, editor, viewer");
-}

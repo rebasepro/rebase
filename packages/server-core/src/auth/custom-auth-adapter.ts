@@ -76,7 +76,7 @@ export function createCustomAuthAdapter(options: CustomAuthAdapterOptions): Auth
 
         userManagement: options.userManagement,
 
-        roleManagement: options.roleManagement,
+
 
         getCapabilities() {
             return defaultCapabilities;

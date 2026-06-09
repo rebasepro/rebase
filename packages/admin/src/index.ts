@@ -45,7 +45,7 @@ export {
     DefaultDrawer,
     DrawerFooterActions,
     AdminModeSyncer,
-    // ContentHomePage, UsersView, RolesView are lazy-loaded — not re-exported here
+    // ContentHomePage is lazy-loaded — not re-exported here
     RebaseCMS,
     RebaseShell,
     RebaseAuthGate,
@@ -97,7 +97,6 @@ export * from "./data_export";
 // Collection editor — moved from @rebasepro/studio (CMS-dependent visual schema editor)
 export * from "./collection_editor";
 
-export { RolesFilterSelect } from "./components/admin/RolesFilterSelect";
-export { UserRolesSelectField } from "./components/admin/UserRolesSelectField";
+
 export { CreationResultDialog } from "./components/admin/CreationResultDialog";
 

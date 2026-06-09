@@ -1,5 +1,5 @@
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { UserService, RoleService, RefreshTokenService, PasswordResetTokenService, Role } from "../src/auth/services";
+import { UserService, RefreshTokenService, PasswordResetTokenService, Role } from "../src/auth/services";
 import { users, refreshTokens, passwordResetTokens } from "../src/schema/auth-schema";
 import { UserData } from "@rebasepro/server-core";
 
@@ -344,18 +344,7 @@ describe("Auth Services", () => {
         describe("getUserRoles", () => {
             it("should return roles for user", async () => {
                 mockExecute.mockResolvedValueOnce({
-                    rows: [
-                        { id: "admin",
-                            name: "Admin",
-                            is_admin: true,
-                            default_permissions: null,
-                            collection_permissions: null },
-                        { id: "editor",
-                            name: "Editor",
-                            is_admin: false,
-                            default_permissions: { edit: true },
-                            collection_permissions: null }
-                    ]
+                    rows: [{ roles: ["admin", "editor"] }]
                 });
 
                 const roles = await userService.getUserRoles("user-123");
@@ -363,7 +352,7 @@ describe("Auth Services", () => {
                 expect(roles).toHaveLength(2);
                 expect(roles[0]).toEqual({
                     id: "admin",
-                    name: "Admin",
+                    name: "admin",
                     isAdmin: true,
                     defaultPermissions: null,
                     collectionPermissions: null
@@ -374,13 +363,7 @@ describe("Auth Services", () => {
         describe("getUserRoleIds", () => {
             it("should return role IDs for user", async () => {
                 mockExecute.mockResolvedValueOnce({
-                    rows: [
-                        { id: "admin",
-                            name: "Admin",
-                            is_admin: true,
-                            default_permissions: null,
-                            collection_permissions: null }
-                    ]
+                    rows: [{ roles: ["admin"] }]
                 });
 
                 const roleIds = await userService.getUserRoleIds("user-123");
@@ -393,10 +376,7 @@ describe("Auth Services", () => {
             it("should delete existing and insert new roles", async () => {
                 await userService.setUserRoles("user-123", ["admin", "editor"]);
 
-                // First call deletes existing roles
                 expect(mockExecute).toHaveBeenCalled();
-                // Subsequent calls insert new roles
-                expect(mockExecute.mock.calls.length).toBeGreaterThanOrEqual(1);
             });
         });
 
@@ -408,7 +388,7 @@ describe("Auth Services", () => {
             });
 
             it("should use editor as default role", async () => {
-                await userService.assignDefaultRole("user-123");
+                await userService.assignDefaultRole("user-123", "editor");
 
                 expect(mockExecute).toHaveBeenCalled();
             });
@@ -419,11 +399,7 @@ describe("Auth Services", () => {
                 const mockUser = { id: "user-123", email: "test@example.com" };
                 mockSelectWhere.mockResolvedValueOnce([mockUser]);
                 mockExecute.mockResolvedValueOnce({
-                    rows: [{ id: "admin",
-                        name: "Admin",
-                        is_admin: true,
-                        default_permissions: null,
-                        collection_permissions: null }]
+                    rows: [{ roles: ["admin"] }]
                 });
 
                 const result = await userService.getUserWithRoles("user-123");
@@ -431,7 +407,7 @@ describe("Auth Services", () => {
                 expect(result).toEqual({
                     user: mockUserData({}),
                     roles: [{ id: "admin",
-                        name: "Admin",
+                        name: "admin",
                         isAdmin: true,
                         defaultPermissions: null,
                         collectionPermissions: null }]
@@ -468,125 +444,6 @@ describe("Auth Services", () => {
                     limit: 10,
                     offset: 0
                 });
-            });
-        });
-    });
-
-    describe("RoleService", () => {
-        let roleService: RoleService;
-
-        beforeEach(() => {
-            roleService = new RoleService(db);
-        });
-
-        describe("getRoleById", () => {
-            it("should return role when found", async () => {
-                mockExecute.mockResolvedValueOnce({
-                    rows: [{ id: "admin",
-name: "Admin",
-is_admin: true,
-default_permissions: null,
-collection_permissions: null }]
-                });
-
-                const result = await roleService.getRoleById("admin");
-
-                expect(result).toEqual({
-                    id: "admin",
-                    name: "Admin",
-                    isAdmin: true,
-                    defaultPermissions: null,
-                    collectionPermissions: null
-                });
-            });
-
-            it("should return null when role not found", async () => {
-                mockExecute.mockResolvedValueOnce({ rows: [] });
-
-                const result = await roleService.getRoleById("nonexistent");
-
-                expect(result).toBeNull();
-            });
-        });
-
-        describe("listRoles", () => {
-            it("should return all roles", async () => {
-                mockExecute.mockResolvedValueOnce({
-                    rows: [
-                        { id: "admin",
-name: "Admin",
-is_admin: true,
-default_permissions: null,
-collection_permissions: null },
-                        { id: "editor",
-name: "Editor",
-is_admin: false,
-default_permissions: null,
-collection_permissions: null }
-                    ]
-                });
-
-                const roles = await roleService.listRoles();
-
-                expect(roles).toHaveLength(2);
-            });
-        });
-
-        describe("createRole", () => {
-            it("should create a role", async () => {
-                mockExecute.mockResolvedValueOnce({
-                    rows: [{ id: "custom",
-name: "Custom Role",
-is_admin: false,
-default_permissions: null,
-collection_permissions: null }]
-                });
-
-                const role = await roleService.createRole({
-                    id: "custom",
-                    name: "Custom Role",
-                    defaultPermissions: null
-                });
-
-                expect(role.id).toBe("custom");
-                expect(role.name).toBe("Custom Role");
-            });
-        });
-
-        describe("updateRole", () => {
-            it("should update a role", async () => {
-                mockExecute
-                    .mockResolvedValueOnce({ rows: [{ id: "admin",
-name: "Admin",
-is_admin: true,
-default_permissions: null,
-collection_permissions: null }] })
-                    .mockResolvedValueOnce({ rows: [] })
-                    .mockResolvedValueOnce({ rows: [{ id: "admin",
-name: "Super Admin",
-is_admin: true,
-default_permissions: null,
-collection_permissions: null }] });
-
-                const result = await roleService.updateRole("admin", { name: "Super Admin" });
-
-                expect(result?.name).toBe("Super Admin");
-            });
-
-            it("should return null when role not found", async () => {
-                mockExecute.mockResolvedValueOnce({ rows: [] });
-
-                const result = await roleService.updateRole("nonexistent", { name: "Test" });
-
-                expect(result).toBeNull();
-            });
-        });
-
-        describe("deleteRole", () => {
-            it("should delete a role", async () => {
-                await roleService.deleteRole("custom");
-
-                expect(mockExecute).toHaveBeenCalled();
             });
         });
     });

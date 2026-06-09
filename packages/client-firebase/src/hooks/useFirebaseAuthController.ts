@@ -24,14 +24,14 @@ import {
 } from "@firebase/auth";
 import { FirebaseApp } from "@firebase/app";
 import { FirebaseAuthController, FirebaseSignInOption, FirebaseSignInProvider, FirebaseUserWrapper } from "../types";
-import { Role, User } from "@rebasepro/types";
+import type { User } from "@rebasepro/types";
 
 export interface FirebaseAuthControllerProps {
     loading?: boolean;
     firebaseApp?: FirebaseApp;
     signInOptions?: Array<FirebaseSignInProvider | FirebaseSignInOption>;
     onSignOut?: () => void;
-    defineRolesFor?: (user: User) => Promise<Role[] | undefined> | Role[] | undefined;
+    defineRolesFor?: (user: User) => Promise<string[] | undefined> | string[] | undefined;
 }
 
 /**
@@ -53,13 +53,11 @@ export const useFirebaseAuthController = <USER extends FirebaseUserWrapper = any
     const [authLoading, setAuthLoading] = useState(true);
     const [loginSkipped, setLoginSkipped] = useState<boolean>(false);
     const [confirmationResult, setConfirmationResult] = useState<undefined | ConfirmationResult>();
-    const [userRoles, _setUserRoles] = useState<Role[] | undefined>();
+    const [userRoles, _setUserRoles] = useState<string[] | undefined>();
     const [extra, setExtra] = useState<any>();
 
-    const setUserRoles = useCallback((roles: Role[] | undefined) => {
-        const currentRoleIds = userRoles?.map(r => r.id);
-        const newRoleIds = roles?.map(r => r.id);
-        if (!equal(currentRoleIds, newRoleIds)) {
+    const setUserRoles = useCallback((roles: string[] | undefined) => {
+        if (!equal(userRoles, roles)) {
             _setUserRoles(roles);
         }
     }, [userRoles]);
@@ -299,7 +297,7 @@ export const useFirebaseAuthController = <USER extends FirebaseUserWrapper = any
     const firebaseUserWrapper: FirebaseUserWrapper | null = loggedUser
         ? {
             ...loggedUser,
-            roles: userRoles?.map(r => r.id), // User.roles is string[], keep Role[] internally only
+            roles: userRoles,
             firebaseUser: loggedUser
         }
         : null;

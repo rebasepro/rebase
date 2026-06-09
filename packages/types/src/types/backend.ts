@@ -711,8 +711,8 @@ export interface InitializedDriver {
 export interface BootstrappedAuth {
     /** User management service. */
     userService: unknown;
-    /** Role management service. */
-    roleService: unknown;
+    /** Role management service (optional, roles are now simple strings). */
+    roleService?: unknown;
     /** Email service (optional). */
     emailService?: unknown;
     /** Combined Auth Repository for unified token and user management. */

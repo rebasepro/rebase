@@ -589,9 +589,16 @@ export function generateCollectionFile(
         // Array/Map heuristics (Fallback if not inferred)
         if (finalPropType === "array" && !inferenceExtra.includes("of: {")) {
             let innerType = "string";
+            let colType = "";
             if (col.udt_name.startsWith("_")) {
                 const baseType = col.udt_name.substring(1);
                 innerType = mapPgType(baseType);
+                if (innerType === "string") colType = "text[]";
+                else if (innerType === "number") colType = col.udt_name === "_numeric" ? "numeric[]" : "integer[]";
+                else if (innerType === "boolean") colType = "boolean[]";
+            }
+            if (colType) {
+                extra += `\n            columnType: "${colType}",`;
             }
             extra += `\n            of: { name: "${humanize(col.column_name)} Item", type: "${innerType}" },`;
         } else if (finalPropType === "map" && !inferenceExtra.includes("keyValue: true") && !inferenceExtra.includes("properties: {")) {
