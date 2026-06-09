@@ -107,7 +107,7 @@ export function Tabs({
 msOverflowStyle: "none" }}
             >
                 <TabsPrimitive.List className={cls(
-                    variant === "standard" && "inline-flex h-10 items-center justify-start rounded-md bg-surface-50 p-1 text-surface-600 dark:bg-surface-900 dark:text-surface-400 gap-2 border",
+                    variant === "standard" && "inline-flex h-9 items-center justify-start rounded-md bg-surface-50 p-1 text-surface-600 dark:bg-surface-900 dark:text-surface-400 gap-2 border",
                     variant === "standard" && defaultBorderMixin,
                     variant === "boxy" && "flex items-center h-full",
                     variant === "pill" && "flex items-center gap-0.5",
@@ -161,7 +161,7 @@ export function Tab({
                 "inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-white transition-all",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-surface-400 focus-visible:ring-offset-2",
                 "disabled:pointer-events-none disabled:opacity-50",
-                variant === "standard" && "rounded-sm px-3 py-1.5 data-[state=active]:bg-white data-[state=active]:text-surface-900 data-[state=active]:shadow-sm dark:data-[state=active]:bg-surface-900 dark:data-[state=active]:text-surface-50",
+                variant === "standard" && "rounded-sm px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-surface-900 data-[state=active]:shadow-sm dark:data-[state=active]:bg-surface-900 dark:data-[state=active]:text-surface-50",
                 variant === "boxy" && cls(
                     "flex-shrink-0 flex items-center gap-1.5 px-3.5 h-9 border-r border-surface-200 dark:border-surface-800 cursor-pointer text-[12px] font-medium transition-colors group relative box-border overflow-hidden",
                     "border-b-2 border-b-transparent",
