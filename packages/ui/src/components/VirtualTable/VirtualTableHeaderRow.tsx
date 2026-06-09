@@ -212,9 +212,10 @@ export const VirtualTableHeaderRow = ({
                 className={cls(defaultBorderMixin, "z-20 sticky min-w-full flex w-fit flex-row top-0 left-0 border-b bg-surface-50 dark:bg-surface-900")}
                 style={{ height: headerHeight }}>
                 {columns.map((column, columnIndex) => {
+                    const columnFilter = column && filter && filter[column.key] ? filter[column.key] : undefined;
                     const filterForThisProperty: [VirtualTableWhereFilterOp, unknown] | undefined =
-                        column && filter && filter[column.key]
-                            ? filter[column.key]
+                        columnFilter
+                            ? (Array.isArray(columnFilter[0]) ? (columnFilter as [VirtualTableWhereFilterOp, unknown][])[0] : (columnFilter as [VirtualTableWhereFilterOp, unknown]))
                             : undefined;
 
                     const isDraggable = !column.frozen && !!onColumnsOrderChange;

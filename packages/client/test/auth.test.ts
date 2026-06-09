@@ -1,5 +1,5 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from "@jest/globals";
-import { createAuth, createMemoryStorage, RebaseSession, RebaseUser, AuthChangeEvent } from "../src/auth";
+import { createAuth, createMemoryStorage, createCookieStorage, RebaseSession, RebaseUser, AuthChangeEvent } from "../src/auth";
 import { Transport, RebaseApiError } from "../src/transport";
 
 /** Minimal mock Response shape used by auth methods that call fetch directly. */
@@ -801,6 +801,64 @@ user: mockUser })
 
         it("overwrites existing values", () => {
             const storage = createMemoryStorage();
+            storage.setItem("key", "old");
+            storage.setItem("key", "new");
+            expect(storage.getItem("key")).toBe("new");
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // Cookie storage
+    // -----------------------------------------------------------------------
+    describe("CookieStorage", () => {
+        let originalDocument: any;
+
+        beforeEach(() => {
+            originalDocument = (globalThis as any).document;
+            const mockDoc = {
+                _cookie: "",
+                get cookie() {
+                    return this._cookie;
+                },
+                set cookie(val) {
+                    const parts = val.split(";");
+                    const pair = parts[0].trim();
+                    const key = pair.split("=")[0];
+                    const value = pair.substring(key.length + 1);
+
+                    const isDelete = parts.some(p => p.trim().startsWith("max-age=-1"));
+                    
+                    const cookies = this._cookie ? this._cookie.split(";").map(c => c.trim()) : [];
+                    const filtered = cookies.filter(c => !c.startsWith(key + "="));
+                    
+                    if (!isDelete) {
+                        filtered.push(`${key}=${value}`);
+                    }
+                    this._cookie = filtered.join("; ");
+                }
+            };
+            (globalThis as any).document = mockDoc as any;
+        });
+
+        afterEach(() => {
+            (globalThis as any).document = originalDocument;
+        });
+
+        it("stores and retrieves values using document.cookie", () => {
+            const storage = createCookieStorage();
+            storage.setItem("key", "val");
+            expect(storage.getItem("key")).toBe("val");
+            storage.removeItem("key");
+            expect(storage.getItem("key")).toBeNull();
+        });
+
+        it("returns null for non-existent keys", () => {
+            const storage = createCookieStorage();
+            expect(storage.getItem("nonexistent")).toBeNull();
+        });
+
+        it("overwrites existing values", () => {
+            const storage = createCookieStorage();
             storage.setItem("key", "old");
             storage.setItem("key", "new");
             expect(storage.getItem("key")).toBe("new");

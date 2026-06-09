@@ -17,7 +17,7 @@ describe("QueryBuilder", () => {
 
             expect(collection.find).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    where: { name: "John" }
+                    where: { name: ["==", "John"] }
                 })
             );
         });
@@ -30,7 +30,7 @@ describe("QueryBuilder", () => {
 
             expect(collection.find).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    where: { age: "gte.18" }
+                    where: { age: [">=", 18] }
                 })
             );
         });
@@ -43,7 +43,7 @@ describe("QueryBuilder", () => {
 
             expect(collection.find).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    where: { score: "gt.100" }
+                    where: { score: [">", 100] }
                 })
             );
         });
@@ -56,7 +56,7 @@ describe("QueryBuilder", () => {
 
             expect(collection.find).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    where: { status: "neq.deleted" }
+                    where: { status: ["!=", "deleted"] }
                 })
             );
         });
@@ -69,7 +69,7 @@ describe("QueryBuilder", () => {
 
             expect(collection.find).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    where: { price: "lt.50" }
+                    where: { price: ["<", 50] }
                 })
             );
         });
@@ -82,7 +82,7 @@ describe("QueryBuilder", () => {
 
             expect(collection.find).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    where: { quantity: "lte.10" }
+                    where: { quantity: ["<=", 10] }
                 })
             );
         });
@@ -95,7 +95,7 @@ describe("QueryBuilder", () => {
 
             expect(collection.find).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    where: { tags: "cs.featured" }
+                    where: { tags: ["array-contains", "featured"] }
                 })
             );
         });
@@ -108,7 +108,7 @@ describe("QueryBuilder", () => {
 
             expect(collection.find).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    where: { status: "in.(active,pending)" }
+                    where: { status: ["in", ["active", "pending"]] }
                 })
             );
         });
@@ -121,7 +121,7 @@ describe("QueryBuilder", () => {
 
             expect(collection.find).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    where: { deletedAt: "null" }
+                    where: { deletedAt: ["==", null] }
                 })
             );
         });
@@ -137,7 +137,28 @@ describe("QueryBuilder", () => {
 
             expect(collection.find).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    where: { age: "gte.18", status: "active" }
+                    where: { age: [">=", 18], status: ["==", "active"] }
+                })
+            );
+        });
+
+        it("aggregates multiple filters on the same column instead of overwriting", async () => {
+            const collection = createMockCollection();
+            const qb = new QueryBuilder(collection as never);
+
+            await qb
+                .where("age", ">=", 18)
+                .where("age", "<=", 30)
+                .find();
+
+            expect(collection.find).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: {
+                        age: [
+                            [">=", 18],
+                            ["<=", 30]
+                        ]
+                    }
                 })
             );
         });
@@ -263,7 +284,7 @@ describe("QueryBuilder", () => {
                 .find();
 
             expect(collection.find).toHaveBeenCalledWith({
-                where: { status: "active", age: "gte.18" },
+                where: { status: ["==", "active"], age: [">=", 18] },
                 orderBy: "createdAt:desc",
                 limit: 10,
                 offset: 20,
@@ -304,7 +325,7 @@ describe("QueryBuilder", () => {
             qb.where("status", "==", "active").listen(onUpdate, onError);
 
             expect(collection.listen).toHaveBeenCalledWith(
-                expect.objectContaining({ where: { status: "active" } }),
+                expect.objectContaining({ where: { status: ["==", "active"] } }),
                 onUpdate,
                 onError
             );

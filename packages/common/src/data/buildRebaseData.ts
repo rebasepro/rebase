@@ -8,7 +8,10 @@ import {
     EntityValues,
     FilterValues,
     WhereFilterOp,
-    WhereFieldValue
+    WhereFieldValue,
+    WhereFilterOpShort,
+    LogicalCondition,
+    WhereValue
 } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { QueryBuilder } from "./query_builder";
@@ -69,11 +72,18 @@ function convertWhereToFilter(where?: Record<string, WhereFieldValue>): FilterVa
             continue;
         }
 
-        // Handle tuple: [operator, value]
-        if (Array.isArray(rawValue) && rawValue.length === 2) {
-            const [rawOp, val] = rawValue;
-            const mappedOp = operatorMap[rawOp] ?? "==";
-            filter[field] = [mappedOp, val];
+        // Handle tuple or array of tuples
+        if (Array.isArray(rawValue)) {
+            const conditions: [WhereFilterOpShort, any][] = Array.isArray(rawValue[0])
+                ? (rawValue as [WhereFilterOpShort, any][])
+                : [rawValue as [WhereFilterOpShort, any]];
+
+            const mappedConditions: [WhereFilterOp, unknown][] = conditions.map(([rawOp, val]) => {
+                const mappedOp = operatorMap[rawOp] ?? "==";
+                return [mappedOp, val];
+            });
+
+            filter[field] = Array.isArray(rawValue[0]) ? mappedConditions : mappedConditions[0];
             continue;
         }
 
@@ -244,8 +254,12 @@ values: {} as Record<string, unknown> }
             } : undefined,
 
         // Fluent Query Builder
-        where(column: keyof M & string, operator: WhereFilterOp, value: unknown) {
-            return new QueryBuilder<M>(accessor).where(column, operator, value);
+        where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOpShort, value?: unknown) {
+            const builder = new QueryBuilder<M>(accessor);
+            if (typeof columnOrCondition === "object") {
+                return builder.where(columnOrCondition);
+            }
+            return builder.where(columnOrCondition as keyof M & string, operator!, value as WhereValue<M[keyof M & string]>);
         },
         orderBy(column: keyof M & string, ascending?: "asc" | "desc") {
             return new QueryBuilder<M>(accessor).orderBy(column, ascending);

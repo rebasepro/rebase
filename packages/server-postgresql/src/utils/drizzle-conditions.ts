@@ -1,6 +1,6 @@
 import { and, eq, or, sql, SQL, ilike, inArray } from "drizzle-orm";
 import { AnyPgColumn, PgTable, PgVarchar, PgText, PgChar } from "drizzle-orm/pg-core";
-import { FilterValues, WhereFilterOp, Relation, JoinStep } from "@rebasepro/types";
+import { FilterValues, WhereFilterOp, Relation, JoinStep, LogicalCondition, FilterCondition } from "@rebasepro/types";
 import { getColumnName, resolveCollectionRelations } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { ConditionBuilderStatic } from "../interfaces";
@@ -37,7 +37,6 @@ export class DrizzleConditionBuilder {
         for (const [field, filterParam] of Object.entries(filter)) {
             if (!filterParam) continue;
 
-            const [op, value] = filterParam as [WhereFilterOp, any];
             let fieldColumn = table[field as keyof typeof table] as AnyPgColumn;
 
             if (!fieldColumn) {
@@ -53,13 +52,49 @@ export class DrizzleConditionBuilder {
                 continue;
             }
 
-            const condition = this.buildSingleFilterCondition(fieldColumn, op, value);
-            if (condition) {
-                conditions.push(condition);
+            const paramsList = Array.isArray(filterParam) && filterParam.length > 0 && Array.isArray(filterParam[0])
+                ? (filterParam as [WhereFilterOp, any][])
+                : [filterParam as [WhereFilterOp, any]];
+
+            for (const [op, value] of paramsList) {
+                const condition = this.buildSingleFilterCondition(fieldColumn, op, value);
+                if (condition) {
+                    conditions.push(condition);
+                }
             }
         }
 
         return conditions;
+    }
+
+    /**
+     * Build logical conditions recursively from LogicalCondition or FilterCondition
+     */
+    static buildLogicalConditions(
+        cond: LogicalCondition | FilterCondition,
+        table: PgTable<any>,
+        collectionPath: string
+    ): SQL | null {
+        if ("type" in cond) {
+            const subSQLs = cond.conditions
+                .map(c => this.buildLogicalConditions(c, table, collectionPath))
+                .filter((sql): sql is SQL => sql !== null);
+            if (subSQLs.length === 0) return null;
+            return (cond.type === "or" ? or(...subSQLs) : and(...subSQLs)) ?? null;
+        } else {
+            let fieldColumn = table[cond.column as keyof typeof table] as AnyPgColumn;
+            if (!fieldColumn) {
+                const relationKey = `${cond.column}_id`;
+                if (relationKey in table) {
+                    fieldColumn = table[relationKey as keyof typeof table] as AnyPgColumn;
+                }
+            }
+            if (!fieldColumn) {
+                console.warn(`Filtering by field '${cond.column}', but it does not exist in table for collection '${collectionPath}'`);
+                return null;
+            }
+            return this.buildSingleFilterCondition(fieldColumn, cond.operator as WhereFilterOp, cond.value);
+        }
     }
 
     /**

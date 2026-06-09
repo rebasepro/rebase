@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, getTableName, gt, lt, or, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
-import { Entity, EntityCollection, FilterValues, Relation } from "@rebasepro/types";
+import { Entity, EntityCollection, FilterValues, Relation, LogicalCondition } from "@rebasepro/types";
 import type { VectorSearchParams } from "@rebasepro/types";
 import { resolveCollectionRelations, findRelation, createRelationRef, createRelationRefWithData } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
@@ -465,6 +465,7 @@ export class EntityFetchService {
             offset?: number;
             startAfter?: Record<string, unknown>;
             searchString?: string;
+            logical?: LogicalCondition;
         },
         collectionPath: string,
         withConfig?: Record<string, unknown>
@@ -492,6 +493,11 @@ export class EntityFetchService {
         if (options.filter) {
             const filterConditions = this.buildFilterConditions(options.filter, table, collectionPath);
             if (filterConditions.length > 0) allConditions.push(...filterConditions);
+        }
+
+        if (options.logical) {
+            const logicalCondition = DrizzleConditionBuilder.buildLogicalConditions(options.logical, table, collectionPath);
+            if (logicalCondition) allConditions.push(logicalCondition);
         }
 
         // Cursor-based pagination (startAfter)
@@ -700,6 +706,7 @@ export class EntityFetchService {
             searchString?: string;
             databaseId?: string;
             vectorSearch?: VectorSearchParams;
+            logical?: LogicalCondition;
         } = {}
     ): Promise<Entity<M>[]> {
         const collection = getCollectionByPath(collectionPath, this.registry);
@@ -772,6 +779,11 @@ export class EntityFetchService {
         if (options.filter) {
             const filterConditions = this.buildFilterConditions(options.filter, table, collectionPath);
             if (filterConditions.length > 0) allConditions.push(...filterConditions);
+        }
+
+        if (options.logical) {
+            const logicalCondition = DrizzleConditionBuilder.buildLogicalConditions(options.logical, table, collectionPath);
+            if (logicalCondition) allConditions.push(logicalCondition);
         }
 
         // Vector distance threshold filter

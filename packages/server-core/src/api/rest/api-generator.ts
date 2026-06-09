@@ -87,9 +87,9 @@ export class RestApiGenerator {
         // GET /collection/count - Count entities (with optional filters)
         this.router.get(`${basePath}/count`, async (c) => {
             this.enforceApiKeyPermission(c, collection.slug);
-            const queryDict = c.req.query();
+            const queryDict = c.req.queries();
             const queryOptions = parseQueryOptions(queryDict);
-            const searchString = queryDict.searchString as string | undefined;
+            const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
             const driver = c.get("driver") || this.driver;
 
             const total = await this.countRawEntities(driver, resolvedCollection, queryOptions, searchString);
@@ -99,9 +99,9 @@ export class RestApiGenerator {
         // GET /collection - List entities
         this.router.get(basePath, async (c) => {
             this.enforceApiKeyPermission(c, collection.slug);
-            const queryDict = c.req.query();
+            const queryDict = c.req.queries();
             const queryOptions = parseQueryOptions(queryDict);
-            const searchString = queryDict.searchString as string | undefined;
+            const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
 
             const driver = c.get("driver") || this.driver;
             const fetchService = this.getFetchService(driver);
@@ -161,7 +161,7 @@ export class RestApiGenerator {
         this.router.get(`${basePath}/:id`, async (c) => {
             this.enforceApiKeyPermission(c, collection.slug);
             const id = c.req.param("id");
-            const queryDict = c.req.query();
+            const queryDict = c.req.queries();
             const queryOptions = parseQueryOptions(queryDict);
             const driver = c.get("driver") || this.driver;
             const fetchService = this.getFetchService(driver);
@@ -388,13 +388,14 @@ entityId };
 
             if (parsed.entityId === "count") {
                 // GET /parent/:parentId/child/count — count child entities
-                const queryDict = c.req.query();
+                const queryDict = c.req.queries();
                 const queryOptions = parseQueryOptions(queryDict);
+                const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
                 
                 const total = driver.countEntities ? await driver.countEntities({
                     path: parsed.collectionPath,
                     filter: queryOptions.where as FetchCollectionProps["filter"],
-                    searchString: queryDict.searchString as string | undefined
+                    searchString
                 }) : 0;
                 
                 return c.json({ count: total });
@@ -408,15 +409,16 @@ entityId };
                 return c.json(this.flattenEntity(entity));
             } else {
                 // GET /parent/:parentId/child — list entities
-                const queryDict = c.req.query();
+                const queryDict = c.req.queries();
                 const queryOptions = parseQueryOptions(queryDict);
+                const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
                 const entities = await driver.fetchCollection({
                     path: parsed.collectionPath,
                     filter: queryOptions.where as FetchCollectionProps["filter"],
                     limit: queryOptions.limit,
                     orderBy: queryOptions.orderBy?.[0]?.field,
                     order: queryOptions.orderBy?.[0]?.direction === "desc" ? "desc" : "asc",
-                    searchString: queryDict.searchString as string | undefined
+                    searchString
                 });
                 return c.json({
                     data: entities.map(e => this.flattenEntity(e)),

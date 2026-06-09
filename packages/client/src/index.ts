@@ -65,17 +65,32 @@ import { createStorage } from "./storage";
  * `http://` → `ws://`, `https://` → `wss://`.
  */
 function deriveWebSocketUrl(baseUrl?: string): string {
-    if (!baseUrl) {
-        // If no baseUrl is provided, we can try to derive it from the window object if in browser
-        if (typeof window !== "undefined") {
-            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-            return `${protocol}//${window.location.host}`;
+    if (typeof window !== "undefined") {
+        let absoluteUrl = "";
+        if (!baseUrl) {
+            absoluteUrl = window.location.origin;
+        } else if (/^https?:\/\//i.test(baseUrl) || /^wss?:\/\//i.test(baseUrl)) {
+            absoluteUrl = baseUrl;
+        } else {
+            try {
+                absoluteUrl = new URL(baseUrl, window.location.href).origin;
+            } catch {
+                absoluteUrl = window.location.origin;
+            }
         }
+        const protocol = absoluteUrl.startsWith("https:") || absoluteUrl.startsWith("wss:") ? "wss:" : "ws:";
+        return absoluteUrl
+            .replace(/^https?:\/\//i, `${protocol}//`)
+            .replace(/^wss?:\/\//i, `${protocol}//`)
+            .replace(/\/$/, "");
+    }
+
+    if (!baseUrl) return "";
+    if (!/^https?:\/\//i.test(baseUrl) && !/^wss?:\/\//i.test(baseUrl)) {
         return "";
     }
     return baseUrl
-        .replace(/^https:\/\//, "wss://")
-        .replace(/^http:\/\//, "ws://")
+        .replace(/^https?:\/\//i, (match) => match.toLowerCase() === "https://" ? "wss://" : "ws://")
         .replace(/\/$/, "");
 }
 
@@ -91,12 +106,27 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
 
     let ws: RebaseWebSocketClient | undefined;
     if (resolvedWsUrl) {
+        const wsOnUnauthorized = options.onUnauthorized || (async () => {
+            try {
+                await auth.refreshSession();
+                return true;
+            } catch (e) {
+                return false;
+            }
+        });
+
         ws = new RebaseWebSocketClient({
             websocketUrl: resolvedWsUrl,
             getAuthToken: async () => {
-                const session = await auth.getSession();
+                let session = auth.getSession();
+                if (session && session.expiresAt <= Date.now() + 10000) {
+                    try {
+                        session = await auth.refreshSession();
+                    } catch (e) { /* ignore */ }
+                }
                 return session?.accessToken || options.token || "";
-            }
+            },
+            onUnauthorized: wsOnUnauthorized
         });
 
         auth.onAuthStateChange((event, session) => {

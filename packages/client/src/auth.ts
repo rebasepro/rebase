@@ -520,3 +520,67 @@ newPassword })
         onAuthStateChange
     };
 }
+
+export interface CookieStorageOptions {
+    path?: string;
+    domain?: string;
+    secure?: boolean;
+    sameSite?: "Lax" | "Strict" | "None";
+    maxAge?: number;
+}
+
+export function createCookieStorage(options: CookieStorageOptions = {}): AuthStorage {
+    const defaultOptions = {
+        path: "/",
+        sameSite: "Lax" as const,
+        ...options
+    };
+
+    return {
+        getItem(key: string): string | null {
+            if (typeof document === "undefined") return null;
+            const nameEQ = encodeURIComponent(key) + "=";
+            const ca = document.cookie.split(";");
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) === " ") c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) === 0) {
+                    return decodeURIComponent(c.substring(nameEQ.length, c.length));
+                }
+            }
+            return null;
+        },
+        setItem(key: string, value: string): void {
+            if (typeof document === "undefined") return;
+            let cookieStr = `${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+            
+            if (defaultOptions.path) {
+                cookieStr += `; path=${defaultOptions.path}`;
+            }
+            if (defaultOptions.domain) {
+                cookieStr += `; domain=${defaultOptions.domain}`;
+            }
+            if (defaultOptions.maxAge !== undefined) {
+                cookieStr += `; max-age=${defaultOptions.maxAge}`;
+            } else {
+                cookieStr += `; max-age=${365 * 24 * 60 * 60}`;
+            }
+            if (defaultOptions.secure) {
+                cookieStr += "; secure";
+            }
+            if (defaultOptions.sameSite) {
+                cookieStr += `; samesite=${defaultOptions.sameSite}`;
+            }
+            
+            document.cookie = cookieStr;
+        },
+        removeItem(key: string): void {
+            if (typeof document === "undefined") return;
+            let cookieStr = `${encodeURIComponent(key)}=; path=${defaultOptions.path || "/"}; max-age=-1`;
+            if (defaultOptions.domain) {
+                cookieStr += `; domain=${defaultOptions.domain}`;
+            }
+            document.cookie = cookieStr;
+        }
+    };
+}

@@ -15,10 +15,10 @@ import { SelectedCellProps } from "@rebasepro/types";
  * derivation actually changed will re-render.
  */
 export function createSelectionStore() {
-    let selectedCell: SelectedCellProps<any> | undefined = undefined;
+    let selectedCell: SelectedCellProps | undefined = undefined;
     const listeners = new Set<() => void>();
 
-    function getSnapshot(): SelectedCellProps<any> | undefined {
+    function getSnapshot(): SelectedCellProps | undefined {
         return selectedCell;
     }
 
@@ -27,7 +27,7 @@ export function createSelectionStore() {
         return () => listeners.delete(listener);
     }
 
-    function select(cell: SelectedCellProps<any> | undefined) {
+    function select(cell: SelectedCellProps | undefined) {
         selectedCell = cell;
         listeners.forEach(l => l());
     }
@@ -43,7 +43,7 @@ export type SelectionStore = ReturnType<typeof createSelectionStore>;
  * `selected` boolean actually changes (not on every store update).
  */
 export function useCellSelected(
-    store: { getSnapshot: () => SelectedCellProps<any> | undefined; subscribe: (listener: () => void) => () => void },
+    store: { getSnapshot: () => SelectedCellProps | undefined; subscribe: (listener: () => void) => () => void },
     propertyKey: string,
     entityPath: string,
     entityId: string | number

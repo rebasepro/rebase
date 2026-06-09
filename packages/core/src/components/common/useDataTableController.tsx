@@ -246,16 +246,22 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         if (filterValues) {
             Object.entries(filterValues).forEach(([key, value]) => {
                 if (value && Array.isArray(value)) {
-                    const [op, val] = value;
-                    const postgrestOp = op === "==" ? "eq" : op === "!=" ? "neq" : op === ">" ? "gt" : op === ">=" ? "gte" : op === "<" ? "lt" : op === "<=" ? "lte" : op === "in" ? "in" : op === "not-in" ? "nin" : op === "array-contains" ? "cs" : op === "array-contains-any" ? "csa" : "eq";
+                    const conditions: [WhereFilterOp, unknown][] = Array.isArray(value[0])
+                        ? (value as [WhereFilterOp, unknown][])
+                        : [value as [WhereFilterOp, unknown]];
 
-                    let stringVal: string;
-                    if (Array.isArray(val)) {
-                        stringVal = `(${val.join(",")})`;
-                    } else {
-                        stringVal = String(val);
+                    const [op, val] = conditions[0] || [];
+                    if (op) {
+                        const postgrestOp = op === "==" ? "eq" : op === "!=" ? "neq" : op === ">" ? "gt" : op === ">=" ? "gte" : op === "<" ? "lt" : op === "<=" ? "lte" : op === "in" ? "in" : op === "not-in" ? "nin" : op === "array-contains" ? "cs" : op === "array-contains-any" ? "csa" : "eq";
+
+                        let stringVal: string;
+                        if (Array.isArray(val)) {
+                            stringVal = `(${val.join(",")})`;
+                        } else {
+                            stringVal = String(val);
+                        }
+                        whereMap[key] = `${postgrestOp}.${stringVal}`;
                     }
-                    whereMap[key] = `${postgrestOp}.${stringVal}`;
                 }
             });
         }
@@ -388,34 +394,40 @@ function encodeFilterAndSort(filterValues?: FilterValues<string>, sortBy?: [stri
     if (filterValues) {
         Object.entries(filterValues).forEach(([key, value]) => {
             if (value) {
-                const [op, val] = value;
-                let encodedValue: unknown = val;
-                try {
-                    if (typeof val === "object") {
-                        if (val instanceof Date) {
-                            encodedValue = val.toISOString();
-                        } else if (Array.isArray(val)) {
-                            encodedValue = JSON.stringify(val, (k, v) => {
-                                if (v instanceof EntityRelation) {
-                                    return encodeRelation(v);
-                                }
-                                if (v instanceof EntityReference) {
-                                    return encodeReference(v);
-                                }
-                                return v;
-                            });
-                        } else if (val instanceof EntityRelation) {
-                            encodedValue = encodeRelation(val);
-                        } else if (val instanceof EntityReference) {
-                            encodedValue = encodeReference(val);
+                const conditions: [WhereFilterOp, unknown][] = Array.isArray(value[0])
+                    ? (value as [WhereFilterOp, unknown][])
+                    : [value as [WhereFilterOp, unknown]];
+
+                const [op, val] = conditions[0] || [];
+                if (op) {
+                    let encodedValue: unknown = val;
+                    try {
+                        if (typeof val === "object") {
+                            if (val instanceof Date) {
+                                encodedValue = val.toISOString();
+                            } else if (Array.isArray(val)) {
+                                encodedValue = JSON.stringify(val, (k, v) => {
+                                    if (v instanceof EntityRelation) {
+                                        return encodeRelation(v);
+                                    }
+                                    if (v instanceof EntityReference) {
+                                        return encodeReference(v);
+                                    }
+                                    return v;
+                                });
+                            } else if (val instanceof EntityRelation) {
+                                encodedValue = encodeRelation(val);
+                            } else if (val instanceof EntityReference) {
+                                encodedValue = encodeReference(val);
+                            }
                         }
+                    } catch (e) {
+                        encodedValue = val;
                     }
-                } catch (e) {
-                    encodedValue = val;
-                }
-                if (encodedValue !== undefined) {
-                    entries[encodeURIComponent(`${key}_op`)] = encodeURIComponent(op);
-                    entries[encodeURIComponent(`${key}_value`)] = encodedValue ? encodeURIComponent(String(encodedValue)) : "null";
+                    if (encodedValue !== undefined) {
+                        entries[encodeURIComponent(`${key}_op`)] = encodeURIComponent(op);
+                        entries[encodeURIComponent(`${key}_value`)] = encodedValue ? encodeURIComponent(String(encodedValue)) : "null";
+                    }
                 }
             }
         });

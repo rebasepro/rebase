@@ -102,12 +102,20 @@ export function App() {
         <Rebase client={rebaseClient} authController={authController} userManagement={userManagement} plugins={[dataEnhancementPlugin]}>
             <RebaseAuth/>
             <RebaseCMS collections={collections} collectionEditor={collectionEditor}/>
-            <RebaseStudio/>
+            <RebaseStudio tools={undefined} homePage={undefined} />
             <RebaseShell title="Rebase"/>
         </Rebase>
     );
 }
 ```
+
+### TypeScript Strict Props Warning
+
+Under strict TypeScript checks, importing and calling `<RebaseStudio/>` without props might throw a compilation error:
+`Type '{}' is missing the following properties from type '{ tools: any; homePage: any; }': tools, homePage`
+
+To satisfy the type checker, pass `tools={undefined} homePage={undefined}` explicitly to the component:
+`<RebaseStudio tools={undefined} homePage={undefined} />`
 
 ### Key Components
 

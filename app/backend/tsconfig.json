@@ -11,29 +11,20 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "declaration": true,
-    "declarationMap": true,
+    "declaration": false,
+    "declarationMap": false,
     "sourceMap": true,
     "baseUrl": ".",
     "jsx": "preserve",
     "paths": {
-      "@rebasepro/types": [
-        "../../packages/types/src/index"
-      ],
-      "@rebasepro/server-core": [
-        "../../packages/server-core/src/index"
-      ],
-      "@rebasepro/common": [
-        "../../packages/common/src/index"
-      ],
       "config": [
         "../config/index"
       ],
-      "@rebasepro/server-postgresql": [
-        "../../packages/server-postgresql/src/index"
+      "hono": [
+        "node_modules/hono"
       ],
-      "@rebasepro/admin": [
-        "../../packages/admin/src/index"
+      "hono/*": [
+        "node_modules/hono/*"
       ]
     }
   },

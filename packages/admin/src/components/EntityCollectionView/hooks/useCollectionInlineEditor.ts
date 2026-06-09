@@ -42,6 +42,7 @@ export function useCollectionInlineEditor<M extends Record<string, unknown>>({
         setError,
         data: entity
     }) => {
+        if (!entity) return;
 
         const updatedValues = setIn({}, propertyKey, value) as Partial<Record<string, unknown>>;
 

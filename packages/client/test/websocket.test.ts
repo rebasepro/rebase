@@ -2165,4 +2165,157 @@ path: "posts" }]
             expect(result[0].id).toBe("1");
         });
     });
+
+    // -----------------------------------------------------------------------
+    // WebSocket Token Refresh and Request Retry
+    // -----------------------------------------------------------------------
+    describe("WebSocket Token Refresh and Request Retry", () => {
+        async function flushMicrotasks(n = 10) {
+            for (let i = 0; i < n; i++) {
+                await Promise.resolve();
+            }
+        }
+
+        it("triggers onUnauthorized and retries pending request on auth error", async () => {
+            const onUnauthorized = jest.fn().mockResolvedValue(true);
+            const getAuthToken = jest.fn()
+                .mockResolvedValueOnce("old-token")
+                .mockResolvedValueOnce("new-token");
+
+            const client = createClient({ getAuthToken, onUnauthorized });
+            jest.runAllTimers();
+            await Promise.resolve();
+
+            const ws = getWs();
+            // Get initial auth request and simulate success
+            const initialAuth = JSON.parse(ws.sentMessages[0]);
+            ws.onmessage!({ data: JSON.stringify({
+                type: "AUTH_SUCCESS",
+                requestId: initialAuth.requestId,
+                payload: {}
+            }) });
+            await flushMicrotasks();
+
+            // Clear sent messages
+            ws.sentMessages = [];
+
+            // Make a data request
+            const fetchPromise = client.fetchCollection({ path: "posts" });
+            expect(ws.sentMessages).toHaveLength(1);
+            const dataMsg = JSON.parse(ws.sentMessages[0]);
+
+            // Simulate auth error response
+            ws.onmessage!({ data: JSON.stringify({
+                type: "ERROR",
+                requestId: dataMsg.requestId,
+                payload: { error: { message: "Unauthorized token", code: "UNAUTHORIZED" } }
+            }) });
+
+            // Allow async handlers to run (onUnauthorized and handleAuthFailure)
+            await flushMicrotasks();
+
+            expect(onUnauthorized).toHaveBeenCalled();
+            expect(getAuthToken).toHaveBeenCalledTimes(2);
+
+            // Re-auth should have been sent
+            const reauthMsg = JSON.parse(ws.sentMessages[1]);
+            expect(reauthMsg.type).toBe("AUTHENTICATE");
+            expect(reauthMsg.payload.token).toBe("new-token");
+
+            // Simulate reauth success
+            ws.onmessage!({ data: JSON.stringify({
+                type: "AUTH_SUCCESS",
+                requestId: reauthMsg.requestId,
+                payload: {}
+            }) });
+            await flushMicrotasks();
+
+            // The data request should have been retried
+            const retriedMsg = JSON.parse(ws.sentMessages[2]);
+            expect(retriedMsg.type).toBe("FETCH_COLLECTION");
+            expect(retriedMsg.payload.path).toBe("posts");
+
+            // Complete the data request
+            ws.onmessage!({ data: JSON.stringify({
+                type: "FETCH_COLLECTION",
+                requestId: retriedMsg.requestId,
+                payload: { entities: [{ id: "post1" }] }
+            }) });
+
+            const result = await fetchPromise;
+            expect(result).toEqual([{ id: "post1" }]);
+        });
+
+        it("triggers onUnauthorized and resubscribes collection subscription on auth error", async () => {
+            const onUnauthorized = jest.fn().mockResolvedValue(true);
+            const getAuthToken = jest.fn()
+                .mockResolvedValueOnce("old-token")
+                .mockResolvedValueOnce("new-token");
+
+            const client = createClient({ getAuthToken, onUnauthorized });
+            jest.runAllTimers();
+            await Promise.resolve();
+
+            const ws = getWs();
+            // Handle initial auth
+            const initialAuth = JSON.parse(ws.sentMessages[0]);
+            ws.onmessage!({ data: JSON.stringify({
+                type: "AUTH_SUCCESS",
+                requestId: initialAuth.requestId,
+                payload: {}
+            }) });
+            await flushMicrotasks();
+
+            ws.sentMessages = [];
+
+            // Setup collection subscription
+            const onUpdate = jest.fn();
+            const onError = jest.fn();
+            client.listenCollection({ path: "posts" }, onUpdate, onError);
+
+            expect(ws.sentMessages).toHaveLength(1);
+            const subMsg = JSON.parse(ws.sentMessages[0]);
+            expect(subMsg.type).toBe("subscribe_collection");
+
+            // Simulate subscription auth error
+            ws.onmessage!({ data: JSON.stringify({
+                type: "ERROR",
+                subscriptionId: subMsg.payload.subscriptionId,
+                payload: { error: { message: "unauthorized", code: "UNAUTHORIZED" } }
+            }) });
+
+            await flushMicrotasks();
+
+            expect(onUnauthorized).toHaveBeenCalled();
+
+            // Check re-authenticate message
+            const reauthMsg = JSON.parse(ws.sentMessages[1]);
+            expect(reauthMsg.type).toBe("AUTHENTICATE");
+            expect(reauthMsg.payload.token).toBe("new-token");
+
+            // Simulate reauth success
+            ws.onmessage!({ data: JSON.stringify({
+                type: "AUTH_SUCCESS",
+                requestId: reauthMsg.requestId,
+                payload: {}
+            }) });
+            await flushMicrotasks();
+
+            // Check that it re-subscribed
+            const resubMsg = JSON.parse(ws.sentMessages[2]);
+            expect(resubMsg.type).toBe("subscribe_collection");
+            expect(resubMsg.payload.path).toBe("posts");
+            expect(resubMsg.payload.subscriptionId).not.toBe(subMsg.payload.subscriptionId);
+
+            // Send collection update on the new subscription
+            ws.onmessage!({ data: JSON.stringify({
+                type: "collection_update",
+                subscriptionId: resubMsg.payload.subscriptionId,
+                entities: [{ id: "post1" }]
+            }) });
+
+            expect(onUpdate).toHaveBeenCalledWith([{ id: "post1" }]);
+            expect(onError).not.toHaveBeenCalled();
+        });
+    });
 });

@@ -1,60 +1,55 @@
-import { Transport, FindParams, buildQueryString } from "./transport";
+import { buildQueryString, FindParams, RebaseApiError, Transport } from "./transport";
 import { RebaseWebSocketClient } from "./websocket";
-import { Entity, FilterValues, WhereFilterOp, CollectionAccessor, WhereFieldValue, FindResponse, FilterOperator } from "@rebasepro/types";
+import {
+    CollectionAccessor,
+    Entity,
+    FilterOperator,
+    FilterValues,
+    FindResponse,
+    WhereFieldValue,
+    WhereFilterOp,
+    LogicalCondition,
+    WhereValue
+} from "@rebasepro/types";
 
 import { QueryBuilder } from "./query_builder";
 
 function parseWhereFilter(where?: Record<string, WhereFieldValue>): FilterValues<string> | undefined {
     if (!where) return undefined;
-    const filters: Record<string, [WhereFilterOp, unknown]> = {};
-    for (const [key, rawValue] of Object.entries(where)) {
-        // Handle null → equality
-        if (rawValue === null) {
-            filters[key] = ["==", null];
-            continue;
-        }
+    const filters: Record<string, any> = {};
 
-        // Handle boolean → equality
-        if (typeof rawValue === "boolean") {
-            filters[key] = ["==", rawValue];
-            continue;
-        }
+    const OP_TO_FILTER: Record<string, WhereFilterOp> = {
+        "eq": "==",
+        "neq": "!=",
+        "gt": ">",
+        "gte": ">=",
+        "lt": "<",
+        "lte": "<=",
+        "==": "==",
+        "!=": "!=",
+        ">": ">",
+        ">=": ">=",
+        "<": "<",
+        "<=": "<=",
+        "in": "in",
+        "nin": "not-in",
+        "not-in": "not-in",
+        "cs": "array-contains",
+        "csa": "array-contains-any",
+        "array-contains": "array-contains",
+        "array-contains-any": "array-contains-any"
+    };
 
-        // Handle number → equality
-        if (typeof rawValue === "number") {
-            filters[key] = ["==", rawValue];
-            continue;
-        }
+    const parseSingle = (rawValue: any, fieldKey: string): [WhereFilterOp, unknown] => {
+        if (rawValue === null) return ["==", null];
+        if (typeof rawValue === "boolean") return ["==", rawValue];
+        if (typeof rawValue === "number") return ["==", rawValue];
 
-        // Handle tuple: [operator, value]
-        if (Array.isArray(rawValue) && rawValue.length === 2) {
+        if (Array.isArray(rawValue) && rawValue.length === 2 && typeof rawValue[0] === "string") {
             const [rawOp, val] = rawValue;
-            const OP_TO_FILTER: Record<string, WhereFilterOp> = {
-                "eq": "==",
-"neq": "!=",
-                "gt": ">",
-"gte": ">=",
-                "lt": "<",
-"lte": "<=",
-                "==": "==",
-"!=": "!=",
-                ">": ">",
-">=": ">=",
-                "<": "<",
-"<=": "<=",
-                "in": "in",
-"nin": "not-in",
-"not-in": "not-in",
-                "cs": "array-contains",
-"csa": "array-contains-any",
-                "array-contains": "array-contains",
-"array-contains-any": "array-contains-any"
-            };
-            filters[key] = [OP_TO_FILTER[rawOp] ?? "==", val];
-            continue;
+            return [OP_TO_FILTER[rawOp] ?? "==", val];
         }
 
-        // Handle string (original PostgREST format)
         const value = String(rawValue);
         const dotIndex = value.indexOf(".");
         if (dotIndex > 0) {
@@ -64,12 +59,24 @@ function parseWhereFilter(where?: Record<string, WhereFieldValue>): FilterValues
             let val: string | number | boolean | null | string[] = valStr;
 
             switch (opStr) {
-                case "eq": op = "=="; break;
-                case "neq": op = "!="; break;
-                case "gt": op = ">"; break;
-                case "gte": op = ">="; break;
-                case "lt": op = "<"; break;
-                case "lte": op = "<="; break;
+                case "eq":
+                    op = "==";
+                    break;
+                case "neq":
+                    op = "!=";
+                    break;
+                case "gt":
+                    op = ">";
+                    break;
+                case "gte":
+                    op = ">=";
+                    break;
+                case "lt":
+                    op = "<";
+                    break;
+                case "lte":
+                    op = "<=";
+                    break;
                 case "in":
                     op = "in";
                     val = valStr.startsWith("(") && valStr.endsWith(")")
@@ -82,24 +89,35 @@ function parseWhereFilter(where?: Record<string, WhereFieldValue>): FilterValues
                         ? valStr.slice(1, -1).split(",").map(v => v.trim())
                         : valStr.split(",");
                     break;
-                case "cs": op = "array-contains"; break;
+                case "cs":
+                    op = "array-contains";
+                    break;
                 case "csa":
                     op = "array-contains-any";
                     val = valStr.startsWith("(") && valStr.endsWith(")")
                         ? valStr.slice(1, -1).split(",").map(v => v.trim())
                         : valStr.split(",");
                     break;
-                default: op = "=="; val = value;
+                default:
+                    op = "==";
+                    val = value;
             }
-            // Simple type inference for parsing from URL-like strings
             if (val === "true") val = true;
             else if (val === "false") val = false;
             else if (val === "null") val = null;
-            else if (typeof val === "string" && /^[0-9]+(\.[0-9]+)?$/.test(val) && key !== "id" && !key.endsWith("_id")) val = Number(val);
+            else if (typeof val === "string" && /^[0-9]+(\.[0-9]+)?$/.test(val) && fieldKey !== "id" && !fieldKey.endsWith("_id")) val = Number(val);
 
-            filters[key] = [op, val];
+            return [op, val];
         } else {
-            filters[key] = ["==", value];
+            return ["==", value];
+        }
+    };
+
+    for (const [key, rawValue] of Object.entries(where)) {
+        if (Array.isArray(rawValue) && rawValue.length > 0 && Array.isArray(rawValue[0])) {
+            filters[key] = rawValue.map(r => parseSingle(r, key));
+        } else {
+            filters[key] = parseSingle(rawValue, key);
         }
     }
     return filters;
@@ -126,13 +144,19 @@ function rowToEntity<M extends Record<string, unknown>>(row: Record<string, unkn
  * Additionally it exposes fluent query builder methods like `.where()`, `.orderBy()`.
  */
 export interface CollectionClient<M extends Record<string, unknown> = Record<string, unknown>> extends CollectionAccessor<M> {
-    // Fluent Query Builder
-    where(column: keyof M & string, operator: FilterOperator, value: unknown): QueryBuilder<M>;
+    where<K extends keyof M & string>(column: K, operator: FilterOperator, value: WhereValue<M[K]>): QueryBuilder<M>;
+    where(logicalCondition: LogicalCondition): QueryBuilder<M>;
+
     orderBy(column: keyof M & string, ascending?: "asc" | "desc"): QueryBuilder<M>;
+
     limit(count: number): QueryBuilder<M>;
+
     offset(count: number): QueryBuilder<M>;
+
     search(searchString: string): QueryBuilder<M>;
+
     include(...relations: string[]): QueryBuilder<M>;
+
     count(params?: FindParams): Promise<number>;
 }
 
@@ -142,7 +166,10 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
     const client: CollectionClient<M> = {
         async find(params?: FindParams): Promise<FindResponse<M>> {
             const qs = buildQueryString(params);
-            const raw = await transport.request<{ data: Record<string, unknown>[]; meta: FindResponse<M>["meta"] }>(basePath + qs, { method: "GET" });
+            const raw = await transport.request<{
+                data: Record<string, unknown>[];
+                meta: FindResponse<M>["meta"]
+            }>(basePath + qs, { method: "GET" });
             return {
                 data: (raw.data || []).map((row: Record<string, unknown>) => rowToEntity<M>(row, slug)),
                 meta: raw.meta
@@ -150,9 +177,16 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
         },
 
         async findById(id: string | number) {
-            const raw = await transport.request<Record<string, unknown>>(`${basePath}/${encodeURIComponent(String(id))}`, { method: "GET" });
-            if (!raw) return undefined;
-            return rowToEntity<M>(raw, slug);
+            try {
+                const raw = await transport.request<Record<string, unknown>>(`${basePath}/${encodeURIComponent(String(id))}`, { method: "GET" });
+                if (!raw) return undefined;
+                return rowToEntity<M>(raw, slug);
+            } catch (err) {
+                if (err instanceof RebaseApiError && err.status === 404) {
+                    return undefined;
+                }
+                throw err;
+            }
         },
 
         async create(data: Partial<M>, id?: string | number) {
@@ -182,15 +216,23 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
         },
 
         async count(params?: FindParams): Promise<number> {
-            const countParams: FindParams = { ...params, limit: undefined, offset: undefined };
+            const countParams: FindParams = {
+                ...params,
+                limit: undefined,
+                offset: undefined
+            };
             const qs = buildQueryString(countParams);
             const raw = await transport.request<{ count: number }>(basePath + "/count" + qs, { method: "GET" });
             return raw.count ?? 0;
         },
 
         // Fluent builder instantiation
-        where(column: keyof M & string, operator: FilterOperator, value: unknown) {
-            return new QueryBuilder<M>(client).where(column, operator, value);
+        where(columnOrCondition: string | LogicalCondition, operator?: FilterOperator, value?: unknown) {
+            const builder = new QueryBuilder<M>(client as unknown as CollectionAccessor<M>);
+            if (typeof columnOrCondition === "object") {
+                return builder.where(columnOrCondition);
+            }
+            return builder.where(columnOrCondition as keyof M & string, operator!, value as WhereValue<M[keyof M & string]>);
         },
         orderBy(column: keyof M & string, ascending?: "asc" | "desc") {
             return new QueryBuilder<M>(client).orderBy(column, ascending);
@@ -239,8 +281,10 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
 
         client.listenById = (id: string | number, onUpdate: (data: Entity<M> | undefined) => void, onError?: (error: Error) => void) => {
             return ws.listenEntity(
-                { path: slug,
-entityId: String(id) },
+                {
+                    path: slug,
+                    entityId: String(id)
+                },
                 (entity: Entity | null) => {
                     if (entity) {
                         onUpdate(entity as Entity<M>);

@@ -689,7 +689,7 @@ export type WhereFilterOp =
  * @group Models
  */
 export type FilterValues<Key extends string> =
-    Partial<Record<Key, [WhereFilterOp, unknown]>>;
+    Partial<Record<Key, [WhereFilterOp, unknown] | [WhereFilterOp, unknown][]>>;
 
 /**
  * A pre-defined filter preset for quick access in the collection toolbar.

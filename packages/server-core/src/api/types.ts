@@ -1,4 +1,4 @@
-import { EntityCollection, VectorSearchParams } from "@rebasepro/types";
+import { EntityCollection, VectorSearchParams, LogicalCondition } from "@rebasepro/types";
 import { AuthResult } from "../auth/middleware";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { DataDriver } from "@rebasepro/types";
@@ -77,6 +77,7 @@ export interface QueryOptions {
     limit?: number;
     offset?: number;
     where?: Record<string, unknown>;
+    logical?: LogicalCondition;
     orderBy?: Array<{ field: string; direction: "asc" | "desc" }>;
     include?: string[];
     /** Columns to return in the response (field-level selection) */

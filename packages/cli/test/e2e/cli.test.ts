@@ -283,22 +283,12 @@ describe("Rebase CLI E2E Integration Suite", () => {
 
         console.log("Detected tables:", tables);
         expect(tables).toContain("rebase.users");
-        expect(tables).toContain("rebase.roles");
-        expect(tables).toContain("rebase.user_roles");
         expect(tables).toContain("rebase.refresh_tokens");
         expect(tables).toContain("rebase.password_reset_tokens");
         expect(tables).toContain("rebase.app_config");
         expect(tables).toContain("public.authors");
         expect(tables).toContain("public.posts");
         expect(tables).toContain("public.tags");
-
-        // Verify seeded roles
-        const rolesRes = await dbClient.query("SELECT id, name FROM rebase.roles ORDER BY id");
-        const roles = rolesRes.rows.map(r => r.id);
-        console.log("Detected roles:", roles);
-        expect(roles).toContain("admin");
-        expect(roles).toContain("editor");
-        expect(roles).toContain("viewer");
 
         // Verify indexes
         const indexesRes = await dbClient.query(`
@@ -308,7 +298,6 @@ describe("Rebase CLI E2E Integration Suite", () => {
         `);
         const indexNames = indexesRes.rows.map(r => r.indexname);
         console.log("Detected indexes:", indexNames);
-        expect(indexNames).toContain("idx_user_roles_user");
         expect(indexNames).toContain("idx_refresh_tokens_hash");
         expect(indexNames).toContain("idx_refresh_tokens_user");
         expect(indexNames).toContain("idx_password_reset_tokens_hash");
@@ -399,10 +388,8 @@ describe("Rebase CLI E2E Integration Suite", () => {
         await dbClient.query("DROP TABLE IF EXISTS authors CASCADE");
         await dbClient.query("DROP TABLE IF EXISTS tags CASCADE");
         await dbClient.query("DROP TABLE IF EXISTS rebase.users CASCADE");
-        await dbClient.query("DROP TABLE IF EXISTS rebase.roles CASCADE");
         await dbClient.query("DROP TABLE IF EXISTS rebase.branches CASCADE");
         await dbClient.query("DROP TABLE IF EXISTS rebase.user_identities CASCADE");
-        await dbClient.query("DROP TABLE IF EXISTS rebase.user_roles CASCADE");
         await dbClient.query("DROP TABLE IF EXISTS rebase.refresh_tokens CASCADE");
         await dbClient.query("DROP TABLE IF EXISTS rebase.password_reset_tokens CASCADE");
         await dbClient.query("DROP TABLE IF EXISTS rebase.app_config CASCADE");

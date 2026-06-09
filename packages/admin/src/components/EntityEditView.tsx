@@ -225,11 +225,13 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
         }
     ), [collection, status, entityId]);
 
-    const [selectedTab, setSelectedTab] = useState<string>(
-        selectedTabProp === "edit" ? MAIN_TAB_VALUE : (selectedTabProp ?? defaultSelectedView ?? MAIN_TAB_VALUE)
-    );
+    const [selectedTab, setSelectedTab] = useState<string>(() => {
+        const val = selectedTabProp ?? defaultSelectedView ?? MAIN_TAB_VALUE;
+        return val === "edit" ? MAIN_TAB_VALUE : val;
+    });
     useEffect(() => {
-        const target = selectedTabProp === "edit" ? MAIN_TAB_VALUE : (selectedTabProp ?? defaultSelectedView ?? MAIN_TAB_VALUE);
+        const val = selectedTabProp ?? defaultSelectedView ?? MAIN_TAB_VALUE;
+        const target = val === "edit" ? MAIN_TAB_VALUE : val;
         if (target !== selectedTab) {
             setSelectedTab(target);
         }

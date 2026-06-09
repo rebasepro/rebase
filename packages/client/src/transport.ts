@@ -1,4 +1,4 @@
-import { FindParams as TypesFindParams, FindResponse as TypesFindResponse, WhereFieldValue } from "@rebasepro/types";
+import { FindParams as TypesFindParams, FindResponse as TypesFindResponse, WhereFieldValue, WhereFilterOpShort } from "@rebasepro/types";
 import { rebaseReviver } from "./reviver";
 
 export interface RebaseClientConfig {
@@ -70,17 +70,38 @@ function normalizeWhereValue(value: WhereFieldValue): string {
     if (typeof value === "number") return String(value);
 
     // Tuple: [operator, val]
-    if (Array.isArray(value) && value.length === 2) {
-        const [rawOp, val] = value;
-        const op = OP_MAP[rawOp] ?? rawOp;
+    if (Array.isArray(value)) {
+        const conditions: [WhereFilterOpShort, any][] = Array.isArray(value[0])
+            ? (value as [WhereFilterOpShort, any][])
+            : [value as [WhereFilterOpShort, any]];
 
-        if (val === null) return `${op}.null`;
-        if (Array.isArray(val)) return `${op}.(${val.join(",")})`;
-        return `${op}.${val}`;
+        const [rawOp, val] = conditions[0] || [];
+        if (rawOp) {
+            const op = OP_MAP[rawOp] ?? rawOp;
+            if (val === null) return `${op}.null`;
+            if (Array.isArray(val)) return `${op}.(${val.join(",")})`;
+            return `${op}.${val}`;
+        }
     }
 
     // String — pass through (either plain equality value or PostgREST syntax)
     return String(value);
+}
+
+function serializeLogicalCondition(cond: any): string {
+    if ("type" in cond) {
+        const sub = cond.conditions.map(serializeLogicalCondition).join(",");
+        return `${cond.type}(${sub})`;
+    } else {
+        const op = OP_MAP[cond.operator] ?? cond.operator;
+        let formattedValue = cond.value;
+        if (Array.isArray(cond.value)) {
+            formattedValue = `(${cond.value.join(",")})`;
+        } else if (cond.value === null) {
+            formattedValue = "null";
+        }
+        return `${cond.column}.${op}.${formattedValue}`;
+    }
 }
 
 export function buildQueryString(params?: FindParams): string {
@@ -103,10 +124,23 @@ export function buildQueryString(params?: FindParams): string {
         parts.push(`include=${encodeURIComponent(params.include.join(","))}`);
     }
 
+    if (params.logical) {
+        const root = params.logical;
+        const serialized = root.conditions.map(serializeLogicalCondition).join(",");
+        parts.push(`${root.type}=${encodeURIComponent(`(${serialized})`)}`);
+    }
+
     if (params.where) {
         for (const [field, value] of Object.entries(params.where)) {
-            const normalized = normalizeWhereValue(value as WhereFieldValue);
-            parts.push(`${encodeURIComponent(field)}=${encodeURIComponent(normalized)}`);
+            if (Array.isArray(value) && value.length > 0 && Array.isArray(value[0])) {
+                for (const subVal of value) {
+                    const normalized = normalizeWhereValue(subVal as WhereFieldValue);
+                    parts.push(`${encodeURIComponent(field)}=${encodeURIComponent(normalized)}`);
+                }
+            } else {
+                const normalized = normalizeWhereValue(value as WhereFieldValue);
+                parts.push(`${encodeURIComponent(field)}=${encodeURIComponent(normalized)}`);
+            }
         }
     }
 

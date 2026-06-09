@@ -1,21 +1,15 @@
-import { FindParams, Entity, FindResponse, CollectionAccessor, QueryBuilderInterface, FilterOperator } from "@rebasepro/types";
+import { FindParams, Entity, FindResponse, CollectionAccessor, QueryBuilderInterface, FilterOperator, LogicalCondition, WhereValue } from "@rebasepro/types";
 
-/**
- * Maps standard operators to Rebase backend's string-based operators
- */
-function mapOperator(op: FilterOperator): string {
-    switch (op) {
-        case "==": return "eq";
-        case "!=": return "neq";
-        case ">": return "gt";
-        case ">=": return "gte";
-        case "<": return "lt";
-        case "<=": return "lte";
-        case "array-contains": return "cs";
-        case "array-contains-any": return "csa";
-        case "not-in": return "nin";
-        default: return op;
-    }
+export function or(...conditions: any[]): LogicalCondition {
+    return { type: "or", conditions };
+}
+
+export function and(...conditions: any[]): LogicalCondition {
+    return { type: "and", conditions };
+}
+
+export function cond(column: string, operator: FilterOperator, value: unknown): any {
+    return { column, operator, value };
 }
 
 export class QueryBuilder<M extends Record<string, unknown> = Record<string, unknown>> implements QueryBuilderInterface<M> {
@@ -28,22 +22,38 @@ export class QueryBuilder<M extends Record<string, unknown> = Record<string, unk
      * @example
      * client.collection('users').where('age', '>=', 18).find()
      */
-    where(column: keyof M & string, operator: FilterOperator, value: unknown): this {
+    where<K extends keyof M & string>(column: K, operator: FilterOperator, value: WhereValue<M[K]>): this;
+    where(logicalCondition: LogicalCondition): this;
+    where(columnOrCondition: any, operator?: FilterOperator, value?: any): this {
+        // Handle LogicalCondition signature
+        if (typeof columnOrCondition === "object" && columnOrCondition !== null && "type" in columnOrCondition) {
+            this.params.logical = columnOrCondition as LogicalCondition;
+            return this;
+        }
+
         if (!this.params.where) {
             this.params.where = {};
         }
 
-        const mappedOp = mapOperator(operator);
-        let formattedValue = value;
+        const column = columnOrCondition as string;
+        const condition: [FilterOperator, unknown] = [operator!, value];
+        const existing = this.params.where[column];
 
-        // Handle arrays for in, nin, cs, csa
-        if (Array.isArray(value) && ["in", "nin", "cs", "csa"].includes(mappedOp)) {
-            formattedValue = `(${value.join(",")})`;
-        } else if (value === null) {
-            formattedValue = "null";
+        if (existing === undefined) {
+            this.params.where[column] = condition;
+        } else if (Array.isArray(existing) && existing.length > 0 && Array.isArray(existing[0])) {
+            (this.params.where[column] as [FilterOperator, unknown][]).push(condition);
+        } else {
+            // Convert existing single tuple/value into array of tuples
+            let firstCondition: [FilterOperator, unknown];
+            if (Array.isArray(existing) && existing.length === 2 && typeof existing[0] === "string") {
+                firstCondition = existing as [FilterOperator, unknown];
+            } else {
+                firstCondition = ["==", existing];
+            }
+            this.params.where[column] = [firstCondition, condition];
         }
 
-        this.params.where[column] = mappedOp === "eq" ? String(formattedValue) : `${mappedOp}.${formattedValue}`;
         return this;
     }
 

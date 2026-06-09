@@ -46,6 +46,8 @@ export interface RebaseWebSocketConfig {
     getAuthToken?: () => Promise<string>;
     /** Optional WebSocket constructor to override globalThis.WebSocket (e.g. for Node environments) */
     WebSocket?: typeof WebSocket;
+    /** Callback to handle unauthorized requests or token expiration (refreshes auth session) */
+    onUnauthorized?: () => Promise<boolean>;
 }
 
 
@@ -131,10 +133,13 @@ export class RebaseWebSocketClient {
     private isAuthenticated = false;
     private authPromise: Promise<void> | null = null;
     private WebSocketConstructor: typeof WebSocket | undefined;
+    public onUnauthorized?: () => Promise<boolean>;
+    private refreshInProgress: Promise<boolean> | null = null;
 
     constructor(config: RebaseWebSocketConfig) {
         this.websocketUrl = config.websocketUrl;
         this.getAuthToken = config.getAuthToken;
+        this.onUnauthorized = config.onUnauthorized;
         this.WebSocketConstructor = config.WebSocket || (typeof WebSocket !== "undefined" ? WebSocket : undefined);
 
         if (!this.WebSocketConstructor) {
@@ -335,6 +340,44 @@ export class RebaseWebSocketClient {
         }, delay);
     }
 
+    private isAuthError(message: WebSocketMessage): boolean {
+        if (message.type === "AUTH_ERROR") return true;
+        const { errorMessage, errorCode } = extractMessageError(message);
+        if (errorCode === "UNAUTHORIZED" || errorCode === "JWT_EXPIRED" || errorCode === "AUTH_ERROR") return true;
+        const lowerMessage = errorMessage.toLowerCase();
+        return lowerMessage.includes("unauthorized") || lowerMessage.includes("token expired") || lowerMessage.includes("token is expired") || lowerMessage.includes("invalid token") || lowerMessage.includes("session expired") || lowerMessage.includes("auth error");
+    }
+
+    private async handleAuthFailure(): Promise<boolean> {
+        if (this.refreshInProgress) {
+            return this.refreshInProgress;
+        }
+        this.refreshInProgress = (async () => {
+            this.isAuthenticated = false;
+            this.authPromise = null;
+            if (this.onUnauthorized) {
+                try {
+                    const refreshed = await this.onUnauthorized();
+                    if (refreshed && this.getAuthToken) {
+                        const token = await this.getAuthToken();
+                        if (token) {
+                            await this.authenticate(token);
+                            return true;
+                        }
+                    }
+                } catch (error) {
+                    console.error("WebSocket auth refresh failed:", error);
+                }
+            }
+            return false;
+        })();
+        try {
+            return await this.refreshInProgress;
+        } finally {
+            this.refreshInProgress = null;
+        }
+    }
+
     private handleWebSocketMessage(message: WebSocketMessage) {
         const {
             type,
@@ -344,17 +387,28 @@ export class RebaseWebSocketClient {
 
         // Handle responses to pending requests
         if (requestId && this.pendingRequests.has(requestId)) {
-            const {
-                resolve,
-                reject
-            } = this.pendingRequests.get(requestId)!;
-            this.pendingRequests.delete(requestId);
-
+            const pendingReq = this.pendingRequests.get(requestId)!;
             if (type === "ERROR" || type === "AUTH_ERROR" || message.error) {
-                const { errorMessage, errorCode } = extractMessageError(message);
-                reject(new ApiError(errorMessage, errorMessage, errorCode));
+                if (this.isAuthError(message)) {
+                    this.pendingRequests.delete(requestId);
+                    this.handleAuthFailure().then(refreshed => {
+                        if (refreshed && pendingReq.message) {
+                            this.doSendMessage(pendingReq.message, pendingReq.resolve, pendingReq.reject).catch(pendingReq.reject);
+                        } else {
+                            const { errorMessage, errorCode } = extractMessageError(message);
+                            pendingReq.reject(new ApiError(errorMessage, errorMessage, errorCode));
+                        }
+                    }).catch(err => {
+                        pendingReq.reject(err);
+                    });
+                } else {
+                    this.pendingRequests.delete(requestId);
+                    const { errorMessage, errorCode } = extractMessageError(message);
+                    pendingReq.reject(new ApiError(errorMessage, errorMessage, errorCode));
+                }
             } else {
-                resolve(message.payload || message);
+                this.pendingRequests.delete(requestId);
+                pendingReq.resolve(message.payload || message);
             }
             return;
         }
@@ -474,6 +528,42 @@ export class RebaseWebSocketClient {
             if (collectionKey) {
                 const collectionSub = this.collectionSubscriptions.get(collectionKey);
                 if (collectionSub) {
+                    if (this.isAuthError(message)) {
+                        this.handleAuthFailure().then(refreshed => {
+                            if (refreshed) {
+                                const oldBackendId = collectionSub.backendSubscriptionId;
+                                const newBackendId = `collection_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+                                collectionSub.backendSubscriptionId = newBackendId;
+                                this.backendToCollectionKey.delete(oldBackendId);
+                                this.backendToCollectionKey.set(newBackendId, collectionKey);
+
+                                this.sendMessage({
+                                    type: "subscribe_collection",
+                                    payload: {
+                                        ...collectionSub.props,
+                                        subscriptionId: newBackendId
+                                    }
+                                }).catch(error => {
+                                    console.error("[WS] Failed to re-subscribe collection after auth refresh:", collectionKey, error);
+                                    collectionSub.callbacks.forEach(callback => {
+                                        if (callback.onError) callback.onError(error);
+                                    });
+                                });
+                            } else {
+                                const { errorMessage, errorCode } = extractMessageError(message);
+                                const error = new ApiError(errorMessage, errorMessage, errorCode);
+                                collectionSub.callbacks.forEach(callback => {
+                                    if (callback.onError) callback.onError(error);
+                                });
+                            }
+                        }).catch(err => {
+                            collectionSub.callbacks.forEach(callback => {
+                                if (callback.onError) callback.onError(err);
+                            });
+                        });
+                        return;
+                    }
+
                     const { errorMessage, errorCode } = extractMessageError(message);
                     const error = new ApiError(errorMessage, errorMessage, errorCode);
                     collectionSub.callbacks.forEach(callback => {
@@ -489,6 +579,42 @@ export class RebaseWebSocketClient {
             if (entityKey) {
                 const entitySub = this.entitySubscriptions.get(entityKey);
                 if (entitySub) {
+                    if (this.isAuthError(message)) {
+                        this.handleAuthFailure().then(refreshed => {
+                            if (refreshed) {
+                                const oldBackendId = entitySub.backendSubscriptionId;
+                                const newBackendId = `entity_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+                                entitySub.backendSubscriptionId = newBackendId;
+                                this.backendToEntityKey.delete(oldBackendId);
+                                this.backendToEntityKey.set(newBackendId, entityKey);
+
+                                this.sendMessage({
+                                    type: "subscribe_entity",
+                                    payload: {
+                                        ...entitySub.props,
+                                        subscriptionId: newBackendId
+                                    }
+                                }).catch(error => {
+                                    console.error("[WS] Failed to re-subscribe entity after auth refresh:", entityKey, error);
+                                    entitySub.callbacks.forEach(callback => {
+                                        if (callback.onError) callback.onError(error);
+                                    });
+                                });
+                            } else {
+                                const { errorMessage, errorCode } = extractMessageError(message);
+                                const error = new ApiError(errorMessage, errorMessage, errorCode);
+                                entitySub.callbacks.forEach(callback => {
+                                    if (callback.onError) callback.onError(error);
+                                });
+                            }
+                        }).catch(err => {
+                            entitySub.callbacks.forEach(callback => {
+                                if (callback.onError) callback.onError(err);
+                            });
+                        });
+                        return;
+                    }
+
                     const { errorMessage, errorCode } = extractMessageError(message);
                     const error = new ApiError(errorMessage, errorMessage, errorCode);
                     entitySub.callbacks.forEach(callback => {

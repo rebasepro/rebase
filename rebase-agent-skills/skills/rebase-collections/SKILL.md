@@ -158,6 +158,15 @@ status: {
 
 Each enum entry supports `id` (stored value), `label` (display text), `color` (optional chip color), and `disabled` (optional).
 
+### PostgreSQL Enum Database Constraints
+
+When `rebase schema generate` is run, any `string` property configured with an `enum` array generates a corresponding PostgreSQL `ENUM` type (e.g. `CREATE TYPE "public"."collection_property" AS ENUM('val1', 'val2')`).
+
+If you write custom server functions, backend callback handlers, or perform manual database updates:
+1. **Validation Constraints**: Pushing or inserting a value that is NOT defined in the collection's enum options array will trigger a PostgreSQL database-level check constraint error (e.g., `invalid input value for enum`).
+2. **Adding Enum Options**: Adding a new enum value in code requires generating and applying a database migration (e.g., `pnpm db:generate` followed by `pnpm db:migrate` or raw enum modification SQL). In development, using a raw SQL command to alter the enum may be necessary because modifying PostgreSQL enums dynamically can be restrictive.
+
+
 ## Relations (Inline Property API)
 
 Relations are defined **directly on the property** using `type: "relation"`. The framework automatically extracts these into the collection's internal `relations[]` at normalization time — you do **not** need a separate `relations[]` array.
@@ -450,6 +459,19 @@ The `Builder` component receives:
 - `modifiedValues` — Current unsaved form values
 - `formContext` — Form state and methods
 - `collection` — The collection definition
+
+### TypeScript Strict Checks in Custom Views
+
+Under strict TypeScript checks (`strictNullChecks: true`), since `entity` is typed as optional (`entity?: Entity<M>`), accessing `entity.id` or `entity.values` directly will cause compilation errors like:
+`error TS18048: 'entity' is possibly 'undefined'.`
+
+Always add a guard clause at the very beginning of your custom view component to handle the undefined state:
+```typescript
+if (!entity) {
+    return null; // or show a loading/error state
+}
+```
+This narrows the type of `entity` for the remainder of the component, allowing safe property access (e.g. `entity.id`, `entity.values.field`).
 
 ## Security Rules (RLS)
 

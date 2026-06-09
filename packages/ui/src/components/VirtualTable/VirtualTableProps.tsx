@@ -278,21 +278,7 @@ export type OnVirtualTableColumnResizeParams = {
  * @see Table
  * @group Components
  */
-export type VirtualTableSort = "asc" | "desc" | undefined;
-
-/**
- * @see Table
- * @group Components
- */
-export type VirtualTableFilterValues<Key extends string> = Partial<Record<Key, [VirtualTableWhereFilterOp, unknown]>>;
-
-/**
- * Filter conditions in a `Query.where()` clause are specified using the
- * strings `<`, `<=`, `==`, `>=`, `>`, `array-contains`, `in`, and `array-contains-any`.
- * @see Table
- * @group Models
- */
-export type VirtualTableWhereFilterOp =
+export type WhereFilterOp =
     | "<"
     | "<="
     | "=="
@@ -303,3 +289,26 @@ export type VirtualTableWhereFilterOp =
     | "in"
     | "not-in"
     | "array-contains-any";
+
+export type FilterValues<Key extends string> =
+    Partial<Record<Key, [WhereFilterOp, unknown] | [WhereFilterOp, unknown][]>>;
+
+/**
+ * @see Table
+ * @group Components
+ */
+export type VirtualTableSort = "asc" | "desc" | undefined;
+
+/**
+ * @see Table
+ * @group Components
+ */
+export type VirtualTableFilterValues<Key extends string> = FilterValues<Key>;
+
+/**
+ * Filter conditions in a `Query.where()` clause are specified using the
+ * strings `<`, `<=`, `==`, `>=`, `>`, `array-contains`, `in`, and `array-contains-any`.
+ * @see Table
+ * @group Models
+ */
+export type VirtualTableWhereFilterOp = WhereFilterOp;

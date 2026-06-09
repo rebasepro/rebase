@@ -154,9 +154,13 @@ function EntityDetailViewInner<M extends Record<string, unknown>>({
         { status: "existing", entityId }
     ), [collection, entityId]);
 
-    const [selectedTab, setSelectedTab] = useState<string>(selectedTabProp ?? defaultSelectedView ?? MAIN_TAB_VALUE);
+    const [selectedTab, setSelectedTab] = useState<string>(() => {
+        const val = selectedTabProp ?? defaultSelectedView ?? MAIN_TAB_VALUE;
+        return val === "edit" ? MAIN_TAB_VALUE : val;
+    });
     useEffect(() => {
-        const target = selectedTabProp ?? defaultSelectedView ?? MAIN_TAB_VALUE;
+        const val = selectedTabProp ?? defaultSelectedView ?? MAIN_TAB_VALUE;
+        const target = val === "edit" ? MAIN_TAB_VALUE : val;
         if (target !== selectedTab) {
             setSelectedTab(target);
         }

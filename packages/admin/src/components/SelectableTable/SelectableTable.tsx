@@ -1,8 +1,8 @@
 import { createSelectionStore } from "./SelectionStore";
 import type { Property } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
-import { CollectionSize, Entity, EntityTableController, FilterValues, SelectedCellProps } from "@rebasepro/types";
-import { CellRendererParams, VirtualTable, VirtualTableColumn } from "@rebasepro/ui";
+import { CollectionSize, Entity, EntityRelation, EntityTableController, FilterValues, SelectedCellProps } from "@rebasepro/types";
+import { CellRendererParams, VirtualTable, VirtualTableColumn, VirtualTableFilterValues, OnRowClickParams, VirtualTableWhereFilterOp } from "@rebasepro/ui";
 import { enumToObjectEntries } from "@rebasepro/common";
 import { DEFAULT_PAGE_SIZE, EntityCollectionTableController, OnCellValueChange, OnColumnResizeParams } from "@rebasepro/core";
 import { FilterFormFieldProps } from "@rebasepro/ui";
@@ -20,7 +20,7 @@ export type SelectableTableProps<M extends Record<string, unknown>> = {
     /**
      * Callback when a cell value changes.
      */
-    onValueChange?: OnCellValueChange<any, M>;
+    onValueChange?: OnCellValueChange<unknown, M>;
 
     columns: VirtualTableColumn[];
 
@@ -100,7 +100,7 @@ export type SelectableTableProps<M extends Record<string, unknown>> = {
      * bust the cell memo comparator, triggering re-render of cells
      * even when rowData hasn't changed.
      */
-    extraData?: Record<string, any>;
+    extraData?: unknown;
 }
 
 /**
@@ -184,12 +184,10 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
         setItemCount?.(pageSize);
     }, [pageSize]);
 
-    const onRowClick = useCallback(({ rowData }: {
-        rowData: Entity<M>
-    }) => {
+    const onRowClick = useCallback(({ rowData }: OnRowClickParams<Record<string, unknown>>) => {
         if (inlineEditing)
             return;
-        return onEntityClick && onEntityClick(rowData);
+        return onEntityClick && onEntityClick(rowData as unknown as Entity<M>);
     }, [onEntityClick, inlineEditing]);
 
     const select = useCallback((cell?: SelectedCellProps<M>) => {
@@ -223,18 +221,22 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
         };
     }, [unselect]);
 
-    const onFilterUpdate = useCallback((updatedFilterValues?: FilterValues<any>) => {
-        setFilterValues?.({ ...updatedFilterValues,
-...fixedFilter } as FilterValues<any>);
-    }, [fixedFilter]);
+    const onFilterUpdate = useCallback((updatedFilterValues?: VirtualTableFilterValues<string>) => {
+        if (setFilterValues) {
+            setFilterValues({
+                ...updatedFilterValues,
+                ...fixedFilter
+            } as FilterValues<Extract<keyof M, string> | (string & {})>);
+        }
+    }, [fixedFilter, setFilterValues]);
 
     const contextValue = useMemo(() => ({
-        setPopupCell: setPopupCell as ((cell?: SelectedCellProps<M>) => void),
         select,
         onValueChange,
         size: size ?? "m",
-        selectionStore
-    } as EntityCollectionTableController<any>), [setPopupCell, select, onValueChange, size, selectionStore]);
+        selectionStore,
+        setPopupCell
+    } as unknown as EntityCollectionTableController<Record<string, unknown>>), [setPopupCell, select, onValueChange, size, selectionStore]);
 
     return (
         <SelectableTableContext.Provider
@@ -243,11 +245,11 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
                 ref={ref}>
 
                 <VirtualTable
-                    data={data as any}
+                    data={data as unknown as Record<string, unknown>[]}
                     columns={columns}
                     // @ts-ignore
                     cellRenderer={cellRenderer}
-                    onRowClick={inlineEditing ? undefined : (onEntityClick ? (onRowClick as any) : undefined)}
+                    onRowClick={inlineEditing ? undefined : (onEntityClick ? onRowClick : undefined)}
                     onEndReached={loadNextPage}
                     onResetPagination={resetPagination}
                     error={dataLoadingError}
@@ -262,9 +264,9 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
                     initialScroll={initialScroll}
                     onScroll={onScroll}
                     checkFilterCombination={checkFilterCombination}
-                    createFilterField={filterable ? (createFilterField as any) : undefined}
-                    rowClassName={useCallback((entity: any) => {
-                        return highlightedRow?.(entity) ? "bg-surface-accent-50 dark:!bg-surface-accent-900" : "";
+                    createFilterField={filterable ? createFilterField : undefined}
+                    rowClassName={useCallback((entity: Record<string, unknown>) => {
+                        return highlightedRow?.(entity as unknown as Entity<M>) ? "bg-surface-accent-50 dark:!bg-surface-accent-900" : "";
                     }, [highlightedRow])}
                     className="grow"
                     emptyComponent={emptyComponent}
@@ -287,7 +289,7 @@ function createFilterField({
     column,
     hidden,
     setHidden
-}: FilterFormFieldProps<any>): React.ReactNode {
+}: FilterFormFieldProps<unknown>): React.ReactNode {
 
     if (!column.custom) {
         return null;
@@ -313,7 +315,7 @@ function createFilterField({
             hidden={hidden}
             setHidden={setHidden}/>;
     } else if (baseProperty.type === "relation" && baseProperty.relation) {
-        return <RelationFilterField value={filterValue as any}
+        return <RelationFilterField value={filterValue as [VirtualTableWhereFilterOp, EntityRelation | EntityRelation[] | null]}
             setValue={setFilterValue}
             name={id as string}
             relation={baseProperty.relation}

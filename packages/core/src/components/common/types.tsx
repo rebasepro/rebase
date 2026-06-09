@@ -1,4 +1,4 @@
-import type { Property } from "@rebasepro/types";
+import type { Property, Entity } from "@rebasepro/types";
 import { CollectionSize, SelectedCellProps } from "@rebasepro/types";
 
 export type EntityCollectionTableController<M extends Record<string, unknown>> = {
@@ -25,7 +25,7 @@ export type EntityCollectionTableController<M extends Record<string, unknown>> =
      * Callback used when the value of a cell has changed.
      * @param params
      */
-    onValueChange?: (params: OnCellValueChangeParams<unknown, M>) => void;
+    onValueChange?: (params: OnCellValueChangeParams<unknown, Entity<M>>) => void;
     /**
      * Size of the elements in the collection
      */
@@ -58,7 +58,7 @@ export type UniqueFieldValidator = (props: {
  * Callback when a cell has changed in a table
  * @group Collection components
  */
-export type OnCellValueChange<T, M extends Record<string, unknown>> = (params: OnCellValueChangeParams<T, M>) => Promise<void> | void;
+export type OnCellValueChange<T, M extends Record<string, unknown>> = (params: OnCellValueChangeParams<T, Entity<M>>) => Promise<void> | void;
 
 /**
  * @group Collection components

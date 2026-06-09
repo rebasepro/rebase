@@ -22,7 +22,21 @@ export type WhereFieldValue =
     | number
     | boolean
     | null
-    | [WhereFilterOpShort, any];
+    | [WhereFilterOpShort, any]
+    | [WhereFilterOpShort, any][];
+
+export type WhereValue<T> = T | T[] | null;
+
+export interface LogicalCondition {
+    type: "and" | "or";
+    conditions: (FilterCondition | LogicalCondition)[];
+}
+
+export interface FilterCondition {
+    column: string;
+    operator: FilterOperator;
+    value: unknown;
+}
 
 /** Short operator strings accepted in the tuple syntax. */
 export type WhereFilterOpShort =
@@ -63,6 +77,8 @@ export interface FindParams {
      * ```
      */
     where?: Record<string, WhereFieldValue>;
+    /** Logical grouping conditions (AND/OR) */
+    logical?: LogicalCondition;
     /**
      * Sort order. Format: "field:direction".
      * @example "created_at:desc", "name:asc"
@@ -97,7 +113,8 @@ export type FilterOperator = WhereFilterOpShort;
  * @group Data
  */
 export interface QueryBuilderInterface<M extends Record<string, unknown> = Record<string, unknown>> {
-    where(column: keyof M & string, operator: FilterOperator, value: unknown): this;
+    where<K extends keyof M & string>(column: K, operator: FilterOperator, value: WhereValue<M[K]>): this;
+    where(logicalCondition: LogicalCondition): this;
     orderBy(column: keyof M & string, ascending?: "asc" | "desc"): this;
     limit(count: number): this;
     offset(count: number): this;
@@ -169,7 +186,8 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     count?(params?: FindParams): Promise<number>;
 
     // Fluent Query Builder
-    where(column: keyof M & string, operator: FilterOperator, value: unknown): QueryBuilderInterface<M>;
+    where<K extends keyof M & string>(column: K, operator: FilterOperator, value: WhereValue<M[K]>): QueryBuilderInterface<M>;
+    where(logicalCondition: LogicalCondition): QueryBuilderInterface<M>;
     orderBy(column: keyof M & string, ascending?: "asc" | "desc"): QueryBuilderInterface<M>;
     limit(count: number): QueryBuilderInterface<M>;
     offset(count: number): QueryBuilderInterface<M>;
