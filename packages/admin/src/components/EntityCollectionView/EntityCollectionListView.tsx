@@ -139,6 +139,13 @@ function getScrollParent(element: HTMLElement | null): HTMLElement | null {
  * PropertyPreview in list row columns (because it would blow up height).
  */
 function isComplexPropertyType(property: Property): boolean {
+    if (property.type === "array") {
+        const ofProp = "of" in property ? property.of : undefined;
+        const innerProp = ofProp ? (Array.isArray(ofProp) ? ofProp[0] : ofProp) : undefined;
+        if (innerProp && typeof innerProp === "object" && "enum" in innerProp && innerProp.enum) {
+            return false;
+        }
+    }
     return property.type === "array"
         || property.type === "map"
         || property.type === "reference"

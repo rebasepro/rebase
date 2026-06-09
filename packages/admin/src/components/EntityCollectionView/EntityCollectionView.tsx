@@ -1092,7 +1092,10 @@ export const EntityCollectionView = React.memo(
                 ) : (
                     <div className="flex flex-col w-full h-full">
                         {toolbarNode}
-                        <div className="flex-1 flex flex-col overflow-y-auto">
+                        <div className={cls(
+                            "flex-1 flex flex-col",
+                            viewMode === "list" && "overflow-y-auto"
+                        )}>
                             {viewMode === "list" ? (
                                 <div
                                     className={cls(

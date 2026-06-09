@@ -109,6 +109,8 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
 
     // Infinite scroll with Intersection Observer — stable deps only
     useEffect(() => {
+        if (!loadMoreRef.current) return;
+
         const observer = new IntersectionObserver(
             (entries) => {
                 const { paginationEnabled: pe, noMoreToLoad: nm, dataLoading: dl, itemCount: ic, pageSize: ps } = paginationStateRef.current;
@@ -124,12 +126,10 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
             }
         );
 
-        if (loadMoreRef.current) {
-            observer.observe(loadMoreRef.current);
-        }
+        observer.observe(loadMoreRef.current);
 
         return () => observer.disconnect();
-    }, [setItemCount]);
+    }, [setItemCount, data.length]);
 
     // Scroll restoration — deferred to after layout paint
     useEffect(() => {
