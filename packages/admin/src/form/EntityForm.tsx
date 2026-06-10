@@ -311,7 +311,7 @@ export function EntityForm<M extends Record<string, unknown>>({
                 }
             }
         },
-        validation: async (values) => {
+        validation: async (values): Promise<Record<string, string>> => {
             if (!validationSchema) return {};
             const result = await validationSchema.safeParseAsync(values);
             if (result.success) return {};
@@ -737,14 +737,14 @@ export function EntityForm<M extends Record<string, unknown>>({
         entity={entity}
         layout={forceActionsAtTheBottom ? "bottom" : "responsive"}
         savingError={savingError}
-        formex={formex as any}
+        formex={formex as FormexController<Record<string, unknown>>}
         disabled={actionsDisabled}
         status={status}
         pluginActions={pluginFormActions ?? []}
         openEntityMode={openEntityMode}
         showDefaultActions={showDefaultActions}
         navigateBack={navigateBack}
-        formContext={formContext as any}
+        formContext={formContext as FormContext<Record<string, unknown>>}
     />;
 
     return (

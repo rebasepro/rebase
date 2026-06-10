@@ -53,12 +53,14 @@ export {
     RebaseLayout,
     RebaseRouteDefs,
     SideDialogs,
-    useApp
+    useApp,
+    CollectionPanel
 } from "./components";
 export type {
     EntityViewProps,
     EntitySelectionProps,
-    SelectableTableProps
+    SelectableTableProps,
+    CollectionPanelProps
 } from "./components";
 
 export * from "./hooks";

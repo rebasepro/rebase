@@ -635,3 +635,318 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
         expect(normalized.through).toBeUndefined();
     });
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// 4. Owning direction batch relation loading (tasks → client pattern)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("batchFetchRelatedEntities: owning direction (FK-based)", () => {
+    let registry: PostgresCollectionRegistry;
+
+    // Mock collections simulating tasks → clients owning relation
+    const mockClientsTable = {
+        id: { name: "id", dataType: "string" },
+        name: { name: "name" },
+        email: { name: "email" },
+        _def: { tableName: "clients" }
+    };
+
+    const mockTasksTable = {
+        id: { name: "id", dataType: "string" },
+        clientId: { name: "client_id", dataType: "string" },
+        title: { name: "title" },
+        _def: { tableName: "tasks" }
+    };
+
+    const clientsCollection: EntityCollection = {
+        slug: "clients",
+        name: "Clients",
+        table: "clients",
+        properties: {
+            id: { type: "string", isId: "uuid" },
+            name: { type: "string" },
+            email: { type: "string" }
+        }
+    };
+
+    const tasksCollection: EntityCollection = {
+        slug: "tasks",
+        name: "Tasks",
+        table: "tasks",
+        properties: {
+            id: { type: "string", isId: "uuid" },
+            clientId: { type: "string", columnName: "client_id" },
+            title: { type: "string" },
+            client: {
+                type: "relation",
+                relationName: "client",
+                target: () => clientsCollection,
+                cardinality: "one",
+                direction: "owning",
+                localKey: "clientId"
+            } as any
+        }
+    };
+
+    /**
+     * Mock DB that returns different results for sequential queries.
+     * The owning-direction path issues 2 queries:
+     * 1. SELECT parentId, fkValue FROM tasks WHERE id IN (...)
+     * 2. SELECT * FROM clients WHERE id IN (...)
+     */
+    function createSequencedMockDb(resultSequence: (() => unknown[])[]) {
+        let queryIndex = 0;
+
+        function makeChainable(): Record<string, unknown> {
+            const chain: Record<string, unknown> = {
+                select: jest.fn(() => chain),
+                from: jest.fn(() => chain),
+                where: jest.fn(() => chain),
+                $dynamic: jest.fn(() => chain),
+                limit: jest.fn(() => chain),
+                offset: jest.fn(() => chain),
+                orderBy: jest.fn(() => chain),
+                innerJoin: jest.fn(() => chain),
+                then: (resolve: (val: unknown[]) => void) => {
+                    const idx = queryIndex++;
+                    resolve(resultSequence[idx] ? resultSequence[idx]() : []);
+                }
+            };
+            return chain;
+        }
+
+        return makeChainable() as unknown as jest.Mocked<NodePgDatabase>;
+    }
+
+    beforeEach(() => {
+        registry = new PostgresCollectionRegistry();
+
+        jest.spyOn(registry, "getCollectionByPath").mockImplementation(path => {
+            if (path?.startsWith("tasks")) return tasksCollection;
+            if (path?.startsWith("clients")) return clientsCollection;
+            return undefined;
+        });
+
+        jest.spyOn(registry, "getTable").mockImplementation(tableName => {
+            if (tableName === "tasks") return mockTasksTable as any;
+            if (tableName === "clients") return mockClientsTable as any;
+            return undefined;
+        });
+
+        jest.spyOn(registry, "getCollections").mockReturnValue([
+            tasksCollection, clientsCollection
+        ]);
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+    });
+
+    it("should batch-load owning relation data with correct FK mapping", async () => {
+        const clientUuid = "77e340ca-c6f1-4559-a360-a853a87c066c";
+        const taskUuid = "46737ae3-a3f3-4663-92d4-17aecdabbd38";
+
+        const db = createSequencedMockDb([
+            // Query 1: FK lookup from tasks table
+            () => [{ parentId: taskUuid, fkValue: clientUuid }],
+            // Query 2: Target entity from clients table
+            () => [{ id: clientUuid, name: "Francesco", email: "f@test.com" }]
+        ]);
+
+        const service = new RelationService(db, registry);
+        const relation = tasksCollection.properties.client as unknown as Relation;
+
+        const results = await service.batchFetchRelatedEntities(
+            "tasks", [taskUuid], "client", relation
+        );
+
+        expect(results.size).toBe(1);
+
+        const clientEntity = results.get(taskUuid);
+        expect(clientEntity).toBeDefined();
+        expect(clientEntity!.id).toBe(clientUuid);
+        expect(clientEntity!.path).toBe("clients");
+        expect(clientEntity!.values).toBeDefined();
+        expect(clientEntity!.values.name).toBe("Francesco");
+        expect(clientEntity!.values.email).toBe("f@test.com");
+    });
+
+    it("should handle multiple tasks pointing to the same client", async () => {
+        const clientUuid = "77e340ca-c6f1-4559-a360-a853a87c066c";
+        const task1 = "task-1-uuid";
+        const task2 = "task-2-uuid";
+
+        const db = createSequencedMockDb([
+            // Both tasks have the same clientId
+            () => [
+                { parentId: task1, fkValue: clientUuid },
+                { parentId: task2, fkValue: clientUuid }
+            ],
+            // Only one client row
+            () => [{ id: clientUuid, name: "Francesco", email: "f@test.com" }]
+        ]);
+
+        const service = new RelationService(db, registry);
+        const relation = tasksCollection.properties.client as unknown as Relation;
+
+        const results = await service.batchFetchRelatedEntities(
+            "tasks", [task1, task2], "client", relation
+        );
+
+        expect(results.size).toBe(2);
+        expect(results.get(task1)!.values.name).toBe("Francesco");
+        expect(results.get(task2)!.values.name).toBe("Francesco");
+    });
+
+    it("should handle tasks with null FK values gracefully", async () => {
+        const task1 = "task-1-uuid";
+
+        const db = createSequencedMockDb([
+            // FK is null
+            () => [{ parentId: task1, fkValue: null }],
+        ]);
+
+        const service = new RelationService(db, registry);
+        const relation = tasksCollection.properties.client as unknown as Relation;
+
+        const results = await service.batchFetchRelatedEntities(
+            "tasks", [task1], "client", relation
+        );
+
+        // No results because FK is null
+        expect(results.size).toBe(0);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// 5. Relation data round-trip: createRelationRefWithData → JSON → reviver
+// ═══════════════════════════════════════════════════════════════════════
+
+import { createRelationRefWithData } from "@rebasepro/common";
+import { EntityRelation } from "@rebasepro/types";
+
+// Inline reviver for test isolation (matches packages/client/src/reviver.ts)
+function rebaseReviver(_key: string, value: unknown): unknown {
+    if (value && typeof value === "object" && "__type" in value) {
+        const record = value as Record<string, unknown>;
+        switch (record.__type) {
+            case "relation":
+            case "EntityRelation":
+                return new EntityRelation(
+                    record.id as string | number,
+                    record.path as string,
+                    record.data as any
+                );
+            default:
+                return value;
+        }
+    }
+    return value;
+}
+
+describe("Relation data JSON round-trip", () => {
+    it("should preserve relation data through JSON.stringify → JSON.parse with reviver", () => {
+        const clientEntity = {
+            id: "client-uuid-123",
+            path: "clients",
+            values: {
+                name: "Francesco",
+                email: "f@test.com",
+                status: "active"
+            }
+        };
+
+        // Server creates this
+        const ref = createRelationRefWithData(clientEntity.id, clientEntity.path, clientEntity as any);
+
+        // Verify server-side structure
+        expect(ref.__type).toBe("relation");
+        expect(ref.id).toBe("client-uuid-123");
+        expect(ref.path).toBe("clients");
+        expect(ref.data).toBeDefined();
+        expect(ref.data.values.name).toBe("Francesco");
+
+        // Simulate full entity with relation in values
+        const taskEntity = {
+            id: "task-uuid-456",
+            path: "tasks",
+            values: {
+                title: "Send intro email",
+                client: ref,
+                status: "pending"
+            }
+        };
+
+        // Server JSON.stringify for WebSocket
+        const json = JSON.stringify(taskEntity);
+
+        // Client JSON.parse with reviver
+        const parsed = JSON.parse(json, rebaseReviver);
+
+        // The client relation should be an EntityRelation instance
+        const clientRelation = parsed.values.client;
+        expect(clientRelation).toBeInstanceOf(EntityRelation);
+        expect(clientRelation.id).toBe("client-uuid-123");
+        expect(clientRelation.path).toBe("clients");
+
+        // The data field should be preserved
+        expect(clientRelation.data).toBeDefined();
+        expect(clientRelation.data.values).toBeDefined();
+        expect(clientRelation.data.values.name).toBe("Francesco");
+        expect(clientRelation.data.values.email).toBe("f@test.com");
+    });
+
+    it("should handle entity with no relation data (stub)", () => {
+        const stubRef = { id: "client-uuid", path: "clients", __type: "relation" as const };
+
+        const json = JSON.stringify({ values: { client: stubRef } });
+        const parsed = JSON.parse(json, rebaseReviver);
+
+        const clientRelation = parsed.values.client;
+        expect(clientRelation).toBeInstanceOf(EntityRelation);
+        expect(clientRelation.id).toBe("client-uuid");
+
+        // data should be undefined for stubs
+        expect(clientRelation.data).toBeUndefined();
+    });
+
+    it("should handle WebSocket collection_update message format", () => {
+        const clientEntity = {
+            id: "client-uuid",
+            path: "clients",
+            values: { name: "Acme Corp", email: "acme@corp.com" }
+        };
+
+        const ref = createRelationRefWithData(clientEntity.id, clientEntity.path, clientEntity as any);
+
+        // Simulate full WebSocket message
+        const wsMessage = {
+            type: "collection_update",
+            subscriptionId: "sub-123",
+            entities: [
+                {
+                    id: "task-1",
+                    path: "tasks",
+                    values: { title: "Task A", client: ref, status: "pending" }
+                },
+                {
+                    id: "task-2",
+                    path: "tasks",
+                    values: { title: "Task B", client: ref, status: "completed" }
+                }
+            ]
+        };
+
+        const json = JSON.stringify(wsMessage);
+        const parsed = JSON.parse(json, rebaseReviver);
+
+        // Both tasks should have correctly hydrated client relations
+        for (const entity of parsed.entities) {
+            const clientRel = entity.values.client;
+            expect(clientRel).toBeInstanceOf(EntityRelation);
+            expect(clientRel.data).toBeDefined();
+            expect(clientRel.data.values.name).toBe("Acme Corp");
+        }
+    });
+});
+

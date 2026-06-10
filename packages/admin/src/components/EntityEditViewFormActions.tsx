@@ -162,7 +162,7 @@ function buildBottomActions<M extends Record<string, unknown>>({
         }
 
         {formActions.length > 0 && <div className="grow flex overflow-auto no-scrollbar">
-            {formActions.map(action => {
+            {formActions.map((action, index) => {
 
                 const props = {
                     view: "form",
@@ -179,7 +179,7 @@ function buildBottomActions<M extends Record<string, unknown>>({
                 const isEnabled = !action.isEnabled || action.isEnabled(props);
                 return (
                     <EntityActionButton
-                        key={action.key}
+                        key={action.key ?? action.name ?? index}
                         action={action}
                         enabled={isEnabled}
                         props={props}
@@ -282,7 +282,7 @@ function buildSideActions<M extends Record<string, unknown>>({
         {pluginActions}
 
         {formActions.length > 0 && <div className="flex flex-row flex-wrap mt-2">
-            {formActions.map(action => {
+            {formActions.map((action, index) => {
                 const props = {
                     view: "form",
                     entity,
@@ -296,7 +296,7 @@ function buildSideActions<M extends Record<string, unknown>>({
                 } satisfies EntityActionClickProps<any>;
                 const isEnabled = !action.isEnabled || action.isEnabled(props);
                 return (
-                    <EntityActionButton key={action.key} action={action} enabled={isEnabled} props={props}/>
+                    <EntityActionButton key={action.key ?? action.name ?? index} action={action} enabled={isEnabled} props={props}/>
                 );
             })}
         </div>}

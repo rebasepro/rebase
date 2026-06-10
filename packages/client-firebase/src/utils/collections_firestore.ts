@@ -117,8 +117,10 @@ function normalizePropertiesEnumValues(
                 );
             }
 
+            const propType = normalizedProperty.type ?? normalizedProperty.dataType;
+
             // Handle array properties with enum values in "of"
-            if (normalizedProperty.dataType === "array" && typeof normalizedProperty.of === "object" && normalizedProperty.of !== null) {
+            if (propType === "array" && typeof normalizedProperty.of === "object" && normalizedProperty.of !== null) {
                 const ofProp = normalizedProperty.of as Record<string, unknown>;
                 if (ofProp.enum) {
                     normalizedProperty.of = {
@@ -132,7 +134,7 @@ function normalizePropertiesEnumValues(
             }
 
             // Handle map properties recursively
-            if (normalizedProperty.dataType === "map" && normalizedProperty.properties) {
+            if (propType === "map" && normalizedProperty.properties) {
                 normalizedProperty.properties = normalizePropertiesEnumValues(
                     normalizedProperty.properties as Properties,
                     sortObjectFormat

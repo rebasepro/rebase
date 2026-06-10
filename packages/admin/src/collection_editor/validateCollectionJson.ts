@@ -52,16 +52,16 @@ function validateProperty(
         return;
     }
 
-    // Check dataType
-    if (!property.dataType) {
+    // Check type
+    if (!property.type) {
         errors.push({
-            path: `${path}.dataType`,
+            path: `${path}.type`,
             message: "Required field is missing"
         });
-    } else if (!VALID_DATA_TYPES.includes(property.dataType as DataType)) {
+    } else if (!VALID_DATA_TYPES.includes(property.type as DataType)) {
         errors.push({
-            path: `${path}.dataType`,
-            message: `Invalid value "${property.dataType}", expected one of: ${VALID_DATA_TYPES.join(", ")}`
+            path: `${path}.type`,
+            message: `Invalid value "${property.type}", expected one of: ${VALID_DATA_TYPES.join(", ")}`
         });
     }
 
@@ -74,7 +74,7 @@ function validateProperty(
     }
 
     // Validate array "of" property
-    if (property.dataType === "array") {
+    if (property.type === "array") {
         if (property.of) {
             if (Array.isArray(property.of)) {
                 property.of.forEach((ofProp: Record<string, unknown>, index: number) => {
@@ -98,12 +98,12 @@ function validateProperty(
     }
 
     // Validate map properties
-    if (property.dataType === "map" && property.properties) {
+    if (property.type === "map" && property.properties) {
         validateProperties(property.properties as Record<string, unknown>, `${path}.properties`, errors);
     }
 
     // Validate reference path
-    if (property.dataType === "reference") {
+    if (property.type === "reference") {
         if (property.path !== undefined && typeof property.path !== "string") {
             errors.push({
                 path: `${path}.path`,
@@ -113,7 +113,7 @@ function validateProperty(
     }
 
     // Validate relation property
-    if (property.dataType === "relation") {
+    if (property.type === "relation") {
         if (property.target !== undefined && typeof property.target !== "string" && typeof property.target !== "function") {
             errors.push({
                 path: `${path}.target`,
@@ -187,7 +187,7 @@ function validateProperty(
     }
 
     // Validate vector property
-    if (property.dataType === "vector") {
+    if (property.type === "vector") {
         if (property.dimensions !== undefined && (typeof property.dimensions !== "number" || isNaN(property.dimensions) || property.dimensions <= 0)) {
             errors.push({
                 path: `${path}.dimensions`,
@@ -197,7 +197,7 @@ function validateProperty(
     }
 
     // Validate storage config for string
-    if (property.dataType === "string" && property.storage) {
+    if (property.type === "string" && property.storage) {
         if (typeof property.storage !== "object") {
             errors.push({
                 path: `${path}.storage`,

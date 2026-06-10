@@ -38,73 +38,73 @@ describe("QueryBuilder", () => {
         it("maps == to eq (renders as plain value)", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("age", "==", 18);
-            expect(getParams(qb).where).toEqual({ age: "18" });
+            expect(getParams(qb).where).toEqual({ age: ["==", 18] });
         });
 
         it("maps != to neq", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("age", "!=", 18);
-            expect(getParams(qb).where).toEqual({ age: "neq.18" });
+            expect(getParams(qb).where).toEqual({ age: ["!=", 18] });
         });
 
         it("maps > to gt", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("score", ">", 100);
-            expect(getParams(qb).where).toEqual({ score: "gt.100" });
+            expect(getParams(qb).where).toEqual({ score: [">", 100] });
         });
 
         it("maps >= to gte", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("score", ">=", 50);
-            expect(getParams(qb).where).toEqual({ score: "gte.50" });
+            expect(getParams(qb).where).toEqual({ score: [">=", 50] });
         });
 
         it("maps < to lt", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("score", "<", 10);
-            expect(getParams(qb).where).toEqual({ score: "lt.10" });
+            expect(getParams(qb).where).toEqual({ score: ["<", 10] });
         });
 
         it("maps <= to lte", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("score", "<=", 0);
-            expect(getParams(qb).where).toEqual({ score: "lte.0" });
+            expect(getParams(qb).where).toEqual({ score: ["<=", 0] });
         });
 
         it("maps array-contains to cs", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("tags", "array-contains", "featured");
-            expect(getParams(qb).where).toEqual({ tags: "cs.featured" });
+            expect(getParams(qb).where).toEqual({ tags: ["array-contains", "featured"] });
         });
 
         it("maps array-contains-any to csa with array", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("tags", "array-contains-any", ["a", "b"]);
-            expect(getParams(qb).where).toEqual({ tags: "csa.(a,b)" });
+            expect(getParams(qb).where).toEqual({ tags: ["array-contains-any", ["a", "b"]] });
         });
 
         it("maps not-in to nin with array", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("status", "not-in", ["deleted", "archived"]);
-            expect(getParams(qb).where).toEqual({ status: "nin.(deleted,archived)" });
+            expect(getParams(qb).where).toEqual({ status: ["not-in", ["deleted", "archived"]] });
         });
 
         it("passes through short operators (eq, neq, gt, gte, lt, lte) directly", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("x", "gt", 5);
-            expect(getParams(qb).where).toEqual({ x: "gt.5" });
+            expect(getParams(qb).where).toEqual({ x: ["gt", 5] });
         });
 
         it("passes through in operator for arrays", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("status", "in", ["active", "pending"]);
-            expect(getParams(qb).where).toEqual({ status: "in.(active,pending)" });
+            expect(getParams(qb).where).toEqual({ status: ["in", ["active", "pending"]] });
         });
 
         it("passes through cs and csa operators", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("tags", "cs", "test");
-            expect(getParams(qb).where).toEqual({ tags: "cs.test" });
+            expect(getParams(qb).where).toEqual({ tags: ["cs", "test"] });
         });
     });
 
@@ -115,31 +115,31 @@ describe("QueryBuilder", () => {
         it("handles null values", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("deletedAt", "==", null);
-            expect(getParams(qb).where).toEqual({ deletedAt: "null" });
+            expect(getParams(qb).where).toEqual({ deletedAt: ["==", null] });
         });
 
         it("handles string values", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("name", "==", "John");
-            expect(getParams(qb).where).toEqual({ name: "John" });
+            expect(getParams(qb).where).toEqual({ name: ["==", "John"] });
         });
 
         it("handles boolean values", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("active", "==", true);
-            expect(getParams(qb).where).toEqual({ active: "true" });
+            expect(getParams(qb).where).toEqual({ active: ["==", true] });
         });
 
         it("handles empty string", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("name", "==", "");
-            expect(getParams(qb).where).toEqual({ name: "" });
+            expect(getParams(qb).where).toEqual({ name: ["==", ""] });
         });
 
         it("handles zero", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("count", "==", 0);
-            expect(getParams(qb).where).toEqual({ count: "0" });
+            expect(getParams(qb).where).toEqual({ count: ["==", 0] });
         });
     });
 
@@ -246,8 +246,8 @@ describe("QueryBuilder", () => {
 
             const params = (result as any).params;
             expect(params.where).toEqual({
-                age: "gte.18",
-                status: "active"
+                age: [">=", 18],
+                status: ["==", "active"]
             });
             expect(params.orderBy).toBe("name:asc");
             expect(params.limit).toBe(25);
@@ -270,9 +270,9 @@ describe("QueryBuilder", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("a", "==", 1).where("b", ">", 2).where("c", "in", ["x", "y"]);
             expect(getParams(qb).where).toEqual({
-                a: "1",
-                b: "gt.2",
-                c: "in.(x,y)"
+                a: ["==", 1],
+                b: [">", 2],
+                c: ["in", ["x", "y"]]
             });
         });
     });
@@ -290,7 +290,7 @@ meta: {} });
             await qb.find();
 
             expect(mockCollection.find).toHaveBeenCalledWith({
-                where: { age: "18" },
+                where: { age: ["==", 18] },
                 limit: 10,
                 offset: 5
             });
@@ -350,7 +350,7 @@ meta: {} });
             const res = qb.listen(cb);
 
             expect(mockCollection.listen).toHaveBeenCalledWith(
-                { where: { age: "18" } },
+                { where: { age: ["==", 18] } },
                 cb,
                 undefined
             );

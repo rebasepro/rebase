@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { EntityCollection, Property, RelationProperty } from "@rebasepro/types";
 import type { Entity, PropertyConfig, EntityRelation } from "@rebasepro/types";
 import { getEntityImagePreviewPropertyKey } from "@rebasepro/common";
+import { getEntityFromCache } from "@rebasepro/core";
 import { getEntityTitlePropertyKey, getEntityPreviewKeys } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
 import type { AuthController } from "@rebasepro/types";
@@ -428,43 +429,93 @@ function resolveRelationDisplayName(
 ): string | undefined {
     // Support both EntityRelation instances and plain objects
     const data = "data" in relation ? (relation as EntityRelation).data : undefined;
-    if (!data || !data.values) {
-        // No eagerly-loaded data — fall back to ID
-        const id = "id" in relation ? relation.id : undefined;
-        return id !== undefined ? String(id) : undefined;
+
+    // Resolve target collection from either `prop.relation.target()` or `prop.target()` (inline API)
+    let targetCollection: EntityCollection | undefined;
+    try {
+        const resolved = prop.relation?.target?.() ?? (typeof prop.target === "function" ? prop.target() : undefined);
+        if (resolved && typeof resolved === "object") {
+            targetCollection = resolved as EntityCollection;
+        }
+    } catch {
+        // Target collection may not be resolvable
     }
 
-    const values = data.values as Record<string, unknown>;
-
-    // Try using the target collection's title property for accuracy
-    try {
-        const targetCollection = prop.relation?.target?.();
+    // Helper: extract display name from entity values using the target collection
+    const extractDisplayName = (values: Record<string, unknown>): string | undefined => {
         if (targetCollection) {
             const targetTitleKey = targetCollection.titleProperty as string | undefined;
             if (targetTitleKey && values[targetTitleKey] !== undefined) {
                 return String(values[targetTitleKey]);
             }
-            // Fallback: find first non-id string property in target
+
+            // Helper to check if a property is hidden/internal
+            const isHiddenProp = (p: Property): boolean => {
+                const ui = (p as any).ui;
+                if (ui?.hideFromCollection) return true;
+                if (ui?.disabled?.hidden) return true;
+                return false;
+            };
+
+            // Helper to check if a property is a visible, non-id string
+            const isDisplayCandidate = (p: Property): boolean => {
+                return p.type === "string" && !p.multiline && !p.markdown && !p.storage
+                    && !("isId" in p && p.isId) && !isHiddenProp(p);
+            };
+
+            // Prioritize common title-like fields: name, title, label, displayName
+            const priorityKeys = ["name", "title", "label", "displayName"];
+            for (const pk of priorityKeys) {
+                const p = targetCollection.properties[pk] as Property | undefined;
+                if (p && isDisplayCandidate(p) && values[pk] !== undefined && values[pk] !== null) {
+                    return String(values[pk]);
+                }
+            }
+
+            // Fallback: find first visible, non-id string property in target
             for (const [k, p] of Object.entries(targetCollection.properties)) {
                 const tp = p as Property;
-                if (tp.type === "string" && !tp.multiline && !tp.markdown && !tp.storage && !("isId" in tp && tp.isId)) {
+                if (isDisplayCandidate(tp)) {
                     if (values[k] !== undefined && values[k] !== null) {
                         return String(values[k]);
                     }
                 }
             }
         }
-    } catch {
-        // Target collection may not be resolvable — fall through
-    }
-
-    // Generic fallback: walk entity values for any short string.
-    for (const [, v] of Object.entries(values)) {
-        if (typeof v === "string" && v.length > 0 && v.length < 200) {
-            return v;
+        // Generic fallback: walk entity values for any short string.
+        for (const [, v] of Object.entries(values)) {
+            if (typeof v === "string" && v.length > 0 && v.length < 200) {
+                return v;
+            }
         }
+        return undefined;
+    };
+
+    // 1. Try eagerly-loaded data on the relation object
+    if (data && data.values) {
+        const result = extractDisplayName(data.values as Record<string, unknown>);
+        if (result) return result;
     }
 
     const id = "id" in relation ? relation.id : undefined;
+
+    // 2. Try the entity cache (sessionStorage) as a fallback
+    if (id !== undefined && targetCollection) {
+        try {
+            const slug = targetCollection.slug ?? (targetCollection as any).table;
+            if (slug) {
+                const cacheKey = `${slug}/${id}`;
+                const cached = getEntityFromCache(cacheKey) as { values?: Record<string, unknown> } | undefined;
+                if (cached?.values) {
+                    const result = extractDisplayName(cached.values);
+                    if (result) return result;
+                }
+            }
+        } catch {
+            // Cache lookup failed — fall through
+        }
+    }
+
+    // 3. Final fallback: show the ID
     return id !== undefined ? String(id) : undefined;
 }

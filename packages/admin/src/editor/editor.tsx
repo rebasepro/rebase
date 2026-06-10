@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState, useRef, useMemo } from "react";
-import { EditorState } from "prosemirror-state";
+import { EditorState, Selection } from "prosemirror-state";
 import { cls, defaultBorderMixin, Separator, useInjectStyles, TextareaAutosize } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/core";
 import { EditorBubble, ImageBubble, SlashCommandMenu, TableBubble, type JSONContent } from "./components";
@@ -236,7 +236,7 @@ onJsonContentChange };
 
 
   return (
-    <div className="relative min-h-[200px] w-full">
+    <div className="relative min-h-[200px] w-full flex flex-col">
       <button
         type="button"
         onClick={handleToggleMarkdown}
@@ -249,10 +249,23 @@ onJsonContentChange };
       <ProseMirrorContext.Provider value={useMemo(() => ({ state,
 view }), [state, view])}>
 
-        <div style={{ display: isMarkdownMode ? "none" : "block" }}>
+        <div style={{ display: isMarkdownMode ? "none" : "flex" }} className="flex-1 flex flex-col">
           <div
             ref={editorRef}
-            className={cls("relative prose dark:prose-invert", proseClass, "prose-headings:font-title prose-headings:font-normal prose-strong:font-semibold prose-code:font-normal prose-blockquote:font-normal prose-a:font-normal font-default focus:outline-none max-w-full px-12 py-4")}
+            onClick={(e) => {
+              // If the click landed on the wrapper padding (not on the ProseMirror
+              // content), focus the editor and place the cursor at the nearest position.
+              if (view && e.target === e.currentTarget) {
+                view.focus();
+                // Place cursor at end of the document
+                const end = view.state.doc.content.size;
+                const tr = view.state.tr.setSelection(
+                  Selection.near(view.state.doc.resolve(end), -1)
+                );
+                view.dispatch(tr);
+              }
+            }}
+            className={cls("relative prose dark:prose-invert cursor-text flex-1", proseClass, "prose-headings:font-title prose-headings:font-normal prose-strong:font-semibold prose-code:font-normal prose-blockquote:font-normal prose-a:font-normal font-default focus:outline-none max-w-full py-4")}
           />
 
           {view && (
@@ -311,6 +324,9 @@ view }), [state, view])}>
 const cssStyles = `
 .ProseMirror {
     box-shadow: none !important;
+    padding-left: 2rem;
+    padding-right: 2rem;
+    min-height: 100%;
 }
 .ProseMirror .is-editor-empty:first-child::before {
   content: attr(data-placeholder);

@@ -26,7 +26,7 @@ export function getEntityViewWidth(props: EntitySidePanelProps<any>, small: bool
         selectedSecondaryForm
     } = resolvedSelectedEntityView(props.collection?.entityViews, customizationController, props.selectedTab);
 
-    const shouldUseSmallLayout = !props.selectedTab || props.selectedTab === JSON_TAB_VALUE || props.selectedTab === HISTORY_TAB_VALUE || Boolean(selectedSecondaryForm);
+    const shouldUseSmallLayout = !props.selectedTab || props.selectedTab === "edit" || props.selectedTab === JSON_TAB_VALUE || props.selectedTab === HISTORY_TAB_VALUE || Boolean(selectedSecondaryForm);
 
     let resolvedWidth: string | undefined;
     if (props.width) {
@@ -187,8 +187,8 @@ width: newWidth };
 
         sideDialogsController.open(
             propsToSidePanel({
-                selectedTab: defaultSelectedView,
-                ...props
+                ...props,
+                selectedTab: props.selectedTab ?? defaultSelectedView,
             },
                 urlController.buildUrlCollectionPath,
                 urlController.resolveDatabasePathsFrom,
@@ -241,6 +241,7 @@ export function buildSidePanelsFromUrl(path: string, collections: EntityCollecti
                 path: navigationEntry.slug,
                 entityId: navigationEntry.entityId,
                 copy: false,
+                collection: navigationEntry.parentCollection,
                 width: navigationEntry.parentCollection?.sideDialogWidth
             };
         } else if (navigationEntry.type === "custom_view") {
@@ -255,6 +256,22 @@ export function buildSidePanelsFromUrl(path: string, collections: EntityCollecti
             }
         }
 
+    }
+
+    // When the URL doesn't contain a tab segment but the collection has a
+    // defaultSelectedView, resolve it so the panel opens with the correct
+    // width and the URL is updated on the next replace() cycle.
+    if (sidePanel && !sidePanel.selectedTab && sidePanel.collection) {
+        const defaultView = resolveDefaultSelectedView(
+            sidePanel.collection.defaultSelectedView,
+            {
+                status: sidePanel.copy ? "copy" : (sidePanel.entityId ? "existing" : "new"),
+                entityId: sidePanel.entityId
+            }
+        );
+        if (defaultView) {
+            sidePanel.selectedTab = defaultView;
+        }
     }
 
     if (newFlag) {

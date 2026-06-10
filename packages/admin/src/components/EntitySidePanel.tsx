@@ -1,6 +1,6 @@
 import type { EntityCollection } from "@rebasepro/types";
 import type { EntitySidePanelProps } from "@rebasepro/types";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { OnUpdateParams } from "../types/components/EntityFormProps";
 import { ErrorBoundary } from "@rebasepro/ui";
@@ -8,11 +8,11 @@ import { IconButton, Maximize2Icon, XIcon } from "@rebasepro/ui";
 import { EntityEditView } from "./EntityEditView";
 import { EntityDetailView } from "./EntityDetailView";
 import { useSideDialogContext } from "./SideDialogs";
-import { useLocation, useNavigate } from "react-router-dom";
-import { removeInitialAndTrailingSlashes } from "@rebasepro/common";
+import { useNavigate } from "react-router-dom";
 import { saveEntityToMemoryCache } from "@rebasepro/core";
 import { useCollectionRegistryController, useSideEntityController } from "../index";
 import { useUrlController } from "../index";
+import { resolveDefaultSelectedView } from "@rebasepro/common";
 
 /**
  * This is the component in charge of rendering the side dialog used
@@ -40,7 +40,6 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
     } = useSideDialogContext();
 
     const navigate = useNavigate();
-    const location = useLocation();
 
     const sideEntityController = useSideEntityController();
     const collectionRegistryController = useCollectionRegistryController();
@@ -95,6 +94,34 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
     useEffect(() => {
         setShowEditInPanel(selectedTab === "edit");
     }, [entityId, selectedTab]);
+
+    // One-time correction: when the side panel opens without the correct
+    // selectedTab but the resolved collection (from the registry) has a
+    // defaultSelectedView, update the panel width and URL to match.
+    // This handles cases where defaultSelectedView is set via the collection
+    // editor / Studio and is not available on the collection object the
+    // caller passed to sideEntityController.open().
+    const hasCorrectedDefaultView = useRef(false);
+    useEffect(() => {
+        if (hasCorrectedDefaultView.current) return;
+        if (selectedTab) return; // Already has a tab — no correction needed
+        if (!entityId || !collection?.defaultSelectedView) return;
+
+        const effectiveDefault = resolveDefaultSelectedView(
+            collection.defaultSelectedView,
+            { status: "existing", entityId }
+        );
+        if (effectiveDefault && effectiveDefault !== "edit") {
+            hasCorrectedDefaultView.current = true;
+            sideEntityController.replace({
+                path,
+                entityId,
+                selectedTab: effectiveDefault,
+                updateUrl: collection.openEntityMode !== "dialog",
+                collection
+            });
+        }
+    }, [selectedTab, entityId, collection, path, sideEntityController]);
 
     // Note: beforeunload is handled by useUnsavedChangesDialog in SideDialogView,
     // which listens to the same `blocked` state via SideDialogContext.
@@ -153,10 +180,13 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
                                 return;
                             }
                             if (tabEntityId) {
-                                const collectionPath = removeInitialAndTrailingSlashes(path);
-                                const tabSuffix = selectedTab ? "/" + selectedTab : "";
-                                const fullUrl = urlController.buildUrlCollectionPath(`${collectionPath}/${tabEntityId}${tabSuffix}#side`);
-                                navigate(fullUrl, { replace: true, state: location.state });
+                                sideEntityController.replace({
+                                    path,
+                                    entityId: tabEntityId,
+                                    selectedTab,
+                                    updateUrl: true,
+                                    collection: paramCollection ?? collection
+                                });
                             }
                         }}
                     />
@@ -198,18 +228,21 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
                                 </IconButton>}
                             </div>}
                         onTabChange={({
-                            entityId,
+                            entityId: tabEntityId,
                             selectedTab,
                             collection: paramCollection
                         }) => {
                             if (collection?.openEntityMode === "dialog" || paramCollection?.openEntityMode === "dialog") {
                                 return;
                             }
-                            if (entityId) {
-                                const collectionPath = removeInitialAndTrailingSlashes(path);
-                                const tabSuffix = selectedTab ? "/" + selectedTab : "";
-                                const fullUrl = urlController.buildUrlCollectionPath(`${collectionPath}/${entityId}${tabSuffix}#side`);
-                                navigate(fullUrl, { replace: true, state: location.state });
+                            if (tabEntityId) {
+                                sideEntityController.replace({
+                                    path,
+                                    entityId: tabEntityId,
+                                    selectedTab,
+                                    updateUrl: true,
+                                    collection: paramCollection ?? collection
+                                });
                             }
                         }}
                         formProps={formProps}

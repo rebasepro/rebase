@@ -4,7 +4,7 @@ import {
     evaluateCondition,
     registerConditionOperations
 } from "../src/util/conditions";
-import { AuthController, ConditionContext, EnumValueConfig, Property, ResolvedProperty, StringProperty } from "../../types";
+import { AuthController, ConditionContext, EnumValueConfig, Property, StringProperty } from "../../types";
 
 describe("Property Conditions", () => {
 
@@ -256,7 +256,7 @@ roles: ["admin"] },
 
         it("should apply disabled condition", () => {
             const property = {
-                dataType: "string",
+                type: "string",
                 name: "Title",
                 resolved: true,
                 fromBuilder: false,
@@ -264,7 +264,7 @@ roles: ["admin"] },
                     disabled: { "==": [{ "var": "values.status" }, "archived"] },
                     disabledMessage: "Cannot edit archived items"
                 }
-            } as ResolvedProperty<string>;
+            } as unknown as Property;
 
             const result = applyPropertyConditions(property, baseContext);
 
@@ -277,14 +277,14 @@ roles: ["admin"] },
 
         it("should apply hidden condition", () => {
             const property = {
-                dataType: "string",
+                type: "string",
                 name: "Internal Notes",
                 resolved: true,
                 fromBuilder: false,
                 conditions: {
                     hidden: { "==": [{ "var": "values.status" }, "archived"] }
                 }
-            } as ResolvedProperty<string>;
+            } as unknown as Property;
 
             const result = applyPropertyConditions(property, baseContext);
 
@@ -295,14 +295,14 @@ roles: ["admin"] },
 
         it("should apply required condition", () => {
             const property = {
-                dataType: "string",
+                type: "string",
                 name: "Email",
                 resolved: true,
                 fromBuilder: false,
                 conditions: {
                     required: { "!!": { "var": "values.status" } }
                 }
-            } as ResolvedProperty<string>;
+            } as unknown as Property;
 
             const result = applyPropertyConditions(property, baseContext);
 
@@ -311,14 +311,14 @@ roles: ["admin"] },
 
         it("should not apply disabled when condition is false", () => {
             const property = {
-                dataType: "string",
+                type: "string",
                 name: "Title",
                 resolved: true,
                 fromBuilder: false,
                 conditions: {
                     disabled: { "==": [{ "var": "values.status" }, "draft"] }
                 }
-            } as ResolvedProperty<string>;
+            } as unknown as Property;
 
             const result = applyPropertyConditions(property, baseContext);
 
@@ -327,7 +327,7 @@ roles: ["admin"] },
 
         it("should apply enum conditions to filter values", () => {
             const property = {
-                dataType: "string",
+                type: "string",
                 name: "Category",
                 resolved: true,
                 fromBuilder: false,
@@ -352,7 +352,7 @@ label: "Food" }
 
         it("should apply enum conditions with object format (Firestore workaround)", () => {
             const property = {
-                dataType: "string",
+                type: "string",
                 name: "Category",
                 resolved: true,
                 fromBuilder: false,
@@ -386,7 +386,7 @@ label: "Food" }
 
         it("should apply excludedEnumValues to remove specific values", () => {
             const property = {
-                dataType: "string",
+                type: "string",
                 name: "Status",
                 resolved: true,
                 fromBuilder: false,
@@ -412,7 +412,7 @@ label: "Archived" }
 
         it("should apply enum conditions to disable specific values", () => {
             const property = {
-                dataType: "string",
+                type: "string",
                 name: "Status",
                 resolved: true,
                 fromBuilder: false,
@@ -446,7 +446,7 @@ values: { status: "draft" } };
 
         it("should handle multiple conditions together", () => {
             const property = {
-                dataType: "string",
+                type: "string",
                 name: "Notes",
                 resolved: true,
                 fromBuilder: false,
@@ -455,7 +455,7 @@ values: { status: "draft" } };
                     required: { "==": [{ "var": "values.status" }, "published"] },
                     disabledMessage: "Cannot edit notes on archived items"
                 }
-            } as ResolvedProperty<string>;
+            } as unknown as Property;
 
             const resultArchived = applyPropertyConditions(property, baseContext);
             expect(resultArchived.ui?.disabled).toBeDefined();
@@ -470,7 +470,7 @@ values: { status: "published" } };
 
         it("should handle clearOnDisabled option", () => {
             const property = {
-                dataType: "string",
+                type: "string",
                 name: "Title",
                 resolved: true,
                 fromBuilder: false,
@@ -478,7 +478,7 @@ values: { status: "published" } };
                     disabled: { "==": [{ "var": "values.status" }, "archived"] },
                     clearOnDisabled: true
                 }
-            } as ResolvedProperty<string>;
+            } as unknown as Property;
 
             const result = applyPropertyConditions(property, baseContext);
 
@@ -506,14 +506,14 @@ roles: ["admin"] },
 
         it("should set readOnly when condition evaluates to true", () => {
             const property = {
-                dataType: "string",
+                type: "string",
                 name: "SKU",
                 resolved: true,
                 fromBuilder: false,
                 conditions: {
                     readOnly: { "==": [{ "var": "values.status" }, "archived"] }
                 }
-            } as ResolvedProperty<string>;
+            } as unknown as Property;
 
             const result = applyPropertyConditions(property, baseContext);
             expect(result.ui?.readOnly).toBe(true);
@@ -521,14 +521,14 @@ roles: ["admin"] },
 
         it("should not set readOnly when condition evaluates to false", () => {
             const property = {
-                dataType: "string",
+                type: "string",
                 name: "SKU",
                 resolved: true,
                 fromBuilder: false,
                 conditions: {
                     readOnly: { "==": [{ "var": "values.status" }, "draft"] }
                 }
-            } as ResolvedProperty<string>;
+            } as unknown as Property;
 
             const result = applyPropertyConditions(property, baseContext);
             expect(result.ui?.readOnly).toBeUndefined();
@@ -552,14 +552,14 @@ roles: [] },
             };
 
             const property = {
-                dataType: "string",
+                type: "string",
                 name: "Status",
                 resolved: true,
                 fromBuilder: false,
                 conditions: {
                     defaultValue: "draft"
                 }
-            } as ResolvedProperty<string>;
+            } as unknown as Property;
 
             const result = applyPropertyConditions(property, context);
             expect(result.defaultValue).toBe("draft");
@@ -582,14 +582,14 @@ roles: [] },
             };
 
             const property = {
-                dataType: "string",
+                type: "string",
                 name: "Status",
                 resolved: true,
                 fromBuilder: false,
                 conditions: {
                     defaultValue: "draft"
                 }
-            } as ResolvedProperty<string>;
+            } as unknown as Property;
 
             const result = applyPropertyConditions(property, context);
             expect(result.defaultValue).toBeUndefined();

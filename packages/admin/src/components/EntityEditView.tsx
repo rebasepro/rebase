@@ -225,17 +225,33 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
         }
     ), [collection, status, entityId]);
 
+    // Track whether we've applied the defaultSelectedView already.
+    // On the initial render, selectedTabProp may be undefined because the URL
+    // has no tab segment — in that case we fall back to defaultSelectedView.
+    // But once the component is mounted, selectedTabProp=undefined means the
+    // user explicitly selected the form tab (which has no URL segment), so we
+    // must NOT re-apply defaultSelectedView.
+    const hasAppliedDefault = useRef(false);
+
     const [selectedTab, setSelectedTab] = useState<string>(() => {
         const val = selectedTabProp ?? defaultSelectedView ?? MAIN_TAB_VALUE;
+        hasAppliedDefault.current = true;
         return val === "edit" ? MAIN_TAB_VALUE : val;
     });
     useEffect(() => {
-        const val = selectedTabProp ?? defaultSelectedView ?? MAIN_TAB_VALUE;
+        // After initial mount, only sync from selectedTabProp — don't fall
+        // back to defaultSelectedView, because undefined now means "form tab".
+        const val = hasAppliedDefault.current
+            ? (selectedTabProp ?? MAIN_TAB_VALUE)
+            : (selectedTabProp ?? defaultSelectedView ?? MAIN_TAB_VALUE);
         const target = val === "edit" ? MAIN_TAB_VALUE : val;
+        if (!hasAppliedDefault.current) {
+            hasAppliedDefault.current = true;
+        }
         if (target !== selectedTab) {
             setSelectedTab(target);
         }
-    }, [selectedTabProp, defaultSelectedView]);
+    }, [selectedTabProp]);
 
     const subcollections = getSubcollections(collection).filter(c => !c.hideFromNavigation);
     const subcollectionsCount = subcollections?.length ?? 0;

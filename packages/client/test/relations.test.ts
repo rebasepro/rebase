@@ -544,7 +544,7 @@ author: { id: 5,
 name: "A" } }]));
         const r = await c.where("status", "==", "published").include("author").limit(5).find();
         const p = mockRequest.mock.calls[0][0] as string;
-        expect(p).toContain("include=author"); expect(p).toContain("limit=5"); expect(p).toContain("status=published");
+        expect(p).toContain("include=author"); expect(p).toContain("limit=5"); expect(p).toContain("status=eq.published");
         expect(r.data[0].values.author).toEqual({ id: 5,
 name: "A" });
     });
@@ -582,7 +582,7 @@ name: "A" });
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.where("status", "==", "active").orderBy("title", "asc").limit(25).offset(50).include("author").find();
         const p = mockRequest.mock.calls[0][0] as string;
-        expect(p).toContain("status=active"); expect(p).toContain("orderBy=title%3Aasc");
+        expect(p).toContain("status=eq.active"); expect(p).toContain("orderBy=title%3Aasc");
         expect(p).toContain("limit=25"); expect(p).toContain("offset=50"); expect(p).toContain("include=author");
     });
     it("all fluent methods return this for chaining", () => {
@@ -825,25 +825,25 @@ describe("QueryBuilder operator mapping", () => {
     const { transport } = createMockTransport();
     function qb() { return new QueryBuilder(createCollectionClient<any>(transport, "t")); }
 
-    it("== → eq (plain value)", () => { expect((qb().where("a", "==", 1) as any).params.where.a).toBe("1"); });
-    it("!= → neq", () => { expect((qb().where("a", "!=", 1) as any).params.where.a).toBe("neq.1"); });
-    it("> → gt", () => { expect((qb().where("a", ">", 1) as any).params.where.a).toBe("gt.1"); });
-    it(">= → gte", () => { expect((qb().where("a", ">=", 1) as any).params.where.a).toBe("gte.1"); });
-    it("< → lt", () => { expect((qb().where("a", "<", 1) as any).params.where.a).toBe("lt.1"); });
-    it("<= → lte", () => { expect((qb().where("a", "<=", 1) as any).params.where.a).toBe("lte.1"); });
-    it("array-contains → cs", () => { expect((qb().where("a", "array-contains", "x") as any).params.where.a).toBe("cs.x"); });
-    it("array-contains-any → csa", () => { expect((qb().where("a", "array-contains-any", ["x", "y"]) as any).params.where.a).toBe("csa.(x,y)"); });
-    it("not-in → nin", () => { expect((qb().where("a", "not-in", ["x", "y"]) as any).params.where.a).toBe("nin.(x,y)"); });
-    it("in → in", () => { expect((qb().where("a", "in", ["x", "y"]) as any).params.where.a).toBe("in.(x,y)"); });
-    it("null value", () => { expect((qb().where("a", "==", null) as any).params.where.a).toBe("null"); });
-    it("boolean true", () => { expect((qb().where("a", "==", true) as any).params.where.a).toBe("true"); });
-    it("boolean false", () => { expect((qb().where("a", "==", false) as any).params.where.a).toBe("false"); });
-    it("empty string", () => { expect((qb().where("a", "==", "") as any).params.where.a).toBe(""); });
-    it("zero", () => { expect((qb().where("a", "==", 0) as any).params.where.a).toBe("0"); });
-    it("short ops pass through", () => { expect((qb().where("a", "gt", 5) as any).params.where.a).toBe("gt.5"); });
+    it("== → eq (plain value)", () => { expect((qb().where("a", "==", 1) as any).params.where.a).toEqual(["==", 1]); });
+    it("!= → neq", () => { expect((qb().where("a", "!=", 1) as any).params.where.a).toEqual(["!=", 1]); });
+    it("> → gt", () => { expect((qb().where("a", ">", 1) as any).params.where.a).toEqual([">", 1]); });
+    it(">= → gte", () => { expect((qb().where("a", ">=", 1) as any).params.where.a).toEqual([">=", 1]); });
+    it("< → lt", () => { expect((qb().where("a", "<", 1) as any).params.where.a).toEqual(["<", 1]); });
+    it("<= → lte", () => { expect((qb().where("a", "<=", 1) as any).params.where.a).toEqual(["<=", 1]); });
+    it("array-contains → cs", () => { expect((qb().where("a", "array-contains", "x") as any).params.where.a).toEqual(["array-contains", "x"]); });
+    it("array-contains-any → csa", () => { expect((qb().where("a", "array-contains-any", ["x", "y"]) as any).params.where.a).toEqual(["array-contains-any", ["x", "y"]]); });
+    it("not-in → nin", () => { expect((qb().where("a", "not-in", ["x", "y"]) as any).params.where.a).toEqual(["not-in", ["x", "y"]]); });
+    it("in → in", () => { expect((qb().where("a", "in", ["x", "y"]) as any).params.where.a).toEqual(["in", ["x", "y"]]); });
+    it("null value", () => { expect((qb().where("a", "==", null) as any).params.where.a).toEqual(["==", null]); });
+    it("boolean true", () => { expect((qb().where("a", "==", true) as any).params.where.a).toEqual(["==", true]); });
+    it("boolean false", () => { expect((qb().where("a", "==", false) as any).params.where.a).toEqual(["==", false]); });
+    it("empty string", () => { expect((qb().where("a", "==", "") as any).params.where.a).toEqual(["==", ""]); });
+    it("zero", () => { expect((qb().where("a", "==", 0) as any).params.where.a).toEqual(["==", 0]); });
+    it("short ops pass through", () => { expect((qb().where("a", "gt", 5) as any).params.where.a).toEqual(["gt", 5]); });
     it("multiple where conditions", () => {
         const p = (qb().where("a", "==", 1).where("b", ">", 2).where("c", "in", ["x"]) as any).params.where;
-        expect(p.a).toBe("1"); expect(p.b).toBe("gt.2"); expect(p.c).toBe("in.(x)");
+        expect(p.a).toEqual(["==", 1]); expect(p.b).toEqual([">", 2]); expect(p.c).toEqual(["in", ["x"]]);
     });
 });
 
@@ -1205,11 +1205,11 @@ describe("QueryBuilder — instance isolation", () => {
         await qb1.find();
         await qb2.find();
 
-        expect((mockRequest.mock.calls[0][0] as string)).toContain("status=active");
-        expect((mockRequest.mock.calls[1][0] as string)).toContain("status=draft");
+        expect((mockRequest.mock.calls[0][0] as string)).toContain("status=eq.active");
+        expect((mockRequest.mock.calls[1][0] as string)).toContain("status=eq.draft");
         // They should be independent
-        expect((mockRequest.mock.calls[0][0] as string)).not.toContain("draft");
-        expect((mockRequest.mock.calls[1][0] as string)).not.toContain("active");
+        expect((mockRequest.mock.calls[0][0] as string)).not.toContain("eq.draft");
+        expect((mockRequest.mock.calls[1][0] as string)).not.toContain("eq.active");
     });
 
     it("include() from collection creates fresh builder each time", async () => {

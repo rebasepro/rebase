@@ -53,3 +53,5 @@ export * from "./RebaseAuthGate";
 export * from "./RebaseNavigation";
 export * from "./RebaseLayout";
 export * from "./RebaseRouteDefs";
+
+export * from "./CollectionPanel";
