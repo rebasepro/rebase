@@ -180,31 +180,44 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
         },
 
         async initializeAuth(config: unknown, driverResult: InitializedDriver): Promise<BootstrappedAuth | undefined> {
-            const authConfig = config as AuthConfig | undefined;
+            const authConfig = config as Record<string, unknown> | undefined;
             if (!authConfig) return undefined;
 
             const internals = driverResult.internals as PostgresDriverInternals;
             const db = internals.db;
             const registry = internals.registry;
 
-            await ensureAuthTablesExist(db, registry);
+            // Resolve the auth collection from the explicit config.
+            // This replaces the old `registry.getTable("users")` magic string lookup.
+            const authCollection = authConfig.collection as EntityCollection | undefined;
+
+            // ensureAuthTablesExist works with the collection abstraction — no Drizzle leakage.
+            await ensureAuthTablesExist(db, authCollection);
 
             let emailService: EmailService | undefined;
             if (authConfig.email) {
-                emailService = createEmailService(authConfig.email);
+                emailService = createEmailService(authConfig.email as EmailConfig);
             }
 
-            const customUsersTable = registry?.getTable("users");
+            // Resolve the Drizzle table for the internal UserService/AuthRepository.
+            // These are internal Postgres-specific services that need the Drizzle table reference.
+            const tableName = authCollection
+                ? ("table" in authCollection && typeof authCollection.table === "string"
+                    ? authCollection.table
+                    : authCollection.slug)
+                : undefined;
+            const usersTable = tableName
+                ? registry.getTable(tableName) as (PgTable & Record<string, AnyPgColumn>) | undefined
+                : undefined;
 
             let usersSchemaName = "rebase";
-
-            if (customUsersTable) {
-                usersSchemaName = getTableConfig(customUsersTable).schema || "public";
+            if (authCollection && "schema" in authCollection && typeof authCollection.schema === "string") {
+                usersSchemaName = authCollection.schema;
             }
 
             const authTables = createAuthSchema(usersSchemaName) as unknown as AuthSchemaTables;
-            if (customUsersTable) {
-                authTables.users = customUsersTable as unknown as PgTable & Record<string, AnyPgColumn>;
+            if (usersTable) {
+                authTables.users = usersTable as unknown as PgTable & Record<string, AnyPgColumn>;
             }
 
             const userService = new UserService(db, authTables);

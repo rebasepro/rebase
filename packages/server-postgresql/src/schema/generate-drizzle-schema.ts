@@ -5,7 +5,7 @@ import { pathToFileURL } from "url";
 import chokidar from "chokidar";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import { EntityCollection } from "@rebasepro/types";
-import { defaultUsersCollection } from "@rebasepro/common";
+
 
 // --- Helper Functions ---
 
@@ -90,11 +90,7 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
             collections = [];
         }
 
-        // Always inject defaults last; developer collections override via generic dedup
-        const collectionsSlugs = new Set(collections.map(c => c.slug));
-        if (!collectionsSlugs.has(defaultUsersCollection.slug)) {
-            collections = [...collections, defaultUsersCollection];
-        }
+
 
         // Sort collections by slug alphabetically to ensure deterministic schema generation
         collections.sort((a, b) => a.slug.localeCompare(b.slug));

@@ -1,44 +1,46 @@
 import { sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { getTableConfig, AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
-import { getColumnMeta } from "../services/entity-helpers";
-import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { logger } from "@rebasepro/server-core";
+import type { EntityCollection } from "@rebasepro/types";
 
 
 
 /**
- * Auto-create auth tables if they don't exist
- * This runs on startup to ensure the database is ready for auth
+ * Auto-create auth tables if they don't exist.
+ *
+ * @param db         — Drizzle database instance
+ * @param collection — The collection that represents auth users.
+ *                     When omitted, a default `rebase.users` table is created.
  */
-export async function ensureAuthTablesExist(db: NodePgDatabase, registry?: PostgresCollectionRegistry): Promise<void> {
+export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: EntityCollection): Promise<void> {
     logger.info("🔍 Checking auth tables...");
 
     try {
-        // Resolve dynamic user table name and ID type
-        let usersTableName = '"users"';
+        // Resolve dynamic user table name and ID type from the collection
+        let usersTableName = '"rebase"."users"';
         let userIdType = "TEXT";
-        let usersSchema = "public";
-        if (registry) {
-            const usersTable = registry.getTable("users") as (PgTable & Record<string, AnyPgColumn>) | undefined;
-            if (usersTable) {
-                const { getTableName } = await import("drizzle-orm");
-                usersSchema = getTableConfig(usersTable).schema || "public";
-                usersTableName = usersSchema === "public" ? `"${getTableName(usersTable)}"` : `"${usersSchema}"."${getTableName(usersTable)}"`;
+        let usersSchema = "rebase";
+        if (collection) {
+            const rawTable = ("table" in collection && typeof collection.table === "string")
+                ? collection.table
+                : collection.slug;
+            usersSchema = ("schema" in collection && typeof collection.schema === "string")
+                ? collection.schema
+                : "public";
+            usersTableName = usersSchema === "public"
+                ? `"${rawTable}"`
+                : `"${usersSchema}"."${rawTable}"`;
 
-                // Inspect users.id column to match referenced column type
-                if (usersTable.id) {
-                    const col = usersTable.id;
-                    const meta = getColumnMeta(col);
-                    const columnType = meta.columnType;
-                    if (columnType === "PgUUID") {
-                        userIdType = "UUID";
-                    } else if (columnType === "PgSerial" || columnType === "PgInteger") {
-                        userIdType = "INTEGER";
-                    } else if (columnType === "PgBigInt" || columnType === "PgBigSerial") {
-                        userIdType = "BIGINT";
-                    }
+            // Derive ID column type from collection properties
+            const idProp = collection.properties?.id;
+            if (idProp) {
+                const isId = ("isId" in idProp) ? (idProp as unknown as Record<string, unknown>).isId : undefined;
+                if (isId === "uuid") {
+                    userIdType = "UUID";
+                } else if (isId === "autoincrement") {
+                    userIdType = "INTEGER";
                 }
+                // Otherwise keep TEXT as default
             }
         }
 

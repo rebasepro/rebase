@@ -1,7 +1,21 @@
-import { DataDriver, EntityCollection, BackendBootstrapper, BootstrappedAuth, RealtimeProvider, HealthCheckResult, InitializedDriver, isSQLAdmin, BackendHooks, AuthAdapter, DatabaseAdapter, SecurityRule, isPostgresCollection } from "@rebasepro/types";
+import {
+    AuthAdapter,
+    BackendBootstrapper,
+    BackendHooks,
+    BootstrappedAuth,
+    DatabaseAdapter,
+    DataDriver,
+    EntityCollection,
+    HealthCheckResult,
+    InitializedDriver,
+    isPostgresCollection,
+    isSQLAdmin,
+    RealtimeProvider,
+    SecurityRule
+} from "@rebasepro/types";
 import { BackendCollectionRegistry } from "./collections/BackendCollectionRegistry";
 import { loadCollectionsFromDirectory } from "./collections/loader";
-import { DriverRegistry, DEFAULT_DRIVER_ID, DefaultDriverRegistry } from "./services/driver-registry";
+import { DEFAULT_DRIVER_ID, DefaultDriverRegistry, DriverRegistry } from "./services/driver-registry";
 import { Server } from "http";
 
 import { RestApiGenerator } from "./api/rest/api-generator";
@@ -16,22 +30,46 @@ import { HonoEnv } from "./api/types";
 import { configureLogLevel } from "./utils/logging";
 import { logger } from "./utils/logger";
 import { requestLogger } from "./utils/request-logger";
-import { createAdminRoutes, createAuthRoutes, requireAuth, requireAdmin, configureJwt } from "./auth";
-import { createStorageController, createStorageRoutes, DEFAULT_STORAGE_ID, DefaultStorageRegistry, BackendStorageConfig, StorageController, StorageRegistry } from "./storage";
+import { configureJwt, requireAdmin, requireAuth } from "./auth";
+import {
+    BackendStorageConfig,
+    createStorageController,
+    createStorageRoutes,
+    DEFAULT_STORAGE_ID,
+    DefaultStorageRegistry,
+    StorageController,
+    StorageRegistry
+} from "./storage";
+import type { ApiKeyStore } from "./auth/api-keys/api-key-store";
 import { createApiKeyStore } from "./auth/api-keys/api-key-store";
 import { createApiKeyRoutes } from "./auth/api-keys/api-key-routes";
-import type { ApiKeyStore } from "./auth/api-keys/api-key-store";
 import { createApiKeyRateLimiter } from "./auth/rate-limiter";
 import { createRebaseClient } from "@rebasepro/client";
-import { defaultUsersCollection } from "@rebasepro/common";
+
 import { createHistoryRoutes } from "./history";
-import { EmailConfig, createEmailService } from "./email";
 import type { EmailService } from "./email";
+import { createEmailService, EmailConfig } from "./email";
 import type { OAuthProvider } from "./auth/interfaces";
 import type { AuthHooks } from "./auth/auth-hooks";
 import { _initRebase } from "./singleton";
 
 export interface RebaseAuthConfig {
+    /**
+     * The collection that represents auth users.
+     *
+     * When provided, this collection's underlying database table is used
+     * for all auth operations (login, registration, password reset, etc.).
+     *
+     * Import the built-in default:
+     * ```ts
+     * import { defaultUsersCollection } from "@rebasepro/common";
+     * auth: { collection: defaultUsersCollection, jwtSecret: "..." }
+     * ```
+     *
+     * Or pass your own collection with the required auth fields
+     * (email, passwordHash, displayName, etc.).
+     */
+    collection?: EntityCollection;
     jwtSecret?: string;
     accessExpiresIn?: string;
     refreshExpiresIn?: string;
@@ -317,13 +355,7 @@ dir: config.collectionsDir });
         logger.info("Default security rules applied to collections without explicit rules");
     }
 
-    if (config.auth) {
-        // Append defaultUsersCollection if not overridden by the developer's collections
-        const activeSlugs = new Set(activeCollections.map(c => c.slug));
-        if (!activeSlugs.has(defaultUsersCollection.slug)) {
-            activeCollections = [...activeCollections, defaultUsersCollection];
-        }
-    }
+
 
     const realtimeServices: Record<string, RealtimeProvider> = {};
     const delegates: Record<string, DataDriver> = {};

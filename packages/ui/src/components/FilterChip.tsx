@@ -1,7 +1,7 @@
 import React from "react";
 import { cls } from "../util";
 
-export interface FilterChipProps {
+export interface FilterChipProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
     /**
      * The text label displayed on the chip.
      */
@@ -11,10 +11,6 @@ export interface FilterChipProps {
      */
     active?: boolean;
     /**
-     * Callback when the chip is clicked.
-     */
-    onClick?: () => void;
-    /**
      * Optional icon rendered before the label.
      */
     icon?: React.ReactNode;
@@ -23,10 +19,6 @@ export interface FilterChipProps {
      * @default "medium"
      */
     size?: "small" | "medium";
-    /**
-     * Additional class names.
-     */
-    className?: string;
     /**
      * Whether the chip is disabled.
      */
@@ -47,17 +39,19 @@ const sizeClasses = {
  *
  * @group Interactive components
  */
-export function FilterChip({
+export const FilterChip = React.forwardRef<HTMLButtonElement, FilterChipProps>(function FilterChip({
     children,
     active = false,
     onClick,
     icon,
     size = "medium",
     className,
-    disabled = false
-}: FilterChipProps) {
+    disabled = false,
+    ...rest
+}: FilterChipProps, ref) {
     return (
         <button
+            ref={ref}
             type="button"
             onClick={onClick}
             disabled={disabled}
@@ -76,9 +70,10 @@ export function FilterChip({
                 disabled && "opacity-50 cursor-not-allowed",
                 className
             )}
+            {...rest}
         >
             {icon}
             {children}
         </button>
     );
-}
+});

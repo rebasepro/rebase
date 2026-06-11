@@ -16,6 +16,7 @@ import {
 import { createPostgresDatabaseConnection, createPostgresAdapter } from "@rebasepro/server-postgresql";
 import { enums, relations, tables } from "./schema.generated.js";
 import { env } from "./env.js";
+import usersCollection from "../../config/collections/users.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -70,6 +71,7 @@ async function startServer() {
             connectionString: postgresResources.connectionString
         }),
         auth: {
+            collection: usersCollection,
             jwtSecret: env.JWT_SECRET,
             accessExpiresIn: env.JWT_ACCESS_EXPIRES_IN,
             refreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN,

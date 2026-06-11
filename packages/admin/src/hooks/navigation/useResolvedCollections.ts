@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 
 import { AuthController, CollectionRegistryController, RebaseData, User } from "@rebasepro/types";
 import type { EntityCollectionsBuilder } from "@rebasepro/types";
-import { CollectionRegistry, defaultUsersCollection } from "@rebasepro/common";
+import { CollectionRegistry } from "@rebasepro/common";
 import { UserManagementDelegate } from "@rebasepro/types";
 
 import { resolveCollections } from "./useNavigationResolution";
@@ -95,14 +95,7 @@ export function useResolvedCollections<EC extends EntityCollection, USER extends
 
                 if (cancelled) return;
 
-                // Append system defaults; developer collections override via generic dedup.
-                const defaults: EntityCollection[] = [];
-                if (userManagementRef.current) {
-                    defaults.push(defaultUsersCollection);
-                }
-                const resolvedSlugs = new Set(resolved.map(c => c.slug));
-                const defaultsToAppend = defaults.filter(c => !resolvedSlugs.has(c.slug));
-                const deduped = [...resolved, ...defaultsToAppend];
+                const deduped = [...resolved];
 
                 // Register with the CollectionRegistry; returns true if changed
                 const changed = collectionRegistryController.collectionRegistryRef.current.registerMultiple(deduped);
